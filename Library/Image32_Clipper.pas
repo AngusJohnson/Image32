@@ -1,0 +1,96 @@
+unit Image32_Clipper;
+
+interface
+
+uses
+  ClipperCore, Clipper, ClipperOffset,
+  Image32, Image32_Draw, Image32_Vector;
+
+function InflatePolygon(const polygon: TArrayOfPointD;
+  delta: Double; joinStyle: TJoinStyle): TArrayOfArrayOfPointD; overload;
+function InflatePolygon(const polygons: TArrayOfArrayOfPointD;
+  delta: Double; joinStyle: TJoinStyle): TArrayOfArrayOfPointD; overload;
+
+function UnionPolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
+  fillRule: TFillRule): TArrayOfArrayOfPointD;
+
+function IntersectPolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
+  fillRule: TFillRule): TArrayOfArrayOfPointD;
+
+function DifferencePolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
+  fillRule: TFillRule): TArrayOfArrayOfPointD;
+
+implementation
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+function InflatePolygon(const polygon: TArrayOfPointD;
+  delta: Double; joinStyle: TJoinStyle): TArrayOfArrayOfPointD;
+var
+  polygons: TArrayOfArrayOfPointD;
+begin
+  setLength(polygons, 1);
+  polygons[0] := polygon;
+  Result := InflatePolygon(polygons, delta, joinStyle);
+end;
+//------------------------------------------------------------------------------
+
+function InflatePolygon(const polygons: TArrayOfArrayOfPointD;
+  delta: Double; joinStyle: TJoinStyle): TArrayOfArrayOfPointD;
+var
+  jt: ClipperOffset.TJoinType;
+begin
+  case joinStyle of
+    jsSquare: jt := jtSquare;
+    jsMiter: jt :=  jtMiter;
+    else jt := jtRound;
+  end;
+  Result := TArrayOfArrayOfPointD(
+    ClipperOffset.ClipperOffsetPaths(TPathsD(polygons), delta, jt, etPolygon));
+end;
+//------------------------------------------------------------------------------
+
+function UnionPolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
+  fillRule: TFillRule): TArrayOfArrayOfPointD;
+begin
+  with TClipperD.Create do
+  try
+    AddPaths(TPathsD(polygons1), ptSubject);
+    AddPaths(TPathsD(polygons2), ptClip);
+    Execute(ctUnion, ClipperCore.TFillRule(fillRule), TPathsD(result));
+  finally
+    Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function IntersectPolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
+  fillRule: TFillRule): TArrayOfArrayOfPointD;
+begin
+  with TClipperD.Create do
+  try
+    AddPaths(TPathsD(polygons1), ptSubject);
+    AddPaths(TPathsD(polygons2), ptClip);
+    Execute(ctIntersection, ClipperCore.TFillRule(fillRule), TPathsD(result));
+  finally
+    Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function DifferencePolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
+  fillRule: TFillRule): TArrayOfArrayOfPointD;
+begin
+  with TClipperD.Create do
+  try
+    AddPaths(TPathsD(polygons1), ptSubject);
+    AddPaths(TPathsD(polygons2), ptClip);
+    Execute(ctDifference, ClipperCore.TFillRule(fillRule), TPathsD(result));
+  finally
+    Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+end.
