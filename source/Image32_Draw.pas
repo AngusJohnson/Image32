@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.02                                                            *
-* Date      :  10 July 2019                                                    *
+* Version   :  1.03                                                            *
+* Date      :  13 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -49,6 +49,7 @@ type
     fColor: TColor32;
   public
     constructor Create(color: TColor32 = clNone32);
+    function Initialize(targetImage: TImage32): Boolean; override;
     procedure SetColor(value: TColor32);
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   end;
@@ -804,6 +805,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TColorRenderer.Initialize(targetImage: TImage32): Boolean;
+begin
+  //there's no point rendering if the color is fully transparent
+  result := inherited Initialize(targetImage) and assigned(fAlphaTbl);
+end;
+//------------------------------------------------------------------------------
+
 procedure TColorRenderer.SetColor(value: TColor32);
 begin
   fColor := value and $FFFFFF;
@@ -1143,8 +1151,8 @@ begin
   lines2 := Outline(lines, lineWidth, joinStyle, endStyle, 2);
   cr := TColorRenderer.Create(color);
   try
-    cr.Initialize(img);
-    Rasterize(lines2, img.bounds, frNonZero, cr);
+    if cr.Initialize(img) then
+      Rasterize(lines2, img.bounds, frNonZero, cr);
   finally
     cr.free;
   end;
@@ -1180,8 +1188,8 @@ begin
   lines := Outline(lines, lineWidth, joinStyle, endStyle);
   cr := TColorRenderer.Create(color);
   try
-    cr.Initialize(img);
-    Rasterize(lines, img.bounds, frNonZero, cr);
+    if cr.Initialize(img) then
+      Rasterize(lines, img.bounds, frNonZero, cr);
   finally
     cr.free;
   end;
@@ -1266,8 +1274,8 @@ begin
   if not assigned(polygons) then exit;
   cr := TColorRenderer.Create(color);
   try
-    cr.Initialize(img);
-    Rasterize(polygons, img.bounds, fillRule, cr);
+    if cr.Initialize(img) then
+      Rasterize(polygons, img.bounds, fillRule, cr);
   finally
     cr.free;
   end;
