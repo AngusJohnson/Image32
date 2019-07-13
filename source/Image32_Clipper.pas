@@ -6,10 +6,10 @@ uses
   ClipperCore, Clipper, ClipperOffset,
   Image32, Image32_Draw, Image32_Vector;
 
-function InflatePolygon(const polygon: TArrayOfPointD;
-  delta: Double; joinStyle: TJoinStyle): TArrayOfArrayOfPointD; overload;
-function InflatePolygon(const polygons: TArrayOfArrayOfPointD;
-  delta: Double; joinStyle: TJoinStyle): TArrayOfArrayOfPointD; overload;
+function InflatePolygon(const polygon: TArrayOfPointD; delta: Double;
+  joinStyle: TJoinStyle; miterLimit: double = 2.0): TArrayOfArrayOfPointD; overload;
+function InflatePolygon(const polygons: TArrayOfArrayOfPointD; delta: Double;
+  joinStyle: TJoinStyle; miterLimit: double = 2.0): TArrayOfArrayOfPointD; overload;
 
 function UnionPolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
   fillRule: TFillRule): TArrayOfArrayOfPointD;
@@ -26,18 +26,20 @@ implementation
 //------------------------------------------------------------------------------
 
 function InflatePolygon(const polygon: TArrayOfPointD;
-  delta: Double; joinStyle: TJoinStyle): TArrayOfArrayOfPointD;
+  delta: Double; joinStyle: TJoinStyle;
+  miterLimit: double): TArrayOfArrayOfPointD;
 var
   polygons: TArrayOfArrayOfPointD;
 begin
   setLength(polygons, 1);
   polygons[0] := polygon;
-  Result := InflatePolygon(polygons, delta, joinStyle);
+  Result := InflatePolygon(polygons, delta, joinStyle, miterLimit);
 end;
 //------------------------------------------------------------------------------
 
 function InflatePolygon(const polygons: TArrayOfArrayOfPointD;
-  delta: Double; joinStyle: TJoinStyle): TArrayOfArrayOfPointD;
+  delta: Double; joinStyle: TJoinStyle;
+  miterLimit: double): TArrayOfArrayOfPointD;
 var
   jt: ClipperOffset.TJoinType;
 begin
@@ -46,8 +48,8 @@ begin
     jsMiter: jt :=  jtMiter;
     else jt := jtRound;
   end;
-  Result := TArrayOfArrayOfPointD(
-    ClipperOffset.ClipperOffsetPaths(TPathsD(polygons), delta, jt, etPolygon));
+  Result := TArrayOfArrayOfPointD(ClipperOffset.ClipperOffsetPaths(
+    TPathsD(polygons), delta, jt, etPolygon, miterLimit));
 end;
 //------------------------------------------------------------------------------
 

@@ -2,8 +2,8 @@ unit BitmapPanels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.02                                                            *
-* Date      :  10 July 2019                                                    *
+* Version   :  1.03                                                            *
+* Date      :  13 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
@@ -99,22 +99,19 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    //ClientToBitmap: Convert panel coordinates to bitmap coordinates
+    //ClientToBitmap: Convert panel client coordinates to bitmap coordinates
     function ClientToBitmap(var clientPt: TPoint): Boolean;
-    //BitmapToPanel: Convert bitmap coordinates to panel coordinates
+    //BitmapToClient: Convert bitmap coordinates to panel client coordinates
     procedure BitmapToClient(var pt: TPoint);
     function CopyToClipboard: Boolean;
     function PasteFromClipboard: Boolean;
-    //GetInnerClientRect: Returns ClientRect less bevels and borders
-    //ClearBitmap: Needed before drawing directly onto a bitmap canvas<br>
-    //      Panel1.ClearBitmap(pf24bit);<br>
-    //      Panel1.Bitmap.Canvas.FillRect(Rect(10,10,20,20));
+    //ClearBitmap: Required only if drawing to the bitmap's Canvas property.
     procedure ClearBitmap(PixelFormat: TPixelFormat = pf32bit);
     property Bitmap: TBitmap read fBmp;
     property BitmapProperties: TBitmapProperties read fBitmapProperties;
     //FocusedColor: Panel's border color when focused (ie if TabStop = true)
     property FocusedColor: TColor read fFocusedColor write fFocusedColor;
-    //InnerMargin: Approx. Border + BevelWidth *2
+    //InnerMargin = BorderWidth + BevelWidth *2 (if bevels assigned)
     property InnerMargin: integer read GetInnerMargin;
     property InnerClientRect: TRect read GetInnerClientRect;
   end;

@@ -3,7 +3,7 @@ unit ClipperOffset;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  10.0 (beta)                                                     *
-* Date      :  9 March 2019                                                    *
+* Date      :  13 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2017                                         *
 * Purpose   :  Offset paths and clipping solutions                             *
@@ -82,10 +82,12 @@ type
   end;
 
   function ClipperOffsetPaths(const paths: TPaths;
-    delta: Double; jt: TJoinType; et: TEndType): TPaths; overload;
+    delta: Double; jt: TJoinType; et: TEndType;
+    miterLimit: double = 2.0): TPaths; overload;
 
   function ClipperOffsetPaths(const paths: TPathsD;
-    delta: Double; jt: TJoinType; et: TEndType): TPathsD; overload;
+    delta: Double; jt: TJoinType; et: TEndType;
+    miterLimit: double = 2.0): TPathsD; overload;
 
 implementation
 
@@ -707,9 +709,9 @@ end;
 //------------------------------------------------------------------------------
 
 function ClipperOffsetPaths(const paths: TPaths;
-  delta: Double; jt: TJoinType; et: TEndType): TPaths;
+  delta: Double; jt: TJoinType; et: TEndType; miterLimit: double): TPaths;
 begin
-  with TClipperOffset.Create(1) do
+  with TClipperOffset.Create(miterLimit) do
   try
     AddPaths(paths);
     Execute(delta, jt, et, Result);
@@ -720,12 +722,12 @@ end;
 //------------------------------------------------------------------------------
 
 function ClipperOffsetPaths(const paths: TPathsD;
-  delta: Double; jt: TJoinType; et: TEndType): TPathsD;
+  delta: Double; jt: TJoinType; et: TEndType; miterLimit: double): TPathsD;
 var
   paths64, sol64: TPaths;
 begin
   paths64 := ScalePaths(paths, 1000, 1000);
-  with TClipperOffset.Create do
+  with TClipperOffset.Create(miterLimit) do
   try
     AddPaths(paths64);
     Execute(delta*1000, jt, et, sol64);

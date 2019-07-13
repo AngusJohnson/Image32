@@ -46,11 +46,11 @@ procedure RedEyeRemove(img: TImage32; const rect: TRect);
 function FloodFillRGB(initial, current: TColor32; tolerance: Integer): Boolean;
 function FloodFillHue(initial, current: TColor32; tolerance: Integer): Boolean;
 
+implementation
+
 const
   FloodFillDefaultRGBTolerance: byte = 20;
   FloodFillDefaultHueTolerance: byte = 1;
-
-implementation
 
 type
   PColor32Array = ^TColor32Array;

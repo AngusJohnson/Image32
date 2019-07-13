@@ -1158,15 +1158,8 @@ begin
       inc(i);
     end else
     begin
-      if residualPat < 0.2  then
-      begin
-        pt2 := path[i+1];
-        inc(i);
-      end else
-      begin
-        pt2.X := pt.X + vecs[i].X * residualPat;
-        pt2.Y := pt.Y + vecs[i].Y * residualPat;
-      end;
+      pt2.X := pt.X + vecs[i].X * residualPat;
+      pt2.Y := pt.Y + vecs[i].Y * residualPat;
       if filling then AddDash(pt, pt2);
       filling := not filling;
       paIdx := (paIdx + 1) mod patCnt;
