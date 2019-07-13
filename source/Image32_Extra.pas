@@ -2,11 +2,12 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.02                                                            *
-* Date      :  10 July 2019                                                    *
+* Version   :  1.03                                                            *
+* Date      :  13 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
-* Purpose   :  Miscellaneous routines for TImage32                             *
+* Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
+*           :  belong in other modules.                                        *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
@@ -31,8 +32,8 @@ procedure DrawGlow(img: TImage32; const polygon: TArrayOfPointD;
 procedure DrawGlow(img: TImage32; const polygons: TArrayOfArrayOfPointD;
   fillRule: TFillRule; color: TColor32; blurRadius: integer); overload;
 
-//FloodFill: The default CompareFunc will FloodFill whereever there are
-//exact color matches with the starting pixel - Point(x,y).
+//FloodFill: If no CompareFunc is provided, FloodFill will fill whereever
+//adjoining pixels exactly match the starting pixel - Point(x,y).
 procedure FloodFill(img: TImage32; x, y: Integer; newColor: TColor32;
   compareFunc: TCompareFunction = nil; tolerance: Integer = 0);
 
