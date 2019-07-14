@@ -216,8 +216,11 @@ type
   PPointD = ^TPointD;
   TPointD = record X, Y: double; end;
   TArrayOfPointD = array of TPointD;
-
   TArrayOfArrayOfPointD = array of TArrayOfPointD;
+
+  //TPath = TArrayOfPointD;          //may cause ambiguity if
+  //TPaths = TArrayOfArrayOfPointD;  //also using Clipper.pas
+
   TArrayOfDouble = array of double;
 
   TPathD = array of TPointD;

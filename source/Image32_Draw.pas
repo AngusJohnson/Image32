@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.03                                                            *
-* Date      :  13 July 2019                                                    *
+* Version   :  1.04                                                            *
+* Date      :  14 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -24,7 +24,7 @@ type
   TTileFillStyle     = (tfsRepeat, tfsMirrorHorz, tfsMirrorVert, tfsRotate180);
 
   //TBoundsProc: Function template for TCustomRenderer.
-  TBoundsProc = function(X, startX, endX: integer): integer;
+  TBoundsProc = function(X, maxX: integer): integer;
 
   TCustomRenderer = class {$IFDEF ABSTRACT_CLASSES} abstract {$ENDIF}
   private
@@ -59,12 +59,10 @@ type
     fImage        : TImage32;
     fOffset       : TPoint;
     fBrushPixel   :  PARGB;
-    fLastXX       : integer;
     fLastYY       : integer;
     fMirrorY      : Boolean;
     fBoundsProc   : TBoundsProc;
     function GetFirstBrushPixel(x, y: integer): PARGB;
-    function GetNextBrushPixel: PARGB;
   public
     constructor Create(tileFillStyle: TTileFillStyle = tfsRepeat;
       brushImage: TImage32 = nil);
@@ -78,15 +76,15 @@ type
 
   TLinearGradientRenderer = class(TCustomRenderer)
   private
-    fStartPt    : TPointD;
-    fEndPt      : TPointD;
-    fStartColor : TColor32;
-    fEndColor   : TColor32;
-    fColors     : TArrayOfColor32;
-    fPerpOffsets: TArrayOfInteger;
-    fBoundsProc : TBoundsProc;
-    fEndDist    : integer;
-    fIsVert     : Boolean;
+    fStartPt         : TPointD;
+    fEndPt           : TPointD;
+    fStartColor      : TColor32;
+    fEndColor        : TColor32;
+    fColors          : TArrayOfColor32;
+    fPerpendicOffsets: TArrayOfInteger;
+    fBoundsProc      : TBoundsProc;
+    fEndDist         : integer;
+    fIsVert          : Boolean;
   public
     function Initialize(targetImage: TImage32): Boolean; override;
     procedure SetParameters(const startPt, endPt: TPointD;
@@ -99,8 +97,8 @@ type
   TRadialGradientRenderer = class(TCustomRenderer)
   private
     fFocalPt   : TPointD;
-    fScaleX     : double;
-    fScaleY     : double;
+    fScaleX    : double;
+    fScaleY    : double;
     fMaxColors : integer;
     fInnerColor: TColor32;
     fOuterColor: TColor32;
@@ -244,75 +242,69 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ClampQ(q, startQ, endQ: integer): integer;
+function ClampQ(q, endQ: integer): integer;
 begin
-  if q < startQ then result := 0
-  else if q > endQ then result := endQ - startQ
-  else result := q - startQ;
+  if q < 0 then result := 0
+  else if q >= endQ then result := endQ -1
+  else result := q;
 end;
 //------------------------------------------------------------------------------
 
-function MirrorQ(q, startQ, endQ: integer): integer;
-var
-  dx: integer;
+function MirrorQ(q, endQ: integer): integer;
 begin
-  q := q - startQ;
-  dx := endQ - StartQ +1;
-  result := q mod dx;
-  if (result < 0) then inc(result, dx);
-  if Odd(Floor(q / dx)) then
-    result := dx - result -1;
+  result := q mod endQ;
+  if (result < 0) then inc(result, endQ);
+  if Odd(q div endQ) then
+    result := (endQ -1) - result;
 end;
 //------------------------------------------------------------------------------
 
-function RepeatQ(q, startQ, endQ: integer): integer;
-var
-  dx: integer;
+function RepeatQ(q, endQ: integer): integer;
 begin
-  if (q < startQ) or (q > endQ) then
+  if (q < 0) or (q >= endQ) then
   begin
-    dx := Abs(endQ - startQ) +1;
-    result := (q - startQ) mod dx;
-    if result < 0 then inc(result, dx);
+    endQ := Abs(endQ);
+    result := q mod endQ;
+    if result < 0 then inc(result, endQ);
   end
-  else result := q - startQ;
+  else result := q;
 end;
 //------------------------------------------------------------------------------
 
-function SoftRepeat(q, startQ, endQ: integer): integer;
+function SoftRepeat(q, endQ: integer): integer;
 var
   dx: integer;
 begin
-  if (q < startQ) or (q > endQ) then
+  if (q < 0) or (q >= endQ) then
   begin
-    dx := Abs(endQ - startQ) +1;
-    result := (q - startQ) mod dx;
+    dx := Abs(endQ);
+    result := q mod dx;
     if result < 0 then inc(result, dx);
     //exactly where the colors repeat, average the two colors
     if result = 0 then result := dx div 2;
   end else
   begin
-    result := q - startQ;
+    result := q;
     if result <> 0 then Exit;
     //soft blend at startQ too
-    dx := Abs(endQ - startQ) +1;
+    dx := Abs(endQ);
     result := dx div 2;
   end;
 end;
 //------------------------------------------------------------------------------
 
-function SoftRepeatExStart(q, startQ, endQ: integer): integer;
+function SoftRepeatExStart(q, endQ: integer): integer;
 var
   dx: integer;
 begin
-  if (q < startQ) or (q > endQ) then
+  if (q < 0) or (q >= endQ) then
   begin
-    dx := Abs(endQ - startQ) +1;
-    result := (q - startQ) mod dx;
+    dx := Abs(endQ);
+    result := q mod dx;
     if result < 0 then inc(result, dx);
     if result = 0 then result := dx div 2;
   end else
-    result := q - startQ;
+    result := q;
 end;
 //------------------------------------------------------------------------------
 
@@ -868,7 +860,7 @@ function TImageRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
   result := inherited and (not fImage.IsEmpty);
   if not result then Exit;
-  fLastXX := 0; fLastYY := 0;
+  fLastYY := 0;
   fBrushPixel := PARGB(fImage.PixelBase);
 end;
 //------------------------------------------------------------------------------
@@ -880,42 +872,31 @@ var
   pBrush: PARGB;
 begin
   pDst := GetDstPixel(x1,y);
+  dec(x1, fOffset.X);
+  dec(y, fOffset.Y);
   pBrush := GetFirstBrushPixel(x1, y);
   for i := x1 to x2 do
   begin
     pDst^ := BlendToAlpha(pDst^,
       MulTable[pBrush.A, Ord(alpha^)] shl 24 or (pBrush.Color and $FFFFFF));
-    inc(pDst); inc(alpha); pBrush := GetNextBrushPixel;
+    inc(pDst); inc(alpha);
+    pBrush := GetPixel(fBrushPixel, fBoundsProc(i, fImage.Width));
   end;
 end;
 //------------------------------------------------------------------------------
 
 function TImageRenderer.GetFirstBrushPixel(x, y: integer): PARGB;
-var
-  w: integer;
 begin
-  w := fImage.Width;
-  dec(x, fOffset.X);
-  x := fBoundsProc(x, 0, w -1);
-  dec(y, fOffset.Y);
   if fMirrorY then
-    y := MirrorQ(y, 0, fImage.Height -1) else
-    y := RepeatQ(y, 0, fImage.Height -1);
+    y := MirrorQ(y, fImage.Height) else
+    y := RepeatQ(y, fImage.Height);
   if y <> fLastYY then
   begin
-    fBrushPixel := PARGB(@fImage.Pixels[y * w]);
+    fBrushPixel := PARGB(fImage.PixelRow[y]);
     fLastYY := y;
   end;
-  fLastXX := x;
+  x := fBoundsProc(x, fImage.Width);
   result := GetPixel(fBrushPixel, x);
-end;
-//------------------------------------------------------------------------------
-
-function TImageRenderer.GetNextBrushPixel: PARGB;
-begin
-  inc(fLastXX);
-  result := GetPixel(fBrushPixel,
-    fBoundsProc(fLastXX, 0, fImage.Width -1));
 end;
 
 //------------------------------------------------------------------------------
@@ -953,7 +934,7 @@ begin
 
   if abs(fEndPt.Y - fStartPt.Y) > abs(fEndPt.X - fStartPt.X) then
   begin
-    //gradient ==> vertical
+    //gradient approaches vertical (> 45 deg.)
     if (fEndPt.Y < fStartPt.Y) then
     begin
       SwapColors(fStartColor, fEndColor);
@@ -967,13 +948,13 @@ begin
     fEndDist := Ceil(dy + dxdy * (fEndPt.X - fStartPt.X));
     fColors := GetLinearColorGradient(fStartColor, fEndColor, fEndDist +1);
     //get a list of perpendicular offsets for each
-    SetLength(fPerpOffsets, Target.Width);
+    SetLength(fPerpendicOffsets, Target.Width);
     //from an imaginary line that's through fStartPt and perpendicular to
     //the gradient line, get a list of Y offsets for each X in image width
     for i := 0 to Target.Width -1 do
-      fPerpOffsets[i] := Round(dxdy * (fStartPt.X - i));
+      fPerpendicOffsets[i] := Round(dxdy * (fStartPt.X - i));
   end
-  else //gradient ==> horizontal
+  else //gradient approaches horizontal (<= 45 deg.)
   begin
     if (fEndPt.X = fStartPt.X) then
     begin
@@ -992,11 +973,11 @@ begin
 
     fEndDist := Ceil(dx + dydx * (fEndPt.Y - fStartPt.Y));
     fColors := GetLinearColorGradient(fStartColor, fEndColor, fEndDist +1);
-    SetLength(fPerpOffsets, Target.Height);
+    SetLength(fPerpendicOffsets, Target.Height);
     //from an imaginary line that's through fStartPt and perpendicular to
     //the gradient line, get a list of X offsets for each Y in image height
     for i := 0 to Target.Height -1 do
-      fPerpOffsets[i] := Round(dydx * (fStartPt.Y - i));
+      fPerpendicOffsets[i] := Round(dydx * (fStartPt.Y - i));
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1012,12 +993,14 @@ begin
   begin
     if fIsVert then
     begin
-      off := fPerpOffsets[i] + Round(fStartPt.Y);
-      color.Color := fColors[fBoundsProc(y, off, off + fEndDist -1)];
+      //when fIsVert = true, fPerpendicOffsets is an array of Y for each X
+      off := fPerpendicOffsets[i] + Round(fStartPt.Y);
+      color.Color := fColors[fBoundsProc(y - off, fEndDist)];
     end else
     begin
-      off := fPerpOffsets[y] + Round(fStartPt.X);
-      color.Color := fColors[fBoundsProc(i, off, off + fEndDist -1)];
+      //when fIsVert = false, fPerpendicOffsets is an array of X for each Y
+      off := fPerpendicOffsets[y] + Round(fStartPt.X);
+      color.Color := fColors[fBoundsProc(i - off, fEndDist)];
     end;
     pDst^ := BlendToAlpha(pDst^,
       MulTable[color.A, Ord(alpha^)] shl 24 or (color.Color and $FFFFFF));
@@ -1033,7 +1016,7 @@ function TRadialGradientRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
   result := inherited Initialize(targetImage) and (fMaxColors > 1);
   if not result then Exit;
-  fColors := GetLinearColorGradient(fInnerColor, fOuterColor, fMaxColors+1);
+  fColors := GetLinearColorGradient(fInnerColor, fOuterColor, fMaxColors);
 end;
 //------------------------------------------------------------------------------
 
@@ -1043,6 +1026,9 @@ procedure TRadialGradientRenderer.SetParameters(const focalRect: TRect;
 var
   radX,radY: double;
 begin
+  fMaxColors := 0;
+  if focalRect.IsEmpty then Exit;
+
   SetGradientFillStyle(gradientFillStyle);
   fInnerColor := innerColor;
   fOuterColor := outerColor;
@@ -1055,12 +1041,12 @@ begin
   begin
     fScaleX     := 1;
     fScaleY     := radX/radY;
-    fMaxColors := Ceil(radX);
+    fMaxColors := Ceil(radX) +1;
   end else
   begin
     fScaleX     := radY/radX;
     fScaleY     := 1;
-    fMaxColors := Ceil(radY);
+    fMaxColors := Ceil(radY) +1;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1086,7 +1072,7 @@ begin
   for i := x1 to x2 do
   begin
     dist := Sqrt(Sqr((y - fFocalPt.Y)*fScaleY) + Sqr((i - fFocalPt.X)*fScaleX));
-    color.Color := fColors[fBoundsProc(Round(dist), 0, fMaxColors)];
+    color.Color := fColors[fBoundsProc(Round(dist), fMaxColors)];
     pDst^ := BlendToAlpha(pDst^,
       MulTable[color.A, Ord(alpha^)] shl 24 or (color.Color and $FFFFFF));
     inc(pDst); inc(alpha);
