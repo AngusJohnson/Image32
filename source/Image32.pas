@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.03                                                            *
-* Date      :  13 July 2019                                                    *
+* Version   :  1.05                                                            *
+* Date      :  15 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -133,7 +133,7 @@ type
     procedure AdjustLuminance(percent: Integer);   //ie +/- 100%
     procedure AdjustSaturation(percent: Integer);  //ie +/- 100%
 
-    //CropTransparentPixels: Trim transparent edges until each edge contains 
+    //CropTransparentPixels: Trim transparent edges until each edge contains
     //at least one opaque or semi-opaque pixel.
     procedure CropTransparentPixels;
     procedure Rotate(angleRads: single);
@@ -142,6 +142,7 @@ type
     //the color to fill those uncovered pixels in rec following rotation.
     procedure RotateRect(const rec: TRect;
       angleRads: single; eraseColor: TColor32 = 0);
+    procedure Skew(dx,dy: double);
 
     //BoxBlur: With several repetitions and a smaller radius, BoxBlur can
     //achieve a close approximation of a GaussianBlur, and it's faster.
@@ -2194,8 +2195,8 @@ begin
       begin
         pt := PointD(x, y);
         RotatePt(pt, cp2, sinA, cosA);
-        xi := Round((pt.X - dx) * 256);
-        yi := Round((pt.Y - dy) * 256);
+        xi := Round((pt.X - dx) *256);
+        yi := Round((pt.Y - dy) *256);
         dstColor^ := GetWeightedPixel(xi, yi);
         inc(dstColor);
       end;
@@ -2246,6 +2247,31 @@ begin
   finally
     tmp.Free;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.Skew(dx,dy: double);
+var
+  i,j, newWidth, newHeight: integer;
+  x,y: double;
+  tmpPxls: TArrayOfColor32;
+  pcDst: PColor32;
+begin
+  if IsEmpty or ((dx = 0) and (dy = 0)) then Exit;
+  newWidth := Width + Ceil(Abs(dx));
+  newHeight := Height + Ceil(Abs(dy));
+  SetLength(tmpPxls, newWidth * newHeight);
+  pcDst := @tmpPxls[0];
+  for i := 0 to newHeight - 1 do
+    for j := 0 to newWidth - 1 do
+    begin
+      x := Min(0,  dx) + j - i * dx/newHeight;
+      y := Min(0, -dy) + j * dy/newWidth + i;
+      pcDst^ := GetWeightedPixel(Round(x*$100), Round(y*$100));
+      inc(pcDst);
+    end;
+  SetSize(newWidth, newHeight);
+  fPixels := tmpPxls;
 end;
 //------------------------------------------------------------------------------
 
