@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.03                                                            *
-* Date      :  13 July 2019                                                    *
+* Version   :  1.06                                                            *
+* Date      :  17 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -65,15 +65,20 @@ type
   function ReversePath(const path: TArrayOfPointD): TArrayOfPointD;
   procedure AddToPath(var path: TArrayOfPointD;
     const extra: TArrayOfPointD);
-  procedure AppendPaths(var paths: TArrayOfArrayOfPointD;
+  procedure AppendPath(var paths: TArrayOfArrayOfPointD;
+    const extra: TArrayOfPointD);
+  {$IFDEF INLINE} inline; {$ENDIF} overload;
+  procedure AppendPath(var paths: TArrayOfArrayOfPointD;
     const extra: TArrayOfArrayOfPointD);
-  {$IFDEF INLINE} inline; {$ENDIF}
+  {$IFDEF INLINE} inline; {$ENDIF} overload;
 
   function MakePath(const pts: array of integer): TArrayOfPointD; overload;
   function MakePath(const pts: array of double): TArrayOfPointD; overload;
 
-  function GetBounds(const paths: TArrayOfArrayOfPointD): TRect;
-  function GetBoundsD(const paths: TArrayOfArrayOfPointD): TRectD;
+  function GetBounds(const path: TArrayOfPointD): TRect; overload;
+  function GetBounds(const paths: TArrayOfArrayOfPointD): TRect; overload;
+  function GetBoundsD(const path: TArrayOfPointD): TRectD; overload;
+  function GetBoundsD(const paths: TArrayOfArrayOfPointD): TRectD; overload;
 
   function Rect(const recD: TRectD): TRect; overload;
   function RectsEqual(const rec1, rec2: TRect): Boolean;
@@ -645,7 +650,22 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure AppendPaths(var paths: TArrayOfArrayOfPointD;
+procedure AppendPath(var paths: TArrayOfArrayOfPointD;
+  const extra: TArrayOfPointD);
+var
+  i, len1, len2: integer;
+begin
+  len1 := length(paths);
+  len2 := length(extra);
+  if len2 = 0 then Exit;
+  setLength(paths, len1 + 1);
+  if len1 = 0 then
+    paths[0] := Copy(extra, 0, len2) else
+    paths[len1] := Copy(extra, 0, len2);
+end;
+//------------------------------------------------------------------------------
+
+procedure AppendPath(var paths: TArrayOfArrayOfPointD;
   const extra: TArrayOfArrayOfPointD);
 var
   i, len1, len2: integer;
@@ -1218,6 +1238,40 @@ begin
       end;
   end;
   result := RectD(l, t, r, b);
+end;
+//------------------------------------------------------------------------------
+
+function GetBoundsD(const path: TArrayOfPointD): TRectD;
+var
+  i,highI: integer;
+  l,t,r,b: double;
+  ppd: PPointD;
+begin
+  l := MaxInt; t := MaxInt;
+  r := -MaxInt; b := -MaxInt;
+  highI := High(path);
+  if highI >= 0 then
+  begin
+    ppd := PPointD(path);
+    for i := 0 to highI do
+    begin
+      if ppd.x < l then l := ppd.x;
+      if ppd.x > r then r := ppd.x;
+      if ppd.y < t then t := ppd.y;
+      if ppd.y > b then b := ppd.y;
+      inc(ppd);
+    end;
+  end;
+  result := RectD(l, t, r, b);
+end;
+//------------------------------------------------------------------------------
+
+function GetBounds(const path: TArrayOfPointD): TRect;
+var
+  recD: TRectD;
+begin
+  recD := GetBoundsD(path);
+  Result := Rect(recD);
 end;
 //------------------------------------------------------------------------------
 

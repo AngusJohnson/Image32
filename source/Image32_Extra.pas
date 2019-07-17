@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.03                                                            *
-* Date      :  13 July 2019                                                    *
+* Version   :  1.06                                                            *
+* Date      :  17 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -16,7 +16,7 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Windows, Math, Image32, Image32_Vector, Image32_Draw;
+  SysUtils, Classes, Windows, Math, Image32, Image32_Draw;
 
 type
 //TCompareFunction: Function template for FloodFill procedure
@@ -40,6 +40,19 @@ procedure FloodFill(img: TImage32; x, y: Integer; newColor: TColor32;
 //RedEyeRemoval: Removes 'red eye' from flash photo images.
 procedure RedEyeRemove(img: TImage32; const rect: TRect);
 
+procedure Erase(img: TImage32; const polygon: TArrayOfPointD;
+  fillRule: TFillRule; inverted: Boolean = false); overload;
+procedure Erase(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+  fillRule: TFillRule; inverted: Boolean = false); overload;
+
+procedure Draw3D(img: TImage32; const polygon: TArrayOfPointD;
+  fillRule: TFillRule; height, blurRadius: integer;
+  colorLt: TColor32 = $DDFFFFFF; colorDk: TColor32 = $80000000;
+  angleRads: double = angle45); overload;
+procedure Draw3D(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+  fillRule: TFillRule; height, blurRadius: integer;
+  colorLt: TColor32 = $DDFFFFFF; colorDk: TColor32 = $80000000;
+  angleRads: double = angle45); overload;
 
 //FLOODFILL COMPARE COLOR FUNCTIONS ( see FloodFill )
 
@@ -47,6 +60,9 @@ function FloodFillRGB(initial, current: TColor32; tolerance: Integer): Boolean;
 function FloodFillHue(initial, current: TColor32; tolerance: Integer): Boolean;
 
 implementation
+
+uses
+  Image32_Vector, Image32_Clipper;
 
 const
   FloodFillDefaultRGBTolerance: byte = 20;
@@ -287,6 +303,25 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function Area(const path: TArrayOfPointD): Double;
+var
+  i, j, highI: Integer;
+  d: Double;
+begin
+  Result := 0.0;
+  highI := High(path);
+  if (highI < 2) then Exit;
+  j := highI;
+  for i := 0 to highI do
+  begin
+    d := (path[j].X + path[i].X);
+    Result := Result + d * (path[j].Y - path[i].Y);
+    j := i;
+  end;
+  Result := -Result * 0.5;
+end;
+//------------------------------------------------------------------------------
+
 function GetFloodFillMask(img: TImage32; x, y: Integer;
   compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
 var
@@ -464,13 +499,102 @@ begin
     DrawPolygon(mask, path, frNonZero, radGrad);
     cutout.CopyFrom(mask, mask.Bounds, cutout.Bounds, BlendMask);
     //now remove red from the cutout
-    cutout.ColorToAlpha(clRed32);
+    cutout.EraseColor(clRed32);
     //finally replace the cutout ...
     img.CopyFrom(cutout, cutout.Bounds, cutoutRec, BlendToOpaque);
   finally
     mask.Free;
     cutout.Free;
     radGrad.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Erase(img: TImage32; const polygon: TArrayOfPointD;
+  fillRule: TFillRule; inverted: Boolean);
+var
+  mask: TImage32;
+begin
+  if not assigned(polygon) then Exit;
+  mask := TImage32.Create(img.Width, img.Height);
+  try
+    DrawPolygon(mask, polygon, fillRule, clBlack32);
+    if inverted then
+      img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendMask) else
+      img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendMaskInverted);
+  finally
+    mask.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Erase(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+  fillRule: TFillRule; inverted: Boolean);
+var
+  mask: TImage32;
+begin
+  if not assigned(polygons) then Exit;
+  mask := TImage32.Create(img.Width, img.Height);
+  try
+    DrawPolygon(mask, polygons, fillRule, clBlack32);
+    if inverted then
+      img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendMask) else
+      img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendMaskInverted);
+  finally
+    mask.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Draw3D(img: TImage32; const polygon: TArrayOfPointD;
+  fillRule: TFillRule; height, blurRadius: integer;
+  colorLt: TColor32; colorDk: TColor32; angleRads: double);
+var
+  polygons: TArrayOfArrayOfPointD;
+begin
+  setLength(polygons, 1);
+  polygons[0] := polygon;
+  Draw3D(img, polygons, fillRule, height, blurRadius, colorLt, colorDk, angleRads);
+end;
+//------------------------------------------------------------------------------
+
+procedure Draw3D(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+  fillRule: TFillRule; height, blurRadius: integer;
+  colorLt: TColor32; colorDk: TColor32; angleRads: double);
+var
+  tmp: TImage32;
+  recI: TRect;
+  recD: TRectD;
+  paths, paths2: TArrayOfArrayOfPointD;
+  x,y: double;
+begin
+  Math.SinCos(angleRads, y, x);
+  recD := GetBoundsD(polygons);
+  recI := Rect(recD);
+  paths := OffsetPath(polygons, -recI.Left, -recI.Top);
+  tmp := TImage32.Create(rectWidth(recI), rectHeight(recI));
+  try
+    if colorLt shr 24 > 0 then
+    begin
+      tmp.Clear(colorLt);
+      paths2 := OffsetPath(paths, -height*x, height*y);
+      Erase(tmp, paths2, fillRule);
+      tmp.BoxBlur(tmp.Bounds, blurRadius, 2);
+      Erase(tmp, paths, fillRule, true);
+      img.CopyFrom(tmp, tmp.Bounds, recI, BlendToAlpha);
+    end;
+
+    if colorDk shr 24 > 0 then
+    begin
+      tmp.Clear(colorDk);
+      paths2 := OffsetPath(paths, height*x, -height*y);
+      Erase(tmp, paths2, fillRule);
+      tmp.BoxBlur(tmp.Bounds, blurRadius, 2);
+      Erase(tmp, paths, fillRule, true);
+      img.CopyFrom(tmp, tmp.Bounds, recI, BlendToAlpha);
+    end;
+  finally
+    tmp.Free;
   end;
 end;
 //------------------------------------------------------------------------------

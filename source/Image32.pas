@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.05                                                            *
-* Date      :  15 July 2019                                                    *
+* Version   :  1.06                                                            *
+* Date      :  17 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -18,12 +18,33 @@ uses
   Windows, SysUtils, Classes, {$IFDEF UITYPES} UITypes, {$ENDIF} Math;
 
 type
+  TColor32 = type Cardinal;
+
+const
+  clNone32     = TColor32($00000000);
+  clAqua32     = TColor32($FF00FFFF);
+  clBlack32    = TColor32($FF000000);
+  clBlue32     = TColor32($FF0000FF);
+  clFuchsia32  = TColor32($FFFF00FF);
+  clGray32     = TColor32($FF7F7F7F);
+  clGreen32    = TColor32($FF008000);
+  clLime32     = TColor32($FF00FF00);
+  clMaroon32   = TColor32($FF800000);
+  clNavy32     = TColor32($FF000080);
+  clOlive32    = TColor32($FF7F7F00);
+  clOrange32   = TColor32($FFFF7F00);
+  clPurple32   = TColor32($FF7F00FF);
+  clRed32      = TColor32($FFFF0000);
+  clSilver32   = TColor32($FFC0C0C0);
+  clTeal32     = TColor32($FF007F7F);
+  clWhite32    = TColor32($FFFFFFFF);
+  clYellow32   = TColor32($FFFFFF00);
+
+type
   TClipboardPriority = (cpLow, cpMedium, cpHigh);
 
   PColor32 = ^TColor32;
-  TColor32 = type Cardinal;
   TArrayOfColor32 = array of TColor32;
-
   TArrayOfInteger = array of Integer;
   TArrayOfByte = array of Byte;
 
@@ -109,7 +130,8 @@ type
     //SetBackgroundColor: Assumes the current image is semi-transparent.
     procedure SetBackgroundColor(bgColor: TColor32);
     //HatchBackground: Assumes the current image is semi-transparent.
-    procedure HatchBackground(color1, color2: TColor32; hatchSize: Integer);
+    procedure HatchBackground(color1: TColor32 = clWhite32;
+      color2: TColor32= clSilver32; hatchSize: Integer = 10);
     //Clear: Fills the entire image with the specified color
     procedure Clear(color: TColor32 = 0);
     procedure FillRect(rec: TRect; color: TColor32);
@@ -121,13 +143,11 @@ type
     //Grayscale: Only changes color channels. The alpha channel is untouched.
     procedure Grayscale;
     procedure InvertColors;
-    //SetTransparentColor: Changes to clNone32 any pixels that
-    //exactly match the specified color.
-    procedure SetTransparentColor(color: TColor32);
+    procedure InvertAlphas;
     //ColorToAlpha: Removes the specified color from the image, even from
     //pixels that are a blend of colors including the specified color.<br>
     //see https://stackoverflow.com/questions/9280902/
-    procedure ColorToAlpha(color: TColor32);
+    procedure EraseColor(color: TColor32; ExactMatchOnly: Boolean = false);
 
     procedure AdjustHue(percent: Integer);         //ie +/- 100%
     procedure AdjustLuminance(percent: Integer);   //ie +/- 100%
@@ -263,8 +283,12 @@ type
   function BlendToOpaque(bgColor, fgColor: TColor32): TColor32;
   //BlendToAlpha: Blends two semi-transparent images (slower than BlendToOpaque)
   function BlendToAlpha(bgColor, fgColor: TColor32): TColor32;
-  //BlendMask: Multiplies (ie reduces) background alpha using foreground mask
+  //BlendMask: Whereever the mask is, preserves the background
   function BlendMask(bgColor, mask: TColor32): TColor32;
+  {$IFDEF INLINE} inline; {$ENDIF}
+  //BlendMaskInverted: Whereever the mask is, removes the background
+  function BlendMaskInverted(bgColor, mask: TColor32): TColor32;
+  {$IFDEF INLINE} inline; {$ENDIF}
 
   //MISCELLANEOUS FUNCTIONS ...
 
@@ -276,9 +300,15 @@ type
   function HslToRgb(hslColor: THsl): TColor32;
   function AdjustHue(color: TColor32; percent: Integer): TColor32;
 
-  function PointD(const X, Y: Double): TPointD;
+  function PointD(const X, Y: Double): TPointD; overload;
+  function PointD(const pt: TPoint): TPointD; overload;
+
   function RectD(left, top, right, bottom: double): TRectD; overload;
   function RectD(const rec: TRect): TRectD; overload;
+
+  //Rad: Converts degrees to radians.
+  function Rad(angleDegrees: double): double;
+  {$IFDEF INLINE} inline; {$ENDIF}
 
   //DPI: Useful for DPIAware sizing of images and their container controls.<br>
   //Scales values relative to the display's resolution (PixelsPerInch).<br>
@@ -289,24 +319,13 @@ type
   {$IFDEF INLINE} inline; {$ENDIF}
 
 const
-  clNone32     = TColor32($00000000);
-  clAqua32     = TColor32($FF00FFFF);
-  clBlack32    = TColor32($FF000000);
-  clBlue32     = TColor32($FF0000FF);
-  clFuchsia32  = TColor32($FFFF00FF);
-  clGray32     = TColor32($FF7F7F7F);
-  clGreen32    = TColor32($FF008000);
-  clLime32     = TColor32($FF00FF00);
-  clMaroon32   = TColor32($FF800000);
-  clNavy32     = TColor32($FF000080);
-  clOlive32    = TColor32($FF7F7F00);
-  clOrange32   = TColor32($FFFF7F00);
-  clPurple32   = TColor32($FF7F00FF);
-  clRed32      = TColor32($FFFF0000);
-  clSilver32   = TColor32($FFC0C0C0);
-  clTeal32     = TColor32($FF007F7F);
-  clWhite32    = TColor32($FFFFFFFF);
-  clYellow32   = TColor32($FFFFFF00);
+  angle45  = Pi /4;
+  angle90  = Pi /2;
+  angle135 = Pi *3/4;
+  angle180 = Pi;
+  angle270 = Pi *3/2;
+  angle360 = Pi *2;
+
 var
   //Both MulTable and DivTable are used in blend functions<br>
   //MulTable[a,b] = a * b / 255
@@ -406,7 +425,6 @@ end;
 //------------------------------------------------------------------------------
 
 function BlendMask(bgColor, mask: TColor32): TColor32;
-{$IFDEF INLINE} inline; {$ENDIF}
 var
   res: TARGB absolute Result;
   bg: TARGB absolute bgColor;
@@ -415,6 +433,18 @@ begin
   Result := bgColor;
   res.A := MulTable[bg.A, fg.A];
   if res.A = 0 then Result := 0;
+end;
+//------------------------------------------------------------------------------
+
+function BlendMaskInverted(bgColor, mask: TColor32): TColor32;
+var
+  res: TARGB absolute Result;
+  bg: TARGB absolute bgColor;
+  fg: TARGB absolute mask;
+begin
+  Result := bgColor;
+  res.A := MulTable[bg.A, 255 - fg.A];
+  if res.A < 2 then Result := 0;
 end;
 
 //------------------------------------------------------------------------------
@@ -503,6 +533,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function Rad(angleDegrees: double): double;
+begin
+  Result := angleDegrees * Pi/180;
+end;
+//------------------------------------------------------------------------------
+
 function DPI(val: Integer): Integer;
 begin
   result := Round( val * DpiScale);
@@ -573,6 +609,13 @@ function PointD(const X, Y: Double): TPointD;
 begin
   Result.X := X;
   Result.Y := Y;
+end;
+//------------------------------------------------------------------------------
+
+function PointD(const pt: TPoint): TPointD;
+begin
+  Result.X := pt.X;
+  Result.Y := pt.Y;
 end;
 //------------------------------------------------------------------------------
 
@@ -985,7 +1028,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.HatchBackground(color1, color2: TColor32; hatchSize: Integer);
+procedure TImage32.HatchBackground(color1: TColor32;
+  color2: TColor32; hatchSize: Integer);
 var
   i,j: Integer;
   pc: PColor32;
@@ -1007,7 +1051,6 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
-
 
 procedure TImage32.Clear(color: TColor32);
 var
@@ -1933,21 +1976,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.SetTransparentColor(color: TColor32);
+procedure TImage32.InvertAlphas;
 var
+  pc: PARGB;
   i: Integer;
-  pc: PColor32;
 begin
-  pc := PixelBase;
+  pc := PARGB(PixelBase);
   for i := 0 to Width * Height -1 do
   begin
-    if pc^ = color then pc^ := 0;
+    pc.A := 255 - pc.A;
     inc(pc);
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.ColorToAlpha(color: TColor32);
+procedure TImage32.EraseColor(color: TColor32; ExactMatchOnly: Boolean);
 var
   fg: TARGB absolute color;
   bg: PARGB;
@@ -1956,6 +1999,17 @@ var
 begin
   if fg.A = 0 then Exit;
   bg := PARGB(PixelBase);
+
+  if ExactMatchOnly then
+  begin
+    for i := 0 to Width * Height -1 do
+    begin
+      if bg.Color = color then bg.Color := clNone32;
+      inc(bg);
+    end;
+    Exit;
+  end;
+
   for i := 0 to Width * Height -1 do
   begin
     if bg.A > 0 then

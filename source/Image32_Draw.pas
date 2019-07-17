@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.05                                                            *
-* Date      :  15 July 2019                                                    *
+* Version   :  1.06                                                            *
+* Date      :  17 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -872,7 +872,10 @@ var
   pBrush: PARGB;
 begin
   pDst := GetDstPixel(x1,y);
-  pBrush := GetFirstBrushPixel(x1 - fOffset.X, y - fOffset.Y);
+  dec(x1, fOffset.X);
+  dec(x2, fOffset.X);
+  dec(y, fOffset.Y);
+  pBrush := GetFirstBrushPixel(x1, y);
   for i := x1 to x2 do
   begin
     pDst^ := BlendToAlpha(pDst^,

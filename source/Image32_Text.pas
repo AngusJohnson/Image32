@@ -2,8 +2,8 @@ unit Image32_Text;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.0                                                             *
-* Date      :  1 July 2019                                                     *
+* Version   :  1.06                                                            *
+* Date      :  17 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module to support text in the Image32 library                   *
@@ -15,7 +15,7 @@ interface
 {$I Image32.inc}
 
 uses
-  Windows, Types, SysUtils, Classes, Math, Image32;
+  Windows, Types, SysUtils, Classes, Math, Image32, Image32_Draw;
 
 type
   //TGlyphInfo: Object that's used internally be TFontInfo
@@ -109,7 +109,11 @@ type
 
   function DrawText(image: TImage32; x,y: double; const text: string;
     fontInfo: TFontInfo = nil; textAlign: TTextAlign = taLeft;
-    textColor: TColor32 = clBlack32; justifySpc: double = 0): TPointD;
+    textColor: TColor32 = clBlack32; justifySpc: double = 0): TPointD; overload;
+
+  function DrawText(image: TImage32; x,y: double; const text: string;
+    fontInfo: TFontInfo; textAlign: TTextAlign; renderer: TCustomRenderer;
+    justifySpc: double = 0): TPointD; overload;
 
   function DrawText_LCD(image: TImage32; x,y: double; const text: string;
     fontInfo: TFontInfo = nil; textAlign: TTextAlign = taLeft; textColor:
@@ -154,7 +158,7 @@ var
 implementation
 
 uses
-  Image32_Vector, Image32_Draw;
+  Image32_Vector;
 
 type
   TMeasureTextPrefer = (mtPreferNone, mtPreferX, mtPreferY);
@@ -493,7 +497,7 @@ begin
     if length(paths2) > 0 then
     begin
       paths2 := OffsetPath(paths2, startPos.X, startPos.Y);
-      AppendPaths(Result, paths2);
+      AppendPath(Result, paths2);
     end;
     if (justifySpc > 0) and (text[i] = #32) then
       dx := dx + justifySpc;
@@ -567,6 +571,18 @@ begin
   if (text = '') or (textColor shr 24 = 0) or image.IsEmpty then Exit;
   paths := GetTextOutline(x,y, text, fontInfo, textAlign, result, justifySpc);
   DrawPolygon(image, paths, frNonZero, textColor);
+end;
+//------------------------------------------------------------------------------
+
+function DrawText(image: TImage32; x,y: double; const text: string;
+  fontInfo: TFontInfo; textAlign: TTextAlign;
+  renderer: TCustomRenderer; justifySpc: double = 0): TPointD;
+var
+  paths: TArrayOfArrayOfPointD;
+begin
+  if (text = '') or image.IsEmpty or not assigned(renderer) then Exit;
+  paths := GetTextOutline(x,y, text, fontInfo, textAlign, result, justifySpc);
+  DrawPolygon(image, paths, frNonZero, renderer);
 end;
 //------------------------------------------------------------------------------
 
