@@ -138,8 +138,9 @@ var
   //also requries more processing and hence is slower to execute.
   AutoWidthThreshold: double = 5.0;
 
-  //MinStrokeWidth: Avoids a Moire effect with thinner lines
-  MinStrokeWidth: double = 1.33;
+  //Line stroke widths of less than about 1.3 will produce noticeable
+  //Moire effect when the lines are close to horizontal or close to vertical
+  MinStrokeWidth: double = 0.5; //1.33;
 
   //DefaultMiterLimit: Avoids excessive spikes when line offsetting
   DefaultMiterLimit: double = 2.0;

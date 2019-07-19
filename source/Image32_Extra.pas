@@ -492,8 +492,7 @@ begin
     mask.GaussianBlur(mask.Bounds, k);
     img.CopyFrom(mask, mask.Bounds, cutoutRec, BlendToOpaque);
 
-    //we can't blur the cutout without degrading image clarity, so
-    //gradient fill to clNone32 a mask to soften the cutout's edges
+    //gradient fill to clNone32 a mask to soften cutout's edges
     path := Ellipse(cutoutRec);
     radGrad.SetParameters(rect3, clBlack32, clNone32);
     DrawPolygon(mask, path, frNonZero, radGrad);

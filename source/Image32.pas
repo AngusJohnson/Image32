@@ -319,12 +319,30 @@ type
   {$IFDEF INLINE} inline; {$ENDIF}
 
 const
-  angle45  = Pi /4;
-  angle90  = Pi /2;
-  angle135 = Pi *3/4;
   angle180 = Pi;
-  angle270 = Pi *3/2;
   angle360 = Pi *2;
+  angle15  = Pi /12;
+  angle30  = angle15 *2;
+  angle45  = angle15 *3;
+  angle60  = angle15 *4;
+  angle75  = angle15 *5;
+  angle90  = Pi /2;
+  angle105 = angle180 - angle75;
+  angle120 = angle180 - angle60;
+  angle135 = angle180 - angle45;
+  angle150 = angle180 - angle30;
+  angle165 = angle180 - angle15;
+  angle195 = angle180 + angle15;
+  angle210 = angle180 + angle30;
+  angle225 = angle180 + angle45;
+  angle240 = angle180 + angle60;
+  angle255 = angle180 + angle75;
+  angle270 = angle360 - angle90;
+  angle285 = angle360 - angle75;
+  angle300 = angle360 - angle60;
+  angle315 = angle360 - angle45;
+  angle330 = angle360 - angle30;
+  angle345 = angle360 - angle15;
 
 var
   //Both MulTable and DivTable are used in blend functions<br>
@@ -2297,7 +2315,7 @@ begin
     //finally move the rotated rec back to the image ...
     if eraseColor <> clNone32 then
       FillRect(rec, eraseColor);
-    CopyFrom(tmp, rec2, rec, BlendToOpaque);
+    CopyFrom(tmp, rec2, rec);
   finally
     tmp.Free;
   end;
@@ -2333,6 +2351,7 @@ procedure TImage32.BoxBlur(rect: TRect; radius, repeats: Integer);
 begin
   //nb: BoxBlur can achieve a very good approximation of a GaussianBlur in a
   //shorter time by using a smaller radius and repeating several (2-3) times.
+  if radius < 1 then Exit;
   for repeats := 0 to repeats do
   begin
     BlurHorizontal(rect, radius);
