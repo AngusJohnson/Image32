@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.06                                                            *
-* Date      :  17 July 2019                                                    *
+* Version   :  1.07                                                            *
+* Date      :  20 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  The core module of the Image32 library                          *
