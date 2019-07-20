@@ -2774,6 +2774,7 @@ procedure TClipperD.AddPaths(const pathsD: TPathsD; polyType: TPathType = ptSubj
 var
   pp: TPaths;
 begin
+  if not assigned(pathsD) then Exit;
   if FScale = 0 then FScale := DefaultScale;
   pp := ScalePaths(pathsD, FScale, FScale);
   Inherited AddPaths(pp, polyType, isOpen);

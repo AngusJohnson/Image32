@@ -23,9 +23,11 @@ type
 TCompareFunction = function(current, compare: TColor32; data: integer): Boolean;
 
 procedure DrawShadow(img: TImage32; const polygon: TArrayOfPointD;
-  fillRule: TFillRule; color: TColor32; dx, dy, blurRadius: integer); overload;
+  fillRule: TFillRule; depth: double; blurRadius: integer;
+  color: TColor32 = $80000000; angleRads: double = angle225); overload;
 procedure DrawShadow(img: TImage32; const polygons: TArrayOfArrayOfPointD;
-  fillRule: TFillRule; color: TColor32; dx, dy, blurRadius: integer); overload;
+  fillRule: TFillRule; depth: double; blurRadius: integer;
+  color: TColor32 = $80000000; angleRads: double = angle225); overload;
 
 procedure DrawGlow(img: TImage32; const polygon: TArrayOfPointD;
   fillRule: TFillRule; color: TColor32; blurRadius: integer); overload;
@@ -63,6 +65,10 @@ implementation
 
 uses
   Image32_Vector, Image32_Clipper;
+
+resourcestring
+  rsDraw3DNeedsNonZeroFill =
+    'Draw3D Error: Procedure requires non-zero filling rule.';
 
 const
   FloodFillDefaultRGBTolerance: byte = 20;
@@ -236,28 +242,32 @@ end;
 //------------------------------------------------------------------------------
 
 procedure DrawShadow(img: TImage32; const polygon: TArrayOfPointD;
-  fillRule: TFillRule; color: TColor32; dx, dy, blurRadius: integer);
+  fillRule: TFillRule; depth: double; blurRadius: integer;
+  color: TColor32; angleRads: double);
 var
   polygons: TArrayOfArrayOfPointD;
 begin
   setlength(polygons, 1);
   polygons[0] := polygon;
-  DrawShadow(img, polygons, fillRule, color, dx, dy, blurRadius);
+  DrawShadow(img, polygons, fillRule, depth, blurRadius, color, angleRads);
 end;
 //------------------------------------------------------------------------------
 
 procedure DrawShadow(img: TImage32; const polygons: TArrayOfArrayOfPointD;
-  fillRule: TFillRule; color: TColor32; dx, dy, blurRadius: integer);
+  fillRule: TFillRule; depth: double; blurRadius: integer;
+  color: TColor32; angleRads: double);
 var
+  x,y: double;
   rec: TRect;
   shadowPolys: TArrayOfArrayOfPointD;
   shadowImg: TImage32;
 begin
+  Math.SinCos(-angleRads, y, x);
   rec := GetBounds(polygons);
   shadowPolys := OffsetPath(polygons,
     blurRadius -rec.Left +1, blurRadius -rec.Top +1);
   Windows.InflateRect(rec, blurRadius +1, blurRadius +1);
-  Windows.OffsetRect(rec, dx, dy);
+  Windows.OffsetRect(rec, Round(x * depth), Round(y * depth));
   shadowImg := TImage32.Create(rec.Width, rec.Height);
   try
     DrawPolygon(shadowImg, shadowPolys, fillRule, color);
@@ -300,25 +310,6 @@ begin
   finally
     glowImg.Free;
   end;
-end;
-//------------------------------------------------------------------------------
-
-function Area(const path: TArrayOfPointD): Double;
-var
-  i, j, highI: Integer;
-  d: Double;
-begin
-  Result := 0.0;
-  highI := High(path);
-  if (highI < 2) then Exit;
-  j := highI;
-  for i := 0 to highI do
-  begin
-    d := (path[j].X + path[i].X);
-    Result := Result + d * (path[j].Y - path[i].Y);
-    j := i;
-  end;
-  Result := -Result * 0.5;
 end;
 //------------------------------------------------------------------------------
 

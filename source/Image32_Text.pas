@@ -19,6 +19,8 @@ uses
 
 type
   //TGlyphInfo: Object that's used internally be TFontInfo
+  //Note - glyph outlines always use the NON-ZERO fill rule
+  //https://docs.microsoft.com/en-us/typography/opentype/spec/glyf
   TGlyphInfo = class
     gm: TGlyphMetrics;
     paths: TArrayOfArrayOfPointD;
@@ -159,6 +161,9 @@ implementation
 
 uses
   Image32_Vector;
+
+resourcestring
+   rsPostscriptNotSupported = 'Postscript fonts are not supported';
 
 type
   TMeasureTextPrefer = (mtPreferNone, mtPreferX, mtPreferY);
@@ -321,7 +326,8 @@ begin
               end;
             end;
           TT_PRIM_CSPLINE:
-              raise Exception.Create('postscript fonts not supported')
+              raise Exception.Create(rsPostscriptNotSupported);
+
           else Exit; //oops
         end;
       end;

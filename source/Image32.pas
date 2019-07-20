@@ -1514,7 +1514,7 @@ var
 begin
   result := false;
   folder := ExtractFilePath(filename);
-  if not DirectoryExists(folder) then Exit;
+  if IsEmpty or not DirectoryExists(folder) then Exit;
   fileFormatClass := GetImageFormatClass(ExtractFileExt(filename));
   if assigned(fileFormatClass) then
     with fileFormatClass.Create do
