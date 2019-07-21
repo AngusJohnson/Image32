@@ -76,7 +76,6 @@ type
     fPixels: TArrayOfColor32;
     function GetPixel(x,y: Integer): TColor32;
     procedure SetPixel(x,y: Integer; color: TColor32);
-    function GetWeightedPixel(x256, y256: Integer): TColor32;
     function GetIsEmpty: Boolean;
     function GetPixelBase: PColor32;
     function GetPixelRow(row: Integer): PColor32;
@@ -291,6 +290,8 @@ type
   {$IFDEF INLINE} inline; {$ENDIF}
 
   //MISCELLANEOUS FUNCTIONS ...
+
+  function GetWeightedPixel(img: TImage32; x256, y256: Integer): TColor32;
 
   //Color32: Converts Graphics.TColor values into TColor32 values.
   function Color32(rgbColor: Integer): TColor32;
@@ -678,6 +679,53 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function GetWeightedPixel(img: TImage32; x256, y256: Integer): TColor32;
+var
+  xi, yi, weight: Integer;
+  width, height: integer;
+  pixels: TArrayOfColor32;
+  color: TWeightedColor;
+  xf, yf: cardinal;
+begin
+  width := img.Width; height := img.Height;
+  pixels := img.Pixels;
+  //coordinate integers (can be negative) -> x256 div 256 & y256 div 256.
+  //coordinate fractions ->  (x256 and $FF) / 256 & (y256 and $FF) / 256
+  if (x256 < -$FF) or (y256 < -$FF) or
+    (x256 >= width * $100) or (y256 >= height * $100) then
+  begin
+    result := clNone32;
+    Exit;
+  end;
+  xi := abs(x256) shr 8;
+  xf := x256 and $FF;
+  yi := abs(y256) shr 8;
+  yf := y256 and $FF;
+
+  color.Reset;
+  weight := (($100 - xf) * ($100 - yf)) shr 8;         //top-left
+  if (x256 < 0) or (y256 < 0) then
+    color.AddWeight(weight) else
+    color.Add(pixels[xi + yi * width], weight);
+
+  weight := (xf * ($100 - yf)) shr 8;                  //top-right
+  if (xi + 1 >= width) or (y256 < 0) then
+    color.AddWeight(weight) else
+    color.Add(pixels[xi + 1 + yi * width], weight);
+
+  weight := (($100 - xf) * yf) shr 8;                  //bottom-left
+  if (x256 < 0) or (yi + 1 = height) then
+    color.AddWeight(weight) else
+    color.Add(pixels[xi + (yi +1) * width], weight);
+
+  weight := (xf * yf) shr 8;                           //bottom-right
+  if (xi + 1 >= width) or (yi + 1 = height) then
+    color.AddWeight(weight) else
+    color.Add(pixels[(xi + 1)  + (yi + 1) * width], weight);
+  Result := color.Color;
+end;
+//------------------------------------------------------------------------------
+
 function GetWeightedColor(const srcBits: TArrayOfColor32;
   x256, y256, xx256, yy256, maxX: Integer): TColor32;
 var
@@ -685,6 +733,11 @@ var
   xf, yf, xxf, yyf: cardinal;
   color: TWeightedColor;
 begin
+  //note: This function differs from GetWeightedPixel in one very important
+  //aspect - this function accommodates weighting any number of pixels
+  //(rather than just adjacent pixels) which is important went performing
+  //significant downsizing.
+
   color.Reset;
 
   xi := x256 shr 8; xf := x256 and $FF;
@@ -1416,49 +1469,6 @@ begin
   finally
     tmp.Free;
   end;
-end;
-//------------------------------------------------------------------------------
-
-function TImage32.GetWeightedPixel(x256, y256: Integer): TColor32;
-var
-  xi, yi, weight: Integer;
-  color: TWeightedColor;
-  xf, yf: cardinal;
-begin
-  //coordinate integers (can be negative) -> x256 div 256 & y256 div 256.
-  //coordinate fractions ->  (x256 and $FF) / 256 & (y256 and $FF) / 256
-  if (x256 < -$FF) or (y256 < -$FF) or
-    (x256 >= fWidth * $100) or (y256 >= fHeight * $100) then
-  begin
-    result := clNone32;
-    Exit;
-  end;
-  xi := abs(x256) shr 8;
-  xf := x256 and $FF;
-  yi := abs(y256) shr 8;
-  yf := y256 and $FF;
-
-  color.Reset;
-  weight := (($100 - xf) * ($100 - yf)) shr 8;         //top-left
-  if (x256 < 0) or (y256 < 0) then
-    color.AddWeight(weight) else
-    color.Add(fPixels[xi + yi * fWidth], weight);
-
-  weight := (xf * ($100 - yf)) shr 8;                  //top-right
-  if (xi + 1 >= fWidth) or (y256 < 0) then
-    color.AddWeight(weight) else
-    color.Add(fPixels[xi + 1 + yi * fWidth], weight);
-
-  weight := (($100 - xf) * yf) shr 8;                  //bottom-left
-  if (x256 < 0) or (yi + 1 = fHeight) then
-    color.AddWeight(weight) else
-    color.Add(fPixels[xi + (yi +1) * fWidth], weight);
-
-  weight := (xf * yf) shr 8;                           //bottom-right
-  if (xi + 1 >= fWidth) or (yi + 1 = fHeight) then
-    color.AddWeight(weight) else
-    color.Add(fPixels[(xi + 1)  + (yi + 1) * fWidth], weight);
-  Result := color.Color;
 end;
 //------------------------------------------------------------------------------
 
@@ -2269,7 +2279,7 @@ begin
         RotatePt(pt, cp2, sinA, cosA);
         xi := Round((pt.X - dx) *256);
         yi := Round((pt.Y - dy) *256);
-        dstColor^ := GetWeightedPixel(xi, yi);
+        dstColor^ := GetWeightedPixel(self, xi, yi);
         inc(dstColor);
       end;
   end else
@@ -2339,7 +2349,7 @@ begin
     begin
       x := Min(0,  dx) + j - i * dx/newHeight;
       y := Min(0, -dy) + j * dy/newWidth + i;
-      pcDst^ := GetWeightedPixel(Round(x*$100), Round(y*$100));
+      pcDst^ := GetWeightedPixel(self, Round(x*$100), Round(y*$100));
       inc(pcDst);
     end;
   SetSize(newWidth, newHeight);

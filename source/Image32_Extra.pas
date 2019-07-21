@@ -19,8 +19,8 @@ uses
   SysUtils, Classes, Windows, Math, Image32, Image32_Draw;
 
 type
-//TCompareFunction: Function template for FloodFill procedure
-TCompareFunction = function(current, compare: TColor32; data: integer): Boolean;
+  //TCompareFunction: Function template for FloodFill procedure
+  TCompareFunction = function(current, compare: TColor32; data: integer): Boolean;
 
 procedure DrawShadow(img: TImage32; const polygon: TArrayOfPointD;
   fillRule: TFillRule; depth: double; blurRadius: integer;
@@ -39,7 +39,7 @@ procedure DrawGlow(img: TImage32; const polygons: TArrayOfArrayOfPointD;
 procedure FloodFill(img: TImage32; x, y: Integer; newColor: TColor32;
   compareFunc: TCompareFunction = nil; tolerance: Integer = 0);
 
-//RedEyeRemoval: Removes 'red eye' from flash photo images.
+//RedEyeRemove: Removes 'red eye' from flash photo images.
 procedure RedEyeRemove(img: TImage32; const rect: TRect);
 
 procedure Erase(img: TImage32; const polygon: TArrayOfPointD;
@@ -587,6 +587,5 @@ begin
     tmp.Free;
   end;
 end;
-//------------------------------------------------------------------------------
 
 end.
