@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.06                                                            *
-* Date      :  17 July 2019                                                    *
+* Version   :  1.10                                                            *
+* Date      :  23 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -34,14 +34,26 @@ type
 
   function Ellipse(const rec: TRect; steps: integer = 0): TArrayOfPointD; overload;
   function Ellipse(const rec: TRectD; steps: integer = 0): TArrayOfPointD; overload;
+
   function Star(const focalPt: TPointD;
     innerRadius, outerRadius: double; points: integer): TArrayOfPointD;
+
   function Arc(const rec: TRect; startAngle, endAngle: double): TArrayOfPointD;
   function Pie(const rec: TRect; StartAngle, EndAngle: double): TArrayOfPointD;
+
   function QBezier(const pt1, pt2, pt3: TPointD): TArrayOfPointD;
   function CBezier(const pt1, pt2, pt3, pt4: TPointD): TArrayOfPointD;
-  //ArrowHead: The controlPt's only function is to control the angle of the arrow.
-  function ArrowHead(const arrowTip, controlPt: TPointD; size: double;
+
+  //CSpline: Approximates the 'S' command inside the 'd' property of an
+  //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
+  function CSpline(const pts: TArrayOfPointD): TArrayOfPointD;
+
+  //QSpline: Approximates the 'T' command inside the 'd' property of an
+  //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
+  function QSpline(const pts: TArrayOfPointD): TArrayOfPointD;
+
+  //ArrowHead: The ctrlPt's only function is to control the angle of the arrow.
+  function ArrowHead(const arrowTip, ctrlPt: TPointD; size: double;
     arrowStyle: TArrowStyle): TArrayOfPointD;
   function ShortenPath(const path: TArrayOfPointD;
     pathEnd: TPathEnd; amount: double): TArrayOfPointD;
@@ -87,8 +99,17 @@ type
   function MidPoint(const rec: TRect): TPoint; overload;
   function MidPoint(const rec: TRectD): TPointD; overload;
 
+  function MidPoint(const pt1, pt2: TPoint): TPoint; overload;
+  function MidPoint(const pt1, pt2: TPointD): TPointD; overload;
+
+  function ReflectPoint(const pt, pivot: TPointD): TPointD;
+
   function IntersectRect(const rec1, rec2: TRectD): TRectD;
   function UnionRect(const rec1, rec2: TRectD): TRectD;
+
+  //these 2 functions are only needed to support older versions of Delphi
+  function MakeArrayOfInteger(const ints: array of integer): TArrayOfInteger;
+  function MakeArrayOfDouble(const doubles: array of double): TArrayOfDouble;
 
   //GetUnitVector: Used internally
   function GetUnitVector(const pt1, pt2: TPointD): TPointD;
@@ -213,6 +234,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function MidPoint(const pt1, pt2: TPoint): TPoint;
+begin
+  Result.X := (pt1.X + pt2.X) div 2;
+  Result.Y := (pt1.Y + pt2.Y) div 2;
+end;
+//------------------------------------------------------------------------------
+
+function MidPoint(const pt1, pt2: TPointD): TPointD;
+begin
+  Result.X := (pt1.X + pt2.X) * 0.5;
+  Result.Y := (pt1.Y + pt2.Y) * 0.5;
+end;
+//------------------------------------------------------------------------------
+
 function IntersectRect(const rec1, rec2: TRectD): TRectD;
 begin
   result.Left := Max(rec1.Left, rec2.Left);
@@ -228,6 +263,26 @@ begin
   result.Top := Min(rec1.Top, rec2.Top);
   result.Right := Max(rec1.Right, rec2.Right);
   result.Bottom := Max(rec1.Bottom, rec2.Bottom);
+end;
+//------------------------------------------------------------------------------
+
+function MakeArrayOfInteger(const ints: array of integer): TArrayOfInteger;
+var
+  i, len: integer;
+begin
+  len := Length(ints);
+  SetLength(Result, len);
+  for i := 0 to len -1 do Result[i] := ints[i];
+end;
+//------------------------------------------------------------------------------
+
+function MakeArrayOfDouble(const doubles: array of double): TArrayOfDouble;
+var
+  i, len: integer;
+begin
+  len := Length(doubles);
+  SetLength(Result, len);
+  for i := 0 to len -1 do Result[i] := doubles[i];
 end;
 //------------------------------------------------------------------------------
 
@@ -980,12 +1035,9 @@ var
   centre, radius: TPointD;
   deltaX, deltaX2, deltaY: extended;
 begin
-  if (endAngle = startAngle) or rec.IsEmpty then Exit;
-  with rec do
-  begin
-    centre := PointD((left+right)/2, (top+bottom)/2);
-    radius := PointD(width/2, Height/2);
-  end;
+  if (endAngle = startAngle) or IsEmptyRect(rec) then Exit;
+  centre := PointD((rec.left+rec.right)/2, (rec.top+rec.bottom)/2);
+  radius := PointD(RectWidth(rec)/2, RectHeight(rec)/2);
   radiusMax := Max(radius.x, radius.y);
   angle := endAngle - startAngle;
   if angle < 0 then angle := Pi * 2 + angle;
@@ -1021,7 +1073,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ArrowHead(const arrowTip, controlPt: TPointD; size: double;
+function ArrowHead(const arrowTip, ctrlPt: TPointD; size: double;
   arrowStyle: TArrowStyle): TArrayOfPointD;
 var
   unitVec, basePt: TPointD;
@@ -1030,7 +1082,7 @@ begin
   //controlPt: simply represents the direction of the line back from the tip
   //See also ShortenPath()
   sDiv2 := size * 0.5;
-  unitVec := GetUnitVector(controlPt, arrowTip);
+  unitVec := GetUnitVector(ctrlPt, arrowTip);
   case arrowStyle of
     asSimple:
       begin
@@ -1381,6 +1433,141 @@ begin
   resultLen := 0; resultCnt := 0;
   AddPoint(pt1);
   DoCurve(pt1, pt2, pt3, pt4);
+  SetLength(result,resultCnt);
+end;
+//------------------------------------------------------------------------------
+
+function ReflectPoint(const pt, pivot: TPointD): TPointD;
+begin
+  Result.X := pivot.X + (pivot.X - pt.X);
+  Result.Y := pivot.Y + (pivot.Y - pt.Y);
+end;
+//------------------------------------------------------------------------------
+
+function CSpline(const pts: TArrayOfPointD): TArrayOfPointD;
+var
+  resultCnt, resultLen: integer;
+
+  procedure AddPoint(const pt: TPointD);
+  begin
+    if resultCnt = resultLen then
+    begin
+      inc(resultLen, BuffSize);
+      setLength(result, resultLen);
+    end;
+    result[resultCnt] := pt;
+    inc(resultCnt);
+  end;
+
+  procedure DoCurve(const p1, p2, p3, p4: TPointD);
+  var
+    p12, p23, p34, p123, p234, p1234: TPointD;
+  begin
+    if (abs(p1.x + p3.x - 2*p2.x) + abs(p2.x + p4.x - 2*p3.x) +
+      abs(p1.y + p3.y - 2*p2.y) + abs(p2.y + p4.y - 2*p3.y)) <
+        CBezierTolerance then
+    begin
+      if resultCnt = length(result) then
+        setLength(result, length(result) +BuffSize);
+      result[resultCnt] := p4;
+      inc(resultCnt);
+    end else
+    begin
+      p12.X := (p1.X + p2.X) / 2;
+      p12.Y := (p1.Y + p2.Y) / 2;
+      p23.X := (p2.X + p3.X) / 2;
+      p23.Y := (p2.Y + p3.Y) / 2;
+      p34.X := (p3.X + p4.X) / 2;
+      p34.Y := (p3.Y + p4.Y) / 2;
+      p123.X := (p12.X + p23.X) / 2;
+      p123.Y := (p12.Y + p23.Y) / 2;
+      p234.X := (p23.X + p34.X) / 2;
+      p234.Y := (p23.Y + p34.Y) / 2;
+      p1234.X := (p123.X + p234.X) / 2;
+      p1234.Y := (p123.Y + p234.Y) / 2;
+      DoCurve(p1, p12, p123, p1234);
+      DoCurve(p1234, p234, p34, p4);
+    end;
+  end;
+
+var
+  i, len: integer;
+  p: PPointD;
+  pt1,pt2,pt3,pt4: TPointD;
+begin
+  result := nil;
+  len := Length(pts); resultLen := 0; resultCnt := 0;
+  if (len < 4) or Odd(len) then Exit; //invalid path
+  p := @pts[0];
+  pt1 := p^; inc(p);
+  pt2 := p^; inc(p);
+  for i := 0 to (len shr 1) - 2 do
+  begin
+    pt3 := p^; inc(p);
+    pt4 := p^; inc(p);
+    DoCurve(pt1, pt2, pt3, pt4);
+    pt1 := pt4;
+    pt2 := ReflectPoint(pt3, pt1);
+  end;
+  SetLength(result,resultCnt);
+end;
+//------------------------------------------------------------------------------
+
+function QSpline(const pts: TArrayOfPointD): TArrayOfPointD;
+var
+  resultCnt, resultLen: integer;
+
+  procedure AddPoint(const pt: TPointD);
+  begin
+    if resultCnt = resultLen then
+    begin
+      inc(resultLen, BuffSize);
+      setLength(result, resultLen);
+    end;
+    result[resultCnt] := pt;
+    inc(resultCnt);
+  end;
+
+  procedure DoCurve(const p1, p2, p3: TPointD);
+  var
+    p12, p23, p123: TPointD;
+  begin
+    if (abs(p1.x + p3.x - 2 * p2.x) +
+      abs(p1.y + p3.y - 2 * p2.y) <
+      QBezierTolerance) then //assessing curve 'flatness'
+    begin
+      AddPoint(p3);
+    end else
+    begin
+      P12.X := (P1.X + P2.X) * 0.5;
+      P12.Y := (P1.Y + P2.Y) * 0.5;
+      P23.X := (P2.X + P3.X) * 0.5;
+      P23.Y := (P2.Y + P3.Y) * 0.5;
+      P123.X := (P12.X + P23.X) * 0.5;
+      P123.Y := (P12.Y + P23.Y) * 0.5;
+      DoCurve(p1, p12, p123);
+      DoCurve(p123, p23, p3);
+    end;
+  end;
+
+var
+  i, len: integer;
+  p: PPointD;
+  pt1,pt2,pt3,pt4: TPointD;
+begin
+  result := nil;
+  len := Length(pts); resultLen := 0; resultCnt := 0;
+  if (len < 3) then Exit; //invalid path
+  p := @pts[0];
+  pt1 := p^; inc(p);
+  pt2 := p^; inc(p);
+  for i := 0 to len - 3 do
+  begin
+    pt3 := p^; inc(p);
+    DoCurve(pt1, pt2, pt3);
+    pt1 := pt3;
+    pt2 := ReflectPoint(pt2, pt1);
+  end;
   SetLength(result,resultCnt);
 end;
 //------------------------------------------------------------------------------

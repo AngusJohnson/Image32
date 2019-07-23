@@ -1,4 +1,4 @@
-﻿unit ClipperCore;
+unit ClipperCore;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
@@ -167,7 +167,7 @@ function PathsToString(const paths: TPathsD): string; overload;
 procedure StringToFile(const str, filename: string);
 
 const
-  MinInt64 = -9223372036854775808;
+  MinInt64 = -9223372036854775807;
   MaxInt64 = 9223372036854775807;
   NullRect64: TRect64 =
     (left: MaxInt64; top: MaxInt64; right: MinInt64; Bottom: MinInt64);

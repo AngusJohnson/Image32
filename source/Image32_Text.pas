@@ -2,8 +2,8 @@ unit Image32_Text;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.06                                                            *
-* Date      :  17 July 2019                                                    *
+* Version   :  1.10                                                            *
+* Date      :  23 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module to support text in the Image32 library                   *
@@ -423,7 +423,7 @@ begin
   end;
 
   //The right 2/3 of the image can now be removed ...
-   image.Crop(Rect(0,0, image.Width div 3, image.Height));
+   image.Crop(Types.Rect(0,0, image.Width div 3, image.Height));
 
   //currently text is white and the background is black
   //so blend in the text and background colors ...

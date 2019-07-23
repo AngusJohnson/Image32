@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.07                                                            *
-* Date      :  20 July 2019                                                    *
+* Version   :  1.10                                                            *
+* Date      :  23 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -19,6 +19,7 @@ uses
 
 type
   TColor32 = type Cardinal;
+  TPointD = record X, Y: double; end;
 
 const
   clNone32     = TColor32($00000000);
@@ -234,7 +235,6 @@ type
   end;
 
   PPointD = ^TPointD;
-  TPointD = record X, Y: double; end;
   TArrayOfPointD = array of TPointD;
   TArrayOfArrayOfPointD = array of TArrayOfPointD;
 
@@ -242,7 +242,6 @@ type
   //TPaths = TArrayOfArrayOfPointD;  //also using Clipper.pas
 
   TArrayOfDouble = array of double;
-
   TPathD = array of TPointD;
 
   TRectD = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
@@ -653,18 +652,18 @@ function GetRotatedRectD(const rec: TRectD; angleRad: double): TRectD;
 var
   i: Integer;
   sinA, cosA: extended;
-  cp: TPointD;
   pts: TPathD;
+  mp: TPointD;
 begin
   setLength(pts, 4);
   Math.SinCos(-angleRad, sinA, cosA);
-  cp.X := (rec.Right + rec.Left) / 2;
-  cp.Y := (rec.Bottom + rec.Top) / 2;
   pts[0] := PointD(rec.Left, rec.Top);
   pts[1] := PointD(rec.Right, rec.Top);
   pts[2] := PointD(rec.Left, rec.Bottom);
   pts[3] := PointD(rec.Right, rec.Bottom);
-  for i := 0 to 3 do RotatePt(pts[i], cp, sinA, cosA);
+  mp.X := (rec.Left + rec.Right) * 0.5;
+  mp.Y := (rec.Top + rec.Bottom) * 0.5;
+  for i := 0 to 3 do RotatePt(pts[i], mp, sinA, cosA);
   result.Left := pts[0].X;
   result.Right := result.Left;
   result.Top := pts[0].Y;
@@ -2231,12 +2230,15 @@ var
   x, y, xi, yi, newWidth, newHeight: Integer;
   sinA, cosA: extended;
   dx, dy: double;
-  pt, cp, cp2: TPointD;
+  pt, cp2: TPointD;
   rec: TRectD;
   dstColor: PColor32;
 const
   TwoPi = 2 * pi;
 begin
+  //nb: There's no point rotating about a specific point
+  //since the rotated image will be recentered.
+
   while angleRads >= TwoPi do angleRads := angleRads - TwoPi;
   while angleRads < 0 do angleRads := angleRads + TwoPi;
   if IsEmpty or (angleRads < 0.001) or
@@ -2259,12 +2261,11 @@ begin
     Exit;
   end;
 
-  cp := PointD(width / 2, height / 2);
-  rec.Left := 0; rec.Top := 0;
-  rec.Right := Width; rec.Bottom := Height;
+  rec := RectD(Bounds);
   rec := GetRotatedRectD(rec, angleRads);
   newWidth := Ceil(rec.Right - rec.Left);
   newHeight := Ceil(rec.Bottom - rec.Top);
+
   cp2 := PointD(newWidth / 2, newHeight / 2);
   SetLength(tmp, newWidth * newHeight);
   dstColor := @tmp[0];

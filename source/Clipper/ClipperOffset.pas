@@ -125,7 +125,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DistanceSqr(const pt1, pt2: TPoint64): Int64;
+function DistanceSqr(const pt1, pt2: TPoint64): double;
 begin
   Result := (pt1.X - pt2.X)*(pt1.X - pt2.X) + (pt1.Y - pt2.Y)*(pt1.Y - pt2.Y);
 end;

@@ -1,5 +1,15 @@
 unit Image32_Clipper;
 
+(*******************************************************************************
+* Author    :  Angus Johnson                                                   *
+* Version   :  1.10                                                            *
+* Date      :  23 July 2019                                                    *
+* Website   :  http://www.angusj.com                                           *
+* Copyright :  Angus Johnson 2010-2019                                         *
+* Purpose   :  Wrapper module for the Clipper library                          *
+* License   :  http://www.boost.org/LICENSE_1_0.txt                            *
+*******************************************************************************)
+
 interface
 
 uses

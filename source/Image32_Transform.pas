@@ -2,8 +2,8 @@ unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.06                                                            *
-* Date      :  17 July 2019                                                    *
+* Version   :  1.10                                                            *
+* Date      :  23 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -198,8 +198,16 @@ end;
 // Projective Transformations
 //------------------------------------------------------------------------------
 
+//The code below is based on code from
+//https://github.com/jlouthan/perspective-transform
+//Copyright (c) 2015 Jenny Louthan (MIT License)
+
+//Portions of that code also contains code from
+//https://github.com/sloisel/numeric
+//Copyright (C) 2011 by Sébastien Loisel (MIT License)
+
 type
-  TMatRow8 = array of double;
+  TMatRow8 = TArrayOfDouble;
   TMatrix8 = array of TMatRow8;
 
 //------------------------------------------------------------------------------
@@ -257,15 +265,12 @@ end;
 function DotMV(const matrix: TMatrix8; const vec: TMatRow8): TMatRow8;
 {$IFDEF INLINE} inline; {$ENDIF}
 var
-  i: integer;
-  row: TMatRow8;
+  i, len: integer;
 begin
-  SetLength(Result, Length(matrix));
-  for i := 0 to high(matrix) do
-  begin
-    row := matrix[i];
-    Result[i] := dotVV(row, vec);
-  end;
+  len := Length(matrix);
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    Result[i] := dotVV(matrix[i], vec);
 end;
 //------------------------------------------------------------------------------
 
@@ -392,63 +397,47 @@ var
   i,j: integer;
   matA, matC, matD: TMatrix8;
   matB, matX: TMatRow8;
-  srcPts, dstPts: array[0..7] of Double;
   r1,r2,r3,r4,r5,r6,r7,r8: TMatRow8;
   ptr: PDouble;
 begin
   Result := IdentityMatrix;
   if (length(srcCorners) <> 4) or (length(dstCorners) <> 4) then Exit;
 
-  //Original code from https://github.com/jlouthan/perspective-transform
-  //Copyright (c) 2015 Jenny Louthan (MIT License)
-
-  srcPts[0] := srcCorners[0].X;
-  srcPts[1] := srcCorners[0].Y;
-  srcPts[2] := srcCorners[1].X;
-  srcPts[3] := srcCorners[1].Y;
-  srcPts[4] := srcCorners[2].X;
-  srcPts[5] := srcCorners[2].Y;
-  srcPts[6] := srcCorners[3].X;
-  srcPts[7] := srcCorners[3].Y;
-
-  dstPts[0] := dstCorners[0].X;
-  dstPts[1] := dstCorners[0].Y;
-  dstPts[2] := dstCorners[1].X;
-  dstPts[3] := dstCorners[1].Y;
-  dstPts[4] := dstCorners[2].X;
-  dstPts[5] := dstCorners[2].Y;
-  dstPts[6] := dstCorners[3].X;
-  dstPts[7] := dstCorners[3].Y;
-
-  r1 := [srcPts[0], srcPts[1], 1, 0, 0, 0,
-    -1*dstPts[0]*srcPts[0], -1*dstPts[0]*srcPts[1]];
-	r2 := [0, 0, 0, srcPts[0], srcPts[1], 1,
-    -1*dstPts[1]*srcPts[0], -1*dstPts[1]*srcPts[1]];
-	r3 := [srcPts[2], srcPts[3], 1, 0, 0, 0,
-    -1*dstPts[2]*srcPts[2], -1*dstPts[2]*srcPts[3]];
-	r4 := [0, 0, 0, srcPts[2], srcPts[3], 1,
-    -1*dstPts[3]*srcPts[2], -1*dstPts[3]*srcPts[3]];
-	r5 := [srcPts[4], srcPts[5], 1, 0, 0, 0,
-    -1*dstPts[4]*srcPts[4], -1*dstPts[4]*srcPts[5]];
-	r6 := [0, 0, 0, srcPts[4], srcPts[5], 1,
-    -1*dstPts[5]*srcPts[4], -1*dstPts[5]*srcPts[5]];
-	r7 := [srcPts[6], srcPts[7], 1, 0, 0, 0,
-    -1*dstPts[6]*srcPts[6], -1*dstPts[6]*srcPts[7]];
-	r8 := [0, 0, 0, srcPts[6], srcPts[7], 1,
-    -1*dstPts[7]*srcPts[6], -1*dstPts[7]*srcPts[7]];
+  r1 := MakeArrayOfDouble([srcCorners[0].X, srcCorners[0].Y, 1, 0, 0, 0,
+    -dstCorners[0].X * srcCorners[0].X, -1*dstCorners[0].X*srcCorners[0].Y]);
+	r2 := MakeArrayOfDouble([0, 0, 0, srcCorners[0].X, srcCorners[0].Y, 1,
+    -dstCorners[0].Y*srcCorners[0].X, -1*dstCorners[0].Y * srcCorners[0].Y]);
+	r3 := MakeArrayOfDouble([srcCorners[1].X, srcCorners[1].Y, 1, 0, 0, 0,
+    -dstCorners[1].X*srcCorners[1].X, -1*dstCorners[1].X*srcCorners[1].Y]);
+	r4 := MakeArrayOfDouble([0, 0, 0, srcCorners[1].X, srcCorners[1].Y, 1,
+    -dstCorners[1].Y*srcCorners[1].X, -1*dstCorners[1].Y*srcCorners[1].Y]);
+	r5 := MakeArrayOfDouble([srcCorners[2].X, srcCorners[2].Y, 1, 0, 0, 0,
+    -dstCorners[2].X*srcCorners[2].X, -1*dstCorners[2].X*srcCorners[2].Y]);
+	r6 := MakeArrayOfDouble([0, 0, 0, srcCorners[2].X, srcCorners[2].Y, 1,
+    -dstCorners[2].Y*srcCorners[2].X, -1*dstCorners[2].Y*srcCorners[2].Y]);
+	r7 := MakeArrayOfDouble([srcCorners[3].X, srcCorners[3].Y, 1, 0, 0, 0,
+    -dstCorners[3].X*srcCorners[3].X, -1*dstCorners[3].X*srcCorners[3].Y]);
+	r8 := MakeArrayOfDouble([0, 0, 0, srcCorners[3].X, srcCorners[3].Y, 1,
+    -dstCorners[3].Y*srcCorners[3].X, -1*dstCorners[3].Y*srcCorners[3].Y]);
 
   SetLength(matB, 8);
-  for i := 0 to 7 do matB[i] := dstPts[i];
+  for i := 0 to 3 do
+  begin
+    matB[i*2] := dstCorners[i].X;
+    matB[i*2 +1] := dstCorners[i].Y;
+  end;
 
   SetLength(matA, 8);
   SetLength(matC, 8);
-  matA := [r1, r2, r3, r4, r5, r6, r7, r8];
+  matA[0] := r1; matA[1] := r2; matA[2] := r3; matA[3] := r4;
+  matA[4] := r5; matA[5] := r6; matA[6] := r7; matA[7] := r8;
+  
   matC := TransposeMatrix(matA);
   matC := dotMMsmall(matC, matA);
   try
     matC := InvMatrix(matC);
   except
-    //error!!!
+    Exit; //Error
   end;
   matD := DotMMsmall(matC, TransposeMatrix(matA));
   matX := DotMV(matD, matB);

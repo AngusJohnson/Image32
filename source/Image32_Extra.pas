@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.06                                                            *
-* Date      :  17 July 2019                                                    *
+* Version   :  1.10                                                            *
+* Date      :  23 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -108,7 +108,7 @@ type
     maskRow      : PByteArray;
     compareFunc  : TCompareFunction;
     procedure Reset(w, h, x, y: Integer; pixelBase: PColor32;
-      compFunc: TCompareFunction; tolerance: Integer = 0);
+      compFunc: TCompareFunction; aTolerance: Integer = 0);
     procedure SetCurrentY(y: Integer);
     function IsMatch(x: Integer): Boolean;
   end;
@@ -209,7 +209,7 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TFloodFillMask.Reset(w, h, x, y: Integer;
-  pixelBase: PColor32; compFunc: TCompareFunction; tolerance: Integer);
+  pixelBase: PColor32; compFunc: TCompareFunction; aTolerance: Integer);
 begin
    mask := nil; //clear a existing mask
 
@@ -220,7 +220,7 @@ begin
    colorsBase := PColor32Array(pixelBase);
    Self.initialColor := colorsBase[x + y * w];
    Self.compareFunc := compFunc;
-   Self.tolerance := tolerance;
+   Self.tolerance := aTolerance;
    //Self.colorsRow and Self.maskRow are left undefined here
 end;
 //------------------------------------------------------------------------------
@@ -257,7 +257,7 @@ procedure DrawShadow(img: TImage32; const polygons: TArrayOfArrayOfPointD;
   fillRule: TFillRule; depth: double; blurRadius: integer;
   color: TColor32; angleRads: double);
 var
-  x,y: double;
+  x,y: extended; //D7 compatible
   rec: TRect;
   shadowPolys: TArrayOfArrayOfPointD;
   shadowImg: TImage32;
@@ -268,7 +268,7 @@ begin
     blurRadius -rec.Left +1, blurRadius -rec.Top +1);
   Windows.InflateRect(rec, blurRadius +1, blurRadius +1);
   Windows.OffsetRect(rec, Round(x * depth), Round(y * depth));
-  shadowImg := TImage32.Create(rec.Width, rec.Height);
+  shadowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
   try
     DrawPolygon(shadowImg, shadowPolys, fillRule, color);
     shadowImg.GaussianBlur(shadowImg.Bounds, blurRadius);
@@ -301,7 +301,7 @@ begin
   glowPolys := OffsetPath(polygons,
     blurRadius -rec.Left +1, blurRadius -rec.Top +1);
   Windows.InflateRect(rec, blurRadius +1, blurRadius +1);
-  glowImg := TImage32.Create(rec.Width, rec.Height);
+  glowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
   try
     DrawPolygon(glowImg, glowPolys, fillRule, color);
     glowImg.GaussianBlur(glowImg.Bounds, blurRadius);
@@ -449,7 +449,7 @@ begin
   pc := img.PixelBase;
   for i := 0 to High(ba) do
   begin
-    if pb^ > 0 then pc^ := newColor;
+    if Ord(pb^) > 0 then pc^ := newColor;
     inc(pb); inc(pc);
   end;
 end;
@@ -556,7 +556,7 @@ var
   recI: TRect;
   recD: TRectD;
   paths, paths2: TArrayOfArrayOfPointD;
-  x,y: double;
+  x,y: extended;
 begin
   Math.SinCos(angleRads, y, x);
   recD := GetBoundsD(polygons);

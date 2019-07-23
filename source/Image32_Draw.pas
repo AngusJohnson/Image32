@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.06                                                            *
-* Date      :  17 July 2019                                                    *
+* Version   :  1.10                                                            *
+* Date      :  23 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -900,7 +900,7 @@ end;
 
 function TImageRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
-  result := inherited and (not fImage.IsEmpty);
+  result := inherited Initialize(targetImage) and (not fImage.IsEmpty);
   if not result then Exit;
   fLastYY := 0;
   fBrushPixel := PARGB(fImage.PixelBase);
@@ -977,7 +977,7 @@ var
   i: integer;
   dx,dy, dxdy,dydx: double;
 begin
-  result := inherited and assigned(fGradientColors);
+  result := inherited Initialize(targetImage) and assigned(fGradientColors);
   if not result then Exit;
 
   if abs(fEndPt.Y - fStartPt.Y) > abs(fEndPt.X - fStartPt.X) then
@@ -1053,7 +1053,13 @@ begin
       if offsetFrac <= fGradientColors[i].offset then
       begin
         if offsetFrac < fGradientColors[i].offset then
-          Insert(gradColor, fGradientColors, i) else
+        begin
+          //Insert(gradColor, fGradientColors, i); //not D7 compatible :(
+          SetLength(fGradientColors, len +1);
+          if i < len then Move(fGradientColors[i],
+            fGradientColors[i], (len -i) * SizeOf(TGradientColor));
+          fGradientColors[i] := gradColor;
+        end else
           fGradientColors[i] := gradColor;
         Exit;
       end;
@@ -1107,7 +1113,7 @@ var
   radX,radY: double;
 begin
   fMaxColors := 0;
-  if focalRect.IsEmpty then Exit;
+  if IsEmptyRect(focalRect) then Exit;
 
   SetGradientFillStyle(gradientFillStyle);
 
@@ -1169,7 +1175,13 @@ begin
       if offsetFrac <= fGradientColors[i].offset then
       begin
         if offsetFrac < fGradientColors[i].offset then
-          Insert(gradColor, fGradientColors, i) else
+        begin
+          //Insert(gradColor, fGradientColors, i); //not D7 compatible :(
+          SetLength(fGradientColors, len +1);
+          if i < len then Move(fGradientColors[i],
+            fGradientColors[i], (len -i) * SizeOf(TGradientColor));
+          fGradientColors[i] := gradColor;
+        end else
           fGradientColors[i] := gradColor;
         Exit;
       end;
