@@ -143,22 +143,22 @@ type
     lineWidth: double; renderer: TCustomRenderer;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
 
-  function DrawDashedLine(img: TImage32; const line: TArrayOfPointD;
-    dashPattern: TArrayOfInteger; patternOffset: double;
+  procedure DrawDashedLine(img: TImage32; const line: TArrayOfPointD;
+    dashPattern: TArrayOfInteger; patternOffset: PDouble;
     lineWidth: double; color: TColor32;
-    endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto): double; overload;
-  function DrawDashedLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
-    dashPattern: TArrayOfInteger; patternOffset: double;
+    endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
+  procedure DrawDashedLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
+    dashPattern: TArrayOfInteger; patternOffset: PDouble;
     lineWidth: double; color: TColor32; endStyle: TEndStyle;
-    joinStyle: TJoinStyle = jsAuto): double; overload;
-  function DrawDashedLine(img: TImage32; const line: TArrayOfPointD;
-    dashPattern: TArrayOfInteger; patternOffset: double;
+    joinStyle: TJoinStyle = jsAuto); overload;
+  procedure DrawDashedLine(img: TImage32; const line: TArrayOfPointD;
+    dashPattern: TArrayOfInteger; patternOffset: PDouble;
     lineWidth: double; renderer: TCustomRenderer; endStyle: TEndStyle;
-    joinStyle: TJoinStyle = jsAuto): double; overload;
-  function DrawDashedLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
-    dashPattern: TArrayOfInteger; patternOffset: double;
+    joinStyle: TJoinStyle = jsAuto); overload;
+  procedure DrawDashedLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
+    dashPattern: TArrayOfInteger; patternOffset: PDouble;
     lineWidth: double; renderer: TCustomRenderer;
-    endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto): double; overload;
+    endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
 
   procedure DrawPolygon(img: TImage32; const polygon: TArrayOfPointD;
     fillRule: TFillRule; color: TColor32); overload;
@@ -1288,17 +1288,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DrawDashedLine(img: TImage32; const line: TArrayOfPointD;
-  dashPattern: TArrayOfInteger; patternOffset: double; lineWidth: double;
-  color: TColor32; endStyle: TEndStyle; joinStyle: TJoinStyle): double;
+procedure DrawDashedLine(img: TImage32; const line: TArrayOfPointD;
+  dashPattern: TArrayOfInteger; patternOffset: PDouble; lineWidth: double;
+  color: TColor32; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
   lines: TArrayOfArrayOfPointD;
   cr: TColorRenderer;
 begin
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
-  result := patternOffset;
   if not assigned(line) then exit;
-  lines := BuildDashPath(line, endStyle = esClosed, dashPattern, Result);
+  lines := GetDashedPath(line, endStyle = esClosed, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
   lines := Outline(lines, lineWidth, joinStyle, endStyle);
   cr := TColorRenderer.Create(color);
@@ -1311,30 +1310,28 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DrawDashedLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
-  dashPattern: TArrayOfInteger; patternOffset: double; lineWidth: double;
-  color: TColor32; endStyle: TEndStyle; joinStyle: TJoinStyle): double;
+procedure DrawDashedLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
+  dashPattern: TArrayOfInteger; patternOffset: PDouble; lineWidth: double;
+  color: TColor32; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
   i: integer;
 begin
-  result := patternOffset;
   if not assigned(lines) then exit;
   for i := 0 to high(lines) do
-    result := DrawDashedLine(img, lines[i],
-      dashPattern, result, lineWidth, color, endStyle, joinStyle);
+    DrawDashedLine(img, lines[i],
+      dashPattern, patternOffset, lineWidth, color, endStyle, joinStyle);
 end;
 //------------------------------------------------------------------------------
 
-function DrawDashedLine(img: TImage32; const line: TArrayOfPointD;
-  dashPattern: TArrayOfInteger; patternOffset: double; lineWidth: double;
-  renderer: TCustomRenderer; endStyle: TEndStyle; joinStyle: TJoinStyle): double;
+procedure DrawDashedLine(img: TImage32; const line: TArrayOfPointD;
+  dashPattern: TArrayOfInteger; patternOffset: PDouble; lineWidth: double;
+  renderer: TCustomRenderer; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
   lines: TArrayOfArrayOfPointD;
 begin
-  result := patternOffset;
   if (not assigned(line)) or (not assigned(renderer)) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
-  lines := BuildDashPath(line, endStyle = esClosed, dashPattern, result);
+  lines := GetDashedPath(line, endStyle = esClosed, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
   lines := Outline(lines, lineWidth, joinStyle, endStyle);
   if renderer.Initialize(img) then
@@ -1342,17 +1339,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DrawDashedLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
-  dashPattern: TArrayOfInteger; patternOffset: double; lineWidth: double;
-  renderer: TCustomRenderer; endStyle: TEndStyle; joinStyle: TJoinStyle): double;
+procedure DrawDashedLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
+  dashPattern: TArrayOfInteger; patternOffset: PDouble; lineWidth: double;
+  renderer: TCustomRenderer; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
   i: integer;
 begin
-  result := patternOffset;
   if not assigned(lines) then exit;
   for i := 0 to high(lines) do
     DrawDashedLine(img, lines[i],
-      dashPattern, result, lineWidth, renderer, endStyle, joinStyle);
+      dashPattern, patternOffset, lineWidth, renderer, endStyle, joinStyle);
 end;
 //------------------------------------------------------------------------------
 

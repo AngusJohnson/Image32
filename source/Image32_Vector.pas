@@ -15,7 +15,7 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Windows, Math, Image32;
+  SysUtils, Classes, Windows, Math, {$IFDEF INLINE} Types, {$ENDIF} Image32;
 
 type
   TArrowStyle = (asSimple, asFancy, asDiamond, asCircle);
@@ -58,9 +58,15 @@ type
   function ShortenPath(const path: TArrayOfPointD;
     pathEnd: TPathEnd; amount: double): TArrayOfPointD;
 
-  function BuildDashPath(const path: TArrayOfPointD;
+  //GetDashPath: Returns a polyline (not polygons)
+  function GetDashedPath(const path: TArrayOfPointD;
     closed: Boolean; const pattern: TArrayOfInteger;
-    var patternOffset: double): TArrayOfArrayOfPointD;
+    patternOffset: PDouble): TArrayOfArrayOfPointD;
+
+  function GetDashedOutLine(const path: TArrayOfPointD;
+    closed: Boolean; const pattern: TArrayOfInteger;
+    patternOffset: PDouble; lineWidth: double;
+    joinStyle: TJoinStyle; endStyle: TEndStyle): TArrayOfArrayOfPointD;
 
   //CopyPaths: Because only dynamic string arrays are copy-on-write
   //function CopyPaths(const paths: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD;
@@ -709,7 +715,7 @@ end;
 procedure AppendPath(var paths: TArrayOfArrayOfPointD;
   const extra: TArrayOfPointD);
 var
-  i, len1, len2: integer;
+  len1, len2: integer;
 begin
   len1 := length(paths);
   len2 := length(extra);
@@ -813,8 +819,7 @@ end;
 //------------------------------------------------------------------------------
 
 function GrowClosedLine(const line: TArrayOfPointD; width: double;
-  joinStyle: TJoinStyle; endStyle: TEndStyle;
-  miterLimit: double): TArrayOfArrayOfPointD;
+  joinStyle: TJoinStyle; miterLimit: double): TArrayOfArrayOfPointD;
 var
   len: integer;
   line2, norms: TArrayOfPointD;
@@ -822,7 +827,7 @@ begin
   len := length(line);
   if len < 3 then
   begin
-    result := GrowOpenLine(line, width, joinStyle, endStyle, miterLimit);
+    result := GrowOpenLine(line, width, joinStyle, esClosed, miterLimit);
     Exit;
   end;
 
@@ -849,7 +854,7 @@ function Outline(const line: TArrayOfPointD; lineWidth: double;
 begin
   if not assigned(line) then exit;
   if endStyle = esClosed then
-    result := GrowClosedLine(line, lineWidth, joinStyle, endStyle, miterLimit)
+    result := GrowClosedLine(line, lineWidth, joinStyle, miterLimit)
   else
     result := GrowOpenLine(line, lineWidth, joinStyle, endStyle, miterLimit);
 end;
@@ -884,7 +889,7 @@ begin
   if endStyle = esClosed then
     for i := 0 to high(lines) do
       AddPaths(GrowClosedLine(lines[i],
-        lineWidth, joinStyle, endStyle, miterLimit))
+        lineWidth, joinStyle, miterLimit))
   else
     for i := 0 to high(lines) do
       AddPaths(GrowOpenLine(lines[i],
@@ -1167,14 +1172,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function BuildDashPath(const path: TArrayOfPointD;
+function GetDashedPath(const path: TArrayOfPointD;
   closed: Boolean; const pattern: TArrayOfInteger;
-  var patternOffset: double): TArrayOfArrayOfPointD;
+  patternOffset: PDouble): TArrayOfArrayOfPointD;
 var
   i, highI, paIdx: integer;
   vecs: TArrayOfPointD;
   patCnt, patLen, resCapacity, resCount: integer;
-  segLen, residualPat: double;
+  segLen, residualPat, patOff: double;
   filling: Boolean;
   pt, pt2: TPointD;
 
@@ -1199,24 +1204,28 @@ begin
   vecs := GetVectors(path);
   if (vecs[0].X = 0) and (vecs[0].Y = 0) then Exit; //not a line
 
-  if patternOffset < 0 then
+  if not assigned(patternOffset) then
+    patOff := 0 else
+    patOff := patternOffset^;
+
+  if patOff < 0 then
   begin
     patLen := 0;
     for i := 0 to patCnt -1 do inc(patLen, pattern[i]);
-    patternOffset := patLen - patternOffset;
+    patOff := patLen - patOff;
   end;
   resCapacity := 0;
   resCount := 0;
   paIdx := paIdx mod patCnt;
 
   filling := true;
-  while patternOffset >= pattern[paIdx] do
+  while patOff >= pattern[paIdx] do
   begin
     filling := not filling;
-    patternOffset := patternOffset - pattern[paIdx];
+    patOff := patOff - pattern[paIdx];
     paIdx := (paIdx + 1) mod patCnt;
   end;
-  residualPat := pattern[paIdx] - patternOffset;
+  residualPat := pattern[paIdx] - patOff;
 
   pt := path[0];
   i := 0;
@@ -1262,10 +1271,32 @@ begin
     end;
   SetLength(Result, resCount);
 
-  patternOffset := 0;
+  if not assigned(patternOffset) then Exit;
+  patOff := 0;
   for i := 0 to paIdx -1 do
-    patternOffset := patternOffset + pattern[i];
-  patternOffset := patternOffset + (pattern[paIdx] - residualPat);
+    patOff := patOff + pattern[i];
+  patternOffset^ := patOff + (pattern[paIdx] - residualPat);
+end;
+//------------------------------------------------------------------------------
+
+function GetDashedOutLine(const path: TArrayOfPointD;
+  closed: Boolean; const pattern: TArrayOfInteger;
+  patternOffset: PDouble; lineWidth: double;
+  joinStyle: TJoinStyle; endStyle: TEndStyle): TArrayOfArrayOfPointD;
+var
+  i: integer;
+  tmp: TArrayOfArrayOfPointD;
+begin
+  Result := nil;
+  tmp := GetDashedPath(path, closed, pattern, patternOffset);
+  if closed then
+    for i := 0 to high(tmp) do
+      AppendPath(Result, GrowClosedLine(tmp[i],
+        lineWidth, joinStyle, 2))
+  else
+    for i := 0 to high(tmp) do
+      AppendPath(Result, GrowOpenLine(tmp[i],
+        lineWidth, joinStyle, endStyle, 2));
 end;
 //------------------------------------------------------------------------------
 
@@ -1553,7 +1584,7 @@ var
 var
   i, len: integer;
   p: PPointD;
-  pt1,pt2,pt3,pt4: TPointD;
+  pt1, pt2, pt3: TPointD;
 begin
   result := nil;
   len := Length(pts); resultLen := 0; resultCnt := 0;

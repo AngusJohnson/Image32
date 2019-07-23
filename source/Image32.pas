@@ -320,7 +320,8 @@ type
 
 const
   angle180 = Pi;
-  angle360 = Pi *2;
+  angle0  = 0;
+  angle360 = 0;
   angle15  = Pi /12;
   angle30  = angle15 *2;
   angle45  = angle15 *3;

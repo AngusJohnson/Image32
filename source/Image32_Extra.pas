@@ -23,11 +23,11 @@ type
   TCompareFunction = function(current, compare: TColor32; data: integer): Boolean;
 
 procedure DrawShadow(img: TImage32; const polygon: TArrayOfPointD;
-  fillRule: TFillRule; depth: double; blurRadius: integer;
-  color: TColor32 = $80000000; angleRads: double = angle225); overload;
+  fillRule: TFillRule; depth: double; angleRads: double = angle225;
+  color: TColor32 = $80000000; cutoutInsideShadow: Boolean = false); overload;
 procedure DrawShadow(img: TImage32; const polygons: TArrayOfArrayOfPointD;
-  fillRule: TFillRule; depth: double; blurRadius: integer;
-  color: TColor32 = $80000000; angleRads: double = angle225); overload;
+  fillRule: TFillRule; depth: double; angleRads: double = angle225;
+  color: TColor32 = $80000000; cutoutInsideShadow: Boolean = false); overload;
 
 procedure DrawGlow(img: TImage32; const polygon: TArrayOfPointD;
   fillRule: TFillRule; color: TColor32; blurRadius: integer); overload;
@@ -242,36 +242,42 @@ end;
 //------------------------------------------------------------------------------
 
 procedure DrawShadow(img: TImage32; const polygon: TArrayOfPointD;
-  fillRule: TFillRule; depth: double; blurRadius: integer;
-  color: TColor32; angleRads: double);
+  fillRule: TFillRule; depth: double; angleRads: double;
+  color: TColor32; cutoutInsideShadow: Boolean);
 var
   polygons: TArrayOfArrayOfPointD;
 begin
   setlength(polygons, 1);
   polygons[0] := polygon;
-  DrawShadow(img, polygons, fillRule, depth, blurRadius, color, angleRads);
+  DrawShadow(img, polygons, fillRule, depth,
+    angleRads, color, cutoutInsideShadow);
 end;
 //------------------------------------------------------------------------------
 
 procedure DrawShadow(img: TImage32; const polygons: TArrayOfArrayOfPointD;
-  fillRule: TFillRule; depth: double; blurRadius: integer;
-  color: TColor32; angleRads: double);
+  fillRule: TFillRule; depth: double; angleRads: double;
+  color: TColor32; cutoutInsideShadow: Boolean);
 var
   x,y: extended; //D7 compatible
   rec: TRect;
-  shadowPolys: TArrayOfArrayOfPointD;
+  polys, shadowPolys: TArrayOfArrayOfPointD;
   shadowImg: TImage32;
 begin
+  if depth < 1 then Exit;
   Math.SinCos(-angleRads, y, x);
+  x := depth * x;
+  y := depth * y;
   rec := GetBounds(polygons);
-  shadowPolys := OffsetPath(polygons,
-    blurRadius -rec.Left +1, blurRadius -rec.Top +1);
-  Windows.InflateRect(rec, blurRadius +1, blurRadius +1);
-  Windows.OffsetRect(rec, Round(x * depth), Round(y * depth));
+  Windows.InflateRect(rec, Ceil(depth*2), Ceil(depth*2));
+  polys := OffsetPath(polygons, -rec.Left, -rec.Top);
+  shadowPolys := OffsetPath(polys, x, y);
   shadowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
   try
     DrawPolygon(shadowImg, shadowPolys, fillRule, color);
-    shadowImg.GaussianBlur(shadowImg.Bounds, blurRadius);
+    shadowImg.BoxBlur(shadowImg.Bounds, Ceil(depth / 3), 2);
+    //cutout the shadow inside the poly, ie case partially transparent
+    if cutoutInsideShadow then
+      Erase(shadowImg, polys, fillRule);
     img.CopyFrom(shadowImg, shadowImg.Bounds, rec, BlendToAlpha);
   finally
     shadowImg.Free;
@@ -304,7 +310,7 @@ begin
   glowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
   try
     DrawPolygon(glowImg, glowPolys, fillRule, color);
-    glowImg.GaussianBlur(glowImg.Bounds, blurRadius);
+    glowImg.boxBlur(glowImg.Bounds, Ceil(blurRadius/3), 2);
     glowImg.ScaleAlpha(4);
     img.CopyFrom(glowImg, glowImg.Bounds, rec, BlendToAlpha);
   finally
