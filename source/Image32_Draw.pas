@@ -356,7 +356,7 @@ end;
 function GetColorGradient(const gradColors: TArrayOfGradientColor;
   len: integer): TArrayOfColor32;
 var
-  i,j, highI, lenC: integer;
+  i,j, lenC: integer;
   dist, offset1, offset2, step, pos: double;
   color1, color2: TColor32;
 begin

@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.10                                                            *
-* Date      :  23 July 2019                                                    *
+* Version   :  1.12                                                            *
+* Date      :  25 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -61,7 +61,9 @@ type
     function SaveToFile(const filename: string; img32: TImage32): Boolean; virtual;
     function LoadFromStream(stream: TStream; img32: TImage32): Boolean; virtual; abstract;
     function LoadFromFile(const filename: string; img32: TImage32): Boolean; virtual;
+    class function CanCopyToClipboard: Boolean; virtual;
     function CopyToClipboard(img32: TImage32): Boolean; virtual; abstract;
+    class function CanPasteFromClipboard: Boolean; virtual; abstract;
     function PasteFromClipboard(img32: TImage32): Boolean; virtual; abstract;
   end;
 
@@ -75,6 +77,8 @@ type
     fAntiAliase: Boolean;
     fIsPremultiplied: Boolean;
     fPixels: TArrayOfColor32;
+    fOnChange: TNotifyEvent;
+    fUpdateCnt: integer;
     function GetPixel(x,y: Integer): TColor32;
     procedure SetPixel(x,y: Integer; color: TColor32);
     function GetIsEmpty: Boolean;
@@ -95,6 +99,9 @@ type
       const srcRec, dstRec: TRect; blendFunc: TBlendFunction);
     procedure BlurHorizontal(rect: TRect; radius: Integer);
     procedure BlurVertical(rect: TRect; radius: Integer);
+    procedure DoOnChange;
+    procedure BeginUpdate;
+    procedure EndUpdate;
   public
     constructor Create(width: Integer = 0; height: Integer = 0); overload;
     constructor Create(src: TImage32); overload;
@@ -122,9 +129,10 @@ type
     //any current image in TImage32. (eg copying from TBitmap.canvas.handle)
     procedure CopyFromDC(srcDc: HDC; width, height: Integer);
     //CopyToDc: Copies the image into a Window's device context
-    procedure CopyToDc(dstDc: HDC; x: Integer = 0; y: Integer = 0; 
+    procedure CopyToDc(dstDc: HDC; x: Integer = 0; y: Integer = 0;
       transparent: Boolean = true; bkColor: TColor32 = 0);
     function CopyToClipBoard: Boolean;
+    function CanPasteFromClipBoard: Boolean;
     function PasteFromClipBoard: Boolean;
     procedure Crop(const rec: TRect);
     //SetBackgroundColor: Assumes the current image is semi-transparent.
@@ -216,6 +224,7 @@ type
     property HasTransparency: Boolean read GetHasTransparency;
     //AntiAliased: Antialiasing is used in scaling and rotation transforms
     property AntiAliased: Boolean read fAntiAliase write fAntiAliase;
+    property OnChange: TNotifyEvent read fOnChange write fOnChange;
   end;
 
   PARGB = ^TARGB;
@@ -1011,7 +1020,8 @@ begin
   else if (ext[1] = '.') then Delete(ext, 1,1);
   if not CharInSet(ext[1], ['A'..'Z','a'..'z']) then Exit;
 
-  cpChar := Char(clipPriority);
+  //ImageFormatClassList is sorted with lowest priority first in list
+  cpChar := Char(ord('0') + Ord(clipPriority));
   ImageFormatClassList.AddObject(cpChar + ext, Pointer(bm32ExClass));
 end;
 //------------------------------------------------------------------------------
@@ -1025,13 +1035,11 @@ begin
   pattern := ext;
   if (pattern = '')  or (pattern = '.') then Exit;
   if pattern[1] = '.' then Delete(pattern, 1,1);
-  if CharInSet(pattern[1],
-    [ Chr( Ord(Low(TClipboardPriority)) ) ..
-    Chr( Ord(High(TClipboardPriority))) ]) then
-      Delete(pattern, 1,1); //ie sort priority
 
-  for i := 0 to imageFormatClassList.count -1 do
+  //try for highest priority first
+  for i := imageFormatClassList.count -1 downto 0 do
   begin
+    //nb: ignore the first (priority) char ...
     matchStr := Copy(imageFormatClassList[i], 2, 80);
     if not SameText(matchStr, pattern) then Continue;
     Result := TImageFormatClass(ImageFormatClassList.objects[i]);
@@ -1072,6 +1080,7 @@ procedure TImage32.Assign(src: TImage32);
 begin
   if assigned(src) then
     src.AssignTo(self);
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -1080,8 +1089,29 @@ begin
   dst.fAntiAliase := fAntiAliase;
   dst.fIsPremultiplied := fIsPremultiplied;
   dst.SetSize(Width, Height);
+  dst.fOnChange := fOnChange;
   if (Width > 0) and (Height > 0) then
     move(fPixels[0], dst.fPixels[0], Width * Height * SizeOf(TColor32));
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.DoOnChange;
+begin
+  if Assigned(fOnChange) then fOnChange(Self);
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.BeginUpdate;
+begin
+  inc(fUpdateCnt);
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.EndUpdate;
+begin
+  dec(fUpdateCnt);
+  if (fUpdateCnt = 0) and Assigned(fOnChange) then
+    fOnChange(Self);
 end;
 //------------------------------------------------------------------------------
 
@@ -1096,6 +1126,7 @@ begin
     pc^ := BlendToOpaque(bgColor, pc^);
      inc(pc);
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -1120,6 +1151,7 @@ begin
      inc(pc);
     end;
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -1140,6 +1172,7 @@ begin
       pc^ := color; inc(pc);
     end;
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -1161,6 +1194,7 @@ begin
     end;
     inc(c, Width - rw);
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -1190,6 +1224,7 @@ begin
     //rec is considered valid even when completely outside the image bounds,
     //and so when that happens we simply return a fully transparent image ...
     FillChar(Result[0], w * h * SizeOf(TColor32), 0);
+    DoOnChange;
     Exit;
   end;
 
@@ -1203,6 +1238,7 @@ begin
       Move(pSrc^, pDst^, w * SizeOf(TColor32));
       inc(pSrc, Width); inc(pDst, w);
     end;
+    DoOnChange;
     Exit;
   end;
 
@@ -1242,6 +1278,7 @@ begin
     FillChar(pDst^, w * SizeOf(TColor32), 0);
     inc(pDst, w);
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -1250,8 +1287,13 @@ var
   newPixels: TArrayOfColor32;
 begin
   newPixels := CopyPixels(rec);
-  SetSize(RectWidth(rec), RectHeight(rec));
-  if not IsEmptyRect(rec) then fPixels := newPixels;
+  BeginUpdate;
+  try
+    SetSize(RectWidth(rec), RectHeight(rec));
+    if not IsEmptyRect(rec) then fPixels := newPixels;
+  finally
+    EndUpdate;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1271,6 +1313,7 @@ begin
   //nb: dynamic arrays are zero-initialized with SetLength() unless the array
   //is returned as a function result. And so SetSize() zero-initializes pixels.
   if color > 0 then Clear(color);
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -1281,10 +1324,7 @@ var
 begin
   if (newWidth <= 0) or (newHeight <= 0) then
   begin
-    fwidth := 0;
-    fheight := 0;
-    fPixels := nil;
-    fIsPremultiplied := false;
+    SetSize(0, 0);
     Exit;
   end;
   if (newWidth = fwidth) and (newHeight = fheight) then Exit;
@@ -1303,11 +1343,13 @@ begin
   begin
     tmp := TImage32.create(self);
     try
+      BeginUpdate;
       rec := Bounds;
       SetSize(newWidth, newHeight, clNone32);
       CopyFrom(tmp, rec, rec);
     finally
       tmp.Free;
+      EndUpdate;
     end;
   end;
 end;
@@ -1320,6 +1362,7 @@ var
   tmp: TArrayOfColor32;
   pc: PColor32;
 begin
+  if (newWidth = fWidth) and (newHeight = fHeight) then Exit;
   SetLength(tmp, newWidth * newHeight * SizeOf(TColor32));
 
   //get scaled X & Y values once only (storing them in lookup arrays) ...
@@ -1345,6 +1388,7 @@ begin
   fPixels := tmp;
   fwidth := newWidth;
   fheight := newHeight;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -1383,6 +1427,7 @@ begin
   fPixels := tmp;
   fwidth := newWidth;
   fheight := newHeight;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -1403,6 +1448,7 @@ begin
   if IsEmpty then Exit;
   tmp := TImage32.create(Self);
   try
+    BeginUpdate;
     SetSize(Height, Width);
     xx := (width - 1) * Height;
     dst := PixelBase;
@@ -1417,6 +1463,7 @@ begin
     end;
   finally
     tmp.Free;
+    EndUpdate;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1430,6 +1477,7 @@ begin
   if IsEmpty then Exit;
   tmp := TImage32.create(Self);
   try
+    BeginUpdate;
     SetSize(Height, Width);
     dst := PixelBase;
     for y := 0 to Height -1 do
@@ -1443,6 +1491,7 @@ begin
     end;
   finally
     tmp.Free;
+    EndUpdate;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1469,6 +1518,7 @@ begin
   finally
     tmp.Free;
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -1559,13 +1609,16 @@ var
 begin
   image32FileFmtClass := GetImageFormatClass(ExtractFileExt(filename));
   result := assigned(image32FileFmtClass);
-  if result then
-    with image32FileFmtClass.Create do
-    try
-      result := LoadFromFile(filename, self);
-    finally
-      free;
-    end;
+  if not result then Exit;
+
+  with image32FileFmtClass.Create do
+  try
+    BeginUpdate;
+    result := LoadFromFile(filename, self);
+  finally
+    free;
+    EndUpdate;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1579,13 +1632,15 @@ begin
     fmt := FmtExt;
   image32FileFmtClass := GetImageFormatClass(fmt);
   result := assigned(image32FileFmtClass);
-  if result then
-    with image32FileFmtClass.Create do
-    try
-      result := LoadFromStream(stream, self);
-    finally
-      free;
-    end;
+  if not result then Exit;
+  with image32FileFmtClass.Create do
+  try
+    BeginUpdate;
+    result := LoadFromStream(stream, self);
+  finally
+    free;
+    EndUpdate;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1605,9 +1660,11 @@ begin
     resStream := TResourceStream.Create(hInstance, resName, PChar(resType));
   end;
   try
+    BeginUpdate;
     LoadFromStream(resStream, resType);
   finally
     resStream.Free;
+    EndUpdate;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1625,6 +1682,7 @@ procedure TImage32.SetPixel(x,y: Integer; color: TColor32);
 begin
   if (x < 0) or (x >= Width) or (y < 0) or (y >= Height) then Exit;
   fPixels[y * width + x] := color;
+  //nb: no notify event here
 end;
 //------------------------------------------------------------------------------
 
@@ -1754,6 +1812,7 @@ begin
   end;
   CopyInternal(src, srcRecClipped, dstRecClipped, blendFunc);
   result := true;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -1764,26 +1823,31 @@ var
   memDc: HDC;
   pixels: Pointer;
 begin
-  SetSize(width, height, 0);
-  bi := GetBitmapInfoHeader(width, height);
-  memDc := GetCompatibleMemDc;
+  BeginUpdate;
   try
-    bm := CreateDIBSection(memDc,
-      PBITMAPINFO(@bi)^, DIB_RGB_COLORS, pixels, 0, 0);
-    if bm = 0 then Exit;
+    SetSize(width, height, 0);
+    bi := GetBitmapInfoHeader(width, height);
+    memDc := GetCompatibleMemDc;
     try
-      oldBm := SelectObject(memDc, bm);
-      BitBlt(memDc, 0,0, width, height, srcDc, 0,0, SRCCOPY);
-      Move(pixels^, fPixels[0], width * height * sizeOf(TColor32));
-      SelectObject(memDc, oldBm);
+      bm := CreateDIBSection(memDc,
+        PBITMAPINFO(@bi)^, DIB_RGB_COLORS, pixels, 0, 0);
+      if bm = 0 then Exit;
+      try
+        oldBm := SelectObject(memDc, bm);
+        BitBlt(memDc, 0,0, width, height, srcDc, 0,0, SRCCOPY);
+        Move(pixels^, fPixels[0], width * height * sizeOf(TColor32));
+        SelectObject(memDc, oldBm);
+      finally
+        DeleteObject(bm);
+      end;
     finally
-      DeleteObject(bm);
+      DeleteDc(memDc);
     end;
+    SetAlpha(255);
+    FlipVertical;
   finally
-    DeleteDc(memDc);
+    EndUpdate;
   end;
-  SetAlpha(255);
-  FlipVertical;
 end;
 //------------------------------------------------------------------------------
 
@@ -1841,31 +1905,53 @@ end;
 
 function TImage32.CopyToClipBoard: Boolean;
 var
-  ext: string;
   i: Integer;
-  fileFormatClass: TImageFormatClass;
+  formatClass: TImageFormatClass;
 begin
   //Sadly with CF_DIB (and even CF_DIBV5) clipboard formats, transparency is
-  //usually lost during copy pasting, so we use the CF_PNG format instead, as
-  //this format is widely supported by other software.
+  //usually lost, so we'll copy all available formats including CF_PNG, that
+  //is if it's registerd.
   result := not IsEmpty;
   if not result then Exit;
   result := false;
+
   OpenClipboard(0);
   try
     EmptyClipboard;
-    //copy each registered format to clipboard
     for i := ImageFormatClassList.Count -1 downto 0 do
     begin
-      ext := ImageFormatClassList[i];
-      fileFormatClass := GetImageFormatClass(ext);
-      if assigned(fileFormatClass) then
-        with fileFormatClass.Create do
-        try
-          if CopyToClipboard(self) then result := true;
-        finally
-          free;
-        end;
+      formatClass := TImageFormatClass(ImageFormatClassList.objects[i]);
+      if not formatClass.CanCopyToClipboard then Continue; //ie skip JPG
+
+      with formatClass.Create do
+      try
+        if CopyToClipboard(self) then result := true;
+      finally
+        free;
+      end;
+    end;
+  finally
+    CloseClipboard;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TImage32.CanPasteFromClipBoard: Boolean;
+var
+  i: Integer;
+  formatClass: TImageFormatClass;
+begin
+  result := false;
+  OpenClipboard(0);
+  try
+    for i := ImageFormatClassList.Count -1 downto 0 do
+    begin
+      formatClass := TImageFormatClass(ImageFormatClassList.objects[i]);
+      if formatClass.CanPasteFromClipboard then
+      begin
+        result := true;
+        Exit;
+      end;
     end;
   finally
     CloseClipboard;
@@ -1875,30 +1961,29 @@ end;
 
 function TImage32.PasteFromClipBoard: Boolean;
 var
-  ext: string;
   i: Integer;
-  fileFormatClass: TImageFormatClass;
+  formatClass: TImageFormatClass;
 begin
-  result := not IsEmpty;
-  if not result then Exit;
-  result := true;
-  OpenClipboard(0);
-  try
-    for i := ImageFormatClassList.Count -1 downto 0 do
-    begin
-      ext := ImageFormatClassList[i];
-      fileFormatClass := GetImageFormatClass(ext);
-      if assigned(fileFormatClass) then
-        with fileFormatClass.Create do
-        try
-          if PasteFromClipboard(self) then Exit;
-        finally
-          free;
-        end;
+  result := false;
+  for i := ImageFormatClassList.Count -1 downto 0 do
+  begin
+    formatClass := TImageFormatClass(ImageFormatClassList.objects[i]);
+    if not formatClass.CanPasteFromClipboard then Continue;
+
+    OpenClipboard(0);
+    try
+      with formatClass.Create do
+      try
+        result := PasteFromClipboard(self);
+        if not Result then Continue;
+      finally
+        free;
+      end;
+    finally
+      CloseClipboard;
     end;
-    result := false;
-  finally
-    CloseClipboard;
+    DoOnChange;
+    Break;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1918,6 +2003,7 @@ begin
     dec(row, fWidth);
   end;
   fPixels := a;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -1941,6 +2027,7 @@ begin
     end;
     dec(row, fWidth *2);
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -1964,6 +2051,7 @@ begin
       c.Color := 0;
     inc(c);
   end;
+  //nb: no OnChange notify event here
 end;
 //------------------------------------------------------------------------------
 
@@ -1979,6 +2067,7 @@ begin
     c.A := alpha;
     inc(c);
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -2001,6 +2090,7 @@ begin
     pc.B := 255 - pc.B;
     inc(pc);
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -2015,6 +2105,7 @@ begin
     pc.A := 255 - pc.A;
     inc(pc);
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -2035,6 +2126,7 @@ begin
       if bg.Color = color then bg.Color := clNone32;
       inc(bg);
     end;
+    DoOnChange;
     Exit;
   end;
 
@@ -2060,6 +2152,7 @@ begin
     end;
     inc(bg);
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -2078,6 +2171,7 @@ begin
   for i := 0 to high(tmpImage) do
     tmpImage[i].hue := lut[ tmpImage[i].hue ];
   fPixels := ArrayOfHSLToArrayColor32(tmpImage);
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -2100,6 +2194,7 @@ begin
   for i := 0 to high(tmpImage) do
     tmpImage[i].lum := lut[ tmpImage[i].lum ];
   fPixels := ArrayOfHSLToArrayColor32(tmpImage);
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -2122,6 +2217,7 @@ begin
   for i := 0 to high(tmpImage) do
     tmpImage[i].sat := lut[ tmpImage[i].sat ];
   fPixels := ArrayOfHSLToArrayColor32(tmpImage);
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -2169,6 +2265,7 @@ begin
       fPixels[x + rec.Left + (y + rec.Top) * Width] := wc.Color;
     end;
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -2300,8 +2397,10 @@ begin
         inc(dstColor);
       end;
   end;
+  BeginUpdate;
   SetSize(newWidth, newHeight);
   fPixels := tmp;
+  EndUpdate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2354,8 +2453,10 @@ begin
       pcDst^ := GetWeightedPixel(self, Round(x*$100), Round(y*$100));
       inc(pcDst);
     end;
+  BeginUpdate;
   SetSize(newWidth, newHeight);
   fPixels := tmpPxls;
+  EndUpdate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2369,6 +2470,7 @@ begin
     BlurHorizontal(rect, radius);
     BlurVertical(rect, radius);
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -2510,6 +2612,7 @@ begin
   finally
     bmpBlur.Free;
   end;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -2582,6 +2685,7 @@ begin
 
   for x := 0 to width * height - 1 do
     fPixels[x] := wca[x].Color or $FF000000;
+  DoOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -2596,6 +2700,7 @@ begin
     pb.A := ClampByte(Round(pb.A * scale));
     inc(pb);
   end;
+  DoOnChange;
 end;
 
 //------------------------------------------------------------------------------
@@ -2701,6 +2806,12 @@ begin
     fs.Free;
   end;
 end;
+//------------------------------------------------------------------------------
+
+class function TImageFormat.CanCopyToClipboard: Boolean;
+begin
+  Result := false;
+end;
 
 //------------------------------------------------------------------------------
 // Initialization functions
@@ -2710,6 +2821,7 @@ procedure SetupImageFormatClassList;
 begin
   ImageFormatClassList := TStringList.Create;
   ImageFormatClassList.Duplicates := dupIgnore;
+  ImageFormatClassList.Sorted := true;
 end;
 //------------------------------------------------------------------------------
 

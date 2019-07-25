@@ -12,8 +12,14 @@ http://www.angusj.com/delphi/image32.php
 
 Changes since initial release:
 
+Version: 1.12
+  Added OnChange event to TImage32 class
+  Added new Image32_Layers unit
+  Tidied up Clipboard support which was messy.
+
 Version: 1.11
-  Changed DrawShadow function parameters
+  Modified DrawShadow function parameters
+  Modified DrawDashedLine function parameters
   Renamed BuildDashPath function to GetDashedPath
   Added GetDashedOutLine function
 

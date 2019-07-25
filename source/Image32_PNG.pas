@@ -2,8 +2,8 @@ unit Image32_PNG;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.10                                                            *
-* Date      :  23 July 2019                                                    *
+* Version   :  1.12                                                            *
+* Date      :  25 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  PNG file format extension for TImage32                          *
@@ -23,7 +23,9 @@ type
   public
     function LoadFromStream(stream: TStream; img32: TImage32): Boolean; override;
     procedure SaveToStream(stream: TStream; img32: TImage32); override;
+    class function CanCopyToClipboard: Boolean; override;
     function CopyToClipboard(img32: TImage32): Boolean; override;
+    class function CanPasteFromClipboard: Boolean; override;
     function PasteFromClipboard(img32: TImage32): Boolean; override;
   end;
 
@@ -201,6 +203,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+class function TImage32Fmt_PNG.CanCopyToClipboard: Boolean;
+begin
+  Result := true;
+end;
+//------------------------------------------------------------------------------
+
 function TImage32Fmt_PNG.CopyToClipboard(img32: TImage32): Boolean;
 var
   dataHdl: THandle;
@@ -219,34 +227,37 @@ begin
       free;
     end;
 
-    if not OpenClipboard(0) then Exit;
+    //nb: clipboard should already be open
+    dataHdl := GlobalAlloc(GMEM_MOVEABLE or GMEM_SHARE, ms.Size);
     try
-      dataHdl := GlobalAlloc(GMEM_MOVEABLE or GMEM_SHARE, ms.Size);
+      dataPtr := GlobalLock(dataHdl);
       try
-        dataPtr := GlobalLock(dataHdl);
-        try
-          Move(ms.Memory^, dataPtr^, ms.Size);
-        finally
-          GlobalUnlock(dataHdl);
-        end;
-        if CF_PNG > 0 then
-        begin
-          if SetClipboardData(CF_PNG, dataHdl) = 0 then
-            raise Exception.Create(s_cf_png_error);
-        end
-        else if SetClipboardData(CF_IMAGEPNG, dataHdl) = 0 then
-            raise Exception.Create(s_cf_imagepng_error);
-      except
-        GlobalFree(dataHdl);
-        raise;
+        Move(ms.Memory^, dataPtr^, ms.Size);
+      finally
+        GlobalUnlock(dataHdl);
       end;
-    finally
-      CloseClipboard;
+      if CF_PNG > 0 then
+      begin
+        if SetClipboardData(CF_PNG, dataHdl) = 0 then
+          raise Exception.Create(s_cf_png_error);
+      end
+      else if SetClipboardData(CF_IMAGEPNG, dataHdl) = 0 then
+          raise Exception.Create(s_cf_imagepng_error);
+    except
+      GlobalFree(dataHdl);
+      raise;
     end;
 
   finally
     ms.free;
   end;
+end;
+//------------------------------------------------------------------------------
+
+class function TImage32Fmt_PNG.CanPasteFromClipboard: Boolean;
+begin
+  result := IsClipboardFormatAvailable(CF_PNG) or
+    IsClipboardFormatAvailable(CF_IMAGEPNG);
 end;
 //------------------------------------------------------------------------------
 
@@ -259,18 +270,14 @@ begin
   result := (CF_PNG > 0) or (CF_IMAGEPNG > 0);
   if not result then Exit;
 
+  //nb: clipboard should already be open
   ms := TMemoryStream.Create;
   try
     dataHdl := 0;
-    if OpenClipboard(0) then
-    try
-      if (CF_PNG > 0) and IsClipboardFormatAvailable(CF_PNG) then
-        dataHdl := GetClipboardData(CF_PNG);
-      if (dataHdl = 0) and IsClipboardFormatAvailable(CF_IMAGEPNG) then
-        dataHdl := GetClipboardData(CF_IMAGEPNG);
-    finally
-      CloseClipboard;
-    end;
+    if (CF_PNG > 0) and IsClipboardFormatAvailable(CF_PNG) then
+      dataHdl := GetClipboardData(CF_PNG);
+    if (dataHdl = 0) and IsClipboardFormatAvailable(CF_IMAGEPNG) then
+      dataHdl := GetClipboardData(CF_IMAGEPNG);
 
     if dataHdl = 0 then
     begin

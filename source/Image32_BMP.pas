@@ -2,8 +2,8 @@ unit Image32_BMP;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.10                                                            *
-* Date      :  23 July 2019                                                    *
+* Version   :  1.12                                                            *
+* Date      :  25 July 2019                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  BMP file format extension for TImage32                          *
@@ -31,7 +31,9 @@ type
     function LoadFromStream(stream: TStream; img32: TImage32): Boolean; override;
     function SaveToFile(const filename: string; img32: TImage32): Boolean; override;
     procedure SaveToStream(stream: TStream; img32: TImage32); override;
+    class function CanCopyToClipboard: Boolean; override;
     function CopyToClipboard(img32: TImage32): Boolean; override;
+    class function CanPasteFromClipboard: Boolean; override;
     function PasteFromClipboard(img32: TImage32): Boolean; override;
   end;
 
@@ -736,6 +738,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+class function TImage32Fmt_BMP.CanCopyToClipboard: Boolean;
+begin
+  Result := true;
+end;
+//------------------------------------------------------------------------------
+
 function TImage32Fmt_BMP.CopyToClipboard(img32: TImage32): Boolean;
 var
   dataHdl: THandle;
@@ -753,29 +761,32 @@ begin
       free;
     end;
 
-    if not OpenClipboard(0) then Exit;
+    //nb: clipboard should already be open
+    dataHdl := GlobalAlloc(GMEM_MOVEABLE or GMEM_SHARE, ms.Size);
     try
-      dataHdl := GlobalAlloc(GMEM_MOVEABLE or GMEM_SHARE, ms.Size);
+      dataPtr := GlobalLock(dataHdl);
       try
-        dataPtr := GlobalLock(dataHdl);
-        try
-          Move(ms.Memory^, dataPtr^, ms.Size);
-        finally
-          GlobalUnlock(dataHdl);
-        end;
-        if SetClipboardData(CF_DIB, dataHdl) = 0 then
-          raise Exception.Create(s_cf_dib_error);
-      except
-        GlobalFree(dataHdl);
-        raise;
+        Move(ms.Memory^, dataPtr^, ms.Size);
+      finally
+        GlobalUnlock(dataHdl);
       end;
-    finally
-      CloseClipboard;
+      if SetClipboardData(CF_DIB, dataHdl) = 0 then
+        raise Exception.Create(s_cf_dib_error);
+    except
+      GlobalFree(dataHdl);
+      raise;
     end;
 
   finally
     ms.free;
   end;
+end;
+//------------------------------------------------------------------------------
+
+class function TImage32Fmt_BMP.CanPasteFromClipboard: Boolean;
+begin
+  result := IsClipboardFormatAvailable(CF_DIB) or
+    IsClipboardFormatAvailable(CF_BITMAP);
 end;
 //------------------------------------------------------------------------------
 
@@ -788,47 +799,44 @@ var
   ms: TMemoryStream;
 begin
   result := false;
-  if not OpenClipboard(0) then Exit;
-  try
-    if IsClipboardFormatAvailable(CF_DIB) then
-    begin
-      ms := TMemoryStream.Create;
+
+  //nb: clipboard should already be open
+  if IsClipboardFormatAvailable(CF_DIB) then
+  begin
+    ms := TMemoryStream.Create;
+    try
+      dataHdl := GetClipboardData(CF_DIB);
+      result := dataHdl > 0;
+      if not result then Exit;
+
+      ms.SetSize(GlobalSize(dataHdl));
+      dataPtr := GlobalLock(dataHdl);
       try
-        dataHdl := GetClipboardData(CF_DIB);
-        result := dataHdl > 0;
-        if not result then Exit;
-
-        ms.SetSize(GlobalSize(dataHdl));
-        dataPtr := GlobalLock(dataHdl);
-        try
-          Move(dataPtr^, ms.Memory^, ms.Size);
-        finally
-          GlobalUnlock(dataHdl);
-        end;
-
-        ms.Position := 0;
-        with TImage32Fmt_BMP.Create do
-        try
-          LoadFromStream(ms, img32);
-        finally
-          Free;
-        end;
+        Move(dataPtr^, ms.Memory^, ms.Size);
       finally
-        ms.free;
+        GlobalUnlock(dataHdl);
       end;
-    end
-    else if IsClipboardFormatAvailable(CF_BITMAP) then
-    begin
-      bitmapHdl := GetClipboardData(CF_BITMAP);
-      if IsClipboardFormatAvailable(CF_PALETTE) then
-        paletteHdl := GetClipboardData(CF_PALETTE) else
-        paletteHdl := 0;
-      result := bitmapHdl > 0;
-      if result then
-        LoadFromHBITMAP(img32, bitmapHdl, paletteHdl);
+
+      ms.Position := 0;
+      with TImage32Fmt_BMP.Create do
+      try
+        LoadFromStream(ms, img32);
+      finally
+        Free;
+      end;
+    finally
+      ms.free;
     end;
-  finally
-    CloseClipboard;
+  end
+  else if IsClipboardFormatAvailable(CF_BITMAP) then
+  begin
+    bitmapHdl := GetClipboardData(CF_BITMAP);
+    if IsClipboardFormatAvailable(CF_PALETTE) then
+      paletteHdl := GetClipboardData(CF_PALETTE) else
+      paletteHdl := 0;
+    result := bitmapHdl > 0;
+    if result then
+      LoadFromHBITMAP(img32, bitmapHdl, paletteHdl);
   end;
 end;
 

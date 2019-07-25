@@ -48,13 +48,18 @@ procedure Erase(img: TImage32; const polygons: TArrayOfArrayOfPointD;
   fillRule: TFillRule; inverted: Boolean = false); overload;
 
 procedure Draw3D(img: TImage32; const polygon: TArrayOfPointD;
-  fillRule: TFillRule; height, blurRadius: integer;
+  fillRule: TFillRule; height, blurRadius: double;
   colorLt: TColor32 = $DDFFFFFF; colorDk: TColor32 = $80000000;
   angleRads: double = angle45); overload;
 procedure Draw3D(img: TImage32; const polygons: TArrayOfArrayOfPointD;
-  fillRule: TFillRule; height, blurRadius: integer;
+  fillRule: TFillRule; height, blurRadius: double;
   colorLt: TColor32 = $DDFFFFFF; colorDk: TColor32 = $80000000;
   angleRads: double = angle45); overload;
+
+procedure DrawButton(img: TImage32;
+  const pt: TPointD; radius: double; color: TColor32 = clNone32);
+procedure DrawSquareButton(img: TImage32;
+  const pt: TPointD; radius: double; color: TColor32 = clNone32);
 
 //FLOODFILL COMPARE COLOR FUNCTIONS ( see FloodFill )
 
@@ -259,6 +264,7 @@ procedure DrawShadow(img: TImage32; const polygons: TArrayOfArrayOfPointD;
   color: TColor32; cutoutInsideShadow: Boolean);
 var
   x,y: extended; //D7 compatible
+  blurSize, rpt: integer;
   rec: TRect;
   polys, shadowPolys: TArrayOfArrayOfPointD;
   shadowImg: TImage32;
@@ -267,6 +273,8 @@ begin
   Math.SinCos(-angleRads, y, x);
   x := depth * x;
   y := depth * y;
+  blurSize := Max(1,Round(depth / 4));
+  if depth <= 2 then rpt :=1 else rpt := 2;
   rec := GetBounds(polygons);
   Windows.InflateRect(rec, Ceil(depth*2), Ceil(depth*2));
   polys := OffsetPath(polygons, -rec.Left, -rec.Top);
@@ -274,8 +282,8 @@ begin
   shadowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
   try
     DrawPolygon(shadowImg, shadowPolys, fillRule, color);
-    shadowImg.BoxBlur(shadowImg.Bounds, Ceil(depth / 3), 2);
-    //cutout the shadow inside the poly, ie case partially transparent
+    shadowImg.BoxBlur(shadowImg.Bounds, blurSize, rpt);
+    //shadowImg.GaussianBlur(shadowImg.Bounds, Ceil(depth));
     if cutoutInsideShadow then
       Erase(shadowImg, polys, fillRule);
     img.CopyFrom(shadowImg, shadowImg.Bounds, rec, BlendToAlpha);
@@ -543,7 +551,7 @@ end;
 //------------------------------------------------------------------------------
 
 procedure Draw3D(img: TImage32; const polygon: TArrayOfPointD;
-  fillRule: TFillRule; height, blurRadius: integer;
+  fillRule: TFillRule; height, blurRadius: double;
   colorLt: TColor32; colorDk: TColor32; angleRads: double);
 var
   polygons: TArrayOfArrayOfPointD;
@@ -555,7 +563,7 @@ end;
 //------------------------------------------------------------------------------
 
 procedure Draw3D(img: TImage32; const polygons: TArrayOfArrayOfPointD;
-  fillRule: TFillRule; height, blurRadius: integer;
+  fillRule: TFillRule; height, blurRadius: double;
   colorLt: TColor32; colorDk: TColor32; angleRads: double);
 var
   tmp: TImage32;
@@ -575,7 +583,7 @@ begin
       tmp.Clear(colorLt);
       paths2 := OffsetPath(paths, -height*x, height*y);
       Erase(tmp, paths2, fillRule);
-      tmp.BoxBlur(tmp.Bounds, blurRadius, 2);
+      tmp.BoxBlur(tmp.Bounds, Round(blurRadius), 2);
       Erase(tmp, paths, fillRule, true);
       img.CopyFrom(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;
@@ -585,7 +593,7 @@ begin
       tmp.Clear(colorDk);
       paths2 := OffsetPath(paths, height*x, -height*y);
       Erase(tmp, paths2, fillRule);
-      tmp.BoxBlur(tmp.Bounds, blurRadius, 2);
+      tmp.BoxBlur(tmp.Bounds, Round(blurRadius), 2);
       Erase(tmp, paths, fillRule, true);
       img.CopyFrom(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;
@@ -593,5 +601,46 @@ begin
     tmp.Free;
   end;
 end;
+//------------------------------------------------------------------------------
+
+procedure DrawButtonInternal(img: TImage32;
+  const pt: TPointD; radius: double; color: TColor32; isSquare: Boolean);
+var
+  path: TArrayOfPointD;
+  rec: TRectD;
+  w,h, w2,h2: integer;
+  shadowSize: double;
+begin
+  if (radius < 4) then Exit;
+  shadowSize := radius / 4;
+  rec := RectD(pt.X -radius, pt.Y -radius, pt.X +radius, pt.Y +radius);
+  if isSquare then
+    path := Rectangle(rec) else
+    path := Ellipse(rec);
+
+  if color shr 24 > 2 then
+  begin
+    DrawShadow(img, path, frNonZero, shadowSize);
+    DrawPolygon(img, path, frNonZero, color);
+  end else
+    DrawShadow(img, path, frNonZero, shadowSize, angle225, $80000000, true);
+  DrawLine(img, path, 1, clBlack32, esClosed);
+  Draw3D(img, path, frNonZero, shadowSize*2, Round(shadowSize));
+end;
+//------------------------------------------------------------------------------
+
+procedure DrawButton(img: TImage32;
+  const pt: TPointD; radius: double; color: TColor32);
+begin
+  DrawButtonInternal(img, pt, radius, color, false);
+end;
+//------------------------------------------------------------------------------
+
+procedure DrawSquareButton(img: TImage32;
+  const pt: TPointD; radius: double; color: TColor32);
+begin
+  DrawButtonInternal(img, pt, radius, color, true);
+end;
+//------------------------------------------------------------------------------
 
 end.
