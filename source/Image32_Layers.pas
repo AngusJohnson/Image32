@@ -18,35 +18,45 @@ uses
   Windows, SysUtils, Classes, Math, Image32;
 
 type
-  TImageLayers32 = class;
+  TLayeredImage32 = class;
 
   TLayer32 = class
-    fOwner: TImageLayers32;
-    fIndex: integer;
-    fImage: TImage32;
+    fOwner   : TLayeredImage32;
+    fIndex   : integer;
+    fImage   : TImage32;
     fPosition: TPoint;
-    fVisible: Boolean;
-    procedure SetPosition(const pt: TPoint);
+    fVisible : Boolean;
+    fOpacity   : Byte;
+    fName    : string;
+    function GetBounds: TRect;
     procedure SetVisible(value: Boolean);
     procedure ImageChanged(Sender: TObject);
+    function GetHeight: integer;
+    function GetWidth: integer;
+    procedure SetOpacity(value: Byte);
   public
-    constructor Create(owner: TImageLayers32; index: integer); virtual;
+    constructor Create(owner: TLayeredImage32; index: integer); virtual;
     destructor Destroy; override;
-    function RaiseOne: Boolean;
-    function RaiseTop: Boolean;
-    function LowerOne: Boolean;
-    function LowerBottom: Boolean;
+    procedure SetSize(width, height: integer);
+    function RaiseUpOne: Boolean;
+    function RaiseToTop: Boolean;
+    function LowerDownOne: Boolean;
+    function LowerToBottom: Boolean;
+    procedure PositionAt(const pt: TPoint);
+    procedure PositionCenteredAt(const pt: TPoint);
     property Image: TImage32 read fImage;
     property Index: integer read fIndex;
-    //Position: Layers will be clipped to the bounds of TImageLayers32.
-    property Position: TPoint read fPosition write SetPosition;
-    //Visible: when false the TImageLayers32 owner will still measure this layer
+    property Height: integer read GetHeight;
+    property Name: string read fName write fName;
+    property Opacity: Byte read fOpacity write SetOpacity;
+    property Bounds: TRect read GetBounds;
     property Visible: Boolean read fVisible write SetVisible;
+    property Width: integer read GetWidth;
   end;
 
-  TImageLayers32 = class
+  TLayeredImage32 = class
   private
-    fImageBase: TImage32;
+    fBackground: TImage32;
     fList: TList;
     fBackColor: TColor32;
     fUpdatePending: Boolean;
@@ -55,44 +65,47 @@ type
     procedure SetHeight(value: integer);
     function GetWidth: integer;
     procedure SetWidth(value: integer);
+    function GetBounds: TRect;
     procedure Update;
-    function GetMergedLayers: TImage32;
+    function GetMergedImage: TImage32;
     function GetLayer(index: integer): TLayer32;
   protected
     procedure UpdatePending;
   public
-    //Clear: deletes all layers
     procedure Clear;
-    constructor Create; virtual;
+    constructor Create(Width: integer = 0; Height: integer =0); virtual;
     destructor Destroy; override;
-    function AddNewLayer: TLayer32;
-    function InsertNewLayer(index: integer): TLayer32;
+    function AddNewLayer(const layerName: string = ''): TLayer32; overload;
+    function InsertNewLayer(index: integer;
+      const layerName: string = ''): TLayer32;
     procedure DeleteLayer(index: integer);
+    function GetLayerAt(const pt: TPoint): TLayer32;
     procedure SetSize(width, height: integer);
-    //BackgroundColor: default = clNone32.
     property BackgroundColor: TColor32 read fBackColor write fBackColor;
+    property Bounds: TRect read GetBounds;
     property Count: integer read GetCount;
-    //Height: Setting Height will be ignored when AutoSize = true
     property Height: integer read GetHeight write SetHeight;
     property Layer[index: integer]: TLayer32 read GetLayer; default;
-    property MergedLayers: TImage32 read GetMergedLayers;
-    //Width: Setting Width will be ignored when AutoSize = true
+    property MergedImage: TImage32 read GetMergedImage;
     property Width: integer read GetWidth write SetWidth;
   end;
 
 implementation
 
 resourcestring
-  rsImageLayerRangeError = 'TImageLayer32 error: Invalid layer index.';
+  rsImageLayerRangeError = 'TLayeredImage32 error: Invalid layer index.';
+
 //------------------------------------------------------------------------------
 // TLayer32 class
 //------------------------------------------------------------------------------
 
-constructor TLayer32.Create(owner: TImageLayers32; index: integer);
+constructor TLayer32.Create(owner: TLayeredImage32; index: integer);
 begin
-  fImage := TImage32.Create;
-  fOwner := owner;
-  fIndex := index;
+  fImage   := TImage32.Create;
+  fOwner   := owner;
+  fIndex   := index;
+  fVisible := true;
+  fOpacity   := 255;
   fImage.OnChange := ImageChanged;
 end;
 //------------------------------------------------------------------------------
@@ -104,6 +117,24 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TLayer32.SetSize(width, height: integer);
+begin
+  fImage.SetSize(width, height);
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.GetHeight: integer;
+begin
+  result := fImage.Height;
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.GetWidth: integer;
+begin
+  result := fImage.Width;
+end;
+//------------------------------------------------------------------------------
+
 procedure TLayer32.ImageChanged(Sender: TObject);
 begin
   if Visible then
@@ -111,11 +142,29 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TLayer32.SetPosition(const pt: TPoint);
+function TLayer32.GetBounds: TRect;
+begin
+  Result.TopLeft := fPosition;
+  Result.Right := Result.Left + fImage.Width;
+  Result.Bottom := Result.Top + fImage.Height;
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.PositionAt(const pt: TPoint);
 begin
   if (pt.X = fPosition.X) and (pt.Y = fPosition.Y) then Exit;
   fPosition := pt;
   fOwner.UpdatePending;
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.PositionCenteredAt(const pt: TPoint);
+var
+  pt2: TPoint;
+begin
+  pt2.X := pt.X - fImage.Width div 2;
+  pt2.Y := pt.Y - fImage.Height div 2;
+  PositionAt(pt2);
 end;
 //------------------------------------------------------------------------------
 
@@ -127,7 +176,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayer32.RaiseOne: Boolean;
+procedure TLayer32.SetOpacity(value: Byte);
+begin
+  if value = fOpacity then Exit;
+  fOpacity := value;
+  ImageChanged(self);
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.RaiseUpOne: Boolean;
 var
   i: integer;
   layer2: TLayer32;
@@ -145,7 +202,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayer32.RaiseTop: Boolean;
+function TLayer32.RaiseToTop: Boolean;
 var
   i, highI: integer;
   layer2: TLayer32;
@@ -165,7 +222,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayer32.LowerOne: Boolean;
+function TLayer32.LowerDownOne: Boolean;
 var
   i: integer;
   layer2: TLayer32;
@@ -183,7 +240,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayer32.LowerBottom: Boolean;
+function TLayer32.LowerToBottom: Boolean;
 var
   i: integer;
   layer2: TLayer32;
@@ -202,33 +259,33 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TImageLayers32 class
+// TLayeredImage32 class
 //------------------------------------------------------------------------------
 
-constructor TImageLayers32.Create;
+constructor TLayeredImage32.Create(Width: integer; Height: integer);
 begin
   fList := TList.Create;
-  fImageBase := TImage32.Create;
+  fBackground := TImage32.Create(Width, Height);
 end;
 //------------------------------------------------------------------------------
 
-destructor TImageLayers32.Destroy;
+destructor TLayeredImage32.Destroy;
 begin
   Clear;
   fList.Free;
-  fImageBase.Free;
+  fBackground.Free;
   inherited;
 end;
 //------------------------------------------------------------------------------
 
-procedure TImageLayers32.SetSize(width, height: integer);
+procedure TLayeredImage32.SetSize(width, height: integer);
 begin
-  fImageBase.SetSize(width, height);
+  fBackground.SetSize(width, height);
   UpdatePending;
 end;
 //------------------------------------------------------------------------------
 
-function TImageLayers32.GetLayer(index: integer): TLayer32;
+function TLayeredImage32.GetLayer(index: integer): TLayer32;
 begin
   if (index < 0) or (index >= Count) then
     raise Exception.Create(rsImageLayerRangeError);
@@ -236,46 +293,75 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImageLayers32.UpdatePending;
+procedure TLayeredImage32.UpdatePending;
 begin
   fUpdatePending := true;
 end;
 //------------------------------------------------------------------------------
 
-procedure TImageLayers32.Update;
+procedure FracAlpha(image: TImage32; opacity: byte);
+var
+  i: Integer;
+  pb: PARGB;
+  alphaTbl: TArrayOfByte;
+begin
+  pb := PARGB(image.PixelBase);
+  alphaTbl := @MulTable[opacity];
+  for i := 0 to image.Width * image.Height - 1 do
+  begin
+    pb.A := alphaTbl[pb.A];
+    inc(pb);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayeredImage32.Update;
 var
   i: integer;
   dstRec: TRect;
   blendFunc: TBlendFunction;
+  tmp: TImage32;
 begin
-  fImageBase.FillRect(fImageBase.Bounds, fBackColor);
+  fBackground.FillRect(fBackground.Bounds, fBackColor);
 
   if fBackColor shr 24 < 254 then //ie semi-transparent
     blendFunc := BlendToAlpha else
     blendFunc := BlendToOpaque;
 
-  for i := 0 to Count -1 do
-  begin
-    with Layer[i] do
+  tmp := TImage32.Create;
+  try
+    for i := 0 to Count -1 do
     begin
-      if not Visible then Continue;
-      dstRec := Rect(fPosition.X, fPosition.Y,
-        fPosition.X + Width, fPosition.Y + Height);
-      fImageBase.CopyFrom(Image, Image.Bounds, dstRec, blendFunc);
+      with Layer[i] do
+      begin
+        if not Visible or (fOpacity < 2) then Continue;
+        dstRec := Rect(fPosition.X, fPosition.Y,
+          fPosition.X + Image.Width, fPosition.Y + Image.Height);
+        if fOpacity < 254 then
+        begin
+          //reduce layer opacity
+          tmp.Assign(Image);
+          FracAlpha(tmp, fOpacity);
+          fBackground.CopyFrom(tmp, tmp.Bounds, dstRec, blendFunc);
+        end else
+          fBackground.CopyFrom(Image, Image.Bounds, dstRec, blendFunc);
+      end;
     end;
+  finally
+    tmp.Free;
   end;
   fUpdatePending := false;
 end;
 //------------------------------------------------------------------------------
 
-function TImageLayers32.GetMergedLayers: TImage32;
+function TLayeredImage32.GetMergedImage: TImage32;
 begin
   if fUpdatePending then Update;
-  Result := fImageBase;
+  Result := fBackground;
 end;
 //------------------------------------------------------------------------------
 
-procedure TImageLayers32.Clear;
+procedure TLayeredImage32.Clear;
 var
   i: integer;
 begin
@@ -286,58 +372,67 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImageLayers32.GetCount: integer;
+function TLayeredImage32.GetCount: integer;
 begin
   Result := fList.Count;
 end;
 //------------------------------------------------------------------------------
 
-function TImageLayers32.GetHeight: integer;
+function TLayeredImage32.GetHeight: integer;
 begin
-  Result := fImageBase.Height;
+  Result := fBackground.Height;
 end;
 //------------------------------------------------------------------------------
 
-procedure TImageLayers32.SetHeight(value: integer);
+procedure TLayeredImage32.SetHeight(value: integer);
 begin
-  if fImageBase.Height = value then Exit;
-  fImageBase.SetSize(Width, value);
+  if fBackground.Height = value then Exit;
+  fBackground.SetSize(Width, value);
   UpdatePending;
 end;
 //------------------------------------------------------------------------------
 
-function TImageLayers32.GetWidth: integer;
+function TLayeredImage32.GetWidth: integer;
 begin
-  Result := fImageBase.Width;
+  Result := fBackground.Width;
 end;
 //------------------------------------------------------------------------------
 
-procedure TImageLayers32.SetWidth(value: integer);
+procedure TLayeredImage32.SetWidth(value: integer);
 begin
-  if fImageBase.Width = value then Exit;
-  fImageBase.SetSize(value, Height);
+  if fBackground.Width = value then Exit;
+  fBackground.SetSize(value, Height);
   UpdatePending;
 end;
 //------------------------------------------------------------------------------
 
-function TImageLayers32.AddNewLayer: TLayer32;
+function TLayeredImage32.GetBounds: TRect;
+begin
+  Result := Rect(0, 0, Width, Height);
+end;
+//------------------------------------------------------------------------------
+
+function TLayeredImage32.AddNewLayer(const layerName: string = ''): TLayer32;
 var
   i: integer;
 begin
   i := Count;
   Result := TLayer32.Create(Self, i);
   fList.Add(Result);
+  Result.fName := layerName;
   UpdatePending;
 end;
 //------------------------------------------------------------------------------
 
-function TImageLayers32.InsertNewLayer(index: integer): TLayer32;
+function TLayeredImage32.InsertNewLayer(index: integer;
+  const layerName: string = ''): TLayer32;
 var
   i: integer;
 begin
   if (index < 0) or (index > Count) then
     raise Exception.Create(rsImageLayerRangeError);
   Result := TLayer32.Create(Self, index);
+  Result.Name := layerName;
   fList.Insert(index, Result);
   for i := index + 1 to Count -1 do
     Layer[i].fIndex := i;
@@ -345,7 +440,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImageLayers32.DeleteLayer(index: integer);
+procedure TLayeredImage32.DeleteLayer(index: integer);
 var
   i: integer;
 begin
@@ -356,6 +451,21 @@ begin
   for i := index to Count -1 do
     Layer[i].fIndex := i;
   UpdatePending;
+end;
+//------------------------------------------------------------------------------
+
+function TLayeredImage32.GetLayerAt(const pt: TPoint): TLayer32;
+var
+  i: integer;
+begin
+  for i := Count -1 downto 0 do
+    with Layer[i] do
+      if PtInRect(Bounds, pt) then
+      begin
+        Result := Layer[i];
+        Exit;
+      end;
+  Result := nil;
 end;
 //------------------------------------------------------------------------------
 

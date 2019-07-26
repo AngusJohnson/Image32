@@ -25,9 +25,8 @@ procedure AffineTransform(img: TImage32; matrix: TMatrixD);
 //Note: matrix multiplication is not symmetric
 function MultiplyMatrices(const current, new: TMatrixD): TMatrixD;
 
-procedure ProjectiveTransform(img: TImage32;
-  const srcCorners, dstCorners: TArrayOfPointD);
-
+function ProjectiveTransform(img: TImage32;
+  const dstPts: TArrayOfPointD): Boolean;
 
 const
   IdentityMatrix: TMatrixD = ((1, 0, 0),(0, 1, 0),(0, 0, 1));
@@ -38,11 +37,10 @@ uses
   Image32_Vector;
 
 resourcestring
-  rsMatrixNotInverible = 'InvertMatrix Error: Matrix not invertible';
-  rsInvalidMatrix = 'Invalid matrix. Tip - start with IdentityMatrix';
+  rsInvalidMatrix = 'Invalid matrix.'; //nb: always start with IdentityMatrix
 
 //------------------------------------------------------------------------------
-// Affine Transformations
+// Affine Transformation
 //------------------------------------------------------------------------------
 
 function MultiplyMatrices(const current, new: TMatrixD): TMatrixD;
@@ -116,7 +114,7 @@ procedure InvertMatrix(var matrix: TMatrixD);
 var
   d: double;
 const
-  tolerance = 1.0E-10;
+  tolerance = 1.0E-5;
 begin
   d := Determinant(matrix);
   if abs(d) > tolerance then
@@ -195,286 +193,142 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// Projective Transformations
+// Projective Transformation
 //------------------------------------------------------------------------------
 
-//The code below is based on code from
-//https://github.com/jlouthan/perspective-transform
-//Copyright (c) 2015 Jenny Louthan (MIT License)
+// The code below is based on code from GR32_Transforms.pas in
+// Graphics32 - https://sourceforge.net/projects/graphics32/
+// Portions created by the initial developer, Alex A. Denisov, are protected
+// by copyright (C) 2000-2009 under Mozilla Public License.
+// MPL 1.1 or LGPL 2.1 with linking exception (http://www.mozilla.org/MPL/ )
 
-//Portions of that code also contains code from
-//https://github.com/sloisel/numeric
-//Copyright (C) 2011 by Sébastien Loisel (MIT License)
-
-type
-  TMatRow8 = TArrayOfDouble;
-  TMatrix8 = array of TMatRow8;
-
-//------------------------------------------------------------------------------
-
-function DotMMsmall(const x, y: TMatrix8): TMatrix8;
+procedure Scale(var M: TMatrixD; Factor: double);
 var
-  i,j,k, p,q,r: integer;
-  bar: TMatRow8;
-  woo: double;
+  i, j: Integer;
 begin
-  p := High(x); q := High(y);
-  r := High(y[0]);
-  SetLength(Result, p +1);
-  for i := 0 to p do SetLength(Result[i], r +1);
-
-  for i := p downto 0 do
-  begin
-    bar := x[i];
-    k := r;
-    while k >= 0 do
-    begin
-      woo := bar[q] * y[q][k];
-      j := q -1;
-      while j >= 1 do
-      begin
-        woo := woo + bar[j] * y[j][k] + bar[j-1] * y[j-1][k];
-        dec(j, 2);
-      end;
-      if (j = 0) then woo := woo + bar[0] * y[0][k];
-      Result[i][k] := woo;
-      dec(k);
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function DotVV(const x, y: TMatRow8): double;
-{$IFDEF INLINE} inline; {$ENDIF}
-var
-  i, n: integer;
-begin
-  n := High(x);
-  Result := x[n] * y[n];
-  i := n -1;
-  while i >= 1 do
-  begin
-     Result := Result + x[i] * y[i] + x[i-1] * y[i-1];
-     dec(i,2);
-  end;
-  if (i = 0) then
-    Result := Result + x[0] * y[0];
-end;
-//------------------------------------------------------------------------------
-
-function DotMV(const matrix: TMatrix8; const vec: TMatRow8): TMatRow8;
-{$IFDEF INLINE} inline; {$ENDIF}
-var
-  i, len: integer;
-begin
-  len := Length(matrix);
-  SetLength(Result, len);
-  for i := 0 to len -1 do
-    Result[i] := dotVV(matrix[i], vec);
-end;
-//------------------------------------------------------------------------------
-
-function MakeIdentity(size: integer): TMatrix8;
-var
-  i: integer;
-begin
-  setLength(Result, size);
-  for i := 0 to size -1 do
-  begin
-    SetLength(Result[i], size);
-    Result[i][i] := 1;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function InvMatrix(const mat: TMatrix8): TMatrix8;
-var
-  i, j, k, m,n, I0: integer;
-  A: TMatrix8;
-  Ai, Aj, Ii, Ij: TMatRow8;
-  kx, x, v0: double;
-begin
-  m := High(mat);
-  n := High(mat[0]);
-  Result := MakeIdentity(m+1);
-  SetLength(A, m +1);
-  for i := 0 to m do
-  begin
-    SetLength(A[i], n+1);
-    Move(mat[i][0], A[i][0], (n+1) * SizeOf(double));
-  end;
-
-  for j := 0 to n do
-  begin
-    i0 := -1; v0 := -1;
-    for i := j to m do
-    begin
-      kx := abs(A[i][j]);
-      if kx > v0 then
-      begin
-        i0 := i;
-        v0 := kx;
-      end;
-    end;
-    if (i0 = -1) then
-      Raise Exception.Create(rsMatrixNotInverible);
-
-    Aj := A[i0];
-    A[i0] := A[j];
-    A[j] := Aj;
-    Ij := Result[i0];
-    Result[i0] := Result[j];
-    Result[j] := Ij;
-    x := Aj[j];
-
-    for k := j to n do Aj[k] := Aj[k] / x;
-    for k := n downto 0 do Ij[k] := Ij[k] / x;
-
-    for i := m downto 0 do
-    begin
-      if (i = j) then Continue;
-      Ai := A[i];
-      Ii := Result[i];
-      x := Ai[j];
-      for k := j+1 to n do Ai[k] := Ai[k] - Aj[k] * x;
-      k := n;
-      while k > 0 do
-      begin
-        Ii[k] := Ii[k] - Ij[k] * x;
-        dec(k);
-        Ii[k] := Ii[k] - Ij[k] * x;
-        dec(k);
-      end;
-      if (k = 0) then Ii[0] := Ii[0] - Ij[0] * x;
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function Round10DP(num: double): double;
-{$IFDEF INLINE} inline; {$ENDIF}
-begin
-  result := (num * 10000000000)/10000000000;
-end;
-//------------------------------------------------------------------------------
-
-function TransposeMatrix(const matrix: TMatrix8): TMatrix8;
-var
-  i,j, highRow, highCol: integer;
-  A0, A1, Bj: TMatRow8;
-begin
-  highRow := High(matrix[0]);
-  highCol := High(matrix);
-  SetLength(Result, highCol +1);
-  for i := 0 to highCol do
-    SetLength(Result[i], highRow +1);
-
-  i := highCol;
-  while i >= 1 do
-  begin
-    A1 := matrix[i];
-    A0 := matrix[i - 1];
-    for j := highRow downto 0 do
-    begin
-      Bj := Result[j];
-      Bj[i] := A1[j];
-      Bj[i-1] := A0[j];
-    end;
-    dec(i, 2);
-  end;
-  if i = 0 then
-  begin
-    A0 := matrix[0];
-    for J := highRow downto 0 do
-      Result[j][0] := A0[j];
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function GetProjectiveMatrix(const srcCorners,
-  dstCorners: TArrayOfPointD): TMatrixD;
-var
-  i,j: integer;
-  matA, matC, matD: TMatrix8;
-  matB, matX: TMatRow8;
-  r1,r2,r3,r4,r5,r6,r7,r8: TMatRow8;
-  ptr: PDouble;
-begin
-  Result := IdentityMatrix;
-  if (length(srcCorners) <> 4) or (length(dstCorners) <> 4) then Exit;
-
-  r1 := MakeArrayOfDouble([srcCorners[0].X, srcCorners[0].Y, 1, 0, 0, 0,
-    -dstCorners[0].X * srcCorners[0].X, -1*dstCorners[0].X*srcCorners[0].Y]);
-	r2 := MakeArrayOfDouble([0, 0, 0, srcCorners[0].X, srcCorners[0].Y, 1,
-    -dstCorners[0].Y*srcCorners[0].X, -1*dstCorners[0].Y * srcCorners[0].Y]);
-	r3 := MakeArrayOfDouble([srcCorners[1].X, srcCorners[1].Y, 1, 0, 0, 0,
-    -dstCorners[1].X*srcCorners[1].X, -1*dstCorners[1].X*srcCorners[1].Y]);
-	r4 := MakeArrayOfDouble([0, 0, 0, srcCorners[1].X, srcCorners[1].Y, 1,
-    -dstCorners[1].Y*srcCorners[1].X, -1*dstCorners[1].Y*srcCorners[1].Y]);
-	r5 := MakeArrayOfDouble([srcCorners[2].X, srcCorners[2].Y, 1, 0, 0, 0,
-    -dstCorners[2].X*srcCorners[2].X, -1*dstCorners[2].X*srcCorners[2].Y]);
-	r6 := MakeArrayOfDouble([0, 0, 0, srcCorners[2].X, srcCorners[2].Y, 1,
-    -dstCorners[2].Y*srcCorners[2].X, -1*dstCorners[2].Y*srcCorners[2].Y]);
-	r7 := MakeArrayOfDouble([srcCorners[3].X, srcCorners[3].Y, 1, 0, 0, 0,
-    -dstCorners[3].X*srcCorners[3].X, -1*dstCorners[3].X*srcCorners[3].Y]);
-	r8 := MakeArrayOfDouble([0, 0, 0, srcCorners[3].X, srcCorners[3].Y, 1,
-    -dstCorners[3].Y*srcCorners[3].X, -1*dstCorners[3].Y*srcCorners[3].Y]);
-
-  SetLength(matB, 8);
-  for i := 0 to 3 do
-  begin
-    matB[i*2] := dstCorners[i].X;
-    matB[i*2 +1] := dstCorners[i].Y;
-  end;
-
-  SetLength(matA, 8);
-  SetLength(matC, 8);
-  matA[0] := r1; matA[1] := r2; matA[2] := r3; matA[3] := r4;
-  matA[4] := r5; matA[5] := r6; matA[6] := r7; matA[7] := r8;
-  
-  matC := TransposeMatrix(matA);
-  matC := dotMMsmall(matC, matA);
-  try
-    matC := InvMatrix(matC);
-  except
-    Exit; //Error
-  end;
-  matD := DotMMsmall(matC, TransposeMatrix(matA));
-  matX := DotMV(matD, matB);
-
-  ptr := @matX[0];
   for i := 0 to 2 do
     for j := 0 to 2 do
-    begin
-      Result[i][j] := Round10DP(ptr^);
-      inc(ptr);
-    end;
-  Result[2][2] := 1;
+      M[i,j] := M[i,j] * Factor;
 end;
 //------------------------------------------------------------------------------
 
-function ProjectiveTransformPt(x,y: double; const mat: TMatrixD): TPointD;
-begin
-  Result.X := (mat[0][0]*x + mat[0][1]*y + mat[0][2]) /
-    (mat[2][0]*x + mat[2][1]*y + 1);
-  Result.Y := (mat[1][0]*x + mat[1][1]*y + mat[1][2]) /
-    (mat[2][0]*x + mat[2][1]*y + 1);
-end;
-//------------------------------------------------------------------------------
-
-procedure ProjectiveTransform(img: TImage32;
-  const srcCorners, dstCorners: TArrayOfPointD);
+procedure Invert(var M: TMatrixD);
 var
-  i,j, w,h, dx, dy: integer;
-  pt: TPointD;
-  matrix: TMatrixD;
+  Det: double;
+begin
+  Det := Determinant(M);
+  if Abs(Det) < 1E-5 then M := IdentityMatrix
+  else
+  begin
+    Adjoint(M);
+    Scale(M, 1 / Det);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function InvTransformPt(var x, y: double; invMatrix: TMatrixD): Boolean;
+var
+  xx, z: double;
+begin
+  z := invMatrix[0, 2] * x + invMatrix[1, 2] * y + invMatrix[2, 2];
+  Result := z <> 0;
+  if not Result then Exit;
+
+  xx := x;
+  x := invMatrix[0, 0] *xx + invMatrix[1, 0] *y + invMatrix[2, 0];
+  y := invMatrix[0, 1] *xx + invMatrix[1, 1] *y + invMatrix[2, 1];
+
+  if z = 1 then Exit;
+  z := 1 / z; x := x * z; y := y * z;
+  Result := (abs(x) < $7FFFFF) and (abs(y) < $7FFFFF); //avoids range error
+end;
+//------------------------------------------------------------------------------
+
+function GetProjectiveTransformInvMatrix(const srcRect: TRect;
+  dst: TArrayOfPointD): TMatrixD;
+var
+  dx1, dx2, px, dy1, dy2, py: double;
+  g, h, k: double;
+  R: TMatrixD;
+begin
+  px := dst[0].X - dst[1].X + dst[2].X - dst[3].X;
+  py := dst[0].Y - dst[1].Y + dst[2].Y - dst[3].Y;
+
+  //if (top.dx = bottom.dx) and (top.dy = bottom.dy) then affine transform
+  if (px = 0) and (py = 0) then
+  begin
+    Result[0, 0] := dst[1].X - dst[0].X;
+    Result[1, 0] := dst[2].X - dst[1].X;
+    Result[2, 0] := dst[0].X;
+
+    Result[0, 1] := dst[1].Y - dst[0].Y;
+    Result[1, 1] := dst[2].Y - dst[1].Y;
+    Result[2, 1] := dst[0].Y;
+
+    Result[0, 2] := 0;
+    Result[1, 2] := 0;
+    Result[2, 2] := 1;
+  end else
+  begin
+    dx1 := dst[1].X - dst[2].X;
+    dx2 := dst[3].X - dst[2].X;
+    dy1 := dst[1].Y - dst[2].Y;
+    dy2 := dst[3].Y - dst[2].Y;
+    k := dx1 * dy2 - dx2 * dy1;
+    if k <> 0 then
+    begin
+      k := 1 / k;
+      g := (px * dy2 - py * dx2) * k;
+      h := (dx1 * py - dy1 * px) * k;
+
+      Result[0, 0] := dst[1].X - dst[0].X + g * dst[1].X;
+      Result[1, 0] := dst[3].X - dst[0].X + h * dst[3].X;
+      Result[2, 0] := dst[0].X;
+
+      Result[0, 1] := dst[1].Y - dst[0].Y + g * dst[1].Y;
+      Result[1, 1] := dst[3].Y - dst[0].Y + h * dst[3].Y;
+      Result[2, 1] := dst[0].Y;
+
+      Result[0, 2] := g;
+      Result[1, 2] := h;
+      Result[2, 2] := 1;
+    end else
+    begin
+      FillChar(Result, SizeOf(Result), 0);
+    end;
+  end;
+
+  // denormalize texture space (u, v)
+  R := IdentityMatrix;
+  R[0, 0] := 1 / (SrcRect.Right - SrcRect.Left);
+  R[1, 1] := 1 / (SrcRect.Bottom - SrcRect.Top);
+  Result := MultiplyMatrices(R, Result);
+
+  R := IdentityMatrix;
+  R[2, 0] := -SrcRect.Left;
+  R[2, 1] := -SrcRect.Top;
+  Result := MultiplyMatrices(R, Result);
+
+  Invert(Result);
+end;
+//------------------------------------------------------------------------------
+
+function ProjectiveTransform(img: TImage32;
+  const dstPts: TArrayOfPointD): Boolean;
+var
+  w,h,i,j, dx,dy: integer;
+  x,y: double;
   rec: TRect;
+  invMatrix: TMatrixD;
   tmp: TArrayOfColor32;
   pc: PColor32;
 begin
-  if img.Width * img.Height = 0 then Exit;
-  rec := GetBounds(dstCorners);
-  matrix := GetProjectiveMatrix(dstCorners, srcCorners);
+  result := false;
+  if img.IsEmpty or (Length(dstPts) <> 4) then Exit;
+  rec := GetBounds(dstPts);
+
+  invMatrix := GetProjectiveTransformInvMatrix(img.Bounds, dstPts);
+
   w := RectWidth(rec); h := RectHeight(rec);
   dx := rec.Left;
   dy := rec.Top;
@@ -483,10 +337,12 @@ begin
   for i := 0 to h -1 do
     for j := 0 to w -1 do
     begin
-      pt := ProjectiveTransformPt(j + dx, i + dy, matrix);
-      pc^ := GetWeightedPixel(img, Round(pt.X * 256), Round(pt.Y * 256));
+      x := j + dx; y := i + dy;
+      if not InvTransformPt(x, y, invMatrix) then Exit;
+      pc^ := GetWeightedPixel(img, Round(x * 256), Round(y * 256));
       inc(pc);
     end;
+  Result := true;
   img.SetSize(w, h);
   Move(tmp[0], img.Pixels[0], w * h * sizeOf(TColor32));
 end;
