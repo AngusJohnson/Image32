@@ -22,7 +22,7 @@ type
 
   TLayer32 = class
     fOwner   : TLayeredImage32;
-    fIndex   : integer;
+    fLevel   : integer;
     fImage   : TImage32;
     fPosition: TPoint;
     fVisible : Boolean;
@@ -35,7 +35,7 @@ type
     function GetWidth: integer;
     procedure SetOpacity(value: Byte);
   public
-    constructor Create(owner: TLayeredImage32; index: integer); virtual;
+    constructor Create(owner: TLayeredImage32; level: integer); virtual;
     destructor Destroy; override;
     procedure SetSize(width, height: integer);
     function RaiseUpOne: Boolean;
@@ -44,12 +44,14 @@ type
     function LowerToBottom: Boolean;
     procedure PositionAt(const pt: TPoint);
     procedure PositionCenteredAt(const pt: TPoint);
+    property Bounds: TRect read GetBounds;
     property Image: TImage32 read fImage;
-    property Index: integer read fIndex;
+    property Level: integer read fLevel;
     property Height: integer read GetHeight;
+    property Left: integer read fPosition.X;
     property Name: string read fName write fName;
     property Opacity: Byte read fOpacity write SetOpacity;
-    property Bounds: TRect read GetBounds;
+    property Top: integer read fPosition.Y;
     property Visible: Boolean read fVisible write SetVisible;
     property Width: integer read GetWidth;
   end;
@@ -68,7 +70,7 @@ type
     function GetBounds: TRect;
     procedure Update;
     function GetMergedImage: TImage32;
-    function GetLayer(index: integer): TLayer32;
+    function GetLayer(level: integer): TLayer32;
   protected
     procedure UpdatePending;
   public
@@ -76,16 +78,16 @@ type
     constructor Create(Width: integer = 0; Height: integer =0); virtual;
     destructor Destroy; override;
     function AddNewLayer(const layerName: string = ''): TLayer32; overload;
-    function InsertNewLayer(index: integer;
+    function InsertNewLayer(level: integer;
       const layerName: string = ''): TLayer32;
-    procedure DeleteLayer(index: integer);
+    procedure DeleteLayer(level: integer);
     function GetLayerAt(const pt: TPoint): TLayer32;
     procedure SetSize(width, height: integer);
     property BackgroundColor: TColor32 read fBackColor write fBackColor;
     property Bounds: TRect read GetBounds;
     property Count: integer read GetCount;
     property Height: integer read GetHeight write SetHeight;
-    property Layer[index: integer]: TLayer32 read GetLayer; default;
+    property Layer[level: integer]: TLayer32 read GetLayer; default;
     property MergedImage: TImage32 read GetMergedImage;
     property Width: integer read GetWidth write SetWidth;
   end;
@@ -93,17 +95,17 @@ type
 implementation
 
 resourcestring
-  rsImageLayerRangeError = 'TLayeredImage32 error: Invalid layer index.';
+  rsImageLayerRangeError = 'TLayeredImage32 error: Level out of range.';
 
 //------------------------------------------------------------------------------
 // TLayer32 class
 //------------------------------------------------------------------------------
 
-constructor TLayer32.Create(owner: TLayeredImage32; index: integer);
+constructor TLayer32.Create(owner: TLayeredImage32; level: integer);
 begin
   fImage   := TImage32.Create;
   fOwner   := owner;
-  fIndex   := index;
+  fLevel   := level;
   fVisible := true;
   fOpacity   := 255;
   fImage.OnChange := ImageChanged;
@@ -189,15 +191,15 @@ var
   i: integer;
   layer2: TLayer32;
 begin
-  result := (fIndex < fOwner.Count -1);
+  result := (fLevel < fOwner.Count -1);
   if not result then Exit;
-  i := fIndex;
+  i := fLevel;
   layer2 := fOwner[i +1];
 
   fOwner.fList[i] := layer2;
-  layer2.fIndex := i;
+  layer2.fLevel := i;
   fOwner.fList[i+1] := self;
-  self.fIndex := i+1;
+  self.fLevel := i+1;
   fOwner.UpdatePending;
 end;
 //------------------------------------------------------------------------------
@@ -208,16 +210,16 @@ var
   layer2: TLayer32;
 begin
   highI := fOwner.Count -1;
-  result := (fIndex < highI);
+  result := (fLevel < highI);
   if not result then Exit;
-  for i := fIndex +1 to highI do
+  for i := fLevel +1 to highI do
   begin
     layer2 := fOwner.Layer[i];
-    layer2.fIndex := i -1;
+    layer2.fLevel := i -1;
     fOwner.fList[i-1] := layer2;
   end;
   fOwner.fList[highI] := self;
-  self.fIndex := highI;
+  self.fLevel := highI;
   fOwner.UpdatePending;
 end;
 //------------------------------------------------------------------------------
@@ -227,15 +229,15 @@ var
   i: integer;
   layer2: TLayer32;
 begin
-  result := (fIndex > 0);
+  result := (fLevel > 0);
   if not result then Exit;
-  i := fIndex;
+  i := fLevel;
   layer2 := fOwner[i -1];
 
   fOwner.fList[i] := layer2;
-  layer2.fIndex := i;
+  layer2.fLevel := i;
   fOwner.fList[i-1] := self;
-  self.fIndex := i-1;
+  self.fLevel := i-1;
   fOwner.UpdatePending;
 end;
 //------------------------------------------------------------------------------
@@ -245,16 +247,16 @@ var
   i: integer;
   layer2: TLayer32;
 begin
-  result := (fIndex > 0);
+  result := (fLevel > 0);
   if not result then Exit;
-  for i := fIndex -1 downto 0 do
+  for i := fLevel -1 downto 0 do
   begin
     layer2 := fOwner.Layer[i];
-    layer2.fIndex := i +1;
+    layer2.fLevel := i +1;
     fOwner.fList[i+1] := layer2;
   end;
   fOwner.fList[0] := self;
-  self.fIndex := 0;
+  self.fLevel := 0;
   fOwner.UpdatePending;
 end;
 
@@ -285,11 +287,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.GetLayer(index: integer): TLayer32;
+function TLayeredImage32.GetLayer(level: integer): TLayer32;
 begin
-  if (index < 0) or (index >= Count) then
+  if (level < 0) or (level >= Count) then
     raise Exception.Create(rsImageLayerRangeError);
-  Result := TLayer32(fList[index]);
+  Result := TLayer32(fList[level]);
 end;
 //------------------------------------------------------------------------------
 
@@ -424,32 +426,32 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.InsertNewLayer(index: integer;
+function TLayeredImage32.InsertNewLayer(level: integer;
   const layerName: string = ''): TLayer32;
 var
   i: integer;
 begin
-  if (index < 0) or (index > Count) then
+  if (level < 0) or (level > Count) then
     raise Exception.Create(rsImageLayerRangeError);
-  Result := TLayer32.Create(Self, index);
+  Result := TLayer32.Create(Self, level);
   Result.Name := layerName;
-  fList.Insert(index, Result);
-  for i := index + 1 to Count -1 do
-    Layer[i].fIndex := i;
+  fList.Insert(level, Result);
+  for i := level + 1 to Count -1 do
+    Layer[i].fLevel := i;
   UpdatePending;
 end;
 //------------------------------------------------------------------------------
 
-procedure TLayeredImage32.DeleteLayer(index: integer);
+procedure TLayeredImage32.DeleteLayer(level: integer);
 var
   i: integer;
 begin
-  if (index < 0) or (index >= Count) then
+  if (level < 0) or (level >= Count) then
     raise Exception.Create(rsImageLayerRangeError);
-  TLayer32(fList[index]).Free;
-  fList.Delete(index);
-  for i := index to Count -1 do
-    Layer[i].fIndex := i;
+  TLayer32(fList[level]).Free;
+  fList.Delete(level);
+  for i := level to Count -1 do
+    Layer[i].fLevel := i;
   UpdatePending;
 end;
 //------------------------------------------------------------------------------

@@ -21,6 +21,8 @@ uses
 type
   //TCompareFunction: Function template for FloodFill procedure
   TCompareFunction = function(current, compare: TColor32; data: integer): Boolean;
+  TButtonOption = (boSquare, boPressed, boDropShadow);
+  TButtonOptions = set of TButtonOption;
 
 procedure DrawShadow(img: TImage32; const polygon: TArrayOfPointD;
   fillRule: TFillRule; depth: double; angleRads: double = angle225;
@@ -56,10 +58,9 @@ procedure Draw3D(img: TImage32; const polygons: TArrayOfArrayOfPointD;
   colorLt: TColor32 = $DDFFFFFF; colorDk: TColor32 = $80000000;
   angleRads: double = angle45); overload;
 
-procedure DrawButton(img: TImage32;
-  const pt: TPointD; radius: double; color: TColor32 = clNone32);
-procedure DrawSquareButton(img: TImage32;
-  const pt: TPointD; radius: double; color: TColor32 = clNone32);
+procedure DrawButton(img: TImage32; const pt: TPointD;
+  size: double; color: TColor32 = clNone32;
+  buttonOptions: TButtonOptions = []);
 
 //FLOODFILL COMPARE COLOR FUNCTIONS ( see FloodFill )
 
@@ -603,43 +604,34 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawButtonInternal(img: TImage32;
-  const pt: TPointD; radius: double; color: TColor32; isSquare: Boolean);
+procedure DrawButton(img: TImage32; const pt: TPointD;
+  size: double; color: TColor32; buttonOptions: TButtonOptions);
 var
   path: TArrayOfPointD;
   rec: TRectD;
-  w,h, w2,h2: integer;
-  shadowSize: double;
+  shadowSize, shadowAngle: double;
 begin
-  if (radius < 4) then Exit;
-  shadowSize := radius / 4;
-  rec := RectD(pt.X -radius, pt.Y -radius, pt.X +radius, pt.Y +radius);
-  if isSquare then
+  if (size < 5) then Exit;
+  size := size /2;
+  shadowSize := size / 4;
+  rec := RectD(pt.X -size, pt.Y -size, pt.X +size, pt.Y +size);
+  if boSquare in buttonOptions then
     path := Rectangle(rec) else
     path := Ellipse(rec);
-
+  if boPressed in buttonOptions then
+    shadowAngle := angle45 else
+    shadowAngle := angle225;
+  //nb: only need to cutout the inside shadow if
+  //the pending color fill is semi-transparent
+  if (boDropShadow in buttonOptions) then
+    DrawShadow(img, path, frNonZero, shadowSize,
+      255, $80000000, color shr 24 < 254);
   if color shr 24 > 2 then
-  begin
-    DrawShadow(img, path, frNonZero, shadowSize);
     DrawPolygon(img, path, frNonZero, color);
-  end else
-    DrawShadow(img, path, frNonZero, shadowSize, angle225, $80000000, true);
+
   DrawLine(img, path, 1, clBlack32, esClosed);
-  Draw3D(img, path, frNonZero, shadowSize*2, Round(shadowSize));
-end;
-//------------------------------------------------------------------------------
-
-procedure DrawButton(img: TImage32;
-  const pt: TPointD; radius: double; color: TColor32);
-begin
-  DrawButtonInternal(img, pt, radius, color, false);
-end;
-//------------------------------------------------------------------------------
-
-procedure DrawSquareButton(img: TImage32;
-  const pt: TPointD; radius: double; color: TColor32);
-begin
-  DrawButtonInternal(img, pt, radius, color, true);
+  Draw3D(img, path, frNonZero, shadowSize*2,
+    Round(shadowSize), $80000000, $DDFFFFFF, shadowAngle);
 end;
 //------------------------------------------------------------------------------
 

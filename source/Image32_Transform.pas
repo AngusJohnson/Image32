@@ -324,11 +324,11 @@ var
   pc: PColor32;
 begin
   result := false;
-  if img.IsEmpty or (Length(dstPts) <> 4) then Exit;
-  rec := GetBounds(dstPts);
+  if img.IsEmpty or (Length(dstPts) <> 4) or
+    not IsPathConvex(dstPts) then Exit;
 
   invMatrix := GetProjectiveTransformInvMatrix(img.Bounds, dstPts);
-
+  rec := GetBounds(dstPts);
   w := RectWidth(rec); h := RectHeight(rec);
   dx := rec.Left;
   dy := rec.Top;

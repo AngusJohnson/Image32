@@ -117,6 +117,13 @@ type
   function MakeArrayOfInteger(const ints: array of integer): TArrayOfInteger;
   function MakeArrayOfDouble(const doubles: array of double): TArrayOfDouble;
 
+  function CrossProduct(const pt1, pt2, pt3: TPointD): double;
+  function TurnsLeft(const pt1, pt2, pt3: TPointD): boolean;
+  {$IFDEF INLINING} inline; {$ENDIF}
+  function TurnsRight(const pt1, pt2, pt3: TPointD): boolean;
+  {$IFDEF INLINING} inline; {$ENDIF}
+  function IsPathConvex(const path: TArrayOfPointD): Boolean;
+
   //GetUnitVector: Used internally
   function GetUnitVector(const pt1, pt2: TPointD): TPointD;
   {$IFDEF INLINE} inline; {$ENDIF}
@@ -289,6 +296,48 @@ begin
   len := Length(doubles);
   SetLength(Result, len);
   for i := 0 to len -1 do Result[i] := doubles[i];
+end;
+//------------------------------------------------------------------------------
+
+function CrossProduct(const pt1, pt2, pt3: TPointD): double;
+var
+  x1,x2,y1,y2: double;
+begin
+  x1 := pt2.X - pt1.X;
+  y1 := pt2.Y - pt1.Y;
+  x2 := pt3.X - pt2.X;
+  y2 := pt3.Y - pt2.Y;
+  result := (x1 * y2 - y1 * x2);
+end;
+//---------------------------------------------------------------------------
+
+function TurnsLeft(const pt1, pt2, pt3: TPointD): boolean;
+begin
+  result := CrossProduct(pt1, pt2, pt3) < 0;
+end;
+//---------------------------------------------------------------------------
+
+function TurnsRight(const pt1, pt2, pt3: TPointD): boolean;
+begin
+  result := CrossProduct(pt1, pt2, pt3) > 0;
+end;
+//---------------------------------------------------------------------------
+
+function IsPathConvex(const path: TArrayOfPointD): Boolean;
+var
+  i, pathLen: integer;
+  dir: boolean;
+begin
+  result := false;
+  pathLen := length(path);
+  if pathLen < 3 then Exit;
+  //get the winding direction of the first angle
+  dir := TurnsRight(path[0], path[1], path[2]);
+  //check that each other angle has the same winding direction
+  for i := 1 to pathLen -1 do
+    if TurnsRight(path[i], path[(i+1) mod pathLen],
+      path[(i+2) mod pathLen]) <> dir then Exit;
+  result := true;
 end;
 //------------------------------------------------------------------------------
 

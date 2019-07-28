@@ -17,6 +17,8 @@ interface
 uses
   Windows, Types, SysUtils, Classes, Math, Image32, Image32_Draw;
 
+const
+  DEFAULT = -1;
 type
   //TGlyphInfo: Object that's used internally be TFontInfo
   //Note - glyph outlines always use the NON-ZERO fill rule
@@ -126,20 +128,20 @@ type
     const text: string; fontInfo: TFontInfo;
     textAlign: TTextAlign = taJustify; textAlignV: TTextAlignV = taTop;
     textColor: TColor32 = clBlack32;
-    lineSpacing: double = -1.0; paraSpacing: double = -1.0): TPointD;
+    lineSpacing: double = DEFAULT; paraSpacing: double = DEFAULT): TPointD;
 
   function DrawWrappedText_LCD(image: TImage32; const rec: TRect;
     const text: string; fontInfo: TFontInfo;
     textAlign: TTextAlign = taJustify; textAlignV: TTextAlignV = taTop;
     textColor: TColor32 = clBlack32;
-    lineSpacing: double = -1.0; paraSpacing: double = -1.0): TPointD;
+    lineSpacing: double = DEFAULT; paraSpacing: double = DEFAULT): TPointD;
 
   //MeasureText: Returns the bounding rectangle of the text.<br>
-  //MeasureText also the returns via 'charPos' the offset for the start of
-  //each character and the offset of the next anticipated character.<br>
+  //MeasureText also returns via 'charOffsets' the offset for the start
+  //of each character PLUS the offset of the next anticipated character.<br>
   //Hence Length(charPos) = Length(text) +1;
   procedure MeasureText(const text: string; fontInfo: TFontInfo;
-    out bounds: TRectD; out charPos: TArrayOfPointD);
+    out bounds: TRectD; out charOffsets: TArrayOfPointD);
 
   //GetFontSize: Returns the font's 'point size' (DPI independant)
   function GetFontSize(logFont: TLogFont): integer;
@@ -772,7 +774,7 @@ end;
 //------------------------------------------------------------------------------
 
 procedure MeasureText(const text: string; fontInfo: TFontInfo;
-  out bounds: TRectD; out charPos: TArrayOfPointD);
+  out bounds: TRectD; out charOffsets: TArrayOfPointD);
 var
   i, len: integer;
   delta, x,y: double;
@@ -781,10 +783,10 @@ var
   mtp: TMeasureTextPrefer;
 begin
   len := Length(text);
-  setLength(charPos, len+1);
+  setLength(charOffsets, len+1);
   bounds := RectD(0, 0, 0, 0);
   if len = 0 then EXit;
-  charPos[0] := PointD(0,0);
+  charOffsets[0] := PointD(0,0);
   if fontInfo = nil then
     fontInfo := FontManager.GetFontInfo(DefaultLogfont);
   fontInfo.FillMissingChars(text);
@@ -808,7 +810,7 @@ begin
     glyphInfo := fontInfo.GlyphInfo[text[i]];
     if not assigned(glyphInfo) then
     begin
-      charPos[i] := charPos[i-1];
+      charOffsets[i] := charOffsets[i-1];
       Continue;
     end;
     rec := glyphInfo.bounds;
@@ -831,8 +833,8 @@ begin
           y := y - glyphInfo.gm.gmCellIncY;
         end;
     end;
-    charPos[i].X := x;
-    charPos[i].Y := y;
+    charOffsets[i].X := x;
+    charOffsets[i].Y := y;
   end;
 end;
 //------------------------------------------------------------------------------
