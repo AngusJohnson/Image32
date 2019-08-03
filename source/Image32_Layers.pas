@@ -29,6 +29,7 @@ type
     fOpacity   : Byte;
     fName    : string;
     function GetBounds: TRect;
+    function GetMidPoint: TPointD;
     procedure SetVisible(value: Boolean);
     procedure ImageChanged(Sender: TObject);
     function GetHeight: integer;
@@ -49,6 +50,7 @@ type
     property Level: integer read fLevel;
     property Height: integer read GetHeight;
     property Left: integer read fPosition.X;
+    property MidPoint: TPointD read GetMidPoint;
     property Name: string read fName write fName;
     property Opacity: Byte read fOpacity write SetOpacity;
     property Top: integer read fPosition.Y;
@@ -93,6 +95,9 @@ type
   end;
 
 implementation
+
+uses
+  Image32_Vector;
 
 resourcestring
   rsImageLayerRangeError = 'TLayeredImage32 error: Level out of range.';
@@ -149,6 +154,12 @@ begin
   Result.TopLeft := fPosition;
   Result.Right := Result.Left + fImage.Width;
   Result.Bottom := Result.Top + fImage.Height;
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.GetMidPoint: TPointD;
+begin
+  Result := Image32_Vector.MidPoint(RectD(GetBounds));
 end;
 //------------------------------------------------------------------------------
 

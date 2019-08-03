@@ -1057,7 +1057,7 @@ begin
           //Insert(gradColor, fGradientColors, i); //not D7 compatible :(
           SetLength(fGradientColors, len +1);
           if i < len then Move(fGradientColors[i],
-            fGradientColors[i], (len -i) * SizeOf(TGradientColor));
+            fGradientColors[i+1], (len -i) * SizeOf(TGradientColor));
           fGradientColors[i] := gradColor;
         end else
           fGradientColors[i] := gradColor;
@@ -1179,7 +1179,7 @@ begin
           //Insert(gradColor, fGradientColors, i); //not D7 compatible :(
           SetLength(fGradientColors, len +1);
           if i < len then Move(fGradientColors[i],
-            fGradientColors[i], (len -i) * SizeOf(TGradientColor));
+            fGradientColors[i+1], (len -i) * SizeOf(TGradientColor));
           fGradientColors[i] := gradColor;
         end else
           fGradientColors[i] := gradColor;

@@ -19,22 +19,25 @@ uses
 {$IF COMPILERVERSION >= 17}
   //Nested types within classes
   {$DEFINE NESTED_TYPES}
-  {$IF COMPILERVERSION >= 18.5}
-    //Delphi 2007   - added inline compiler directive
-    {$DEFINE INLINE}
-    {$IF COMPILERVERSION >= 20}
-      //Delphi 2009  - added TBitmap.AlphaFormat property
-      {$DEFINE ALPHAFORMAT}
-      {$IF COMPILERVERSION >= 21}
-        //Delphi 2010 - added screen gesture support
-        {$DEFINE GESTURES}
+  {$IF COMPILERVERSION >= 18}
+    //Delphi 2006   - added TBitmap.SetSize method
+    {$DEFINE SETSIZE}
+    {$IF COMPILERVERSION >= 18.5}
+      //Delphi 2007   - added inline compiler directive
+      {$DEFINE INLINE}
+      {$IF COMPILERVERSION >= 20}
+        //Delphi 2009  - added TBitmap.AlphaFormat property
+        {$DEFINE ALPHAFORMAT}
+        {$IF COMPILERVERSION >= 21}
+          //Delphi 2010 - added screen gesture support
+          {$DEFINE GESTURES}
+        {$IFEND}
       {$IFEND}
     {$IFEND}
   {$IFEND}
 {$IFEND}
 
 type
-
   TBitmapProperties = class;
 
   //TFileDropEvent: Method template for TBitmapProperties.OnFileDrop
@@ -105,7 +108,7 @@ type
     procedure BitmapToClient(var pt: TPoint);
     function CopyToClipboard: Boolean;
     function PasteFromClipboard: Boolean;
-    //ClearBitmap: Required only if drawing to the bitmap's Canvas property.
+    //ClearBitmap: Required only when drawing to the bitmap's Canvas property.
     procedure ClearBitmap(PixelFormat: TPixelFormat = pf32bit);
     property Bitmap: TBitmap read fBmp;
     property BitmapProperties: TBitmapProperties read fBitmapProperties;
@@ -213,6 +216,9 @@ type
       true: (color: TColor);
   end;
 
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
 //Since record methods were only added to Delphi in version D2006,
 //the following functions provide compatability for earlier versions
 
@@ -221,24 +227,28 @@ function RectWidth(const rec: TRect): integer;
 begin
   result := rec.Right - rec.Left;
 end;
+//------------------------------------------------------------------------------
 
 procedure SetRectWidth(var rec: TRect; width: integer);
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
   rec.Right := rec.Left + width;
 end;
+//------------------------------------------------------------------------------
 
 function RectHeight(const rec: TRect): integer;
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
   result := rec.Bottom - rec.Top;
 end;
+//------------------------------------------------------------------------------
 
 procedure SetRectHeight(var rec: TRect; height: integer);
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
   rec.Bottom := rec.Top + height;
 end;
+//------------------------------------------------------------------------------
 
 //DPI: the 'standard' screen resoluton is 96dpi;
 //newer monitors however typically have higher resoulutions (eg 120, 144dpi).
@@ -249,6 +259,7 @@ function DpiScale(value: integer): integer;
 begin
   result := Round(value * Screen.PixelsPerInch div 96);
 end;
+//------------------------------------------------------------------------------
 
 function MakeDarker(color: TColor; percent: integer): TColor;
 var
@@ -727,7 +738,7 @@ end;
 procedure TPanel.ClearBitmap(PixelFormat: TPixelFormat);
 var
   i: integer;
-  c: PColor32;
+  pc: PColor32;
 begin
   if fBmp.Empty then
     Raise Exception.Create(rsClearBitmapError);
@@ -737,18 +748,18 @@ begin
     {$IFDEF ALPHAFORMAT}
     fBmp.AlphaFormat := afPremultiplied;
     {$ENDIF}
-    c := PColor32(fBmp.ScanLine[fBmp.Height -1]);
+    pc := PColor32(fBmp.ScanLine[fBmp.Height -1]);
     for i := 0 to fBmp.Width * fBmp.Height -1 do
     begin
-      c^ := 0;
-      inc(c);
+      pc^ := 0;
+      inc(pc);
     end;
   end else
   begin
     {$IFDEF ALPHAFORMAT}
     fBmp.AlphaFormat := afIgnored;
     {$ENDIF}
-    fBmp.Canvas.Brush.Color :=  $FFFFFF;
+    fBmp.Canvas.Brush.Color := Self.Color;
     fBmp.Canvas.FillRect(Rect(0, 0, fBmp.Width, fBmp.Height));
   end;
   Invalidate;
@@ -867,8 +878,12 @@ begin
   begin
     tmpBmp := TBitmap.Create; //temporary bitmap for clipping
     try
+      {$IFDEF SETSIZE}
+      tmpBmp.SetSize(srcRec.Width, srcRec.Height);
+      {$ELSE}
       tmpBmp.Width := RectWidth(srcRec);
       tmpBmp.Height := RectHeight(srcRec);
+      {$ENDIF}
       tmpBmp.Canvas.CopyRect(Rect(0,0,RectWidth(srcRec),
         RectHeight(srcRec)), fBmp.Canvas, srcRec);
       Canvas.StretchDraw(fDstRect, tmpBmp);

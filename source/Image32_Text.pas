@@ -105,7 +105,7 @@ type
   end;
 
   TTextAlign = (taLeft, taRight, taCenter, taJustify);
-  TTextAlignV = (taTop, taMiddle, taBottom);
+  TTextVAlign = (tvaTop, tvaMiddle, tvaBottom);
 
   function GetTextOutline(x, y: double; const text: string;
     fontInfo: TFontInfo; textAlign: TTextAlign; out textEndPos: TPointD;
@@ -126,13 +126,13 @@ type
 
   function DrawWrappedText(image: TImage32; const rec: TRect;
     const text: string; fontInfo: TFontInfo;
-    textAlign: TTextAlign = taJustify; textAlignV: TTextAlignV = taTop;
+    textAlign: TTextAlign = taJustify; textAlignV: TTextVAlign = tvaTop;
     textColor: TColor32 = clBlack32;
     lineSpacing: double = DEFAULT; paraSpacing: double = DEFAULT): TPointD;
 
   function DrawWrappedText_LCD(image: TImage32; const rec: TRect;
     const text: string; fontInfo: TFontInfo;
-    textAlign: TTextAlign = taJustify; textAlignV: TTextAlignV = taTop;
+    textAlign: TTextAlign = taJustify; textAlignV: TTextVAlign = tvaTop;
     textColor: TColor32 = clBlack32;
     lineSpacing: double = DEFAULT; paraSpacing: double = DEFAULT): TPointD;
 
@@ -596,7 +596,7 @@ end;
 
 function DrawWrappedTextInternal(image: TImage32; const rec: TRect;
   const text: string; fontInfo: TFontInfo; lcd: Boolean;
-  textAlign: TTextAlign; textAlignV: TTextAlignV;
+  textAlign: TTextAlign; textAlignV: TTextVAlign;
   textColor: TColor32; lineSpacing: double; paraSpacing: double): TPointD;
 var
   bounds: TRectD;
@@ -694,14 +694,14 @@ begin
   y := rec.Top + dy;
 
   case textAlignV of
-    taMiddle:
+    tvaMiddle:
       begin
         WrapText(true, lcd); //ie just measuring vertical offset
         if y >= rec.Bottom then
           y := rec.Top + dy else
           y := rec.Top + dy + (rec.Bottom - y)/2;
       end;
-    taBottom:
+    tvaBottom:
       begin
         WrapText(true, lcd); //ie just measuring vertical offset
         if y >= rec.Bottom then
@@ -716,7 +716,7 @@ end;
 
 function DrawWrappedText(image: TImage32; const rec: TRect;
   const text: string; fontInfo: TFontInfo;
-  textAlign: TTextAlign; textAlignV: TTextAlignV;
+  textAlign: TTextAlign; textAlignV: TTextVAlign;
   textColor: TColor32; lineSpacing: double; paraSpacing: double): TPointD;
 begin
   Result := DrawWrappedTextInternal(image, rec, text, fontInfo,
@@ -726,7 +726,7 @@ end;
 
 function DrawWrappedText_LCD(image: TImage32; const rec: TRect;
   const text: string; fontInfo: TFontInfo;
-  textAlign: TTextAlign; textAlignV: TTextAlignV; textColor: TColor32;
+  textAlign: TTextAlign; textAlignV: TTextVAlign; textColor: TColor32;
   lineSpacing: double; paraSpacing: double): TPointD;
 begin
   Result := DrawWrappedTextInternal(image, rec, text, fontInfo,

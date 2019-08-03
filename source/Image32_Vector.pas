@@ -71,7 +71,9 @@ type
   //CopyPaths: Because only dynamic string arrays are copy-on-write
   //function CopyPaths(const paths: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD;
 
-  function OffsetPoint(const pt: TPointD; dx, dy: double): TPointD;
+  function OffsetPoint(const pt: TPoint; dx, dy: integer): TPoint; overload;
+  function OffsetPoint(const pt: TPointD; dx, dy: double): TPointD; overload;
+
   function OffsetPath(const path: TArrayOfPointD;
     dx, dy: double): TArrayOfPointD; overload;
   function OffsetPath(const paths: TArrayOfArrayOfPointD;
@@ -164,6 +166,10 @@ type
    //cause artifacts when paths are rendered.
   function Grow(const path, normals: TArrayOfPointD; delta: double;
     joinStyle: TJoinStyle; miterLimit: double): TArrayOfPointD;
+
+const
+  NullRect: TRect = (left: 0; top: 0; right: 0; Bottom: 0);
+  NullRectD: TRectD = (left: 0; top: 0; right: 0; Bottom: 0);
 
 var
   //AutoWidthThreshold: When JoinStyle = jsAuto, this is the threshold at
@@ -391,6 +397,13 @@ begin
   setLength(result, len1);
   for i := 0 to len1 -1 do
     result[i] := Copy(paths[i], 0, length(paths[i]));
+end;
+//------------------------------------------------------------------------------
+
+function OffsetPoint(const pt: TPoint; dx, dy: integer): TPoint;
+begin
+  result.x := pt.x + dx;
+  result.y := pt.y + dy;
 end;
 //------------------------------------------------------------------------------
 
@@ -1577,8 +1590,11 @@ var
 begin
   result := nil;
   len := Length(pts); resultLen := 0; resultCnt := 0;
-  if (len < 4) or Odd(len) then Exit; //invalid path
+  if (len < 4) then Exit;
+  //ignore incomplete trailing control points
+  if Odd(len) then dec(len);
   p := @pts[0];
+  AddPoint(p^);
   pt1 := p^; inc(p);
   pt2 := p^; inc(p);
   for i := 0 to (len shr 1) - 2 do
@@ -1637,8 +1653,9 @@ var
 begin
   result := nil;
   len := Length(pts); resultLen := 0; resultCnt := 0;
-  if (len < 3) then Exit; //invalid path
+  if (len < 3) then Exit;
   p := @pts[0];
+  AddPoint(p^);
   pt1 := p^; inc(p);
   pt2 := p^; inc(p);
   for i := 0 to len - 3 do

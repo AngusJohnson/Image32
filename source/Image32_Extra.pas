@@ -270,13 +270,13 @@ var
   polys, shadowPolys: TArrayOfArrayOfPointD;
   shadowImg: TImage32;
 begin
-  if depth < 1 then Exit;
+  rec := GetBounds(polygons);
+  if IsEmptyRect(rec) or (depth < 1) then Exit;
   Math.SinCos(-angleRads, y, x);
   x := depth * x;
   y := depth * y;
   blurSize := Max(1,Round(depth / 4));
   if depth <= 2 then rpt :=1 else rpt := 2;
-  rec := GetBounds(polygons);
   Windows.InflateRect(rec, Ceil(depth*2), Ceil(depth*2));
   polys := OffsetPath(polygons, -rec.Left, -rec.Top);
   shadowPolys := OffsetPath(polys, x, y);
@@ -284,7 +284,6 @@ begin
   try
     DrawPolygon(shadowImg, shadowPolys, fillRule, color);
     shadowImg.BoxBlur(shadowImg.Bounds, blurSize, rpt);
-    //shadowImg.GaussianBlur(shadowImg.Bounds, Ceil(depth));
     if cutoutInsideShadow then
       Erase(shadowImg, polys, fillRule);
     img.CopyFrom(shadowImg, shadowImg.Bounds, rec, BlendToAlpha);
@@ -495,6 +494,8 @@ begin
     Windows.InflateRect(rect3, -k, -k);
     path := Ellipse(rect3);
     DrawPolygon(mask, path, frNonZero, clBlack32);
+    //given the very small area and small radius of the blur, the
+    //speed improvement of BoxBlur over GaussianBlur is inconsequential.
     mask.GaussianBlur(mask.Bounds, k);
     img.CopyFrom(mask, mask.Bounds, cutoutRec, BlendToOpaque);
 
@@ -526,7 +527,7 @@ begin
     DrawPolygon(mask, polygon, fillRule, clBlack32);
     if inverted then
       img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendMask) else
-      img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendMaskInverted);
+      img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendInvertedMask);
   finally
     mask.Free;
   end;
@@ -544,7 +545,7 @@ begin
     DrawPolygon(mask, polygons, fillRule, clBlack32);
     if inverted then
       img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendMask) else
-      img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendMaskInverted);
+      img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendInvertedMask);
   finally
     mask.Free;
   end;

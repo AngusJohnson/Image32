@@ -117,18 +117,18 @@ type
     //stretchImage parameter.
     procedure Resize(newWidth, newHeight: Integer; stretchImage: Boolean = true);
     procedure Scale(sx, sy: single);
-    //CopyFrom: Copies part or all of an image from another TImage32 object
-    //(src). If no blend function is provided, then the pixels in src's srcRec
+    //CopyFrom: Copies part or all of another TImage32 image (src).
+    //If no blend function is provided, then the pixels in src's srcRec
     //simply replace whatever is in 'dstRec'. If a blend function is provided,
     //then that functions determines how the image from src will be blended
-    //with the current image. Also the image from src's srcRec will be stretch
-    //resized if necessary to fit into dstRec.
+    //with the current image. Also the image from src's srcRec will be
+    //stretched if necessary to fit into dstRec.
     function CopyFrom(src: TImage32; srcRec, dstRec: TRect;
       blendFunc: TBlendFunction = nil): Boolean;
-    //CopyFromDC: Copies an image from a Window's device context, erasing
+    //CopyFromDC: Copies an image from a Windows device context, erasing
     //any current image in TImage32. (eg copying from TBitmap.canvas.handle)
     procedure CopyFromDC(srcDc: HDC; width, height: Integer);
-    //CopyToDc: Copies the image into a Window's device context
+    //CopyToDc: Copies the image into a Windows device context
     procedure CopyToDc(dstDc: HDC; x: Integer = 0; y: Integer = 0;
       transparent: Boolean = true; bkColor: TColor32 = 0);
     function CopyToClipBoard: Boolean;
@@ -152,7 +152,7 @@ type
     procedure Grayscale;
     procedure InvertColors;
     procedure InvertAlphas;
-    //ColorToAlpha: Removes the specified color from the image, even from
+    //EraseColor: Removes the specified color from the image, even from
     //pixels that are a blend of colors including the specified color.<br>
     //see https://stackoverflow.com/questions/9280902/
     procedure EraseColor(color: TColor32; ExactMatchOnly: Boolean = false);
@@ -161,7 +161,7 @@ type
     procedure AdjustLuminance(percent: Integer);   //ie +/- 100%
     procedure AdjustSaturation(percent: Integer);  //ie +/- 100%
 
-    //CropTransparentPixels: Trim transparent edges until each edge contains
+    //CropTransparentPixels: Trims transparent edges until each edge contains
     //at least one opaque or semi-opaque pixel.
     procedure CropTransparentPixels;
     procedure Rotate(angleRads: single);
@@ -293,12 +293,12 @@ type
   //BlendMask: Whereever the mask is, preserves the background
   function BlendMask(bgColor, mask: TColor32): TColor32;
   {$IFDEF INLINE} inline; {$ENDIF}
-  //BlendMaskInverted: Whereever the mask is, removes the background
-  function BlendMaskInverted(bgColor, mask: TColor32): TColor32;
+  function BlendInvertedMask(bgColor, mask: TColor32): TColor32;
   {$IFDEF INLINE} inline; {$ENDIF}
 
   //MISCELLANEOUS FUNCTIONS ...
 
+  //GetWeightedPixel: coordinates x256, y256 are scaled up by 256.
   function GetWeightedPixel(img: TImage32; x256, y256: Integer): TColor32;
 
   //Color32: Converts Graphics.TColor values into TColor32 values.
@@ -309,15 +309,16 @@ type
   function HslToRgb(hslColor: THsl): TColor32;
   function AdjustHue(color: TColor32; percent: Integer): TColor32;
 
+  //Alpha: clears the color channels
+  function Alpha(color: TColor32): TColor32;
+  //NoAlpha: clears the alpha channel
+  function NoAlpha(color: TColor32): TColor32;
+
   function PointD(const X, Y: Double): TPointD; overload;
   function PointD(const pt: TPoint): TPointD; overload;
 
   function RectD(left, top, right, bottom: double): TRectD; overload;
   function RectD(const rec: TRect): TRectD; overload;
-
-  //Rad: Converts degrees to radians.
-  function Rad(angleDegrees: double): double;
-  {$IFDEF INLINE} inline; {$ENDIF}
 
   //DPI: Useful for DPIAware sizing of images and their container controls.<br>
   //Scales values relative to the display's resolution (PixelsPerInch).<br>
@@ -385,7 +386,7 @@ var
 const
   div255 : Double = 1 / 255;
   div6   : Double = 1 / 6;
-  MaxBlur = 20;
+  MaxBlur = 50;
 type
   PColor32Array = ^TColor32Array;
   TColor32Array = array [0.. maxint div SizeOf(TColor32) -1] of TColor32;
@@ -464,7 +465,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function BlendMaskInverted(bgColor, mask: TColor32): TColor32;
+function BlendInvertedMask(bgColor, mask: TColor32): TColor32;
 var
   res: TARGB absolute Result;
   bg: TARGB absolute bgColor;
@@ -528,6 +529,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function Alpha(color: TColor32): TColor32;
+{$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result := (color and $FF000000);
+end;
+//------------------------------------------------------------------------------
+
+function NoAlpha(color: TColor32): TColor32;
+{$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result := (color and $FFFFFF);
+end;
+//------------------------------------------------------------------------------
+
 function GetCompatibleMemDc(wnd: HWnd = 0): HDC;
 var
   dc: HDC;
@@ -541,7 +556,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetBitmapInfoHeader(width, height: Integer): TBitmapInfoHeader;
+function Get32bitBitmapInfoHeader(width, height: Integer): TBitmapInfoHeader;
 begin
   FillChar(Result, sizeof(Result), #0);
   Result.biSize := sizeof(TBitmapInfoHeader);
@@ -558,12 +573,6 @@ function RectsEqual(const rec1, rec2: TRect): Boolean;
 begin
   result := (rec1.Left = rec2.Left) and (rec1.Top = rec2.Top) and
     (rec1.Right = rec2.Right) and (rec1.Bottom = rec2.Bottom);
-end;
-//------------------------------------------------------------------------------
-
-function Rad(angleDegrees: double): double;
-begin
-  Result := angleDegrees * Pi/180;
 end;
 //------------------------------------------------------------------------------
 
@@ -1089,7 +1098,6 @@ begin
   dst.fAntiAliase := fAntiAliase;
   dst.fIsPremultiplied := fIsPremultiplied;
   dst.SetSize(Width, Height);
-  dst.fOnChange := fOnChange;
   if (Width > 0) and (Height > 0) then
     move(fPixels[0], dst.fPixels[0], Width * Height * SizeOf(TColor32));
 end;
@@ -1826,7 +1834,7 @@ begin
   BeginUpdate;
   try
     SetSize(width, height, 0);
-    bi := GetBitmapInfoHeader(width, height);
+    bi := Get32bitBitmapInfoHeader(width, height);
     memDc := GetCompatibleMemDc;
     try
       bm := CreateDIBSection(memDc,
@@ -1863,19 +1871,20 @@ var
   bf: BLENDFUNCTION;
 begin
   if IsEmpty then Exit;
-  bi := GetBitmapInfoHeader(Width, Height);
+  bi := Get32bitBitmapInfoHeader(Width, Height);
   tmp := TImage32.create(self);
   try
     tmp.FlipVertical; //DIB sections store pixels Y-inverted
-    hasTransparency := transparent and (bkColor < 255) and Self.HasTransparency;
+    hasTransparency :=
+      transparent and (bkColor < 255) and Self.HasTransparency;
     if HasTransparency then
       tmp.Premultiply;  //this is required for DIB sections
     if bkColor <> 0 then
       tmp.SetBackgroundColor(bkColor);
     memDc := GetCompatibleMemDc;
     try
-      bm := CreateDIBSection(memDc,
-        PBITMAPINFO(@bi)^, DIB_RGB_COLORS, dibBits,0,0);
+      bm := CreateDIBSection(memDc, PBITMAPINFO(@bi)^,
+        DIB_RGB_COLORS, dibBits, 0, 0);
       if bm = 0 then Exit;
       try
         Move(tmp.PixelBase^, dibBits^, Width * Height * SizeOf(TColor32));
@@ -1886,7 +1895,8 @@ begin
           bf.BlendFlags := 0;
           bf.SourceConstantAlpha := 255;
           bf.AlphaFormat := AC_SRC_ALPHA;
-          AlphaBlend(dstDc, x,y, Width, Height, memDC, 0, 0, Width, Height, bf);
+          AlphaBlend(dstDc, x,y, Width, Height,
+            memDC, 0, 0, Width, Height, bf);
         end
         else
           BitBlt(dstDc, x,y, Width, Height, memDc, 0,0, SRCCOPY);
@@ -2317,7 +2327,7 @@ begin
         if x > x2 then x2 := x;
       end;
 
-  rec := Rect(x1, height-y2-1, x2+1, height-y1);
+  rec := Rect(x1, y1, x2+1, y2+1);
   Crop(rec);
 end;
 //------------------------------------------------------------------------------
@@ -2462,8 +2472,6 @@ end;
 
 procedure TImage32.BoxBlur(rect: TRect; radius, repeats: Integer);
 begin
-  //nb: BoxBlur can achieve a very good approximation of a GaussianBlur in a
-  //shorter time by using a smaller radius and repeating several (2-3) times.
   if radius < 1 then Exit;
   for repeats := 0 to repeats do
   begin
@@ -2597,7 +2605,8 @@ begin
   bmpBlur := TImage32.Create(self); //clone self
   try
     pColor := PARGB(pixelBase);
-    bmpBlur.GaussianBlur(Bounds, radius);
+    //bmpBlur.GaussianBlur(Bounds, radius);
+    bmpBlur.BoxBlur(Bounds, Ceil(radius/4), 3);
     pBlur := PARGB(bmpBlur.pixelBase);
     for i := 1 to Width * Height do
     begin

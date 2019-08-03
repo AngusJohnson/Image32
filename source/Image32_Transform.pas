@@ -28,6 +28,15 @@ function MultiplyMatrices(const current, new: TMatrixD): TMatrixD;
 function ProjectiveTransform(img: TImage32;
   const dstPts: TArrayOfPointD): Boolean;
 
+function SplineTransformVert(img: TImage32;
+  const topCSpline, bottomCSpline: TArrayOfPointD;
+  backColor: TColor32 = clGray32;
+  reverseFill: Boolean = False): Boolean;
+function SplineTransformHorz(img: TImage32;
+  const leftCSpline, rightCSpline: TArrayOfPointD;
+  backColor: TColor32 = clGray32;
+  reverseFill: Boolean = False): Boolean;
+
 const
   IdentityMatrix: TMatrixD = ((1, 0, 0),(0, 1, 0),(0, 0, 1));
 
@@ -345,6 +354,298 @@ begin
   Result := true;
   img.SetSize(w, h);
   Move(tmp[0], img.Pixels[0], w * h * sizeOf(TColor32));
+end;
+
+//------------------------------------------------------------------------------
+// Spline transformations
+//------------------------------------------------------------------------------
+
+function ReColor(color, newColor: TColor32): TColor32;
+{$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result := Alpha(color) or NoAlpha(newColor);
+end;
+//------------------------------------------------------------------------------
+
+function InterpolateHorz(const pt1, pt2: TPointD): TArrayOfPointD;
+var
+  i, len: integer;
+  x,y,dx,dy: double;
+begin
+  len := Round(Distance(pt1, pt2)) +1;
+  SetLength(Result, len);
+  dy := (pt2.Y - pt1.Y)/ len;
+  dx := (pt2.X - pt1.X)/ len;
+  x := pt1.X; y := pt1.Y;
+  for i := 0 to len -1 do
+  begin
+    x := x + dx; y := y + dy;
+    Result[i] := PointD(Round(x), y);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function InterpolateVert(const pt1, pt2: TPointD): TArrayOfPointD;
+var
+  i, len: integer;
+  x,y,dx,dy: double;
+begin
+  len := Round(Distance(pt1, pt2)) +1;
+  SetLength(Result, len);
+  dy := (pt2.Y - pt1.Y)/ len;
+  dx := (pt2.X - pt1.X)/ len;
+  x := pt1.X; y := pt1.Y;
+  for i := 0 to len -1 do
+  begin
+    x := x + dx; y := y + dy;
+    Result[i] := PointD(x, Round(y));
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function InterpolatePathHorz(const path: TArrayOfPointD): TArrayOfPointD;
+var
+  i,len,len2: integer;
+  tmp: TArrayOfPointD;
+begin
+  //returns array of Y for each integer value of X along path, and
+  //accommodates overlapping values of Y too
+  len := length(path);
+  setLength(result, 1);
+  result[0] := PointD(Round(path[0].X), path[0].Y);
+  for i := 1 to len -1 do
+  begin
+    tmp := InterpolateHorz(path[i-1], path[i]);
+    len := Length(Result);
+    len2 := Length(tmp);
+    SetLength(Result, len + len2);
+    Move(tmp[0], Result[len], len2 * SizeOf(TPointD));
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function InterpolatePathVert(const path: TArrayOfPointD): TArrayOfPointD;
+var
+  i,len, len2: integer;
+  tmp: TArrayOfPointD;
+begin
+  //returns array of X for each integer value of Y along path, and
+  //accommodates overlapping values of X too
+  len := length(path);
+  setLength(result, 1);
+  result[0] := PointD(Round(path[0].X), path[0].Y);
+  for i := 1 to len -1 do
+  begin
+    tmp := InterpolateVert(path[i-1], path[i]);
+    len := Length(Result);
+    len2 := Length(tmp);
+    SetLength(Result, len + len2);
+    Move(tmp[0], Result[len], len2 * SizeOf(TPointD));
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function SplineTransformVert(img: TImage32;
+  const topCSpline, bottomCSpline: TArrayOfPointD;
+  backColor: TColor32 = clGray32;
+  reverseFill: Boolean = False): Boolean;
+var
+  t,u,v, i,j, x,len, len2, w,h: integer;
+  prevX: integer;
+  dx, dy, y, sy: double;
+  topPath, botPath: TArrayOfPointD;
+  rec: TRect;
+  scaleY: TArrayOfDouble;
+  pc: PColor32;
+  tmp: TArrayOfColor32;
+  backColoring, allowBackColoring: Boolean;
+begin
+  len := Length(topCSpline);
+  len2 := Length(bottomCSpline);
+  Result := (len >= 4) and (len2 >= 4) and
+    (topCSpline[0].X = bottomCSpline[0].X) and
+    (topCSpline[len-1].X = bottomCSpline[len2-1].X);
+  if not Result then Exit;
+  topPath := CSpline(topCSpline);
+  botPath := CSpline(bottomCSpline);
+  rec := Rect(UnionRect(GetBoundsD(topPath), GetBoundsD(botPath)));
+  Result := not IsEmptyRect(rec);
+  if not Result then Exit;
+
+  topPath := OffsetPath(topPath, -rec.Left, -rec.Top);
+  topPath := InterpolatePathHorz(topPath);
+  botPath := OffsetPath(botPath, -rec.Left, -rec.Top);
+  botPath := InterpolatePathHorz(botPath);
+  len := Length(topPath);
+  setLength(scaleY, len);
+  for i := 0 to len -1 do
+    if botPath[i].Y <= topPath[i].Y then
+      scaleY[i] := 0 else
+      scaleY[i] := img.Height/ (botPath[i].Y - topPath[i].Y);
+
+  w := RectWidth(rec); h := RectHeight(rec);
+  dx := (img.Width / len) * 256;
+  SetLength(tmp, w * h);
+
+  if reverseFill then
+  begin
+    t := -1; u := len -1; v := -1;
+  end else
+  begin
+    t := 1; u := 0; v := len;
+  end;
+  prevX := u - t;
+
+  backColoring := false;
+  allowBackColoring := (backColor shr 24) > 2;
+  while u <> v do
+  begin
+    //dst x:
+    x := Round(topPath[u].X);
+    if x >= w then begin inc(u, t); Continue; end;
+
+    //check if reversing fill direction - ie folding overlap
+    if allowBackColoring then
+    begin
+      if (x <> prevX) then
+      begin
+        if reverseFill then
+          backColoring := prevX < x else
+          backColoring := prevX > x;
+      end
+      else if (Abs(u -v) > 1) then //ie safe to look ahead
+      begin
+        if reverseFill then
+          backColoring := prevX < topPath[u+t].X else
+          backColoring := prevX > topPath[u+t].X;
+      end;
+    end;
+    prevX := x;
+    pc := @tmp[x];
+
+    //src x:
+    x := Round(u * dx);
+
+    dy := topPath[u].Y;
+    sy :=  scaleY[u];
+    for j := 0 to h -1 do
+    begin
+      y := (j - dy) * sy;
+      if backColoring then
+        pc^ := BlendToAlpha(pc^,
+          ReColor(GetWeightedPixel(img, x, Round(y * 256)), backColor))
+      else
+        //blend in case has folding overlap
+        pc^ := BlendToAlpha(pc^,
+          GetWeightedPixel(img, x, Round(y * 256)));
+      inc(pc, w);
+    end;
+    inc(u, t);
+  end;
+  img.SetSize(w, h);
+  Move(tmp[0], img.PixelBase^, w * h * SizeOf(TColor32));
+end;
+//------------------------------------------------------------------------------
+
+function SplineTransformHorz(img: TImage32;
+  const leftCSpline, rightCSpline: TArrayOfPointD;
+  backColor: TColor32 = clGray32;
+  reverseFill: Boolean = False): Boolean;
+var
+  t,u,v, i,j, y,prevY, len, len2, w,h: integer;
+  x, dx,dy,sx: double;
+  leftPath, rightPath: TArrayOfPointD;
+  rec: TRect;
+  scaleX: TArrayOfDouble;
+  pc: PColor32;
+  tmp: TArrayOfColor32;
+  backColoring, allowBackColoring: Boolean;
+begin
+  len := Length(leftCSpline);
+  len2 := Length(rightCSpline);
+  Result := (len >= 4) and (len2 >= 4) and
+    (leftCSpline[0].Y = rightCSpline[0].Y) and
+    (leftCSpline[len-1].Y = rightCSpline[len2-1].Y);
+  if not Result then Exit;
+
+  leftPath := CSpline(leftCSpline);
+  rightPath := CSpline(rightCSpline);
+  rec := Rect(UnionRect(GetBoundsD(leftPath), GetBoundsD(rightPath)));
+  Result := not IsEmptyRect(rec);
+  if not Result then Exit;
+
+  leftPath := OffsetPath(leftPath, -rec.Left, -rec.Top);
+  leftPath := InterpolatePathVert(leftPath);
+
+  rightPath := OffsetPath(rightPath, -rec.Left, -rec.Top);
+  rightPath := InterpolatePathVert(rightPath);
+  len := Length(leftPath);
+  setLength(scaleX, len);
+  for i := 0 to len -1 do
+    if rightPath[i].X <= leftPath[i].X then
+      scaleX[i] := 0 else
+      scaleX[i] := img.Width/ (rightPath[i].X - leftPath[i].X);
+
+  w := RectWidth(rec); h := RectHeight(rec);
+  dy := (img.Height / len) * 256;
+  SetLength(tmp, w * h);
+
+  if reverseFill then
+  begin
+    t := -1; u := len -1; v := -1;
+  end else
+  begin
+    t := 1; u := 0; v := len;
+  end;
+  prevY := u - t;
+
+  backColoring := false;
+  allowBackColoring := (backColor shr 24) > 2;
+  while u <> v do
+  begin
+    //dst y:
+    y := Round(leftPath[u].Y);
+    if y >= h then begin inc(u, t); Continue; end;
+
+    //check if reversing fill direction - ie folding overlap
+    if allowBackColoring then
+    begin
+      if (y <> prevY) then
+      begin
+        if reverseFill then
+          backColoring := prevY < y else
+          backColoring := prevY > y;
+      end
+      else if (Abs(u -v) > 1) then //ie safe to look ahead
+      begin
+        if reverseFill then
+          backColoring := prevY < leftPath[u+t].Y else
+          backColoring := prevY > leftPath[u+t].Y;
+      end;
+    end;
+
+    prevY := y;
+    pc := @tmp[y  * w];
+    //src y:
+    y := Round(u * dy);
+
+    dx := leftPath[u].X;
+    sx :=  scaleX[u];
+    for j := 0 to w -1 do
+    begin
+      x := (j - dx) * sx;
+      if backColoring then
+        pc^ := BlendToAlpha(pc^,
+          ReColor(GetWeightedPixel(img, Round(x * 256), y), backColor))
+      else
+        //blend in case has folding overlap
+        pc^ := BlendToAlpha(pc^, GetWeightedPixel(img, Round(x * 256), y));
+      inc(pc);
+    end;
+    inc(u, t);
+  end;
+  img.SetSize(w, h);
+  Move(tmp[0], img.PixelBase^, w * h * SizeOf(TColor32));
 end;
 //------------------------------------------------------------------------------
 
