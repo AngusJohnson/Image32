@@ -22,6 +22,7 @@ type
   TJoinStyle  = (jsAuto, jsSquare, jsMiter, jsRound);
   TEndStyle   = (esClosed, esButt, esSquare, esRound);
   TPathEnd    = (peStart, peEnd, peBothEnds);
+  TSplineType = (stQuadratic, stCubic);
 
   function InflateRect(const rec: TRectD; dx, dy: double): TRectD; overload;
 
@@ -41,8 +42,10 @@ type
   function Arc(const rec: TRect; startAngle, endAngle: double): TArrayOfPointD;
   function Pie(const rec: TRect; StartAngle, EndAngle: double): TArrayOfPointD;
 
-  function QBezier(const pt1, pt2, pt3: TPointD): TArrayOfPointD;
-  function CBezier(const pt1, pt2, pt3, pt4: TPointD): TArrayOfPointD;
+  function QBezier(const pt1, pt2, pt3: TPointD): TArrayOfPointD; overload;
+  function QBezier(const pts: TArrayOfPointD): TArrayOfPointD; overload;
+  function CBezier(const pt1, pt2, pt3, pt4: TPointD): TArrayOfPointD; overload;
+  function CBezier(const pts: TArrayOfPointD): TArrayOfPointD; overload;
 
   //CSpline: Approximates the 'S' command inside the 'd' property of an
   //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
@@ -87,13 +90,13 @@ type
     const extra: TArrayOfPointD);
   procedure AppendPath(var paths: TArrayOfArrayOfPointD;
     const extra: TArrayOfPointD);
-  {$IFDEF INLINE} inline; {$ENDIF} overload;
+    {$IFDEF INLINE} inline; {$ENDIF} overload;
   procedure AppendPath(var paths: TArrayOfArrayOfPointD;
     const extra: TArrayOfArrayOfPointD);
-  {$IFDEF INLINE} inline; {$ENDIF} overload;
+    {$IFDEF INLINE} inline; {$ENDIF} overload;
 
-  function MakePath(const pts: array of integer): TArrayOfPointD; overload;
-  function MakePath(const pts: array of double): TArrayOfPointD; overload;
+  function MakePathI(const pts: array of integer): TArrayOfPointD; overload;
+  function MakePathD(const pts: array of double): TArrayOfPointD; overload;
 
   function GetBounds(const path: TArrayOfPointD): TRect; overload;
   function GetBounds(const paths: TArrayOfArrayOfPointD): TRect; overload;
@@ -101,8 +104,11 @@ type
   function GetBoundsD(const paths: TArrayOfArrayOfPointD): TRectD; overload;
 
   function Rect(const recD: TRectD): TRect; overload;
+  function Rect(const l,t,r,b: integer): TRect; overload;
   function RectsEqual(const rec1, rec2: TRect): Boolean;
   procedure OffsetRect(var rec: TRectD; dx, dy: double); overload;
+
+  function Point(const pt: TPointD): TPoint; overload;
 
   function MidPoint(const rec: TRect): TPoint; overload;
   function MidPoint(const rec: TRectD): TPointD; overload;
@@ -168,6 +174,8 @@ type
     joinStyle: TJoinStyle; miterLimit: double): TArrayOfPointD;
 
 const
+  NullPoint: TPoint = (X: 0; Y: 0);
+  NullPointD: TPointD = (X: 0; Y: 0);
   NullRect: TRect = (left: 0; top: 0; right: 0; Bottom: 0);
   NullRectD: TRectD = (left: 0; top: 0; right: 0; Bottom: 0);
 
@@ -187,6 +195,10 @@ var
 
 implementation
 
+resourcestring
+  rsInvalidQBezier = 'Invalid QBezier - requires 3 points';
+  rsInvalidCBezier = 'Invalid CBezier - requires 4 points';
+
 type
   TArray256Bytes = array[0..255] of byte;
 
@@ -205,14 +217,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Point(const pt: TPointD): TPoint; overload;
+function Point(const pt: TPointD): TPoint;
 begin
   result.X := Round(pt.x);
   result.Y := Round(pt.y);
 end;
 //------------------------------------------------------------------------------
 
-function Rect(const l,t,r,b: integer): TRect; overload;
+function Rect(const l,t,r,b: integer): TRect;
 begin
   Result.Left := l;
   Result.Top := t;
@@ -1393,20 +1405,21 @@ var
   l,t,r,b: double;
   ppd: PPointD;
 begin
-  l := MaxInt; t := MaxInt;
-  r := -MaxInt; b := -MaxInt;
+  result := NullRectD;
   highI := High(path);
-  if highI >= 0 then
+  if highI < 0 then Exit;
+  l := path[0].X;
+  t := path[0].Y;
+  r := l;
+  b := t;
+  ppd := PPointD(path);
+  for i := 1 to highI do
   begin
-    ppd := PPointD(path);
-    for i := 0 to highI do
-    begin
-      if ppd.x < l then l := ppd.x;
-      if ppd.x > r then r := ppd.x;
-      if ppd.y < t then t := ppd.y;
-      if ppd.y > b then b := ppd.y;
-      inc(ppd);
-    end;
+    inc(ppd);
+    if ppd.x < l then l := ppd.x;
+    if ppd.x > r then r := ppd.x;
+    if ppd.y < t then t := ppd.y;
+    if ppd.y > b then b := ppd.y;
   end;
   result := RectD(l, t, r, b);
 end;
@@ -1427,6 +1440,14 @@ var
 begin
   recD := GetBoundsD(paths);
   Result := Rect(recD);
+end;
+//------------------------------------------------------------------------------
+
+function QBezier(const pts: TArrayOfPointD): TArrayOfPointD;
+begin
+  if Length(pts) <> 3 then
+    raise Exception.Create(rsInvalidQBezier);
+  result := QBezier(pts[0], pts[1], pts[2]);
 end;
 //------------------------------------------------------------------------------
 
@@ -1472,6 +1493,14 @@ begin
   AddPoint(pt1);
   DoCurve(pt1, pt2, pt3);
   SetLength(result, resultCnt);
+end;
+//------------------------------------------------------------------------------
+
+function CBezier(const pts: TArrayOfPointD): TArrayOfPointD;
+begin
+  if Length(pts) <> 4 then
+    raise Exception.Create(rsInvalidCBezier);
+  result := CBezier(pts[0], pts[1], pts[2], pts[3]);
 end;
 //------------------------------------------------------------------------------
 
@@ -1669,7 +1698,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function MakePath(const pts: array of integer): TArrayOfPointD; overload;
+function MakePathI(const pts: array of integer): TArrayOfPointD; overload;
 var
   i,j, x,y, len: Integer;
 begin
@@ -1693,7 +1722,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function MakePath(const pts: array of double): TArrayOfPointD;
+function MakePathD(const pts: array of double): TArrayOfPointD;
 var
   i, j, len: Integer;
   x,y: double;

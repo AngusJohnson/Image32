@@ -92,6 +92,7 @@ type
     function GetColorCount: Integer;
     function GetHasTransparency: Boolean;
     function GetBounds: TRect;
+    function GetMidPoint: TPointD;
   protected
     function CopyPixels(rec: TRect): TArrayOfColor32;
     //CopyInternal: Internal routine (has no bounds checking)
@@ -215,6 +216,7 @@ type
     //Bounds: Result := Rect(0, 0, Width, Height);
     property Bounds: TRect read GetBounds;
     property IsEmpty: Boolean read GetIsEmpty;
+    property MidPoint: TPointD read GetMidPoint;
     property Pixel[x,y: Integer]: TColor32 read GetPixel write SetPixel;
     property Pixels: TArrayOfColor32 read fPixels;
     property PixelBase: PColor32 read GetPixelBase;
@@ -1308,6 +1310,12 @@ end;
 function TImage32.GetBounds: TRect;
 begin
   result := Rect(0, 0, Width, Height);
+end;
+//------------------------------------------------------------------------------
+
+function TImage32.GetMidPoint: TPointD;
+begin
+  Result := PointD(fWidth * 0.5, fHeight * 0.5);
 end;
 //------------------------------------------------------------------------------
 

@@ -15,7 +15,8 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Windows, Math, Image32, Image32_Draw;
+  SysUtils, Classes, Windows, Math, Types,
+  Image32, Image32_Draw, Image32_Vector;
 
 type
   TMatrixD = array [0..2, 0..2] of double;
@@ -28,22 +29,17 @@ function MultiplyMatrices(const current, new: TMatrixD): TMatrixD;
 function ProjectiveTransform(img: TImage32;
   const dstPts: TArrayOfPointD): Boolean;
 
-function SplineTransformVert(img: TImage32;
-  const topCSpline, bottomCSpline: TArrayOfPointD;
-  backColor: TColor32 = clGray32;
-  reverseFill: Boolean = False): Boolean;
-function SplineTransformHorz(img: TImage32;
-  const leftCSpline, rightCSpline: TArrayOfPointD;
-  backColor: TColor32 = clGray32;
-  reverseFill: Boolean = False): Boolean;
+function SplineTransformVert(img: TImage32; const topSpline: TArrayOfPointD;
+  splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
+  out offset: TPoint): Boolean;
+function SplineTransformHorz(img: TImage32; const leftSpline: TArrayOfPointD;
+  splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
+  out offset: TPoint): Boolean;
 
 const
   IdentityMatrix: TMatrixD = ((1, 0, 0),(0, 1, 0),(0, 0, 1));
 
 implementation
-
-uses
-  Image32_Vector;
 
 resourcestring
   rsInvalidMatrix = 'Invalid matrix.'; //nb: always start with IdentityMatrix
@@ -367,12 +363,24 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function InterpolateHorz(const pt1, pt2: TPointD): TArrayOfPointD;
+function Interpolate(const pt1, pt2: TPointD; frac: double): TPointD;
+begin
+  if frac <= 0 then Result := pt1
+  else if frac >= 1 then Result := pt2
+  else
+  begin
+    result.X := pt1.X + frac * (pt2.X - pt1.X);
+    result.Y := pt1.Y + frac * (pt2.Y - pt1.Y);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function InterpolateSegment(const pt1, pt2: TPointD): TArrayOfPointD;
 var
   i, len: integer;
   x,y,dx,dy: double;
 begin
-  len := Round(Distance(pt1, pt2)) +1;
+  len := Ceil(Distance(pt1, pt2));
   SetLength(Result, len);
   dy := (pt2.Y - pt1.Y)/ len;
   dx := (pt2.X - pt1.X)/ len;
@@ -380,42 +388,24 @@ begin
   for i := 0 to len -1 do
   begin
     x := x + dx; y := y + dy;
-    Result[i] := PointD(Round(x), y);
+    Result[i] := PointD(x, y);
   end;
 end;
 //------------------------------------------------------------------------------
 
-function InterpolateVert(const pt1, pt2: TPointD): TArrayOfPointD;
-var
-  i, len: integer;
-  x,y,dx,dy: double;
-begin
-  len := Round(Distance(pt1, pt2)) +1;
-  SetLength(Result, len);
-  dy := (pt2.Y - pt1.Y)/ len;
-  dx := (pt2.X - pt1.X)/ len;
-  x := pt1.X; y := pt1.Y;
-  for i := 0 to len -1 do
-  begin
-    x := x + dx; y := y + dy;
-    Result[i] := PointD(x, Round(y));
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function InterpolatePathHorz(const path: TArrayOfPointD): TArrayOfPointD;
+function InterpolatePath(const path: TArrayOfPointD): TArrayOfPointD;
 var
   i,len,len2: integer;
   tmp: TArrayOfPointD;
 begin
-  //returns array of Y for each integer value of X along path, and
-  //accommodates overlapping values of Y too
+  //returns a coordinate array for every value of X and y along the path based
+  //on 2D distance. (This is a sadly only a poor approximation to perspective
+  //distance - eg with tight bezier curves).
   len := length(path);
-  setLength(result, 1);
-  result[0] := PointD(Round(path[0].X), path[0].Y);
+  setLength(result, 0);
   for i := 1 to len -1 do
   begin
-    tmp := InterpolateHorz(path[i-1], path[i]);
+    tmp := InterpolateSegment(path[i-1], path[i]);
     len := Length(Result);
     len2 := Length(tmp);
     SetLength(Result, len + len2);
@@ -424,33 +414,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function InterpolatePathVert(const path: TArrayOfPointD): TArrayOfPointD;
+function SplineTransformVert(img: TImage32; const topSpline: TArrayOfPointD;
+  splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
+  out offset: TPoint): Boolean;
 var
-  i,len, len2: integer;
-  tmp: TArrayOfPointD;
-begin
-  //returns array of X for each integer value of Y along path, and
-  //accommodates overlapping values of X too
-  len := length(path);
-  setLength(result, 1);
-  result[0] := PointD(Round(path[0].X), path[0].Y);
-  for i := 1 to len -1 do
-  begin
-    tmp := InterpolateVert(path[i-1], path[i]);
-    len := Length(Result);
-    len2 := Length(tmp);
-    SetLength(Result, len + len2);
-    Move(tmp[0], Result[len], len2 * SizeOf(TPointD));
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function SplineTransformVert(img: TImage32;
-  const topCSpline, bottomCSpline: TArrayOfPointD;
-  backColor: TColor32 = clGray32;
-  reverseFill: Boolean = False): Boolean;
-var
-  t,u,v, i,j, x,len, len2, w,h: integer;
+  t,u,v, i,j, x,len, w,h: integer;
   prevX: integer;
   dx, dy, y, sy: double;
   topPath, botPath: TArrayOfPointD;
@@ -460,35 +428,42 @@ var
   tmp: TArrayOfColor32;
   backColoring, allowBackColoring: Boolean;
 begin
-  len := Length(topCSpline);
-  len2 := Length(bottomCSpline);
-  Result := (len >= 4) and (len2 >= 4) and
-    (topCSpline[0].X = bottomCSpline[0].X) and
-    (topCSpline[len-1].X = bottomCSpline[len2-1].X);
-  if not Result then Exit;
-  topPath := CSpline(topCSpline);
-  botPath := CSpline(bottomCSpline);
-  rec := Rect(UnionRect(GetBoundsD(topPath), GetBoundsD(botPath)));
+  offset := NullPoint;
+  //convert the top spline control points into a flattened path
+  if splineType = stQuadratic then
+    topPath := QSpline(topSpline) else
+    topPath := CSpline(topSpline);
+
+  rec := GetBounds(topPath);
+  //return false if the spline is invalid or there's no vertical transformation
   Result := not IsEmptyRect(rec);
   if not Result then Exit;
 
+  offset := rec.TopLeft;
   topPath := OffsetPath(topPath, -rec.Left, -rec.Top);
-  topPath := InterpolatePathHorz(topPath);
-  botPath := OffsetPath(botPath, -rec.Left, -rec.Top);
-  botPath := InterpolatePathHorz(botPath);
-  len := Length(topPath);
+  //'Interpolate' the path so that there's a coordinate for every rounded
+  //X and Y between the start and end of the flattened spline path. This
+  //is to give a very rough approximatation of distance, so that the image
+  //is roughly proportionally spaced even when the spline causes overlap.
+  topPath := InterpolatePath(topPath);
+  botPath := OffsetPath(topPath, 0, img.Height);
+  Windows.OffsetRect(rec, -rec.Left, -rec.Top);
+  rec := Rect(UnionRect(RectD(rec), GetBoundsD(botPath)));
+  w := RectWidth(rec); h := RectHeight(rec);
+  len  := Length(topPath);
+
   setLength(scaleY, len);
   for i := 0 to len -1 do
     if botPath[i].Y <= topPath[i].Y then
       scaleY[i] := 0 else
       scaleY[i] := img.Height/ (botPath[i].Y - topPath[i].Y);
 
-  w := RectWidth(rec); h := RectHeight(rec);
   dx := (img.Width / len) * 256;
   SetLength(tmp, w * h);
 
   if reverseFill then
   begin
+    //ie fill from right-to-left or bottom-to-top
     t := -1; u := len -1; v := -1;
   end else
   begin
@@ -513,7 +488,7 @@ begin
           backColoring := prevX < x else
           backColoring := prevX > x;
       end
-      else if (Abs(u -v) > 1) then //ie safe to look ahead
+      else if (Abs(u -v) > 1) then //ie it's safe to look ahead
       begin
         if reverseFill then
           backColoring := prevX < topPath[u+t].X else
@@ -531,11 +506,12 @@ begin
     for j := 0 to h -1 do
     begin
       y := (j - dy) * sy;
+
       if backColoring then
         pc^ := BlendToAlpha(pc^,
           ReColor(GetWeightedPixel(img, x, Round(y * 256)), backColor))
       else
-        //blend in case has folding overlap
+        //blend in case spline causes folding overlap
         pc^ := BlendToAlpha(pc^,
           GetWeightedPixel(img, x, Round(y * 256)));
       inc(pc, w);
@@ -547,12 +523,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SplineTransformHorz(img: TImage32;
-  const leftCSpline, rightCSpline: TArrayOfPointD;
-  backColor: TColor32 = clGray32;
-  reverseFill: Boolean = False): Boolean;
+function SplineTransformHorz(img: TImage32; const leftSpline: TArrayOfPointD;
+  splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
+  out offset: TPoint): Boolean;
 var
-  t,u,v, i,j, y,prevY, len, len2, w,h: integer;
+  t,u,v, i,j, y,prevY, len, w,h: integer;
   x, dx,dy,sx: double;
   leftPath, rightPath: TArrayOfPointD;
   rec: TRect;
@@ -561,32 +536,36 @@ var
   tmp: TArrayOfColor32;
   backColoring, allowBackColoring: Boolean;
 begin
-  len := Length(leftCSpline);
-  len2 := Length(rightCSpline);
-  Result := (len >= 4) and (len2 >= 4) and
-    (leftCSpline[0].Y = rightCSpline[0].Y) and
-    (leftCSpline[len-1].Y = rightCSpline[len2-1].Y);
-  if not Result then Exit;
+  offset := NullPoint;
 
-  leftPath := CSpline(leftCSpline);
-  rightPath := CSpline(rightCSpline);
-  rec := Rect(UnionRect(GetBoundsD(leftPath), GetBoundsD(rightPath)));
+  //convert the left spline control points into a flattened path
+  if splineType = stQuadratic then
+    leftPath := QSpline(leftSpline) else
+    leftPath := CSpline(leftSpline);
+  rec := GetBounds(leftPath);
+  //return false if the spline is invalid or there's no horizontal transformation
   Result := not IsEmptyRect(rec);
   if not Result then Exit;
 
+  offset := rec.TopLeft;
   leftPath := OffsetPath(leftPath, -rec.Left, -rec.Top);
-  leftPath := InterpolatePathVert(leftPath);
+  //'Interpolate' the path so that there's a coordinate for every rounded
+  //X and Y between the start and end of the flattened spline path. This
+  //is to give a very rough approximatation of distance, so that the image
+  //is roughly proportionally spaced even when the spline causes overlap.
+  leftPath := InterpolatePath(leftPath);
+  rightPath := OffsetPath(leftPath, img.Width, 0);
+  Windows.OffsetRect(rec, -rec.Left, -rec.Top);
+  rec := Rect(UnionRect(RectD(rec), GetBoundsD(rightPath)));
+  w := RectWidth(rec); h := RectHeight(rec);
+  len  := Length(leftPath);
 
-  rightPath := OffsetPath(rightPath, -rec.Left, -rec.Top);
-  rightPath := InterpolatePathVert(rightPath);
-  len := Length(leftPath);
   setLength(scaleX, len);
   for i := 0 to len -1 do
     if rightPath[i].X <= leftPath[i].X then
       scaleX[i] := 0 else
-      scaleX[i] := img.Width/ (rightPath[i].X - leftPath[i].X);
+      scaleX[i] := img.Width / (rightPath[i].X - leftPath[i].X);
 
-  w := RectWidth(rec); h := RectHeight(rec);
   dy := (img.Height / len) * 256;
   SetLength(tmp, w * h);
 
@@ -616,7 +595,7 @@ begin
           backColoring := prevY < y else
           backColoring := prevY > y;
       end
-      else if (Abs(u -v) > 1) then //ie safe to look ahead
+      else if (Abs(u -v) > 1) then //ie it's safe to look ahead
       begin
         if reverseFill then
           backColoring := prevY < leftPath[u+t].Y else
@@ -638,7 +617,7 @@ begin
         pc^ := BlendToAlpha(pc^,
           ReColor(GetWeightedPixel(img, Round(x * 256), y), backColor))
       else
-        //blend in case has folding overlap
+        //blend in case spline causes folding overlap
         pc^ := BlendToAlpha(pc^, GetWeightedPixel(img, Round(x * 256), y));
       inc(pc);
     end;

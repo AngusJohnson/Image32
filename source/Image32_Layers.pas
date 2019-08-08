@@ -15,26 +15,30 @@ interface
 {$I Image32.inc}
 
 uses
-  Windows, SysUtils, Classes, Math, Image32;
+  Windows, SysUtils, Classes, Math, Types, Image32;
 
 type
+  TLayer32Class = class of TLayer32;
   TLayeredImage32 = class;
 
   TLayer32 = class
-    fOwner   : TLayeredImage32;
-    fLevel   : integer;
-    fImage   : TImage32;
-    fPosition: TPoint;
-    fVisible : Boolean;
-    fOpacity   : Byte;
-    fName    : string;
+    fOwner       : TLayeredImage32;
+    fLevel       : integer;
+    fImage       : TImage32;
+    fPosition    : TPoint;
+    fVisible     : Boolean;
+    fOpacity     : Byte;
+    fName        : string;
     function GetBounds: TRect;
     function GetMidPoint: TPointD;
+    function GetClientMidPoint: TPointD;
     procedure SetVisible(value: Boolean);
     procedure ImageChanged(Sender: TObject);
     function GetHeight: integer;
     function GetWidth: integer;
     procedure SetOpacity(value: Byte);
+  protected
+    property Owner: TLayeredImage32 read fOwner;
   public
     constructor Create(owner: TLayeredImage32; level: integer); virtual;
     destructor Destroy; override;
@@ -43,9 +47,12 @@ type
     function RaiseToTop: Boolean;
     function LowerDownOne: Boolean;
     function LowerToBottom: Boolean;
+    procedure Move(dx, dy: integer);
     procedure PositionAt(const pt: TPoint);
-    procedure PositionCenteredAt(const pt: TPoint);
+    procedure PositionCenteredAt(const pt: TPoint); overload;
+    procedure PositionCenteredAt(const pt: TPointD); overload;
     property Bounds: TRect read GetBounds;
+    property ClientMidPoint: TPointD read GetClientMidPoint;
     property Image: TImage32 read fImage;
     property Level: integer read fLevel;
     property Height: integer read GetHeight;
@@ -56,6 +63,23 @@ type
     property Top: integer read fPosition.Y;
     property Visible: Boolean read fVisible write SetVisible;
     property Width: integer read GetWidth;
+  end;
+
+  TDesignerLayer32 = class(TLayer32)
+  private
+    fButtonSize: integer;
+  protected
+    procedure DrawDashedLine(const ctrlPts: TArrayOfPointD); virtual;
+    procedure DrawGridLine(const pt1, pt2: TPointD;
+      width: double; color: TColor32); virtual;
+    procedure DrawButton(const pt: TPointD; color: TColor32); virtual;
+  public
+    constructor Create(owner: TLayeredImage32; level: integer); override;
+    procedure DrawGrid(majorInterval, minorInterval: integer);
+    procedure DrawQSpline(const ctrlPts: TArrayOfPointD);
+    procedure DrawCSpline(const ctrlPts: TArrayOfPointD);
+    procedure DrawRectangle(const rec: TRect);
+    property ButtonSize: integer read fButtonSize write fButtonSize;
   end;
 
   TLayeredImage32 = class
@@ -70,7 +94,7 @@ type
     function GetWidth: integer;
     procedure SetWidth(value: integer);
     function GetBounds: TRect;
-    procedure Update;
+    function GetMidPoint: TPointD;
     function GetMergedImage: TImage32;
     function GetLayer(level: integer): TLayer32;
   protected
@@ -79,9 +103,13 @@ type
     procedure Clear;
     constructor Create(Width: integer = 0; Height: integer =0); virtual;
     destructor Destroy; override;
+    function AddNewLayer(layerClass: TLayer32Class;
+      const layerName: string = ''): TLayer32; overload;
     function AddNewLayer(const layerName: string = ''): TLayer32; overload;
+    function InsertNewLayer(layerClass: TLayer32Class;
+      level: integer; const layerName: string = ''): TLayer32; overload;
     function InsertNewLayer(level: integer;
-      const layerName: string = ''): TLayer32;
+      const layerName: string = ''): TLayer32; overload;
     procedure DeleteLayer(level: integer);
     function GetLayerAt(const pt: TPoint): TLayer32;
     procedure SetSize(width, height: integer);
@@ -90,14 +118,18 @@ type
     property Count: integer read GetCount;
     property Height: integer read GetHeight write SetHeight;
     property Layer[level: integer]: TLayer32 read GetLayer; default;
+    property MidPoint: TPointD read GetMidPoint;
     property MergedImage: TImage32 read GetMergedImage;
     property Width: integer read GetWidth write SetWidth;
   end;
 
+var
+  DefaultButtonSize: integer;
+
 implementation
 
 uses
-  Image32_Vector;
+  Image32_Draw, Image32_Vector, Image32_Extra;
 
 resourcestring
   rsImageLayerRangeError = 'TLayeredImage32 error: Level out of range.';
@@ -157,6 +189,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TLayer32.GetClientMidPoint: TPointD;
+begin
+  if Image.IsEmpty then
+    Result := NullPointD else
+    Result := PointD(Image.Width, Image.Height);
+end;
+//------------------------------------------------------------------------------
+
 function TLayer32.GetMidPoint: TPointD;
 begin
   Result := Image32_Vector.MidPoint(RectD(GetBounds));
@@ -178,6 +218,22 @@ begin
   pt2.X := pt.X - fImage.Width div 2;
   pt2.Y := pt.Y - fImage.Height div 2;
   PositionAt(pt2);
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.PositionCenteredAt(const pt: TPointD);
+var
+  pt2: TPoint;
+begin
+  pt2.X := Round(pt.X - fImage.Width * 0.5);
+  pt2.Y := Round(pt.Y - fImage.Height  * 0.5);
+  PositionAt(pt2);
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.Move(dx, dy: integer);
+begin
+  PositionAt(Point(Left + dx, Top + dy));
 end;
 //------------------------------------------------------------------------------
 
@@ -272,6 +328,141 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// TDesignerLayer32 class
+//------------------------------------------------------------------------------
+
+constructor TDesignerLayer32.Create(owner: TLayeredImage32; level: integer);
+begin
+  inherited;
+  fButtonSize := DefaultButtonSize;
+end;
+//------------------------------------------------------------------------------
+
+procedure TDesignerLayer32.DrawDashedLine(const ctrlPts: TArrayOfPointD);
+begin
+  Image32_Draw.DrawDashedLine(Image, ctrlPts,
+    MakeArrayOfInteger([4,4]), nil, 1, clRed32, esSquare);
+end;
+//------------------------------------------------------------------------------
+
+procedure TDesignerLayer32.DrawGridLine(const pt1, pt2: TPointD;
+  width: double; color: TColor32);
+var
+  path: TArrayOfPointD;
+begin
+  SetLength(path, 2);
+  path[0] := pt1; path[1] := pt2;
+  Image32_Draw.DrawLine(Image, path, width, color, esSquare);
+end;
+//------------------------------------------------------------------------------
+
+procedure TDesignerLayer32.DrawGrid(majorInterval, minorInterval: integer);
+var
+  i, x,y, w,h: integer;
+begin
+  w := image.Width; h := image.Height;
+  if minorInterval <> 0 then
+  begin
+    x := minorInterval; y := minorInterval;
+    for i := 1 to (w div minorInterval) -1 do
+    begin
+      DrawGridLine(PointD(x, 0), PointD(x, h), 1, $20000000);
+      inc(x, minorInterval);
+    end;
+    for i := 1 to (h div minorInterval) -1 do
+    begin
+      DrawGridLine(PointD(0, y), PointD(w, y), 1, $20000000);
+      inc(y, minorInterval);
+    end;
+  end;
+  if majorInterval <> 0 then
+  begin
+    x := majorInterval; y := majorInterval;
+    for i := 1 to (w div majorInterval) -1 do
+    begin
+      DrawGridLine(PointD(x, 0), PointD(x, h), 1, $30000000);
+      inc(x, majorInterval);
+    end;
+    for i := 1 to (h div majorInterval) -1 do
+    begin
+      DrawGridLine(PointD(0, y), PointD(w, y), 1, $30000000);
+      inc(y, majorInterval);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TDesignerLayer32.DrawButton(const pt: TPointD; color: TColor32);
+begin
+  Image32_Extra.DrawButton(image, pt, fButtonSize, color, []);
+end;
+//------------------------------------------------------------------------------
+
+procedure TDesignerLayer32.DrawQSpline(const ctrlPts: TArrayOfPointD);
+var
+  i, len: integer;
+  pt, pt2: TPointD;
+  path: TArrayOfPointD;
+begin
+  len := length(ctrlPts);
+  if len < 3 then Exit;
+  SetLength(path, 2);
+  path[0] := ctrlPts[0];
+  path[1] := ctrlPts[1];
+  DrawDashedLine(path);
+  pt := ctrlPts[1];
+  for i := 2 to len -2 do
+  begin
+    pt2 := ReflectPoint(pt, ctrlPts[i]);
+    path[0] := pt;
+    path[1] := pt2;
+    DrawDashedLine(path);
+    DrawButton(pt2, clNone32);
+    pt := pt2;
+  end;
+  path[0] := pt; path[1] := ctrlPts[len-1];
+  DrawDashedLine(path);
+end;
+//------------------------------------------------------------------------------
+
+procedure TDesignerLayer32.DrawCSpline(const ctrlPts: TArrayOfPointD);
+var
+  i, len: integer;
+  pt: TPointD;
+  path: TArrayOfPointD;
+begin
+  len := length(ctrlPts);
+  if Odd(len) then dec(len);
+  if len < 4 then Exit;
+  SetLength(path, 2);
+  path[0] := ctrlPts[0];
+  path[1] := ctrlPts[1];
+  DrawDashedLine(path);
+  i := 2;
+  while i < len -2 do
+  begin
+    pt := ReflectPoint(ctrlPts[i], ctrlPts[i+1]);
+    path[0] := ctrlPts[i];
+    path[1] := pt;
+    DrawDashedLine(path);
+    DrawButton(pt, clNone32);
+    inc(i, 2);
+  end;
+  path[0] := ctrlPts[len-2];
+  path[1] := ctrlPts[len-1];
+  DrawDashedLine(path);
+end;
+//------------------------------------------------------------------------------
+
+procedure TDesignerLayer32.DrawRectangle(const rec: TRect);
+var
+  path: TArrayOfPointD;
+begin
+  path := Rectangle(rec);
+  DrawDashedLine(path);
+end;
+
+//------------------------------------------------------------------------------
 // TLayeredImage32 class
 //------------------------------------------------------------------------------
 
@@ -328,48 +519,45 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TLayeredImage32.Update;
+function TLayeredImage32.GetMergedImage: TImage32;
 var
   i: integer;
   dstRec: TRect;
   blendFunc: TBlendFunction;
   tmp: TImage32;
 begin
-  fBackground.FillRect(fBackground.Bounds, fBackColor);
+  if fUpdatePending then
+  begin
+    fBackground.FillRect(fBackground.Bounds, fBackColor);
 
-  if fBackColor shr 24 < 254 then //ie semi-transparent
-    blendFunc := BlendToAlpha else
-    blendFunc := BlendToOpaque;
+    if fBackColor shr 24 < 254 then //ie semi-transparent
+      blendFunc  := BlendToAlpha else
+      blendFunc := BlendToOpaque;
 
-  tmp := TImage32.Create;
-  try
-    for i := 0 to Count -1 do
-    begin
-      with Layer[i] do
+    tmp := TImage32.Create;
+    try
+      for i := 0 to Count -1 do
       begin
-        if not Visible or (fOpacity < 2) then Continue;
-        dstRec := Rect(fPosition.X, fPosition.Y,
-          fPosition.X + Image.Width, fPosition.Y + Image.Height);
-        if fOpacity < 254 then
+        with Layer[i] do
         begin
-          //reduce layer opacity
-          tmp.Assign(Image);
-          FracAlpha(tmp, fOpacity);
-          fBackground.CopyFrom(tmp, tmp.Bounds, dstRec, blendFunc);
-        end else
-          fBackground.CopyFrom(Image, Image.Bounds, dstRec, blendFunc);
+          if not Visible or (fOpacity < 2) then Continue;
+          dstRec := Types.Rect(fPosition.X, fPosition.Y,
+            fPosition.X + Image.Width, fPosition.Y + Image.Height);
+          if fOpacity < 254 then
+          begin
+            //reduce layer opacity
+            tmp.Assign(Image);
+            FracAlpha(tmp, fOpacity);
+            fBackground.CopyFrom(tmp, tmp.Bounds, dstRec, blendFunc);
+          end else
+            fBackground.CopyFrom(Image, Image.Bounds, dstRec, blendFunc);
+        end;
       end;
+    finally
+      tmp.Free;
     end;
-  finally
-    tmp.Free;
+    fUpdatePending := false;
   end;
-  fUpdatePending := false;
-end;
-//------------------------------------------------------------------------------
-
-function TLayeredImage32.GetMergedImage: TImage32;
-begin
-  if fUpdatePending then Update;
   Result := fBackground;
 end;
 //------------------------------------------------------------------------------
@@ -378,7 +566,7 @@ procedure TLayeredImage32.Clear;
 var
   i: integer;
 begin
-  SetSize(0, 0);
+  fBackground.Clear;
   for i := 0 to Count -1 do
     TLayer32(fList[i]).free;
   fList.Clear;
@@ -421,35 +609,55 @@ end;
 
 function TLayeredImage32.GetBounds: TRect;
 begin
-  Result := Rect(0, 0, Width, Height);
+  Result := Types.Rect(0, 0, Width, Height);
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.AddNewLayer(const layerName: string = ''): TLayer32;
+function TLayeredImage32.GetMidPoint: TPointD;
+begin
+  Result := PointD(fBackground.Width * 0.5, fBackground.Height * 0.5);
+end;
+//------------------------------------------------------------------------------
+
+function TLayeredImage32.AddNewLayer(layerClass: TLayer32Class;
+  const layerName: string = ''): TLayer32;
 var
   i: integer;
 begin
   i := Count;
-  Result := TLayer32.Create(Self, i);
+  result := layerClass.Create(self, i);
   fList.Add(Result);
   Result.fName := layerName;
   UpdatePending;
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.InsertNewLayer(level: integer;
-  const layerName: string = ''): TLayer32;
+function TLayeredImage32.AddNewLayer(const layerName: string = ''): TLayer32;
+begin
+  Result := AddNewLayer(TLayer32, layerName);
+end;
+//------------------------------------------------------------------------------
+
+function TLayeredImage32.InsertNewLayer(layerClass: TLayer32Class;
+  level: integer; const layerName: string = ''): TLayer32;
 var
   i: integer;
 begin
   if (level < 0) or (level > Count) then
     raise Exception.Create(rsImageLayerRangeError);
-  Result := TLayer32.Create(Self, level);
+  Result := layerClass.Create(Self, level);
   Result.Name := layerName;
   fList.Insert(level, Result);
   for i := level + 1 to Count -1 do
     Layer[i].fLevel := i;
   UpdatePending;
+end;
+//------------------------------------------------------------------------------
+
+function TLayeredImage32.InsertNewLayer(level: integer;
+  const layerName: string = ''): TLayer32;
+begin
+  Result := InsertNewLayer(TLayer32, level, layerName);
 end;
 //------------------------------------------------------------------------------
 
@@ -481,5 +689,8 @@ begin
   Result := nil;
 end;
 //------------------------------------------------------------------------------
+
+initialization
+  DefaultButtonSize := DPI(11);
 
 end.

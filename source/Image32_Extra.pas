@@ -16,7 +16,7 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Windows, Math, Image32, Image32_Draw;
+  SysUtils, Classes, Windows, Math, Types, Image32, Image32_Draw;
 
 type
   //TCompareFunction: Function template for FloodFill procedure
@@ -70,7 +70,7 @@ function FloodFillHue(initial, current: TColor32; tolerance: Integer): Boolean;
 implementation
 
 uses
-  Image32_Vector, Image32_Clipper;
+  Image32_Vector;
 
 resourcestring
   rsDraw3DNeedsNonZeroFill =
@@ -423,7 +423,7 @@ function GetFloodFillBounds(img: TImage32; x,y: Integer;
   end;
 
 begin
-  Result := Rect(x,y, x,y);
+  Result := Types.Rect(x,y, x,y);
   while (Result.Top > 0) and RowHasFill(Result.Top -1) do
     dec(Result.Top);
   while (Result.Bottom < img.Height -1) and RowHasFill(Result.Bottom) do

@@ -16,26 +16,32 @@ uses
   SysUtils, Classes, Windows, Messages, Types, Graphics,
   Controls, Forms, ExtCtrls, Math, ShellApi, ClipBrd;
 
-{$IF COMPILERVERSION >= 17}
-  //Nested types within classes
+{$IFDEF FPC}
   {$DEFINE NESTED_TYPES}
-  {$IF COMPILERVERSION >= 18}
-    //Delphi 2006   - added TBitmap.SetSize method
-    {$DEFINE SETSIZE}
-    {$IF COMPILERVERSION >= 18.5}
-      //Delphi 2007   - added inline compiler directive
-      {$DEFINE INLINE}
-      {$IF COMPILERVERSION >= 20}
-        //Delphi 2009  - added TBitmap.AlphaFormat property
-        {$DEFINE ALPHAFORMAT}
-        {$IF COMPILERVERSION >= 21}
-          //Delphi 2010 - added screen gesture support
-          {$DEFINE GESTURES}
+  {$DEFINE SETSIZE}
+  {$DEFINE INLINE}
+{$ELSE}
+  {$IF COMPILERVERSION >= 17}
+    //Nested types within classes
+    {$DEFINE NESTED_TYPES}
+    {$IF COMPILERVERSION >= 18}
+      //Delphi 2006   - added TBitmap.SetSize method
+      {$DEFINE SETSIZE}
+      {$IF COMPILERVERSION >= 18.5}
+        //Delphi 2007   - added inline compiler directive
+        {$DEFINE INLINE}
+        {$IF COMPILERVERSION >= 20}
+          //Delphi 2009  - added TBitmap.AlphaFormat property
+          {$DEFINE ALPHAFORMAT}
+          {$IF COMPILERVERSION >= 21}
+            //Delphi 2010 - added screen gesture support
+            {$DEFINE GESTURES}
+          {$IFEND}
         {$IFEND}
       {$IFEND}
     {$IFEND}
   {$IFEND}
-{$IFEND}
+{$ENDIF}
 
 type
   TBitmapProperties = class;
@@ -94,7 +100,7 @@ type
     procedure WMDropFiles(var Msg: TMessage); message WM_DROPFILES;
     function DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint): Boolean; override;
     function DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint): Boolean; override;
-    procedure CMFocusChanged(var Message: TCMFocusChanged); message CM_FOCUSCHANGED;
+    procedure CMFocusChanged(var Message: TMessage); message CM_FOCUSCHANGED;
     procedure BmpChanged(Sender: TObject);
     procedure BitmapScaleAtPos(newScale: double; const mousePos: TPoint);
     function GetInnerMargin: integer;
@@ -187,6 +193,12 @@ type
     property OnFileDrop: TFileDropEvent read fOnDragDrop write fOnDragDrop;
     property OnPaste: TNotifyEvent read fOnPaste write fOnPaste;
   end;
+
+{$IFDEF FPC}
+  function AlphaBlend(DC: HDC; p2, p3, p4, p5: Integer;
+      DC6: HDC; p7, p8, p9, p10: Integer; p11: TBlendFunction): BOOL;
+      stdcall; external 'msimg32.dll' name 'AlphaBlend';
+{$ENDIF}
 
 const
   SCALE_STRETCHED = -1;
@@ -415,7 +427,7 @@ begin
   Touch.InteractiveGestures := [igZoom, igPan];
   {$ENDIF}
   fBmp.Canvas.Brush.Color := Color;
-  fBmp.OnChange := BmpChanged;
+  fBmp.OnChange := {$IFDEF FPC}@{$ENDIF}BmpChanged;
   fFocusedColor := Color;
   DoubleBuffered := true;
 end;
@@ -663,6 +675,9 @@ var
 begin
   result := not fBmp.Empty;
   if not result then Exit;
+{$IFDEF FPC}
+  fBmp.SaveToClipboardFormat(CF_BITMAP);
+{$ELSE}
   Clipboard.Open;
   try
     fBmp.SaveToClipboardFormat(fmt, data, pal);
@@ -670,6 +685,7 @@ begin
   finally
     Clipboard.Close;
   end;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -679,18 +695,22 @@ begin
   try
     result := Clipboard.HasFormat(CF_BITMAP);
     if not result then Exit;
+{$IFDEF FPC}
+     fBmp.LoadFromClipBoardFormat(CF_BITMAP);
+{$ELSE}
     fBmp.LoadFromClipBoardFormat(CF_BITMAP,
       ClipBoard.GetAsHandle(CF_BITMAP),0);
-    fOffsetX := 0; fOffsetY := 0;
-    if fScale = SCALE_BEST_FIT then
-      BitmapScaleBestFit else
-      fScale := 1;
-    Invalidate;
-    if assigned(fBitmapProperties.fOnPaste) then
-      fBitmapProperties.fOnPaste(self);
+{$ENDIF}
   finally
     Clipboard.Close;
   end;
+  fOffsetX := 0; fOffsetY := 0;
+  if fScale = SCALE_BEST_FIT then
+    BitmapScaleBestFit else
+    fScale := 1;
+  Invalidate;
+  if assigned(fBitmapProperties.fOnPaste) then
+    fBitmapProperties.fOnPaste(self);
 end;
 //------------------------------------------------------------------------------
 
@@ -931,7 +951,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPanel.CMFocusChanged(var Message: TCMFocusChanged);
+procedure TPanel.CMFocusChanged(var Message: TMessage);
 begin
   Invalidate;
 end;
