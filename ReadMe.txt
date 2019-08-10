@@ -1,8 +1,8 @@
 
 Image32 is a compact 2D graphics library written in Delphi Pascal. It provides an extensive range of image manipulation functions. It also includes a polygon renderer for line and polygon drawing. The renderer supports a range of brush filling options including tiled images, and linear and radial gradient fills.
 
-Version: 1.16
-Uploaded: 8 August 2019
+Version: 1.17
+Uploaded: 11 August 2019
 Freeware for both open source and commercial applications released under 
 Boost Software License - see https://www.boost.org/LICENSE_1_0.txt
 Copyright © 2019 Angus Johnson
@@ -11,6 +11,11 @@ http://www.angusj.com/delphi/image32.php
 
 
 Changes since initial release:
+
+Version: 1.17
+  Refactored gradient renderers and added TSvgRadialGradientRenderer.
+  Minor bugfixes and code improvements.
+  Improved documentation.
 
 Version: 1.16
   BitmapPanels now compiles in Free Pascal (FPC) too.

@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.10                                                            *
-* Date      :  23 July 2019                                                    *
+* Version   :  1.17                                                            *
+* Date      :  11 August 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -152,6 +152,9 @@ type
   {$IFDEF INLINE} inline; {$ENDIF}
   function Distance(const pt1, pt2: TPointD): double; overload;
   {$IFDEF INLINE} inline; {$ENDIF}
+
+  function IsPointInEllipse(const ellipseRec: TRect; const pt: TPoint): Boolean;
+
   //GetIntersectsEllipseAndLine: Gets the intersection of an ellipse and
   //a line. The function result = true when the line either touches
   //tangentially or passes through the ellipse. If the line touches
@@ -605,50 +608,84 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function IsPointInEllipse(const ellipseRec: TRect; const pt: TPoint): Boolean;
+var
+  rec: TRectD;
+  x,y, y2, a,b, dx,dy: double;
+begin
+  a := RectWidth(ellipseRec) *0.5;
+  b := RectHeight(ellipseRec) *0.5;
+  dx := ellipseRec.Left + a;
+  dy := ellipseRec.Top + b;
+  rec := RectD(ellipseRec);
+  OffsetRect(rec, -dx, -dy);
+  x := pt.X -dx; y := pt.Y -dy;
+  //first make sure pt is inside rect
+  Result := (abs(x) <= a) and (abs(y) <= b);
+  if not result then Exit;
+  //given (x*x)/(a*a) + (y*y)/(b*b) = 1
+  //then y*y = b*b(1 - (x*x)/(a*a))
+  //nb: contents of Sqrt below will always be positive
+  //since the substituted x must be within ellipseRec bounds
+  y2 := Sqrt((b*b*(1 - (x*x)/(a*a))));
+  Result := (y >= -y2) and (y <= y2);
+end;
+//------------------------------------------------------------------------------
+
 function GetLineEllipseIntersects(const ellipseRect: TRect;
   var linePt1, linePt2: TPointD): Boolean;
 var
   dx, dy, m,a,b,c,q: double;
+  qa,qb,qc,qs: double;
   rec: TRectD;
+  pt1, pt2: TPointD;
 begin
+  a := RectWidth(ellipseRect) *0.5;
+  b := RectHeight(ellipseRect) *0.5;
   //offset ellipseRect so it's centered over the coordinate origin
-  dx := (ellipseRect.Left + ellipseRect.Right) / 2;
-  dy := (ellipseRect.Top + ellipseRect.Bottom) / 2;
+  dx := ellipseRect.Left + a; dy := ellipseRect.Top + b;
   rec := RectD(ellipseRect);
   offsetRect(rec, -dx, -dy);
-  linePt1 := OffsetPoint(linePt1, -dx, -dy);
-  linePt2 := OffsetPoint(linePt2, -dx, -dy);
-  //equation of ellipse = x^2/a^2 + y^2/b^2 = 1
+  pt1 := OffsetPoint(linePt1, -dx, -dy);
+  pt2 := OffsetPoint(linePt2, -dx, -dy);
+  //equation of ellipse = (x*x)/(a*a) + (y*y)/(b*b) = 1
   //equation of line = y = mx + c;
-  a := RectWidth(ellipseRect)/2;
-  b := RectHeight(ellipseRect)/2;
-
-  if (linePt1.X = linePt2.X) then //vertical line (ie infinite slope)
+  if (pt1.X = pt2.X) then //vertical line (ie infinite slope)
   begin
-    //given x = d, then y^2 = (1 - d^2/a^2)*b^2
-    q := (1 - Sqr(linePt1.X)/Sqr(a))* Sqr(b);
+    //given x = K, then y*y = b*b(1 - (x*x)/(a*a))
+    q := (b*b)*(1 - Sqr(pt1.X)/(a*a));
     result := q >= 0;
     if not result then Exit;
-    linePt1.Y := Sqrt(q);
-    linePt2.Y := -Sqrt(q);
+    q := Sqrt(q);
+    pt1.Y := q;
+    pt2.Y := -q;
   end else
   begin
-    //given that ellipse and line have been offset so
-    //ellipse is centered over the coordinate origin,
-    //and given x^2/a^2 + y^2/b^2 = 1 and y = mx + c
-    m := (linePt1.Y - linePt2.Y)/(linePt1.X - linePt2.X);
-    c := linePt1.Y - m * linePt1.X;
-    q := Sqr(a) * Sqr(m) + Sqr(b) - Sqr(c);
-    result := q >= 0;
+    //using simultaneous equations and substitution
+    //given y = mx + c
+    m := (pt1.Y - pt2.Y)/(pt1.X - pt2.X);
+    c := pt1.Y - m * pt1.X;
+    //given (x*x)/(a*a) + (y*y)/(b*b) = 1
+    //(x*x)/(a*a)*(b*b) + (y*y) = (b*b)
+    //(b*b)/(a*a) *(x*x) + Sqr(m*x +c) = (b*b)
+    //(b*b)/(a*a) *(x*x) + (m*m)*(x*x) + 2*m*x*c +c*c = b*b
+    //((b*b)/(a*a) +(m*m)) *(x*x) + 2*m*c*(x) + (c*c) - (b*b) = 0
+    //solving quadratic equation
+    qa := ((b*b)/(a*a) +(m*m));
+    qb := 2*m*c;
+    qc := (c*c) - (b*b);
+    qs := (qb*qb) - 4*qa*qc;
+    Result := qs >= 0;
     if not result then Exit;
-    linePt1.X := (-Sqr(a)*m*c + a*b*Sqrt(q))/(Sqr(a)*Sqr(m)+Sqr(b));
-    linePt2.X := (-Sqr(a)*m*c - a*b*Sqrt(q))/(Sqr(a)*Sqr(m)+Sqr(b));
-    linePt1.Y := (Sqr(b)*c + a*b*m*Sqrt(q))/(Sqr(a)*Sqr(m)+Sqr(b));
-    linePt2.Y := (Sqr(b)*c - a*b*m*Sqrt(q))/(Sqr(a)*Sqr(m)+Sqr(b));
+    qs := Sqrt(qs);
+    pt1.X := (-qb +qs)/(2 * qa);
+    pt1.Y := m * pt1.X + c;
+    pt2.X := (-qb -qs)/(2 * qa);
+    pt2.Y := m * pt2.X + c;
   end;
-  //reverse initial offset
-  linePt1 := OffsetPoint(linePt1, dx, dy);
-  linePt2 := OffsetPoint(linePt2, dx, dy);
+  //finally reverse initial offset
+  linePt1 := OffsetPoint(pt1, dx, dy);
+  linePt2 := OffsetPoint(pt2, dx, dy);
 end;
 //------------------------------------------------------------------------------
 

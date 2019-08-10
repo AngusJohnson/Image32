@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.10                                                            *
-* Date      :  23 July 2019                                                    *
+* Version   :  1.17                                                            *
+* Date      :  11 August 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -23,7 +23,7 @@ type
 
   TLayer32 = class
     fOwner       : TLayeredImage32;
-    fLevel       : integer;
+    fIndex       : integer;
     fImage       : TImage32;
     fPosition    : TPoint;
     fVisible     : Boolean;
@@ -40,7 +40,7 @@ type
   protected
     property Owner: TLayeredImage32 read fOwner;
   public
-    constructor Create(owner: TLayeredImage32; level: integer); virtual;
+    constructor Create(owner: TLayeredImage32); virtual;
     destructor Destroy; override;
     procedure SetSize(width, height: integer);
     function RaiseUpOne: Boolean;
@@ -54,7 +54,7 @@ type
     property Bounds: TRect read GetBounds;
     property ClientMidPoint: TPointD read GetClientMidPoint;
     property Image: TImage32 read fImage;
-    property Level: integer read fLevel;
+    property Index: integer read fIndex;
     property Height: integer read GetHeight;
     property Left: integer read fPosition.X;
     property MidPoint: TPointD read GetMidPoint;
@@ -74,10 +74,10 @@ type
       width: double; color: TColor32); virtual;
     procedure DrawButton(const pt: TPointD; color: TColor32); virtual;
   public
-    constructor Create(owner: TLayeredImage32; level: integer); override;
+    constructor Create(owner: TLayeredImage32); override;
     procedure DrawGrid(majorInterval, minorInterval: integer);
-    procedure DrawQSpline(const ctrlPts: TArrayOfPointD);
-    procedure DrawCSpline(const ctrlPts: TArrayOfPointD);
+    procedure DrawQSplineDesign(const ctrlPts: TArrayOfPointD);
+    procedure DrawCSplineDesign(const ctrlPts: TArrayOfPointD);
     procedure DrawRectangle(const rec: TRect);
     property ButtonSize: integer read fButtonSize write fButtonSize;
   end;
@@ -96,7 +96,7 @@ type
     function GetBounds: TRect;
     function GetMidPoint: TPointD;
     function GetMergedImage: TImage32;
-    function GetLayer(level: integer): TLayer32;
+    function GetLayer(index: integer): TLayer32;
   protected
     procedure UpdatePending;
   public
@@ -107,17 +107,17 @@ type
       const layerName: string = ''): TLayer32; overload;
     function AddNewLayer(const layerName: string = ''): TLayer32; overload;
     function InsertNewLayer(layerClass: TLayer32Class;
-      level: integer; const layerName: string = ''): TLayer32; overload;
-    function InsertNewLayer(level: integer;
+      index: integer; const layerName: string = ''): TLayer32; overload;
+    function InsertNewLayer(index: integer;
       const layerName: string = ''): TLayer32; overload;
-    procedure DeleteLayer(level: integer);
+    procedure DeleteLayer(index: integer);
     function GetLayerAt(const pt: TPoint): TLayer32;
     procedure SetSize(width, height: integer);
     property BackgroundColor: TColor32 read fBackColor write fBackColor;
     property Bounds: TRect read GetBounds;
     property Count: integer read GetCount;
     property Height: integer read GetHeight write SetHeight;
-    property Layer[level: integer]: TLayer32 read GetLayer; default;
+    property Layer[index: integer]: TLayer32 read GetLayer; default;
     property MidPoint: TPointD read GetMidPoint;
     property MergedImage: TImage32 read GetMergedImage;
     property Width: integer read GetWidth write SetWidth;
@@ -132,17 +132,17 @@ uses
   Image32_Draw, Image32_Vector, Image32_Extra;
 
 resourcestring
-  rsImageLayerRangeError = 'TLayeredImage32 error: Level out of range.';
+  rsImageLayerRangeError = 'TLayeredImage32 error: index out of range.';
 
 //------------------------------------------------------------------------------
 // TLayer32 class
 //------------------------------------------------------------------------------
 
-constructor TLayer32.Create(owner: TLayeredImage32; level: integer);
+constructor TLayer32.Create(owner: TLayeredImage32);
 begin
   fImage   := TImage32.Create;
   fOwner   := owner;
-  fLevel   := level;
+  fIndex   := 0;
   fVisible := true;
   fOpacity   := 255;
   fImage.OnChange := ImageChanged;
@@ -258,15 +258,15 @@ var
   i: integer;
   layer2: TLayer32;
 begin
-  result := (fLevel < fOwner.Count -1);
+  result := (fIndex < fOwner.Count -1);
   if not result then Exit;
-  i := fLevel;
+  i := fIndex;
   layer2 := fOwner[i +1];
 
   fOwner.fList[i] := layer2;
-  layer2.fLevel := i;
+  layer2.fIndex := i;
   fOwner.fList[i+1] := self;
-  self.fLevel := i+1;
+  self.fIndex := i+1;
   fOwner.UpdatePending;
 end;
 //------------------------------------------------------------------------------
@@ -277,16 +277,16 @@ var
   layer2: TLayer32;
 begin
   highI := fOwner.Count -1;
-  result := (fLevel < highI);
+  result := (fIndex < highI);
   if not result then Exit;
-  for i := fLevel +1 to highI do
+  for i := fIndex +1 to highI do
   begin
     layer2 := fOwner.Layer[i];
-    layer2.fLevel := i -1;
+    layer2.fIndex := i -1;
     fOwner.fList[i-1] := layer2;
   end;
   fOwner.fList[highI] := self;
-  self.fLevel := highI;
+  self.fIndex := highI;
   fOwner.UpdatePending;
 end;
 //------------------------------------------------------------------------------
@@ -296,15 +296,15 @@ var
   i: integer;
   layer2: TLayer32;
 begin
-  result := (fLevel > 0);
+  result := (fIndex > 0);
   if not result then Exit;
-  i := fLevel;
+  i := fIndex;
   layer2 := fOwner[i -1];
 
   fOwner.fList[i] := layer2;
-  layer2.fLevel := i;
+  layer2.fIndex := i;
   fOwner.fList[i-1] := self;
-  self.fLevel := i-1;
+  self.fIndex := i-1;
   fOwner.UpdatePending;
 end;
 //------------------------------------------------------------------------------
@@ -314,16 +314,16 @@ var
   i: integer;
   layer2: TLayer32;
 begin
-  result := (fLevel > 0);
+  result := (fIndex > 0);
   if not result then Exit;
-  for i := fLevel -1 downto 0 do
+  for i := fIndex -1 downto 0 do
   begin
     layer2 := fOwner.Layer[i];
-    layer2.fLevel := i +1;
+    layer2.fIndex := i +1;
     fOwner.fList[i+1] := layer2;
   end;
   fOwner.fList[0] := self;
-  self.fLevel := 0;
+  self.fIndex := 0;
   fOwner.UpdatePending;
 end;
 
@@ -331,7 +331,7 @@ end;
 // TDesignerLayer32 class
 //------------------------------------------------------------------------------
 
-constructor TDesignerLayer32.Create(owner: TLayeredImage32; level: integer);
+constructor TDesignerLayer32.Create(owner: TLayeredImage32);
 begin
   inherited;
   fButtonSize := DefaultButtonSize;
@@ -398,7 +398,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TDesignerLayer32.DrawQSpline(const ctrlPts: TArrayOfPointD);
+procedure TDesignerLayer32.DrawQSplineDesign(const ctrlPts: TArrayOfPointD);
 var
   i, len: integer;
   pt, pt2: TPointD;
@@ -425,7 +425,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TDesignerLayer32.DrawCSpline(const ctrlPts: TArrayOfPointD);
+procedure TDesignerLayer32.DrawCSplineDesign(const ctrlPts: TArrayOfPointD);
 var
   i, len: integer;
   pt: TPointD;
@@ -489,11 +489,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.GetLayer(level: integer): TLayer32;
+function TLayeredImage32.GetLayer(index: integer): TLayer32;
 begin
-  if (level < 0) or (level >= Count) then
+  if (index < 0) or (index >= Count) then
     raise Exception.Create(rsImageLayerRangeError);
-  Result := TLayer32(fList[level]);
+  Result := TLayer32(fList[index]);
 end;
 //------------------------------------------------------------------------------
 
@@ -625,9 +625,10 @@ var
   i: integer;
 begin
   i := Count;
-  result := layerClass.Create(self, i);
+  result := layerClass.Create(self);
   fList.Add(Result);
   Result.fName := layerName;
+  Result.fIndex := i;
   UpdatePending;
 end;
 //------------------------------------------------------------------------------
@@ -639,38 +640,37 @@ end;
 //------------------------------------------------------------------------------
 
 function TLayeredImage32.InsertNewLayer(layerClass: TLayer32Class;
-  level: integer; const layerName: string = ''): TLayer32;
+  index: integer; const layerName: string = ''): TLayer32;
 var
   i: integer;
 begin
-  if (level < 0) or (level > Count) then
+  if (index < 0) or (index > Count) then
     raise Exception.Create(rsImageLayerRangeError);
-  Result := layerClass.Create(Self, level);
+  Result := layerClass.Create(Self);
   Result.Name := layerName;
-  fList.Insert(level, Result);
-  for i := level + 1 to Count -1 do
-    Layer[i].fLevel := i;
+  fList.Insert(index, Result);
+  for i := index to Count -1 do Layer[i].fIndex := i;
   UpdatePending;
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.InsertNewLayer(level: integer;
+function TLayeredImage32.InsertNewLayer(index: integer;
   const layerName: string = ''): TLayer32;
 begin
-  Result := InsertNewLayer(TLayer32, level, layerName);
+  Result := InsertNewLayer(TLayer32, index, layerName);
 end;
 //------------------------------------------------------------------------------
 
-procedure TLayeredImage32.DeleteLayer(level: integer);
+procedure TLayeredImage32.DeleteLayer(index: integer);
 var
   i: integer;
 begin
-  if (level < 0) or (level >= Count) then
+  if (index < 0) or (index >= Count) then
     raise Exception.Create(rsImageLayerRangeError);
-  TLayer32(fList[level]).Free;
-  fList.Delete(level);
-  for i := level to Count -1 do
-    Layer[i].fLevel := i;
+  TLayer32(fList[index]).Free;
+  fList.Delete(index);
+  for i := index to Count -1 do
+    Layer[i].fIndex := i;
   UpdatePending;
 end;
 //------------------------------------------------------------------------------

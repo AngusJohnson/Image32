@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.12                                                            *
-* Date      :  25 July 2019                                                    *
+* Version   :  1.17                                                            *
+* Date      :  11 August 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -329,6 +329,12 @@ type
   {$IFDEF INLINE} inline; {$ENDIF}
   function DPI(val: double): double; overload;
   {$IFDEF INLINE} inline; {$ENDIF}
+
+  {$IFDEF FPC}
+  function AlphaBlend(DC: HDC; p2, p3, p4, p5: Integer;
+    DC6: HDC; p7, p8, p9, p10: Integer; p11: Windows.TBlendFunction): BOOL;
+    stdcall; external 'msimg32.dll' name 'AlphaBlend';
+  {$ENDIF}
 
 const
   angle180 = Pi;
@@ -1903,8 +1909,7 @@ begin
           bf.BlendFlags := 0;
           bf.SourceConstantAlpha := 255;
           bf.AlphaFormat := AC_SRC_ALPHA;
-          AlphaBlend(dstDc, x,y, Width, Height,
-            memDC, 0, 0, Width, Height, bf);
+          AlphaBlend(dstDc, x,y, Width,Height, memDC, 0,0,Width,Height, bf);
         end
         else
           BitBlt(dstDc, x,y, Width, Height, memDc, 0,0, SRCCOPY);

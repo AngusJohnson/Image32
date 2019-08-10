@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.10                                                            *
-* Date      :  23 July 2019                                                    *
+* Version   :  1.17                                                            *
+* Date      :  11 August 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -43,7 +43,6 @@ type
   protected
     function Initialize(targetImage: TImage32): Boolean; virtual;
     function GetDstPixel(x,y: integer): PColor32;
-
     property Target: TImage32 read fImage;
   public
     //RenderProc: x & y refer to pixel coords in the destination image and
@@ -82,14 +81,24 @@ type
     property Offset: TPoint read fOffset write fOffset;
   end;
 
-  TLinearGradientRenderer = class(TCustomRenderer)
+  //TCustomGradientRenderer: also an abstract class
+  TCustomGradientRenderer = class(TCustomRenderer)
   private
     fStartPt         : TPointD;
     fEndPt           : TPointD;
-    fGradientColors  : TArrayOfGradientColor;
     fColors          : TArrayOfColor32;
-    fPerpendicOffsets: TArrayOfInteger;
     fBoundsProc      : TBoundsProc;
+    fGradientColors  : TArrayOfGradientColor;
+  protected
+    procedure SetGradientFillStyle(value: TGradientFillStyle);
+  public
+    constructor Create;
+    procedure InsertColorStop(offsetFrac: single; color: TColor32);
+  end;
+
+  TLinearGradientRenderer = class(TCustomGradientRenderer)
+  private
+    fPerpendicOffsets: TArrayOfInteger;
     fEndDist         : integer;
     fIsVert          : Boolean;
   public
@@ -97,27 +106,36 @@ type
     procedure SetParameters(const startPt, endPt: TPointD;
       startColor, endColor: TColor32;
       gradFillStyle: TGradientFillStyle = gfsClamp);
-    procedure SetGradientFillStyle(value: TGradientFillStyle);
-    procedure InsertColorStop(offsetFrac: single; color: TColor32);
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   end;
 
-  TRadialGradientRenderer = class(TCustomRenderer)
+  TRadialGradientRenderer = class(TCustomGradientRenderer)
   private
-    fFocalPt        : TPointD;
+    fCenterPt       : TPointD;
     fScaleX         : double;
     fScaleY         : double;
-    fGradientColors : TArrayOfGradientColor;
     fMaxColors      : integer;
     fColors         : TArrayOfColor32;
-    fBoundsProc     : TBoundsProc;
   public
     function Initialize(targetImage: TImage32): Boolean; override;
     procedure SetParameters(const focalRect: TRect;
       innerColor, outerColor: TColor32;
       gradientFillStyle: TGradientFillStyle = gfsClamp);
-    procedure SetGradientFillStyle(value: TGradientFillStyle);
-    procedure InsertColorStop(offsetFrac: single; color: TColor32);
+    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
+  end;
+
+  TSvgRadialGradientRenderer = class(TCustomGradientRenderer)
+  private
+    aa,bb           : double;
+    dx,dy           : double;
+    rec             : TRectD;
+    fFocusPt        : TPointD;
+    fMaxColors      : integer;
+    fColors         : TArrayOfColor32;
+  public
+    function Initialize(targetImage: TImage32): Boolean; override;
+    procedure SetParameters(const ellipseRect: TRect;
+      const focus: TPoint; innerColor, outerColor: TColor32);
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   end;
 
@@ -578,6 +596,8 @@ begin
   scanlineY := Round(bot.Y);
   if bot.Y = scanlineY then dec(scanlineY);
   //at the lower-most extent of the edge 'split' the first fragment
+  if scanlineY < 0 then Exit;
+
   psl := @scanlines[scanlineY];
   pFrag := @psl.fragments[psl.count];
   inc(psl.count);
@@ -943,6 +963,62 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// TGradientRenderer
+//------------------------------------------------------------------------------
+
+constructor TCustomGradientRenderer.Create;
+begin
+  fBoundsProc := ClampQ; //default proc
+end;
+//------------------------------------------------------------------------------
+
+procedure TCustomGradientRenderer.SetGradientFillStyle(value: TGradientFillStyle);
+begin
+  case value of
+    gfsClamp: fBoundsProc := ClampQ;
+    gfsMirror: fBoundsProc := MirrorQ;
+    else fBoundsProc := SoftRepeat;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TCustomGradientRenderer.InsertColorStop(offsetFrac: single; color: TColor32);
+var
+  i, len: integer;
+  gradColor: TGradientColor;
+begin
+  if offsetFrac < 0 then offsetFrac := 0
+  else if offsetFrac > 1 then offsetFrac := 1;
+  gradColor.offset := offsetFrac;
+  gradColor.color := color;
+  len := Length(fGradientColors);
+  if len = 0 then
+  begin
+    if (offsetFrac = 0) or (offsetFrac = 1) then
+      SetLength(fGradientColors, 2) else
+      SetLength(fGradientColors, 3);
+    for i := 0 to high(fGradientColors) do
+      fGradientColors[i] := gradColor;
+  end else
+  begin
+    for i := 0 to len -1 do
+      if offsetFrac <= fGradientColors[i].offset then
+      begin
+        if offsetFrac < fGradientColors[i].offset then
+        begin
+          SetLength(fGradientColors, len +1);
+          if i < len then Move(fGradientColors[i],
+            fGradientColors[i+1], (len -i) * SizeOf(TGradientColor));
+          fGradientColors[i] := gradColor;
+        end else
+          fGradientColors[i] := gradColor;
+        Exit;
+      end;
+    fGradientColors[len-1] := gradColor;
+  end;
+end;
+
+//------------------------------------------------------------------------------
 // TLinearGradientRenderer
 //------------------------------------------------------------------------------
 
@@ -959,16 +1035,6 @@ begin
   fGradientColors[0].color := startColor;
   fGradientColors[1].offset := 1;
   fGradientColors[1].color := endColor;
-end;
-//------------------------------------------------------------------------------
-
-procedure TLinearGradientRenderer.SetGradientFillStyle(value: TGradientFillStyle);
-begin
-  case value of
-    gfsClamp: fBoundsProc := ClampQ;
-    gfsMirror: fBoundsProc := MirrorQ;
-    else fBoundsProc := SoftRepeat;
-  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1030,44 +1096,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TLinearGradientRenderer.InsertColorStop(offsetFrac: single; color: TColor32);
-var
-  i, len: integer;
-  gradColor: TGradientColor;
-begin
-  if offsetFrac < 0 then offsetFrac := 0
-  else if offsetFrac > 1 then offsetFrac := 1;
-  gradColor.offset := offsetFrac;
-  gradColor.color := color;
-  len := Length(fGradientColors);
-  if len = 0 then
-  begin
-    if (offsetFrac = 0) or (offsetFrac = 1) then
-      SetLength(fGradientColors, 2) else
-      SetLength(fGradientColors, 3);
-    for i := 0 to high(fGradientColors) do
-      fGradientColors[i] := gradColor;
-  end else
-  begin
-    for i := 0 to len -1 do
-      if offsetFrac <= fGradientColors[i].offset then
-      begin
-        if offsetFrac < fGradientColors[i].offset then
-        begin
-          //Insert(gradColor, fGradientColors, i); //not D7 compatible :(
-          SetLength(fGradientColors, len +1);
-          if i < len then Move(fGradientColors[i],
-            fGradientColors[i+1], (len -i) * SizeOf(TGradientColor));
-          fGradientColors[i] := gradColor;
-        end else
-          fGradientColors[i] := gradColor;
-        Exit;
-      end;
-    fGradientColors[len-1] := gradColor;
-  end;
-end;
-//------------------------------------------------------------------------------
-
 procedure TLinearGradientRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
 var
   i, off: integer;
@@ -1124,8 +1152,8 @@ begin
   fGradientColors[1].offset := 1;
   fGradientColors[1].color := outerColor;
 
-  fFocalPt.X  := (focalRect.Left + focalRect.Right) * 0.5;
-  fFocalPt.Y  := (focalRect.Top + focalRect.Bottom) * 0.5;
+  fCenterPt.X  := (focalRect.Left + focalRect.Right) * 0.5;
+  fCenterPt.Y  := (focalRect.Top + focalRect.Bottom) * 0.5;
   radX    :=  RectWidth(focalRect) * 0.5;
   radY    :=  RectHeight(focalRect) * 0.5;
   if radX >= radY then
@@ -1142,54 +1170,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TRadialGradientRenderer.SetGradientFillStyle(value: TGradientFillStyle);
-begin
-  case value of
-    gfsClamp: fBoundsProc := ClampQ;
-    gfsMirror: fBoundsProc := MirrorQ;
-    else fBoundsProc := SoftRepeatExStart;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TRadialGradientRenderer.InsertColorStop(offsetFrac: single; color: TColor32);
-var
-  i, len: integer;
-  gradColor: TGradientColor;
-begin
-  if offsetFrac < 0 then offsetFrac := 0
-  else if offsetFrac > 1 then offsetFrac := 1;
-  gradColor.offset := offsetFrac;
-  gradColor.color := color;
-  len := Length(fGradientColors);
-  if len = 0 then
-  begin
-    if (offsetFrac = 0) or (offsetFrac = 1) then
-      SetLength(fGradientColors, 2) else
-      SetLength(fGradientColors, 3);
-    for i := 0 to high(fGradientColors) do
-      fGradientColors[i] := gradColor;
-  end else
-  begin
-    for i := 0 to len -1 do
-      if offsetFrac <= fGradientColors[i].offset then
-      begin
-        if offsetFrac < fGradientColors[i].offset then
-        begin
-          //Insert(gradColor, fGradientColors, i); //not D7 compatible :(
-          SetLength(fGradientColors, len +1);
-          if i < len then Move(fGradientColors[i],
-            fGradientColors[i+1], (len -i) * SizeOf(TGradientColor));
-          fGradientColors[i] := gradColor;
-        end else
-          fGradientColors[i] := gradColor;
-        Exit;
-      end;
-    fGradientColors[len-1] := gradColor;
-  end;
-end;
-//------------------------------------------------------------------------------
-
 procedure TRadialGradientRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
 var
   i: integer;
@@ -1200,11 +1180,119 @@ begin
   pDst := GetDstPixel(x1,y);
   for i := x1 to x2 do
   begin
-    dist := Sqrt(Sqr((y - fFocalPt.Y)*fScaleY) + Sqr((i - fFocalPt.X)*fScaleX));
+    dist := Hypot((y - fCenterPt.Y) *fScaleY, (i - fCenterPt.X) *fScaleX);
     color.Color := fColors[fBoundsProc(Round(dist), fMaxColors)];
     pDst^ := BlendToAlpha(pDst^,
       MulTable[color.A, Ord(alpha^)] shl 24 or (color.Color and $FFFFFF));
     inc(pDst); inc(alpha);
+  end;
+end;
+
+//------------------------------------------------------------------------------
+// TSvgRadialGradientRenderer
+//------------------------------------------------------------------------------
+
+function TSvgRadialGradientRenderer.Initialize(targetImage: TImage32): Boolean;
+begin
+  result := inherited Initialize(targetImage) and (fMaxColors > 1);
+  if not result then Exit;
+  fColors := GetColorGradient(fGradientColors, fMaxColors);
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgRadialGradientRenderer.SetParameters(const ellipseRect: TRect;
+  const focus: TPoint; innerColor, outerColor: TColor32);
+begin
+  fMaxColors := 0;
+  if IsEmptyRect(ellipseRect) then Exit;
+
+  //reset gradient colors if perviously set
+  SetLength(fGradientColors, 2);
+  fGradientColors[0].offset := 0;
+  fGradientColors[0].color := innerColor;
+  fGradientColors[1].offset := 1;
+  fGradientColors[1].color := outerColor;
+
+  aa    :=  RectWidth(ellipseRect) * 0.5;
+  bb    :=  RectHeight(ellipseRect) * 0.5;
+  dx    :=  ellipseRect.Left + aa;
+  dy    :=  ellipseRect.Top  + bb;
+  rec := RectD(ellipseRect);
+  OffsetRect(rec, -dx, -dy);
+  fFocusPt.X := focus.X - dx;
+  fFocusPt.Y := focus.Y - dy;
+  fMaxColors := Ceil(Hypot(aa *2, bb *2)) +1;
+  aa := aa * aa;
+  bb := bb * bb;
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgRadialGradientRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
+var
+  i: integer;
+  q,m,c, qa,qb,qc,qs: double;
+  distMax, dist: double;
+  color: TARGB;
+  pDst: PColor32;
+  pt, ellipsePt: TPointD;
+begin
+  //get left-most pixel to render
+  pDst := GetDstPixel(x1,y);
+  pt.X := x1 - dx; pt.Y := y - dy;
+  for i := x1 to x2 do
+  begin
+    if (pt.X <= rec.Left) or (pt.X >= rec.Right) or
+      (pt.Y <= rec.Top) or (pt.Y >= rec.Bottom) then q := 1
+
+    //equation of ellipse = (x*x)/aa + (y*y)/bb = 1
+    //equation of line = y = mx + c;
+    else if (pt.X = fFocusPt.X) then //vertical line
+    begin
+      //let x = pt.X, then y*y = b*b(1 - Sqr(pt.X)/aa)
+      q := Sqrt(bb*(1 - Sqr(pt.X)/aa));
+      ellipsePt.X := pt.X;
+      if pt.Y >= fFocusPt.Y then
+        ellipsePt.Y := q else
+        ellipsePt.Y := -q;
+      dist := abs(pt.Y - fFocusPt.Y);
+      distMax := abs(ellipsePt.Y - fFocusPt.Y);
+      if (dist >= distMax) then
+        q := 1 else
+        q := dist/ distMax;
+    end else
+    begin
+      //using simultaneous equations and substitution
+      //given y = mx + c
+      m := (pt.Y - fFocusPt.Y)/(pt.X - fFocusPt.X);
+      c := pt.Y - m * pt.X;
+      //given (x*x)/aa + (y*y)/bb = 1
+      //(x*x)/aa*bb + (y*y) = bb
+      //bb/aa *(x*x) + Sqr(m*x +c) = bb
+      //bb/aa *(x*x) + (m*m)*(x*x) + 2*m*x*c +c*c = b*b
+      //(bb/aa +(m*m)) *(x*x) + 2*m*c*(x) + (c*c) - bb = 0
+      //solving quadratic equation
+      qa := (bb/aa +(m*m));
+      qb := 2*m*c;
+      qc := (c*c) - bb;
+      qs := (qb*qb) - 4*qa*qc;
+      if qs >= 0 then
+      begin
+        qs := Sqrt(qs);
+        if pt.X <= fFocusPt.X then
+          ellipsePt.X := (-qb -qs)/(2 * qa) else
+          ellipsePt.X := (-qb +qs)/(2 * qa);
+        ellipsePt.Y := m * ellipsePt.X + c;
+        dist := Hypot(pt.X - fFocusPt.X, pt.Y - fFocusPt.Y);
+        distMax := Hypot(ellipsePt.X - fFocusPt.X, ellipsePt.Y - fFocusPt.Y);
+        if dist > distMax then q := 1
+        else q := dist/ distMax;
+      end else
+        q := 1;
+    end;
+    color.Color := fColors[fBoundsProc(Round(q * fMaxColors), fMaxColors)];
+    pDst^ := BlendToAlpha(pDst^,
+      MulTable[color.A, Ord(alpha^)] shl 24 or (color.Color and $FFFFFF));
+    inc(pDst); pt.X := pt.X + 1; inc(alpha);
   end;
 end;
 

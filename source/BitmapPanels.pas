@@ -2,8 +2,8 @@ unit BitmapPanels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.03                                                            *
-* Date      :  13 July 2019                                                    *
+* Version   :  1.04                                                            *
+* Date      :  10 August 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
@@ -16,32 +16,7 @@ uses
   SysUtils, Classes, Windows, Messages, Types, Graphics,
   Controls, Forms, ExtCtrls, Math, ShellApi, ClipBrd;
 
-{$IFDEF FPC}
-  {$DEFINE NESTED_TYPES}
-  {$DEFINE SETSIZE}
-  {$DEFINE INLINE}
-{$ELSE}
-  {$IF COMPILERVERSION >= 17}
-    //Nested types within classes
-    {$DEFINE NESTED_TYPES}
-    {$IF COMPILERVERSION >= 18}
-      //Delphi 2006   - added TBitmap.SetSize method
-      {$DEFINE SETSIZE}
-      {$IF COMPILERVERSION >= 18.5}
-        //Delphi 2007   - added inline compiler directive
-        {$DEFINE INLINE}
-        {$IF COMPILERVERSION >= 20}
-          //Delphi 2009  - added TBitmap.AlphaFormat property
-          {$DEFINE ALPHAFORMAT}
-          {$IF COMPILERVERSION >= 21}
-            //Delphi 2010 - added screen gesture support
-            {$DEFINE GESTURES}
-          {$IFEND}
-        {$IFEND}
-      {$IFEND}
-    {$IFEND}
-  {$IFEND}
-{$ENDIF}
+{$I Image32.inc}
 
 type
   TBitmapProperties = class;
@@ -1079,12 +1054,16 @@ var
   marg: integer;
 begin
   Result := inherited DoMouseWheelDown(Shift, MousePos);
+  if Result then Exit;
   if fBmp.Empty or not fBitmapProperties.fZoomScrollEnabled or
     (fScaleType = stStretched) then Exit;
+  {$IFNDEF FPC}
   MousePos := ScreenToClient(MousePos);
+  {$ENDIF}
   marg := GetInnerMargin;
   MousePos := OffsetPoint(MousePos, -marg, -marg);
   BitmapScaleAtPos(fScale * 0.9, MousePos);
+  Result := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -1093,12 +1072,16 @@ var
   marg: integer;
 begin
   Result := inherited DoMouseWheelUp(Shift, MousePos);
+  if Result then Exit;
   if fBmp.Empty or not fBitmapProperties.fZoomScrollEnabled or
     (fScaleType = stStretched) then Exit;
+  {$IFNDEF FPC}
   MousePos := ScreenToClient(MousePos);
+  {$ENDIF}
   marg := GetInnerMargin;
   MousePos := OffsetPoint(MousePos, -marg, -marg);
   BitmapScaleAtPos(fScale * 1.1, MousePos);
+  Result := true;
 end;
 //------------------------------------------------------------------------------
 
