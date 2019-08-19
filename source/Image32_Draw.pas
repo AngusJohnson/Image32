@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.17                                                            *
-* Date      :  11 August 2019                                                  *
+* Version   :  1.18                                                            *
+* Date      :  18 August 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -355,7 +355,17 @@ var
   res: TARGB absolute Result;
   R, invR: PByteArray;
 begin
-  if (mask = 0) then
+  if fg.A = 0 then
+  begin
+    Result := bgColor;
+    res.A := MulTable[res.A, not mask];
+  end
+  else if bg.A = 0 then
+  begin
+    Result := fgColor;
+    res.A := MulTable[res.A, mask];
+  end
+  else if (mask = 0) then
     Result := bgColor
   else if (mask = 255) then
     Result := fgColor
@@ -371,6 +381,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+//GetColorGradient: using the supplied array of TGradientColor,
+//create an array of TColor32 of the specified length
 function GetColorGradient(const gradColors: TArrayOfGradientColor;
   len: integer): TArrayOfColor32;
 var
@@ -1048,7 +1060,7 @@ begin
 
   if abs(fEndPt.Y - fStartPt.Y) > abs(fEndPt.X - fStartPt.X) then
   begin
-    //gradient approaches vertical (> 45 deg.)
+    //gradient > 45 degrees
     if (fEndPt.Y < fStartPt.Y) then
     begin
       fGradientColors := ReverseColors(fGradientColors);
@@ -1068,7 +1080,7 @@ begin
     for i := 0 to Target.Width -1 do
       fPerpendicOffsets[i] := Round(dxdy * (fStartPt.X - i));
   end
-  else //gradient approaches horizontal (<= 45 deg.)
+  else //gradient <= 45 degrees
   begin
     if (fEndPt.X = fStartPt.X) then
     begin

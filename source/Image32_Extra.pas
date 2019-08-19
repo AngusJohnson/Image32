@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.17                                                            *
-* Date      :  11 August 2019                                                  *
+* Version   :  1.18                                                            *
+* Date      :  18 August 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -617,7 +617,10 @@ begin
   shadowSize := size / 4;
   rec := RectD(pt.X -size, pt.Y -size, pt.X +size, pt.Y +size);
   if boSquare in buttonOptions then
-    path := Rectangle(rec) else
+  begin
+    path := Rectangle(rec);
+    rec := InflateRect(rec, -1,-1);
+  end else
     path := Ellipse(rec);
   if boPressed in buttonOptions then
     shadowAngle := angle45 else
@@ -630,9 +633,14 @@ begin
   if color shr 24 > 2 then
     DrawPolygon(img, path, frNonZero, color);
 
-  DrawLine(img, path, 1, clBlack32, esClosed);
   Draw3D(img, path, frNonZero, shadowSize*2,
-    Round(shadowSize), $80000000, $DDFFFFFF, shadowAngle);
+    Ceil(shadowSize), $80000000, $DDFFFFFF, shadowAngle);
+  DrawLine(img, path, 1, clBlack32, esClosed);
+
+  if not (boSquare in buttonOptions) then Exit;
+  path := Rectangle(rec);
+  setLength(path, 3);
+  DrawLine(img, path, 0.75, clWhite32, esSquare);
 end;
 //------------------------------------------------------------------------------
 

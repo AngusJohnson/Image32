@@ -24,7 +24,7 @@ type
   //For notes on RLE bitmap compression, see ...
   //https://docs.microsoft.com/en-us/windows/desktop/gdi/bitmap-compression
 
-  TImage32Fmt_BMP = class(TImageFormat)
+  TImageFormat_BMP = class(TImageFormat)
   private
     useClipboardFormat: Boolean;
   public
@@ -325,7 +325,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImage32Fmt_BMP.LoadFromStream(stream: TStream;
+function TImageFormat_BMP.LoadFromStream(stream: TStream;
   img32: TImage32): Boolean;
 var
   palEntrySize: integer;
@@ -630,7 +630,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32Fmt_BMP.SaveToStream(stream: TStream; img32: TImage32);
+procedure TImageFormat_BMP.SaveToStream(stream: TStream; img32: TImage32);
 var
   bih: TBitmapV4Header;
   palCnt, BitCount, rowSize: integer;
@@ -712,7 +712,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImage32Fmt_BMP.SaveToFile(const filename: string;
+function TImageFormat_BMP.SaveToFile(const filename: string;
   img32: TImage32): Boolean;
 var
   stream: TFilestream;
@@ -738,13 +738,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-class function TImage32Fmt_BMP.CanCopyToClipboard: Boolean;
+class function TImageFormat_BMP.CanCopyToClipboard: Boolean;
 begin
   Result := true;
 end;
 //------------------------------------------------------------------------------
 
-function TImage32Fmt_BMP.CopyToClipboard(img32: TImage32): Boolean;
+function TImageFormat_BMP.CopyToClipboard(img32: TImage32): Boolean;
 var
   dataHdl: THandle;
   dataPtr: pointer;
@@ -753,7 +753,7 @@ begin
   result := true;
   ms := TMemoryStream.Create;
   try
-    with TImage32Fmt_BMP.Create do
+    with TImageFormat_BMP.Create do
     try
       useClipboardFormat := true;
       SaveToStream(ms, img32);
@@ -783,14 +783,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-class function TImage32Fmt_BMP.CanPasteFromClipboard: Boolean;
+class function TImageFormat_BMP.CanPasteFromClipboard: Boolean;
 begin
   result := IsClipboardFormatAvailable(CF_DIB) or
     IsClipboardFormatAvailable(CF_BITMAP);
 end;
 //------------------------------------------------------------------------------
 
-function TImage32Fmt_BMP.PasteFromClipboard(img32: TImage32): Boolean;
+function TImageFormat_BMP.PasteFromClipboard(img32: TImage32): Boolean;
 var
   dataHdl: THandle;
   bitmapHdl: HBITMAP;
@@ -818,7 +818,7 @@ begin
       end;
 
       ms.Position := 0;
-      with TImage32Fmt_BMP.Create do
+      with TImageFormat_BMP.Create do
       try
         LoadFromStream(ms, img32);
       finally
@@ -888,6 +888,6 @@ end;
 //------------------------------------------------------------------------------
 
 initialization
-  TImage32.RegisterImageFormatClass('BMP', TImage32Fmt_BMP, cpLow);
+  TImage32.RegisterImageFormatClass('BMP', TImageFormat_BMP, cpLow);
 
 end.

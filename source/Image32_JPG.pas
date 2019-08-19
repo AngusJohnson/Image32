@@ -19,7 +19,7 @@ uses
 
 type
 
-  TImage32Fmt_JPG = class(TImageFormat)
+  TImageFormat_JPG = class(TImageFormat)
   public
     function LoadFromStream(stream: TStream; img32: TImage32): Boolean; override;
     procedure SaveToStream(stream: TStream; img32: TImage32); override;
@@ -41,7 +41,7 @@ implementation
 type
   TJpegImageHack = class(TJpegImage);
 
-function TImage32Fmt_JPG.LoadFromStream(stream: TStream; img32: TImage32): Boolean;
+function TImageFormat_JPG.LoadFromStream(stream: TStream; img32: TImage32): Boolean;
 var
   jpeg: TJpegImage;
 begin
@@ -62,7 +62,7 @@ end;
 // Saving (writing) Jpeg images to file ...
 //------------------------------------------------------------------------------
 
-procedure TImage32Fmt_JPG.SaveToStream(stream: TStream; img32: TImage32);
+procedure TImageFormat_JPG.SaveToStream(stream: TStream; img32: TImage32);
 var
   Jpeg: TJpegImage;
 begin
@@ -80,19 +80,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImage32Fmt_JPG.CopyToClipboard(img32: TImage32): Boolean;
+function TImageFormat_JPG.CopyToClipboard(img32: TImage32): Boolean;
 begin
   result := false; //not implemented
 end;
 //------------------------------------------------------------------------------
 
-class function TImage32Fmt_JPG.CanPasteFromClipboard: Boolean;
+class function TImageFormat_JPG.CanPasteFromClipboard: Boolean;
 begin
   result := false;
 end;
 //------------------------------------------------------------------------------
 
-function TImage32Fmt_JPG.PasteFromClipboard(img32: TImage32): Boolean;
+function TImageFormat_JPG.PasteFromClipboard(img32: TImage32): Boolean;
 begin
   result := false; //not implemented
 end;
@@ -101,8 +101,8 @@ end;
 //------------------------------------------------------------------------------
 
 initialization
-  TImage32.RegisterImageFormatClass('JPG', TImage32Fmt_JPG, cpLow);
-  TImage32.RegisterImageFormatClass('JPEG', TImage32Fmt_JPG, cpLow);
+  TImage32.RegisterImageFormatClass('JPG', TImageFormat_JPG, cpLow);
+  TImage32.RegisterImageFormatClass('JPEG', TImageFormat_JPG, cpLow);
   //don't bother with clipboard formats as PNG and BMP formats are preferred
 
 end.

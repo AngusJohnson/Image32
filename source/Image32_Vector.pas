@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.17                                                            *
-* Date      :  11 August 2019                                                  *
+* Version   :  1.18                                                            *
+* Date      :  18 August 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -94,6 +94,9 @@ type
   procedure AppendPath(var paths: TArrayOfArrayOfPointD;
     const extra: TArrayOfArrayOfPointD);
     {$IFDEF INLINE} inline; {$ENDIF} overload;
+
+  function RotatePath(const path: TArrayOfPointD;
+    const focalPoint: TPointD; angleRads: double): TArrayOfPointD;
 
   function MakePathI(const pts: array of integer): TArrayOfPointD; overload;
   function MakePathD(const pts: array of double): TArrayOfPointD; overload;
@@ -850,6 +853,36 @@ begin
     setLength(paths, len1 + len2);
     for i := 0 to len2 -1 do
       paths[len1+i] := Copy(extra[i], 0, length(extra[i]));
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure RotatePt(var pt: TPointD; const center: TPointD; sinA, cosA: double);
+var
+  tmpX, tmpY: double;
+begin
+  tmpX := pt.X-center.X;
+  tmpY := pt.Y-center.Y;
+  pt.X := tmpX * cosA - tmpY * sinA + center.X;
+  pt.Y := tmpX * sinA + tmpY * cosA + center.Y;
+end;
+//------------------------------------------------------------------------------
+
+function RotatePath(const path: TArrayOfPointD;
+  const focalPoint: TPointD; angleRads: double): TArrayOfPointD;
+var
+  i: integer;
+  x,y: double;
+  sinA, cosA: extended;
+begin
+  SetLength(Result, length(path));
+  Math.SinCos(angleRads, sinA, cosA);
+  for i := 0 to high(path) do
+  begin
+    x := path[i].X - focalPoint.X;
+    y := path[i].Y - focalPoint.Y;
+    Result[i].X := x * cosA - y * sinA + focalPoint.X;
+    Result[i].Y := x * sinA + y * cosA + focalPoint.Y;
   end;
 end;
 //------------------------------------------------------------------------------

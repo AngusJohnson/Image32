@@ -100,7 +100,7 @@ type
       const srcRec, dstRec: TRect; blendFunc: TBlendFunction);
     procedure BlurHorizontal(rect: TRect; radius: Integer);
     procedure BlurVertical(rect: TRect; radius: Integer);
-    procedure DoOnChange;
+    procedure Changed;
     procedure BeginUpdate;
     procedure EndUpdate;
   public
@@ -1097,7 +1097,7 @@ procedure TImage32.Assign(src: TImage32);
 begin
   if assigned(src) then
     src.AssignTo(self);
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1111,7 +1111,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.DoOnChange;
+procedure TImage32.Changed;
 begin
   if Assigned(fOnChange) then fOnChange(Self);
 end;
@@ -1142,7 +1142,7 @@ begin
     pc^ := BlendToOpaque(bgColor, pc^);
      inc(pc);
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1167,7 +1167,7 @@ begin
      inc(pc);
     end;
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1188,7 +1188,7 @@ begin
       pc^ := color; inc(pc);
     end;
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1210,7 +1210,7 @@ begin
     end;
     inc(c, Width - rw);
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1240,7 +1240,7 @@ begin
     //rec is considered valid even when completely outside the image bounds,
     //and so when that happens we simply return a fully transparent image ...
     FillChar(Result[0], w * h * SizeOf(TColor32), 0);
-    DoOnChange;
+    Changed;
     Exit;
   end;
 
@@ -1254,7 +1254,7 @@ begin
       Move(pSrc^, pDst^, w * SizeOf(TColor32));
       inc(pSrc, Width); inc(pDst, w);
     end;
-    DoOnChange;
+    Changed;
     Exit;
   end;
 
@@ -1294,7 +1294,7 @@ begin
     FillChar(pDst^, w * SizeOf(TColor32), 0);
     inc(pDst, w);
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1335,7 +1335,7 @@ begin
   //nb: dynamic arrays are zero-initialized with SetLength() unless the array
   //is returned as a function result. And so SetSize() zero-initializes pixels.
   if color > 0 then Clear(color);
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1410,7 +1410,7 @@ begin
   fPixels := tmp;
   fwidth := newWidth;
   fheight := newHeight;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1449,7 +1449,7 @@ begin
   fPixels := tmp;
   fwidth := newWidth;
   fheight := newHeight;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1540,7 +1540,7 @@ begin
   finally
     tmp.Free;
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1834,7 +1834,7 @@ begin
   end;
   CopyInternal(src, srcRecClipped, dstRecClipped, blendFunc);
   result := true;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2005,7 +2005,7 @@ begin
     finally
       CloseClipboard;
     end;
-    DoOnChange;
+    Changed;
     Break;
   end;
 end;
@@ -2026,7 +2026,7 @@ begin
     dec(row, fWidth);
   end;
   fPixels := a;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2050,7 +2050,7 @@ begin
     end;
     dec(row, fWidth *2);
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2090,7 +2090,7 @@ begin
     c.A := alpha;
     inc(c);
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2113,7 +2113,7 @@ begin
     pc.B := 255 - pc.B;
     inc(pc);
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2128,7 +2128,7 @@ begin
     pc.A := 255 - pc.A;
     inc(pc);
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2149,7 +2149,7 @@ begin
       if bg.Color = color then bg.Color := clNone32;
       inc(bg);
     end;
-    DoOnChange;
+    Changed;
     Exit;
   end;
 
@@ -2175,7 +2175,7 @@ begin
     end;
     inc(bg);
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2194,7 +2194,7 @@ begin
   for i := 0 to high(tmpImage) do
     tmpImage[i].hue := lut[ tmpImage[i].hue ];
   fPixels := ArrayOfHSLToArrayColor32(tmpImage);
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2217,7 +2217,7 @@ begin
   for i := 0 to high(tmpImage) do
     tmpImage[i].lum := lut[ tmpImage[i].lum ];
   fPixels := ArrayOfHSLToArrayColor32(tmpImage);
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2240,7 +2240,7 @@ begin
   for i := 0 to high(tmpImage) do
     tmpImage[i].sat := lut[ tmpImage[i].sat ];
   fPixels := ArrayOfHSLToArrayColor32(tmpImage);
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2288,7 +2288,7 @@ begin
       fPixels[x + rec.Left + (y + rec.Top) * Width] := wc.Color;
     end;
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2491,7 +2491,7 @@ begin
     BlurHorizontal(rect, radius);
     BlurVertical(rect, radius);
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2634,7 +2634,7 @@ begin
   finally
     bmpBlur.Free;
   end;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2707,7 +2707,7 @@ begin
 
   for x := 0 to width * height - 1 do
     fPixels[x] := wca[x].Color or $FF000000;
-  DoOnChange;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2722,7 +2722,7 @@ begin
     pb.A := ClampByte(Round(pb.A * scale));
     inc(pb);
   end;
-  DoOnChange;
+  Changed;
 end;
 
 //------------------------------------------------------------------------------
@@ -2855,7 +2855,6 @@ begin
   for i := 0 to 255 do MulTable[i, 0] := 0;
   for j := 0 to 255 do DivTable[0, j] := 0;
   for i := 0 to 255 do DivTable[i, 0] := 0;
-
   for i := 1 to 255 do
     for j := 1 to 255 do
     begin

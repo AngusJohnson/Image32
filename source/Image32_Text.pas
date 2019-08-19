@@ -182,11 +182,6 @@ const
     (eM11:(fract: 0; value: 1); eM12:(fract: 0; value: 0);
      eM21:(fract: 0; value: 0); eM22:(fract: 0; value: -1));
 
-var
-  //alphaTable: reduces anti-alias fringe by 25%
-  alphaTable: array[0..255] of byte;
-  scale64To255: array[0..64] of byte;
-
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
@@ -839,25 +834,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure MakeScaleTable;
-var
-  i: integer;
-begin
-  for i := 0 to 64 do
-    scale64To255[i] := Round(i * 255 / 64)
-end;
-//------------------------------------------------------------------------------
-
-procedure MakeAlphaTable;
-var
-  i: integer;
-begin
-  for i := 0 to 50 do alphaTable[i] := 0;
-  for i := 51 to 255 do
-    alphaTable[i] := i - (255 - i) div 4;
-end;
-//------------------------------------------------------------------------------
-
 function GetDefaultFontInfo: TFontInfo;
 begin
   result := FontManager.GetFontInfo(DefaultLogfont);
@@ -1259,8 +1235,6 @@ end;
 //------------------------------------------------------------------------------
 
 initialization
-  MakeScaleTable;
-  MakeAlphaTable;
   CreateFontManager;
 
 finalization

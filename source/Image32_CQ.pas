@@ -557,15 +557,20 @@ end;
 //------------------------------------------------------------------------------
 
 procedure MakeDitherTables;
+const
+  OneDiv16   = 0.0625;
+  ThreeDiv16 = 0.1875;
+  FiveDiv16  = 0.3125;
+  SevenDiv16 = 0.4375;
 var
   i: Integer;
 begin
   for i := -255 to 255 do
   begin
-    Mul1Div16Table[i] := Round(i / 16);
-    Mul3Div16Table[i] := Round(i * 3 / 16);
-    Mul5Div16Table[i] := Round(i * 5 / 16);
-    Mul7Div16Table[i] := Round(i * 7 / 16);
+    Mul1Div16Table[i] := Round(i * OneDiv16);
+    Mul3Div16Table[i] := Round(i * ThreeDiv16);
+    Mul5Div16Table[i] := Round(i * FiveDiv16);
+    Mul7Div16Table[i] := Round(i * SevenDiv16);
   end;
 end;
 

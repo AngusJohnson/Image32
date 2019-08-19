@@ -19,7 +19,7 @@ uses
 
 type
 
-  TImage32Fmt_PNG = class(TImageFormat)
+  TImageFormat_PNG = class(TImageFormat)
   public
     function LoadFromStream(stream: TStream; img32: TImage32): Boolean; override;
     procedure SaveToStream(stream: TStream; img32: TImage32); override;
@@ -43,7 +43,7 @@ resourcestring
 // Loading (reading) PNG images from file ...
 //------------------------------------------------------------------------------
 
-function TImage32Fmt_PNG.LoadFromStream(stream: TStream; img32: TImage32): Boolean;
+function TImageFormat_PNG.LoadFromStream(stream: TStream; img32: TImage32): Boolean;
 var
   i,j: integer;
   png: TPngImage;
@@ -163,7 +163,7 @@ end;
 // Saving (writing) PNG images to file ...
 //------------------------------------------------------------------------------
 
-procedure TImage32Fmt_PNG.SaveToStream(stream: TStream; img32: TImage32);
+procedure TImageFormat_PNG.SaveToStream(stream: TStream; img32: TImage32);
 var
   i,j: integer;
   png: TPngImage;
@@ -203,13 +203,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-class function TImage32Fmt_PNG.CanCopyToClipboard: Boolean;
+class function TImageFormat_PNG.CanCopyToClipboard: Boolean;
 begin
   Result := true;
 end;
 //------------------------------------------------------------------------------
 
-function TImage32Fmt_PNG.CopyToClipboard(img32: TImage32): Boolean;
+function TImageFormat_PNG.CopyToClipboard(img32: TImage32): Boolean;
 var
   dataHdl: THandle;
   dataPtr: pointer;
@@ -220,7 +220,7 @@ begin
 
   ms := TMemoryStream.Create;
   try
-    with TImage32Fmt_PNG.Create do
+    with TImageFormat_PNG.Create do
     try
       SaveToStream(ms, img32);
     finally
@@ -254,14 +254,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-class function TImage32Fmt_PNG.CanPasteFromClipboard: Boolean;
+class function TImageFormat_PNG.CanPasteFromClipboard: Boolean;
 begin
   result := IsClipboardFormatAvailable(CF_PNG) or
     IsClipboardFormatAvailable(CF_IMAGEPNG);
 end;
 //------------------------------------------------------------------------------
 
-function TImage32Fmt_PNG.PasteFromClipboard(img32: TImage32): Boolean;
+function TImageFormat_PNG.PasteFromClipboard(img32: TImage32): Boolean;
 var
   dataHdl: THandle;
   dataPtr: pointer;
@@ -294,7 +294,7 @@ begin
     end;
 
     ms.Position := 0;
-    with TImage32Fmt_PNG.Create do
+    with TImageFormat_PNG.Create do
     try
       LoadFromStream(ms, img32);
     finally
@@ -310,7 +310,7 @@ end;
 //------------------------------------------------------------------------------
 
 initialization
-  TImage32.RegisterImageFormatClass('PNG', TImage32Fmt_PNG, cpHigh);
+  TImage32.RegisterImageFormatClass('PNG', TImageFormat_PNG, cpHigh);
   CF_PNG     := RegisterClipboardFormat('PNG');
   CF_IMAGEPNG := RegisterClipboardFormat('image/png');
 
