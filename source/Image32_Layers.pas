@@ -19,6 +19,7 @@ uses
 
 type
   TSizingStyle = (ssCorners, ssEdges, ssEdgesAndCorners, ssCustom);
+  TMergeImageState = (misUnknown, misMergeAll, misHideDesigners);
 
   TLayer32Class = class of TLayer32;
   TLayeredImage32 = class;
@@ -74,10 +75,11 @@ type
     property Width: integer read GetWidth;
   end;
 
-  //TCustomDesignerLayer32, unlike its descendant TDesignerLayer32, this class
-  //will still be returned by TLayeredImage32.GetLayerAt(). Nevertheless,
-  //TCustomDesignerLayer32 will be filtered as a design layer in
-  //TLayeredImage32.GetMergedImage so it's the ideal class for control buttons.
+  //TCustomDesignerLayer32 behaves exactly like TLayer32 except this class and
+  //its descendants can be excluded from TLayeredImage32.GetMergedImage (when
+  //the HideDesigners parameter is true). However, unlike its descendant class
+  //TDesignerLayer32, it will still be visible to TLayeredImage32.GetLayerAt
+  //which makes it the ideal class for designer button control layers.
   TCustomDesignerLayer32 = class(TLayer32);
 
   TDesignerLayer32 = class(TCustomDesignerLayer32)
@@ -94,18 +96,22 @@ type
     procedure DrawCSplineDesign(const ctrlPts: TArrayOfPointD;
       ButtonSize: integer = 0);
     procedure DrawRectangle(const rec: TRect);
+    procedure DrawEllipse(const rec: TRect);
   end;
 
   TLayeredImage32 = class
   private
-    fBackground: TImage32;
+    fMergedImage: TImage32;
     fList: TList;
-    //fGroupList: lists the layer index to the start of each group
-    //negative offsets indicate the group no longer exists
-    //eg fGroupList[0] = 10 - Layer[10].fGroupIndex = 1
+    //fGroupList: Lists the layer index of the bottom of each group.
+    //Negative offsets indicate the group no longer exists.
+    //Given that group indexes start at 1 and fGroupList is zero based, then
+    //fGroupList[0] refers to group 1 and fGroupList[1] refers to group 2 etc.
+    //eg fGroupList[1] := 10 --> group 2 starts at Layer[10].
     fGroupList: TList;
     fBackColor: TColor32;
     fUpdatePending: Boolean;
+    fMergeImageState: TMergeImageState;
     function GetCount: integer;
     function GetHeight: integer;
     procedure SetHeight(value: integer);
@@ -116,7 +122,6 @@ type
     function GetLayer(index: integer): TLayer32;
     function GetTopLayer: TLayer32;
     procedure ReIndexFrom(start, stop: integer);
-  protected
   public
     constructor Create(Width: integer = 0; Height: integer =0); virtual;
     destructor Destroy; override;
@@ -532,6 +537,15 @@ begin
   path := Rectangle(rec);
   DrawDashedLine(path, true);
 end;
+//------------------------------------------------------------------------------
+
+procedure TDesignerLayer32.DrawEllipse(const rec: TRect);
+var
+  path: TArrayOfPointD;
+begin
+  path := Ellipse(rec);
+  DrawDashedLine(path, true);
+end;
 
 //------------------------------------------------------------------------------
 // TLayeredImage32 class
@@ -541,7 +555,8 @@ constructor TLayeredImage32.Create(Width: integer; Height: integer);
 begin
   fList := TList.Create;
   fGroupList := TList.Create;
-  fBackground := TImage32.Create(Width, Height);
+  fMergedImage := TImage32.Create(Width, Height);
+  fMergeImageState := misUnknown;
 end;
 //------------------------------------------------------------------------------
 
@@ -550,14 +565,14 @@ begin
   Clear;
   fGroupList.Free;
   fList.Free;
-  fBackground.Free;
+  fMergedImage.Free;
   inherited;
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayeredImage32.SetSize(width, height: integer);
 begin
-  fBackground.SetSize(width, height);
+  fMergedImage.SetSize(width, height);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -616,9 +631,11 @@ var
   blendFunc: TBlendFunction;
   tmp: TImage32;
 begin
-  if fUpdatePending or hideDesigners then
+  if fUpdatePending or
+    (hideDesigners and (fMergeImageState <> misHideDesigners)) or
+    (not hideDesigners and (fMergeImageState <> misMergeAll)) then
   begin
-    fBackground.Clear(fBackColor);
+    fMergedImage.Clear(fBackColor);
 
     if fBackColor shr 24 < 254 then //ie semi-transparent
       blendFunc  := BlendToAlpha else
@@ -638,25 +655,28 @@ begin
           tmp := TImage32.Create(Image);
           try
             FracAlpha(tmp, fOpacity);
-            fBackground.CopyFrom(tmp, tmp.Bounds, Bounds, blendFunc);
+            fMergedImage.CopyFrom(tmp, tmp.Bounds, Bounds, blendFunc);
           finally
             tmp.Free;
           end;
         end else
-          fBackground.CopyFrom(Image, Image.Bounds, Bounds, blendFunc);
+          fMergedImage.CopyFrom(Image, Image.Bounds, Bounds, blendFunc);
       end;
     end;
-    fUpdatePending := not hideDesigners;
+
+    fUpdatePending := false;
+    if hideDesigners then fMergeImageState := misHideDesigners
+    else fMergeImageState := misMergeAll;
   end;
-  Result := fBackground;
-end;
+  Result := fMergedImage;
+ end;
 //------------------------------------------------------------------------------
 
 procedure TLayeredImage32.Clear;
 var
   i: integer;
 begin
-  fBackground.Clear;
+  fMergedImage.Clear;
   for i := 0 to Count -1 do
     TLayer32(fList[i]).free;
   fList.Clear;
@@ -672,28 +692,28 @@ end;
 
 function TLayeredImage32.GetHeight: integer;
 begin
-  Result := fBackground.Height;
+  Result := fMergedImage.Height;
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayeredImage32.SetHeight(value: integer);
 begin
-  if fBackground.Height = value then Exit;
-  fBackground.SetSize(Width, value);
+  if fMergedImage.Height = value then Exit;
+  fMergedImage.SetSize(Width, value);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 function TLayeredImage32.GetWidth: integer;
 begin
-  Result := fBackground.Width;
+  Result := fMergedImage.Width;
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayeredImage32.SetWidth(value: integer);
 begin
-  if fBackground.Width = value then Exit;
-  fBackground.SetSize(value, Height);
+  if fMergedImage.Width = value then Exit;
+  fMergedImage.SetSize(value, Height);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -706,7 +726,7 @@ end;
 
 function TLayeredImage32.GetMidPoint: TPointD;
 begin
-  Result := PointD(fBackground.Width * 0.5, fBackground.Height * 0.5);
+  Result := PointD(fMergedImage.Width * 0.5, fMergedImage.Height * 0.5);
 end;
 //------------------------------------------------------------------------------
 
@@ -1151,7 +1171,7 @@ begin
   if not result then Exit;
   rec := GetRectFromGroupButtons(lim, movedBtnLayer.GroupIndex);
 
-  //ADJUST REC ACCORDING TO THE NEW POSITION OF MOVINGBTNLAYER
+  //ADJUST REC ACCORDING TO THE NEW POSITION OF MOVEDBTNLAYER
 
   btnMP := Point(movedBtnLayer.MidPoint);
 
@@ -1198,7 +1218,8 @@ begin
   end;
   recMP := MidPoint(rec);
 
-  //REPOSITION ALL BUTTONS SO THAT THEY ALIGN WITH REC AND ARE CENTERED
+  //REPOSITION ALL BUTTONS SO THAT THEY ALIGN WITH REC
+  //AND EDGE BUTTONS ARE RE-CENTERED TOO
 
   if cnt = 8 then
   begin
@@ -1222,7 +1243,7 @@ begin
       lim[fig + i].PositionCenteredAt(Point(edgeMps[i]));
   end;
 
-  //copy the master image to the working image, then resize and reposition
+  //copy the master image to the target image, then resize and reposition
   targetLayer.Image.Assign(masterImg);
   targetLayer.Image.Resize(RectWidth(rec), RectHeight(rec));
   targetLayer.PositionAt(rec.TopLeft);

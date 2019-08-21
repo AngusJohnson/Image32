@@ -12,6 +12,10 @@ http://www.angusj.com/delphi/image32.php
 
 Changes since initial release:
 
+Version: 1.19
+  Fixed minor bug in TImages32.CopyToDC.
+  Added an animation example
+
 Version: 1.18
   Major revision of layers in Image32_Layers.
   Fixed minor bug in BlendColorUsingMask() in Image32_Draw.

@@ -1891,8 +1891,7 @@ begin
     tmp.FlipVertical; //DIB sections store pixels Y-inverted
     hasTransparency :=
       transparent and (bkColor < 255) and Self.HasTransparency;
-    if HasTransparency then
-      tmp.Premultiply;  //this is required for DIB sections
+    tmp.Premultiply;  //this is required for DIB sections
     if bkColor <> 0 then
       tmp.SetBackgroundColor(bkColor);
     memDc := GetCompatibleMemDc;
