@@ -3,7 +3,7 @@ unit Timer;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.0                                                             *
-* Date      :  18 August 2019                                                  *
+* Date      :  20 August 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  A much more accurate and responsive timer than Delphi's         *
@@ -21,9 +21,8 @@ uses
 type
   TTimerThread = class(TThread)
   private
-    fFreq        : double;
-    fCancelEvent : THandle;
     fInterval    : double;
+    fCancelEvent : THandle;
     fOnTimer     : TNotifyEvent;
     procedure DoOnTimer;
   protected
@@ -34,7 +33,6 @@ type
       priority: TThreadPriority; onTimerEvent: TNotifyEvent);
     destructor Destroy; override;
     property Interval: double write fInterval;
-    property OnTimer: TNotifyEvent read fOnTimer write fOnTimer;
   end;
 
   TTimerEx = class
@@ -63,12 +61,8 @@ implementation
 
 constructor TTimerThread.Create(interval: double;
   priority: TThreadPriority; onTimerEvent: TNotifyEvent);
-var
-  freq : TLargeInteger;
 begin
-  QueryPerformanceFrequency(freq);
-  fFreq := 1000/freq;
-  FreeOnTerminate := true;
+  FreeOnTerminate := false;
   fInterval := interval;
   fOnTimer := onTimerEvent;
   fCancelEvent := Windows.CreateEvent(nil, true, false, nil);
@@ -92,23 +86,24 @@ end;
 
 procedure TTimerThread.Execute;
 var
-  delay, prevDelay: double;
-  cnt1 : TLargeInteger;
-  cnt2 : TLargeInteger;
+  delay, prevDelay, f: double;
+  freq, cnt1, cnt2 : TLargeInteger;
   interval: DWORD;
 begin
   delay := 0;
   prevDelay := fInterval;
   interval := Round(fInterval);
+  QueryPerformanceFrequency(freq);
+  f := 1000/freq;
   QueryPerformanceCounter(cnt1);
   while not Terminated do
   begin
     QueryPerformanceCounter(cnt2);
-    delay := (((cnt2 - cnt1) * fFreq - fInterval) + prevDelay);
+    delay := (((cnt2 - cnt1) * f - fInterval) + prevDelay);
     cnt1 := cnt2;
     prevDelay := delay;
-    if delay > fInterval then
-      interval := 0 else
+    if delay >= fInterval -1 then
+      interval := 1 else
       interval := Round(fInterval - delay);
     if WaitForSingleObject(fCancelEvent, interval) = WAIT_OBJECT_0 then
       Break;
@@ -157,7 +152,7 @@ begin
   end else
   begin
     fTimerThread.Terminate;
-    fTimerThread := nil;
+    FreeAndNil(fTimerThread);
   end;
 end;
 //------------------------------------------------------------------------------
