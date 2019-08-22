@@ -40,12 +40,11 @@ type
     procedure mnuHorizontalEdgesClick(Sender: TObject);
   private
     layeredImage32: TLayeredImage32;
-    buttonMovingLayer: TLayer32;
-    btnLayerSize: integer;
-    clickPoint: TPoint;
-    ImageIsMoving: Boolean;
-    buttonPts: TArrayOfPointD;
-    margin: integer;
+    fButtonClickedLayer: TLayer32;
+    fMouseDownPoint: TPoint;
+    fImageClicked: Boolean;
+    fButtonPts: TArrayOfPointD;
+    fMargin: integer;
     procedure UpdateButtonLayers;
     procedure UpdateLayeredImage(transform: Boolean);
     procedure ButtonPointsToStatusbar;
@@ -69,6 +68,8 @@ uses
 //------------------------------------------------------------------------------
 
 procedure TForm1.FormCreate(Sender: TObject);
+var
+  layer: TLayer32;
 begin
   //SETUP THE DISPLAY PANEL
 
@@ -81,35 +82,27 @@ begin
 
   //SETUP THE LAYERED IMAGE
   DefaultButtonSize := DPI(8);
-  margin := DPI(50);
+  fMargin := DPI(50);
 
-  layeredImage32 := TLayeredImage32.Create(100, 100);
-  //layeredImage32.BackgroundColor := clWhite32;
+  layeredImage32 := TLayeredImage32.Create; //will size later
 
-  //add a background layer to show hatched transparency
-  //and make it a TDesignerLayer32 so it isn't 'clickable'
-  layeredImage32.AddNewLayer(TDesignerLayer32, 'background - hatched');  //0
+  //Layer 0: background layer to show hatched transparency
+  //         and it's a TDesignerLayer32 so it isn't 'clickable'
+  layeredImage32.AddNewLayer(TDesignerLayer32, 'background - hatched');
 
+  //Layer 1: hidden master layer containing the starting image
+  layer := layeredImage32.AddNewLayer('master - hidden');
+  layer.image.LoadFromResource('BEETLE', 'BMP');
+  layer.Visible := false;
 
-  //add a hidden master layer containing the starting image
-  with layeredImage32.AddNewLayer('master - hidden') do                  //1
-  begin
-    image.LoadFromResource('BEETLE', 'BMP');
-    Visible := false;
-  end;
+  //Layer 2: for the visible transformed image
+  layer := layeredImage32.AddNewLayer('transformed');
+  layer.Image.Assign(layeredImage32[1].Image);
+  layer.PositionAt(Point(fMargin, fMargin));
 
-  //add a third layer for the transformed image
-  layeredImage32.AddNewLayer('transformed');                             //2
-  layeredImage32[2].Image.Assign(layeredImage32[1].Image);
-  layeredImage32[2].PositionAt(Point(margin, margin));
-
-  //add 4 more layers for control buttons                                //3-7
-
-  btnLayerSize := DefaultButtonSize +1; //+1 = room for pen outline
-  //and to avoid rounding issues when positioning layers using its midpoint
-  if Odd(btnLayerSize) then inc(btnLayerSize);
-  buttonPts := Rectangle(layeredImage32[2].Bounds);
-  CreateButtonGroup(layeredImage32, buttonPts, clBlue32, DefaultButtonSize, []);
+  //Layers 3 -7: create and position control buttons
+  fButtonPts := Rectangle(layeredImage32[2].Bounds); //lt, rt, rb, lb
+  CreateButtonGroup(layeredImage32, fButtonPts, clBlue32, DefaultButtonSize, []);
 
   //TRANSFORM AND DISPLAY
   UpdateLayeredImage(true);
@@ -133,14 +126,14 @@ begin
     begin
       //copy the master image the the 'transform' layer (2) and transform
       image.Assign(layeredImage32[1].Image);
-      if not ProjectiveTransform(layeredImage32[2].Image, buttonPts) then
+      if not ProjectiveTransform(layeredImage32[2].Image, fButtonPts) then
         Exit;
 
-      rec := GetBounds(buttonPts);
+      rec := GetBounds(fButtonPts);
       layeredImage32[2].PositionAt(rec.TopLeft);
       //resize layeredImage32 so there's room for further transforms
-      w := image.Width + margin  + rec.Left;
-      h := image.Height + margin + rec.Top;
+      w := image.Width + fMargin  + rec.Left;
+      h := image.Height + fMargin + rec.Top;
       layeredImage32.SetSize(w, h);
       //redo hatched bakground image
       layeredImage32[0].SetSize(w, h);
@@ -161,7 +154,7 @@ var
   s: string;
 begin
   for i := 0 to 3 do
-    s := format('%s  (%1.0n,%1.0n)', [s, buttonPts[i].X, buttonPts[i].Y]);
+    s := format('%s  (%1.0n,%1.0n)', [s, fButtonPts[i].X, fButtonPts[i].Y]);
   StatusBar1.SimpleText := s;
 end;
 //------------------------------------------------------------------------------
@@ -172,7 +165,7 @@ var
 begin
   //nb: first 3 layers are non-button layers
   for i := 0 to 3 do
-    layeredImage32[3+i].PositionCenteredAt(buttonPts[i]);
+    layeredImage32[3+i].PositionCenteredAt(fButtonPts[i]);
 end;
 //------------------------------------------------------------------------------
 
@@ -181,27 +174,19 @@ procedure TForm1.Panel1MouseDown(Sender: TObject; Button: TMouseButton;
 var
   len: integer;
   pt: TPoint;
+  layer: TLayer32;
 begin
   pt := Types.Point(X,Y);
   if not Panel1.ClientToBitmap(pt) then Exit;
+  layer := layeredImage32.GetLayerAt(pt);
+  if not Assigned(layer) then Exit;
 
-  buttonMovingLayer := layeredImage32.GetLayerAt(pt);
-  if Assigned(buttonMovingLayer) and
-    (buttonMovingLayer.Name <> 'button') then
-      buttonMovingLayer := nil;
+  if (layer.Name = 'button') then
+    fButtonClickedLayer := layer else
+    fImageClicked := true;
 
-  if Assigned(buttonMovingLayer) then
-  begin
-    //while moving buttons temporarily disable panel zoom and scroll
-    panel1.BitmapProperties.ZoomAndScrollEnabled := false
-  end
-  else if PtInRect(layeredImage32[2].Bounds, pt) then
-  begin
-    clickPoint := pt;
-    ImageIsMoving := true;
-    //while moving the image temporarily disable panel zoom and scroll
-    panel1.BitmapProperties.ZoomAndScrollEnabled := false;
-  end;
+  fMouseDownPoint := pt;
+  panel1.BitmapProperties.ZoomAndScrollEnabled := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -215,38 +200,38 @@ begin
   pt := Types.Point(X,Y);
   if not Panel1.ClientToBitmap(pt) then Exit;
 
-  if ImageIsMoving then
+  if fImageClicked then
   begin
-    dx := pt.X - clickPoint.X;
-    dy := pt.Y - clickPoint.Y;
-    clickPoint := pt;
-    buttonPts := OffsetPath(buttonPts, dx, dy);
-    //offset (move) both buttons and image
-    layeredImage32[2].Offset(dx, dy);
+    dx := pt.X - fMouseDownPoint.X;
+    dy := pt.Y - fMouseDownPoint.Y;
+    fMouseDownPoint := pt;
+    fButtonPts := OffsetPath(fButtonPts, dx, dy);
+    //offset (move) both buttons and transformed image
     layeredImage32.OffsetGroup(1, dx, dy);
+    layeredImage32[2].Offset(dx, dy);
     UpdateLayeredImage(false);
   end
-  else if Assigned(buttonMovingLayer) then
+  else if Assigned(fButtonClickedLayer) then
   begin
     //nb: first 3 layers are non-button layers
-    btnIdx := buttonMovingLayer.Index -3;
-    buttonPts[btnIdx] := PointD(pt);
+    btnIdx := fButtonClickedLayer.Index -3;
+    fButtonPts[btnIdx] := PointD(pt);
 
     if mnuVerticalEdges.Checked then
     begin
       case btnIdx of
-        0: buttonPts[3].X := buttonPts[0].X;
-        1: buttonPts[2].X := buttonPts[1].X;
-        2: buttonPts[1].X := buttonPts[2].X;
-        3: buttonPts[0].X := buttonPts[3].X;
+        0: fButtonPts[3].X := fButtonPts[0].X;
+        1: fButtonPts[2].X := fButtonPts[1].X;
+        2: fButtonPts[1].X := fButtonPts[2].X;
+        3: fButtonPts[0].X := fButtonPts[3].X;
       end;
     end else if mnuHorizontalEdges.Checked then
     begin
       case btnIdx of
-        0: buttonPts[1].Y := buttonPts[0].Y;
-        1: buttonPts[0].Y := buttonPts[1].Y;
-        2: buttonPts[3].Y := buttonPts[2].Y;
-        3: buttonPts[2].Y := buttonPts[3].Y;
+        0: fButtonPts[1].Y := fButtonPts[0].Y;
+        1: fButtonPts[0].Y := fButtonPts[1].Y;
+        2: fButtonPts[3].Y := fButtonPts[2].Y;
+        3: fButtonPts[2].Y := fButtonPts[3].Y;
       end;
     end;
     UpdateButtonLayers;
@@ -267,8 +252,8 @@ end;
 procedure TForm1.Panel1MouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  ImageIsMoving := false;
-  buttonMovingLayer := nil;
+  fImageClicked := false;
+  fButtonClickedLayer := nil;
   //re-enable Panel1 zoom and scroll
   Panel1.BitmapProperties.ZoomAndScrollEnabled := true;
 end;
@@ -282,8 +267,8 @@ begin
     layeredImage32[1].Image.LoadFromFile(OpenDialog1.FileName);
     //copy the master image to the 'transform' layer and position it
     layeredImage32[2].Image.Assign(layeredImage32[1].Image);
-    layeredImage32[2].PositionAt(Point(margin, margin));
-    buttonPts := Rectangle(layeredImage32[2].Image.Bounds);
+    layeredImage32[2].PositionAt(Point(fMargin, fMargin));
+    fButtonPts := Rectangle(layeredImage32[2].Bounds);
     UpdateButtonLayers;
     UpdateLayeredImage(true);
   end;
@@ -307,12 +292,12 @@ procedure TForm1.mnuHorizontalEdgesClick(Sender: TObject);
 begin
   if mnuVerticalEdges.Checked then
   begin
-    buttonPts[3].X := buttonPts[0].X;
-    buttonPts[2].X := buttonPts[1].X;
+    fButtonPts[3].X := fButtonPts[0].X;
+    fButtonPts[2].X := fButtonPts[1].X;
   end else if mnuHorizontalEdges.Checked then
   begin
-    buttonPts[1].Y := buttonPts[0].Y;
-    buttonPts[2].Y := buttonPts[3].Y;
+    fButtonPts[1].Y := fButtonPts[0].Y;
+    fButtonPts[2].Y := fButtonPts[3].Y;
   end
   else Exit;
   UpdateButtonLayers;

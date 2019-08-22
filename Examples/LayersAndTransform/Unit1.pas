@@ -41,11 +41,11 @@ type
     procedure CopytoClipboard1Click(Sender: TObject);
   private
     layeredImage32: TLayeredImage32;
-    buttonMovingLayer: TLayer32;
-    btnLayerSize: integer;
-    clickPoint: TPoint;
-    ImageIsMoving: Boolean;
-    splinePts: TArrayOfPointD;
+    fButtonClickedLayer: TLayer32;
+    fClickPoint: TPoint;
+    fImageIsClicked: Boolean;
+    fSplinePts: TArrayOfPointD;
+    fMargin: integer;
     procedure ResetSplinePts;
     procedure UpdateLayeredImage(transform: Boolean);
   public
@@ -64,49 +64,42 @@ uses
   Image32_BMP, Image32_PNG, Image32_JPG, Image32_Draw, Image32_Vector,
   Image32_Extra, Image32_Transform;
 
-const
-  margin = 100;
-
 //------------------------------------------------------------------------------
 
 procedure TForm1.FormCreate(Sender: TObject);
+var
+  layer: TLayer32;
 begin
   //SETUP THE DISPLAY PANEL
 
   Panel1.BorderWidth := DPI(16);
   Panel1.BevelInner := bvLowered;
-  //set Panel1.Tabstop := true to enable keyboard controls
-  Panel1.TabStop := true;
+  Panel1.TabStop := true; //enables keyboard control
   Panel1.FocusedColor := clGradientInactiveCaption;
   Panel1.BitmapProperties.Scale := 1;
 
   //SETUP THE LAYERED IMAGE
   DefaultButtonSize := DPI(8);
+  fMargin := DPI(50);
 
-  layeredImage32 := TLayeredImage32.Create(100, 100);
-  //layeredImage32.BackgroundColor := clWhite32;
+  layeredImage32 := TLayeredImage32.Create;
 
-  //add a 'hatched' layer (0) to highlight transparency
-  layeredImage32.AddNewLayer('background - hatched');               //0
+  //Layer 0: 'hatched' layer to highlight transparency
+  layeredImage32.AddNewLayer('background - hatched');
 
-  //add a hidden master layer (1) containing the starting image
-  with layeredImage32.AddNewLayer('master - hidden') do             //1
-  begin
-    image.LoadFromResource('UNION_JACK', 'BMP');
-    Visible := false;
-  end;
+  //Layer 1: hidden layer contains the starting image
+  layer := layeredImage32.AddNewLayer('master - hidden');
+  layer.image.LoadFromResource('UNION_JACK', 'BMP');
+  layer.Visible := false;
 
-  //add another layer (2) for the transformed image
-  layeredImage32.AddNewLayer('transformed');                        //2
+  //Layer 2: for the transformed image
+  layeredImage32.AddNewLayer('transformed');
 
-  //add a design layer for design lines etc
-  layeredImage32.AddNewLayer(TDesignerLayer32, 'design');           //3
+  //Layer 3: a design layer for design lines etc
+  layeredImage32.AddNewLayer(TDesignerLayer32, 'design');
 
-  //and reset for a very basic starting transformation
-  //adding layers for each tangible spline control button
-  btnLayerSize := Ceil(DefaultButtonSize * 1.25);
-  if Odd(btnLayerSize) then inc(btnLayerSize);
-  ResetSplinePts;                                                   //4+
+  //Layers 4+: button layers
+  ResetSplinePts;
 
   //finally update and display the layered image
   UpdateLayeredImage(true);
@@ -115,17 +108,14 @@ end;
 
 procedure TForm1.ResetSplinePts;
 begin
-  //remove the group of buttons
-  //and the only group (1) will be the buttons
   with layeredImage32 do
-    if Count > 4 then DeleteGroup(1);
+    if Count > 4 then DeleteGroup(1); //button are the only group
 
-  with layeredImage32[1].Image do //with the master image
-    splinePts := MakePathI([0,margin, Width div 2,0, Width,margin]);
-  splinePts := OffsetPath(splinePts, margin, margin);
+  with layeredImage32[1].Image do     //with the master image
+    fSplinePts := MakePathI([0,0, Width div 2,fMargin, Width,0]);
+  fSplinePts := OffsetPath(fSplinePts, fMargin, fMargin);
 
-  CreateButtonGroup(layeredImage32,
-    splinePts, clGreen32, DefaultButtonSize, []);
+  CreateButtonGroup(layeredImage32, fSplinePts, clGreen32, DefaultButtonSize, []);
 end;
 //------------------------------------------------------------------------------
 
@@ -141,13 +131,13 @@ begin
     begin
       //using splinePts, update the 'transformed' layer
       image.Assign(layeredImage32[1].Image); //copy the master image
-      if not SplineTransformVert(image, splinePts,
+      if not SplineTransformVert(image, fSplinePts,
         stQuadratic, clRed32, false, pt) then Exit;
-      PositionAt(pt); //nb: 'pt' returned by SplineTransformVert above
+      PositionAt(pt); //nb: 'pt' returned by SplineTransformVert
 
       //resize layeredImage32 so there's room for further transforms
-      w := image.Width + margin  + pt.X;
-      h := image.Height + margin + pt.Y;
+      w := image.Width + fMargin  + pt.X;
+      h := image.Height + fMargin + pt.Y;
       layeredImage32.SetSize(w, h);
       layeredImage32[0].SetSize(w, h);
       layeredImage32[0].Image.HatchBackground(clWhite32, $FFE0E0E0);
@@ -165,16 +155,16 @@ begin
       SetSize(w, h); //also clears layer
       if mnuShowControls.Checked then
       begin
-        path := QSpline(splinePts);
+        path := QSpline(fSplinePts);
         DrawLine(image, path, 1.5, clBlack32, esSquare);
       end;
-      DrawQSplineDesign(splinePts);
+      DrawQSplineDesign(fSplinePts);
     end;
 
   //move the 'button' layers to the splinePts coordinates (index 4+)
-  for i := 0 to high(splinePts) do
+  for i := 0 to high(fSplinePts) do
     with layeredImage32[4 +i] do
-      PositionCenteredAt(Point(splinePts[i]));
+      PositionCenteredAt(Point(fSplinePts[i]));
 
   layeredImage32[2].Visible := not mnuShowControls.Checked;
   for i := 3 to layeredImage32.Count -1 do
@@ -206,29 +196,29 @@ begin
   begin
     //add an extra spline control point on right click
 
-    len := Length(splinePts);
-    SetLength(splinePts, len +1);
-    splinePts[len] := PointD(pt);
+    len := Length(fSplinePts);
+    SetLength(fSplinePts, len +1);
+    fSplinePts[len] := PointD(pt);
 
     AddToButtonGroup(layeredImage32, 1, pt);
     UpdateLayeredImage(true);
     Exit;
   end;
 
-  buttonMovingLayer := layeredImage32.GetLayerAt(pt);
-  if Assigned(buttonMovingLayer) and
-    (buttonMovingLayer.Name <> 'button') then
-      buttonMovingLayer := nil;
+  fButtonClickedLayer := layeredImage32.GetLayerAt(pt);
+  if Assigned(fButtonClickedLayer) and
+    (fButtonClickedLayer.Name <> 'button') then
+      fButtonClickedLayer := nil;
 
-  if Assigned(buttonMovingLayer) then
+  if Assigned(fButtonClickedLayer) then
   begin
     //while moving buttons temporarily disable panel zoom and scroll
     panel1.BitmapProperties.ZoomAndScrollEnabled := false
   end
   else if PtInRect(layeredImage32[2].Bounds, pt) then
   begin
-    clickPoint := pt;
-    ImageIsMoving := true;
+    fClickPoint := pt;
+    fImageIsClicked := true;
     //while moving the image temporarily disable panel zoom and scroll
     panel1.BitmapProperties.ZoomAndScrollEnabled := false;
   end;
@@ -245,18 +235,18 @@ begin
   pt := Types.Point(X,Y);
   if not Panel1.ClientToBitmap(pt) then Exit;
 
-  if ImageIsMoving then
+  if fImageIsClicked then
   begin
-    dx := pt.X - clickPoint.X;
-    dy := pt.Y - clickPoint.Y;
-    clickPoint := pt;
-    splinePts := OffsetPath(splinePts, dx, dy);
+    dx := pt.X - fClickPoint.X;
+    dy := pt.Y - fClickPoint.Y;
+    fClickPoint := pt;
+    fSplinePts := OffsetPath(fSplinePts, dx, dy);
     //move (offset) the buttons and the image too
     layeredImage32.OffsetGroup(1, dx, dy);
     layeredImage32[2].Offset(dx, dy);
     UpdateLayeredImage(false);
   end
-  else if not Assigned(buttonMovingLayer) then
+  else if not Assigned(fButtonClickedLayer) then
   begin
     layer := layeredImage32.GetLayerAt(pt);
     if Assigned(layer) and (layer.Name = 'button') then
@@ -269,9 +259,9 @@ begin
       Panel1.Cursor := crDefault;
   end else
   begin
-    buttonMovingLayer.PositionCenteredAt(pt);
+    fButtonClickedLayer.PositionCenteredAt(pt);
     //nb: first 4 layers are non-button layers
-    splinePts[buttonMovingLayer.Index -4] := PointD(pt);
+    fSplinePts[fButtonClickedLayer.Index -4] := PointD(pt);
     UpdateLayeredImage(true);
   end;
 end;
@@ -280,8 +270,8 @@ end;
 procedure TForm1.Panel1MouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  ImageIsMoving := false;
-  buttonMovingLayer := nil;
+  fImageIsClicked := false;
+  fButtonClickedLayer := nil;
   //re-enable Panel1 zoom and scroll
   Panel1.BitmapProperties.ZoomAndScrollEnabled := true;
 end;
