@@ -2,8 +2,8 @@ unit BitmapPanels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.04                                                            *
-* Date      :  10 August 2019                                                  *
+* Version   :  1.05                                                            *
+* Date      :  22 August 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
@@ -433,7 +433,7 @@ begin
   clientPt.X := Round((clientPt.X -fDstRect.Left + fOffsetX)/fScale);
   clientPt.Y := Round((clientPt.Y -fDstRect.Top + fOffsetY)/fScale);
   Result := (clientPt.X >= 0) and (clientPt.X < fBmp.Width) and
-    (clientPt.Y >= 0) and (clientPt.Y < fBmp.Width);
+    (clientPt.Y >= 0) and (clientPt.Y < fBmp.Height);
 end;
 //------------------------------------------------------------------------------
 
