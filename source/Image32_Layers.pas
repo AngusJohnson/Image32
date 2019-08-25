@@ -613,7 +613,7 @@ procedure FracAlpha(image: TImage32; opacity: byte);
 var
   i: Integer;
   pb: PARGB;
-  alphaTbl: TArrayOfByte;
+  alphaTbl: PByteArray;
 begin
   pb := PARGB(image.PixelBase);
   alphaTbl := @MulTable[opacity];
@@ -811,7 +811,7 @@ begin
   //GetLayerAt ignores TDesignerLayer32 layers but not
   //TCustomDesignerLayer32 layers (eg buttons)
   for i := Count -1 downto 0 do
-    if Layer[i] is TDesignerLayer32 then continue
+    if (Layer[i] is TDesignerLayer32) or not Layer[i].Visible then continue
     else with Layer[i] do
       if PtInRect(Bounds, pt) then
       begin

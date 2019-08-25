@@ -140,7 +140,7 @@ begin
       h := image.Height + fMargin + pt.Y;
       layeredImage32.SetSize(w, h);
       layeredImage32[0].SetSize(w, h);
-      layeredImage32[0].Image.HatchBackground(clWhite32, $FFE0E0E0);
+      HatchBackground(layeredImage32[0].Image, clWhite32, $FFE0E0E0);
     end;
   end else
   begin

@@ -41,8 +41,34 @@ procedure DrawGlow(img: TImage32; const polygons: TArrayOfArrayOfPointD;
 procedure FloodFill(img: TImage32; x, y: Integer; newColor: TColor32;
   compareFunc: TCompareFunction = nil; tolerance: Integer = 0);
 
+//BoxBlur: With several repetitions and a smaller radius, BoxBlur can
+//achieve a close approximation of a GaussianBlur, and it's faster.
+procedure BoxBlur(img: TImage32; rect: TRect; radius, repeats: Integer);
+procedure GaussianBlur(img: TImage32; rec: TRect; radius: Integer);
+
+//Emboss: A smaller radius is sharper. Increasing depth increases contrast.
+//Luminance changes grayscale balance (unless preserveColor = true)
+procedure Emboss(img: TImage32; radius: Integer = 1; depth: Integer = 10;
+  luminance: Integer = 75; preserveColor: Boolean = false);
+
+//Sharpen: Radius range is 1 - 10; amount range is 1 - 100.<br>
+//see https://en.wikipedia.org/wiki/Unsharp_masking
+procedure Sharpen(img: TImage32; radius: Integer = 2; amount: Integer = 10);
+
+//HatchBackground: Assumes the current image is semi-transparent.
+procedure HatchBackground(img: TImage32; color1: TColor32 = clWhite32;
+  color2: TColor32= clSilver32; hatchSize: Integer = 10);
+
+//EraseColor: Removes the specified color from the image, even from
+//pixels that are a blend of colors including the specified color.<br>
+//see https://stackoverflow.com/questions/9280902/
+procedure EraseColor(img: TImage32;
+  color: TColor32; ExactMatchOnly: Boolean = false);
+
 //RedEyeRemove: Removes 'red eye' from flash photo images.
 procedure RedEyeRemove(img: TImage32; const rect: TRect);
+
+procedure PencilEffect(img: TImage32; intensity: integer = 0);
 
 procedure Erase(img: TImage32; const polygon: TArrayOfPointD;
   fillRule: TFillRule; inverted: Boolean = false); overload;
@@ -83,6 +109,9 @@ const
 type
   PColor32Array = ^TColor32Array;
   TColor32Array = array [0.. maxint div SizeOf(TColor32) -1] of TColor32;
+
+  PWeightedColorArray = ^TWeightedColorArray;
+  TWeightedColorArray = array [0.. $FFFFFF] of TWeightedColor;
 
   PFloodFillRec = ^TFloodFillRec;
   TFloodFillRec = record
@@ -283,7 +312,7 @@ begin
   shadowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
   try
     DrawPolygon(shadowImg, shadowPolys, fillRule, color);
-    shadowImg.BoxBlur(shadowImg.Bounds, blurSize, rpt);
+    BoxBlur(shadowImg, shadowImg.Bounds, blurSize, rpt);
     if cutoutInsideShadow then
       Erase(shadowImg, polys, fillRule);
     img.CopyFrom(shadowImg, shadowImg.Bounds, rec, BlendToAlpha);
@@ -318,7 +347,7 @@ begin
   glowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
   try
     DrawPolygon(glowImg, glowPolys, fillRule, color);
-    glowImg.boxBlur(glowImg.Bounds, Ceil(blurRadius/3), 2);
+    BoxBlur(glowImg, glowImg.Bounds, Ceil(blurRadius/3), 2);
     glowImg.ScaleAlpha(4);
     img.CopyFrom(glowImg, glowImg.Bounds, rec, BlendToAlpha);
   finally
@@ -469,6 +498,380 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure Sharpen(img: TImage32; radius: Integer; amount: Integer);
+var
+  i: Integer;
+  amt: double;
+  weightAmount: array [-255 .. 255] of Integer;
+  bmpBlur: TImage32;
+  pColor, pBlur: PARGB;
+begin
+  amt := ClampRange(amount/20, 0.05, 5);
+  radius := ClampRange(radius, 1, 10);
+  for i := -255 to 255 do
+    weightAmount[i] := Round(amt * i);
+
+  bmpBlur := TImage32.Create(img); //clone self
+  try
+    pColor := PARGB(img.pixelBase);
+    //bmpBlur.GaussianBlur(Bounds, radius);
+    BoxBlur(bmpBlur, bmpBlur.Bounds, Ceil(radius/4), 3);
+    pBlur := PARGB(bmpBlur.pixelBase);
+    for i := 1 to img.Width * img.Height do
+    begin
+      if pColor.A > 0 then
+      begin
+        pColor.R := ClampByte(pColor.R  + weightAmount[pColor.R - pBlur.R]);
+        pColor.G := ClampByte(pColor.G  + weightAmount[pColor.G - pBlur.G]);
+        pColor.B := ClampByte(pColor.B  + weightAmount[pColor.B - pBlur.B]);
+      end;
+      Inc(pColor); Inc(pBlur);
+    end;
+  finally
+    bmpBlur.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+//HatchBackground: Assumes the current image is semi-transparent.
+procedure HatchBackground(img: TImage32;
+  color1: TColor32; color2: TColor32; hatchSize: Integer);
+var
+  i,j: Integer;
+  pc: PColor32;
+  colors: array[boolean] of TColor32;
+  hatch: Boolean;
+begin
+  colors[false] := color1;
+  colors[true] := color2;
+  pc := img.Pixelbase;
+  for i := 0 to img.Height -1 do
+  begin
+    hatch := Odd(i div hatchSize);
+    for j := 0 to img.Width -1 do
+    begin
+      if (j + 1) mod hatchSize = 0 then hatch := not hatch;
+      pc^ := BlendToOpaque(colors[hatch], pc^);
+     inc(pc);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure EraseColor(img: TImage32; color: TColor32; ExactMatchOnly: Boolean);
+var
+  fg: TARGB absolute color;
+  bg: PARGB;
+  i: Integer;
+  Q: byte;
+begin
+  if fg.A = 0 then Exit;
+  bg := PARGB(img.PixelBase);
+
+  if ExactMatchOnly then
+  begin
+    for i := 0 to img.Width * img.Height -1 do
+    begin
+      if bg.Color = color then bg.Color := clNone32;
+      inc(bg);
+    end;
+  end else
+  begin
+    for i := 0 to img.Width * img.Height -1 do
+    begin
+      if bg.A > 0 then
+      begin
+        Q := 0;
+        if (bg.R > fg.R) then Q := Max(Q, DivTable[bg.R - fg.R, fg.R xor 255])
+        else if (bg.R < fg.R) then Q := Max(Q, DivTable[fg.R - bg.R, fg.R]);
+        if (bg.G > fg.G) then Q := Max(Q, DivTable[bg.G - fg.G, fg.G xor 255])
+        else if (bg.G < fg.G) then Q := Max(Q, DivTable[fg.G - bg.G, fg.G]);
+        if (bg.B > fg.B) then Q := Max(Q, DivTable[bg.B - fg.B, fg.B xor 255])
+        else if (bg.B < fg.B) then Q := Max(Q, DivTable[fg.B - bg.B, fg.B]);
+        if Q > 0 then
+        begin
+          bg.A := MulTable[bg.A, Q];
+          bg.R := DivTable[bg.R - MulTable[fg.R, 255 - Q], Q];
+          bg.G := DivTable[bg.G - MulTable[fg.G, 255 - Q], Q];
+          bg.B := DivTable[bg.B - MulTable[fg.B, 255 - Q], Q];
+        end else
+          bg.Color := clNone32;
+      end;
+      inc(bg);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure BlurHorizontal(img: TImage32; rect: TRect; radius: Integer);
+var
+  i, x,y, widthLess1: Integer;
+  pc0, pcB, pcF: PColor32;
+  wc: TWeightedColor;
+  buffer: TArrayOfColor32;
+begin
+  Windows.IntersectRect(rect, img.Bounds, rect);
+  if IsEmptyRect(rect) or (radius < 1) then Exit;
+  widthLess1 := RectWidth(rect) -1;
+  radius := ClampRange(radius, 1, Min(widthLess1, MaxBlur));
+  setLength(buffer, widthLess1 +1);
+
+  for y := 0 to RectHeight(rect) -1 do
+  begin
+    pc0 := @img.Pixels[(rect.Top + y) * img.Width + rect.Left];
+    //copy the row's pixels into a buffer because blurring spoils the color
+    //of pixels being removed from the kernel (especially with larger radii).
+    Move(pc0^, buffer[0], RectWidth(rect) * SizeOf(TColor32));
+
+    wc.Reset;
+    //build the horizontal kernel (wc) using the first pixel in each row ...
+    wc.Add(pc0^, 1);
+    pcB := @buffer[0]; pcF := pcB;
+    for i := 1 to radius do
+    begin
+      inc(pcF);
+      wc.Add(pcF^, 1);
+    end;
+    pc0^ := wc.Color; //updates the first pixel in the row
+
+    inc(pcF);
+    //pcB & pcF now both point to the color buffer, representing the
+    //left-most and right-most kernel pixels respectively
+
+    //process the rest of the row, updating the kernel each time - removing
+    //the old left-most pixel in the kernel and adding the new right-most one.
+    for x := 1 to widthLess1 do
+    begin
+      if x > radius then
+      begin
+        wc.Subtract(pcB^, 1);
+        inc(pcB);
+      end;
+      if x < (widthLess1 - radius) then
+      begin
+        wc.add(pcF^, 1);
+        inc(pcF)
+      end;
+      inc(pc0);
+      pc0^ := wc.Color;
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure BlurVertical(img: TImage32; rect: TRect; radius: Integer);
+var
+  i, x,y, heightLess1: Integer;
+  pc0, pcB, pcF: PColor32;
+  wc: TWeightedColor;
+  buffer: TArrayOfColor32;
+begin
+  heightLess1 := RectHeight(rect) -1;
+  radius := ClampRange(radius, 1, Min(heightLess1, MaxBlur));
+  setLength(buffer, heightLess1 +1);
+
+  for x := 0 to RectWidth(rect) -1 do
+  begin
+    pc0 := @img.Pixels[(rect.Top * img.Width) + rect.Left + x];
+    //build the vertical pixel buffer ...
+    pcF := pc0;
+    for i := 0 to heightLess1 do
+    begin
+      buffer[i] := pcF^;
+      inc(pcF, img.Width);
+    end;
+
+    wc.Reset;
+    wc.Add(pc0^, 1);
+    pcB := @buffer[0]; pcF := pcB;
+    for i := 1 to radius do
+    begin
+      inc(pcF);
+      wc.Add(pcF^, 1);
+    end;
+    pc0^ := wc.Color;
+    inc(pcF);
+    for y := 1 to heightLess1 do
+    begin
+      if y > radius then
+      begin
+        wc.Subtract(pcB^, 1);
+        inc(pcB);
+      end;
+      if y < (heightLess1 - radius) then
+      begin
+        wc.add(pcF^, 1);
+        inc(pcF);
+      end;
+      inc(pc0, img.Width);
+      pc0^ := wc.Color;
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure BoxBlur(img: TImage32; rect: TRect; radius, repeats: Integer);
+begin
+  if radius < 1 then Exit;
+  for repeats := 0 to repeats do
+  begin
+    BlurHorizontal(img, rect, radius);
+    BlurVertical(img, rect, radius);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure GaussianBlur(img: TImage32; rec: TRect; radius: Integer);
+var
+  i, x,y,yy,z: Integer;
+  gaussTable: array [-MaxBlur .. MaxBlur] of Cardinal;
+  wc: TWeightedColor;
+  wca: TArrayOfWeightedColor;
+  row: PColor32Array;
+  wcRow: PWeightedColorArray;
+begin
+  Windows.IntersectRect(rec, img.Bounds, rec);
+  if IsEmptyRect(rec) or (radius < 1) then Exit
+  else if radius > MaxBlur then radius := MaxBlur;
+
+  for i := 0 to radius do
+  begin
+    gaussTable[i] := Sqr(Radius - i +1);
+    gaussTable[-i] := gaussTable[i];
+  end;
+
+  setLength(wca, RectWidth(rec) * RectHeight(rec));
+
+  for y := 0 to RectHeight(rec) -1 do
+  begin
+    row := PColor32Array(@img.Pixels[(y + rec.Top) * img.Width + rec.Left]);
+    wcRow := PWeightedColorArray(@wca[y * RectWidth(rec)]);
+    for x := 0 to RectWidth(rec) -1 do
+      for z := max(0, x - radius) to min(img.Width -1, x + radius) do
+        wcRow[x].Add(row[z], gaussTable[x-z]);
+  end;
+
+  for x := 0 to RectWidth(rec) -1 do
+  begin
+    for y := 0 to RectHeight(rec) -1 do
+    begin
+      wc.Reset;
+      yy := max(0, y - radius) * RectWidth(rec);
+      for z := max(0, y - radius) to min(RectHeight(rec) -1, y + radius) do
+      begin
+        wc.Add(wca[x + yy].Color, gaussTable[y-z]);
+        inc(yy, RectWidth(rec));
+      end;
+      img.Pixels[x + rec.Left + (y + rec.Top) * img.Width] := wc.Color;
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function IncPWeightColor(pwc: PWeightedColor; cnt: Integer): PWeightedColor;
+begin
+  result := PWeightedColor(PByte(pwc) + cnt * SizeOf(TWeightedColor));
+end;
+//------------------------------------------------------------------------------
+
+function Intensity(color: TColor32): byte;
+var
+  c: TARGB absolute color;
+begin
+  Result := (c.R * 61 + c.G * 174 + c.B * 21) shr 8;
+end;
+//------------------------------------------------------------------------------
+
+function Gray(color: TColor32): TColor32;
+var
+  c: TARGB absolute color;
+  res: TARGB absolute Result;
+begin
+  res.A := c.A;
+  res.R := Intensity(color);
+  res.G := res.R;
+  res.B := res.R;
+end;
+//------------------------------------------------------------------------------
+
+procedure Emboss(img: TImage32; radius: Integer;
+  depth: Integer; luminance: Integer; preserveColor: Boolean);
+var
+  yy,xx, x,y, w,h: Integer;
+  b: byte;
+  kernel: array [0 .. MaxBlur, 0 .. MaxBlur] of Integer;
+  wca: TArrayOfWeightedColor;
+  pc0, pcf, pcb: PColor32; //pointers to pixels (forward & backward in kernel)
+  pw0, pw: PWeightedColor; //pointers to weight
+  customGray: TColor32;
+  pc: PColor32;
+const
+  maxDepth = 50;
+begin
+  //grayscale luminance as percent where 0% is black and 100% is white
+  //(luminance is ignored when preserveColor = true)
+  luminance := ClampRange(luminance, 0, 100);
+  b := luminance *255 div 100;
+  customGray := $FF000000 + b shl 16 + b shl 8 + b;
+
+  ClampRange(radius, 1, 5);
+  inc(depth);
+  ClampRange(depth, 2, maxDepth);
+
+  kernel[0][0] := 1;
+  for y := 1 to radius do
+    for x := 1 to radius do
+      kernel[y][x] := depth;
+
+  w := img.Width; h := img.Height;
+  //nb: dynamic arrays are zero-initialized (unless they're a function result)
+  SetLength(wca, w * h);
+
+  pc0 := IncPColor32(img.PixelBase, radius * w);
+  pw0 := @wca[radius * w];
+  for y := radius to h -1 - radius do
+  begin
+    for x := radius to w -1 - radius do
+    begin
+      pw := IncPWeightColor(pw0, x);
+      pcb := IncPColor32(pc0, x - 1);
+      if preserveColor then
+      begin
+        pcf := IncPColor32(pc0, x);
+        pw^.Add(pcf^, kernel[0,0]);
+        inc(pcf);
+      end else
+      begin
+        pw^.Add(customGray, kernel[0,0]);
+        pcf := IncPColor32(pc0, x + 1);
+      end;
+
+      //parse the kernel ...
+      for yy := 1 to radius do
+      begin
+        for xx := 1 to radius do
+        begin
+          pw^.Subtract(Gray(pcf^), kernel[yy,xx]);
+          pw^.Add(Gray(pcb^), kernel[yy,xx]);
+          dec(pcb); inc(pcf);
+        end;
+        dec(pcb, img.Width - radius);
+        inc(pcf, img.Width - radius);
+      end;
+    end;
+    inc(pc0, img.Width);
+    inc(pw0, img.Width);
+  end;
+
+  pc := @img.Pixels[0]; pw := @wca[0];
+  for x := 0 to img.width * img.Height - 1 do
+  begin
+    pc^ := pw.Color or $FF000000;
+    inc(pc); inc(pw);
+  end;
+end;
+//------------------------------------------------------------------------------
+
 procedure RedEyeRemove(img: TImage32; const rect: TRect);
 var
   k: integer;
@@ -496,7 +899,7 @@ begin
     DrawPolygon(mask, path, frNonZero, clBlack32);
     //given the very small area and small radius of the blur, the
     //speed improvement of BoxBlur over GaussianBlur is inconsequential.
-    mask.GaussianBlur(mask.Bounds, k);
+    GaussianBlur(mask, mask.Bounds, k);
     img.CopyFrom(mask, mask.Bounds, cutoutRec, BlendToOpaque);
 
     //gradient fill to clNone32 a mask to soften cutout's edges
@@ -505,7 +908,7 @@ begin
     DrawPolygon(mask, path, frNonZero, radGrad);
     cutout.CopyFrom(mask, mask.Bounds, cutout.Bounds, BlendMask);
     //now remove red from the cutout
-    cutout.EraseColor(clRed32);
+    EraseColor(cutout, clRed32);
     //finally replace the cutout ...
     img.CopyFrom(cutout, cutout.Bounds, cutoutRec, BlendToOpaque);
   finally
@@ -585,7 +988,7 @@ begin
       tmp.Clear(colorLt);
       paths2 := OffsetPath(paths, -height*x, height*y);
       Erase(tmp, paths2, fillRule);
-      tmp.BoxBlur(tmp.Bounds, Round(blurRadius), 2);
+      BoxBlur(tmp, tmp.Bounds, Round(blurRadius), 2);
       Erase(tmp, paths, fillRule, true);
       img.CopyFrom(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;
@@ -595,7 +998,7 @@ begin
       tmp.Clear(colorDk);
       paths2 := OffsetPath(paths, height*x, -height*y);
       Erase(tmp, paths2, fillRule);
-      tmp.BoxBlur(tmp.Bounds, Round(blurRadius), 2);
+      BoxBlur(tmp, tmp.Bounds, Round(blurRadius), 2);
       Erase(tmp, paths, fillRule, true);
       img.CopyFrom(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;
@@ -641,6 +1044,66 @@ begin
   path := Rectangle(rec);
   setLength(path, 3);
   DrawLine(img, path, 0.75, clWhite32, esSquare);
+end;
+//------------------------------------------------------------------------------
+
+function ColorDifference(color1, color2: TColor32): cardinal;
+  {$IFDEF INLINE} inline; {$ENDIF}
+var
+  c1: TARGB absolute color1;
+  c2: TARGB absolute color2;
+begin
+  result := Abs(c1.R - c2.R) + Abs(c1.G - c2.G) + Abs(c1.B - c2.B);
+end;
+//------------------------------------------------------------------------------
+
+function AlphaAverage(color1, color2: TColor32): cardinal;
+  {$IFDEF INLINE} inline; {$ENDIF}
+var
+  c1: TARGB absolute color1;
+  c2: TARGB absolute color2;
+begin
+  result := c1.A + c2.A shr 1;
+end;
+//------------------------------------------------------------------------------
+
+procedure PencilEffect(img: TImage32; intensity: integer);
+var
+  i,j, w,h: integer;
+  tmp, tmp2: TArrayOfColor32;
+  s: PColor32;
+  d: PARGB;
+begin
+  w := img.Width; h := img.Height;
+  if w * h = 0 then Exit;
+  SetLength(tmp, w * h);
+  SetLength(tmp2, w * h);
+  s := img.PixelRow[0]; d := @tmp[0];
+  for j := 0 to h-1 do
+  begin
+    for i := 0 to w-2 do
+    begin
+      d.A := Min($FF, ColorDifference(s^, IncPColor32(s, 1)^));
+      inc(s); inc(d);
+    end;
+    inc(s); inc(d);
+  end;
+
+  for j := 0 to w-1 do
+  begin
+    s := @tmp[j]; d := @tmp2[j];
+    for i := 0 to h-2 do
+    begin
+      d.A := Min($FF, AlphaAverage(s^, IncPColor32(s, w)^));
+      inc(s, w); inc(d, w);
+    end;
+  end;
+  Move(tmp2[0], img.PixelBase^, w * h * sizeOf(TColor32));
+
+  if intensity < 1 then Exit;
+  if intensity > 10 then
+    intensity := 10; //range = 1-10
+  img.ScaleAlpha(intensity);
 end;
 //------------------------------------------------------------------------------
 

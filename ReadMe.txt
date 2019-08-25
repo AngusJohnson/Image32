@@ -2,7 +2,7 @@
 Image32 is a compact 2D graphics library written in Delphi Pascal. It provides an extensive range of image manipulation functions. It also includes a polygon renderer for line and polygon drawing. The renderer supports a range of brush filling options including tiled images, and linear and radial gradient fills.
 
 Version: 1.18
-Uploaded: 20 August 2019
+Uploaded: 25 August 2019
 Freeware for both open source and commercial applications released under 
 Boost Software License - see https://www.boost.org/LICENSE_1_0.txt
 Copyright © 2019 Angus Johnson
@@ -12,9 +12,16 @@ http://www.angusj.com/delphi/image32.php
 
 Changes since initial release:
 
-Version: 1.19
+Version: 1.20
+  Significant refactor of TImage32. Removed 5 methods:
+    BoxBlur; Emboss; EraseColor; GaussianBlur; HatchBackground
+    and made them functions in Image32_Extra unit.
+  Added new PencilEffect function to Image32_Extra.
+  Fixed bug in TLayeredImage32.GetMergedImage 
+  Fixed bug in TLayeredImage32.GetLayerAt
   Fixed minor bug in TImages32.CopyToDC.
-  Added an animation example
+  Fixed minor bug in BitmapPanels unit.
+  Added an animation example to Examples folder.
 
 Version: 1.18
   Major revision of layers in Image32_Layers.

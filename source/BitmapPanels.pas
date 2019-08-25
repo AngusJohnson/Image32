@@ -984,11 +984,11 @@ procedure TPanel.BitmapScaleAtPos(newScale: double; const mousePos: TPoint);
 begin
   newScale := Max(fBitmapProperties.fMinScale,
     Min(fBitmapProperties.fMaxScale, newScale));
-  if fBmp.Empty or (fScaleType = stStretched) then Exit;
   fScaleType := stScaled;
   fOffsetX := Round((mousePos.X + fOffsetX) * newScale/fScale - mousePos.X);
   fOffsetY := Round((mousePos.Y + fOffsetY) * newScale/fScale - mousePos.Y);
   fScale := newScale;
+  if fBmp.Empty or (fScaleType = stStretched) then Exit;
   Invalidate;
   if assigned(fBitmapProperties.fOnBitmapResizing) then
     fBitmapProperties.fOnBitmapResizing(self);

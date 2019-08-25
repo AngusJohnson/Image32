@@ -98,8 +98,6 @@ type
     //CopyInternal: Internal routine (has no bounds checking)
     procedure CopyInternal(src: TImage32;
       const srcRec, dstRec: TRect; blendFunc: TBlendFunction);
-    procedure BlurHorizontal(rect: TRect; radius: Integer);
-    procedure BlurVertical(rect: TRect; radius: Integer);
     procedure Changed;
     procedure BeginUpdate;
     procedure EndUpdate;
@@ -138,9 +136,6 @@ type
     procedure Crop(const rec: TRect);
     //SetBackgroundColor: Assumes the current image is semi-transparent.
     procedure SetBackgroundColor(bgColor: TColor32);
-    //HatchBackground: Assumes the current image is semi-transparent.
-    procedure HatchBackground(color1: TColor32 = clWhite32;
-      color2: TColor32= clSilver32; hatchSize: Integer = 10);
     //Clear: Fills the entire image with the specified color
     procedure Clear(color: TColor32 = 0);
     procedure FillRect(rec: TRect; color: TColor32);
@@ -153,10 +148,6 @@ type
     procedure Grayscale;
     procedure InvertColors;
     procedure InvertAlphas;
-    //EraseColor: Removes the specified color from the image, even from
-    //pixels that are a blend of colors including the specified color.<br>
-    //see https://stackoverflow.com/questions/9280902/
-    procedure EraseColor(color: TColor32; ExactMatchOnly: Boolean = false);
 
     procedure AdjustHue(percent: Integer);         //ie +/- 100%
     procedure AdjustLuminance(percent: Integer);   //ie +/- 100%
@@ -173,19 +164,8 @@ type
       angleRads: single; eraseColor: TColor32 = 0);
     procedure Skew(dx,dy: double);
 
-    //BoxBlur: With several repetitions and a smaller radius, BoxBlur can
-    //achieve a close approximation of a GaussianBlur, and it's faster.
-    procedure BoxBlur(rect: TRect; radius, repeats: Integer);
-    procedure GaussianBlur(rec: TRect; radius: Integer);
-    //Emboss: A smaller radius is sharper. Increasing depth increases contrast.
-    //Luminance changes grayscale balance (unless preserveColor = true)
-    procedure Emboss(radius: Integer = 1; depth: Integer = 10;
-      luminance: Integer = 75; preserveColor: Boolean = false);
     //ScaleAlpha: Scales the alpha byte of every pixel by the specified amount.
     procedure ScaleAlpha(scale: double);
-    //Sharpen: Radius range is 1 - 10; amount range is 1 - 100.<br>
-    //see https://en.wikipedia.org/wiki/Unsharp_masking
-    procedure Sharpen(radius: Integer = 2; amount: Integer = 10);
     //RegisterImageFormatClass: Registers a TImageFormatClass with TImage32 and
     //associates it with a specific 3 character file extension (eg BMP).
     class procedure RegisterImageFormatClass(ext: string;
@@ -285,6 +265,7 @@ type
     property AddCount: Integer read fAddCount;
     property Color: TColor32 read GetColor;
   end;
+  TArrayOfWeightedColor = array of TWeightedColor;
 
   //BLEND FUNCTIONS ( see TImage32.CopyFrom() )
 
@@ -321,6 +302,11 @@ type
 
   function RectD(left, top, right, bottom: double): TRectD; overload;
   function RectD(const rec: TRect): TRectD; overload;
+
+  function ClampByte(val: Integer): byte;
+  function ClampRange(val, min, max: Integer): Integer; overload;
+  function ClampRange(val, min, max: single): single; overload;
+  function IncPColor32(pc: Pointer; cnt: Integer): PColor32;
 
   //DPI: Useful for DPIAware sizing of images and their container controls.<br>
   //Scales values relative to the display's resolution (PixelsPerInch).<br>
@@ -363,12 +349,14 @@ const
   angle330 = angle360 - angle30;
   angle345 = angle360 - angle15;
 
+  MaxBlur = 50;
+
 var
   //Both MulTable and DivTable are used in blend functions<br>
   //MulTable[a,b] = a * b / 255
-  MulTable: array [Byte,Byte] of Byte; 
+  MulTable: array [Byte,Byte] of Byte;
   //DivTable[a,b] = a * 255/b (for a &lt;= b)
-  DivTable: array [Byte,Byte] of Byte; 
+  DivTable: array [Byte,Byte] of Byte;
 
   ScreenPixelsY: Integer;
   //DPI: Useful for DPIAware sizing of images and their container controls.<br>
@@ -394,16 +382,11 @@ var
 const
   div255 : Double = 1 / 255;
   div6   : Double = 1 / 6;
-  MaxBlur = 50;
 type
   PColor32Array = ^TColor32Array;
   TColor32Array = array [0.. maxint div SizeOf(TColor32) -1] of TColor32;
 
   TArrayofHSL = array of THsl;
-
-  TArrayOfWeightedColor = array of TWeightedColor;
-  PWeightedColorArray = ^TWeightedColorArray;
-  TWeightedColorArray = array [0.. $FFFFFF] of TWeightedColor;
 
   TByteArray = array[0..MaxInt -1] of Byte;
   PByteArray = ^TByteArray;
@@ -604,8 +587,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ClampRange(val, min, max: Integer): Integer; overload;
-
+function ClampRange(val, min, max: Integer): Integer;
 begin
   if val < min then result := min
   else if val > max then result := max
@@ -613,8 +595,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ClampRange(val, min, max: single): single; overload;
-
+function ClampRange(val, min, max: single): single;
 begin
   if val < min then result := min
   else if val > max then result := max
@@ -629,17 +610,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function IncPColor32(pc: PColor32; cnt: Integer): PColor32;
-
+function IncPColor32(pc: Pointer; cnt: Integer): PColor32;
 begin
   result := PColor32(PByte(pc) + cnt * SizeOf(TColor32));
-end;
-//------------------------------------------------------------------------------
-
-function IncPWeightColor(pwc: PWeightedColor; cnt: Integer): PWeightedColor;
-
-begin
-  result := PWeightedColor(PByte(pwc) + cnt * SizeOf(TWeightedColor));
 end;
 //------------------------------------------------------------------------------
 
@@ -904,26 +877,6 @@ begin
   for i := 0 to len -1 do
     result[i] := HslToRgb(hslArr[i]);
 end;
-//------------------------------------------------------------------------------
-
-function Intensity(color: TColor32): byte;
-var
-  c: TARGB absolute color;
-begin
-  Result := (c.R * 61 + c.G * 174 + c.B * 21) shr 8;
-end;
-//------------------------------------------------------------------------------
-
-function Gray(color: TColor32): TColor32;
-var
-  c: TARGB absolute color;
-  res: TARGB absolute Result;
-begin
-  res.A := c.A;
-  res.R := Intensity(color);
-  res.G := res.R;
-  res.B := res.R;
-end;
 
 //------------------------------------------------------------------------------
 // TRectD methods
@@ -1141,31 +1094,6 @@ begin
   begin
     pc^ := BlendToOpaque(bgColor, pc^);
      inc(pc);
-  end;
-  Changed;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImage32.HatchBackground(color1: TColor32;
-  color2: TColor32; hatchSize: Integer);
-var
-  i,j: Integer;
-  pc: PColor32;
-  colors: array[boolean] of TColor32;
-  hatch: Boolean;
-begin
-  colors[false] := color1;
-  colors[true] := color2;
-  pc := Pixelbase;
-  for i := 0 to Height -1 do
-  begin
-    hatch := Odd(i div hatchSize);
-    for j := 0 to Width -1 do
-    begin
-      if (j + 1) mod hatchSize = 0 then hatch := not hatch;
-      pc^ := BlendToOpaque(colors[hatch], pc^);
-     inc(pc);
-    end;
   end;
   Changed;
 end;
@@ -2131,53 +2059,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.EraseColor(color: TColor32; ExactMatchOnly: Boolean);
-var
-  fg: TARGB absolute color;
-  bg: PARGB;
-  i: Integer;
-  Q: byte;
-begin
-  if fg.A = 0 then Exit;
-  bg := PARGB(PixelBase);
-
-  if ExactMatchOnly then
-  begin
-    for i := 0 to Width * Height -1 do
-    begin
-      if bg.Color = color then bg.Color := clNone32;
-      inc(bg);
-    end;
-    Changed;
-    Exit;
-  end;
-
-  for i := 0 to Width * Height -1 do
-  begin
-    if bg.A > 0 then
-    begin
-      Q := 0;
-      if (bg.R > fg.R) then Q := Max(Q, DivTable[bg.R - fg.R, fg.R xor 255])
-      else if (bg.R < fg.R) then Q := Max(Q, DivTable[fg.R - bg.R, fg.R]);
-      if (bg.G > fg.G) then Q := Max(Q, DivTable[bg.G - fg.G, fg.G xor 255])
-      else if (bg.G < fg.G) then Q := Max(Q, DivTable[fg.G - bg.G, fg.G]);
-      if (bg.B > fg.B) then Q := Max(Q, DivTable[bg.B - fg.B, fg.B xor 255])
-      else if (bg.B < fg.B) then Q := Max(Q, DivTable[fg.B - bg.B, fg.B]);
-      if Q > 0 then
-      begin
-        bg.A := MulTable[bg.A, Q];
-        bg.R := DivTable[bg.R - MulTable[fg.R, 255 - Q], Q];
-        bg.G := DivTable[bg.G - MulTable[fg.G, 255 - Q], Q];
-        bg.B := DivTable[bg.B - MulTable[fg.B, 255 - Q], Q];
-      end else
-        bg.Color := clNone32;
-    end;
-    inc(bg);
-  end;
-  Changed;
-end;
-//------------------------------------------------------------------------------
-
 procedure TImage32.AdjustHue(percent: Integer);
 var
   i: Integer;
@@ -2239,54 +2120,6 @@ begin
   for i := 0 to high(tmpImage) do
     tmpImage[i].sat := lut[ tmpImage[i].sat ];
   fPixels := ArrayOfHSLToArrayColor32(tmpImage);
-  Changed;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImage32.GaussianBlur(rec: TRect; radius: Integer);
-var
-  i, x,y,yy,z: Integer;
-  gaussTable: array [-MaxBlur .. MaxBlur] of Cardinal;
-  wc: TWeightedColor;
-  wca: TArrayOfWeightedColor;
-  row: PColor32Array;
-  wcRow: PWeightedColorArray;
-begin
-  IntersectRect(rec, Bounds, rec);
-  if IsEmptyRect(rec) or (radius < 1) then Exit
-  else if radius > MaxBlur then radius := MaxBlur;
-
-  for i := 0 to radius do
-  begin
-    gaussTable[i] := Sqr(Radius - i +1);
-    gaussTable[-i] := gaussTable[i];
-  end;
-
-  setLength(wca, RectWidth(rec) * RectHeight(rec));
-
-  for y := 0 to RectHeight(rec) -1 do
-  begin
-    row := PColor32Array(@fPixels[(y + rec.Top) * Width + rec.Left]);
-    wcRow := PWeightedColorArray(@wca[y * RectWidth(rec)]);
-    for x := 0 to RectWidth(rec) -1 do
-      for z := max(0, x - radius) to min(Width -1, x + radius) do
-        wcRow[x].Add(row[z], gaussTable[x-z]);
-  end;
-
-  for x := 0 to RectWidth(rec) -1 do
-  begin
-    for y := 0 to RectHeight(rec) -1 do
-    begin
-      wc.Reset;
-      yy := max(0, y - radius) * RectWidth(rec);
-      for z := max(0, y - radius) to min(RectHeight(rec) -1, y + radius) do
-      begin
-        wc.Add(wca[x + yy].Color, gaussTable[y-z]);
-        inc(yy, RectWidth(rec));
-      end;
-      fPixels[x + rec.Left + (y + rec.Top) * Width] := wc.Color;
-    end;
-  end;
   Changed;
 end;
 //------------------------------------------------------------------------------
@@ -2479,234 +2312,6 @@ begin
   SetSize(newWidth, newHeight);
   fPixels := tmpPxls;
   EndUpdate;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImage32.BoxBlur(rect: TRect; radius, repeats: Integer);
-begin
-  if radius < 1 then Exit;
-  for repeats := 0 to repeats do
-  begin
-    BlurHorizontal(rect, radius);
-    BlurVertical(rect, radius);
-  end;
-  Changed;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImage32.BlurHorizontal(rect: TRect; radius: Integer);
-var
-  i, x,y, widthLess1: Integer;
-  pc0, pcB, pcF: PColor32;
-  wc: TWeightedColor;
-  buffer: TArrayOfColor32;
-begin
-  IntersectRect(rect, Bounds, rect);
-  if IsEmptyRect(rect) or (radius < 1) then Exit;
-  widthLess1 := RectWidth(rect) -1;
-  radius := ClampRange(radius, 1, Min(widthLess1, MaxBlur));
-  setLength(buffer, widthLess1 +1);
-
-  for y := 0 to RectHeight(rect) -1 do
-  begin
-    pc0 := @fPixels[(rect.Top + y) * width + rect.Left];
-    //copy the row's pixels into a buffer because blurring spoils the color
-    //of pixels being removed from the kernel (especially with larger radii).
-    Move(pc0^, buffer[0], RectWidth(rect) * SizeOf(TColor32));
-
-    wc.Reset;
-    //build the horizontal kernel (wc) using the first pixel in each row ...
-    wc.Add(pc0^, 1);
-    pcB := @buffer[0]; pcF := pcB;
-    for i := 1 to radius do
-    begin
-      inc(pcF);
-      wc.Add(pcF^, 1);
-    end;
-    pc0^ := wc.Color; //updates the first pixel in the row
-
-    inc(pcF);
-    //pcB & pcF now both point to the color buffer, representing the
-    //left-most and right-most kernel pixels respectively
-
-    //process the rest of the row, updating the kernel each time - removing
-    //the old left-most pixel in the kernel and adding the new right-most one.
-    for x := 1 to widthLess1 do
-    begin
-      if x > radius then
-      begin
-        wc.Subtract(pcB^, 1);
-        inc(pcB);
-      end;
-      if x < (widthLess1 - radius) then
-      begin
-        wc.add(pcF^, 1);
-        inc(pcF)
-      end;
-      inc(pc0);
-      pc0^ := wc.Color;
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImage32.BlurVertical(rect: TRect; radius: Integer);
-var
-  i, x,y, heightLess1: Integer;
-  pc0, pcB, pcF: PColor32;
-  wc: TWeightedColor;
-  buffer: TArrayOfColor32;
-begin
-  heightLess1 := RectHeight(rect) -1;
-  radius := ClampRange(radius, 1, Min(heightLess1, MaxBlur));
-  setLength(buffer, heightLess1 +1);
-
-  for x := 0 to RectWidth(rect) -1 do
-  begin
-    pc0 := @fPixels[(rect.Top * Width) + rect.Left + x];
-    //build the vertical pixel buffer ...
-    pcF := pc0;
-    for i := 0 to heightLess1 do
-    begin
-      buffer[i] := pcF^;
-      inc(pcF, Width);
-    end;
-
-    wc.Reset;
-    wc.Add(pc0^, 1);
-    pcB := @buffer[0]; pcF := pcB;
-    for i := 1 to radius do
-    begin
-      inc(pcF);
-      wc.Add(pcF^, 1);
-    end;
-    pc0^ := wc.Color;
-    inc(pcF);
-    for y := 1 to heightLess1 do
-    begin
-      if y > radius then
-      begin
-        wc.Subtract(pcB^, 1);
-        inc(pcB);
-      end;
-      if y < (heightLess1 - radius) then
-      begin
-        wc.add(pcF^, 1);
-        inc(pcF);
-      end;
-      inc(pc0, Width);
-      pc0^ := wc.Color;
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImage32.Sharpen(radius: Integer; amount: Integer);
-var
-  i: Integer;
-  amt: double;
-  weightAmount: array [-255 .. 255] of Integer;
-  bmpBlur: TImage32;
-  pColor, pBlur: PARGB;
-begin
-  amt := ClampRange(amount/20, 0.05, 5);
-  radius := ClampRange(radius, 1, 10);
-  for i := -255 to 255 do
-    weightAmount[i] := Round(amt * i);
-
-  bmpBlur := TImage32.Create(self); //clone self
-  try
-    pColor := PARGB(pixelBase);
-    //bmpBlur.GaussianBlur(Bounds, radius);
-    bmpBlur.BoxBlur(Bounds, Ceil(radius/4), 3);
-    pBlur := PARGB(bmpBlur.pixelBase);
-    for i := 1 to Width * Height do
-    begin
-      if pColor.A > 0 then
-      begin
-        pColor.R := ClampByte(pColor.R  + weightAmount[pColor.R - pBlur.R]);
-        pColor.G := ClampByte(pColor.G  + weightAmount[pColor.G - pBlur.G]);
-        pColor.B := ClampByte(pColor.B  + weightAmount[pColor.B - pBlur.B]);
-      end;
-      Inc(pColor); Inc(pBlur);
-    end;
-  finally
-    bmpBlur.Free;
-  end;
-  Changed;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImage32.Emboss(radius: Integer;
-  depth: Integer; luminance: Integer; preserveColor: Boolean);
-var
-  yy,xx, x,y: Integer;
-  b: byte;
-  kernel: array [0 .. MaxBlur, 0 .. MaxBlur] of Integer;
-  wca: TArrayOfWeightedColor;
-  pc0, pcf, pcb: PColor32; //pointers to pixels (forward & backward in kernel)
-  pw0, pw: PWeightedColor; //pointers to weight
-  customGray: TColor32;
-const
-  maxDepth = 50;
-begin
-  //grayscale luminance as percent where 0% is black and 100% is white
-  //(luminance is ignored when preserveColor = true)
-  luminance := ClampRange(luminance, 0, 100);
-  b := luminance *255 div 100;
-  customGray := $FF000000 + b shl 16 + b shl 8 + b;
-
-  ClampRange(radius, 1, 5);
-  inc(depth);
-  ClampRange(depth, 2, maxDepth);
-
-  kernel[0][0] := 1;
-  for y := 1 to radius do
-    for x := 1 to radius do
-      kernel[y][x] := depth;
-
-  //nb: dynamic arrays are zero-initialized (unless they're a function result)
-  SetLength(wca, Width * Height);
-
-  pc0 := IncPColor32(PixelBase, radius * width);
-  pw0 := @wca[radius * width];
-  for y := radius to height -1 - radius do
-  begin
-    for x := radius to width -1 - radius do
-    begin
-      pw := IncPWeightColor(pw0, x);
-      pcb := IncPColor32(pc0, x - 1);
-      if preserveColor then
-      begin
-        pcf := IncPColor32(pc0, x);
-        pw^.Add(pcf^, kernel[0,0]);
-        inc(pcf);
-      end else
-      begin
-        pw^.Add(customGray, kernel[0,0]);
-        pcf := IncPColor32(pc0, x + 1);
-      end;
-
-      //parse the kernel ...
-      for yy := 1 to radius do
-      begin
-        for xx := 1 to radius do
-        begin
-          pw^.Subtract(Gray(pcf^), kernel[yy,xx]);
-          pw^.Add(Gray(pcb^), kernel[yy,xx]);
-          dec(pcb); inc(pcf);
-        end;
-        dec(pcb, Width - radius);
-        inc(pcf, Width - radius);
-      end;
-    end;
-    inc(pc0, Width);
-    inc(pw0, Width);
-  end;
-
-  for x := 0 to width * height - 1 do
-    fPixels[x] := wca[x].Color or $FF000000;
-  Changed;
 end;
 //------------------------------------------------------------------------------
 

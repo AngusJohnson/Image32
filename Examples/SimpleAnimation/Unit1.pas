@@ -46,15 +46,15 @@ const
 
 procedure TForm1.FormCreate(Sender: TObject);
 var
-  i: integer;
+  i, ImageSize, SpaceAbove, sqSize: integer;
   j,k: double;
   img, img2: TImage32;
   path, path2: TArrayOfPointD;
   rec: TRect;
-const
-  ImageSize = 150;
-  SpaceAbove = ImageSize *2;
 begin
+  ImageSize := DPI(100);
+  SpaceAbove := ImageSize *2;
+
   //SETUP THE DISPLAY PANEL
   Panel1.BorderWidth := DPI(16);
   Panel1.BevelInner := bvLowered;
@@ -73,34 +73,34 @@ begin
 
   masterImageList := TImageList32.Create;
 
-  //add almost 50 images to masterImageList
+  //add 31 images to masterImageList that are viewed twice each loop
+  //except the top and bottom images (viewed once) ==> 60/loop
   img := TImage32.Create(ImageSize, ImageSize);
   DrawPolygon(img, path, frNonZero, clLime32);
   Draw3D(img, path, frNonZero, 8, 8);
   DrawLine(img, path, 3, clGreen32, esClosed);
 
   //acceleration phase
-  k := power(SpaceAbove, 1/40); //k^40 = SpaceAbove
+  k := power(SpaceAbove, 1/25); //k^25 = SpaceAbove
   j := k;
-  for i := 1 to 40 do
+  for i := 1 to 25 do
   begin
     img2 := TImage32.Create(ImageSize, ImageSize + SpaceAbove);
     rec := Rect(0, Round(j), ImageSize, Round(j) + ImageSize);
     j := j * k;
     img2.CopyFrom(img, img.Bounds, rec);
-    img2.AdjustHue(Round(j/20));
     DrawLine(img2, path2, 5, clBlack32, esSquare);
     masterImageList.Add(img2);
   end;
 
-  img.AdjustHue(15);
   //deceleration (squishing) phase :)
-  k := power(100, 1/8); //k^8 = 100
+  sqSize := ImageSize *2 div 3;
+  k := power(sqSize, 1/6); //k^6 = sqSize
   j := 100/k;
-  for i := 1 to 8 do
+  for i := 1 to 6 do
   begin
     img2 := TImage32.Create(ImageSize, ImageSize + SpaceAbove);
-    rec := Rect(0, SpaceAbove +100 -Round(j), ImageSize, SpaceAbove +ImageSize);
+    rec := Rect(0, SpaceAbove + sqSize -Round(j), ImageSize, SpaceAbove +ImageSize);
     j := j/k;
     img2.CopyFrom(img, img.Bounds, rec);
     DrawLine(img2, path2, 5, clBlack32, esSquare);
@@ -111,7 +111,7 @@ begin
   //and setup the timer to kick things off
   timer := TTimerEx.Create;
   timer.OnTimer := DoTimer;
-  timer.Interval := 1000/94; //1000msec/94frames
+  timer.Interval := 1000/60; //1000msec/60frames = 60frames/sec
   timer.Priority := tpLowest;
   timer.Enabled := true;
 end;

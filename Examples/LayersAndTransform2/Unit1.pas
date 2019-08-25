@@ -137,7 +137,7 @@ begin
       layeredImage32.SetSize(w, h);
       //redo hatched bakground image
       layeredImage32[0].SetSize(w, h);
-      layeredImage32[0].Image.HatchBackground(clWhite32, $FFE0E0E0);
+      HatchBackground(layeredImage32[0].Image, clWhite32, $FFE0E0E0);
     end;
 
   //copy the merged layeredImage32 to Panel1

@@ -21,16 +21,16 @@ uses
 type
   TTimerThread = class(TThread)
   private
-    fInterval    : double;
-    fCancelEvent : THandle;
-    fOnTimer     : TNotifyEvent;
+    fInterval     : double;
+    fCancelEvent  : THandle;
+    fOnTimer      : TNotifyEvent;
     procedure DoOnTimer;
   protected
-    procedure Terminate;
     procedure Execute; override;
+    procedure Terminate;
   public
-    constructor Create(interval: double;
-      priority: TThreadPriority; onTimerEvent: TNotifyEvent);
+    constructor Create(interval: double; priority: TThreadPriority;
+      onTimer, onTerminated: TNotifyEvent);
     destructor Destroy; override;
     property Interval: double write fInterval;
   end;
@@ -42,6 +42,7 @@ type
     fOnTimer     : TNotifyEvent;
     fPriority    : TThreadPriority;
     function GetEnabled: Boolean;
+    procedure OnTerminated(Sender: TObject);
     procedure SetEnabled(value: Boolean);
     procedure SetInterval(value: double);
   public
@@ -59,22 +60,23 @@ implementation
 // TTimerThread
 //------------------------------------------------------------------------------
 
-constructor TTimerThread.Create(interval: double;
-  priority: TThreadPriority; onTimerEvent: TNotifyEvent);
+constructor TTimerThread.Create(interval: double; priority:
+  TThreadPriority; onTimer, onTerminated: TNotifyEvent);
 begin
-  FreeOnTerminate := false;
+  FreeOnTerminate := true;
+  OnTerminate := onTerminated;
   fInterval := interval;
-  fOnTimer := onTimerEvent;
+  fOnTimer := onTimer;
   fCancelEvent := Windows.CreateEvent(nil, true, false, nil);
-  inherited Create(False);
+  inherited Create(false);
   self.Priority := priority;
 end;
 //------------------------------------------------------------------------------
 
 destructor TTimerThread.Destroy;
 begin
-  CloseHandle(fCancelEvent);
   inherited Destroy;
+  CloseHandle(fCancelEvent);
 end;
 //------------------------------------------------------------------------------
 
@@ -90,9 +92,7 @@ var
   freq, cnt1, cnt2 : TLargeInteger;
   interval: DWORD;
 begin
-  delay := 0;
   prevDelay := fInterval;
-  interval := Round(fInterval);
   QueryPerformanceFrequency(freq);
   f := 1000/freq;
   QueryPerformanceCounter(cnt1);
@@ -114,7 +114,7 @@ end;
 
 procedure TTimerThread.Terminate;
 begin
-  SetEvent(fCancelEvent); //signals cancel
+  SetEvent(fCancelEvent);
   inherited Terminate;
 end;
 
@@ -124,15 +124,26 @@ end;
 
 constructor TTimerEx.Create;
 begin
-  fInterval := 1000; //default = 1 second
+  fInterval := 1000; //msec
   fPriority := tpLowest;
 end;
 //------------------------------------------------------------------------------
 
 destructor TTimerEx.Destroy;
 begin
+  //nb: If this object is being destroyed on application shutdown, while a
+  //thread is still executing, then signaling thread termination here won't
+  //necessarily end the thread before the OS cleans it up. If it's essential
+  //that the thread terminates normally (or memory leak reports annoy) then call
+  //Application.ProcessMessages after TimerEx is freed in the form's destructor.
   Enabled := false;
   inherited Destroy;
+end;
+//------------------------------------------------------------------------------
+
+procedure TTimerEx.OnTerminated(Sender: TObject);
+begin
+  fTimerThread := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -145,15 +156,11 @@ end;
 procedure TTimerEx.SetEnabled(value: Boolean);
 begin
   if value = GetEnabled then Exit;
-  if value then
-  begin
-    if (fInterval > 0) and Assigned(fOnTimer) then
-      fTimerThread := TTimerThread.Create(fInterval, fPriority, fOnTimer);
-  end else
-  begin
-    fTimerThread.Terminate;
-    FreeAndNil(fTimerThread);
-  end;
+  if not value then
+    fTimerThread.Terminate
+  else if (fInterval > 0) and Assigned(fOnTimer) then
+    fTimerThread := TTimerThread.Create(fInterval,
+      fPriority, fOnTimer, OnTerminated);
 end;
 //------------------------------------------------------------------------------
 

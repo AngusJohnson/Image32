@@ -27,7 +27,6 @@ object Form1: TForm1
     OnMouseDown = Panel1MouseDown
     OnMouseMove = Panel1MouseMove
     OnMouseUp = Panel1MouseUp
-    ExplicitHeight = 395
   end
   object StatusBar1: TStatusBar
     Left = 0
@@ -39,7 +38,6 @@ object Form1: TForm1
     SimplePanel = True
     SimpleText = ' Right-click to add additional objects'
     UseSystemFont = False
-    ExplicitTop = 389
   end
   object MainMenu1: TMainMenu
     Left = 112

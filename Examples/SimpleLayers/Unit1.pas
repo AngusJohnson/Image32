@@ -115,7 +115,7 @@ begin
 
   layer := layeredImage32.AddNewLayer(TDesignerLayer32, 'hatched background');
   layer.SetSize(layeredImage32.Width, layeredImage32.Height);
-  layer.Image.HatchBackground($FFF0F0F0, clWhite32);
+  HatchBackground(layer.Image, $FFF0F0F0, clWhite32);
 
   //LOAD A SINGLE IMAGE (OTHERS CAN BE ADDED LATER WITH A RIGHT-CLICK).
   image := TImage32.Create;
@@ -191,9 +191,9 @@ var
 begin
   //copy the merged layeredImage32 to Panel1 (+/- designer layers)
   Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
-  Panel1.ClearBitmap;
+  //Panel1.ClearBitmap;
   dc := Panel1.Bitmap.Canvas.Handle;
-  layeredImage32.GetMergedImage(mnuHideControls.Checked).CopyToDc(dc);
+  layeredImage32.GetMergedImage(mnuHideControls.Checked).CopyToDc(dc,0,0,false);
   Panel1.Refresh;
 end;
 //------------------------------------------------------------------------------
