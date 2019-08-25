@@ -349,8 +349,6 @@ const
   angle330 = angle360 - angle30;
   angle345 = angle360 - angle15;
 
-  MaxBlur = 50;
-
 var
   //Both MulTable and DivTable are used in blend functions<br>
   //MulTable[a,b] = a * b / 255

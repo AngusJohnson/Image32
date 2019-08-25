@@ -105,6 +105,7 @@ resourcestring
 const
   FloodFillDefaultRGBTolerance: byte = 20;
   FloodFillDefaultHueTolerance: byte = 1;
+  MaxBlur = 100;
 
 type
   PColor32Array = ^TColor32Array;
@@ -1067,43 +1068,40 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function BlendColorDodge(bgColor, fgColor: TColor32): TColor32;
+var
+  res: TARGB absolute Result;
+  bg: TARGB absolute bgColor;
+  fg: TARGB absolute fgColor;
+begin
+  res.A := 255;
+  res.R := DivTable[bg.R, not fg.R];
+  res.G := DivTable[bg.G, not fg.G];
+  res.B := DivTable[bg.B, not fg.B];
+end;
+//------------------------------------------------------------------------------
+
 procedure PencilEffect(img: TImage32; intensity: integer);
 var
   i,j, w,h: integer;
   tmp, tmp2: TArrayOfColor32;
+  img2: TImage32;
   s: PColor32;
   d: PARGB;
 begin
   w := img.Width; h := img.Height;
   if w * h = 0 then Exit;
-  SetLength(tmp, w * h);
-  SetLength(tmp2, w * h);
-  s := img.PixelRow[0]; d := @tmp[0];
-  for j := 0 to h-1 do
-  begin
-    for i := 0 to w-2 do
-    begin
-      d.A := Min($FF, ColorDifference(s^, IncPColor32(s, 1)^));
-      inc(s); inc(d);
-    end;
-    inc(s); inc(d);
-  end;
 
-  for j := 0 to w-1 do
-  begin
-    s := @tmp[j]; d := @tmp2[j];
-    for i := 0 to h-2 do
-    begin
-      d.A := Min($FF, AlphaAverage(s^, IncPColor32(s, w)^));
-      inc(s, w); inc(d, w);
-    end;
+  intensity := max(1, min(10, intensity));
+  img.Grayscale;
+  img2 := TImage32.Create(img);
+  try
+    img2.InvertColors;
+    BoxBlur(img2, img2.Bounds, intensity * 3, 3);
+    img.CopyFrom(img2, img2.Bounds, img.Bounds, BlendColorDodge);
+  finally
+    img2.Free;
   end;
-  Move(tmp2[0], img.PixelBase^, w * h * sizeOf(TColor32));
-
-  if intensity < 1 then Exit;
-  if intensity > 10 then
-    intensity := 10; //range = 1-10
-  img.ScaleAlpha(intensity);
 end;
 //------------------------------------------------------------------------------
 
