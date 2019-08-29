@@ -29,7 +29,6 @@ type
   TArrayOfGradientColor = array of TGradientColor;
 
   TGradientFillStyle = (gfsClamp, gfsMirror, gfsRepeat);
-  TTileFillStyle     = (tfsRepeat, tfsMirrorHorz, tfsMirrorVert, tfsRotate180);
 
   //TBoundsProc: Function template for TCustomRenderer.
   TBoundsProc = function(X, maxX: integer): integer;

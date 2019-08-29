@@ -69,6 +69,7 @@ procedure EraseColor(img: TImage32;
 procedure RedEyeRemove(img: TImage32; const rect: TRect);
 
 procedure PencilEffect(img: TImage32; intensity: integer = 0);
+procedure TraceContours(img: TImage32; intensity: integer);
 
 procedure Erase(img: TImage32; const polygon: TArrayOfPointD;
   fillRule: TFillRule; inverted: Boolean = false); overload;
@@ -559,6 +560,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function ColorDifference(color1, color2: TColor32): cardinal;
+  {$IFDEF INLINE} inline; {$ENDIF}
+var
+  c1: TARGB absolute color1;
+  c2: TARGB absolute color2;
+begin
+  result := Abs(c1.R - c2.R) + Abs(c1.G - c2.G) + Abs(c1.B - c2.B);
+end;
+//------------------------------------------------------------------------------
+
 procedure EraseColor(img: TImage32; color: TColor32; ExactMatchOnly: Boolean);
 var
   fg: TARGB absolute color;
@@ -582,19 +593,19 @@ begin
     begin
       if bg.A > 0 then
       begin
-        Q := 0;
-        if (bg.R > fg.R) then Q := Max(Q, DivTable[bg.R - fg.R, fg.R xor 255])
-        else if (bg.R < fg.R) then Q := Max(Q, DivTable[fg.R - bg.R, fg.R]);
-        if (bg.G > fg.G) then Q := Max(Q, DivTable[bg.G - fg.G, fg.G xor 255])
+        if (bg.R > fg.R) then Q := DivTable[bg.R - fg.R, not fg.R]
+        else if (bg.R < fg.R) then Q := DivTable[fg.R - bg.R, fg.R]
+        else Q := 0;
+        if (bg.G > fg.G) then Q := Max(Q, DivTable[bg.G - fg.G, not fg.G])
         else if (bg.G < fg.G) then Q := Max(Q, DivTable[fg.G - bg.G, fg.G]);
-        if (bg.B > fg.B) then Q := Max(Q, DivTable[bg.B - fg.B, fg.B xor 255])
+        if (bg.B > fg.B) then Q := Max(Q, DivTable[bg.B - fg.B, not fg.B])
         else if (bg.B < fg.B) then Q := Max(Q, DivTable[fg.B - bg.B, fg.B]);
-        if Q > 0 then
+        if (Q > 0) then
         begin
           bg.A := MulTable[bg.A, Q];
-          bg.R := DivTable[bg.R - MulTable[fg.R, 255 - Q], Q];
-          bg.G := DivTable[bg.G - MulTable[fg.G, 255 - Q], Q];
-          bg.B := DivTable[bg.B - MulTable[fg.B, 255 - Q], Q];
+          bg.R := DivTable[bg.R - MulTable[fg.R, not Q], Q];
+          bg.G := DivTable[bg.G - MulTable[fg.G, not Q], Q];
+          bg.B := DivTable[bg.B - MulTable[fg.B, not Q], Q];
         end else
           bg.Color := clNone32;
       end;
@@ -1048,16 +1059,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ColorDifference(color1, color2: TColor32): cardinal;
-  {$IFDEF INLINE} inline; {$ENDIF}
-var
-  c1: TARGB absolute color1;
-  c2: TARGB absolute color2;
-begin
-  result := Abs(c1.R - c2.R) + Abs(c1.G - c2.G) + Abs(c1.B - c2.B);
-end;
-//------------------------------------------------------------------------------
-
+//function ColorDifference(color1, color2: TColor32): cardinal;
+//  {$IFDEF INLINE} inline; {$ENDIF}
+//var
+//  c1: TARGB absolute color1;
+//  c2: TARGB absolute color2;
+//begin
+//  result := Abs(c1.R - c2.R) + Abs(c1.G - c2.G) + Abs(c1.B - c2.B);
+//end;
+////------------------------------------------------------------------------------
+//
 function AlphaAverage(color1, color2: TColor32): cardinal;
   {$IFDEF INLINE} inline; {$ENDIF}
 var
@@ -1065,6 +1076,19 @@ var
   c2: TARGB absolute color2;
 begin
   result := c1.A + c2.A shr 1;
+end;
+//------------------------------------------------------------------------------
+
+function BlendLinearBurn(bgColor, fgColor: TColor32): TColor32;
+var
+  res: TARGB absolute Result;
+  bg: TARGB absolute bgColor;
+  fg: TARGB absolute fgColor;
+begin
+  res.A := 255;
+  res.R := Max(0, bg.R + fg.R - 255);
+  res.G := Max(0, bg.G + fg.G - 255);
+  res.B := Max(0, bg.B + fg.B - 255);
 end;
 //------------------------------------------------------------------------------
 
@@ -1083,25 +1107,63 @@ end;
 
 procedure PencilEffect(img: TImage32; intensity: integer);
 var
-  i,j, w,h: integer;
-  tmp, tmp2: TArrayOfColor32;
+  w,h, rpt: integer;
   img2: TImage32;
-  s: PColor32;
-  d: PARGB;
 begin
   w := img.Width; h := img.Height;
   if w * h = 0 then Exit;
 
+  rpt := max(0, min(3, intensity));
   intensity := max(1, min(10, intensity));
   img.Grayscale;
   img2 := TImage32.Create(img);
   try
     img2.InvertColors;
-    BoxBlur(img2, img2.Bounds, intensity * 3, 3);
+    BoxBlur(img2, img2.Bounds, intensity * 3, rpt);
     img.CopyFrom(img2, img2.Bounds, img.Bounds, BlendColorDodge);
   finally
     img2.Free;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TraceContours(img: TImage32; intensity: integer);
+var
+  i,j, w,h: integer;
+  tmp, tmp2: TArrayOfColor32;
+  s: PColor32;
+  d: PARGB;
+begin
+  w := img.Width; h := img.Height;
+  if w * h = 0 then Exit;
+  SetLength(tmp, w * h);
+  SetLength(tmp2, w * h);
+  s := img.PixelRow[0]; d := @tmp[0];
+  for j := 0 to h-1 do
+  begin
+    for i := 0 to w-2 do
+    begin
+      d.A := Min($FF, ColorDifference(s^, IncPColor32(s, 1)^));
+      inc(s); inc(d);
+    end;
+    inc(s); inc(d);
+  end;
+
+  for j := 0 to w-1 do
+  begin
+    s := @tmp[j]; d := @tmp2[j];
+    for i := 0 to h-2 do
+    begin
+      d.A := Min($FF, AlphaAverage(s^, IncPColor32(s, w)^));
+      inc(s, w); inc(d, w);
+    end;
+  end;
+  Move(tmp2[0], img.PixelBase^, w * h * sizeOf(TColor32));
+
+  if intensity < 1 then Exit;
+  if intensity > 10 then
+    intensity := 10; //range = 1-10
+  img.ScaleAlpha(intensity);
 end;
 //------------------------------------------------------------------------------
 

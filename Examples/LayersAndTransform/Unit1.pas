@@ -15,9 +15,9 @@ type
     File1: TMenuItem;
     Exit1: TMenuItem;
     mnuShowControls: TMenuItem;
+    mnuShowAll: TMenuItem;
     mnuShowImage: TMenuItem;
     N1: TMenuItem;
-    mnuShowAll: TMenuItem;
     StatusBar1: TStatusBar;
     OpenDialog1: TOpenDialog;
     SaveDialog1: TSaveDialog;
@@ -150,6 +150,7 @@ begin
 
   //draw spline's design lines and implicit buttons on the design layer
   if not mnuShowImage.Checked then
+  begin
     with TDesignerLayer32(layeredImage32[3]) do
     begin
       SetSize(w, h); //also clears layer
@@ -160,6 +161,7 @@ begin
       end;
       DrawQSplineDesign(fSplinePts);
     end;
+  end;
 
   //move the 'button' layers to the splinePts coordinates (index 4+)
   for i := 0 to high(fSplinePts) do
@@ -167,12 +169,10 @@ begin
       PositionCenteredAt(Point(fSplinePts[i]));
 
   layeredImage32[2].Visible := not mnuShowControls.Checked;
-  for i := 3 to layeredImage32.Count -1 do
-    layeredImage32[i].Visible := not mnuShowImage.Checked;
 
   //copy the merged layeredImage32 to Panel1
   Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
-  layeredImage32.GetMergedImage(false).CopyToDc(Panel1.Bitmap.Canvas.Handle);
+  layeredImage32.GetMergedImage(mnuShowImage.Checked).CopyToDc(Panel1.Bitmap.Canvas.Handle);
   Panel1.Refresh;
 end;
 //------------------------------------------------------------------------------

@@ -83,20 +83,25 @@ type
   TCustomDesignerLayer32 = class(TLayer32);
 
   TDesignerLayer32 = class(TCustomDesignerLayer32)
+  private
+    fPenWidth: double;
+    fPenColor: TColor32;
+    fButtonSize: Double;
   protected
     procedure DrawDashedLine(const ctrlPts: TArrayOfPointD; closed: Boolean); virtual;
     procedure DrawGridLine(const pt1, pt2: TPointD;
       width: double; color: TColor32); virtual;
-    procedure DrawButton(const pt: TPointD;
-      color: TColor32; ButtonSize: integer); virtual;
+    procedure DrawButton(const pt: TPointD; color: TColor32); virtual;
   public
+    constructor Create(owner: TLayeredImage32); override;
     procedure DrawGrid(majorInterval, minorInterval: integer);
-    procedure DrawQSplineDesign(const ctrlPts: TArrayOfPointD;
-      ButtonSize: integer = 0);
-    procedure DrawCSplineDesign(const ctrlPts: TArrayOfPointD;
-      ButtonSize: integer = 0);
+    procedure DrawQSplineDesign(const ctrlPts: TArrayOfPointD);
+    procedure DrawCSplineDesign(const ctrlPts: TArrayOfPointD);
     procedure DrawRectangle(const rec: TRect);
     procedure DrawEllipse(const rec: TRect);
+    property ButtonSize: double read fButtonSize write fButtonSize;
+    property PenColor: TColor32 read fPenColor write fPenColor;
+    property PenWidth: double read fPenWidth write fPenWidth;
   end;
 
   TLayeredImage32 = class
@@ -192,6 +197,7 @@ type
 
 var
   DefaultButtonSize: integer;
+  ButtonLayerName: string = 'button';
 
 const
   crDefault   =   0;
@@ -293,8 +299,7 @@ end;
 
 procedure TLayer32.ImageChanged(Sender: TObject);
 begin
-  if Visible then
-    fOwner.Invalidate;
+  fOwner.Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -406,13 +411,22 @@ end;
 // TDesignerLayer32 class
 //------------------------------------------------------------------------------
 
+constructor TDesignerLayer32.Create(owner: TLayeredImage32);
+begin
+  inherited Create(owner);
+  fPenWidth := 1.0;
+  fPenColor := clRed32;
+  fButtonSize := DefaultButtonSize;
+end;
+//------------------------------------------------------------------------------
+
 procedure TDesignerLayer32.DrawDashedLine(const ctrlPts: TArrayOfPointD;
   closed: Boolean);
 const
   endstyle: array[Boolean] of TEndStyle = (esSquare, esClosed);
 begin
   Image32_Draw.DrawDashedLine(Image, ctrlPts,
-    MakeArrayOfInteger([4,4]), nil, 1, clRed32, endstyle[closed]);
+    MakeArrayOfInteger([4,4]), nil, fPenWidth, fPenColor, endstyle[closed]);
 end;
 //------------------------------------------------------------------------------
 
@@ -463,15 +477,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TDesignerLayer32.DrawButton(const pt: TPointD;
-  color: TColor32; ButtonSize: integer);
+procedure TDesignerLayer32.DrawButton(const pt: TPointD; color: TColor32);
 begin
-  Image32_Extra.DrawButton(image, pt, ButtonSize, color, []);
+  Image32_Extra.DrawButton(image, pt, fButtonSize, color, []);
 end;
 //------------------------------------------------------------------------------
 
-procedure TDesignerLayer32.DrawQSplineDesign(const ctrlPts: TArrayOfPointD;
-  ButtonSize: integer);
+procedure TDesignerLayer32.DrawQSplineDesign(const ctrlPts: TArrayOfPointD);
 var
   i, len: integer;
   pt, pt2: TPointD;
@@ -479,7 +491,7 @@ var
 begin
   len := length(ctrlPts);
   if len < 3 then Exit;
-  if ButtonSize < 2 then ButtonSize := DefaultButtonSize;
+  if fButtonSize < 2 then fButtonSize := fButtonSize;
   SetLength(path, 2);
   path[0] := ctrlPts[0];
   path[1] := ctrlPts[1];
@@ -491,7 +503,7 @@ begin
     path[0] := pt;
     path[1] := pt2;
     DrawDashedLine(path, false);
-    DrawButton(pt2, clNone32, ButtonSize);
+    DrawButton(pt2, clNone32);
     pt := pt2;
   end;
   path[0] := pt; path[1] := ctrlPts[len-1];
@@ -499,8 +511,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TDesignerLayer32.DrawCSplineDesign(const ctrlPts: TArrayOfPointD;
-  ButtonSize: integer);
+procedure TDesignerLayer32.DrawCSplineDesign(const ctrlPts: TArrayOfPointD);
 var
   i, len: integer;
   pt: TPointD;
@@ -509,7 +520,7 @@ begin
   len := length(ctrlPts);
   if Odd(len) then dec(len);
   if len < 4 then Exit;
-  if ButtonSize < 2 then ButtonSize := DefaultButtonSize;
+  if fButtonSize < 2 then fButtonSize := DefaultButtonSize;
   SetLength(path, 2);
   path[0] := ctrlPts[0];
   path[1] := ctrlPts[1];
@@ -521,7 +532,7 @@ begin
     path[0] := ctrlPts[i];
     path[1] := pt;
     DrawDashedLine(path, false);
-    DrawButton(pt, clNone32, ButtonSize);
+    DrawButton(pt, clNone32);
     inc(i, 2);
   end;
   path[0] := ctrlPts[len-2];
@@ -1112,7 +1123,7 @@ begin
     ssCorners:
       for i := 0 to 3 do
       begin
-        layer := lim.AddNewLayer(TDesignerLayer32, 'button');
+        layer := lim.AddNewLayer(TDesignerLayer32, ButtonLayerName);
         layer.SetSize(btnSizeEx, btnSizeEx);
         layer.PositionCenteredAt(Point(corners[i]));
         layer.CursorId := cnrCursorIds[i];
@@ -1122,7 +1133,7 @@ begin
     ssEdges:
       for i := 0 to 3 do
       begin
-        layer := lim.AddNewLayer(TCustomDesignerLayer32, 'button');
+        layer := lim.AddNewLayer(TCustomDesignerLayer32, ButtonLayerName);
         layer.SetSize(btnSizeEx, btnSizeEx);
         layer.PositionCenteredAt(Point(edges[i]));
         layer.CursorId := edgeCursorIds[i];
@@ -1132,14 +1143,14 @@ begin
     else
       for i := 0 to 3 do
       begin
-        layer := lim.AddNewLayer(TCustomDesignerLayer32, 'button');
+        layer := lim.AddNewLayer(TCustomDesignerLayer32, ButtonLayerName);
         layer.SetSize(btnSizeEx, btnSizeEx);
         layer.PositionCenteredAt(Point(corners[i]));
         layer.CursorId := cnrCursorIds[i];
         Image32_Extra.DrawButton(layer.Image,
           mp, buttonSize, buttonColor, buttonOptions);
 
-        layer := lim.AddNewLayer(TCustomDesignerLayer32, 'button');
+        layer := lim.AddNewLayer(TCustomDesignerLayer32, ButtonLayerName);
         layer.SetSize(btnSizeEx, btnSizeEx);
         layer.PositionCenteredAt(Point(edges[i]));
         layer.CursorId := edgeCursorIds[i];
@@ -1272,7 +1283,7 @@ begin
   startGroupIdx := layeredImage32.Count;
   for i := 0 to high(buttonPts) do
   begin
-    layer := layeredImage32.AddNewLayer(TCustomDesignerLayer32, 'button');
+    layer := layeredImage32.AddNewLayer(TCustomDesignerLayer32, ButtonLayerName);
     layer.SetSize(btnSizeEx, btnSizeEx);
     layer.PositionCenteredAt(Point(buttonPts[i]));
     layer.CursorId := crHandPoint;
@@ -1294,7 +1305,7 @@ begin
   //nb: the only way to add to a group is to temporarily ungroup
   layeredImage32.UnGroup(groupIdx);
   newLayer :=
-    layeredImage32.InsertNewLayer(TCustomDesignerLayer32, lig+1, 'button');
+    layeredImage32.InsertNewLayer(TCustomDesignerLayer32, lig+1, ButtonLayerName);
   newLayer.Image.Assign(layeredImage32[lig].Image);
   newLayer.PositionCenteredAt(pt);
   newLayer.CursorId := crHandPoint;

@@ -17,8 +17,9 @@ interface
 
 uses Windows, SysUtils, Classes, Math, Image32;
 
+procedure ReduceColors(image: TImage32;
+  MaxColors: integer; UseDithering: Boolean = true);
 function CreatePalette(image: TImage32; MaxColors: integer): TArrayOfColor32;
-
 //nb: dithering is recommended for pretty much all palette reduction
 procedure ApplyPalette(image: TImage32; const palette: array of TColor32;
   UseDithering: Boolean = true);
@@ -487,7 +488,7 @@ var
 begin
   len := Length(palette);
 
-  if len < 8 then
+  if len < 4 then
   begin
     Dither(image, nil);
     Exit;
@@ -514,6 +515,16 @@ begin
   finally
     octree.Free;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure ReduceColors(image: TImage32;
+  MaxColors: integer; UseDithering: Boolean = true);
+var
+  pal: TArrayOfColor32;
+begin
+  pal := CreatePalette(image, MaxColors);
+  ApplyPalette(image, pal, UseDithering);
 end;
 //------------------------------------------------------------------------------
 
