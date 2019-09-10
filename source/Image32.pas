@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.17                                                            *
-* Date      :  11 August 2019                                                  *
+* Version   :  1.22                                                            *
+* Date      :  10 September 2019                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -127,7 +127,7 @@ type
       blendFunc: TBlendFunction = nil): Boolean;
     //CopyFromDC: Copies an image from a Windows device context, erasing
     //any current image in TImage32. (eg copying from TBitmap.canvas.handle)
-    procedure CopyFromDC(srcDc: HDC; width, height: Integer);
+    procedure CopyFromDC(srcDc: HDC; const srcRect: TRect);
     //CopyToDc: Copies the image into a Windows device context
     procedure CopyToDc(dstDc: HDC; x: Integer = 0; y: Integer = 0;
       transparent: Boolean = true; bkColor: TColor32 = 0);
@@ -211,6 +211,24 @@ type
     property OnChange: TNotifyEvent read fOnChange write fOnChange;
   end;
 
+  TImageList32 = class
+  private
+    fList: TList;
+    function GetImage(index: integer): TImage32;
+    function GetLast: TImage32;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Clear;
+    function Count: integer;
+    procedure Add(image: TImage32);
+    procedure Insert(index: integer; image: TImage32);
+    procedure Move(currentIndex, newIndex: integer);
+    procedure Delete(index: integer);
+    property Image[index: integer]: TImage32 read GetImage; default;
+    property Last: TImage32 read GetLast;
+  end;
+
   PARGB = ^TARGB;
   TARGB = packed record
     case boolean of
@@ -288,8 +306,11 @@ type
   //GetWeightedPixel: coordinates x256, y256 are scaled up by 256.
   function GetWeightedPixel(img: TImage32; x256, y256: Integer): TColor32;
 
-  //Color32: Converts Graphics.TColor values into TColor32 values.
-  function Color32(rgbColor: Integer): TColor32;
+  //Color32: Converts a Graphics.TColor value into a TColor32 value.
+  function Color32(rgbColor: Integer): TColor32; overload;
+  function Color32(a, r, g, b: Byte): TColor32; overload;
+  //RGBColor: Converts a TColor32 value into a COLORREF value
+  function RGBColor(color: TColor32): Cardinal;
   function InvertColor(color: TColor32): TColor32;
 
   //RgbtoHsl: See https://en.wikipedia.org/wiki/HSL_and_HSV
@@ -509,6 +530,23 @@ begin
     result := rgbColor;
   res.A := res.B; res.B := res.R; res.R := res.A; //byte swap
   res.A := 255;
+end;
+//------------------------------------------------------------------------------
+
+function Color32(a, r, g, b: Byte): TColor32;
+var
+  res: TARGB absolute Result;
+begin
+  res.A := a; res.R := r; res.G := g; res.B := b;
+end;
+//------------------------------------------------------------------------------
+
+function RGBColor(color: TColor32): Cardinal;
+var
+  c  : TARGB absolute color;
+  res: TARGB absolute Result;
+begin
+  res.R := c.B; res.G := c.G; res.B := c.R; res.A := 0;
 end;
 //------------------------------------------------------------------------------
 
@@ -1536,7 +1574,6 @@ end;
 function TImage32.SaveToFile(const filename: string): Boolean;
 var
   fileFormatClass: TImageFormatClass;
-  folder: string;
 begin
   result := false;
   if IsEmpty or (length(filename) < 5) then Exit;
@@ -1781,17 +1818,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.CopyFromDC(srcDc: HDC; width, height: Integer);
+procedure TImage32.CopyFromDC(srcDc: HDC; const srcRect: TRect);
 var
   bi: TBitmapInfoHeader;
   bm, oldBm: HBitmap;
   memDc: HDC;
   pixels: Pointer;
+  w,h: integer;
 begin
   BeginUpdate;
   try
-    SetSize(width, height, 0);
-    bi := Get32bitBitmapInfoHeader(width, height);
+    w := RectWidth(srcRect);
+    h := RectHeight(srcRect);
+    SetSize(w, h);
+    bi := Get32bitBitmapInfoHeader(w, h);
     memDc := GetCompatibleMemDc;
     try
       bm := CreateDIBSection(memDc,
@@ -1799,8 +1839,8 @@ begin
       if bm = 0 then Exit;
       try
         oldBm := SelectObject(memDc, bm);
-        BitBlt(memDc, 0,0, width, height, srcDc, 0,0, SRCCOPY);
-        Move(pixels^, fPixels[0], width * height * sizeOf(TColor32));
+        BitBlt(memDc, 0, 0, w, h, srcDc, srcRect.Left,srcRect.Top, SRCCOPY);
+        Move(pixels^, fPixels[0], w * h * sizeOf(TColor32));
         SelectObject(memDc, oldBm);
       finally
         DeleteObject(bm);
@@ -2426,6 +2466,77 @@ begin
     inc(pb);
   end;
   Changed;
+end;
+
+//------------------------------------------------------------------------------
+// TImageList32
+//------------------------------------------------------------------------------
+
+constructor TImageList32.Create;
+begin
+  fList := TList.Create;
+end;
+//------------------------------------------------------------------------------
+
+destructor TImageList32.Destroy;
+begin
+  Clear;
+  fList.Free;
+  inherited;
+end;
+//------------------------------------------------------------------------------
+
+function TImageList32.Count: integer;
+begin
+  result := fList.Count;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImageList32.Clear;
+var
+  i: integer;
+begin
+  for i := 0 to fList.Count -1 do
+    TImage32(fList[i]).Free;
+  fList.Clear;
+end;
+//------------------------------------------------------------------------------
+
+function TImageList32.GetImage(index: integer): TImage32;
+begin
+  result := TImage32(fList[index]);
+end;
+//------------------------------------------------------------------------------
+
+function TImageList32.GetLast: TImage32;
+begin
+  if Count = 0 then Result := nil
+  else Result := TImage32(fList[Count -1]);
+end;
+//------------------------------------------------------------------------------
+
+procedure TImageList32.Add(image: TImage32);
+begin
+  fList.Add(image);
+end;
+//------------------------------------------------------------------------------
+
+procedure TImageList32.Insert(index: integer; image: TImage32);
+begin
+  fList.Insert(index, image);
+end;
+//------------------------------------------------------------------------------
+
+procedure TImageList32.Move(currentIndex, newIndex: integer);
+begin
+  fList.Move(currentIndex, newIndex);
+end;
+//------------------------------------------------------------------------------
+
+procedure TImageList32.Delete(index: integer);
+begin
+  TImage32(fList[index]).Free;
+  fList.Delete(index);
 end;
 
 //------------------------------------------------------------------------------

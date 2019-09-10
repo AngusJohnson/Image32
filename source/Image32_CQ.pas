@@ -2,8 +2,8 @@ unit Image32_CQ;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.17                                                            *
-* Date      :  11 August 2019                                                  *
+* Version   :  1.22                                                            *
+* Date      :  10 September 2019                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Color reduction for TImage32                                    *
@@ -209,6 +209,7 @@ begin
     argb.R := TotalR div Count;
     argb.G := TotalG div Count;
     argb.B := TotalB div Count;
+    argb.R := 255;
   end;
 end;
 

@@ -2,8 +2,8 @@ unit BitmapPanels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.05                                                            *
-* Date      :  22 August 2019                                                  *
+* Version   :  1.06                                                            *
+* Date      :  10 September 2019                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
@@ -52,6 +52,7 @@ type
     fMousePos: TPoint;
     fFocusedColor: TColor;
     fBitmapProperties: TBitmapProperties;
+    procedure SetFocusedColor(color: TColor);
     procedure UpdateCursor;
     procedure BitmapScaleBestFit;
 {$IFDEF GESTURES}
@@ -94,7 +95,7 @@ type
     property Bitmap: TBitmap read fBmp;
     property BitmapProperties: TBitmapProperties read fBitmapProperties;
     //FocusedColor: Panel's border color when focused (ie if TabStop = true)
-    property FocusedColor: TColor read fFocusedColor write fFocusedColor;
+    property FocusedColor: TColor read fFocusedColor write SetFocusedColor;
     //InnerMargin = BorderWidth + BevelWidth *2 (if bevels assigned)
     property InnerMargin: integer read GetInnerMargin;
     property InnerClientRect: TRect read GetInnerClientRect;
@@ -965,6 +966,13 @@ begin
   scaleY := (ClientHeight- marg *2) / fBmp.Height;
   if scaleY < scaleX then fScale := scaleY
   else fScale := scaleX;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPanel.SetFocusedColor(color: TColor);
+begin
+  fFocusedColor := color;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 

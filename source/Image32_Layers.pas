@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.18                                                            *
-* Date      :  18 August 2019                                                  *
+* Version   :  1.22                                                            *
+* Date      :  10 September 2019                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -165,22 +165,6 @@ type
     property MidPoint: TPointD read GetMidPoint;
     property TopLayer: TLayer32 read GetTopLayer;
     property Width: integer read GetWidth write SetWidth;
-  end;
-
-  TImageList32 = class
-  private
-    fList: TList;
-    function GetImage(index: integer): TImage32;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    procedure Clear;
-    function Count: integer;
-    procedure Add(image: TImage32);
-    procedure Insert(index: integer; image: TImage32);
-    procedure Move(currentIndex, newIndex: integer);
-    procedure Delete(index: integer);
-    property Image[index: integer]: TImage32 read GetImage; default;
   end;
 
   function CreateSizingBtnsGroup(targetLayer: TLayer32;
@@ -414,7 +398,7 @@ end;
 constructor TDesignerLayer32.Create(owner: TLayeredImage32);
 begin
   inherited Create(owner);
-  fPenWidth := 1.0;
+  fPenWidth := 1;
   fPenColor := clRed32;
   fButtonSize := DefaultButtonSize;
 end;
@@ -424,9 +408,12 @@ procedure TDesignerLayer32.DrawDashedLine(const ctrlPts: TArrayOfPointD;
   closed: Boolean);
 const
   endstyle: array[Boolean] of TEndStyle = (esSquare, esClosed);
+var
+  step: integer;
 begin
+  step := Round(fPenWidth * 1.5) + 3;
   Image32_Draw.DrawDashedLine(Image, ctrlPts,
-    MakeArrayOfInteger([4,4]), nil, fPenWidth, fPenColor, endstyle[closed]);
+    MakeArrayOfInteger([step,step]), nil, fPenWidth, fPenColor, endstyle[closed]);
 end;
 //------------------------------------------------------------------------------
 
@@ -990,70 +977,6 @@ begin
   lig := GetIdxLastLayerInGroup(groupIdx);
   for i := fig to lig do
     Layer[i].Visible := true;
-end;
-
-//------------------------------------------------------------------------------
-// TImageList32
-//------------------------------------------------------------------------------
-
-constructor TImageList32.Create;
-begin
-  fList := TList.Create;
-end;
-//------------------------------------------------------------------------------
-
-destructor TImageList32.Destroy;
-begin
-  Clear;
-  fList.Free;
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
-function TImageList32.Count: integer;
-begin
-  result := fList.Count;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImageList32.Clear;
-var
-  i: integer;
-begin
-  for i := 0 to fList.Count -1 do
-    TImage32(fList[i]).Free;
-  fList.Clear;
-end;
-//------------------------------------------------------------------------------
-
-function TImageList32.GetImage(index: integer): TImage32;
-begin
-  result := TImage32(fList[index]);
-end;
-//------------------------------------------------------------------------------
-
-procedure TImageList32.Add(image: TImage32);
-begin
-  fList.Add(image);
-end;
-//------------------------------------------------------------------------------
-
-procedure TImageList32.Insert(index: integer; image: TImage32);
-begin
-  fList.Insert(index, image);
-end;
-//------------------------------------------------------------------------------
-
-procedure TImageList32.Move(currentIndex, newIndex: integer);
-begin
-  fList.Move(currentIndex, newIndex);
-end;
-//------------------------------------------------------------------------------
-
-procedure TImageList32.Delete(index: integer);
-begin
-  TImage32(fList[index]).Free;
-  fList.Delete(index);
 end;
 
 //------------------------------------------------------------------------------

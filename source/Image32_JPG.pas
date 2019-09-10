@@ -51,7 +51,7 @@ begin
     jpeg.LoadFromStream(stream);
     if jpeg.Empty then Exit;
     with TJpegImageHack(jpeg).Bitmap do
-      img32.CopyFromDC(Canvas.Handle, Width, Height);
+      img32.CopyFromDC(Canvas.Handle, Rect(0,0, Width, Height));
     result := true;
   finally
     jpeg.Free;

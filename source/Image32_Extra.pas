@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.18                                                            *
-* Date      :  18 August 2019                                                  *
+* Version   :  1.22                                                            *
+* Date      :  10 September 2019                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -59,11 +59,12 @@ procedure Sharpen(img: TImage32; radius: Integer = 2; amount: Integer = 10);
 procedure HatchBackground(img: TImage32; color1: TColor32 = clWhite32;
   color2: TColor32= clSilver32; hatchSize: Integer = 10);
 
+procedure ReplaceColor(img: TImage32; oldColor, newColor: TColor32);
+
 //EraseColor: Removes the specified color from the image, even from
 //pixels that are a blend of colors including the specified color.<br>
 //see https://stackoverflow.com/questions/9280902/
-procedure EraseColor(img: TImage32;
-  color: TColor32; ExactMatchOnly: Boolean = false);
+procedure EraseColor(img: TImage32; color: TColor32);
 
 //RedEyeRemove: Removes 'red eye' from flash photo images.
 procedure RedEyeRemove(img: TImage32; const rect: TRect);
@@ -570,7 +571,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure EraseColor(img: TImage32; color: TColor32; ExactMatchOnly: Boolean);
+procedure ReplaceColor(img: TImage32; oldColor, newColor: TColor32);
+var
+  color: PColor32;
+  i: Integer;
+begin
+  color := img.PixelBase;
+  for i := 0 to img.Width * img.Height -1 do
+  begin
+    if color^ = oldColor then color^ := newColor;
+    inc(color);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure EraseColor(img: TImage32; color: TColor32);
 var
   fg: TARGB absolute color;
   bg: PARGB;
@@ -580,37 +595,27 @@ begin
   if fg.A = 0 then Exit;
   bg := PARGB(img.PixelBase);
 
-  if ExactMatchOnly then
+  for i := 0 to img.Width * img.Height -1 do
   begin
-    for i := 0 to img.Width * img.Height -1 do
+    if bg.A > 0 then
     begin
-      if bg.Color = color then bg.Color := clNone32;
-      inc(bg);
-    end;
-  end else
-  begin
-    for i := 0 to img.Width * img.Height -1 do
-    begin
-      if bg.A > 0 then
+      if (bg.R > fg.R) then Q := DivTable[bg.R - fg.R, not fg.R]
+      else if (bg.R < fg.R) then Q := DivTable[fg.R - bg.R, fg.R]
+      else Q := 0;
+      if (bg.G > fg.G) then Q := Max(Q, DivTable[bg.G - fg.G, not fg.G])
+      else if (bg.G < fg.G) then Q := Max(Q, DivTable[fg.G - bg.G, fg.G]);
+      if (bg.B > fg.B) then Q := Max(Q, DivTable[bg.B - fg.B, not fg.B])
+      else if (bg.B < fg.B) then Q := Max(Q, DivTable[fg.B - bg.B, fg.B]);
+      if (Q > 0) then
       begin
-        if (bg.R > fg.R) then Q := DivTable[bg.R - fg.R, not fg.R]
-        else if (bg.R < fg.R) then Q := DivTable[fg.R - bg.R, fg.R]
-        else Q := 0;
-        if (bg.G > fg.G) then Q := Max(Q, DivTable[bg.G - fg.G, not fg.G])
-        else if (bg.G < fg.G) then Q := Max(Q, DivTable[fg.G - bg.G, fg.G]);
-        if (bg.B > fg.B) then Q := Max(Q, DivTable[bg.B - fg.B, not fg.B])
-        else if (bg.B < fg.B) then Q := Max(Q, DivTable[fg.B - bg.B, fg.B]);
-        if (Q > 0) then
-        begin
-          bg.A := MulTable[bg.A, Q];
-          bg.R := DivTable[bg.R - MulTable[fg.R, not Q], Q];
-          bg.G := DivTable[bg.G - MulTable[fg.G, not Q], Q];
-          bg.B := DivTable[bg.B - MulTable[fg.B, not Q], Q];
-        end else
-          bg.Color := clNone32;
-      end;
-      inc(bg);
+        bg.A := MulTable[bg.A, Q];
+        bg.R := DivTable[bg.R - MulTable[fg.R, not Q], Q];
+        bg.G := DivTable[bg.G - MulTable[fg.G, not Q], Q];
+        bg.B := DivTable[bg.B - MulTable[fg.B, not Q], Q];
+      end else
+        bg.Color := clNone32;
     end;
+    inc(bg);
   end;
 end;
 //------------------------------------------------------------------------------
