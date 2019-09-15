@@ -85,10 +85,10 @@ begin
   layeredImage32 := TLayeredImage32.Create;
 
   //Layer 0: 'hatched' layer to highlight transparency
-  layeredImage32.AddNewLayer('background - hatched');
+  layeredImage32.AddNewLayer(TDesignerLayer32, 'background - hatched');
 
   //Layer 1: hidden layer contains the starting image
-  layer := layeredImage32.AddNewLayer('master - hidden');
+  layer := layeredImage32.AddNewLayer(TDesignerLayer32, 'master - hidden');
   layer.image.LoadFromResource('UNION_JACK', 'BMP');
   layer.Visible := false;
 

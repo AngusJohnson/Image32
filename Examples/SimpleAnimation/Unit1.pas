@@ -6,7 +6,7 @@ interface
 uses
   Windows, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls,
-  Image32, Image32_Layers, BitmapPanels, Timer;
+  Image32, BitmapPanels, Timer;
 
 type
   TForm1 = class(TForm)

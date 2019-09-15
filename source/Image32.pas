@@ -249,13 +249,11 @@ type
 
   PPointD = ^TPointD;
   TArrayOfPointD = array of TPointD;
+  TPathD = TArrayOfPointD;         //may cause ambiguity with Clipper.pas
   TArrayOfArrayOfPointD = array of TArrayOfPointD;
-
-  //TPath = TArrayOfPointD;          //may cause ambiguity if
-  //TPaths = TArrayOfArrayOfPointD;  //also using Clipper.pas
+  TPathsD = TArrayOfArrayOfPointD; //may cause ambiguity with Clipper.pas
 
   TArrayOfDouble = array of double;
-  TPathD = array of TPointD;
 
   TRectD = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
     Left, Top, Right, Bottom: double;

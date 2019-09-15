@@ -23,6 +23,7 @@ type
   TEndStyle   = (esClosed, esButt, esSquare, esRound);
   TPathEnd    = (peStart, peEnd, peBothEnds);
   TSplineType = (stQuadratic, stCubic);
+  TFillRule = (frEvenOdd, frNonZero, frPositive, frNegative);
 
   function InflateRect(const rec: TRectD; dx, dy: double): TRectD; overload;
 
@@ -86,6 +87,7 @@ type
   function ScalePath(const paths: TArrayOfArrayOfPointD;
     sx, sy: double): TArrayOfArrayOfPointD; overload;
   function ReversePath(const path: TArrayOfPointD): TArrayOfPointD;
+  function OpenPathToFlatPolygon(const path: TArrayOfPointD): TArrayOfPointD;
   procedure AddToPath(var path: TArrayOfPointD;
     const extra: TArrayOfPointD);
   procedure AppendPath(var paths: TArrayOfArrayOfPointD;
@@ -155,6 +157,9 @@ type
   {$IFDEF INLINE} inline; {$ENDIF}
   function Distance(const pt1, pt2: TPointD): double; overload;
   {$IFDEF INLINE} inline; {$ENDIF}
+
+  function PointInPaths(const pt: TPointD;
+    const paths: TArrayOfArrayOfPointD; fillRule: TFillRule): Boolean;
 
   function IsPointInEllipse(const ellipseRec: TRect; const pt: TPoint): Boolean;
 
@@ -497,17 +502,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ReversePathSpecial(const path: TArrayOfPointD): TArrayOfPointD;
+function OpenPathToFlatPolygon(const path: TArrayOfPointD): TArrayOfPointD;
 var
-  i, highI: integer;
+  i, len, len2: integer;
 begin
-  //trims first and last point from reversed path
-  result := nil;
-  highI := High(path);
-  if highI < 2 then Exit;
-  SetLength(result, highI -1);
-  for i := 0 to highI -2 do
-    result[i] := path[highI-1 -i];
+  len := Length(path);
+  len2 := Max(0, len - 2);
+  setLength(Result, len + len2);
+  if len = 0 then Exit;
+  Move(path[0], Result[0], len * SizeOf(TPointD));
+  if len2 = 0 then Exit;
+  for i := 0 to len - 3 do
+    result[len + i] := path[len - 2 -i];
 end;
 //------------------------------------------------------------------------------
 
@@ -608,6 +614,77 @@ end;
 function Distance(const pt1, pt2: TPointD): double;
 begin
   Result := Sqrt(DistanceSqrd(pt1, pt2));
+end;
+//------------------------------------------------------------------------------
+
+function PointInPathsWindingCount(const pt: TPointD;
+  const paths: TArrayOfArrayOfPointD): integer;
+var
+  i,j, len: integer;
+  p: TArrayOfPointD;
+  prevPt: TPointD;
+  isAbove: Boolean;
+  crossProd: double;
+begin
+  //nb: returns MaxInt ((2^32)-1) when pt is on a line
+  Result := 0;
+  for i := 0 to High(paths) do
+  begin
+    j := 0;
+    p := paths[i];
+    len := Length(p);
+    if len < 3 then Continue;
+    prevPt := p[len-1];
+    while (j < len) and (p[j].Y = prevPt.Y) do inc(j);
+    if j = len then continue;
+    isAbove := (prevPt.Y < pt.Y);
+    while (j < len) do
+    begin
+      if isAbove then
+      begin
+        while (j < len) and (p[j].Y < pt.Y) do inc(j);
+        if j = len then break
+        else if j > 0 then prevPt := p[j -1];
+        crossProd := CrossProduct(prevPt, p[j], pt);
+        if crossProd = 0 then
+        begin
+          result := MaxInt;
+          Exit;
+        end
+        else if crossProd < 0 then dec(Result);
+      end else
+      begin
+        while (j < len) and (p[j].Y > pt.Y) do inc(j);
+        if j = len then break
+        else if j > 0 then prevPt := p[j -1];
+        crossProd := CrossProduct(prevPt, p[j], pt);
+        if crossProd = 0 then
+        begin
+          result := MaxInt;
+          Exit;
+        end
+        else if crossProd > 0 then inc(Result);
+      end;
+      inc(j);
+      isAbove := not isAbove;
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function PointInPaths(const pt: TPointD;
+  const paths: TArrayOfArrayOfPointD; fillRule: TFillRule): Boolean;
+var
+  wc: integer;
+begin
+  wc := PointInPathsWindingCount(pt, paths);
+  case fillRule of
+    frEvenOdd: result := Odd(wc);
+    frNonZero: result := (wc <> 0);
+    //when 'pt' is on a path and fill rule is either frPositive or frNegative,
+    //then quite a lot more work is needed to safely determine the result.
+    else result := false;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -922,8 +999,7 @@ begin
 
   if joinStyle = jsRound then
   begin
-    line2 := ReversePathSpecial(line);
-    AddToPath(line2, line);
+    line2 := OpenPathToFlatPolygon(line);
   end else
   begin
     line1 := Copy(line, 0, len);
@@ -938,8 +1014,7 @@ begin
       with line1[len-1] do
         line1[len-1] := PointD(X + vec2.X * wd2, Y + vec2.y * wd2);
     end;
-    line2 := ReversePathSpecial(line1);
-    AddToPath(line2, line1);
+    line2 := OpenPathToFlatPolygon(line1);
   end;
   SetLength(result, 1);
   Result[0] := Grow(line2, nil, width/2, joinStyle, miterLimit);

@@ -16,13 +16,19 @@ uses
   ClipperCore, Clipper, ClipperOffset,
   Image32, Image32_Draw, Image32_Vector;
 
-function InflatePolygon(const polygon: TArrayOfPointD; delta: Double;
-  joinStyle: TJoinStyle; miterLimit: double = 2.0): TArrayOfArrayOfPointD; overload;
-function InflatePolygon(const polygons: TArrayOfArrayOfPointD; delta: Double;
-  joinStyle: TJoinStyle; miterLimit: double = 2.0): TArrayOfArrayOfPointD; overload;
+function InflatePolygon(const polygon: TArrayOfPointD;
+  delta: Double; joinStyle: TJoinStyle = jsAuto;
+  miterLimit: double = 2.0): TArrayOfArrayOfPointD;
+function InflatePolygons(const polygons: TArrayOfArrayOfPointD;
+  delta: Double; joinStyle: TJoinStyle = jsAuto;
+  miterLimit: double = 2.0): TArrayOfArrayOfPointD;
 
-function UnionPolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
+function UnionPolygon(const polygon: TArrayOfPointD;
   fillRule: TFillRule): TArrayOfArrayOfPointD;
+function UnionPolygons(const polygon1, polygon2: TArrayOfPointD;
+  fillRule: TFillRule): TArrayOfArrayOfPointD; overload;
+function UnionPolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
+  fillRule: TFillRule): TArrayOfArrayOfPointD; overload;
 
 function IntersectPolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
   fillRule: TFillRule): TArrayOfArrayOfPointD;
@@ -43,11 +49,11 @@ var
 begin
   setLength(polygons, 1);
   polygons[0] := polygon;
-  Result := InflatePolygon(polygons, delta, joinStyle, miterLimit);
+  Result := InflatePolygons(polygons, delta, joinStyle, miterLimit);
 end;
 //------------------------------------------------------------------------------
 
-function InflatePolygon(const polygons: TArrayOfArrayOfPointD;
+function InflatePolygons(const polygons: TArrayOfArrayOfPointD;
   delta: Double; joinStyle: TJoinStyle;
   miterLimit: double): TArrayOfArrayOfPointD;
 var
@@ -59,7 +65,36 @@ begin
     else jt := jtRound;
   end;
   Result := TArrayOfArrayOfPointD(ClipperOffset.ClipperOffsetPaths(
-    TPathsD(polygons), delta, jt, etPolygon, miterLimit));
+    ClipperCore.TPathsD(polygons), delta, jt, etPolygon, miterLimit));
+end;
+//------------------------------------------------------------------------------
+
+function UnionPolygon(const polygon: TArrayOfPointD;
+  fillRule: TFillRule): TArrayOfArrayOfPointD;
+begin
+  with TClipperD.Create do
+  try
+    AddPath(ClipperCore.TPathD(polygon));
+    Execute(ctUnion,
+      ClipperCore.TFillRule(fillRule), ClipperCore.TPathsD(result));
+  finally
+    Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function UnionPolygons(const polygon1, polygon2: TArrayOfPointD;
+  fillRule: TFillRule): TArrayOfArrayOfPointD;
+begin
+  with TClipperD.Create do
+  try
+    AddPath(ClipperCore.TPathD(polygon1), ptSubject);
+    AddPath(ClipperCore.TPathD(polygon2), ptClip);
+    Execute(ctUnion,
+      ClipperCore.TFillRule(fillRule), ClipperCore.TPathsD(result));
+  finally
+    Free;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -68,9 +103,10 @@ function UnionPolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
 begin
   with TClipperD.Create do
   try
-    AddPaths(TPathsD(polygons1), ptSubject);
-    AddPaths(TPathsD(polygons2), ptClip);
-    Execute(ctUnion, ClipperCore.TFillRule(fillRule), TPathsD(result));
+    AddPaths(ClipperCore.TPathsD(polygons1), ptSubject);
+    AddPaths(ClipperCore.TPathsD(polygons2), ptClip);
+    Execute(ctUnion,
+      ClipperCore.TFillRule(fillRule), ClipperCore.TPathsD(result));
   finally
     Free;
   end;
@@ -82,9 +118,10 @@ function IntersectPolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
 begin
   with TClipperD.Create do
   try
-    AddPaths(TPathsD(polygons1), ptSubject);
-    AddPaths(TPathsD(polygons2), ptClip);
-    Execute(ctIntersection, ClipperCore.TFillRule(fillRule), TPathsD(result));
+    AddPaths(ClipperCore.TPathsD(polygons1), ptSubject);
+    AddPaths(ClipperCore.TPathsD(polygons2), ptClip);
+    Execute(ctIntersection,
+      ClipperCore.TFillRule(fillRule), ClipperCore.TPathsD(result));
   finally
     Free;
   end;
@@ -96,9 +133,10 @@ function DifferencePolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
 begin
   with TClipperD.Create do
   try
-    AddPaths(TPathsD(polygons1), ptSubject);
-    AddPaths(TPathsD(polygons2), ptClip);
-    Execute(ctDifference, ClipperCore.TFillRule(fillRule), TPathsD(result));
+    AddPaths(ClipperCore.TPathsD(polygons1), ptSubject);
+    AddPaths(ClipperCore.TPathsD(polygons2), ptClip);
+    Execute(ctDifference,
+      ClipperCore.TFillRule(fillRule), ClipperCore.TPathsD(result));
   finally
     Free;
   end;

@@ -21,8 +21,12 @@ type
   TSizingStyle = (ssCorners, ssEdges, ssEdgesAndCorners, ssCustom);
   TMergeImageState = (misUnknown, misMergeAll, misHideDesigners);
 
+  TLayer32 = class;
   TLayer32Class = class of TLayer32;
   TLayeredImage32 = class;
+
+  TLayerHitTestEvent =
+    function (layer: TLayer32; const pt: TPoint): Boolean of Object;
 
   TLayer32 = class
   private
@@ -45,6 +49,7 @@ type
     function GetIsInGroup: Boolean;
     procedure SetOpacity(value: Byte);
   protected
+    function HitTest(const pt: TPoint): Boolean; virtual;
     property Owner: TLayeredImage32 read fOwner;
     property IsInGroup: Boolean read GetIsInGroup;
   public
@@ -53,10 +58,11 @@ type
     procedure SetSize(width, height: integer);
     function BringForward(newLevel: integer): Boolean;
     function SendBack(newLevel: integer): Boolean;
-    procedure Offset(dx, dy: integer);
+    procedure Offset(dx, dy: integer); virtual;
     procedure PositionAt(const pt: TPoint);
     procedure PositionCenteredAt(const pt: TPoint); overload;
     procedure PositionCenteredAt(const pt: TPointD); overload;
+    procedure SetBounds(const bounds: TRect);
 
     property Bounds: TRect read GetBounds;
     property ClientMidPoint: TPointD read GetClientMidPoint;
@@ -75,13 +81,26 @@ type
     property Width: integer read GetWidth;
   end;
 
-  //TCustomDesignerLayer32 behaves exactly like TLayer32 except this class and
-  //its descendants can be excluded from TLayeredImage32.GetMergedImage (when
-  //the HideDesigners parameter is true). However, unlike its descendant class
-  //TDesignerLayer32, it will still be visible to TLayeredImage32.GetLayerAt
-  //which makes it the ideal class for designer button control layers.
+  THitTestLayer32 = class(TLayer32)
+  private
+    fPath: TArrayOfPointD;
+  protected
+    procedure SetPath(const path: TArrayOfPointD); virtual;
+  public
+    constructor Create(owner: TLayeredImage32); override;
+    procedure Offset(dx, dy: integer); override;
+    property Path: TArrayOfPointD read fPath write SetPath;
+  end;
+
+  //TCustomDesignerLayer32 objects can be filtered (excluded) from
+  //TLayeredImage32.GetMergedImage when its 'HideDesigners' parameter is true.
   TCustomDesignerLayer32 = class(TLayer32);
 
+  TButtonDesignerLayer32 = class(TCustomDesignerLayer32);
+
+  //TDesignerLayer32 objects are 'non-click' in that they won't be
+  //returned by calls to TLayeredImage32.GetLayerAt(). This class also
+  //contains a number of special designer methods.
   TDesignerLayer32 = class(TCustomDesignerLayer32)
   private
     fPenWidth: double;
@@ -92,6 +111,7 @@ type
     procedure DrawGridLine(const pt1, pt2: TPointD;
       width: double; color: TColor32); virtual;
     procedure DrawButton(const pt: TPointD; color: TColor32); virtual;
+    function HitTest(const pt: TPoint): Boolean; override;
   public
     constructor Create(owner: TLayeredImage32); override;
     procedure DrawGrid(majorInterval, minorInterval: integer);
@@ -143,7 +163,7 @@ type
     procedure Invalidate;
     function GetLayerNamed(const name: string): TLayer32;
     function GetLayerAt(const pt: TPoint): TLayer32;
-    function GetMergedImage(hideDesigners: Boolean): TImage32;
+    function GetMergedImage(hideDesigners: Boolean = false): TImage32;
 
     function Group(startIdx, endIdx: integer): Boolean;
     procedure UnGroup(groupIdx: integer);
@@ -200,16 +220,9 @@ uses
 
 resourcestring
   rsLayer32DeleteError =
-    'TLayer32 delete error: layers must be ungrouped before they can be '+
-    'deleted separately. Otherwise, use TLayeredImage32.DeleteGroup.';
-  rsImageLayerRangeError =
-    'TLayeredImage32 error: index out of range.';
-  rsImageLayerAddInsertDesignerError =
-    'TDesignerLayer32 error: This layer must be added/inserted immediately' +
-    'above a ''normal'' layer.';
-  rsImageLayerAddButtonsError =
-    'TDesignerLayer32 error: There''s a problem matching the designer layer'+
-    'with its target layer while adding buttons.';
+    'TLayer32 delete error: Individual layers must be ungrouped before they '+
+    'can be deleted. Otherwise, use TLayeredImage32.DeleteGroup.';
+  rsImageLayerRangeError = 'TLayeredImage32 error: index out of range.';
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions
@@ -257,6 +270,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TLayer32.HitTest(const pt: TPoint): Boolean;
+begin
+  Result := true;
+end;
+//------------------------------------------------------------------------------
+
 procedure TLayer32.SetSize(width, height: integer);
 begin
   fImage.SetSize(width, height);
@@ -292,6 +311,13 @@ begin
   Result.TopLeft := fPosition;
   Result.Right := Result.Left + fImage.Width;
   Result.Bottom := Result.Top + fImage.Height;
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.SetBounds(const bounds: TRect);
+begin
+  SetSize(RectWidth(bounds), RectHeight(bounds));
+  PositionAt(bounds.TopLeft);
 end;
 //------------------------------------------------------------------------------
 
@@ -392,6 +418,29 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// THitTestLayer32 class
+//------------------------------------------------------------------------------
+
+constructor THitTestLayer32.Create(owner: TLayeredImage32);
+begin
+  inherited Create(owner);
+  CursorId := crSizeAll;
+end;
+//------------------------------------------------------------------------------
+
+procedure THitTestLayer32.Offset(dx, dy: integer);
+begin
+  inherited Offset(dx, dy);
+  fPath := OffsetPath(fPath, dx, dy);
+end;
+//------------------------------------------------------------------------------
+
+procedure THitTestLayer32.SetPath(const path: TArrayOfPointD);
+begin
+  fPath := path;
+end;
+
+//------------------------------------------------------------------------------
 // TDesignerLayer32 class
 //------------------------------------------------------------------------------
 
@@ -401,6 +450,12 @@ begin
   fPenWidth := 1;
   fPenColor := clRed32;
   fButtonSize := DefaultButtonSize;
+end;
+//------------------------------------------------------------------------------
+
+function TDesignerLayer32.HitTest(const pt: TPoint): Boolean;
+begin
+  Result := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -781,9 +836,14 @@ begin
     raise Exception.Create(rsLayer32DeleteError);
   Layer[index].Free;
   fList.Delete(index);
-  //update indexes
+
+  //update indexes and group indexes
   for i := index to Count -1 do
     Layer[i].fIndex := i;
+  for i := 0 to fGroupList.Count -1 do
+    if integer(fGroupList[i]) > index then
+      fGroupList[i] := Pointer(Integer(fGroupList[i]) -1);
+
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -806,17 +866,14 @@ function TLayeredImage32.GetLayerAt(const pt: TPoint): TLayer32;
 var
   i: integer;
 begin
-  //GetLayerAt ignores TDesignerLayer32 layers but not
-  //TCustomDesignerLayer32 layers (eg buttons)
+  Result := nil;
   for i := Count -1 downto 0 do
-    if (Layer[i] is TDesignerLayer32) or not Layer[i].Visible then continue
-    else with Layer[i] do
-      if PtInRect(Bounds, pt) then
+    with Layer[i] do
+      if Visible and PtInRect(Bounds, pt) and HitTest(pt) then
       begin
         Result := Layer[i];
-        Exit;
+        Break;
       end;
-  Result := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -878,8 +935,14 @@ end;
 //------------------------------------------------------------------------------
 
 function TLayeredImage32.CountLayersInGroup(groupIdx: integer): integer;
+var
+  idx, idx2, cnt: integer;
 begin
-  Result := GetIdxLastLayerInGroup(groupIdx) - GetIdxFirstLayerInGroup(groupIdx) +1;
+  cnt := Count;
+  idx := GetIdxFirstLayerInGroup(groupIdx);
+  idx2 := idx +1;
+  while (idx2  < cnt) and (Layer[idx2].fGroupIndex = groupIdx) do inc(idx2);
+  Result := idx2 - idx;
 end;
 //------------------------------------------------------------------------------
 
@@ -1046,7 +1109,7 @@ begin
     ssCorners:
       for i := 0 to 3 do
       begin
-        layer := lim.AddNewLayer(TDesignerLayer32, ButtonLayerName);
+        layer := lim.AddNewLayer(TButtonDesignerLayer32, ButtonLayerName);
         layer.SetSize(btnSizeEx, btnSizeEx);
         layer.PositionCenteredAt(Point(corners[i]));
         layer.CursorId := cnrCursorIds[i];
@@ -1056,7 +1119,7 @@ begin
     ssEdges:
       for i := 0 to 3 do
       begin
-        layer := lim.AddNewLayer(TCustomDesignerLayer32, ButtonLayerName);
+        layer := lim.AddNewLayer(TButtonDesignerLayer32, ButtonLayerName);
         layer.SetSize(btnSizeEx, btnSizeEx);
         layer.PositionCenteredAt(Point(edges[i]));
         layer.CursorId := edgeCursorIds[i];
@@ -1066,14 +1129,14 @@ begin
     else
       for i := 0 to 3 do
       begin
-        layer := lim.AddNewLayer(TCustomDesignerLayer32, ButtonLayerName);
+        layer := lim.AddNewLayer(TButtonDesignerLayer32, ButtonLayerName);
         layer.SetSize(btnSizeEx, btnSizeEx);
         layer.PositionCenteredAt(Point(corners[i]));
         layer.CursorId := cnrCursorIds[i];
         Image32_Extra.DrawButton(layer.Image,
           mp, buttonSize, buttonColor, buttonOptions);
 
-        layer := lim.AddNewLayer(TCustomDesignerLayer32, ButtonLayerName);
+        layer := lim.AddNewLayer(TButtonDesignerLayer32, ButtonLayerName);
         layer.SetSize(btnSizeEx, btnSizeEx);
         layer.PositionCenteredAt(Point(edges[i]));
         layer.CursorId := edgeCursorIds[i];
@@ -1206,7 +1269,7 @@ begin
   startGroupIdx := layeredImage32.Count;
   for i := 0 to high(buttonPts) do
   begin
-    layer := layeredImage32.AddNewLayer(TCustomDesignerLayer32, ButtonLayerName);
+    layer := layeredImage32.AddNewLayer(TButtonDesignerLayer32, ButtonLayerName);
     layer.SetSize(btnSizeEx, btnSizeEx);
     layer.PositionCenteredAt(Point(buttonPts[i]));
     layer.CursorId := crHandPoint;
@@ -1228,7 +1291,7 @@ begin
   //nb: the only way to add to a group is to temporarily ungroup
   layeredImage32.UnGroup(groupIdx);
   newLayer :=
-    layeredImage32.InsertNewLayer(TCustomDesignerLayer32, lig+1, ButtonLayerName);
+    layeredImage32.InsertNewLayer(TButtonDesignerLayer32, lig+1, ButtonLayerName);
   newLayer.Image.Assign(layeredImage32[lig].Image);
   newLayer.PositionCenteredAt(pt);
   newLayer.CursorId := crHandPoint;

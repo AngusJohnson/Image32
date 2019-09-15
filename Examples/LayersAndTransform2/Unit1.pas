@@ -87,11 +87,11 @@ begin
   layeredImage32 := TLayeredImage32.Create; //will size later
 
   //Layer 0: background layer to show hatched transparency
-  //         and it's a TDesignerLayer32 so it isn't 'clickable'
+  //         and it's a TDesignLayer32 so it isn't 'clickable'
   layeredImage32.AddNewLayer(TDesignerLayer32, 'background - hatched');
 
   //Layer 1: hidden master layer containing the starting image
-  layer := layeredImage32.AddNewLayer('master - hidden');
+  layer := layeredImage32.AddNewLayer(TDesignerLayer32, 'master - hidden');
   layer.image.LoadFromResource('BEETLE', 'BMP');
   layer.Visible := false;
 

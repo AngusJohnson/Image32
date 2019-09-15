@@ -18,7 +18,7 @@ uses
   SysUtils, Classes, Windows, Types, Math, Image32, Image32_Vector;
 
 type
-  TFillRule = (frEvenOdd, frNonZero, frPositive, frNegative);
+  TFillRule = Image32_Vector.TFillRule;
 
   //TGradientColor: used internally by both
   //TLinearGradientRenderer and TRadialGradientRenderer

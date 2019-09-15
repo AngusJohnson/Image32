@@ -113,7 +113,7 @@ begin
   //nb: we don't need to worry about BackgroundColor as we're
   //going to add a hatched image for the background instead.
 
-  layer := layeredImage32.AddNewLayer(TDesignerLayer32, 'hatched background');
+  layer := layeredImage32.AddNewLayer(TNonClickableDesignLayer32, 'hatched background');
   layer.SetSize(layeredImage32.Width, layeredImage32.Height);
   HatchBackground(layer.Image, $FFF0F0F0, clWhite32);
 
@@ -121,6 +121,7 @@ begin
   image := TImage32.Create;
   image.LoadFromResource('UNION_JACK', 'BMP');
   masterImageList.Add(image);
+
   layer := layeredImage32.AddNewLayer('');
   layer.image.Assign(image);
   layer.PositionCenteredAt(Point(layeredImage32.MidPoint));

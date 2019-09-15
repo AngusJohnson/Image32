@@ -1,8 +1,8 @@
 
 Image32 is a compact 2D graphics library written in Delphi Pascal. It provides an extensive range of image manipulation functions. It also includes a polygon renderer for line and polygon drawing. The renderer supports a range of brush filling options including tiled images, and linear and radial gradient fills.
 
-Version: 1.22
-Uploaded: 9 September 2019
+Version: 1.23
+Uploaded: 16 September 2019
 Freeware for both open source and commercial applications released under 
 Boost Software License - see https://www.boost.org/LICENSE_1_0.txt
 Copyright © 2019 Angus Johnson
@@ -10,8 +10,19 @@ Copyright © 2019 Angus Johnson
 http://www.angusj.com/delphi/image32.php
 
 
-Changes since initial release:
+Recent changes:
 
+Version: 1.23
+  Added InflatePolygon function in Image32_Clipper
+  Added UnionPolygon function in Image32_Clipper
+  Added OpenPathToFlatPolygon function in Image32_Vector
+  Added PointInPaths function in Image32_Vector
+  Added THitTestLayer32 class in Image32_Layers
+  Added TButtonDesignerLayer32 class in Image32_Layers
+  Added TLayer32.SetBounds procedure 
+  Fixed TLayeredImage32.DeleteLayer that broke GroupIndexes
+  Added new LayersAndSplines example application
+  
 Version: 1.22
   Improved TDesignerLayer32 dashed line drawing.
   Changed TImage32.CopyFromDC parameters
@@ -37,55 +48,3 @@ Version: 1.20
   Fixed minor bug in TImages32.CopyToDC.
   Fixed minor bug in BitmapPanels unit.
   Added an animation example to Examples folder.
-
-Version: 1.18
-  Major revision of layers in Image32_Layers.
-  Fixed minor bug in BlendColorUsingMask() in Image32_Draw.
-  Added RotatePath to Image32_Vector.
-
-Version: 1.17
-  Refactored gradient renderers and added TSvgRadialGradientRenderer.
-  Minor bugfixes and code improvements.
-  Improved documentation.
-
-Version: 1.16
-  BitmapPanels now compiles in Free Pascal (FPC) too.
-  Added TImage32.MidPoint property.
-  Major update to SplineTransformVert and SplineTransformHorz functions.
-  Major update to TLayeredImage32 and TLayer32 and added new TDesignerLayer32.
-
-Version: 1.15
-  Added SplineTransformVert & SplineTransformHorz to Image32_Transform.pas
-  Added TLayer32.MidPoint property in Image32_Layers.pas
-  Changed TTextAlignV to TTextVAlign in Image32_Text.pas
-  Added Alpha() and NoAlpha() functions to Image32.pas
-  Fixed a minor bug in color gradient renderers
-  Fixed a bug in TImage32.CropTransparentPixels
- 
-Version: 1.14
-  Modified DrawButton function parameters
-  Minor code tidy and documentation improvements
-
-Version: 1.13
-  Major improvements to Image32_Layers unit
-  Modified ProjectiveTransform function
-
-Version: 1.12
-  Added OnChange event to TImage32 class
-  Added new Image32_Layers unit
-  Tidied up Clipboard support which was messy.
-
-Version: 1.11
-  Modified DrawShadow function parameters
-  Modified DrawDashedLine function parameters
-  Renamed BuildDashPath function to GetDashedPath
-  Added GetDashedOutLine function
-
-Version: 1.10
-  Added Draw3D function
-  Added affine and projective transformation functions.
-  Added QSpline & CSpline functions
-  Added option to insert intermediate colors into gradient renders
-  Numerous minor bug fixes
-  Significantly improved documentation
-  
