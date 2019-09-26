@@ -14,7 +14,7 @@ unit Timer;
 interface
 
 uses
-  Windows, SysUtils, Classes, Math;
+  Windows, SysUtils, Classes, Math, Forms;
 
 {$WARN SYMBOL_PLATFORM OFF}
 
@@ -82,6 +82,7 @@ end;
 
 procedure TTimerThread.DoOnTimer;
 begin
+  //nb: this method is synchronized
   if not Terminated then fOnTimer(Self);
 end;
 //------------------------------------------------------------------------------
@@ -131,12 +132,17 @@ end;
 
 destructor TTimerEx.Destroy;
 begin
-  //nb: If this object is being destroyed on application shutdown, while a
-  //thread is still executing, then signaling thread termination here won't
-  //necessarily end the thread before the OS cleans it up. If it's essential
-  //that the thread terminates normally (or memory leak reports annoy) then call
-  //Application.ProcessMessages after TimerEx is freed in the form's destructor.
   Enabled := false;
+
+  //nb: If this object is being destroyed on application shutdown while a
+  //thread is still executing, for example freeing TTimerEx in the main form's
+  //destructor, then signaling thread termination here (Enabled := false;)
+  //won't necessarily ensure termination before the OS cleans up. If it's
+  //essential that the thread terminates normally (or if memory leak reporting
+  //annoys) then call Application.ProcessMessages after this object is freed.
+  //Alternatively, include Forms in 'uses' and call ProcessMessages here.
+  while Enabled do Application.ProcessMessages;
+
   inherited Destroy;
 end;
 //------------------------------------------------------------------------------

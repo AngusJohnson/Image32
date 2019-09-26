@@ -57,6 +57,7 @@ type
   function QSpline(const pts: TArrayOfPointD): TArrayOfPointD;
 
   //ArrowHead: The ctrlPt's only function is to control the angle of the arrow.
+  //Suggested size = lineWidth *3 + DPI(5)
   function ArrowHead(const arrowTip, ctrlPt: TPointD; size: double;
     arrowStyle: TArrowStyle): TArrayOfPointD;
   function ShortenPath(const path: TArrayOfPointD;
@@ -96,6 +97,11 @@ type
   procedure AppendPath(var paths: TArrayOfArrayOfPointD;
     const extra: TArrayOfArrayOfPointD);
     {$IFDEF INLINE} inline; {$ENDIF} overload;
+
+  function GetAngle(const pt, origin: TPoint): double; overload;
+  function GetAngle(const pt, origin: TPointD): double; overload;
+  function GetAngle(const a, b, c: TPoint): double; overload;
+  function GetAngle(const a, b, c: TPointD): double; overload;
 
   function RotatePath(const path: TArrayOfPointD;
     const focalPoint: TPointD; angleRads: double): TArrayOfPointD;
@@ -158,7 +164,9 @@ type
   function Distance(const pt1, pt2: TPointD): double; overload;
   {$IFDEF INLINE} inline; {$ENDIF}
 
-  function PointInPaths(const pt: TPointD;
+  function PointInPolygon(const pt: TPointD;
+    const path: TArrayOfPointD; fillRule: TFillRule): Boolean;
+  function PointInPolgons(const pt: TPointD;
     const paths: TArrayOfArrayOfPointD; fillRule: TFillRule): Boolean;
 
   function IsPointInEllipse(const ellipseRec: TRect; const pt: TPoint): Boolean;
@@ -617,8 +625,75 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function PointInPathsWindingCount(const pt: TPointD;
-  const paths: TArrayOfArrayOfPointD): integer;
+function PointInPolyWindingCount(const pt: TPointD;
+  const path: TArrayOfPointD; out PointOnEdgeDir: integer): integer;
+var
+  i, len: integer;
+  prevPt: TPointD;
+  isAbove: Boolean;
+  crossProd: double;
+begin
+  //nb: PointOnEdgeDir == 0 unless 'pt' is on 'path'
+  Result := 0;
+  PointOnEdgeDir := 0;
+  i := 0;
+  len := Length(path);
+  if len = 0 then Exit;
+  prevPt := path[len-1];
+  while (i < len) and (path[i].Y = prevPt.Y) do inc(i);
+  if i = len then Exit;
+  isAbove := (prevPt.Y < pt.Y);
+  while (i < len) do
+  begin
+    if isAbove then
+    begin
+      while (i < len) and (path[i].Y < pt.Y) do inc(i);
+      if i = len then break
+      else if i > 0 then prevPt := path[i -1];
+      crossProd := CrossProduct(prevPt, path[i], pt);
+      if crossProd = 0 then
+      begin
+        PointOnEdgeDir := -1;
+        //nb: could safely exit here with frNonZero or frEvenOdd fill rules
+      end
+      else if crossProd < 0 then dec(Result);
+    end else
+    begin
+      while (i < len) and (path[i].Y > pt.Y) do inc(i);
+      if i = len then break
+      else if i > 0 then prevPt := path[i -1];
+      crossProd := CrossProduct(prevPt, path[i], pt);
+      if crossProd = 0 then
+      begin
+        PointOnEdgeDir := 1;
+        //nb: could safely exit here with frNonZero or frEvenOdd fill rules
+      end
+      else if crossProd > 0 then inc(Result);
+    end;
+    inc(i);
+    isAbove := not isAbove;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function PointInPolygon(const pt: TPointD;
+  const path: TArrayOfPointD; fillRule: TFillRule): Boolean;
+var
+  wc: integer;
+  PointOnEdgeDir: integer;
+begin
+  wc := PointInPolyWindingCount(pt, path, PointOnEdgeDir);
+  case fillRule of
+    frEvenOdd: result := (PointOnEdgeDir <> 0)  or Odd(wc);
+    frNonZero: result := (PointOnEdgeDir <> 0)  or (wc <> 0);
+    frPositive: result := (PointOnEdgeDir + wc > 0);
+    else {frNegative} result := (PointOnEdgeDir + wc < 0);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function PointInPolysWindingCount(const pt: TPointD;
+  const paths: TArrayOfArrayOfPointD; out PointOnEdgeDir: integer): integer;
 var
   i,j, len: integer;
   p: TArrayOfPointD;
@@ -626,8 +701,9 @@ var
   isAbove: Boolean;
   crossProd: double;
 begin
-  //nb: returns MaxInt ((2^32)-1) when pt is on a line
+  //nb: PointOnEdgeDir == 0 unless 'pt' is on 'path'
   Result := 0;
+  PointOnEdgeDir := 0;
   for i := 0 to High(paths) do
   begin
     j := 0;
@@ -646,11 +722,7 @@ begin
         if j = len then break
         else if j > 0 then prevPt := p[j -1];
         crossProd := CrossProduct(prevPt, p[j], pt);
-        if crossProd = 0 then
-        begin
-          result := MaxInt;
-          Exit;
-        end
+        if crossProd = 0 then PointOnEdgeDir := -1
         else if crossProd < 0 then dec(Result);
       end else
       begin
@@ -658,11 +730,7 @@ begin
         if j = len then break
         else if j > 0 then prevPt := p[j -1];
         crossProd := CrossProduct(prevPt, p[j], pt);
-        if crossProd = 0 then
-        begin
-          result := MaxInt;
-          Exit;
-        end
+        if crossProd = 0 then PointOnEdgeDir := 1
         else if crossProd > 0 then inc(Result);
       end;
       inc(j);
@@ -672,18 +740,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function PointInPaths(const pt: TPointD;
+function PointInPolgons(const pt: TPointD;
   const paths: TArrayOfArrayOfPointD; fillRule: TFillRule): Boolean;
 var
   wc: integer;
+  PointOnEdgeDir: integer;
 begin
-  wc := PointInPathsWindingCount(pt, paths);
+  wc := PointInPolysWindingCount(pt, paths, PointOnEdgeDir);
   case fillRule of
-    frEvenOdd: result := Odd(wc);
-    frNonZero: result := (wc <> 0);
-    //when 'pt' is on a path and fill rule is either frPositive or frNegative,
-    //then quite a lot more work is needed to safely determine the result.
-    else result := false;
+    frEvenOdd: result := (PointOnEdgeDir <> 0) or Odd(wc);
+    frNonZero: result := (PointOnEdgeDir <> 0) or (wc <> 0);
+    frPositive: result := (PointOnEdgeDir + wc > 0);
+    else {frNegative} result := (PointOnEdgeDir + wc < 0);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -963,6 +1031,89 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
+
+function GetAngle(const pt, origin: TPoint): double;
+var
+  x,y: double;
+begin
+  x := pt.X - origin.X;
+  y := pt.Y - origin.Y;
+  if x = 0 then
+  begin
+    if y > 0 then result := angle270
+    else result := angle90;
+  end else
+  begin
+    result := arctan2(-y, x);
+    if result < 0 then result := result + angle360;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function GetAngle(const pt, origin: TPointD): double;
+var
+  x,y: double;
+begin
+  x := pt.X - origin.X;
+  y := pt.Y - origin.Y;
+  if x = 0 then
+  begin
+    if y > 0 then result := angle270
+    else result := angle90;
+  end else
+  begin
+    result := arctan2(-y, x);
+    if result < 0 then result := result + angle360;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function GetAngle(const a, b, c: TPoint): double;
+var
+  ab,bc: TPointD;
+  dotProd, abSqr, bcSqr, cosSqr, cos2, alpha2: single;
+begin
+  //http://stackoverflow.com/questions/3486172/angle-between-3-points/3487062
+  ab.X := b.X - a.X;
+  ab.Y := b.Y - a.Y;
+  bc.X := b.X - c.X;
+  bc.Y := b.Y - c.Y;
+  dotProd := ab.X * bc.X + ab.Y * bc.Y;
+  abSqr := ab.x * ab.x + ab.y * ab.y;
+  bcSqr := bc.x * bc.x + bc.y * bc.y;
+  cosSqr := dotProd * dotProd / abSqr / bcSqr;
+  cos2 := 2 * cosSqr - 1;
+  if (cos2 <= -1) then alpha2 := pi
+  else if (cos2 >= 1) then alpha2 := 0
+  else alpha2 := arccos(cos2);
+  result := alpha2 / 2;
+  if (dotProd < 0) then result := pi - result;
+  if (ab.x * bc.y - ab.y * bc.x) < 0 then result := -result;
+end;
+//---------------------------------------------------------------------------
+
+function GetAngle(const a, b, c: TPointD): double;
+var
+  ab,bc: TPointD;
+  dotProd, abSqr, bcSqr, cosSqr, cos2, alpha2: single;
+begin
+  ab.X := b.X - a.X;
+  ab.Y := b.Y - a.Y;
+  bc.X := b.X - c.X;
+  bc.Y := b.Y - c.Y;
+  dotProd := ab.X * bc.X + ab.Y * bc.Y;
+  abSqr := ab.x * ab.x + ab.y * ab.y;
+  bcSqr := bc.x * bc.x + bc.y * bc.y;
+  cosSqr := dotProd * dotProd / abSqr / bcSqr;
+  cos2 := 2 * cosSqr - 1;
+  if (cos2 <= -1) then alpha2 := pi
+  else if (cos2 >= 1) then alpha2 := 0
+  else alpha2 := arccos(cos2);
+  result := alpha2 / 2;
+  if (dotProd < 0) then result := pi - result;
+  if (ab.x * bc.y - ab.y * bc.x) < 0 then result := -result;
+end;
+//---------------------------------------------------------------------------
 
 function GrowOpenLine(const line: TArrayOfPointD; width: double;
   joinStyle: TJoinStyle; endStyle: TEndStyle;
@@ -1590,7 +1741,7 @@ end;
 
 function QBezier(const pts: TArrayOfPointD): TArrayOfPointD;
 begin
-  if Length(pts) <> 3 then
+  if Length(pts) < 3 then
     raise Exception.Create(rsInvalidQBezier);
   result := QBezier(pts[0], pts[1], pts[2]);
 end;
@@ -1643,7 +1794,7 @@ end;
 
 function CBezier(const pts: TArrayOfPointD): TArrayOfPointD;
 begin
-  if Length(pts) <> 4 then
+  if Length(pts) < 4 then
     raise Exception.Create(rsInvalidCBezier);
   result := CBezier(pts[0], pts[1], pts[2], pts[3]);
 end;

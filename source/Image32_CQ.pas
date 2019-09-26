@@ -27,7 +27,7 @@ procedure ApplyPalette(image: TImage32; const palette: array of TColor32;
 function CreateLogPalette(const palColors: TArrayOfColor32): TMaxLogPalette;
 
 //DrawPalette: Useful for debugging
-//procedure DrawPalette(image: TImage32; const palette: array of TColor32);
+procedure DrawPalette(image: TImage32; const palette: array of TColor32);
 
 const
 
@@ -209,7 +209,7 @@ begin
     argb.R := TotalR div Count;
     argb.G := TotalG div Count;
     argb.B := TotalB div Count;
-    argb.R := 255;
+    argb.A := 255;
   end;
 end;
 

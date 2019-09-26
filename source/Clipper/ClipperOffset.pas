@@ -492,6 +492,7 @@ begin
     //the lowermost polygon must be an outer polygon. So we can use that as the
     //designated orientation for outer polygons (needed for tidy-up clipping)
     lowestIdx := GetLowestPolygonIdx;
+    if lowestIdx < 0 then Exit;
     negate := (Area(FPathsIn[lowestIdx]) < 0);
     //if polygon orientations are reversed, then 'negate' ...
     if negate then FDelta := FDelta;

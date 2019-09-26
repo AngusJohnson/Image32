@@ -135,11 +135,7 @@ begin
   end else
   begin
     inc(imgIndex);
-    if (imgIndex = masterImageList.Count -1) then
-    begin
-      reversing := true;
-      //Windows.Beep(850,120); //synchronous, so keep it short!
-    end;
+    if (imgIndex = masterImageList.Count -1) then reversing := true;
   end;
 end;
 //------------------------------------------------------------------------------

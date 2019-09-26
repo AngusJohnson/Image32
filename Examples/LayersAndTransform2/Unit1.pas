@@ -81,7 +81,7 @@ begin
   Panel1.BitmapProperties.Scale := 1;
 
   //SETUP THE LAYERED IMAGE
-  DefaultButtonSize := DPI(8);
+  DefaultButtonSize := DPI(10);
   fMargin := DPI(50);
 
   layeredImage32 := TLayeredImage32.Create; //will size later

@@ -113,7 +113,7 @@ begin
   //nb: we don't need to worry about BackgroundColor as we're
   //going to add a hatched image for the background instead.
 
-  layer := layeredImage32.AddNewLayer(TNonClickableDesignLayer32, 'hatched background');
+  layer := layeredImage32.AddNewLayer(TDesignerLayer32, 'hatched background');
   layer.SetSize(layeredImage32.Width, layeredImage32.Height);
   HatchBackground(layer.Image, $FFF0F0F0, clWhite32);
 
@@ -219,7 +219,8 @@ end;
 procedure TForm1.AddButtons(layer: TLayer32);
 begin
   activeLayer := layer;
-  CreateSizingBtnsGroup(activeLayer, ssEdgesAndCorners, clBlue32, DPI(8), []);
+  CreateSizingBtnsGroup(activeLayer,
+    ssEdgesAndCorners, clBlue32, DefaultButtonSize, []);
   activeLayer.CursorId := crSizeAll;
 end;
 //------------------------------------------------------------------------------

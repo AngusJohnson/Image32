@@ -785,7 +785,6 @@ var
   end;
 
 begin
-
   fDstRect := ClientRect;
   if TabStop and Focused then
     Canvas.Brush.Color := fFocusedColor else

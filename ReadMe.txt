@@ -1,8 +1,8 @@
 
-Image32 is a compact 2D graphics library written in Delphi Pascal. It provides an extensive range of image manipulation functions. It also includes a polygon renderer for line and polygon drawing. The renderer supports a range of brush filling options including tiled images, and linear and radial gradient fills.
+Image32 is a 2D graphics library written in Delphi Pascal. It provides an extensive range of image manipulation functions. It also includes a polygon renderer for line and polygon drawing. The renderer supports a range of brush filling options including tiled images, and linear and radial gradient fills.
 
-Version: 1.23
-Uploaded: 16 September 2019
+Version: 1.24
+Uploaded: 26 September 2019
 Freeware for both open source and commercial applications released under 
 Boost Software License - see https://www.boost.org/LICENSE_1_0.txt
 Copyright © 2019 Angus Johnson
@@ -11,6 +11,19 @@ http://www.angusj.com/delphi/image32.php
 
 
 Recent changes:
+
+Version: 1.24
+  Added TMixedPath class in new Image32_MixedPath unit
+  Added LayersAndMixedPaths example.
+  Added InflateOpenPath and InflateOpenPaths function in Image32_Clipper
+  Added GetAngle functions in Image32_Vector
+  Renamed PointInPaths function to PointInPolygons in Image32_Vector
+  Updated THitTestLayer32 in Image32_Layers
+  Modified DrawCSplineDesign and DrawQSplineDesign methods in TDesignerLayer32
+  Modified CreateSizingBtnsGroup function in Image32_Layers
+  Modified CreateButtonGroup function in Image32_Layers
+  Renamed TLayeredImage32.CountLayersInGroup to TLayeredImage32.GroupCount
+  Fixed bug in CreatePalette in Image32_CQ (introduced in ver. 1.23)
 
 Version: 1.23
   Added InflatePolygon function in Image32_Clipper

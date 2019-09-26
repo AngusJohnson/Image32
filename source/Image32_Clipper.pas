@@ -23,8 +23,17 @@ function InflatePolygons(const polygons: TArrayOfArrayOfPointD;
   delta: Double; joinStyle: TJoinStyle = jsAuto;
   miterLimit: double = 2.0): TArrayOfArrayOfPointD;
 
+function InflateOpenPath(const path: TArrayOfPointD;
+  delta: Double; joinStyle: TJoinStyle = jsAuto; endStyle: TEndStyle = esSquare;
+  miterLimit: double = 2.0): TArrayOfArrayOfPointD;
+function InflateOpenPaths(const paths: TArrayOfArrayOfPointD;
+  delta: Double; joinStyle: TJoinStyle = jsAuto; endStyle: TEndStyle = esSquare;
+  miterLimit: double = 2.0): TArrayOfArrayOfPointD;
+
 function UnionPolygon(const polygon: TArrayOfPointD;
   fillRule: TFillRule): TArrayOfArrayOfPointD;
+function UnionPolygons(const polygons: TArrayOfArrayOfPointD;
+  fillRule: TFillRule): TArrayOfArrayOfPointD; overload;
 function UnionPolygons(const polygon1, polygon2: TArrayOfPointD;
   fillRule: TFillRule): TArrayOfArrayOfPointD; overload;
 function UnionPolygons(const polygons1, polygons2: TArrayOfArrayOfPointD;
@@ -69,12 +78,60 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function InflateOpenPath(const path: TArrayOfPointD;
+  delta: Double; joinStyle: TJoinStyle; endStyle: TEndStyle;
+  miterLimit: double): TArrayOfArrayOfPointD;
+var
+  paths: TArrayOfArrayOfPointD;
+begin
+  setLength(paths, 1);
+  paths[0] := path;
+  Result := InflateOpenPaths(paths, delta, joinStyle, endStyle, miterLimit);
+end;
+//------------------------------------------------------------------------------
+
+function InflateOpenPaths(const paths: TArrayOfArrayOfPointD;
+  delta: Double; joinStyle: TJoinStyle; endStyle: TEndStyle;
+  miterLimit: double): TArrayOfArrayOfPointD;
+var
+  jt: ClipperOffset.TJoinType;
+  et: TEndType;
+begin
+  case joinStyle of
+    jsSquare: jt := jtSquare;
+    jsMiter: jt :=  jtMiter;
+    else jt := jtRound;
+  end;
+  case endStyle of
+    esButt: et := etOpenButt;
+    esSquare: et := etOpenSquare;
+    else et := etOpenRound;
+  end;
+  Result := TArrayOfArrayOfPointD(ClipperOffset.ClipperOffsetPaths(
+    ClipperCore.TPathsD(paths), delta, jt, et, miterLimit));
+end;
+//------------------------------------------------------------------------------
+
 function UnionPolygon(const polygon: TArrayOfPointD;
   fillRule: TFillRule): TArrayOfArrayOfPointD;
 begin
   with TClipperD.Create do
   try
     AddPath(ClipperCore.TPathD(polygon));
+    Execute(ctUnion,
+      ClipperCore.TFillRule(fillRule), ClipperCore.TPathsD(result));
+  finally
+    Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function UnionPolygons(const polygons: TArrayOfArrayOfPointD;
+  fillRule: TFillRule): TArrayOfArrayOfPointD;
+begin
+  with TClipperD.Create do
+  try
+    AddPaths(ClipperCore.TPathsD(polygons));
     Execute(ctUnion,
       ClipperCore.TFillRule(fillRule), ClipperCore.TPathsD(result));
   finally

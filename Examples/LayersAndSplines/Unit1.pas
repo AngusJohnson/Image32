@@ -213,7 +213,7 @@ begin
   //create an array of points using the midpoint of each button layer
   if layeredImage32.TopLayer is TButtonDesignerLayer32 then
   begin
-    cnt := layeredImage32.CountLayersInGroup(1);
+    cnt := layeredImage32.GroupCount(1);
     setLength(Result, cnt);
     i := layeredImage32.GetIdxFirstLayerInGroup(1);
     for j := 0 to cnt -1 do
@@ -265,7 +265,7 @@ begin
     //no designer buttons so just clear the design layer
     layeredImage32.TopLayer.Image.Clear;
   end
-  else if layeredImage32.CountLayersInGroup(1) > 2 then
+  else if layeredImage32.GroupCount(1) > 2 then
   begin
     path := ButtonsToPath;
     designLayer.Image.Clear;
@@ -305,7 +305,7 @@ var
   path: TArrayOfPointD;
 begin
   if not (layeredImage32.TopLayer is TButtonDesignerLayer32) or
-    (layeredImage32.CountLayersInGroup(1) < 3) then Exit;
+    (layeredImage32.GroupCount(1) < 3) then Exit;
   //Close Path creates a polygon, End Path finishes an open path (line)
   path := ButtonsToPath;
   layeredImage32.DeleteGroup(1);
@@ -325,7 +325,7 @@ var
   path: TArrayOfPointD;
 begin
   if not (layeredImage32.TopLayer is TButtonDesignerLayer32) or
-    (layeredImage32.CountLayersInGroup(1) < 3) then Exit;
+    (layeredImage32.GroupCount(1) < 3) then Exit;
 
   //Close Path creates a polygon, End Path finishes an open path (line)
   path := ButtonsToPath;
