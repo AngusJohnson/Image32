@@ -1,8 +1,8 @@
 
 Image32 is a 2D graphics library written in Delphi Pascal. It provides an extensive range of image manipulation functions. It also includes a polygon renderer for line and polygon drawing. The renderer supports a range of brush filling options including tiled images, and linear and radial gradient fills.
 
-Version: 1.24
-Uploaded: 26 September 2019
+Version: 1.25
+Uploaded: 6 October 2019
 Freeware for both open source and commercial applications released under 
 Boost Software License - see https://www.boost.org/LICENSE_1_0.txt
 Copyright © 2019 Angus Johnson
@@ -12,6 +12,34 @@ http://www.angusj.com/delphi/image32.php
 
 Recent changes:
 
+Version: 1.25
+  Changes in Image32_Layers
+    Renamed TLayer32.GroupIndex property to TLayer32.GroupId
+    Renamed TLayer32.GetIdxFirstLayerInGroup to GeFirstInGroupIdx
+    Renamed TLayer32.GetIdxLastLayerInGroup to GetLastInGroupIdx
+    Added TLayer32.IndexInGroup property
+    Merged THitTestLayer32 into TLayer32 class
+    Added TDesignerLayer32.DrawLine method
+    Added StartButtonGroup function
+    Modified AddToButtonGroup function
+  Changes in Image32_MixedPath
+    Fixed minor bug in TMixedPath.FlattenPath
+    Changed TMixedPath.Points property 
+    Added TMixedPath.PointTypes property
+    Changed TPointType to TMixedType (as there's now also a TSmoothType)
+    Added TSmoothPath class to Image32_MixedPath unit
+    Added a LayersAndSmoothPaths example
+    Added TMixedPathLayer32 & TSmoothPathLayer32 classes
+    Added DrawMixedPathDesigner & DrawSmoothPathDesigner functions
+  Changes in Image32_Vector  
+    Fixed bug in ShortenPath function
+    Added RotatePoint function
+    Added GetDefaultArrowHeadSize function
+    Amended GetAngle function
+  Changes in Image32_Text  
+    Added GetTextAlongPathOutine function
+  Minor bugfix to BitmapPanels
+  
 Version: 1.24
   Added TMixedPath class in new Image32_MixedPath unit
   Added LayersAndMixedPaths example.

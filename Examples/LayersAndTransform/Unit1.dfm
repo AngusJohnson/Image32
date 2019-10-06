@@ -1,9 +1,9 @@
 object Form1: TForm1
-  Left = 0
-  Top = 0
+  Left = 618
+  Top = 336
+  Width = 386
+  Height = 448
   Caption = 'Image32 - Layer and Transform example'
-  ClientHeight = 390
-  ClientWidth = 370
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -26,8 +26,6 @@ object Form1: TForm1
     OnMouseDown = Panel1MouseDown
     OnMouseMove = Panel1MouseMove
     OnMouseUp = Panel1MouseUp
-    ExplicitWidth = 458
-    ExplicitHeight = 395
   end
   object StatusBar1: TStatusBar
     Left = 0
@@ -41,8 +39,6 @@ object Form1: TForm1
       '  Right click where you want to add the next spline control poin' +
       't'
     UseSystemFont = False
-    ExplicitTop = 395
-    ExplicitWidth = 458
   end
   object MainMenu1: TMainMenu
     Left = 112

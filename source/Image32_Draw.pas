@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.18                                                            *
-* Date      :  18 August 2019                                                  *
+* Version   :  1.25                                                            *
+* Date      :  6 October 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -498,9 +498,9 @@ begin
   begin
     inc(j, psl.count);
     //nb: 1. GetMem is faster than a dynamic array as it's not initialized
-    //    2. psl.fragments is zero initialized by SetLength()
+    //    2. (j + 1) below prevents a very rare AV.
     if j > 0 then
-      GetMem(psl.fragments, j * SizeOf(TFragment));
+      GetMem(psl.fragments, (j +1) * SizeOf(TFragment));
     psl.count := 0;
     psl.minX := clipRight;
     psl.maxX := 0;
@@ -776,7 +776,12 @@ begin
   maxH := RectHeight(clipRec2);
   SetLength(scanlines, maxH +1);
   SetLength(windingAccum, maxW +2);
+  try
   AllocateScanlines(paths2, scanlines, maxH, maxW-1);
+    except
+      beep(0,0);
+      Exit;
+    end;
   InitializeScanlines(paths2, scanlines, clipRec2);
   SetLength(byteBuffer, RectWidth(clipRec2));
 

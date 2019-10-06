@@ -2,8 +2,8 @@ unit BitmapPanels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.06                                                            *
-* Date      :  10 September 2019                                               *
+* Version   :  1.07                                                            *
+* Date      :  2 October 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
@@ -537,16 +537,18 @@ var
   rec: TRect;
 begin
   inherited;
-  if fBmp.Empty or not fBitmapProperties.fZoomScrollEnabled or
-    (fScaleType = stStretched) then Exit;
-
-  fMouseDown := true;
-  rec := GetInnerClientRect;
-  if (X > rec.Right) then
-    fMouseDownOverBevelV := true
-  else if (Y > rec.Bottom) then
-    fMouseDownOverBevelH := true;
-  fMousePos := Point(X, Y);
+  if not fBmp.Empty and
+    fBitmapProperties.fZoomScrollEnabled and
+    (fScaleType <> stStretched) then
+  begin
+    fMouseDown := true;
+    rec := GetInnerClientRect;
+    if (X > rec.Right) then
+      fMouseDownOverBevelV := true
+    else if (Y > rec.Bottom) then
+      fMouseDownOverBevelH := true;
+    fMousePos := Point(X, Y);
+  end;
   if TabStop and not Focused and CanFocus then
   begin
     SetFocus;

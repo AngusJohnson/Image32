@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.18                                                            *
-* Date      :  18 August 2019                                                  *
+* Version   :  1.25                                                            *
+* Date      :  6 October 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -15,10 +15,10 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Windows, Math, {$IFDEF INLINE} Types, {$ENDIF} Image32;
+  SysUtils, Classes, Windows, Math, Types, Image32;
 
 type
-  TArrowStyle = (asSimple, asFancy, asDiamond, asCircle);
+  TArrowStyle = (asNone, asSimple, asFancy, asDiamond, asCircle, asTail);
   TJoinStyle  = (jsAuto, jsSquare, jsMiter, jsRound);
   TEndStyle   = (esClosed, esButt, esSquare, esRound);
   TPathEnd    = (peStart, peEnd, peBothEnds);
@@ -57,9 +57,11 @@ type
   function QSpline(const pts: TArrayOfPointD): TArrayOfPointD;
 
   //ArrowHead: The ctrlPt's only function is to control the angle of the arrow.
-  //Suggested size = lineWidth *3 + DPI(5)
   function ArrowHead(const arrowTip, ctrlPt: TPointD; size: double;
     arrowStyle: TArrowStyle): TArrayOfPointD;
+
+  function GetDefaultArrowHeadSize(lineWidth: double): double;
+
   function ShortenPath(const path: TArrayOfPointD;
     pathEnd: TPathEnd; amount: double): TArrayOfPointD;
 
@@ -98,13 +100,17 @@ type
     const extra: TArrayOfArrayOfPointD);
     {$IFDEF INLINE} inline; {$ENDIF} overload;
 
-  function GetAngle(const pt, origin: TPoint): double; overload;
-  function GetAngle(const pt, origin: TPointD): double; overload;
+  function GetAngle(const origin, pt: TPoint): double; overload;
+  function GetAngle(const origin, pt: TPointD): double; overload;
   function GetAngle(const a, b, c: TPoint): double; overload;
   function GetAngle(const a, b, c: TPointD): double; overload;
 
+  procedure RotatePoint(var pt: TPointD;
+    const focalPoint: TPointD; sinA, cosA: double);
   function RotatePath(const path: TArrayOfPointD;
-    const focalPoint: TPointD; angleRads: double): TArrayOfPointD;
+    const focalPoint: TPointD; angleRads: double): TArrayOfPointD; overload;
+  function RotatePath(const paths: TArrayOfArrayOfPointD;
+    const focalPoint: TPointD; angleRads: double): TArrayOfArrayOfPointD; overload;
 
   function MakePathI(const pts: array of integer): TArrayOfPointD; overload;
   function MakePathD(const pts: array of double): TArrayOfPointD; overload;
@@ -120,6 +126,9 @@ type
   procedure OffsetRect(var rec: TRectD; dx, dy: double); overload;
 
   function Point(const pt: TPointD): TPoint; overload;
+
+  function PointsEqual(const pt1, pt2: TPointD): Boolean; overload;
+  {$IFDEF INLINING} inline; {$ENDIF}
 
   function MidPoint(const rec: TRect): TPoint; overload;
   function MidPoint(const rec: TRectD): TPointD; overload;
@@ -166,7 +175,7 @@ type
 
   function PointInPolygon(const pt: TPointD;
     const path: TArrayOfPointD; fillRule: TFillRule): Boolean;
-  function PointInPolgons(const pt: TPointD;
+  function PointInPolygons(const pt: TPointD;
     const paths: TArrayOfArrayOfPointD; fillRule: TFillRule): Boolean;
 
   function IsPointInEllipse(const ellipseRec: TRect; const pt: TPoint): Boolean;
@@ -222,8 +231,8 @@ type
   TArray256Bytes = array[0..255] of byte;
 
 const
-  CBezierTolerance  = 0.25;
-  QBezierTolerance  = 0.25;
+  CBezierTolerance  = 0.5;
+  QBezierTolerance  = 0.5;
   BuffSize          = 128;
 
 //------------------------------------------------------------------------------
@@ -240,6 +249,12 @@ function Point(const pt: TPointD): TPoint;
 begin
   result.X := Round(pt.x);
   result.Y := Round(pt.y);
+end;
+//------------------------------------------------------------------------------
+
+function PointsEqual(const pt1, pt2: TPointD): Boolean;
+begin
+  result := (pt1.X = pt2.X) and (pt1.Y = pt2.Y);
 end;
 //------------------------------------------------------------------------------
 
@@ -740,7 +755,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function PointInPolgons(const pt: TPointD;
+function PointInPolygons(const pt: TPointD;
   const paths: TArrayOfArrayOfPointD; fillRule: TFillRule): Boolean;
 var
   wc: integer;
@@ -1002,26 +1017,25 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure RotatePt(var pt: TPointD; const center: TPointD; sinA, cosA: double);
+procedure RotatePoint(var pt: TPointD;
+  const focalPoint: TPointD; sinA, cosA: double);
 var
   tmpX, tmpY: double;
 begin
-  tmpX := pt.X-center.X;
-  tmpY := pt.Y-center.Y;
-  pt.X := tmpX * cosA - tmpY * sinA + center.X;
-  pt.Y := tmpX * sinA + tmpY * cosA + center.Y;
+  tmpX := pt.X-focalPoint.X;
+  tmpY := pt.Y-focalPoint.Y;
+  pt.X := tmpX * cosA - tmpY * sinA + focalPoint.X;
+  pt.Y := tmpX * sinA + tmpY * cosA + focalPoint.Y;
 end;
 //------------------------------------------------------------------------------
 
-function RotatePath(const path: TArrayOfPointD;
-  const focalPoint: TPointD; angleRads: double): TArrayOfPointD;
+function RotatePathInternal(const path: TArrayOfPointD;
+  const focalPoint: TPointD; sinA, cosA: extended): TArrayOfPointD;
 var
   i: integer;
   x,y: double;
-  sinA, cosA: extended;
 begin
   SetLength(Result, length(path));
-  Math.SinCos(angleRads, sinA, cosA);
   for i := 0 to high(path) do
   begin
     x := path[i].X - focalPoint.X;
@@ -1032,7 +1046,30 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetAngle(const pt, origin: TPoint): double;
+function RotatePath(const path: TArrayOfPointD;
+  const focalPoint: TPointD; angleRads: double): TArrayOfPointD;
+var
+  sinA, cosA: extended;
+begin
+  Math.SinCos(angleRads, sinA, cosA);
+  Result := RotatePathInternal(path, focalPoint, sinA, cosA);
+end;
+//------------------------------------------------------------------------------
+
+function RotatePath(const paths: TArrayOfArrayOfPointD;
+  const focalPoint: TPointD; angleRads: double): TArrayOfArrayOfPointD;
+var
+  i: integer;
+  sinA, cosA: extended;
+begin
+  Math.SinCos(angleRads, sinA, cosA);
+  SetLength(Result, length(paths));
+  for i := 0 to high(paths) do
+    Result[i] := RotatePathInternal(paths[i], focalPoint, sinA, cosA);
+end;
+//------------------------------------------------------------------------------
+
+function GetAngle(const origin, pt: TPoint): double;
 var
   x,y: double;
 begin
@@ -1050,7 +1087,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetAngle(const pt, origin: TPointD): double;
+function GetAngle(const origin, pt: TPointD): double;
 var
   x,y: double;
 begin
@@ -1452,92 +1489,127 @@ function ArrowHead(const arrowTip, ctrlPt: TPointD; size: double;
   arrowStyle: TArrowStyle): TArrayOfPointD;
 var
   unitVec, basePt: TPointD;
-  sDiv2: double;
+  sDiv40, sDiv50, sDiv60, sDiv120: double;
 begin
-  //controlPt: simply represents the direction of the line back from the tip
-  //See also ShortenPath()
-  sDiv2 := size * 0.5;
+  result := nil;
+  sDiv40 := size * 0.40;
+  sDiv50 := size * 0.50;
+  sDiv60 := size * 0.60;
+  sDiv120 := sDiv60 * 2;
   unitVec := GetUnitVector(ctrlPt, arrowTip);
+
   case arrowStyle of
+    asNone:
+      Exit;
     asSimple:
       begin
         setLength(result, 3);
         basePt := OffsetPoint(arrowTip, -unitVec.X * size, -unitVec.Y * size);
         result[0] := arrowTip;
-        result[1] := OffsetPoint(basePt, unitVec.Y * sDiv2, -unitVec.X * sDiv2);
-        result[2] := OffsetPoint(basePt, -unitVec.Y * sDiv2, unitVec.X * sDiv2);
+        result[1] := OffsetPoint(basePt, unitVec.Y * sDiv50, -unitVec.X * sDiv50);
+        result[2] := OffsetPoint(basePt, -unitVec.Y * sDiv50, unitVec.X * sDiv50);
       end;
     asFancy:
       begin
-        sDiv2 := sDiv2 * 0.75;
         setLength(result, 4);
         basePt := OffsetPoint(arrowTip,
-          - 1.33 * unitVec.X * size, - 1.33 * unitVec.Y * size);
-        result[0] := OffsetPoint(basePt, -unitVec.Y *sDiv2, unitVec.X *sDiv2);
+          -unitVec.X * sDiv120, -unitVec.Y * sDiv120);
+        result[0] := OffsetPoint(basePt, -unitVec.Y *sDiv50, unitVec.X *sDiv50);
         result[1] := OffsetPoint(arrowTip, -unitVec.X *size, -unitVec.Y *size);
-        result[2] := OffsetPoint(basePt, unitVec.Y *sDiv2, -unitVec.X *sDiv2);
+        result[2] := OffsetPoint(basePt, unitVec.Y *sDiv50, -unitVec.X *sDiv50);
         result[3] := arrowTip;
       end;
     asDiamond:
       begin
         setLength(result, 4);
-        basePt := OffsetPoint(arrowTip, -unitVec.X * sDiv2, -unitVec.Y * sDiv2);
-        sDiv2 := sDiv2 * 0.75;
+        basePt := OffsetPoint(arrowTip, -unitVec.X * sDiv60, -unitVec.Y * sDiv60);
         result[0] := arrowTip;
-        result[1] := OffsetPoint(basePt, unitVec.Y * sDiv2, -unitVec.X * sDiv2);
-        result[2] := OffsetPoint(arrowTip, -unitVec.X * size, -unitVec.Y * size);
-        result[3] := OffsetPoint(basePt, -unitVec.Y * sDiv2, unitVec.X * sDiv2);
+        result[1] := OffsetPoint(basePt, unitVec.Y * sDiv50, -unitVec.X * sDiv50);
+        result[2] := OffsetPoint(arrowTip, -unitVec.X * sDiv120, -unitVec.Y * sDiv120);
+        result[3] := OffsetPoint(basePt, -unitVec.Y * sDiv50, unitVec.X * sDiv50);
       end;
     asCircle:
       begin
-        basePt := OffsetPoint(arrowTip, -unitVec.X * sDiv2, -unitVec.Y * sDiv2);
+        basePt := OffsetPoint(arrowTip, -unitVec.X * sDiv50, -unitVec.Y * sDiv50);
         with Point(basePt) do
-          result := Ellipse(RectD(x - sDiv2, y - sDiv2, x + sDiv2, y + sDiv2));
+          result := Ellipse(RectD(x - sDiv50, y - sDiv50, x + sDiv50, y + sDiv50));
       end;
+    asTail:
+      begin
+        setLength(result, 6);
+        basePt := OffsetPoint(arrowTip, -unitVec.X * sDiv60, -unitVec.Y * sDiv60);
+        result[0] := OffsetPoint(arrowTip, unitVec.Y * sDiv40, -unitVec.X * sDiv40);
+        result[1] := OffsetPoint(basePt, unitVec.Y * sDiv40, -unitVec.X * sDiv40);
+        result[2] := OffsetPoint(arrowTip, -unitVec.X * sDiv120, -unitVec.Y * sDiv120);
+        result[3] := OffsetPoint(basePt, -unitVec.Y * sDiv40, unitVec.X * sDiv40);
+        result[4] := OffsetPoint(arrowTip, -unitVec.Y * sDiv40, unitVec.X * sDiv40);
+        result[5] := OffsetPoint(arrowTip, -unitVec.X * sDiv50, -unitVec.Y * sDiv50);
+      end;
+
   end;
+end;
+//------------------------------------------------------------------------------
+
+function GetDefaultArrowHeadSize(lineWidth: double): double;
+begin
+  Result := lineWidth *3 + 7;
 end;
 //------------------------------------------------------------------------------
 
 function ShortenPath(const path: TArrayOfPointD;
   pathEnd: TPathEnd; amount: double): TArrayOfPointD;
 var
-  len: double;
+  len, amount2: double;
   vec: TPointD;
-  highPath: integer;
+  i, highPath: integer;
 begin
   result := path;
   highPath := high(path);
   if highPath < 1 then Exit;
+  amount2 := amount;
+
   if pathEnd <> peEnd then
   begin
-    while (highPath > 1) do
+    //shorten start
+    i := 0;
+    while (i < highPath) do
     begin
-      len := Distance(path[0], path[1]);
+      len := Distance(result[i], result[i+1]);
       if (len >= amount) then Break;
       amount := amount - len;
-      //Delete(result, 0, 1);
-      Move(Result[1], Result[0], highPath * SizeOf(TPointD));
-      SetLength(Result, highPath);
-      dec(highPath);
+      inc(i);
     end;
-    vec := GetUnitVector(path[0], path[1]);
-    result[0].X := result[0].X + vec.X * amount;
-    result[0].Y := result[0].Y + vec.Y * amount;
+    if i > 0 then
+    begin
+      Move(path[i], Result[0], (highPath - i +1) * SizeOf(TPointD));
+      dec(highPath, i);
+      SetLength(Result, highPath +1);
+    end;
+    if amount > 0 then
+    begin
+      vec := GetUnitVector(result[0], result[1]);
+      result[0].X := result[0].X + vec.X * amount;
+      result[0].Y := result[0].Y + vec.Y * amount;
+    end;
   end;
+
   if pathEnd <> peStart then
   begin
+    //shorten end
     while (highPath > 1) do
     begin
-      len := Distance(path[highPath], path[highPath -1]);
-      if (len >= amount) then Break;
-      amount := amount - len;
-      //Delete(result, highPath, 1);
-      SetLength(Result, highPath);
+      len := Distance(result[highPath], result[highPath -1]);
+      if (len >= amount2) then Break;
+      amount2 := amount2 - len;
       dec(highPath);
     end;
-    vec := GetUnitVector(path[highPath], path[highPath -1]);
-    result[highPath].X := result[highPath].X + vec.X * amount;
-    result[highPath].Y := result[highPath].Y + vec.Y * amount;
+    SetLength(Result, highPath +1);
+    if amount2 > 0 then
+    begin
+      vec := GetUnitVector(result[highPath], result[highPath -1]);
+      result[highPath].X := result[highPath].X + vec.X * amount2;
+      result[highPath].Y := result[highPath].Y + vec.Y * amount2;
+    end;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1547,7 +1619,7 @@ function GetDashedPath(const path: TArrayOfPointD;
   patternOffset: PDouble): TArrayOfArrayOfPointD;
 var
   i, highI, paIdx: integer;
-  vecs: TArrayOfPointD;
+  vecs, path2: TArrayOfPointD;
   patCnt, patLen, resCapacity, resCount: integer;
   segLen, residualPat, patOff: double;
   filling: Boolean;
@@ -1569,9 +1641,20 @@ var
 begin
   paIdx := 0;
   patCnt := length(pattern);
-  highI := high(path);
+
+  path2 := path;
+  highI := high(path2);
   if (highI < 1) or (patCnt = 0) then Exit;
-  vecs := GetVectors(path);
+
+  if closed and
+    ((path2[highI].X <> path2[0].X) or (path2[highI].Y <> path2[0].Y)) then
+  begin
+    inc(highI);
+    setLength(path2, highI +2);
+    path2[highI] := path2[0];
+  end;
+
+  vecs := GetVectors(path2);
   if (vecs[0].X = 0) and (vecs[0].Y = 0) then Exit; //not a line
 
   if not assigned(patternOffset) then
@@ -1597,16 +1680,16 @@ begin
   end;
   residualPat := pattern[paIdx] - patOff;
 
-  pt := path[0];
+  pt := path2[0];
   i := 0;
   while (i < highI) do
   begin
-    segLen := Distance(pt, path[i+1]);
+    segLen := Distance(pt, path2[i+1]);
     if residualPat > segLen then
     begin
-      if filling then AddDash(pt, path[i+1]);
+      if filling then AddDash(pt, path2[i+1]);
       residualPat := residualPat - segLen;
-      pt := path[i+1];
+      pt := path2[i+1];
       inc(i);
     end else
     begin
@@ -1619,26 +1702,6 @@ begin
       pt := pt2;
     end;
   end;
-
-  if Closed then
-    while true do
-    begin
-      segLen := Distance(pt, path[0]);
-      if residualPat >= segLen then
-      begin
-        if filling then AddDash(pt, path[0]);
-        break;
-      end else
-      begin
-        pt2.X := pt.X + vecs[highI].X * residualPat;
-        pt2.Y := pt.Y + vecs[highI].Y * residualPat;
-        if filling then AddDash(pt, pt2);
-        filling := not filling;
-        paIdx := (paIdx + 1) mod patCnt;
-        residualPat := pattern[paIdx];
-        pt := pt2;
-      end;
-    end;
   SetLength(Result, resCount);
 
   if not assigned(patternOffset) then Exit;
@@ -1787,7 +1850,12 @@ var
 begin
   resultLen := 0; resultCnt := 0;
   AddPoint(pt1);
-  DoCurve(pt1, pt2, pt3);
+  if ((pt1.X = pt2.X) and (pt1.Y = pt2.Y)) or
+    ((pt2.X = pt3.X) and (pt2.Y = pt3.Y)) then
+  begin
+    AddPoint(pt3)
+  end else
+    DoCurve(pt1, pt2, pt3);
   SetLength(result, resultCnt);
 end;
 //------------------------------------------------------------------------------
@@ -1850,7 +1918,12 @@ begin
   result := nil;
   resultLen := 0; resultCnt := 0;
   AddPoint(pt1);
-  DoCurve(pt1, pt2, pt3, pt4);
+  if (pt1.X = pt2.X) and (pt1.Y = pt2.Y) and
+    (pt3.X = pt4.X) and (pt3.Y = pt4.Y) then
+  begin
+    AddPoint(pt4)
+  end else
+    DoCurve(pt1, pt2, pt3, pt4);
   SetLength(result,resultCnt);
 end;
 //------------------------------------------------------------------------------

@@ -1,9 +1,9 @@
 object Form1: TForm1
-  Left = 0
-  Top = 0
+  Left = 594
+  Top = 418
+  Width = 419
+  Height = 472
   Caption = 'Image32 - Layers example'
-  ClientHeight = 414
-  ClientWidth = 403
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -27,7 +27,6 @@ object Form1: TForm1
     OnMouseDown = Panel1MouseDown
     OnMouseMove = Panel1MouseMove
     OnMouseUp = Panel1MouseUp
-    ExplicitWidth = 458
   end
   object StatusBar1: TStatusBar
     Left = 0
@@ -39,7 +38,6 @@ object Form1: TForm1
     SimplePanel = True
     SimpleText = ' Right-click to add additional objects'
     UseSystemFont = False
-    ExplicitWidth = 458
   end
   object MainMenu1: TMainMenu
     Left = 112

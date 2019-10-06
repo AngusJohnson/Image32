@@ -6,7 +6,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
   Types, Menus, ExtCtrls, ComCtrls, Image32, Image32_Layers, BitmapPanels,
-  Vcl.Dialogs;
+  Dialogs;
 
 type
   TForm1 = class(TForm)
@@ -126,6 +126,8 @@ begin
   layer.image.Assign(image);
   layer.PositionCenteredAt(Point(layeredImage32.MidPoint));
 
+  DefaultButtonSize := DPI(8);
+
   //DISPLAY WHAT'S ON SHOW
   PaintLayeredImage;
 end;
@@ -139,7 +141,7 @@ var
 begin
   image := TImage32.Create(192,192);
   rec := image.Bounds;
-  InflateRect(rec, -10, -10);
+  Windows.InflateRect(rec, -10, -10);
   path := Rectangle(rec);
   DrawPolygon(image, path, frNonZero, $AA00FFFF);
   DrawLine(image, path, 5, clNavy32, esClosed);
@@ -154,18 +156,23 @@ function TForm1.AddEllipse(const pt: TPoint): TLayer32;
 var
   image: TImage32;
   rec: TRect;
-  path: TArrayOfPointD;
+  paths: TArrayOfArrayOfPointD;
 begin
   image := TImage32.Create(256,192);
   rec := image.Bounds;
-  InflateRect(rec, -10, -10);
-  path := Ellipse(rec);
-  DrawPolygon(image, path, frNonZero, $AAFFFF00);
-  DrawLine(image, path, 5, clMaroon32, esClosed);
+  Windows.InflateRect(rec, -10, -10);
+  SetLength(paths, 1);
+  paths[0] := Ellipse(rec);
+  DrawPolygon(image, paths, frNonZero, $AAFFFF00);
+  DrawLine(image, paths, 5, clMaroon32, esClosed);
   masterImageList.Add(image);
+  //since this is a non-rectangular region, use THitTestLayer32
   Result := layeredImage32.AddNewLayer('ellipse');
   Result.image.Assign(image);
   Result.PositionCenteredAt(pt);
+  //since this is an ellipse, define and assign the hit-test region
+  paths := OffsetPath(paths, Result.Left, Result.Top);
+  Result.HitTestRegions := paths;
 end;
 //------------------------------------------------------------------------------
 
@@ -191,7 +198,10 @@ var
   dc: HDC;
 begin
   //copy the merged layeredImage32 to Panel1 (+/- designer layers)
-  Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  //nb: some very old Delphi compilers don't support TBitmap.SetSize
+  //Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  Panel1.Bitmap.Width := layeredImage32.Width;
+  Panel1.Bitmap.Height := layeredImage32.Height;
   //Panel1.ClearBitmap;
   dc := Panel1.Bitmap.Canvas.Handle;
   layeredImage32.GetMergedImage(mnuHideControls.Checked).CopyToDc(dc,0,0,false);
@@ -210,8 +220,7 @@ procedure TForm1.DeleteButtons;
 begin
   if not assigned(activeLayer) then Exit;
   with layeredImage32 do
-    DeleteGroup(TopLayer.GroupIndex);
-  activeLayer.CursorId := crDefault;
+    DeleteGroup(TopLayer.GroupId);
   activeLayer := nil;
 end;
 //------------------------------------------------------------------------------
@@ -221,7 +230,6 @@ begin
   activeLayer := layer;
   CreateSizingBtnsGroup(activeLayer,
     ssEdgesAndCorners, clBlue32, DefaultButtonSize, []);
-  activeLayer.CursorId := crSizeAll;
 end;
 //------------------------------------------------------------------------------
 
@@ -326,7 +334,7 @@ end;
 
 procedure TForm1.mnuSaveClick(Sender: TObject);
 begin
-  if SaveDialog1.Execute(handle) then
+  if SaveDialog1.Execute then
     layeredImage32.GetMergedImage(true).SaveToFile(SaveDialog1.FileName);
 end;
 //------------------------------------------------------------------------------
@@ -374,7 +382,7 @@ procedure TForm1.mnuDeleteLayerClick(Sender: TObject);
 begin
   if not assigned(activeLayer) then Exit;
   masterImageList.Delete(activeLayer.Index);
-  with layeredImage32 do DeleteGroup(TopLayer.GroupIndex);
+  with layeredImage32 do DeleteGroup(TopLayer.GroupId);
   layeredImage32.DeleteLayer(activeLayer.Index);
   activeLayer := nil;
   PaintLayeredImage;

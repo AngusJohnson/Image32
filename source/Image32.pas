@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.22                                                            *
-* Date      :  10 September 2019                                               *
+* Version   :  1.25                                                            *
+* Date      :  6 October 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -352,7 +352,7 @@ type
 const
   angle180 = Pi;
   angle0  = 0;
-  angle360 = 0;
+  angle360 = angle180 *2;
   angle15  = Pi /12;
   angle30  = angle15 *2;
   angle45  = angle15 *3;

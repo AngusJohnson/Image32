@@ -2,8 +2,8 @@ unit Image32_Text;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.17                                                            *
-* Date      :  11 August 2019                                                  *
+* Version   :  1.25                                                            *
+* Date      :  6 October 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module to support text in the Image32 library                   *
@@ -123,6 +123,11 @@ type
     fontInfo: TFontInfo = nil; textAlign: TTextAlign = taLeft; textColor:
     TColor32 = clBlack32; opaqueBkColor: TColor32 = clNone32;
     justifySpc: double = 0): TPointD;
+
+  function GetTextAlongPathOutine(image: TImage32;
+    const text: string; const path: TArrayOfPointD; fontInfo: TFontInfo;
+    textAlign: TTextAlign; vertOffset: integer = 0;
+    charSpacing: double = 0): TArrayOfArrayOfPointD;
 
   function DrawWrappedText(image: TImage32; const rec: TRect;
     const text: string; fontInfo: TFontInfo;
@@ -764,6 +769,98 @@ begin
     image.CopyFrom(tmpImg, tmpImg.Bounds, rec, BlendToOpaque);
   finally
     tmpImg.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+type
+  TPathInfo = record
+    pt     : TPointD;
+    vector : TPointD;
+    angle  : Double;
+    dist   : double;
+  end;
+  TPathInfos = array of TPathInfo;
+
+function GetTextAlongPathOutine(image: TImage32;
+  const text: string; const path: TArrayOfPointD; fontInfo: TFontInfo;
+  textAlign: TTextAlign; vertOffset: integer = 0;
+  charSpacing: double = 0): TArrayOfArrayOfPointD;
+var
+  i,j, textLen, pathLen: integer;
+  left, center, center2, dist, dx: double;
+  glyph: TGlyphInfo;
+  pathInfo: TPathInfo;
+  pathInfos: TPathInfos;
+  pt, rotatePt: TPointD;
+  tmpPaths: TArrayOfArrayOfPointD;
+const
+  TwoPi = Pi * 2;
+
+  function GetPathInfo(offset: double): integer;
+  begin
+    Result := 0;
+    while Result < pathLen - 2 do
+    begin
+      if pathInfos[Result+1].dist > offset then break;
+      inc(Result);
+    end;
+    if pathInfos[Result].angle >= 0 then Exit;
+    //initialize the remaining fields (ie other then 'dist')
+    pathInfos[Result].angle  := -GetAngle(path[Result], path[Result+1]);
+    pathInfos[Result].vector := GetUnitVector(path[Result], path[Result+1]);
+    pathInfos[Result].pt     := path[Result];
+  end;
+
+  function GetTextWidth: double;
+  var
+    i: integer;
+  begin
+    result := -charSpacing;
+    for i := 1 to textLen do
+      Result := Result +
+        fontInfo.GetGlyphInfo(text[i]).gm.gmCellIncX + charSpacing;
+  end;
+
+begin
+  Result := nil;
+  pathLen := Length(path);
+  textLen := Length(text);
+  setLength(pathInfos, pathLen);
+  if (pathLen < 2) or (textLen = 0) then Exit;
+
+  dist := 0;
+  for i:= 0 to pathLen -2 do
+  begin
+    pathInfos[i].angle := -1; //flags fields other than dist as uninitialized
+    pathInfos[i].dist := dist;
+    dist := dist + Distance(path[i], path[i+1]);
+  end;
+  pathInfos[pathLen -1].dist := dist;
+
+  case textAlign of
+    taCenter: Left := (dist - GetTextWidth) * 0.5;
+    taRight : Left := dist - GetTextWidth;
+    else      Left := 0;
+  end;
+
+  Result := nil;
+  for i := 1 to textLen do
+  begin
+    glyph := fontInfo.GetGlyphInfo(text[i]);
+    center := glyph.bounds.Width * 0.5;
+    center2 := left + center;
+    j := GetPathInfo(center2);
+    pathInfo := pathInfos[j];
+    rotatePt := PointD(center, -vertOffset);
+    tmpPaths := RotatePath(glyph.paths, rotatePt, pathInfo.angle);
+    dx := center2 - pathInfo.dist;
+    pt.X := pathInfo.pt.X + pathInfo.vector.X * dx - rotatePt.X;
+    pt.Y := pathInfo.pt.Y + pathInfo.vector.Y * dx - rotatePt.Y;
+
+    tmpPaths := OffsetPath(tmpPaths, pt.X, pt.Y);
+    AppendPath(Result, tmpPaths);
+    left := left + glyph.gm.gmCellIncX + charSpacing;
   end;
 end;
 //------------------------------------------------------------------------------

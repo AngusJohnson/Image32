@@ -1,8 +1,8 @@
 object FrmMain: TFrmMain
-  Left = 0
-  Top = 0
+  Left = 524
+  Top = 346
   Caption = 'Image32 - Layers & MixedPaths'
-  ClientHeight = 414
+  ClientHeight = 413
   ClientWidth = 458
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -20,7 +20,7 @@ object FrmMain: TFrmMain
     Left = 0
     Top = 41
     Width = 458
-    Height = 347
+    Height = 346
     Align = alClient
     PopupMenu = PopupMenu1
     TabOrder = 0
@@ -31,7 +31,7 @@ object FrmMain: TFrmMain
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 388
+    Top = 387
     Width = 458
     Height = 26
     Panels = <>
@@ -87,7 +87,6 @@ object FrmMain: TFrmMain
       Top = 10
       Width = 32
       Height = 22
-      NumbersOnly = True
       TabOrder = 1
       Text = '5'
       OnChange = edWidthChange

@@ -5,8 +5,8 @@ interface
 //nb: Add Image32's Library folder to the project's search path
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
-  Types, Menus, ExtCtrls, ComCtrls, Image32, Image32_Layers, BitmapPanels,
-  Vcl.Dialogs, Image32_MixedPath, Vcl.StdCtrls;
+  Types, Menus, ExtCtrls, StdCtrls, ComCtrls,
+  BitmapPanels, Image32, Image32_Layers, Image32_MixedPath;
 
 const
   UM_REPAINT = WM_USER +1;
@@ -67,26 +67,17 @@ type
     moveType      : TMoveType;
     clickedLayer  : TLayer32;
     designLayer   : TLayer32;
-    currPointType : TPointType;
+    currPointType : TMixedType;
+    //buttonPath: represents the button path that's being constructed
     buttonPath    : TMixedPath;
+    //btnPathRegion: hit-test region for (unfinished) button path
     btnPathRegion : TArrayOfArrayOfPointD;
-    procedure UpdateButtonPath;
-    function PointOnPath(const pt: TPoint): Boolean;
+    procedure UpdateButtonPathFromButtons;
+    function PointOnButtonPath(const pt: TPoint): Boolean;
     procedure RepaintPanel;
     procedure UMREPAINT(var message: TMessage); message UM_REPAINT;
   public
     { Public declarations }
-  end;
-
-  //TMixedPathLayer32: Base class for TLineLayer32 and TPolygonLayer32
-  TMixedPathLayer32 = class(THitTestLayer32)
-  protected
-    fMixedPath: TMixedPath;
-  public
-    constructor Create(owner: TLayeredImage32); override;
-    destructor Destroy; override;
-    procedure Offset(dx, dy: integer); override;
-    property MixedPath: TMixedPath read fMixedPath;
   end;
 
   TLineLayer32 = class(TMixedPathLayer32)
@@ -119,44 +110,11 @@ var
   lineWidth: integer = 5;
 
 type
+
   TExButtonDesignerLayer32 = class(TButtonDesignerLayer32)
   public
-    PointType: TPointType;
+    PointType: TMixedType;
   end;
-
-//------------------------------------------------------------------------------
-// TMixedPathLayer32
-//------------------------------------------------------------------------------
-
-constructor TMixedPathLayer32.Create(owner: TLayeredImage32);
-begin
-  inherited;
-  fMixedPath := TMixedPath.Create;
-end;
-//------------------------------------------------------------------------------
-
-destructor TMixedPathLayer32.Destroy;
-begin
- fMixedPath.Free;
- inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMixedPathLayer32.Offset(dx, dy: integer);
-var
-  i: integer;
-  cp: TCtrlPoint;
-begin
-  inherited Offset(dx, dy);
-  //when the layer is offset, offset fMixedPath control points too
-  for i := 0 to fMixedPath.Count -1 do
-  begin
-    cp := fMixedPath[i];
-    cp.X := cp.X + dx;
-    cp.Y := cp.Y + dy;
-    fMixedPath[i] := cp;
-  end;
-end;
 
 //------------------------------------------------------------------------------
 // TLineLayer32
@@ -167,16 +125,16 @@ var
   rec: TRect;
   flattened: TArrayOfPointD;
 begin
-  //calculate and assign hit test regions
   flattened := mixedPath.FlattenedPath;
-  self.HitTestRegions := InflateOpenPath(OpenPathToFlatPolygon(flattened),
+  //calculate and assign hit test regions
+  HitTestRegions := InflateOpenPath(OpenPathToFlatPolygon(flattened),
     lineWidth + hitTestWidth);
-
-  fMixedPath.Assign(mixedPath);
-
-  //draw flattened line
   rec := GetBounds(HitTestRegions);
   self.SetBounds(rec);
+
+  self.MixedPath.Assign(mixedPath);
+
+  //draw flattened open path
   Image.Clear;
   flattened := OffsetPath(flattened, -Left, -Top);
   DrawLine(Image, flattened, lineWidth, clNavy32, esRound);
@@ -192,17 +150,18 @@ var
   rec: TRect;
   flattened: TArrayOfPointD;
 begin
-  //calculate and assign hit test regions
   flattened := mixedPath.FlattenedPath;
-  //nb: UnionPolygon fixes up any self-intersections
-  self.HitTestRegions := UnionPolygon(flattened, frEvenOdd);
+
+  //calculate and assign hit test regions
+  //nb: UnionPolygon here fixes up any potential self-intersections
+  HitTestRegions := UnionPolygon(flattened, frEvenOdd);
   HitTestRegions := InflatePolygons(HitTestRegions, lineWidth + hitTestWidth);
-
-  fMixedPath.Assign(mixedPath);
-
-  //draw polygon
   rec := GetBounds(HitTestRegions);
   self.SetBounds(rec);
+
+  self.MixedPath.Assign(mixedPath);
+
+  //draw polygon
   flattened := OffsetPath(flattened, -Left, -Top);
   Image.Clear;
   DrawPolygon(Image, flattened, frNonZero, $88FFFF66);
@@ -234,7 +193,7 @@ begin
   layeredImage32 := TLayeredImage32.Create(RectWidth(rec), RectHeight(rec));
   layeredImage32.BackgroundColor := clWhite32;
 
-  //hatched image layer is TDesignerLayer32 so it's non-clickable
+  //hatched image layer is TDesignerLayer32 so it's 'non-clickable'
   layer := layeredImage32.AddNewLayer(TDesignerLayer32, 'hatched background');
   layer.SetSize(layeredImage32.Width, layeredImage32.Height);
   HatchBackground(layer.Image, $FFF0F0F0, clWhite32);
@@ -258,7 +217,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TFrmMain.UpdateButtonPath;
+procedure TFrmMain.UpdateButtonPathFromButtons;
 var
   i, fig,lig: integer;
 begin
@@ -266,8 +225,8 @@ begin
   //create an array of points using the midpoint of each button layer
   if layeredImage32.GroupCount(1) > 0 then
   begin
-    fig := layeredImage32.GetIdxFirstLayerInGroup(1);
-    lig := layeredImage32.GetIdxLastLayerInGroup(1);
+    fig := layeredImage32.GetFirstInGroupIdx(1);
+    lig := layeredImage32.GetLastInGroupIdx(1);
     for i := fig to lig do
       with TExButtonDesignerLayer32(layeredImage32[i]) do
         buttonPath.Add(MidPoint, PointType);
@@ -279,9 +238,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFrmMain.PointOnPath(const pt: TPoint): Boolean;
+function TFrmMain.PointOnButtonPath(const pt: TPoint): Boolean;
 begin
-  result := PointInPolgons(PointD(pt), btnPathRegion, frEvenOdd);
+  result := PointInPolygons(PointD(pt), btnPathRegion, frEvenOdd);
 end;
 //------------------------------------------------------------------------------
 
@@ -292,8 +251,8 @@ begin
   if not (layeredImage32.TopLayer is TButtonDesignerLayer32) then Exit;
 
   //layers must be ungrouped before individual layers can be deleted
-  fig := layeredImage32.GetIdxFirstLayerInGroup(1);
-  lig := layeredImage32.GetIdxLastLayerInGroup(1);
+  fig := layeredImage32.GetFirstInGroupIdx(1);
+  lig := layeredImage32.GetLastInGroupIdx(1);
   layeredImage32.UnGroup(1);
   layeredImage32.DeleteLayer(lig);
   if lig > fig then
@@ -303,35 +262,33 @@ begin
       Integer(TExButtonDesignerLayer32(layeredImage32.TopLayer).PointType);
   end;
 
-  UpdateButtonPath;
+  UpdateButtonPathFromButtons;
   RepaintPanel;
 end;
 //------------------------------------------------------------------------------
 
 procedure TFrmMain.mnuDeleteAllButtonControlsClick(Sender: TObject);
 begin
-  if layeredImage32.TopLayer.GroupIndex <> 1 then Exit;
+  if layeredImage32.TopLayer.GroupId <> 1 then Exit;
   layeredImage32.DeleteGroup(1);
-  UpdateButtonPath;
+  UpdateButtonPathFromButtons;
   RepaintPanel;
 end;
 //------------------------------------------------------------------------------
 
 procedure TFrmMain.cbTypesChange(Sender: TObject);
 begin
-  currPointType := TPointType(cbTypes.ItemIndex);
+  currPointType := TMixedType(cbTypes.ItemIndex);
 end;
 //------------------------------------------------------------------------------
 
 procedure TFrmMain.RepaintPanel;
 var
   dc: HDC;
-  i,j,k, d, len, cnt: integer;
+  d: integer;
   rec: TRect;
-  pointType: TPointType;
-  pts, pts2: TArrayOfPointD;
   dl: TDesignerLayer32;
-  isStartOfPath: Boolean;
+  dashes: TArrayOfInteger;
 begin
   dl := TDesignerLayer32(designLayer);
   dl.Image.Clear;
@@ -340,7 +297,7 @@ begin
 
   if (layeredImage32.TopLayer is TButtonDesignerLayer32) then
   begin
-    if layeredImage32.TopLayer.GroupIndex = 2 then //ie is rotating
+    if layeredImage32.TopLayer.GroupId = 2 then //ie is rotating
     begin
       DrawButton(dl.Image, PointD(rotatePoint), DefaultButtonSize, clMaroon32);
       d := Round(Distance(Point(layeredImage32.TopLayer.MidPoint), rotatePoint));
@@ -351,64 +308,26 @@ begin
     //flattened buttons path
     if layeredImage32.GroupCount(1) > 1 then
       DrawLine(dl.Image, buttonPath.FlattenedPath, lineWidth, clBlack32, esRound);
-
-    //display control lines and virtual buttons for spline segments
-    cnt := buttonPath.Count;
-    i := 1;
-    while i < cnt do
-    begin
-      j := i + 1;
-      isStartOfPath := i = 1;
-      pointType := buttonPath[i].PointType;
-      while (j < cnt) and (buttonPath[j].PointType = pointType) do inc(j);
-      if not isStartOfPath and (pointType in [ptCSpline,ptQSpline]) then dec(i);
-      len := j-i +1;
-      setLength(pts, len);
-      for k := 0 to len -1 do pts[k] := buttonPath[i - 1 + k].Point;
-
-      case pointType of
-        ptCBezier:
-          while Length(pts) >= 4 do
-          begin
-            pts2 := Copy(pts, 0, 4);
-            dl.DrawCSplineDesign(pts2);
-            Delete(pts, 0, 3);
-          end;
-        ptQBezier:
-          while Length(pts) >= 3 do
-          begin
-            pts2 := Copy(pts, 0, 3);
-            dl.DrawQSplineDesign(pts2);
-            Delete(pts, 0, 2);
-          end;
-        ptCSpline:
-          begin
-            if len < 4 then break;
-            dl.DrawCSplineDesign(pts, isStartOfPath);
-          end;
-        ptQSpline:
-          begin
-            if len < 3 then break;
-            dl.DrawQSplineDesign(pts, isStartOfPath);
-          end;
-      end;
-      i := j;
-    end;
+    DrawMixedPathDesigner(buttonPath, dl);
   end;
 
+  setLength(dashes, 2);
+  dashes[0] := 5; dashes[1] := 5;
   //display dashed hit-test outline for selected layer
   if Assigned(clickedLayer) and (moveType = mtLayer) then
   begin
     if (clickedLayer is TLineLayer32) then
       DrawDashedLine(dl.Image, TLineLayer32(clickedLayer).HitTestRegions,
-        [5,5], nil, 1, clRed32, esClosed)
+        dashes, nil, 1, clRed32, esClosed)
     else if (clickedLayer is TPolygonLayer32) then
       DrawDashedLine(dl.Image, TPolygonLayer32(clickedLayer).HitTestRegions,
-        [5,5], nil, 1, clRed32, esClosed);
+        dashes, nil, 1, clRed32, esClosed);
   end;
 
   //merge layeredImage32 onto pnlMain
-  pnlMain.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  //pnlMain.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  pnlMain.Bitmap.Width := layeredImage32.Width;
+  pnlMain.Bitmap.Height := layeredImage32.Height;
   dc := pnlMain.Bitmap.Canvas.Handle;
   layeredImage32.GetMergedImage(mnuHideControls.Checked).CopyToDc(dc,0,0,false);
   pnlMain.Refresh;
@@ -426,6 +345,9 @@ var
   polygonLayer: TPolygonLayer32;
   lineLayer: TLineLayer32;
 begin
+  //just in case rotating ...
+  if layeredImage32.GroupCount(2) > 0 then layeredImage32.DeleteGroup(2);
+
   if not cbTypes.Enabled or
     not (layeredImage32.TopLayer is TButtonDesignerLayer32) then Exit;
 
@@ -470,17 +392,17 @@ begin
     clGreen32, DPI(9), [], TExButtonDesignerLayer32);
 
   //update PointType for each button layer
-  fig := layeredImage32.GetIdxFirstLayerInGroup(1);
-  lig := layeredImage32.GetIdxLastLayerInGroup(1);
+  fig := layeredImage32.GetFirstInGroupIdx(1);
+  lig := layeredImage32.GetLastInGroupIdx(1);
   for i := fig to lig do
     TExButtonDesignerLayer32(layeredImage32[i]).PointType :=
-      TMixedPathLayer32(clickedLayer).MixedPath[i - fig].PointType;
+      TMixedPathLayer32(clickedLayer).MixedPath.PointTypes[i - fig];
 
   //delete the selected layer now we have the edit buttons
   layeredImage32.DeleteLayer(clickedLayer.Index);
   clickedLayer := nil;
 
-  UpdateButtonPath;
+  UpdateButtonPathFromButtons;
   RepaintPanel;
 end;
 //------------------------------------------------------------------------------
@@ -496,7 +418,7 @@ begin
   rotatePoint := MidPoint(rec);
   i := (RectWidth(rec) + RectHeight(rec)) div 4;
   pt := PointD(rotatePoint.X,rotatePoint.Y - i);
-  CreateButtonGroup(layeredImage32, [pt], clRed32,
+  StartButtonGroup(layeredImage32, Point(pt), clRed32,
     DPI(9), [], TButtonDesignerLayer32);
   layeredImage32.TopLayer.CursorId := crRotate;
   RepaintPanel;
@@ -507,12 +429,12 @@ procedure TFrmMain.pnlMainDblClick(Sender: TObject);
 begin
   //adding a button - either starting a button group or adding to it
   if not (layeredImage32.TopLayer is TButtonDesignerLayer32) then
-    CreateButtonGroup(layeredImage32, [PointD(clickPoint)],
+    StartButtonGroup(layeredImage32, clickPoint,
       clGreen32, DPI(9), [], TExButtonDesignerLayer32)
   else
     AddToButtonGroup(layeredImage32, 1, clickPoint);
   TExButtonDesignerLayer32(layeredImage32.TopLayer).PointType := currPointType;
-  UpdateButtonPath;
+  UpdateButtonPathFromButtons;
   PostMessage(handle, UM_REPAINT, 0,0);
 end;
 //------------------------------------------------------------------------------
@@ -535,16 +457,16 @@ begin
   pnlMain.BitmapProperties.ZoomAndScrollEnabled := not Assigned(clickedLayer);
 
   with layeredImage32 do
-    if (TopLayer.GroupIndex = 2) and (TopLayer <> clickedLayer) then
+    if (TopLayer.GroupId = 2) and (TopLayer <> clickedLayer) then
       DeleteGroup(2);
 
   if Assigned(clickedLayer) and (clickedLayer is TButtonDesignerLayer32) then
   begin
-    if clickedLayer.GroupIndex = 2 then
+    if clickedLayer.GroupId = 2 then
       moveType := mtRotateButton else
       moveType := mtOneButton
   end
-  else if PointOnPath(pt) then
+  else if PointOnButtonPath(pt) then
     moveType := mtAllButtons
   else if Assigned(clickedLayer) then
     moveType := mtLayer; //ie a completed layer (line or polygon)
@@ -557,7 +479,6 @@ procedure TFrmMain.pnlMainMouseMove(Sender: TObject; Shift: TShiftState; X,
 var
   i, dx,dy, fig, lig: integer;
   pt: TPoint;
-  path: TArrayOfPointD;
   layer: TLayer32;
   angle: double;
 begin
@@ -570,7 +491,7 @@ begin
     layer := layeredImage32.GetLayerAt(pt);
     if Assigned(layer) and (layer is TButtonDesignerLayer32) then
       pnlMain.Cursor := layer.CursorId
-    else if PointOnPath(pt) then
+    else if PointOnButtonPath(pt) then
       pnlMain.Cursor := crSizeAll
     else if Assigned(layer) then
       pnlMain.Cursor := layer.CursorId
@@ -589,16 +510,17 @@ begin
   if moveType = mtRotateButton then
   begin
     angle := GetAngle(clickPoint, rotatePoint, pt);
-    path := RotatePath(buttonPath.CtrlPoints, PointD(rotatePoint), angle);
-    fig := layeredImage32.GetIdxFirstLayerInGroup(1);
-    lig := layeredImage32.GetIdxLastLayerInGroup(1);
+    buttonPath.Rotate(PointD(rotatePoint), angle);
+    //path := RotatePath(buttonPath.CtrlPoints, PointD(rotatePoint), angle);
+    fig := layeredImage32.GetFirstInGroupIdx(1);
+    lig := layeredImage32.GetLastInGroupIdx(1);
     for i := fig to lig do
-      layeredImage32[i].PositionCenteredAt(path[i-fig]);
+      layeredImage32[i].PositionCenteredAt(buttonPath[i-fig]);
   end;
 
   clickPoint := pt;
   if moveType in [mtAllButtons, mtOneButton, mtRotateButton] then
-    UpdateButtonPath;
+    UpdateButtonPathFromButtons;
   PostMessage(handle, UM_REPAINT, 0,0);
 end;
 //------------------------------------------------------------------------------

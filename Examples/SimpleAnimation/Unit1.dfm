@@ -1,9 +1,9 @@
 object Form1: TForm1
-  Left = 0
-  Top = 0
+  Left = 514
+  Top = 310
+  Width = 340
+  Height = 503
   Caption = 'Image32: Simple animation'
-  ClientHeight = 445
-  ClientWidth = 324
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -33,6 +33,7 @@ object Form1: TForm1
     Panels = <>
     ParentFont = True
     SimplePanel = True
+    SimpleText = ' Double click to slow animation'
     UseSystemFont = False
   end
   object MainMenu1: TMainMenu

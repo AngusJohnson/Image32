@@ -6,7 +6,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
   Types, Menus, ExtCtrls, ComCtrls, Image32, Image32_Layers, BitmapPanels,
-  Vcl.Dialogs;
+  Dialogs;
 
 type
   TForm1 = class(TForm)
@@ -98,7 +98,7 @@ begin
   //Layer 2: for the visible transformed image
   layer := layeredImage32.AddNewLayer('transformed');
   layer.Image.Assign(layeredImage32[1].Image);
-  layer.PositionAt(Point(fMargin, fMargin));
+  layer.PositionAt(Types.Point(fMargin, fMargin));
 
   //Layers 3 -7: create and position control buttons
   fButtonPts := Rectangle(layeredImage32[2].Bounds); //lt, rt, rb, lb
@@ -117,8 +117,7 @@ end;
 
 procedure TForm1.UpdateLayeredImage(transform: Boolean);
 var
-  i,w,h: integer;
-  path: TArrayOfPointD;
+  w,h: integer;
   rec: TRect;
 begin
   if transform then
@@ -141,7 +140,9 @@ begin
     end;
 
   //copy the merged layeredImage32 to Panel1
-  Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  //Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  Panel1.Bitmap.Width := layeredImage32.Width;
+  Panel1.Bitmap.Height := layeredImage32.Height;
   layeredImage32.GetMergedImage(false).CopyToDc(Panel1.Bitmap.Canvas.Handle);
   Panel1.Refresh;
   ButtonPointsToStatusbar;
@@ -172,7 +173,6 @@ end;
 procedure TForm1.Panel1MouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
-  len: integer;
   pt: TPoint;
   layer: TLayer32;
 begin
@@ -261,13 +261,13 @@ end;
 
 procedure TForm1.mnuOpenClick(Sender: TObject);
 begin
-  if OpenDialog1.Execute(handle) then
+  if OpenDialog1.Execute then
   begin
     //reload the master image
     layeredImage32[1].Image.LoadFromFile(OpenDialog1.FileName);
     //copy the master image to the 'transform' layer and position it
     layeredImage32[2].Image.Assign(layeredImage32[1].Image);
-    layeredImage32[2].PositionAt(Point(fMargin, fMargin));
+    layeredImage32[2].PositionAt(Types.Point(fMargin, fMargin));
     fButtonPts := Rectangle(layeredImage32[2].Bounds);
     UpdateButtonLayers;
     UpdateLayeredImage(true);
@@ -277,7 +277,7 @@ end;
 
 procedure TForm1.mnuSaveClick(Sender: TObject);
 begin
-  if SaveDialog1.Execute(handle) then
+  if SaveDialog1.Execute then
     layeredImage32[2].Image.SaveToFile(SaveDialog1.FileName);
 end;
 //------------------------------------------------------------------------------

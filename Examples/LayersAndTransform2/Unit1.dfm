@@ -1,9 +1,9 @@
 object Form1: TForm1
   Left = 0
   Top = 0
+  Width = 398
+  Height = 434
   Caption = 'Image32 - Layer and Transform #2'
-  ClientHeight = 376
-  ClientWidth = 382
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -26,8 +26,6 @@ object Form1: TForm1
     OnMouseDown = Panel1MouseDown
     OnMouseMove = Panel1MouseMove
     OnMouseUp = Panel1MouseUp
-    ExplicitWidth = 458
-    ExplicitHeight = 395
   end
   object StatusBar1: TStatusBar
     Left = 0
@@ -38,8 +36,6 @@ object Form1: TForm1
     ParentFont = True
     SimplePanel = True
     UseSystemFont = False
-    ExplicitTop = 395
-    ExplicitWidth = 458
   end
   object MainMenu1: TMainMenu
     Left = 112

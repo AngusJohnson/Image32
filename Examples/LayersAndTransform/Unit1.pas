@@ -6,7 +6,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
   Types, Menus, ExtCtrls, ComCtrls, Image32, Image32_Layers, BitmapPanels,
-  Vcl.Dialogs;
+  Dialogs;
 
 type
   TForm1 = class(TForm)
@@ -157,7 +157,7 @@ begin
       if mnuShowControls.Checked then
       begin
         path := QSpline(fSplinePts);
-        DrawLine(image, path, 1.5, clBlack32, esSquare);
+        Image32_Draw.DrawLine(image, path, 1.5, clBlack32, esSquare);
       end;
       DrawQSplineDesign(fSplinePts);
     end;
@@ -171,7 +171,9 @@ begin
   layeredImage32[2].Visible := not mnuShowControls.Checked;
 
   //copy the merged layeredImage32 to Panel1
-  Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  //Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  Panel1.Bitmap.Width := layeredImage32.Width;
+  Panel1.Bitmap.Height := layeredImage32.Height;
   layeredImage32.GetMergedImage(mnuShowImage.Checked).CopyToDc(Panel1.Bitmap.Canvas.Handle);
   Panel1.Refresh;
 end;
@@ -285,7 +287,7 @@ end;
 
 procedure TForm1.mnuOpenClick(Sender: TObject);
 begin
-  if OpenDialog1.Execute(handle) then
+  if OpenDialog1.Execute then
   begin
     layeredImage32[1].Image.LoadFromFile(OpenDialog1.FileName);
     ResetSplinePts;
@@ -296,7 +298,7 @@ end;
 
 procedure TForm1.mnuSaveClick(Sender: TObject);
 begin
-  if SaveDialog1.Execute(handle) then
+  if SaveDialog1.Execute then
     layeredImage32[2].Image.SaveToFile(SaveDialog1.FileName);
 end;
 //------------------------------------------------------------------------------

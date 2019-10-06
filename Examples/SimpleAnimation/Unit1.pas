@@ -62,7 +62,9 @@ begin
   Panel1.TabStop := true;
   Panel1.FocusedColor := clGradientInactiveCaption;
   Panel1.BitmapProperties.Scale := 1;
-  Panel1.Bitmap.SetSize(ImageSize, ImageSize + SpaceAbove);
+  //Panel1.Bitmap.SetSize(ImageSize, ImageSize + SpaceAbove);
+  Panel1.Bitmap.Width := ImageSize;
+  Panel1.Bitmap.Height := ImageSize + SpaceAbove;
 
   rec := Rect(0,0,ImageSize,ImageSize);
   Windows.InflateRect(rec, -15,-15);

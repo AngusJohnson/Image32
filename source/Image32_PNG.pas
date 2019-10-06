@@ -2,8 +2,8 @@ unit Image32_PNG;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.17                                                            *
-* Date      :  11 August 2019                                                  *
+* Version   :  1.25                                                            *
+* Date      :  6 October 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  PNG file format extension for TImage32                          *
@@ -15,8 +15,9 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Windows, Math, Image32, PngImage;
+  SysUtils, Classes, Windows, Math, Image32 {$IFDEF DELPHI_PNG}, PngImage{$ENDIF};
 
+{$IFDEF DELPHI_PNG}
 type
 
   TImageFormat_PNG = class(TImageFormat)
@@ -33,8 +34,10 @@ var
   CF_PNG: Cardinal = 0;     //Windows Clipboard
   CF_IMAGEPNG: Cardinal = 0;
 
+{$ENDIF}
 implementation
 
+{$IFDEF DELPHI_PNG}
 resourcestring
   s_cf_png_error      = 'TImage32 - PNG clipboard format error';
   s_cf_imagepng_error = 'TImage32 - image/png clipboard format error';
@@ -313,5 +316,6 @@ initialization
   TImage32.RegisterImageFormatClass('PNG', TImageFormat_PNG, cpHigh);
   CF_PNG     := RegisterClipboardFormat('PNG');
   CF_IMAGEPNG := RegisterClipboardFormat('image/png');
+{$ENDIF}
 
 end.

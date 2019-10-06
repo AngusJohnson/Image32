@@ -2,8 +2,8 @@ unit Image32_Clipper;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.17                                                            *
-* Date      :  11 August 2019                                                  *
+* Version   :  1.25                                                            *
+* Date      :  2 October 2019                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Wrapper module for the Clipper library                          *
@@ -99,8 +99,10 @@ var
 begin
   case joinStyle of
     jsSquare: jt := jtSquare;
-    jsMiter: jt :=  jtMiter;
-    else jt := jtRound;
+    jsMiter:  jt :=  jtMiter;
+    jsRound:  jt := jtRound;
+    else if endStyle = esRound then jt := jtRound
+    else jt := jtSquare;
   end;
   case endStyle of
     esButt: et := etOpenButt;
