@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.25                                                            *
-* Date      :  6 October 2019                                                  *
+* Version   :  1.26                                                            *
+* Date      :  14 October 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -91,8 +91,7 @@ type
     sx, sy: double): TArrayOfArrayOfPointD; overload;
   function ReversePath(const path: TArrayOfPointD): TArrayOfPointD;
   function OpenPathToFlatPolygon(const path: TArrayOfPointD): TArrayOfPointD;
-  procedure AddToPath(var path: TArrayOfPointD;
-    const extra: TArrayOfPointD);
+  function JoinPaths(const path1, path2: TArrayOfPointD):TArrayOfPointD;
   procedure AppendPath(var paths: TArrayOfArrayOfPointD;
     const extra: TArrayOfPointD);
     {$IFDEF INLINE} inline; {$ENDIF} overload;
@@ -146,6 +145,7 @@ type
   function MakeArrayOfDouble(const doubles: array of double): TArrayOfDouble;
 
   function CrossProduct(const pt1, pt2, pt3: TPointD): double;
+  function DotProduct(const pt1, pt2, pt3: TPointD): double;
   function TurnsLeft(const pt1, pt2, pt3: TPointD): boolean;
   {$IFDEF INLINING} inline; {$ENDIF}
   function TurnsRight(const pt1, pt2, pt3: TPointD): boolean;
@@ -174,9 +174,12 @@ type
   {$IFDEF INLINE} inline; {$ENDIF}
 
   function PointInPolygon(const pt: TPointD;
-    const path: TArrayOfPointD; fillRule: TFillRule): Boolean;
+    const polygon: TArrayOfPointD; fillRule: TFillRule): Boolean;
   function PointInPolygons(const pt: TPointD;
-    const paths: TArrayOfArrayOfPointD; fillRule: TFillRule): Boolean;
+    const polygons: TArrayOfArrayOfPointD; fillRule: TFillRule): Boolean;
+
+  function ClosestPointOnLine(const pt, linePt1, linePt2: TPointD): TPointD;
+  function ClosestPointOnSegment(const pt, segPt1, segPt2: TPointD): TPointD;
 
   function IsPointInEllipse(const ellipseRec: TRect; const pt: TPoint): Boolean;
 
@@ -360,6 +363,18 @@ begin
   x2 := pt3.X - pt2.X;
   y2 := pt3.Y - pt2.Y;
   result := (x1 * y2 - y1 * x2);
+end;
+//---------------------------------------------------------------------------
+
+function DotProduct(const pt1, pt2, pt3: TPointD): double;
+var
+  x1,x2,y1,y2: double;
+begin
+  x1 := pt2.X - pt1.X;
+  y1 := pt2.Y - pt1.Y;
+  x2 := pt2.X - pt3.X;
+  y2 := pt2.Y - pt3.Y;
+  result := (x1 * x2 + y1 * y2);
 end;
 //---------------------------------------------------------------------------
 
@@ -692,12 +707,12 @@ end;
 //------------------------------------------------------------------------------
 
 function PointInPolygon(const pt: TPointD;
-  const path: TArrayOfPointD; fillRule: TFillRule): Boolean;
+  const polygon: TArrayOfPointD; fillRule: TFillRule): Boolean;
 var
   wc: integer;
   PointOnEdgeDir: integer;
 begin
-  wc := PointInPolyWindingCount(pt, path, PointOnEdgeDir);
+  wc := PointInPolyWindingCount(pt, polygon, PointOnEdgeDir);
   case fillRule of
     frEvenOdd: result := (PointOnEdgeDir <> 0)  or Odd(wc);
     frNonZero: result := (PointOnEdgeDir <> 0)  or (wc <> 0);
@@ -756,18 +771,54 @@ end;
 //------------------------------------------------------------------------------
 
 function PointInPolygons(const pt: TPointD;
-  const paths: TArrayOfArrayOfPointD; fillRule: TFillRule): Boolean;
+  const polygons: TArrayOfArrayOfPointD; fillRule: TFillRule): Boolean;
 var
   wc: integer;
   PointOnEdgeDir: integer;
 begin
-  wc := PointInPolysWindingCount(pt, paths, PointOnEdgeDir);
+  wc := PointInPolysWindingCount(pt, polygons, PointOnEdgeDir);
   case fillRule of
     frEvenOdd: result := (PointOnEdgeDir <> 0) or Odd(wc);
     frNonZero: result := (PointOnEdgeDir <> 0) or (wc <> 0);
     frPositive: result := (PointOnEdgeDir + wc > 0);
     else {frNegative} result := (PointOnEdgeDir + wc < 0);
   end;
+end;
+//------------------------------------------------------------------------------
+
+//ClosestPoint: ClosestPointOnLine or ClosestPointOnSegment
+function ClosestPoint(const pt, linePt1, linePt2: TPointD;
+  constrainToSegment: Boolean): TPointD;
+var
+  q: double;
+begin
+  if (linePt1.X = linePt2.X) and (linePt1.Y = linePt2.Y) then
+  begin
+    Result := linePt1;
+  end else
+  begin
+    q := ((pt.X-linePt1.X)*(linePt2.X-linePt1.X) +
+      (pt.Y-linePt1.Y)*(linePt2.Y-linePt1.Y)) /
+      (sqr(linePt2.X-linePt1.X) + sqr(linePt2.Y-linePt1.Y));
+    if constrainToSegment then
+    begin
+      if q < 0 then q := 0 else if q > 1 then q := 1;
+    end;
+    Result.X := round((1-q)*linePt1.X + q*linePt2.X);
+    Result.Y := round((1-q)*linePt1.Y + q*linePt2.Y);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function ClosestPointOnLine(const pt, linePt1, linePt2: TPointD): TPointD;
+begin
+  result := ClosestPoint(pt, linePt1, linePt2, false);
+end;
+//------------------------------------------------------------------------------
+
+function ClosestPointOnSegment(const pt, segPt1, segPt2: TPointD): TPointD;
+begin
+  result := ClosestPoint(pt, segPt1, segPt2, true);
 end;
 //------------------------------------------------------------------------------
 
@@ -971,17 +1022,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure AddToPath(var path: TArrayOfPointD; const extra: TArrayOfPointD);
+function JoinPaths(const path1, path2: TArrayOfPointD):TArrayOfPointD;
 var
-  i, len1, len2: integer;
+  len1, len2: integer;
 begin
-  len1 := length(path);
-  len2 := length(extra);
+  len1 := length(path1);
+  len2 := length(path2);
+  if len1 > 0 then
+    Result := Copy(path1, 0, len1);
   if len2 > 0 then
   begin
-    setLength(path, len1 + len2);
-    for i := 0 to len2 -1 do
-      path[len1+i] := extra[i];
+    setLength(Result, len1 + len2);
+    Move(path2[0], Result[len1], len2 * SizeOf(TPointD));
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1141,6 +1193,11 @@ begin
   dotProd := ab.X * bc.X + ab.Y * bc.Y;
   abSqr := ab.x * ab.x + ab.y * ab.y;
   bcSqr := bc.x * bc.x + bc.y * bc.y;
+  if (abSqr = 0) or (bcSqr = 0) then
+  begin
+    Result := 0;
+    Exit;
+  end;
   cosSqr := dotProd * dotProd / abSqr / bcSqr;
   cos2 := 2 * cosSqr - 1;
   if (cos2 <= -1) then alpha2 := pi
@@ -1149,6 +1206,7 @@ begin
   result := alpha2 / 2;
   if (dotProd < 0) then result := pi - result;
   if (ab.x * bc.y - ab.y * bc.x) < 0 then result := -result;
+  //if Result < 0 then Result := -Result; //todo - recheck!!
 end;
 //---------------------------------------------------------------------------
 
@@ -1506,8 +1564,8 @@ begin
         setLength(result, 3);
         basePt := OffsetPoint(arrowTip, -unitVec.X * size, -unitVec.Y * size);
         result[0] := arrowTip;
-        result[1] := OffsetPoint(basePt, unitVec.Y * sDiv50, -unitVec.X * sDiv50);
-        result[2] := OffsetPoint(basePt, -unitVec.Y * sDiv50, unitVec.X * sDiv50);
+        result[1] := OffsetPoint(basePt, -unitVec.Y * sDiv50, unitVec.X * sDiv50);
+        result[2] := OffsetPoint(basePt, unitVec.Y * sDiv50, -unitVec.X * sDiv50);
       end;
     asFancy:
       begin
@@ -1524,9 +1582,9 @@ begin
         setLength(result, 4);
         basePt := OffsetPoint(arrowTip, -unitVec.X * sDiv60, -unitVec.Y * sDiv60);
         result[0] := arrowTip;
-        result[1] := OffsetPoint(basePt, unitVec.Y * sDiv50, -unitVec.X * sDiv50);
+        result[1] := OffsetPoint(basePt, -unitVec.Y * sDiv50, unitVec.X * sDiv50);
         result[2] := OffsetPoint(arrowTip, -unitVec.X * sDiv120, -unitVec.Y * sDiv120);
-        result[3] := OffsetPoint(basePt, -unitVec.Y * sDiv50, unitVec.X * sDiv50);
+        result[3] := OffsetPoint(basePt, unitVec.Y * sDiv50, -unitVec.X * sDiv50);
       end;
     asCircle:
       begin
@@ -1538,12 +1596,12 @@ begin
       begin
         setLength(result, 6);
         basePt := OffsetPoint(arrowTip, -unitVec.X * sDiv60, -unitVec.Y * sDiv60);
-        result[0] := OffsetPoint(arrowTip, unitVec.Y * sDiv40, -unitVec.X * sDiv40);
-        result[1] := OffsetPoint(basePt, unitVec.Y * sDiv40, -unitVec.X * sDiv40);
-        result[2] := OffsetPoint(arrowTip, -unitVec.X * sDiv120, -unitVec.Y * sDiv120);
-        result[3] := OffsetPoint(basePt, -unitVec.Y * sDiv40, unitVec.X * sDiv40);
-        result[4] := OffsetPoint(arrowTip, -unitVec.Y * sDiv40, unitVec.X * sDiv40);
-        result[5] := OffsetPoint(arrowTip, -unitVec.X * sDiv50, -unitVec.Y * sDiv50);
+        result[0] := OffsetPoint(arrowTip, -unitVec.X * sDiv50, -unitVec.Y * sDiv50);
+        result[1] := OffsetPoint(arrowTip, -unitVec.Y * sDiv40, unitVec.X * sDiv40);
+        result[2] := OffsetPoint(basePt, -unitVec.Y * sDiv40, unitVec.X * sDiv40);
+        result[3] := OffsetPoint(arrowTip, -unitVec.X * sDiv120, -unitVec.Y * sDiv120);
+        result[4] := OffsetPoint(basePt, unitVec.Y * sDiv40, -unitVec.X * sDiv40);
+        result[5] := OffsetPoint(arrowTip, unitVec.Y * sDiv40, -unitVec.X * sDiv40);
       end;
 
   end;

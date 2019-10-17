@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.25                                                            *
-* Date      :  6 October 2019                                                  *
+* Version   :  1.26                                                            *
+* Date      :  14 October 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -652,12 +652,20 @@ end;
 
 procedure TLayeredImage32.ReIndexFrom(start, stop: integer);
 var
-  i: integer;
+  i, lastGroupId: integer;
 begin
-  if stop < 0 then stop := Count -1
-  else stop := Min(stop, Count -1);
+  stop := Min(stop, Count -1);
+  lastGroupId := 0;
   for i := start to stop do
-    TLayer32(fList[i]).fIndex := i;
+    with Layer[i] do
+    begin
+      fIndex := i;
+      if (fGroupId > 0) and (lastGroupId <> fGroupId) then
+      begin
+        fGroupList[fGroupId -1] := Pointer(i); //ie first in group
+        lastGroupId := fGroupId;
+      end;
+    end;
 end;
 //------------------------------------------------------------------------------
 
@@ -667,7 +675,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure FracAlpha(image: TImage32; opacity: byte);
+procedure AdjustOpacity(image: TImage32; opacity: byte);
 var
   i: Integer;
   pb: PARGB;
@@ -712,7 +720,7 @@ begin
           //reduce layer opacity
           tmp := TImage32.Create(Image);
           try
-            FracAlpha(tmp, fOpacity);
+            AdjustOpacity(tmp, fOpacity);
             fMergedImage.CopyFrom(tmp, tmp.Bounds, Bounds, blendFunc);
           finally
             tmp.Free;
@@ -810,8 +818,6 @@ end;
 
 function TLayeredImage32.InsertNewLayer(layerClass: TLayer32Class;
   index: integer; const layerName: string = ''): TLayer32;
-var
-  i: integer;
 begin
   if (index < 0) or (index > Count) then
     raise Exception.Create(rsImageLayerRangeError);
@@ -826,14 +832,12 @@ begin
   Result := layerClass.Create(Self);
   Result.Name := layerName;
   fList.Insert(index, Result);
-  for i := index to Count -1 do Layer[i].fIndex := i;
+  ReIndexFrom(index, Count -1);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayeredImage32.DeleteLayer(index: integer);
-var
-  i: integer;
 begin
   if (index < 0) or (index >= Count) then
     raise Exception.Create(rsImageLayerRangeError);
@@ -841,14 +845,7 @@ begin
     raise Exception.Create(rsLayer32DeleteError);
   Layer[index].Free;
   fList.Delete(index);
-
-  //update indexes and group indexes
-  for i := index to Count -1 do
-    Layer[i].fIndex := i;
-  for i := 0 to fGroupList.Count -1 do
-    if integer(fGroupList[i]) > index then
-      fGroupList[i] := Pointer(Integer(fGroupList[i]) -1);
-
+  ReIndexFrom(index, Count -1);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -939,8 +936,8 @@ begin
   Result := GetFirstInGroupIdx(GroupId);
   if Result < 0 then Exit;
   topLevel := Count -1;
-  while (Result < topLevel) and (Layer[Result +1].fGroupId = GroupId) do
-    inc(Result);
+  while (Result < topLevel) and
+    (Layer[Result +1].fGroupId = GroupId) do inc(Result);
 end;
 //------------------------------------------------------------------------------
 
@@ -965,7 +962,7 @@ begin
   fig := GetFirstInGroupIdx(GroupId);
   if fig < 0 then Exit;
   lig := GetLastInGroupIdx(GroupId);
-  //nb: it almost never makes sense offseting design layers
+  //nb: it almost never makes sense offsetting design layers
   for i := fig to lig do
     if not (Layer[i] is TDesignerLayer32) then
       Layer[i].Offset(dx, dy);
@@ -1027,15 +1024,9 @@ begin
     Layer[i].Free;
     fList.Delete(i);
   end;
-  //update indexes
-  for i := fig to Count -1 do
-    Layer[i].fIndex := i;
-  for i := 0 to fGroupList.Count -1 do
-    if integer(fGroupList[i]) > lig then
-      fGroupList[i] := Pointer(Integer(fGroupList[i]) -1);
+  ReIndexFrom(fig, Count -1);
   //remove group from fGroupList
   fGroupList[GroupId -1] := pointer(-1);
-
   Invalidate;
 end;
 //------------------------------------------------------------------------------

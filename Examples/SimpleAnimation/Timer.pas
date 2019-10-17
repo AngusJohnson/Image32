@@ -135,8 +135,8 @@ begin
   Enabled := false;
 
   //nb: If this object is being destroyed on application shutdown while a
-  //thread is still executing, for example freeing TTimerEx in the main form's
-  //destructor, then signaling thread termination here (Enabled := false;)
+  //thread is still executing (eg. freeing TTimerEx in the main form's
+  //destructor), then signaling thread termination here (Enabled := false)
   //won't necessarily ensure termination before the OS cleans up. If it's
   //essential that the thread terminates normally (or if memory leak reporting
   //annoys) then call Application.ProcessMessages after this object is freed.

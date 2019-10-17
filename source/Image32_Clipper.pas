@@ -2,8 +2,8 @@ unit Image32_Clipper;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.25                                                            *
-* Date      :  2 October 2019                                                  *
+* Version   :  1.26                                                            *
+* Date      :  14 October 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Wrapper module for the Clipper library                          *
@@ -16,6 +16,8 @@ uses
   ClipperCore, Clipper, ClipperOffset,
   Image32, Image32_Draw, Image32_Vector;
 
+//nb: InflatePolygons assumes that there's consistent winding where
+//outer paths wind in one direction and inner paths in the other
 function InflatePolygon(const polygon: TArrayOfPointD;
   delta: Double; joinStyle: TJoinStyle = jsAuto;
   miterLimit: double = 2.0): TArrayOfArrayOfPointD;

@@ -199,7 +199,7 @@ var
   openPaths: Boolean;
 begin
   openPaths := not (FEndType in [etPolygon, etOpenJoined]);
-  if openPaths then minLen := 1 else minLen := 3;
+  if openPaths then minLen := 1 else minLen := 2;
   for i := 0 to high(FPathsIn) do
   begin
     StripDuplicates(FPathsIn[i]);
@@ -726,16 +726,19 @@ function ClipperOffsetPaths(const paths: TPathsD;
   delta: Double; jt: TJoinType; et: TEndType; miterLimit: double): TPathsD;
 var
   paths64, sol64: TPaths;
+const
+  scalingFactor = 100;
+  invScalingFactor = 1/scalingFactor;
 begin
-  paths64 := ScalePaths(paths, 1000, 1000);
+  paths64 := ScalePaths(paths, scalingFactor, scalingFactor);
   with TClipperOffset.Create(miterLimit) do
   try
     AddPaths(paths64);
-    Execute(delta*1000, jt, et, sol64);
+    Execute(delta * scalingFactor, jt, et, sol64);
   finally
     free;
   end;
-  Result := ScalePathsD(sol64, 0.001, 0.001);
+  Result := ScalePathsD(sol64, invScalingFactor, invScalingFactor);
 end;
 //------------------------------------------------------------------------------
 

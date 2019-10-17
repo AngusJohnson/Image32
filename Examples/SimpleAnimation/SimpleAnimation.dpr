@@ -9,6 +9,9 @@ uses
 {$I Image32.inc}
 
 begin
+{$IFDEF REPORTMEMORYLEAKS}
+  ReportMemoryLeaksOnShutdown := DebugHook <> 0;
+{$ENDIF}
   Application.Initialize;
 {$IFDEF MAINFORMONTASKBAR}
   Application.MainFormOnTaskbar := True;

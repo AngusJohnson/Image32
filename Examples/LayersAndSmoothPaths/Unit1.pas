@@ -44,6 +44,10 @@ type
     mnuSmoothAsym: TMenuItem;
     mnuSharpWithHdls: TMenuItem;
     mnuSharpNoHdls: TMenuItem;
+    Label1: TLabel;
+    Label3: TLabel;
+    edPenColor: TEdit;
+    edFillColor: TEdit;
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -65,6 +69,7 @@ type
     procedure mnuRotateButtonsClick(Sender: TObject);
     procedure mnuSharpNoHdlsClick(Sender: TObject);
     procedure PopupMenu1Popup(Sender: TObject);
+    procedure edPenColorChange(Sender: TObject);
   private
     layeredImage32: TLayeredImage32;
     clickPoint    : TPoint;
@@ -78,21 +83,23 @@ type
     disableTypeChange: Boolean;
     procedure RefreshButtonGroupFromPath;
     procedure UpdateButtonGroupFromPath;
-    function PointOnPath(const pt: TPoint): Boolean;
-    procedure RepaintPanel;
-    procedure UMREPAINT(var message: TMessage); message UM_REPAINT;
+    function HitTestButtonPath(const pt: TPoint): Boolean;
+    function ClearRotateButton: Boolean;
+    procedure UpdatePanelBitmap;
+    procedure BeginPanelPaint(Sender: TObject);
+    procedure PanelKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   public
     { Public declarations }
   end;
 
   TLineLayer32 = class(TSmoothPathLayer32)
   public
-    procedure SetMixedPath(const smoothPath: TSmoothPath);
+    procedure SetSmoothPath(const smoothPath: TSmoothPath);
   end;
 
   TPolygonLayer32 = class(TSmoothPathLayer32)
   public
-    procedure SetMixedPath(const smoothPath: TSmoothPath);
+    procedure SetSmoothPath(const smoothPath: TSmoothPath);
   end;
 
 var
@@ -110,10 +117,8 @@ uses
 const
   crRotate = 1;
   margin = 100;
-  //There are 2 types of CBezier buttons controls:
-  //1. curve ends and 2. curve shape controls (aka handles)
-  btnColors: array [boolean] of TColor32 = (clBlue32, clGreen32);
-  buttonOpts: array [boolean] of TButtonOptions = ([], [boSquare]);
+  defaultFillColor: TColor32 = $88FFFF66;
+  defaultPenColor: TColor32 = clNavy32;
 var
   buttonSizes: array [boolean] of integer;
 
@@ -128,21 +133,33 @@ type
   end;
 
 //------------------------------------------------------------------------------
+// Miscellaneous functions
+//------------------------------------------------------------------------------
+
+function GetFillColor: TColor32;
+begin
+  result := StrToInt64Def(FrmMain.edFillColor.Text, clNone32);
+end;
+//------------------------------------------------------------------------------
+
+function GetPenColor: TColor32;
+begin
+  result := StrToInt64Def(FrmMain.edPenColor.Text, clBlack32);
+end;
+
+//------------------------------------------------------------------------------
 // TLineLayer32
 //------------------------------------------------------------------------------
 
-procedure TLineLayer32.SetMixedPath(const smoothPath: TSmoothPath);
+procedure TLineLayer32.SetSmoothPath(const smoothPath: TSmoothPath);
 var
   rec: TRect;
   flatPath: TArrayOfPointD;
-  startPt, endPt: TPointD;
-  arrows: TArrayOfArrayOfPointD;
 begin
   flatPath := smoothPath.FlattenedPath;
-
   //calculate and assign hit test regions
   self.HitTestRegions := InflateOpenPath(OpenPathToFlatPolygon(flatPath),
-    lineWidth + hitTestWidth);
+    lineWidth + hitTestWidth, jsAuto, esRound);
 
   self.SmoothPath.Assign(smoothPath);
 
@@ -151,7 +168,7 @@ begin
   self.SetBounds(rec);
   Image.Clear;
   flatPath := OffsetPath(flatPath, -Left, -Top);
-  DrawLine(Image, flatPath, lineWidth, clNavy32, esRound);
+  DrawLine(Image, flatPath, lineWidth, GetPenColor, esRound);
   CursorId := crSizeAll;
 end;
 
@@ -159,7 +176,7 @@ end;
 // TPolygonLayer32
 //------------------------------------------------------------------------------
 
-procedure TPolygonLayer32.SetMixedPath(const smoothPath: TSmoothPath);
+procedure TPolygonLayer32.SetSmoothPath(const smoothPath: TSmoothPath);
 var
   rec: TRect;
   flattened: TArrayOfPointD;
@@ -168,7 +185,8 @@ begin
   flattened := smoothPath.FlattenedPath;
   //nb: UnionPolygon fixes up any self-intersections
   self.HitTestRegions := UnionPolygon(flattened, frEvenOdd);
-  HitTestRegions := InflatePolygons(HitTestRegions, lineWidth + hitTestWidth);
+  HitTestRegions :=
+    InflatePolygons(HitTestRegions, (lineWidth + hitTestWidth) *0.5);
 
   self.SmoothPath.Assign(smoothPath);
 
@@ -177,8 +195,8 @@ begin
   self.SetBounds(rec);
   flattened := OffsetPath(flattened, -Left, -Top);
   Image.Clear;
-  DrawPolygon(Image, flattened, frNonZero, $88FFFF66);
-  DrawLine(Image, flattened, lineWidth, clMaroon32, esClosed);
+  DrawPolygon(Image, flattened, frNonZero, GetFillColor);
+  DrawLine(Image, flattened, lineWidth, GetPenColor, esClosed);
   CursorId := crSizeAll;
 end;
 
@@ -195,6 +213,8 @@ begin
   hitTestWidth       := DPI(5);
   buttonSizes[false] := DPI(9);
   buttonSizes[true]  := DPI(8);
+  edFillColor.Text   := '$' + inttohex(defaultFillColor, 8);
+  edPenColor.Text   := '$' + inttohex(defaultPenColor, 8);
 
   setLength(dashes, 2);
   dashes[0] := 5; dashes[1] := 5;
@@ -207,6 +227,8 @@ begin
   pnlMain.TabStop := true;
   pnlMain.FocusedColor := clGradientInactiveCaption;
   pnlMain.BitmapProperties.Scale := 1;
+  pnlMain.BitmapProperties.OnBeginPaint := BeginPanelPaint;
+  pnlMain.BitmapProperties.OnKeyDown := PanelKeyDown;
 
   //SETUP LAYEREDIMAGE32
   rec := pnlMain.InnerClientRect;
@@ -224,11 +246,6 @@ begin
 
   Screen.Cursors[crRotate] :=
     LoadImage(hInstance, 'ROTATE', IMAGE_CURSOR, 32,32,0);
-
-  RepaintPanel; //just to paint hatched background
-
-  StatusBar1.SimpleText :=
-    ' Double-click to add a control point. Right click for popup menu options';
 end;
 //------------------------------------------------------------------------------
 
@@ -254,9 +271,11 @@ begin
   //update hittest region too
   if buttonPath.Count > 1 then
     btnPathRegion := InflateOpenPath(OpenPathToFlatPolygon(
-      buttonPath.FlattenedPath), Max(lineWidth, hitTestWidth), jsRound)
+      buttonPath.FlattenedPath), lineWidth + hitTestWidth, jsRound)
   else
     btnPathRegion := nil;
+
+  UpdatePanelBitmap;
 end;
 //------------------------------------------------------------------------------
 
@@ -265,13 +284,21 @@ var
   i: integer;
   hideNextLayer, IsCurveEnd: Boolean;
   layer: TLayer32;
+  btnColor: TColor32;
+const
+  //There are 2 types of CBezier buttons controls:
+  //1. curve ends and 2. curve shape controls (aka handles)
+  btnColors: array [boolean] of TColor32 = (clBlue32, clGreen32);
+  buttonOpts: array [boolean] of TButtonOptions = ([], [boSquare]);
 begin
   layeredImage32.DeleteGroup(1);
   if buttonPath.Count = 0  then Exit;
 
+  if buttonPath.Count = 1 then
+    btnColor := clLime32 else
+    btnColor := btnColors[true];
   layer := StartButtonGroup(layeredImage32, Point(buttonPath[0]),
-    btnColors[true], buttonSizes[true], buttonOpts[true],
-    TExButtonDesignerLayer32);
+    btnColor, buttonSizes[true], buttonOpts[true], TExButtonDesignerLayer32);
   with TExButtonDesignerLayer32(layer) do
   begin
     PointType := buttonPath.PointTypes[0];
@@ -281,8 +308,11 @@ begin
   for i := 1 to buttonPath.Count -1 do
   begin
       IsCurveEnd := i mod 3 = 0;
+      if i = buttonPath.Count -1 then
+    btnColor := clLime32 else
+    btnColor := btnColors[IsCurveEnd];
       layer := AddToButtonGroup(layeredImage32, 1, Point(buttonPath[i]),
-        btnColors[IsCurveEnd], buttonSizes[IsCurveEnd], buttonOpts[IsCurveEnd]);
+        btnColor, buttonSizes[IsCurveEnd], buttonOpts[IsCurveEnd]);
       with TExButtonDesignerLayer32(layer) do
       begin
         PointType := buttonPath.PointTypes[i];
@@ -302,10 +332,12 @@ begin
       buttonPath.FlattenedPath), Max(lineWidth, hitTestWidth), jsRound)
   else
     btnPathRegion := nil;
+
+  UpdatePanelBitmap;
 end;
 //------------------------------------------------------------------------------
 
-function TFrmMain.PointOnPath(const pt: TPoint): Boolean;
+function TFrmMain.HitTestButtonPath(const pt: TPoint): Boolean;
 begin
   //hittest for button path
   result := PointInPolygons(PointD(pt), btnPathRegion, frEvenOdd);
@@ -318,7 +350,6 @@ begin
   buttonPath.DeleteLast;
   UpdateButtonGroupFromPath;
   clickedLayer := nil;
-  RepaintPanel;
 end;
 //------------------------------------------------------------------------------
 
@@ -330,28 +361,22 @@ begin
   buttonPath.Clear;
   clickedLayer := nil;
   btnPathRegion := nil;
-  RepaintPanel;
+  UpdatePanelBitmap;
 end;
 //------------------------------------------------------------------------------
 
-procedure TFrmMain.RepaintPanel;
+procedure TFrmMain.UpdatePanelBitmap;
 var
-  dc: HDC;
   i, d: integer;
-  ahSize: double;
   rec: TRect;
   path: TArrayOfPointD;
-  startPt, endPt: TPointD;
-  arrowHeads: TArrayOfArrayOfPointD;
   dl: TDesignerLayer32;
-  color: TColor32;
 begin
+  if not Active then Exit; //just avoids several calls in FormCreate
+
   //Repaints the designer layer
   dl := TDesignerLayer32(designLayer);
   dl.Image.Clear;
-  if buttonPath.CurrentCurveIsComplete then
-    color :=  clBlack32 else
-    color := $FFCC0000; //red
 
   //designer (non-rotation) buttons
   //though most of this is just arrow head stuff
@@ -359,29 +384,27 @@ begin
   if Assigned(path) then
   begin
     //draw plain old flattened button path
-    DrawLine(dl.Image, path, lineWidth, color, esRound);
+    DrawLine(dl.Image, path, lineWidth, GetPenColor, esRound);
     //display control lines
     DrawSmoothPathDesigner(buttonPath, dl);
   end;
 
   //outline selected button
-  if Assigned(clickedLayer) and
-    (clickedLayer.GroupId = 1) and (clickedLayer.IndexInGroup mod 3 = 0) then
+  if Assigned(clickedLayer) and (clickedLayer.GroupId = 1) then
   begin
     rec.TopLeft := Point(clickedLayer.MidPoint);
     rec.BottomRight := rec.TopLeft;
-    i := Max(DefaultButtonSize, linewidth)  div 2 + hitTestWidth;
+    i := Max(DefaultButtonSize, linewidth) div 2 + hitTestWidth;
     Windows.InflateRect(rec, i, i);
-    DrawPolygon(dl.Image, Ellipse(rec), frEvenOdd, $2000AA00);
-    DrawLine(dl.Image, Ellipse(rec), 1, $AA00AA00, esClosed);
-    //dl.DrawEllipse(rec);
+    DrawPolygon(dl.Image, Ellipse(rec), frEvenOdd, $40AAAAAA);
+    DrawLine(dl.Image, Ellipse(rec), 1, $AAFF0000, esClosed);
   end;
 
   //rotation (always group 2)
   i := layeredImage32.GetFirstInGroupIdx(2);
   if i > 0 then
   begin
-    DrawButton(dl.Image, PointD(rotatePoint), DefaultButtonSize, clMaroon32);
+    DrawButton(dl.Image, PointD(rotatePoint), DefaultButtonSize, clSilver32);
     d := Round(Distance(Point(layeredImage32.TopLayer.MidPoint), rotatePoint));
     with rotatePoint do rec := Rect(X - d, Y - d, X + d, Y + d);
     dl.DrawEllipse(rec);
@@ -416,20 +439,23 @@ begin
   end else
     StatusBar1.SimpleText := '';
 
-  //merge layeredImage32 onto pnlMain
-  //pnlMain.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
-  pnlMain.Bitmap.Width := layeredImage32.Width;
-  pnlMain.Bitmap.Height := layeredImage32.Height;
-  dc := pnlMain.Bitmap.Canvas.Handle;
-  layeredImage32.GetMergedImage(mnuHideControls.Checked).CopyToDc(dc,0,0,false);
-
-  pnlMain.Refresh;
+  pnlMain.Invalidate;
 end;
 //------------------------------------------------------------------------------
 
-procedure TFrmMain.UMREPAINT(var message: TMessage);
+procedure TFrmMain.BeginPanelPaint(Sender: TObject);
+var
+  dc: HDC;
 begin
-  RepaintPanel;
+  //update pnlMain.Bitmap with layeredImage32's merged image
+
+  //Sadly, versions of Delphi prior to D2006 don't support TBitmap.SetSize.
+  //pnlMain.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  pnlMain.Bitmap.Width := layeredImage32.Width;
+  pnlMain.Bitmap.Height := layeredImage32.Height;
+
+  dc := pnlMain.Bitmap.Canvas.Handle;
+  layeredImage32.GetMergedImage(mnuHideControls.Checked).CopyToDc(dc,0,0,false);
 end;
 //------------------------------------------------------------------------------
 
@@ -441,14 +467,14 @@ begin
   if not buttonPath.CurrentCurveIsComplete or
     not (layeredImage32.TopLayer is TButtonDesignerLayer32) then Exit;
 
-  //create a 'completed' path (polyline or polygon) from the buttons
+  //create a 'completed' path (either polyline or polygon) from the buttons
   if Sender = mnuMakePolygon then
   begin
     if buttonPath.Count < 3 then Exit;
     layeredImage32.DeleteGroup(1);
     polygonLayer :=
       TPolygonLayer32(layeredImage32.AddNewLayer(TPolygonLayer32, ''));
-    polygonLayer.SetMixedPath(buttonPath);
+    polygonLayer.SetSmoothPath(buttonPath);
     designLayer.BringForward(polygonLayer.Index);
   end else
   begin
@@ -456,12 +482,13 @@ begin
     layeredImage32.DeleteGroup(1);
     lineLayer :=
       TLineLayer32(layeredImage32.AddNewLayer(TLineLayer32, ''));
-    lineLayer.SetMixedPath(buttonPath);
+    lineLayer.SetSmoothPath(buttonPath);
     designLayer.BringForward(lineLayer.Index);
   end;
   buttonPath.Clear;
+  clickedLayer := nil;
   btnPathRegion := nil;
-  RepaintPanel;
+  UpdatePanelBitmap;
 end;
 //------------------------------------------------------------------------------
 
@@ -475,12 +502,10 @@ begin
     layeredImage32.DeleteGroup(1);
 
   buttonPath.Assign(TSmoothPathLayer32(clickedLayer).SmoothPath);
-  UpdateButtonGroupFromPath;
-
-  //finally delete the selected layer now we have the edit buttons
   layeredImage32.DeleteLayer(clickedLayer.Index);
+
+  UpdateButtonGroupFromPath;
   clickedLayer := nil;
-  RepaintPanel;
 end;
 //------------------------------------------------------------------------------
 
@@ -499,7 +524,7 @@ begin
   layer := StartButtonGroup(layeredImage32, Point(pt), clRed32,
     DPI(9), [], TButtonDesignerLayer32);
   layer.CursorId := crRotate;
-  RepaintPanel;
+  UpdatePanelBitmap;
 end;
 //------------------------------------------------------------------------------
 
@@ -508,7 +533,6 @@ begin
   //double click adds a button control layer
   buttonPath.Add(PointD(clickPoint), buttonPath.LastType);
   UpdateButtonGroupFromPath;
-  PostMessage(handle, UM_REPAINT, 0,0);
 end;
 //------------------------------------------------------------------------------
 
@@ -534,7 +558,7 @@ begin
 
   if not Assigned(clickedLayer) then
   begin
-    if PointOnPath(pt) then moveType := mtAllButtons;
+    if HitTestButtonPath(pt) then moveType := mtAllButtons;
   end
   else if (clickedLayer is TButtonDesignerLayer32) then
   begin
@@ -548,7 +572,7 @@ begin
   //disable pnlMain scrolling if we're about to move a layer
   pnlMain.BitmapProperties.ZoomAndScrollEnabled := moveType = mtNone;
 
-  PostMessage(handle, UM_REPAINT, 0,0);
+  UpdatePanelBitmap;
 end;
 //------------------------------------------------------------------------------
 
@@ -569,7 +593,7 @@ begin
     layer := layeredImage32.GetLayerAt(pt);
     if Assigned(layer) and (layer is TButtonDesignerLayer32) then
       pnlMain.Cursor := layer.CursorId
-    else if PointOnPath(pt) then
+    else if HitTestButtonPath(pt) then
       pnlMain.Cursor := crSizeAll
     else if Assigned(layer) then
       pnlMain.Cursor := layer.CursorId
@@ -600,10 +624,12 @@ begin
         RefreshButtonGroupFromPath;
       end;
     else
+    begin
       clickedLayer.Offset(dx, dy);
+      UpdatePanelBitmap;
+    end;
   end;
   clickPoint := pt;
-  PostMessage(handle, UM_REPAINT, 0,0);
 end;
 //------------------------------------------------------------------------------
 
@@ -622,7 +648,7 @@ begin
   begin
     layeredImage32.DeleteLayer(clickedLayer.Index);
     clickedLayer := nil;
-  RepaintPanel;
+    UpdatePanelBitmap;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -635,7 +661,7 @@ end;
 
 procedure TFrmMain.mnuHideControlsClick(Sender: TObject);
 begin
-  RepaintPanel;
+  pnlMain.Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -643,9 +669,14 @@ procedure TFrmMain.edWidthChange(Sender: TObject);
 begin
   lineWidth := Max(1, Min(25, strtoint(edWidth.text)));
   if Assigned(clickedLayer) and (clickedLayer is TLineLayer32) then
-    with TLineLayer32(clickedLayer) do SetMixedPath(SmoothPath);
-  //don't repaint when starting up
-  if self.Active then RepaintPanel;
+    with TLineLayer32(clickedLayer) do SetSmoothPath(SmoothPath);
+  UpdatePanelBitmap;
+end;
+//------------------------------------------------------------------------------
+
+procedure TFrmMain.edPenColorChange(Sender: TObject);
+begin
+  UpdatePanelBitmap;
 end;
 //------------------------------------------------------------------------------
 
@@ -706,7 +737,117 @@ begin
   buttonPath.PointTypes[clickedLayer.IndexInGroup] := newType;
   //buttonPath shape may change with new point type
   UpdateButtonGroupFromPath;
-  RepaintPanel;
+end;
+//------------------------------------------------------------------------------
+
+function TFrmMain.ClearRotateButton: Boolean;
+begin
+  Result := layeredImage32.GroupCount(2) > 0;
+  if Result then layeredImage32.DeleteGroup(2);
+end;
+//------------------------------------------------------------------------------
+
+procedure TFrmMain.PanelKeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+var
+  i, dist, dx, dy: integer;
+  angle: double;
+  pt: TPointD;
+begin
+  //keyboard control of buttons
+  case Key of
+    VK_ESCAPE:
+      begin
+        clickedLayer := nil;
+        ClearRotateButton;
+      end;
+    VK_TAB: // Ctrl+Tab => changes button selection
+      begin
+        if not (ssCtrl in Shift) then Exit;
+        ClearRotateButton;
+        if (ssShift in Shift) then
+        begin
+          if Assigned(clickedLayer) then i := clickedLayer.Index -1
+          else i := layeredImage32.Count -1;
+          while (i >= 0) and (not layeredImage32[i].Visible or
+            (layeredImage32[i].GroupId <> 1)) do dec(i);
+          if (i < 0) then
+          begin
+            if not Assigned(clickedLayer) then Exit;
+            i := layeredImage32.Count -1;
+            while (i > 0) and (not layeredImage32[i].Visible or
+              (layeredImage32[i].GroupId <> 1)) do dec(i);
+          end;
+        end else
+        begin
+          if Assigned(clickedLayer) then i := clickedLayer.Index +1
+          else i := 0;
+          while (i < layeredImage32.Count) and
+            (not layeredImage32[i].Visible or
+            (layeredImage32[i].GroupId <> 1)) do inc(i);
+          if (i = layeredImage32.Count) then
+          begin
+            if not Assigned(clickedLayer) then Exit;
+            i := 0;
+            while (i < clickedLayer.Index) and
+              (not layeredImage32[i].Visible or
+              (layeredImage32[i].GroupId <> 1)) do inc(i);
+          end;
+        end;
+        clickedLayer := layeredImage32[i];
+      end;
+    VK_LEFT .. VK_DOWN:
+      begin
+        if (clickedLayer = nil) then Exit;
+        ClearRotateButton;
+        if ssCtrl in Shift then dist := 10 else dist := 1;
+        if clickedLayer is TButtonDesignerLayer32 then
+        begin
+          pt := clickedLayer.MidPoint;
+          clickPoint := Point(pt);
+          case Key of
+            VK_LEFT: pt.X := pt.X - dist;
+            VK_RIGHT: pt.X := pt.X + dist;
+            VK_UP: pt.Y := pt.Y - dist;
+            VK_DOWN: pt.Y := pt.Y + dist;
+          end;
+          if clickedLayer.GroupId = 2 then
+          begin
+            dx := 0; dy := 0;
+            case Key of
+              VK_LEFT: dx := -dist;
+              VK_RIGHT: dx := dist;
+              VK_UP: dy := -dist;
+              VK_DOWN: dy := dist;
+            end;
+            if clickedLayer.Name = 'Rotate' then
+            begin
+              clickedLayer.Offset(dx, dy);
+              angle := GetAngle(clickPoint, rotatePoint, Point(pt));
+              buttonPath.Rotate(PointD(rotatePoint), angle);
+              RefreshButtonGroupFromPath;
+            end
+            else Exit;
+          end else
+          begin
+            buttonPath[clickedLayer.IndexInGroup] := pt;
+          end;
+          RefreshButtonGroupFromPath;
+        end else
+        begin
+           case Key of
+            VK_LEFT: clickedLayer.Offset(-dist, 0);
+            VK_RIGHT: clickedLayer.Offset(dist, 0);
+            VK_UP: clickedLayer.Offset(0, -dist);
+            VK_DOWN: clickedLayer.Offset(0, dist);
+          end;
+        end;
+      end;
+    else
+      Exit;
+  end;
+  UpdatePanelBitmap;
+  Key := 0;
 end;
 //------------------------------------------------------------------------------
 

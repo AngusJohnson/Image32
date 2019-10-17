@@ -15,10 +15,12 @@ type
     File1: TMenuItem;
     Exit1: TMenuItem;
     StatusBar1: TStatusBar;
+    Timer1: TTimer;
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure Panel1DblClick(Sender: TObject);
+    procedure Timer1Timer(Sender: TObject);
   private
     timer: TTimerEx;
     reversing: Boolean;
@@ -75,8 +77,9 @@ begin
 
   masterImageList := TImageList32.Create;
 
-  //add 31 images to masterImageList that are viewed twice each loop
-  //except the top and bottom images (viewed once) ==> 60/loop
+  //31 images (25 + 6) will be added to masterImageList. Each will be viewed
+  //twice in each loop except for the top and bottom images. (60 frames/loop)
+
   img := TImage32.Create(ImageSize, ImageSize);
   DrawPolygon(img, path, frNonZero, clLime32);
   Draw3D(img, path, frNonZero, 8, 8);
@@ -110,12 +113,17 @@ begin
   end;
   img.Free;
 
-  //and setup the timer to kick things off
+  //setup my threaded timer to kick things off
   timer := TTimerEx.Create;
   timer.OnTimer := DoTimer;
   timer.Interval := 1000/60; //1000msec/60frames = 60frames/sec
   timer.Priority := tpLowest;
   timer.Enabled := true;
+
+//  //Unfortunately Delphi's TTimer component isn't time accurate. If you swap
+//  //timers here, you'll see that TTimer is noticeably slower than expected.
+//  Timer1.Interval := 1000 div 60; //1000msec/60frames = 60frames/sec
+//  Timer1.Enabled := True;
 end;
 //------------------------------------------------------------------------------
 
@@ -123,6 +131,22 @@ procedure TForm1.FormDestroy(Sender: TObject);
 begin
   masterImageList.Free;
   timer.Free;
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.Timer1Timer(Sender: TObject);
+begin
+  masterImageList[imgIndex].CopyToDc(Panel1.Bitmap.Canvas.Handle, 0,0, false);
+  Panel1.Repaint;
+  if reversing then
+  begin
+    dec(imgIndex);
+    if (imgIndex = 0) then reversing := false;
+  end else
+  begin
+    inc(imgIndex);
+    if (imgIndex = masterImageList.Count -1) then reversing := true;
+  end;
 end;
 //------------------------------------------------------------------------------
 

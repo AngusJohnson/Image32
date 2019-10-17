@@ -2,8 +2,8 @@ unit BitmapPanels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.07                                                            *
-* Date      :  2 October 2019                                                  *
+* Version   :  1.10                                                            *
+* Date      :  14 October 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
@@ -34,12 +34,13 @@ type
     type TScaleType = (stScaled, stFit, stStretched);
     {$ENDIF}
   private
-    fBmp: TBitmap;
-    fScale: double;
-    fScaleType: TScaleType;
-    fDstRect: TRect;
-    fOffsetX: integer;
-    fOffsetY: integer;
+    fBmp          : TBitmap;
+    fResetPending : Boolean;
+    fScale        : double;
+    fScaleType    : TScaleType;
+    fDstRect      : TRect;
+    fOffsetX      : integer;
+    fOffsetY      : integer;
 {$IFDEF GESTURES}
     fLastDistance: integer;
     fLastLocation: TPoint;
@@ -71,6 +72,7 @@ type
       X, Y: Integer); override;
     procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
     procedure WMKeyDown(var Message: TWMKey); message WM_KEYDOWN;
+    procedure WMKeyUp(var Message: TWMKey); message WM_KEYUP;
     procedure WMEraseBkgnd(var message: TMessage); message WM_ERASEBKGND;
     procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
     procedure WMDropFiles(var Msg: TMessage); message WM_DROPFILES;
@@ -91,7 +93,7 @@ type
     function CopyToClipboard: Boolean;
     function PasteFromClipboard: Boolean;
     //ClearBitmap: Required only when drawing to the bitmap's Canvas property.
-    procedure ClearBitmap(PixelFormat: TPixelFormat = pf32bit);
+    procedure ClearBitmap(PixelFormat: TPixelFormat = pf24bit);
     property Bitmap: TBitmap read fBmp;
     property BitmapProperties: TBitmapProperties read fBitmapProperties;
     //FocusedColor: Panel's border color when focused (ie if TabStop = true)
@@ -111,12 +113,16 @@ type
     fScalingCursor: integer;
     fScrollButtonColor: TColor;
     fScrollButtonColorHot: TColor;
+    fAutoCenter: Boolean;
     fOnBitmapResizing: TNotifyEvent;
     fOnScrolling: TNotifyEvent;
     fOnDragDrop: TFileDropEvent;
     fOnPaste: TNotifyEvent;
+    fOnBeforePaint: TNotifyEvent;
     fFileDropEnabled: Boolean;
     fCopyPasteEnabled: Boolean;
+    fOnKeyDown: TKeyEvent;
+    fOnKeyUp  : TKeyEvent;
     function GetOffset: TPoint;
     procedure SetOffset(const Pt: TPoint);
     function GetScale: double;
@@ -126,9 +132,11 @@ type
     procedure SetZoomScrollEnabled(value: Boolean);
     procedure SetScrollbarsVisible(value: Boolean);
     procedure SetScalingCursor(value: integer);
+    procedure SetAutoCenter(value: Boolean);
   public
     constructor Create(ownerPanel: TPanel);
     procedure ResetBitmap;
+    property AutoCenter: Boolean read fAutoCenter write SetAutoCenter;
     //CopyPasteEnabled: Default = false.
     property CopyPasteEnabled: Boolean
       read fCopyPasteEnabled write fCopyPasteEnabled;
@@ -168,6 +176,10 @@ type
       read fOnScrolling write fOnScrolling;
     property OnFileDrop: TFileDropEvent read fOnDragDrop write fOnDragDrop;
     property OnPaste: TNotifyEvent read fOnPaste write fOnPaste;
+
+    property OnBeginPaint: TNotifyEvent read fOnBeforePaint write fOnBeforePaint;
+    property OnKeyDown: TKeyEvent read fOnKeyDown write fOnKeyDown;
+    property OnKeyUp: TKeyEvent read fOnKeyUp write fOnKeyUp;
   end;
 
 {$IFDEF FPC}
@@ -274,6 +286,7 @@ begin
   fMinScale := MinScaleSize;
   fMaxScale := MaxScaleSize;
   fShowScrollbars := true;
+  fAutoCenter := true;
   fScrollButtonColor := MakeDarker(clBtnFace, 20); //ie 20% darker
   fScrollButtonColorHot := clHotLight;
   fZoomScrollEnabled := true;
@@ -330,11 +343,13 @@ begin
     if fOwner.fScaleType = stFit then Exit;
     fOwner.fScaleType := stFit;
     fOwner.Invalidate;
+    fAutoCenter := true;
   end else if value = SCALE_STRETCHED then
   begin
     if fOwner.fScaleType = stStretched then Exit;
     fOwner.fScaleType := stStretched;
     fOwner.Invalidate;
+    fAutoCenter := true;
   end else
   begin
     if value < fMinScale then value := fMinScale
@@ -381,6 +396,16 @@ begin
   fShowScrollbars := value;
   fOwner.Invalidate;
 end;
+//------------------------------------------------------------------------------
+
+procedure TBitmapProperties.SetAutoCenter(value: Boolean);
+begin
+  if value = fAutoCenter then Exit;
+  fAutoCenter := value;
+  //when fAutoCenter is disabled, then neither
+  //SCALE_BEST_FIT or SCALE_STRETCHED work sensibly
+  if not fAutoCenter then SetScale(1);
+end;
 
 //------------------------------------------------------------------------------
 // Imaged enhanced TPanel class
@@ -394,7 +419,8 @@ begin
   fOffsetX := 0;
   fOffsetY := 0;
   fBmp := TBitmap.Create;
-  fBmp.PixelFormat := pf32bit;
+  fBmp.PixelFormat := pf24bit;
+  fResetPending := true;
   {$IFDEF ALPHAFORMAT}
   fBmp.AlphaFormat := afPremultiplied;
   {$ENDIF}
@@ -419,9 +445,9 @@ end;
 
 procedure TPanel.BmpChanged(Sender: TObject);
 begin
+  if fResetPending and not fBmp.Empty then ClearBitmap(fBmp.PixelFormat);
   if fScale <= 0  then BitmapScaleBestFit;
   //nb: also called when the bitmap canvas has been updated
-  //fOffsetX := 0; fOffsetY := 0;
   UpdateCursor;
   Invalidate;
 end;
@@ -457,8 +483,19 @@ procedure TPanel.WMKeyDown(var Message: TWMKey);
 var
   mul: integer;
   midPoint: TPoint;
+  charCode: Word;
+  shiftState: TShiftState;
 begin
   inherited;
+  shiftState := KeyDataToShiftState(Message.KeyData);
+
+  if Assigned(fBitmapProperties.fOnKeyDown) then
+  begin
+    charCode := Message.CharCode;
+    fBitmapProperties.fOnKeyDown(Self, charCode, shiftState);
+    if charCode = 0 then Exit;
+  end;
+
   if (Message.CharCode >= Ord('V')) and
     (ssCtrl in KeyDataToShiftState(Message.KeyData)) and
     fBitmapProperties.fCopyPasteEnabled then
@@ -520,6 +557,22 @@ begin
       fBitmapProperties.Scale := (Message.CharCode - Ord('0')) /10 else
       fBitmapProperties.Scale := Message.CharCode - Ord('0');
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPanel.WMKeyUp(var Message: TWMKey);
+var
+  charCode: Word;
+  shiftState: TShiftState;
+begin
+  if Assigned(fBitmapProperties.fOnKeyUp) then
+  begin
+    shiftState := KeyDataToShiftState(Message.KeyData);
+    charCode := Message.CharCode;
+    fBitmapProperties.fOnKeyUp(Self, charCode, shiftState);
+    if charCode = 0 then Exit;
+  end;
+  inherited;
 end;
 //------------------------------------------------------------------------------
 
@@ -738,9 +791,10 @@ var
   i: integer;
   pc: PColor32;
 begin
-  if fBmp.Empty then
-    Raise Exception.Create(rsClearBitmapError);
-  fBmp.PixelFormat := PixelFormat;
+  if fBmp.PixelFormat <> PixelFormat then
+    fBmp.PixelFormat := PixelFormat;
+  fResetPending := fBmp.Empty;
+  if fResetPending then Exit;
   if PixelFormat = pf32bit then
   begin
     {$IFDEF ALPHAFORMAT}
@@ -801,10 +855,10 @@ begin
   //calling inherited draws the bevels and panel caption.
   inherited;
 
-  if fBmp.Empty then
-  begin
-    Exit;
-  end;
+  if Assigned(fBitmapProperties.fOnBeforePaint) then
+    fBitmapProperties.fOnBeforePaint(Self);
+
+  if fBmp.Empty then Exit;
 
   srcRec := Rect(0, 0, fBmp.Width, fBmp.Height);
 
@@ -845,18 +899,27 @@ begin
     end;
 
     OffsetRect(srcRec, Round(fOffsetX/fscale), Round(fOffsetY/fscale));
-    //if necessary, center the dstRec
-    if (RectWidth(srcScaled) < RectWidth(fDstRect)) then
+    if BitmapProperties.fAutoCenter then
     begin
-      fDstRect.Left :=
-        (RectWidth(fDstRect) - RectWidth(srcScaled)) div 2 + marginOff;
-      SetRectWidth(fDstRect, RectWidth(srcScaled));
-    end;
-    if RectHeight(srcScaled) < RectHeight(fDstRect) then
+      //if srcScaled is smaller than dstRect then center the image
+      if (RectWidth(srcScaled) < RectWidth(fDstRect)) then
+      begin
+        fDstRect.Left :=
+          (RectWidth(fDstRect) - RectWidth(srcScaled)) div 2 + marginOff;
+        SetRectWidth(fDstRect, RectWidth(srcScaled));
+      end;
+      if RectHeight(srcScaled) < RectHeight(fDstRect) then
+      begin
+        fDstRect.Top :=
+          (RectHeight(fDstRect) - RectHeight(srcScaled)) div 2 + marginOff;
+        SetRectHeight(fDstRect, RectHeight(srcScaled));
+      end;
+    end else
     begin
-      fDstRect.Top :=
-        (RectHeight(fDstRect) - RectHeight(srcScaled)) div 2 + marginOff;
-      SetRectHeight(fDstRect, RectHeight(srcScaled));
+      if (RectWidth(srcScaled) < RectWidth(fDstRect)) then
+        SetRectWidth(fDstRect, RectWidth(srcScaled));
+      if RectHeight(srcScaled) < RectHeight(fDstRect) then
+        SetRectHeight(fDstRect, RectHeight(srcScaled));
     end;
   end;
 

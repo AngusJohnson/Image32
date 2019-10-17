@@ -13,10 +13,12 @@
   {$IF COMPILERVERSION >= 18}
     {$DEFINE ABSTRACT_CLASSES}       //Delphi 2006 - added abstract classes
     {$DEFINE RECORD_METHODS}         //Delphi 2006 - added records with methods
+    {$DEFINE REPORTMEMORYLEAKS}      //Delphi 2006 - added ReportMemoryLeaksOnShutdown
+    {$DEFINE SETSIZE}                //Delphi 2006 - added TBitmap.SetSize
     {$IF COMPILERVERSION >= 18.5}
       {$IFNDEF DEBUG}
         {$DEFINE INLINE}             //Delphi 2007 - added inlining
-      {$ENDIF}
+      {$IFEND}
       {$DEFINE DELPHI_PNG}           //Delphi 2007 - added png support
       {$DEFINE MAINFORMONTASKBAR}    //Delphi 2007 - added TApplication.MainFormOnTaskbar
       {$if CompilerVersion >= 20}

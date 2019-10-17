@@ -1,9 +1,9 @@
 object Form1: TForm1
   Left = 514
   Top = 310
-  Width = 340
-  Height = 503
   Caption = 'Image32: Simple animation'
+  ClientHeight = 444
+  ClientWidth = 324
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -20,14 +20,14 @@ object Form1: TForm1
     Left = 0
     Top = 0
     Width = 324
-    Height = 419
+    Height = 418
     Align = alClient
     TabOrder = 0
     OnDblClick = Panel1DblClick
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 419
+    Top = 418
     Width = 324
     Height = 26
     Panels = <>
@@ -47,5 +47,11 @@ object Form1: TForm1
         OnClick = Exit1Click
       end
     end
+  end
+  object Timer1: TTimer
+    Enabled = False
+    OnTimer = Timer1Timer
+    Left = 120
+    Top = 152
   end
 end

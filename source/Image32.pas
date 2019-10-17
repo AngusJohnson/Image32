@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.25                                                            *
-* Date      :  6 October 2019                                                  *
+* Version   :  1.26                                                            *
+* Date      :  14 October 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -214,6 +214,7 @@ type
   TImageList32 = class
   private
     fList: TList;
+    fIsImageOwner: Boolean;
     function GetImage(index: integer): TImage32;
     function GetLast: TImage32;
   public
@@ -226,6 +227,7 @@ type
     procedure Move(currentIndex, newIndex: integer);
     procedure Delete(index: integer);
     property Image[index: integer]: TImage32 read GetImage; default;
+    property IsImageOwner: Boolean read fIsImageOwner write fIsImageOwner;
     property Last: TImage32 read GetLast;
   end;
 
@@ -524,7 +526,7 @@ var
   res: TARGB absolute Result;
 begin
   if rgbColor < 0 then
-    result := GetSysColor(-rgbColor) else
+    result := GetSysColor(rgbColor and $FFFFFF) else
     result := rgbColor;
   res.A := res.B; res.B := res.R; res.R := res.A; //byte swap
   res.A := 255;
@@ -2473,6 +2475,7 @@ end;
 constructor TImageList32.Create;
 begin
   fList := TList.Create;
+  fIsImageOwner := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -2494,8 +2497,9 @@ procedure TImageList32.Clear;
 var
   i: integer;
 begin
-  for i := 0 to fList.Count -1 do
-    TImage32(fList[i]).Free;
+  if IsImageOwner then
+    for i := 0 to fList.Count -1 do
+      TImage32(fList[i]).Free;
   fList.Clear;
 end;
 //------------------------------------------------------------------------------
@@ -2533,7 +2537,7 @@ end;
 
 procedure TImageList32.Delete(index: integer);
 begin
-  TImage32(fList[index]).Free;
+  if fIsImageOwner then TImage32(fList[index]).Free;
   fList.Delete(index);
 end;
 

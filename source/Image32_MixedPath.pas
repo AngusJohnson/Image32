@@ -2,8 +2,8 @@ unit Image32_MixedPath;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.25                                                            *
-* Date      :  6 October 2019                                                  *
+* Version   :  1.26                                                            *
+* Date      :  14 October 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module that supports mixed-type (curved & straight) paths       *
@@ -59,6 +59,7 @@ type
     procedure DeleteLastType;
     procedure Offset(dx, dy: integer);
     procedure Rotate(const focalPoint: TPointD; angleRads: double);
+    procedure Scale(sx, sy: double);
 
     property Points[index: integer]: TPointD
       read GetPoint write SetPoint; Default;
@@ -108,6 +109,7 @@ type
     procedure DeleteLast;
     procedure Offset(dx, dy: integer);
     procedure Rotate(const focalPoint: TPointD; angleRads: double);
+    procedure Scale(sx, sy: double);
 
     //AutoAdjust: Where moving one point might also move others
     property AutoAdjust: Boolean read fAutoAdjust write fAutoAdjust;
@@ -270,7 +272,7 @@ begin
           SetLength(tmp, j - i +1);
           for k := i to j do
             tmp[k-i] := fCtrlPoints[k].Point;
-          AddToPath(Result, tmp);
+          Result := JoinPaths(Result, tmp);
         end;
       mtCBezier:
         begin
@@ -280,7 +282,7 @@ begin
           begin
             for k := i to i +3 do
               tmp[k-i] := fCtrlPoints[k].Point;
-            AddToPath(Result, CBezier(tmp));
+            Result := JoinPaths(Result, CBezier(tmp));
             inc(i, 3);
           end;
         end;
@@ -292,7 +294,7 @@ begin
           begin
             for k := i to i +2 do
               tmp[k-i] := fCtrlPoints[k].Point;
-            AddToPath(Result, QBezier(tmp));
+            Result := JoinPaths(Result, QBezier(tmp));
             inc(i, 2);
           end;
         end;
@@ -318,7 +320,7 @@ begin
 
           tmp[2] := fCtrlPoints[i+1].Point;
           tmp[3] := fCtrlPoints[i+2].Point;
-          AddToPath(Result, CSpline(tmp));
+          Result := JoinPaths(Result, CSpline(tmp));
           inc(i,2);
           while i < j - 1 do
           begin
@@ -326,7 +328,7 @@ begin
             tmp[1] := ReflectPoint(fCtrlPoints[i-1].Point, tmp[0]);
             tmp[2] := fCtrlPoints[i+1].Point;
             tmp[3] := fCtrlPoints[i+2].Point;
-            AddToPath(Result, CSpline(tmp));
+            Result := JoinPaths(Result, CSpline(tmp));
             inc(i, 2);
           end;
         end;
@@ -343,14 +345,14 @@ begin
             tmp[1] := ReflectPoint(fCtrlPoints[i-1].Point, tmp[0]);
 
           tmp[2] := fCtrlPoints[i+1].Point;
-          AddToPath(Result, QSpline(tmp));
+          Result := JoinPaths(Result, QSpline(tmp));
           inc(i);
           while i < j do
           begin
             tmp[0] := fCtrlPoints[i].Point;
             tmp[1] := ReflectPoint(tmp[1], tmp[0]);
             tmp[2] := fCtrlPoints[i+1].Point;
-            AddToPath(Result, QSpline(tmp));
+            Result := JoinPaths(Result, QSpline(tmp));
             inc(i);
           end;
           virtualPt := tmp[1];
@@ -490,6 +492,18 @@ begin
   for i := 0 to Count -1 do
     RotatePoint(fCtrlPoints[i].Point, focalPoint, sinA, cosA);
 end;
+//------------------------------------------------------------------------------
+
+procedure TMixedPath.Scale(sx, sy: double);
+var
+  i: integer;
+begin
+  for i := 0 to Count -1 do
+  begin
+    fCtrlPoints[i].X := fCtrlPoints[i].X * sx;
+    fCtrlPoints[i].Y := fCtrlPoints[i].Y * sy;
+  end;
+end;
 
 //------------------------------------------------------------------------------
 // TSmoothPath
@@ -570,6 +584,7 @@ function TSmoothPath.GetPointType(index: integer): TSmoothType;
 begin
   if (index < 0) or (index >= Count) then
     raise Exception.Create(rsSmoothPathRangeError);
+  dec(index, index mod 3);
   Result := fCtrlPoints[index].PointType;
 end;
 //------------------------------------------------------------------------------
@@ -583,6 +598,8 @@ var
 begin
   if (index < 0) or (index >= Count) then
     raise Exception.Create(rsSmoothPathRangeError);
+  //only assign TSmoothType to 'node' controls, not 'handles'
+  if index mod 3 > 0 then Exit;
 
   oldType := fCtrlPoints[index].PointType;
   if (newType = oldType) then Exit;
@@ -606,6 +623,7 @@ begin
 
   case newType of
     stSmoothSym:
+      if (idx2 > index) then
       begin
         vec := GetUnitVector(fCtrlPoints[idx1].Point, fCtrlPoints[idx2].Point);
         dist := (Distance(fCtrlPoints[index].Point, fCtrlPoints[idx1].Point) +
@@ -613,11 +631,11 @@ begin
         if (idx1 < index) then
           fCtrlPoints[index-1].Point :=
             OffsetPoint(fCtrlPoints[index].Point, -vec.X *dist, -vec.Y *dist);
-        if (idx2 > index) then
-          fCtrlPoints[index+1].Point :=
-            OffsetPoint(fCtrlPoints[index].Point, vec.X *dist, vec.Y *dist);
+        fCtrlPoints[index+1].Point :=
+          OffsetPoint(fCtrlPoints[index].Point, vec.X *dist, vec.Y *dist);
       end;
     stSmoothAsym:
+      if (idx2 > index) then
       begin
         vec := GetUnitVector(fCtrlPoints[idx1].Point, fCtrlPoints[idx2].Point);
         if (idx1 < index) then
@@ -626,14 +644,12 @@ begin
           fCtrlPoints[idx1].Point :=
             OffsetPoint(fCtrlPoints[index].Point, -vec.X *dist, -vec.Y *dist);
         end;
-        if (idx2 > index) then
-        begin
-          dist := Distance(fCtrlPoints[idx2].Point, fCtrlPoints[index].Point);
-          fCtrlPoints[idx2].Point :=
-            OffsetPoint(fCtrlPoints[index].Point, vec.X *dist, vec.Y *dist);
-        end;
+        dist := Distance(fCtrlPoints[idx2].Point, fCtrlPoints[index].Point);
+        fCtrlPoints[idx2].Point :=
+          OffsetPoint(fCtrlPoints[index].Point, vec.X *dist, vec.Y *dist);
       end;
     stSharpWithHdls:
+      if (idx2 > index) then
       begin
         if (idx1 < index) then
         begin
@@ -642,13 +658,10 @@ begin
           fCtrlPoints[idx1].Point :=
             OffsetPoint(fCtrlPoints[index].Point, vec.X *dist, vec.Y *dist);
         end;
-        if (idx2 > index) then
-        begin
-          vec := GetUnitVector(fCtrlPoints[index].Point, fCtrlPoints[idx2].Point);
-          dist := Distance(fCtrlPoints[idx2].Point, fCtrlPoints[index].Point);
-          fCtrlPoints[idx2].Point :=
-            OffsetPoint(fCtrlPoints[index].Point, vec.X *dist, vec.Y *dist);
-        end;
+        vec := GetUnitVector(fCtrlPoints[index].Point, fCtrlPoints[idx2].Point);
+        dist := Distance(fCtrlPoints[idx2].Point, fCtrlPoints[index].Point);
+        fCtrlPoints[idx2].Point :=
+          OffsetPoint(fCtrlPoints[index].Point, vec.X *dist, vec.Y *dist);
       end;
     stSharpNoHdls:
       begin
@@ -662,13 +675,10 @@ end;
 //------------------------------------------------------------------------------
 
 function TSmoothPath.GetLastType: TSmoothType;
-var
-  i: integer;
 begin
-  i := (fCount -1);
-  if (i < 0) then
+  if (fCount = 0) then
     Result := stSmoothSym else
-    result := fCtrlPoints[i - (i mod 3)].PointType;
+    result := PointTypes[fCount -1];
 end;
 //------------------------------------------------------------------------------
 
@@ -686,7 +696,7 @@ begin
   begin
     for k := j to j + 3 do
         tmp[k - j] := fCtrlPoints[k].Point;
-    AddToPath(Result, CBezier(tmp));
+    Result := JoinPaths(Result, CBezier(tmp));
     inc(j, 3);
   end;
   fFlattened := Result;
@@ -700,9 +710,6 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TSmoothPath.AddInternal(const pt: TPointD; pointType: TSmoothType);
-var
-  i: integer;
-  oldType: TSmoothType;
 
   procedure CheckCapacity(neededCapacity: integer);
   begin
@@ -711,22 +718,13 @@ var
     SetLength(fCtrlPoints, fCapacity);
   end;
 
-  function GetOneThird: TPointD;
+  function GetPointAtFracDist(dist: Double): TPointD;
   var
     prevPt: TPointD;
   begin
     prevPt := fCtrlPoints[fCount - 1].Point;
-    Result.X := prevPt.X + (pt.X - prevPt.X) * 0.33333333;
-    Result.Y := prevPt.Y + (pt.Y - prevPt.Y) * 0.33333333;
-  end;
-
-  function GetTwoThirds: TPointD;
-  var
-    prevPt: TPointD;
-  begin
-    prevPt := fCtrlPoints[fCount - 1].Point;
-    Result.X := prevPt.X + (pt.X - prevPt.X) * 0.66666667;
-    Result.Y := prevPt.Y + (pt.Y - prevPt.Y) * 0.66666667;
+    Result.X := prevPt.X + (pt.X - prevPt.X) * dist;
+    Result.Y := prevPt.Y + (pt.Y - prevPt.Y) * dist;
   end;
 
   function ReflectedPoint: TPointD;
@@ -738,6 +736,12 @@ var
     Result := ReflectPoint(prevPrevPt, prevPt);
   end;
 
+var
+  i: integer;
+  oldType: TSmoothType;
+const
+  OneThird  = 0.3333;
+  OneHalf   = 0.5;
 begin
   oldType := GetLastType;
   if (fCount = 0) or (fAutoAdjust = false) then
@@ -745,12 +749,11 @@ begin
     CheckCapacity(fCount +1);
     fCtrlPoints[fCount].Point := pt;
     if fCount mod 3 = 0 then
-      fCtrlPoints[fCount].PointType := pointType else
-      fCtrlPoints[fCount].PointType := stSmoothSym;
+      fCtrlPoints[fCount].PointType := pointType;
     inc(fCount);
   end else
   begin
-    //auto-add 2 handles before adding end control
+    //auto-add 2 handles before adding the end control
     CheckCapacity(fCount + 3);
     i := fCount mod 3;
     if i = 1 then
@@ -758,13 +761,13 @@ begin
       case oldType of
         stSmoothSym, stSmoothAsym:
           if fCount = 1 then
-            fCtrlPoints[fCount].Point := GetOneThird else
+            fCtrlPoints[fCount].Point := GetPointAtFracDist(OneThird) else
             fCtrlPoints[fCount].Point :=  ReflectedPoint;
-         stSharpWithHdls: GetOneThird;
+         stSharpWithHdls:
+           fCtrlPoints[fCount].Point := GetPointAtFracDist(OneThird);
          stSharpNoHdls:
            fCtrlPoints[fCount].Point := fCtrlPoints[fCount - 1].Point;
       end;
-      fCtrlPoints[fCount].PointType := stSmoothSym;
       inc(fCount); i := 2;
     end;
 
@@ -772,10 +775,9 @@ begin
     begin
       case pointType of
         stSmoothSym, stSmoothAsym, stSharpWithHdls:
-          fCtrlPoints[fCount].Point := GetTwoThirds;
+          fCtrlPoints[fCount].Point := GetPointAtFracDist(OneHalf);
         stSharpNoHdls: fCtrlPoints[fCount].Point := pt;
       end;
-      fCtrlPoints[fCount].PointType := stSmoothSym;
       inc(fCount);
     end;
 
@@ -918,6 +920,18 @@ begin
   Math.SinCos(angleRads, sinA, cosA);
   for i := 0 to Count -1 do
     RotatePoint(fCtrlPoints[i].Point, focalPoint, sinA, cosA);
+end;
+//------------------------------------------------------------------------------
+
+procedure TSmoothPath.Scale(sx, sy: double);
+var
+  i: integer;
+begin
+  for i := 0 to Count -1 do
+  begin
+    fCtrlPoints[i].X := fCtrlPoints[i].X * sx;
+    fCtrlPoints[i].Y := fCtrlPoints[i].Y * sy;
+  end;
 end;
 
 //------------------------------------------------------------------------------

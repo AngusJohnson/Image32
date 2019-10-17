@@ -1,9 +1,9 @@
 object FrmMain: TFrmMain
   Left = 554
   Top = 394
+  Width = 438
+  Height = 471
   Caption = 'Image32 - Layers & SmoothPaths'
-  ClientHeight = 413
-  ClientWidth = 461
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -19,7 +19,7 @@ object FrmMain: TFrmMain
   object pnlMain: TPanel
     Left = 0
     Top = 43
-    Width = 461
+    Width = 422
     Height = 344
     Align = alClient
     PopupMenu = PopupMenu1
@@ -32,30 +32,47 @@ object FrmMain: TFrmMain
   object StatusBar1: TStatusBar
     Left = 0
     Top = 387
-    Width = 461
+    Width = 422
     Height = 26
     Panels = <>
     ParentFont = True
     SimplePanel = True
+    SimpleText = 
+      ' Double-click to add a control point. Right click for popup menu' +
+      ' options'
     UseSystemFont = False
   end
   object pnlTop: TPanel
     Left = 0
     Top = 0
-    Width = 461
+    Width = 422
     Height = 43
     Align = alTop
     TabOrder = 2
     object Label2: TLabel
-      Left = 12
+      Left = 8
       Top = 13
       Width = 63
       Height = 14
       Caption = 'Line &Width:'
       FocusControl = edWidth
     end
+    object Label1: TLabel
+      Left = 140
+      Top = 14
+      Width = 56
+      Height = 14
+      Caption = '&Pen Color:'
+    end
+    object Label3: TLabel
+      Left = 287
+      Top = 14
+      Width = 47
+      Height = 14
+      Caption = '&Fill Color:'
+    end
     object edWidth: TEdit
-      Left = 81
+      Left = 77
       Top = 10
       Width = 32
       Height = 22
@@ -64,7 +81,7 @@ object FrmMain: TFrmMain
       OnChange = edWidthChange
     end
     object UpDown1: TUpDown
-      Left = 113
+      Left = 109
       Top = 10
       Width = 16
       Height = 22
@@ -73,6 +90,21 @@ object FrmMain: TFrmMain
       Max = 25
       Position = 5
       TabOrder = 1
+    end
+    object edPenColor: TEdit
+      Left = 203
+      Top = 11
+      Width = 73
+      Height = 22
+      TabOrder = 2
+      OnChange = edPenColorChange
+    end
+    object edFillColor: TEdit
+      Left = 340
+      Top = 11
+      Width = 73
+      Height = 22
+      TabOrder = 3
     end
   end
   object MainMenu1: TMainMenu
@@ -93,7 +125,6 @@ object FrmMain: TFrmMain
       end
       object Exit1: TMenuItem
         Caption = 'E&xit'
-        ShortCut = 27
         OnClick = Exit1Click
       end
     end
@@ -149,13 +180,13 @@ object FrmMain: TFrmMain
       GroupIndex = 1
     end
     object mnuMakePolyline: TMenuItem
-      Caption = 'Make Poly&line Layer'
+      Caption = 'Convert Button Path to Poly&line Layer '
       GroupIndex = 1
       ShortCut = 16460
       OnClick = mnuMakePolylineClick
     end
     object mnuMakePolygon: TMenuItem
-      Caption = 'Make &Polygon Layer'
+      Caption = 'Convert Button Path to &Polygon Layer '
       GroupIndex = 1
       ShortCut = 16464
       OnClick = mnuMakePolylineClick

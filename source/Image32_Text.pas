@@ -2,8 +2,8 @@ unit Image32_Text;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.25                                                            *
-* Date      :  6 October 2019                                                  *
+* Version   :  1.26                                                            *
+* Date      :  14 October 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module to support text in the Image32 library                   *
@@ -49,6 +49,7 @@ type
     constructor Create(const logfont: TLogfont; InitAnsi: boolean = true);
     destructor Destroy; override;
     procedure FillMissingChars(const s: string);
+    function MeasureText(const text: string): TPointD;
     property LogFont: TLogFont read fLogFont;
     property Handle: HFont read fHandle;
     property Fontname: string read GetFontName;
@@ -82,7 +83,7 @@ type
     //logFont.<br> If AutoAdd is true and no match is found in the current
     //list of TFontInfo objects, then the fontManager will create a new
     //TFontInfo object to match the supplied logFont. Otherwise when no match
-    //is found, the function will teturn nil.<br>
+    //is found, the function will return nil.<br>
     //Also, it's much more efficient the derive path info for ranges of
     //characters, rather than deriving this info for individual characters.
     //So when InitAnsi is true, the FontManager will get path infor for all
@@ -93,12 +94,11 @@ type
       InitAnsi: boolean = true): TFontInfo; overload;
     //Clear: Deletes all stored TFontInfo object;
     procedure Clear;
-    //Capacity: If left unchecked, the list of TFontInfos in the font
-    //manager (FM) could get very large. This could slow could slow performance.
-    //Capacity provides a limit to the number of active TFontInfo objects
-    //storred by FM ((default Capacity = 50). When the FM reaches this limit,
-    //it first removes the TFontInfo object with the longest time since it
-    //was last accessed.
+    //Capacity: If left unchecked, the list of TFontInfos in font manager (FM)
+    //could get very large and could slow could slow performance. Capacity
+    //provides a limit to the number of active TFontInfo objects stored by FM
+    //(the default Capacity = 50). When the FM reaches this limit, TFontInfo
+    //objects with the longest time since last access will be removed first.
     property Capacity: integer read fCapacity write SetCapacity;
     //InstalledFonts: Lists all the fonts currently installed in Windows.
     property InstalledFonts: TStringList read GetInstalledFonts;
@@ -787,7 +787,7 @@ function GetTextAlongPathOutine(image: TImage32;
   textAlign: TTextAlign; vertOffset: integer = 0;
   charSpacing: double = 0): TArrayOfArrayOfPointD;
 var
-  i,j, textLen, pathLen: integer;
+  i, textLen, pathLen: integer;
   left, center, center2, dist, dx: double;
   glyph: TGlyphInfo;
   pathInfo: TPathInfo;
@@ -797,19 +797,22 @@ var
 const
   TwoPi = Pi * 2;
 
-  function GetPathInfo(offset: double): integer;
+  function GetPathInfo(offset: double): TPathInfo;
+  var
+    i: integer;
   begin
-    Result := 0;
-    while Result < pathLen - 2 do
+    i := 0;
+    while i < pathLen - 2 do
     begin
-      if pathInfos[Result+1].dist > offset then break;
-      inc(Result);
+      if pathInfos[i+1].dist > offset then break;
+      inc(i);
     end;
-    if pathInfos[Result].angle >= 0 then Exit;
+    Result := pathInfos[i];
+    if Result.angle >= 0 then Exit;
     //initialize the remaining fields (ie other then 'dist')
-    pathInfos[Result].angle  := -GetAngle(path[Result], path[Result+1]);
-    pathInfos[Result].vector := GetUnitVector(path[Result], path[Result+1]);
-    pathInfos[Result].pt     := path[Result];
+    Result.angle  := -GetAngle(path[i], path[i+1]);
+    Result.vector := GetUnitVector(path[i], path[i+1]);
+    Result.pt     := path[i];
   end;
 
   function GetTextWidth: double;
@@ -850,8 +853,7 @@ begin
     glyph := fontInfo.GetGlyphInfo(text[i]);
     center := glyph.bounds.Width * 0.5;
     center2 := left + center;
-    j := GetPathInfo(center2);
-    pathInfo := pathInfos[j];
+    pathInfo := GetPathInfo(center2);
     rotatePt := PointD(center, -vertOffset);
     tmpPaths := RotatePath(glyph.paths, rotatePt, pathInfo.angle);
     dx := center2 - pathInfo.dist;
@@ -1080,6 +1082,16 @@ begin
     SelectObject(memDC, oldFont);
     DeleteDC(memDC);
   end;
+end;
+//------------------------------------------------------------------------------
+
+function TFontInfo.MeasureText(const text: string): TPointD;
+var
+  bounds: TRectD;
+  dummy: TArrayOfPointD;
+begin
+  Image32_Text.MeasureText(text, self, bounds, dummy);
+  Result := PointD(bounds.Width, bounds.Height);
 end;
 //------------------------------------------------------------------------------
 

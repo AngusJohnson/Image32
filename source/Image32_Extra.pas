@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.22                                                            *
-* Date      :  10 September 2019                                               *
+* Version   :  1.26                                                            *
+* Date      :  14 October 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -57,7 +57,7 @@ procedure Sharpen(img: TImage32; radius: Integer = 2; amount: Integer = 10);
 
 //HatchBackground: Assumes the current image is semi-transparent.
 procedure HatchBackground(img: TImage32; color1: TColor32 = clWhite32;
-  color2: TColor32= clSilver32; hatchSize: Integer = 10);
+  color2: TColor32= $FFE8E8E8; hatchSize: Integer = 10);
 
 procedure ReplaceColor(img: TImage32; oldColor, newColor: TColor32);
 
