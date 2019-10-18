@@ -44,10 +44,11 @@ type
     mnuSmoothAsym: TMenuItem;
     mnuSharpWithHdls: TMenuItem;
     mnuSharpNoHdls: TMenuItem;
-    Label1: TLabel;
-    Label3: TLabel;
+    lblPenColor: TLabel;
+    lblFillColor: TLabel;
     edPenColor: TEdit;
     edFillColor: TEdit;
+    Shape1: TShape;
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -117,13 +118,11 @@ uses
 const
   crRotate = 1;
   margin = 100;
-  defaultFillColor: TColor32 = $88FFFF66;
-  defaultPenColor: TColor32 = clNavy32;
 var
   buttonSizes: array [boolean] of integer;
-
   hitTestWidth: integer;
   lineWidth: integer;
+  fillColor, penColor: TColor32;
 
 type
 
@@ -213,8 +212,18 @@ begin
   hitTestWidth       := DPI(5);
   buttonSizes[false] := DPI(9);
   buttonSizes[true]  := DPI(8);
-  edFillColor.Text   := '$' + inttohex(defaultFillColor, 8);
-  edPenColor.Text   := '$' + inttohex(defaultPenColor, 8);
+  fillColor := $88FFFF66;
+  penColor := clNavy32;
+  edFillColor.Text  := '$' + inttohex(fillColor, 8);
+  edPenColor.Text   := '$' + inttohex(penColor, 8);
+
+  with pnlTop do
+  begin
+    Bitmap.Width := RectWidth(InnerClientRect);
+    Bitmap.Height := RectHeight(InnerClientRect);
+    BitmapProperties.AutoCenter := false;
+  end;
+  edPenColorChange(nil);
 
   setLength(dashes, 2);
   dashes[0] := 5; dashes[1] := 5;
@@ -448,12 +457,12 @@ var
   dc: HDC;
 begin
   //update pnlMain.Bitmap with layeredImage32's merged image
-
-  //Sadly, versions of Delphi prior to D2006 don't support TBitmap.SetSize.
-  //pnlMain.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  {$IFDEF SETSIZE} 
+  pnlMain.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  {$ELSE}
   pnlMain.Bitmap.Width := layeredImage32.Width;
   pnlMain.Bitmap.Height := layeredImage32.Height;
-
+  {$ENDIF}
   dc := pnlMain.Bitmap.Canvas.Handle;
   layeredImage32.GetMergedImage(mnuHideControls.Checked).CopyToDc(dc,0,0,false);
 end;
@@ -676,7 +685,15 @@ end;
 
 procedure TFrmMain.edPenColorChange(Sender: TObject);
 begin
+  if Length(FrmMain.edPenColor.Text) = 9 then
+    penColor := TColor32(StrToInt64Def(FrmMain.edPenColor.Text, penColor));
+  if Length(FrmMain.edFillColor.Text) = 9 then
+    fillColor := TColor32(StrToInt64Def(FrmMain.edFillColor.Text, fillColor));
   UpdatePanelBitmap;
+
+  Shape1.Brush.Color := RGBColor(BlendToOpaque(Color32(clBtnFace), fillColor));
+  Shape1.Pen.Width := 3;
+  Shape1.Pen.Color := RGBColor(BlendToOpaque(Color32(clBtnFace), penColor));
 end;
 //------------------------------------------------------------------------------
 

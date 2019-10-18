@@ -76,6 +76,7 @@ type
     N8: TMenuItem;
     mnuFont2: TMenuItem;
     mnuFont: TMenuItem;
+    Shape1: TShape;
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -285,6 +286,7 @@ begin
   buttonSize         := DPI(9);
   popupPos           := Types.Point(0,0);
 
+  Shape1.Pen.Width := DPI(3);
   fillColor          := defaultFillClr;
   penColor           := defaultPenClr;
   edFillColor.Text   := '$' + inttoHex(fillColor, 8);
@@ -293,13 +295,6 @@ begin
   setLength(dashes, 2);
   dashes[0] := 5; dashes[1] := 5;
   buttonPath := TSmoothPath.Create;
-
-  with pnlTop do
-  begin
-    Bitmap.Width := RectWidth(InnerClientRect);
-    Bitmap.Height := RectHeight(InnerClientRect);
-    BitmapProperties.AutoCenter := false;
-  end;
 
   //SETUP THE DISPLAY PANEL
   pnlMain.BorderWidth := DPI(16);
@@ -382,7 +377,7 @@ var
   btnColor: TColor32;
 const
   //There are 2 types of CBezier buttons controls:
-  //1. curve ends and 2. curve shape controls (aka handles)
+  //1. curve end 'nodes' and 2. curve shaping 'handles'
   btnColors: array [boolean] of TColor32 = ($FF0088FF, $FF00AA00);
   buttonOpts: array [boolean] of TButtonOptions = ([], [boSquare]);
   btnColorLast: TColor32 = clLime32;
@@ -1065,39 +1060,21 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TFrmMain.edPenColorChange(Sender: TObject);
-var
-  rec: TRect;
-  c: TColor;
 begin
-  UpdateLayeredImage;
   if Length(FrmMain.edPenColor.Text) = 9 then
     penColor := TColor32(StrToInt64Def(FrmMain.edPenColor.Text, penColor));
-
   if Length(FrmMain.edFillColor.Text) = 9 then
     fillColor := TColor32(StrToInt64Def(FrmMain.edFillColor.Text, fillColor));
-
-  //color pnlTop behind edPenColor and edFillColor edit windows with fillColor
-  c := RGBColor(BlendToOpaque(Color32(clBtnFace), fillColor));
-  pnlTop.Bitmap.Canvas.Brush.Color := c;
-  rec := Rect(lblFillColor.Left -5,
-    edFillColor.Top - 5,
-    edPenColor.Left + edPenColor.Width +5,
-    edPenColor.Top + edPenColor.Height + 5);
-  pnlTop.Bitmap.Canvas.FillRect(rec);
-  pnlTop.Bitmap.Canvas.Brush.Color := clBtnFace;
-
-  //change the color label font colors to the chosen pen color
-  c := RGBColor(penColor);
-  lblFillColor.Font.Color := c;
-  lblPenColor.Font.Color := c;
   UpdateLayeredImage;
+
+  Shape1.Brush.Color := RGBColor(BlendToOpaque(Color32(clBtnFace), fillColor));
+  Shape1.Pen.Color := RGBColor(BlendToOpaque(Color32(clBtnFace), penColor));
 end;
 //------------------------------------------------------------------------------
 
 procedure TFrmMain.edWidthChange(Sender: TObject);
 begin
   lineWidth := Max(1, Min(25, strtoint(edWidth.text)));
-  //only repaint after starting up
   UpdateLayeredImage;
 end;
 //------------------------------------------------------------------------------
@@ -1206,12 +1183,18 @@ end;
 procedure TFrmMain.rbLineArrowClick(Sender: TObject);
 begin
   ClearRotateSizeButton;
-  buttonPath.Clear;
-  btnPathRegion := nil;
-  if Sender = rbPolygonArrow then
-    StartPolygonArrow else
+  if layeredImage32.GroupCount(1) > 0 then
+  begin
+    layeredImage32.DeleteGroup(1);
+    buttonPath.Clear;
+    btnPathRegion := nil;
+    UpdateLayeredImage;
+  end
+  else if Sender = rbPolygonArrow then
+    StartPolygonArrow
+  else
     UpdateButtonGroupFromPath;
-  UpdateLayeredImage;
+
   cbArrowStart.Enabled := Sender = rbLineArrow;
   cbArrowEnd.Enabled := cbArrowStart.Enabled;
   lblArrowStart.Enabled := cbArrowStart.Enabled;

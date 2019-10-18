@@ -1,9 +1,9 @@
 object FrmMain: TFrmMain
   Left = 554
   Top = 394
-  Width = 438
-  Height = 471
   Caption = 'Image32 - Layers & SmoothPaths'
+  ClientHeight = 412
+  ClientWidth = 466
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -19,8 +19,8 @@ object FrmMain: TFrmMain
   object pnlMain: TPanel
     Left = 0
     Top = 43
-    Width = 422
-    Height = 344
+    Width = 466
+    Height = 343
     Align = alClient
     PopupMenu = PopupMenu1
     TabOrder = 0
@@ -31,8 +31,8 @@ object FrmMain: TFrmMain
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 387
-    Width = 422
+    Top = 386
+    Width = 466
     Height = 26
     Panels = <>
     ParentFont = True
@@ -45,7 +45,7 @@ object FrmMain: TFrmMain
   object pnlTop: TPanel
     Left = 0
     Top = 0
-    Width = 422
+    Width = 466
     Height = 43
     Align = alTop
     TabOrder = 2
@@ -57,19 +57,27 @@ object FrmMain: TFrmMain
       Caption = 'Line &Width:'
       FocusControl = edWidth
     end
-    object Label1: TLabel
-      Left = 140
-      Top = 14
+    object lblPenColor: TLabel
+      Left = 317
+      Top = 13
       Width = 56
       Height = 14
+      Alignment = taRightJustify
       Caption = '&Pen Color:'
     end
-    object Label3: TLabel
-      Left = 287
-      Top = 14
+    object lblFillColor: TLabel
+      Left = 147
+      Top = 13
       Width = 47
       Height = 14
+      Alignment = taRightJustify
       Caption = '&Fill Color:'
+    end
+    object Shape1: TShape
+      Left = 288
+      Top = 12
+      Width = 18
+      Height = 18
     end
     object edWidth: TEdit
       Left = 77
@@ -89,22 +97,23 @@ object FrmMain: TFrmMain
       Min = 1
       Max = 25
       Position = 5
-      TabOrder = 1
+      TabOrder = 3
     end
     object edPenColor: TEdit
-      Left = 203
-      Top = 11
+      Left = 380
+      Top = 10
       Width = 73
       Height = 22
       TabOrder = 2
       OnChange = edPenColorChange
     end
     object edFillColor: TEdit
-      Left = 340
-      Top = 11
+      Left = 201
+      Top = 10
       Width = 73
       Height = 22
-      TabOrder = 3
+      TabOrder = 1
+      OnChange = edPenColorChange
     end
   end
   object MainMenu1: TMainMenu

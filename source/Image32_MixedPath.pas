@@ -147,9 +147,9 @@ type
     property SmoothPath: TSmoothPath read fSmoothPath;
   end;
 
-  procedure DrawMixedPathDesigner(const mixedPath: TMixedPath;
+  procedure DrawMixedPathOnDesigner(const mixedPath: TMixedPath;
     designerLayer: TDesignerLayer32);
-  procedure DrawSmoothPathDesigner(const smoothPath: TSmoothPath;
+  procedure DrawSmoothPathOnDesigner(const smoothPath: TSmoothPath;
     designerLayer: TDesignerLayer32);
 
 implementation
@@ -995,7 +995,7 @@ end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-procedure DrawMixedPathDesigner(const mixedPath: TMixedPath;
+procedure DrawMixedPathOnDesigner(const mixedPath: TMixedPath;
   designerLayer: TDesignerLayer32);
 var
   i,j,highI: integer;
@@ -1109,7 +1109,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawSmoothPathDesigner(const smoothPath: TSmoothPath;
+procedure DrawSmoothPathOnDesigner(const smoothPath: TSmoothPath;
   designerLayer: TDesignerLayer32);
 var
   i, highI: integer;

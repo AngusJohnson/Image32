@@ -157,7 +157,7 @@ type
     procedure DeleteLayer(index: integer);
     procedure Clear;
     procedure Invalidate;
-    function GetLayerNamed(const name: string): TLayer32;
+    function FindLayerNamed(const name: string): TLayer32;
     function GetLayerAt(const pt: TPoint): TLayer32;
     function GetMergedImage(hideDesigners: Boolean = false): TImage32;
 
@@ -850,7 +850,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.GetLayerNamed(const name: string): TLayer32;
+function TLayeredImage32.FindLayerNamed(const name: string): TLayer32;
 var
   i: integer;
 begin

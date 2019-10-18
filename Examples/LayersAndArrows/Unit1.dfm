@@ -3,7 +3,7 @@ object FrmMain: TFrmMain
   Top = 394
   Caption = 'Image, Arrows & Text'
   ClientHeight = 468
-  ClientWidth = 444
+  ClientWidth = 473
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -19,7 +19,7 @@ object FrmMain: TFrmMain
   object pnlMain: TPanel
     Left = 0
     Top = 105
-    Width = 444
+    Width = 473
     Height = 337
     Align = alClient
     PopupMenu = PopupMenu1
@@ -28,12 +28,11 @@ object FrmMain: TFrmMain
     OnMouseDown = pnlMainMouseDown
     OnMouseMove = pnlMainMouseMove
     OnMouseUp = pnlMainMouseUp
-    ExplicitTop = 99
   end
   object StatusBar1: TStatusBar
     Left = 0
     Top = 442
-    Width = 444
+    Width = 473
     Height = 26
     Panels = <>
     ParentFont = True
@@ -46,10 +45,11 @@ object FrmMain: TFrmMain
   object pnlTop: TPanel
     Left = 0
     Top = 0
-    Width = 444
+    Width = 473
     Height = 105
     Align = alTop
     TabOrder = 0
+    ExplicitTop = -6
     object Label2: TLabel
       Left = 14
       Top = 45
@@ -60,40 +60,28 @@ object FrmMain: TFrmMain
       FocusControl = edWidth
     end
     object lblFillColor: TLabel
-      Left = 139
+      Left = 143
       Top = 45
-      Width = 55
+      Width = 47
       Height = 14
       Alignment = taRightJustify
       Caption = 'Fill &Color:'
       Color = clBtnFace
       FocusControl = edFillColor
-      Font.Charset = DEFAULT_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -12
-      Font.Name = 'Tahoma'
-      Font.Style = [fsBold]
       ParentColor = False
-      ParentFont = False
       Transparent = True
     end
     object lblPenColor: TLabel
-      Left = 283
+      Left = 317
       Top = 45
-      Width = 63
+      Width = 56
       Height = 14
       Alignment = taRightJustify
       Caption = 'Pe&n Color:'
       FocusControl = edPenColor
-      Font.Charset = DEFAULT_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -12
-      Font.Name = 'Tahoma'
-      Font.Style = [fsBold]
-      ParentFont = False
     end
     object lblArrowStart: TLabel
-      Left = 14
+      Left = 24
       Top = 75
       Width = 109
       Height = 14
@@ -102,7 +90,7 @@ object FrmMain: TFrmMain
       FocusControl = cbArrowStart
     end
     object lblArrowEnd: TLabel
-      Left = 236
+      Left = 240
       Top = 73
       Width = 103
       Height = 14
@@ -116,6 +104,12 @@ object FrmMain: TFrmMain
       Width = 101
       Height = 14
       Caption = 'Major Arrow Style:'
+    end
+    object Shape1: TShape
+      Left = 285
+      Top = 43
+      Width = 20
+      Height = 20
     end
     object rbLineArrow: TRadioButton
       Left = 128
@@ -147,7 +141,7 @@ object FrmMain: TFrmMain
       OnChange = edWidthChange
     end
     object edFillColor: TEdit
-      Left = 197
+      Left = 195
       Top = 42
       Width = 77
       Height = 22
@@ -157,7 +151,7 @@ object FrmMain: TFrmMain
       OnChange = edPenColorChange
     end
     object edPenColor: TEdit
-      Left = 350
+      Left = 380
       Top = 42
       Width = 77
       Height = 22
@@ -167,7 +161,7 @@ object FrmMain: TFrmMain
       OnChange = edPenColorChange
     end
     object cbArrowStart: TComboBox
-      Left = 132
+      Left = 141
       Top = 70
       Width = 80
       Height = 22
@@ -185,7 +179,7 @@ object FrmMain: TFrmMain
         'Tail')
     end
     object cbArrowEnd: TComboBox
-      Left = 347
+      Left = 350
       Top = 70
       Width = 80
       Height = 22
@@ -203,7 +197,7 @@ object FrmMain: TFrmMain
         'Tail')
     end
     object LineWidthUpDown: TUpDown
-      Left = 118
+      Left = 117
       Top = 42
       Width = 16
       Height = 22
@@ -215,11 +209,12 @@ object FrmMain: TFrmMain
     end
     object pnlText: TPanel
       Left = 260
-      Top = 11
-      Width = 163
+      Top = 15
+      Width = 197
       Height = 21
       Alignment = taRightJustify
       BevelOuter = bvNone
+      Caption = 'Font name; Size'
       TabOrder = 8
       OnDblClick = mnuFontClick
     end

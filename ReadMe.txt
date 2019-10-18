@@ -1,8 +1,8 @@
 
 Image32 is a 2D graphics library written in Delphi Pascal. It provides an extensive range of image manipulation functions. It also includes a polygon renderer for line and polygon drawing. The renderer supports a range of brush filling options including tiled images, and linear and radial gradient fills.
 
-Version: 1.27
-Uploaded: 17 October 2019
+Version: 1.28
+Uploaded: 20 October 2019
 Freeware for both open source and commercial applications released under 
 Boost Software License - see https://www.boost.org/LICENSE_1_0.txt
 Copyright © 2019 Angus Johnson
@@ -12,6 +12,11 @@ http://www.angusj.com/delphi/image32.php
 
 Recent changes:
 
+Version: 1.28
+  Changes in Image32_MixedPath
+    Renamed DrawMixedPathDesigner to DrawMixedPathOnDesigner
+    Renamed DrawSmoothPathDesigner to DrawSmoothPathOnDesigner
+
 Version: 1.27
   Changes in Image32
     Fixed bug in Color32 function
@@ -20,8 +25,12 @@ Version: 1.27
   Changes in Image32_Text
     Added TFontInfo.MeasureText method
   Changes in BitmapPanels
-    TPanel.ClearBitmap pixelFormat parameter now defaults to pf24bit
+    Changed TPanel.ClearBitmap pixelFormat parameter default (now pf24bit)
     Added TPanel.BitmapProperties.AutoCenter property (default = True)
+  Changes in Image32_Layers
+    Renamed TLayeredImage32.GetLayerNamed to FindLayerNamed
+  Changes in Examples
+    Updated several examples
     
 Version: 1.26
   Changes in Image32
