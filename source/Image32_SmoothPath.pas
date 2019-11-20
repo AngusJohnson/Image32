@@ -1,12 +1,12 @@
-unit Image32_MixedPath;
+unit Image32_SmoothPath;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.26                                                            *
-* Date      :  14 October 2019                                                 *
+* Version   :  1.28                                                            *
+* Date      :  22 October 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
-* Purpose   :  Module that supports mixed-type (curved & straight) paths       *
+* Purpose   :  Supports paths with multiple sub-curves                         *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
@@ -18,59 +18,6 @@ uses
 {$I Image32.inc}
 
 type
-  TMixedType = (mtStraight, mtCBezier, mtQBezier, mtCSpline, mtQSpline);
-
-  TMixedPoint = record
-    PointType: TMixedType;
-    case boolean of
-      false: (Point    : TPointD);
-      true: (X: double; Y: double);
-  end;
-
-  //TMixedPath: structure for paths containing both curved and straight edges
-  TMixedPath = class
-  private
-    fCapacity       : integer;
-    fTotalCount     : integer;      //total control points (ie <= capacity)
-    fCurrentType    : TMixedType;
-    fCurrentCount   : integer;      //count of current PointType
-    fCtrlPoints     : array of TMixedPoint;
-    fFlattened      : TArrayOfPointD;
-    function GetCtrlPoints: TArrayOfPointD;
-    function GetPoint(index: integer): TPointD;
-    procedure SetPoint(index: integer; const ctrlPt: TPointD);
-    function GetPointType(index: integer): TMixedType;
-    procedure SetPointType(index: integer; const mixedType: TMixedType);
-    function GetFlattenedPath: TArrayOfPointD;
-    procedure AddInternal(const pt: TPointD);
-  public
-    function Add(const pt: TPointD; pointType: TMixedType): Boolean; overload;
-    function Add(const pt: TPointD): Boolean; overload;
-    procedure Assign(mixedPath: TMixedPath);
-    procedure AssignTo(mixedPath: TMixedPath);
-    //CurrentTypeIsComplete: indicates if the current control points
-    //constitute a valid path or whether more control points are required.
-    function CurrentTypeIsComplete: Boolean;
-    procedure Clear;
-    //DeleteLast: deletes the last control point
-    procedure DeleteLast;
-    //DeleteLastType: starting at the end and heading toward the beginning,
-    //deletes contiguous control points with the same TMixedType
-    procedure DeleteLastType;
-    procedure Offset(dx, dy: integer);
-    procedure Rotate(const focalPoint: TPointD; angleRads: double);
-    procedure Scale(sx, sy: double);
-
-    property Points[index: integer]: TPointD
-      read GetPoint write SetPoint; Default;
-    property PointTypes[index: integer]: TMixedType
-      read GetPointType write SetPointType;
-    property CtrlPoints: TArrayOfPointD read GetCtrlPoints;
-    property CurrentType: TMixedType read fCurrentType;
-    property Count: integer read fTotalCount;
-    property FlattenedPath: TArrayOfPointD read GetFlattenedPath;
-  end;
-
   TSmoothType = (stSmoothSym, stSmoothAsym, stSharpWithHdls, stSharpNoHdls);
 
   TSmoothPoint = record
@@ -103,7 +50,6 @@ type
     procedure Add(const pt: TPointD); overload;
     procedure Assign(mixedPath: TSmoothPath);
     procedure AssignTo(mixedPath: TSmoothPath);
-    function CurrentCurveIsComplete: Boolean;
     procedure Clear;
     //DeleteLast: deletes the last control point
     procedure DeleteLast;
@@ -123,19 +69,7 @@ type
     property FlattenedPath: TArrayOfPointD read GetFlattenedPath;
   end;
 
-  //Anticipating that both TMixedPath and TSmoothPath will
-  //mostly be used inside a TLayeredImage32 ...
-
-  TMixedPathLayer32 = class(TLayer32)
-  private
-    fMixedPath: TMixedPath;
-  public
-    constructor Create(owner: TLayeredImage32); override;
-    destructor Destroy; override;
-    procedure Offset(dx, dy: integer); override;
-    property MixedPath: TMixedPath read fMixedPath;
-  end;
-
+  //Anticipating that TSmoothPath will mostly be used inside a TLayeredImage32
   TSmoothPathLayer32 = class(TLayer32)
   private
     //saved copy of smoothPath in case layer needs re-editing
@@ -147,8 +81,6 @@ type
     property SmoothPath: TSmoothPath read fSmoothPath;
   end;
 
-  procedure DrawMixedPathOnDesigner(const mixedPath: TMixedPath;
-    designerLayer: TDesignerLayer32);
   procedure DrawSmoothPathOnDesigner(const smoothPath: TSmoothPath;
     designerLayer: TDesignerLayer32);
 
@@ -158,352 +90,10 @@ uses
   Image32_Draw, Image32_Vector, Image32_Extra;
 
 resourcestring
-  rsMixedPathRangeError = 'TMixedPath: index is out of range.';
   rsSmoothPathRangeError = 'TSmoothPath: index is out of range.';
 
 const
   capacityIncrement = 16;
-
-//------------------------------------------------------------------------------
-// TMixedPath
-//------------------------------------------------------------------------------
-
-procedure TMixedPath.Clear;
-begin
-  fCtrlPoints := nil;
-  fFlattened := nil;
-  fCapacity := 0;
-  fTotalCount := 0;
-  fCurrentCount := 0;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMixedPath.Assign(mixedPath: TMixedPath);
-begin
-  mixedPath.AssignTo(self);
-end;
-//------------------------------------------------------------------------------
-
-procedure TMixedPath.AssignTo(mixedPath: TMixedPath);
-begin
-  if not assigned(mixedPath) then Exit;
-  mixedPath.fCapacity := self.fCapacity;
-  mixedPath.fTotalCount := self.fTotalCount;
-  mixedPath.fCurrentType := self.fCurrentType;
-  mixedPath.fCurrentCount := self.fCurrentCount;
-  mixedPath.fCtrlPoints := Copy(self.fCtrlPoints, 0, self.fCapacity);
-  mixedPath.fFlattened := nil;
-end;
-//------------------------------------------------------------------------------
-
-function TMixedPath.GetCtrlPoints: TArrayOfPointD;
-var
-  i, cnt: integer;
-begin
-  cnt := Count;
-  setLength(Result, cnt);
-  for i := 0 to cnt - 1 do
-    Result[i] := fCtrlPoints[i].Point;
-end;
-//------------------------------------------------------------------------------
-
-function TMixedPath.GetPoint(index: integer): TPointD;
-begin
-  if (index < 0) or (index >= Count) then
-    raise Exception.Create(rsMixedPathRangeError);
-  Result := fCtrlPoints[index].Point;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMixedPath.SetPoint(index: integer; const ctrlPt: TPointD);
-begin
-  if (index < 0) or (index >= Count) then
-    raise Exception.Create(rsMixedPathRangeError);
-  fCtrlPoints[index].Point := ctrlPt;
-end;
-//------------------------------------------------------------------------------
-
-function TMixedPath.GetPointType(index: integer): TMixedType;
-begin
-  if (index < 0) or (index >= Count) then
-    raise Exception.Create(rsMixedPathRangeError);
-  Result := fCtrlPoints[index].PointType;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMixedPath.SetPointType(index: integer; const mixedType: TMixedType);
-begin
-  if (index < 0) or (index >= Count) then
-    raise Exception.Create(rsMixedPathRangeError);
-  fCtrlPoints[index].PointType := mixedType;
-end;
-//------------------------------------------------------------------------------
-
-function TMixedPath.GetFlattenedPath: TArrayOfPointD;
-var
-  i,j,k, highI: integer;
-  tmp: TArrayOfPointD;
-  pointType: TMixedType;
-  virtualPt: TPointD;
-begin
-  if not assigned(fCtrlPoints) then
-  begin
-    Result := nil;
-    Exit;
-  end
-  else if assigned(fFlattened) then
-  begin
-    Result := fFlattened;
-    Exit;
-  end;
-
-  virtualPt := NullPointD;
-  i := 0;
-  highI := fTotalCount -1;
-  while i < highI do
-  begin
-    j := i +1;
-    pointType := fCtrlPoints[j].PointType;
-    while (j < highI) and
-      (fCtrlPoints[j+1].PointType = pointType) do inc(j);
-    case pointType of
-      mtStraight:
-        begin
-          SetLength(tmp, j - i +1);
-          for k := i to j do
-            tmp[k-i] := fCtrlPoints[k].Point;
-          Result := JoinPaths(Result, tmp);
-        end;
-      mtCBezier:
-        begin
-          if j < i + 3 then break;
-          SetLength(tmp, 4);
-          while i < j - 2 do
-          begin
-            for k := i to i +3 do
-              tmp[k-i] := fCtrlPoints[k].Point;
-            Result := JoinPaths(Result, CBezier(tmp));
-            inc(i, 3);
-          end;
-        end;
-      mtQBezier:
-        begin
-          if j < i + 2 then break;
-          SetLength(tmp, 3);
-          while i < j - 1 do
-          begin
-            for k := i to i +2 do
-              tmp[k-i] := fCtrlPoints[k].Point;
-            Result := JoinPaths(Result, QBezier(tmp));
-            inc(i, 2);
-          end;
-        end;
-      mtCSpline:
-        begin
-          SetLength(tmp, 4);
-          tmp[0] := fCtrlPoints[i].Point;
-          if i = 0 then
-          begin
-            if j < 3 then break;
-            tmp[1] := fCtrlPoints[1].Point;
-            inc(i);
-          end
-          else if fCtrlPoints[i].PointType = mtQSpline then
-          begin
-            if j < i +2 then break;
-            tmp[1] := ReflectPoint(virtualPt, tmp[0]);
-          end else
-          begin
-            if j < i +2 then break;
-            tmp[1] := ReflectPoint(fCtrlPoints[i-1].Point, tmp[0]);
-          end;
-
-          tmp[2] := fCtrlPoints[i+1].Point;
-          tmp[3] := fCtrlPoints[i+2].Point;
-          Result := JoinPaths(Result, CSpline(tmp));
-          inc(i,2);
-          while i < j - 1 do
-          begin
-            tmp[0] := fCtrlPoints[i].Point;
-            tmp[1] := ReflectPoint(fCtrlPoints[i-1].Point, tmp[0]);
-            tmp[2] := fCtrlPoints[i+1].Point;
-            tmp[3] := fCtrlPoints[i+2].Point;
-            Result := JoinPaths(Result, CSpline(tmp));
-            inc(i, 2);
-          end;
-        end;
-      mtQSpline:
-        begin
-          SetLength(tmp, 3);
-          tmp[0] := fCtrlPoints[i].Point;
-          if i = 0 then
-          begin
-            if j < 2 then break;
-            tmp[1] := fCtrlPoints[1].Point;
-            inc(i);
-          end else
-            tmp[1] := ReflectPoint(fCtrlPoints[i-1].Point, tmp[0]);
-
-          tmp[2] := fCtrlPoints[i+1].Point;
-          Result := JoinPaths(Result, QSpline(tmp));
-          inc(i);
-          while i < j do
-          begin
-            tmp[0] := fCtrlPoints[i].Point;
-            tmp[1] := ReflectPoint(tmp[1], tmp[0]);
-            tmp[2] := fCtrlPoints[i+1].Point;
-            Result := JoinPaths(Result, QSpline(tmp));
-            inc(i);
-          end;
-          virtualPt := tmp[1];
-        end;
-    end;
-    i := j;
-  end;
-  fFlattened := Result;
-end;
-//------------------------------------------------------------------------------
-
-function TMixedPath.CurrentTypeIsComplete: Boolean;
-var
-  isFirst: Boolean;
-begin
-  result := true;
-  if fTotalCount > 0 then
-  begin
-    isFirst := fTotalCount = fCurrentCount;
-    case fCurrentType of
-      mtStraight:
-        if isFirst then Result := fCurrentCount > 1
-        else Result := fCurrentCount > 0;
-      mtCBezier:
-        if isFirst then Result := (fCurrentCount -1) mod 3 = 0
-        else Result := fCurrentCount mod 3 = 0;
-      mtQBezier:
-        if isFirst then Result := (fCurrentCount -1) mod 2 = 0
-        else Result := fCurrentCount mod 2 = 0;
-      mtCSpline:
-        if isFirst then Result := fCurrentCount > 3
-        else Result := fCurrentCount mod 2 = 0;
-      mtQSpline:
-        if isFirst then Result := fCurrentCount > 2
-        else Result := fCurrentCount > 0;
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMixedPath.AddInternal(const pt: TPointD);
-begin
-  if fTotalCount = fCapacity then
-  begin
-    inc(fCapacity, capacityIncrement);
-    SetLength(fCtrlPoints, fCapacity);
-  end;
-  fCtrlPoints[fTotalCount].PointType := fCurrentType;
-  fCtrlPoints[fTotalCount].Point := pt;
-  inc(fTotalCount);
-  inc(fCurrentCount);
-  fFlattened := nil;
-end;
-//------------------------------------------------------------------------------
-
-function TMixedPath.Add(const pt: TPointD): Boolean;
-begin
-  //nb: the first Add() must specify a TMixedType
-  Result := assigned(fCtrlPoints);
-  if not Result then Exit;
-  AddInternal(pt);
-end;
-//------------------------------------------------------------------------------
-
-function TMixedPath.Add(const pt: TPointD; pointType: TMixedType): Boolean;
-begin
-  if not assigned(fCtrlPoints) then
-  begin
-    fCurrentType := pointType;
-    Result := true;
-  end
-  else if (pointType <> fCurrentType) then
-  begin
-    Result := CurrentTypeIsComplete;
-    if not Result then Exit;
-    fCurrentType := pointType;
-    fCurrentCount := 0;
-  end else
-    Result := true;
-  AddInternal(pt);
-end;
-//------------------------------------------------------------------------------
-
-procedure TMixedPath.DeleteLast;
-begin
-  if fTotalCount = 0 then
-    Exit
-  else if fCurrentCount > 1 then
-  begin
-    dec(fTotalCount, fCurrentCount);
-    dec(fCurrentCount);
-  end else
-    DeleteLastType;
-  fFlattened := nil;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMixedPath.DeleteLastType;
-var
-  i: integer;
-  pt: TMixedType;
-begin
-  if fTotalCount = 0 then Exit;
-
-  dec(fTotalCount, fCurrentCount);
-  if fTotalCount > 0 then
-  begin
-    pt := fCtrlPoints[fTotalCount].PointType;
-    i := fTotalCount -1;
-    while (i >= 0) and (fCtrlPoints[i].PointType = pt) do Dec(i);
-    fCurrentCount := fTotalCount - i;
-  end
-  else
-    fCurrentCount := 0;
-  fFlattened := nil;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMixedPath.Offset(dx, dy: integer);
-var
-  i: integer;
-begin
-  for i := 0 to Count -1 do
-  begin
-    fCtrlPoints[i].X := fCtrlPoints[i].X + dx;
-    fCtrlPoints[i].Y := fCtrlPoints[i].Y + dy;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMixedPath.Rotate(const focalPoint: TPointD; angleRads: double);
-var
-  i: integer;
-  sinA, cosA: extended;
-begin
-  Math.SinCos(angleRads, sinA, cosA);
-  for i := 0 to Count -1 do
-    RotatePoint(fCtrlPoints[i].Point, focalPoint, sinA, cosA);
-end;
-//------------------------------------------------------------------------------
-
-procedure TMixedPath.Scale(sx, sy: double);
-var
-  i: integer;
-begin
-  for i := 0 to Count -1 do
-  begin
-    fCtrlPoints[i].X := fCtrlPoints[i].X * sx;
-    fCtrlPoints[i].Y := fCtrlPoints[i].Y * sy;
-  end;
-end;
 
 //------------------------------------------------------------------------------
 // TSmoothPath
@@ -700,12 +290,6 @@ begin
     inc(j, 3);
   end;
   fFlattened := Result;
-end;
-//------------------------------------------------------------------------------
-
-function TSmoothPath.CurrentCurveIsComplete: Boolean;
-begin
-  result := (fCount = 0) or ((fCount > 3) and (fCount mod 3 = 1));
 end;
 //------------------------------------------------------------------------------
 
@@ -935,40 +519,6 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TMixedPathLayer32
-//------------------------------------------------------------------------------
-
-constructor TMixedPathLayer32.Create(owner: TLayeredImage32);
-begin
-  inherited;
-  fMixedPath := TMixedPath.Create;
-end;
-//------------------------------------------------------------------------------
-
-destructor TMixedPathLayer32.Destroy;
-begin
- fMixedPath.Free;
- inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMixedPathLayer32.Offset(dx, dy: integer);
-var
-  i: integer;
-  mpPt: TPointD;
-begin
-  inherited Offset(dx, dy);
-  //when the layer is offset, offset MixedPath too
-  for i := 0 to fMixedPath.Count -1 do
-  begin
-    mpPt := fMixedPath.Points[i];
-    mpPt.X := mpPt.X + dx;
-    mpPt.Y := mpPt.Y + dy;
-    fMixedPath.Points[i] := mpPt;
-  end;
-end;
-
-//------------------------------------------------------------------------------
 // TSmoothPathLayer32
 //------------------------------------------------------------------------------
 
@@ -993,120 +543,6 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-
-procedure DrawMixedPathOnDesigner(const mixedPath: TMixedPath;
-  designerLayer: TDesignerLayer32);
-var
-  i,j,highI: integer;
-  btnSize: double;
-  pointType: TMixedType;
-  pts: TArrayOfPointD;
-  virtualPt: TPointD;
-begin
-  setLength(pts, 2);
-  highI := mixedPath.Count -1;
-  btnSize := designerLayer.ButtonSize;
-  if btnSize < 2 then btnSize := DefaultButtonSize;
-  virtualPt := NullPointD;
-
-  i := 0;
-  while i < highI do
-  begin
-    j := i + 1;
-    pointType := mixedPath.PointTypes[j];
-    while (j < highI) and (mixedPath.PointTypes[j+1] = pointType) do inc(j);
-    case pointType of
-      mtCBezier:
-        while i < j -2 do
-        begin
-          pts[0] := mixedPath.Points[i];
-          pts[1] := mixedPath.Points[i+1];
-          designerLayer.DrawLine(pts);
-          pts[0] := mixedPath.Points[i+2];
-          pts[1] := mixedPath.Points[i+3];
-          designerLayer.DrawLine(pts);
-          inc(i, 3);
-        end;
-      mtQBezier:
-        while i < j -1 do
-        begin
-          pts[0] := mixedPath.Points[i];
-          pts[1] := mixedPath.Points[i+1];
-          designerLayer.DrawLine(pts);
-          pts[0] := mixedPath.Points[i+1];
-          pts[1] := mixedPath.Points[i+2];
-          designerLayer.DrawLine(pts);
-          inc(i, 2);
-        end;
-      mtCSpline:
-        begin
-          pts[0] := mixedPath.Points[i];
-          if i = 0 then
-          begin
-            if i > j - 3 then break;
-            pts[1] := mixedPath.Points[1];
-            designerLayer.DrawLine(pts);
-            inc(i);
-          end
-          else if mixedPath.PointTypes[i] = mtQSpline then
-          begin
-            if i > j - 2 then break;
-            pts[1] := ReflectPoint(virtualPt, pts[0]);
-            designerLayer.DrawLine(pts);
-            DrawButton(designerLayer.Image, pts[1], btnSize);
-          end else
-          begin
-            if i > j - 2 then break;
-            pts[1] := ReflectPoint(mixedPath.Points[i-1], pts[0]);
-            designerLayer.DrawLine(pts);
-            DrawButton(designerLayer.Image, pts[1], btnSize);
-          end;
-          pts[0] := mixedPath.Points[i+1];
-          pts[1] := mixedPath.Points[i+2];
-          designerLayer.DrawLine(pts);
-          inc(i, 2);
-          while i < j - 1 do
-          begin
-            pts[0] := mixedPath.Points[i];
-            pts[1] := ReflectPoint(mixedPath.Points[i-1], pts[0]);
-            designerLayer.DrawLine(pts);
-            DrawButton(designerLayer.Image, pts[1], btnSize);
-            pts[0] := mixedPath.Points[i+1];
-            pts[1] := mixedPath.Points[i+2];
-            designerLayer.DrawLine(pts);
-            inc(i, 2);
-          end;
-        end;
-      mtQSpline:
-        begin
-          pts[0] := mixedPath.Points[i];
-          if i = 0 then
-          begin
-            pts[1] := mixedPath.Points[1];
-            inc(i);
-          end
-          else
-            pts[1] := ReflectPoint(mixedPath.Points[i-1], pts[0]);
-
-          designerLayer.DrawLine(pts);
-          DrawButton(designerLayer.Image, pts[1], btnSize);
-          while i < j do
-          begin
-            pts[0] := mixedPath.Points[i+1];
-            inc(i);
-            designerLayer.DrawLine(pts);
-            if i = j then break;
-            pts[1] := ReflectPoint(pts[1], pts[0]);
-            designerLayer.DrawLine(pts);
-            DrawButton(designerLayer.Image, pts[1], btnSize);
-          end;
-          virtualPt := pts[1];
-        end;
-    end;
-    i := j;
-  end;
-end;
 //------------------------------------------------------------------------------
 
 procedure DrawSmoothPathOnDesigner(const smoothPath: TSmoothPath;
