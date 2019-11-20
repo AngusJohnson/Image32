@@ -2412,8 +2412,8 @@ var
   rec2: TRect;
   recWidth, recHeight: integer;
 begin
-  recWidth := (rec.Left + rec.Right);
-  recHeight := (rec.Top + rec.Bottom);
+  recWidth := rec.Right - rec.Left;
+  recHeight := rec.Bottom - rec.Top;
   //create a tmp image with a copy of the pixels inside rec ...
   tmp := TImage32.Create(self, rec);
   try
