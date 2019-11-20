@@ -14,22 +14,26 @@
   {$IFEND}
   {$IF COMPILERVERSION >= 17}
     {$IFNDEF DEBUG}
-      {$DEFINE INLINE}                 //Delphi 2005 - added inlining
+      {$DEFINE INLINE}                   //Delphi 2005 - added inlining
     {$IFEND}  
     {$IF COMPILERVERSION >= 18}
-      {$DEFINE ABSTRACT_CLASSES}       //Delphi 2006 - added abstract classes
-      {$DEFINE RECORD_METHODS}         //Delphi 2006 - added records with methods
-      {$DEFINE REPORTMEMORYLEAKS}      //Delphi 2006 - added ReportMemoryLeaksOnShutdown
+      {$DEFINE ABSTRACT_CLASSES}         //Delphi 2006 - added abstract classes
+      {$DEFINE RECORD_METHODS}           //Delphi 2006 - added records with methods
+      {$DEFINE REPORTMEMORYLEAKS}        //Delphi 2006 - added ReportMemoryLeaksOnShutdown
       {$WARN SYMBOL_PLATFORM OFF}
-      {$DEFINE SETSIZE}                //Delphi 2006 - added TBitmap.SetSize
+      {$DEFINE SETSIZE}                  //Delphi 2006 - added TBitmap.SetSize
       {$IF COMPILERVERSION >= 18.5}
-        {$DEFINE DELPHI_PNG}           //Delphi 2007 - added PNG support
-        {$DEFINE MAINFORMONTASKBAR}    //Delphi 2007 - added TApplication.MainFormOnTaskbar
+        {$DEFINE DELPHI_PNG}             //Delphi 2007 - added PNG support
+        {$DEFINE MAINFORMONTASKBAR}      //Delphi 2007 - added TApplication.MainFormOnTaskbar
         {$if CompilerVersion >= 20}
-          {$DEFINE PBYTE}              //Delphi 2009 - added PByte
-          {$DEFINE EXIT_PARAM}         //Delphi 2009 - added Exit(value)
-          {$IF COMPILERVERSION >= 23}
-            {$DEFINE UITYPES}          //UITypes unit added in DelphiXE2
+          {$DEFINE PBYTE}                //Delphi 2009 - added PByte
+          {$DEFINE EXIT_PARAM}           //Delphi 2009 - added Exit(value)
+          {$DEFINE ALPHAFORMAT}          //Delphi 2009 - added TBitmap.AlphaFormat property
+          {$IF COMPILERVERSION >= 21}
+            {$DEFINE GESTURES}           //Delphi 2010 - added screen gesture support
+            {$IF COMPILERVERSION >= 23}
+              {$DEFINE UITYPES}          //DelphiXE2   - added UITypes unit
+            {$IFEND}
           {$IFEND}
         {$IFEND}
       {$IFEND}
