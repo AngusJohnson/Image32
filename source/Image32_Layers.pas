@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.26                                                            *
-* Date      :  14 October 2019                                                 *
+* Version   :  1.28                                                            *
+* Date      :  21 November 2019                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -721,12 +721,12 @@ begin
           tmp := TImage32.Create(Image);
           try
             AdjustOpacity(tmp, fOpacity);
-            fMergedImage.CopyFrom(tmp, tmp.Bounds, Bounds, blendFunc);
+            fMergedImage.CopyBlend(tmp, tmp.Bounds, Bounds, blendFunc);
           finally
             tmp.Free;
           end;
         end else
-          fMergedImage.CopyFrom(Image, Image.Bounds, Bounds, blendFunc);
+          fMergedImage.CopyBlend(Image, Image.Bounds, Bounds, blendFunc);
       end;
     end;
 
@@ -1171,7 +1171,7 @@ var
   i, btnIdx, cnt, fig: integer;
   lim: TLayeredImage32;
   rec: TRect;
-  btnMP, recMP: TPoint;
+  btnMP: TPoint;
   corners, edgeMps: TArrayOfPointD;
   style: TSizingStyle;
 begin
@@ -1230,7 +1230,6 @@ begin
       3: rec.Left := btnMP.X;
     end;
   end;
-  recMP := MidPoint(rec);
 
   //REPOSITION ALL BUTTONS SO THAT THEY ALIGN WITH REC
   //AND EDGE BUTTONS ARE RE-CENTERED TOO

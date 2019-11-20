@@ -63,10 +63,17 @@ begin
   //set Panel1.Tabstop := true to enable keyboard controls
   Panel1.TabStop := true;
   Panel1.FocusedColor := clGradientInactiveCaption;
-  Panel1.BitmapProperties.Scale := 1;
-  //Panel1.Bitmap.SetSize(ImageSize, ImageSize + SpaceAbove);
+  //enable bitmap transparency (ie to the panel background)
+  Panel1.Bitmap.PixelFormat := pf32bit;
+  //since ScaleType defaults to stFit, change to ...
+  Panel1.BitmapProperties.ScaleType := stScaled; //(scale = 1)
+
+  {$IFDEF SETSIZE}
+  Panel1.Bitmap.SetSize(ImageSize, ImageSize + SpaceAbove);
+  {$ELSE}
   Panel1.Bitmap.Width := ImageSize;
   Panel1.Bitmap.Height := ImageSize + SpaceAbove;
+  {$ENDIF}
 
   rec := Rect(0,0,ImageSize,ImageSize);
   Windows.InflateRect(rec, -15,-15);
@@ -93,7 +100,7 @@ begin
     img2 := TImage32.Create(ImageSize, ImageSize + SpaceAbove);
     rec := Rect(0, Round(j), ImageSize, Round(j) + ImageSize);
     j := j * k;
-    img2.CopyFrom(img, img.Bounds, rec);
+    img2.CopyBlend(img, img.Bounds, rec);
     DrawLine(img2, path2, 5, clBlack32, esSquare);
     masterImageList.Add(img2);
   end;
@@ -107,7 +114,7 @@ begin
     img2 := TImage32.Create(ImageSize, ImageSize + SpaceAbove);
     rec := Rect(0, SpaceAbove + sqSize -Round(j), ImageSize, SpaceAbove +ImageSize);
     j := j/k;
-    img2.CopyFrom(img, img.Bounds, rec);
+    img2.CopyBlend(img, img.Bounds, rec);
     DrawLine(img2, path2, 5, clBlack32, esSquare);
     masterImageList.Add(img2);
   end;

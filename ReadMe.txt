@@ -2,7 +2,7 @@
 Image32 is a 2D graphics library written in Delphi Pascal. It provides an extensive range of image manipulation functions. It also includes a polygon renderer for line and polygon drawing. The renderer supports a range of brush filling options including tiled images, and linear and radial gradient fills.
 
 Version: 1.28
-Uploaded: 20 October 2019
+Uploaded: 24 November 2019
 Freeware for both open source and commercial applications released under 
 Boost Software License - see https://www.boost.org/LICENSE_1_0.txt
 Copyright © 2019 Angus Johnson
@@ -13,9 +13,26 @@ http://www.angusj.com/delphi/image32.php
 Recent changes:
 
 Version: 1.28
+  Changes in Image32
+    Renamed TImage32.CopyFrom method to CopyBlend
   Changes in Image32_MixedPath
-    Renamed DrawMixedPathDesigner to DrawMixedPathOnDesigner
-    Renamed DrawSmoothPathDesigner to DrawSmoothPathOnDesigner
+    Deleted deprecated TMixedPath class in Image32_MixedPath
+    Renamed Image32_MixedPath to Image32_SmoothPath
+    Renamed DrawSmoothPathDesigner to DrawSmoothPathOntoDesigner
+  Changes in Image32_Extra
+    Changed and renamed FloodFillRGB function to CompareRGB
+    Changed and renamed FloodFillHue function to CompareHue
+    Exposed GetFloodFillMask function
+    Added GetMask function
+    Added MaskToPolygons function (see documentation)
+  Changes in Image32_Draw
+    Added ErasePolygon function
+    Added DrawBoolMask function
+    Added DrawAlphaMask function
+  Changes in BitmapPanels
+    Added TPanel.BitmapProperties.ScaleType property
+    Removed TPanel.BitmapProperties.RawScale property
+    Modified TPanel.ClearBitmap (see documentation)
 
 Version: 1.27
   Changes in Image32

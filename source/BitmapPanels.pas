@@ -2,8 +2,8 @@ unit BitmapPanels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.10                                                            *
-* Date      :  14 October 2019                                                 *
+* Version   :  1.11                                                            *
+* Date      :  21 November 2019                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
@@ -53,7 +53,7 @@ type
     fMousePos: TPoint;
     fFocusedColor: TColor;
     fBitmapProperties: TBitmapProperties;
-    procedure SetFocusedColor(color: TColor);
+    procedure SetFocusedColor(aColor: TColor);
     procedure UpdateCursor;
     procedure BitmapScaleBestFit;
 {$IFDEF GESTURES}
@@ -93,7 +93,7 @@ type
     function CopyToClipboard: Boolean;
     function PasteFromClipboard: Boolean;
     //ClearBitmap: Required only when drawing to the bitmap's Canvas property.
-    procedure ClearBitmap(PixelFormat: TPixelFormat = pf24bit);
+    procedure ClearBitmap;
     property Bitmap: TBitmap read fBmp;
     property BitmapProperties: TBitmapProperties read fBitmapProperties;
     //FocusedColor: Panel's border color when focused (ie if TabStop = true)
@@ -125,8 +125,9 @@ type
     fOnKeyUp  : TKeyEvent;
     function GetOffset: TPoint;
     procedure SetOffset(const Pt: TPoint);
+    function GetScaleType: TScaleType;
     function GetScale: double;
-    function GetRawScale: double;
+    procedure SetScaleType(value: TScaleType);
     procedure SetScale(value: double);
     procedure SetFileDropEnabled(value: Boolean);
     procedure SetZoomScrollEnabled(value: Boolean);
@@ -146,11 +147,11 @@ type
     //Offset: The amount to offset the image.<br>
     //(Assumes the display image size exceeds the panel's display area.)
     property Offset: TPoint read GetOffset write SetOffset;
+    property ScaleType: TScaleType read GetScaleType write SetScaleType;
+
     //Scale: SCALE_BEST_FIT, SCALE_STRETCHED, or a value between ScaleMin and
     //ScaleMax.
     property Scale: double read GetScale write SetScale;
-    //RawScale: Useful only when Scale = SCALE_BEST_FIT
-    property RawScale: double read GetRawScale;
     //ScaleMin: Default = 0.05;
     property ScaleMin: double read fMinScale write fMinScale;
     //ScaleMax: Default = 10.0;
@@ -170,6 +171,7 @@ type
     //ScrollButtonColorHot: Default = clHotLight
     property ScrollButtonColorHot: TColor
       read fScrollButtonColorHot write fScrollButtonColorHot;
+
     property OnResizing: TNotifyEvent
       read fOnBitmapResizing write fOnBitmapResizing;
     property OnScrolling: TNotifyEvent
@@ -189,9 +191,6 @@ type
 {$ENDIF}
 
 const
-  SCALE_STRETCHED = -1;
-  SCALE_BEST_FIT = 0;
-
   //The minimum size for scrolling buttons. If borders are too narrow
   //to properly display scroll buttons then scroll buttons will be disabled.
   FMinScrollBtnSize = 5;
@@ -200,12 +199,7 @@ implementation
 
 resourcestring
   rsClearBitmapError = 'Error in BitmapPanels.TPanel.ClearBitmap - bitmap is empty.';
-
-const
-  //Minimum zoom scale
-  MinScaleSize = 0.05;
-  //Maximum zoom scale
-  MaxScaleSize = 10.0;
+  rsScaleError = 'Error: Scale must be a value larger than 0';
 
 type
   PColor32 = ^TColor32;
@@ -283,8 +277,8 @@ begin
   fOwner := ownerPanel;
   fOwner.fScale := 1;
   fOwner.fScaleType := stFit;
-  fMinScale := MinScaleSize;
-  fMaxScale := MaxScaleSize;
+  fMinScale := 0.05; //default min
+  fMaxScale := 20;   //default max
   fShowScrollbars := true;
   fAutoCenter := true;
   fScrollButtonColor := MakeDarker(clBtnFace, 20); //ie 20% darker
@@ -316,21 +310,29 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TBitmapProperties.GetScale: double;
+function TBitmapProperties.GetScaleType: TScaleType;
 begin
-  case fOwner.fScaleType of
-    stScaled: Result := fOwner.fScale;
-    stFit   : Result := SCALE_BEST_FIT;
-    else Result := SCALE_STRETCHED;
-  end;
+  Result := fOwner.fScaleType;
 end;
 //------------------------------------------------------------------------------
 
-function TBitmapProperties.GetRawScale: double;
+function TBitmapProperties.GetScale: double;
 begin
-  if fOwner.fScaleType = stStretched then
-    Result := 1 else
-    Result := fOwner.fScale;
+  if fOwner.fScaleType = stStretched then result := 1
+  else Result := fOwner.fScale;
+end;
+//------------------------------------------------------------------------------
+
+procedure TBitmapProperties.SetScaleType(value: TScaleType);
+begin
+  if fOwner.fScaleType = value then Exit;
+  fOwner.fScaleType := value;
+  if (fOwner.fScaleType = stFit) and assigned(fOnBitmapResizing) then
+  begin
+    fOwner.BitmapScaleBestFit;
+    fOnBitmapResizing(self);
+  end;
+  fOwner.Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -338,28 +340,13 @@ procedure TBitmapProperties.SetScale(value: double);
 var
   rec: TRect;
 begin
-  if value = SCALE_BEST_FIT then
-  begin
-    if fOwner.fScaleType = stFit then Exit;
-    fOwner.fScaleType := stFit;
-    fOwner.Invalidate;
-    fAutoCenter := true;
-  end else if value = SCALE_STRETCHED then
-  begin
-    if fOwner.fScaleType = stStretched then Exit;
-    fOwner.fScaleType := stStretched;
-    fOwner.Invalidate;
-    fAutoCenter := true;
-  end else
-  begin
-    if value < fMinScale then value := fMinScale
-    else if value > fMaxScale then value := fMaxScale;
-    fOwner.fScaleType := stScaled;
-    //zoom in or out relative to the center of the image
-    rec := fOwner.ClientRect;
-    fOwner.BitmapScaleAtPos(value,
-      Point(RectWidth(rec) div 2, RectHeight(rec) div 2));
-  end;
+  if value < fMinScale then value := fMinScale
+  else if value > fMaxScale then value := fMaxScale;
+  fOwner.fScaleType := stScaled;
+  //zoom in or out relative to the center of the image
+  rec := fOwner.ClientRect;
+  fOwner.BitmapScaleAtPos(value,
+    Point(RectWidth(rec) div 2, RectHeight(rec) div 2));
 end;
 //------------------------------------------------------------------------------
 
@@ -445,8 +432,8 @@ end;
 
 procedure TPanel.BmpChanged(Sender: TObject);
 begin
-  if fResetPending and not fBmp.Empty then ClearBitmap(fBmp.PixelFormat);
-  if fScale <= 0  then BitmapScaleBestFit;
+  if fResetPending and not fBmp.Empty then ClearBitmap;
+  if fScaleType = stFit  then BitmapScaleBestFit;
   //nb: also called when the bitmap canvas has been updated
   UpdateCursor;
   Invalidate;
@@ -513,7 +500,9 @@ begin
     Exit;
   end;
 
-  if not fBitmapProperties.fZoomScrollEnabled then Exit;
+  if (fScaleType = stStretched) or
+    not fBitmapProperties.fZoomScrollEnabled then Exit;
+
   if (Message.CharCode >= VK_LEFT) and (Message.CharCode <= VK_DOWN) then
   begin
     //zoom in and out with CTRL+UP and CTRL+DOWN respectively
@@ -546,13 +535,11 @@ begin
   end
   else if Message.CharCode = Ord('0') then
   begin
-    fScaleType := stFit;
-    Invalidate;
-    if assigned(fBitmapProperties.fOnBitmapResizing) then
-      fBitmapProperties.fOnBitmapResizing(self);
+    fBitmapProperties.SetScaleType(stFit);
   end
   else if (Message.CharCode >= Ord('1')) and (Message.CharCode <= Ord('9')) then
   begin
+    fBitmapProperties.SetScaleType(stScaled);
     if ssShift in KeyDataToShiftState(Message.KeyData) then
       fBitmapProperties.Scale := (Message.CharCode - Ord('0')) /10 else
       fBitmapProperties.Scale := Message.CharCode - Ord('0');
@@ -736,7 +723,7 @@ begin
     Clipboard.Close;
   end;
   fOffsetX := 0; fOffsetY := 0;
-  if fScale = SCALE_BEST_FIT then
+  if fScaleType = stFit then
     BitmapScaleBestFit else
     fScale := 1;
   Invalidate;
@@ -786,31 +773,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPanel.ClearBitmap(PixelFormat: TPixelFormat);
-var
-  i: integer;
-  pc: PColor32;
+procedure TPanel.ClearBitmap;
 begin
-  if fBmp.PixelFormat <> PixelFormat then
-    fBmp.PixelFormat := PixelFormat;
   fResetPending := fBmp.Empty;
   if fResetPending then Exit;
-  if PixelFormat = pf32bit then
+  if fBmp.PixelFormat = pf32bit then
   begin
-    {$IFDEF ALPHAFORMAT}
-    fBmp.AlphaFormat := afPremultiplied;
-    {$ENDIF}
-    pc := PColor32(fBmp.ScanLine[fBmp.Height -1]);
-    for i := 0 to fBmp.Width * fBmp.Height -1 do
-    begin
-      pc^ := 0;
-      inc(pc);
-    end;
+    FillChar(fBmp.ScanLine[fBmp.Height -1]^, fBmp.Width * fBmp.Height * 4, 0);
   end else
   begin
-    {$IFDEF ALPHAFORMAT}
-    fBmp.AlphaFormat := afIgnored;
-    {$ENDIF}
     fBmp.Canvas.Brush.Color := Self.Color;
     fBmp.Canvas.FillRect(Rect(0, 0, fBmp.Width, fBmp.Height));
   end;
@@ -999,13 +970,11 @@ end;
 
 function TPanel.GetInnerMargin: integer;
 begin
-  //nb: If BorderStyle = bsSingle, a line will be drawn around the outside of
-  //the Panel reducing ClientRect. Hence, further adjustments aren't required.
-  Result := 0;
+  //nb: BorderWidth is the space between outer and inner bevels
+  Result := BorderWidth;
   if BevelInner <> bvNone then inc(result, BevelWidth);
   if BevelOuter <> bvNone then inc(result, BevelWidth);
-  //BorderWidth: the space between outer and inner bevels
-  inc(result, BorderWidth);
+  //BorderStyle changes the OUTSIDE of the panel so won't affect InnerMargin.
 end;
 //------------------------------------------------------------------------------
 
@@ -1033,9 +1002,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPanel.SetFocusedColor(color: TColor);
+procedure TPanel.SetFocusedColor(aColor: TColor);
 begin
-  fFocusedColor := color;
+  fFocusedColor := aColor;
   Invalidate;
 end;
 //------------------------------------------------------------------------------

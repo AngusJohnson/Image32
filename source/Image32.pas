@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.26                                                            *
-* Date      :  14 October 2019                                                 *
+* Version   :  1.28                                                            *
+* Date      :  21 November 2019                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -67,7 +67,7 @@ type
     function PasteFromClipboard(img32: TImage32): Boolean; virtual; abstract;
   end;
 
-  //TBlendFunction: Function template for TImage32.CopyFrom.
+  //TBlendFunction: Function template for TImage32.CopyBlend.
   TBlendFunction = function(bgColor, fgColor: TColor32): TColor32;
   TTileFillStyle = (tfsRepeat, tfsMirrorHorz, tfsMirrorVert, tfsRotate180);
 
@@ -116,14 +116,15 @@ type
     //existing image will either be stretched or cropped depending on the
     //stretchImage parameter.
     procedure Resize(newWidth, newHeight: Integer; stretchImage: Boolean = true);
-    procedure Scale(sx, sy: single);
-    //CopyFrom: Copies part or all of another TImage32 image (src).
+    procedure Scale(s: single); overload;
+    procedure Scale(sx, sy: single); overload;
+    //CopyBlend: Copies part or all of another TImage32 image (src).
     //If no blend function is provided, then the pixels in src's srcRec
     //simply replace whatever is in 'dstRec'. If a blend function is provided,
     //then that functions determines how the image from src will be blended
     //with the current image. Also the image from src's srcRec will be
     //stretched if necessary to fit into dstRec.
-    function CopyFrom(src: TImage32; srcRec, dstRec: TRect;
+    function CopyBlend(src: TImage32; srcRec, dstRec: TRect;
       blendFunc: TBlendFunction = nil): Boolean;
     //CopyFromDC: Copies an image from a Windows device context, erasing
     //any current image in TImage32. (eg copying from TBitmap.canvas.handle)
@@ -289,7 +290,7 @@ type
   end;
   TArrayOfWeightedColor = array of TWeightedColor;
 
-  //BLEND FUNCTIONS ( see TImage32.CopyFrom() )
+  //BLEND FUNCTIONS ( see TImage32.CopyBlend() )
 
   //BlendToOpaque: Blends a semi-transparent image onto an opaque background
   function BlendToOpaque(bgColor, fgColor: TColor32): TColor32;
@@ -417,7 +418,7 @@ type
   PByteArray = ^TByteArray;
 
 //------------------------------------------------------------------------------
-// Blend functions - used by TImage32.CopyFrom()
+// Blend functions - used by TImage32.CopyBlend()
 //------------------------------------------------------------------------------
 
 function BlendToOpaque(bgColor, fgColor: TColor32): TColor32;
@@ -1350,7 +1351,7 @@ begin
       BeginUpdate;
       rec := Bounds;
       SetSize(newWidth, newHeight, clNone32);
-      CopyFrom(tmp, rec, rec);
+      CopyBlend(tmp, rec, rec);
     finally
       tmp.Free;
       EndUpdate;
@@ -1432,6 +1433,12 @@ begin
   fwidth := newWidth;
   fheight := newHeight;
   Changed;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.Scale(s: single);
+begin
+  Scale(s, s);
 end;
 //------------------------------------------------------------------------------
 
@@ -1740,7 +1747,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImage32.CopyFrom(src: TImage32; srcRec, dstRec: TRect;
+function TImage32.CopyBlend(src: TImage32; srcRec, dstRec: TRect;
   blendFunc: TBlendFunction): Boolean;
 var
   tmp: TImage32;
@@ -1771,11 +1778,11 @@ begin
 
   if (scale.X <> 1.0) or (scale.Y <> 1.0) then
   begin
-    //scale source (tmp) to the destination then call CopyFrom() again ...
+    //scale source (tmp) to the destination then call CopyBlend() again ...
     tmp := TImage32.Create(src, srcRecClipped);
     try
       tmp.Scale(scale.X, scale.Y);
-      result := CopyFrom(tmp, tmp.Bounds, dstRec, blendFunc);
+      result := CopyBlend(tmp, tmp.Bounds, dstRec, blendFunc);
     finally
       tmp.Free;
     end;
@@ -1806,7 +1813,7 @@ begin
   begin
     tmp := TImage32.Create(self, srcRecClipped);
     try
-      result := src.CopyFrom(tmp, tmp.Bounds, dstRecClipped, blendFunc);
+      result := src.CopyBlend(tmp, tmp.Bounds, dstRecClipped, blendFunc);
     finally
       tmp.Free;
     end;
@@ -2403,24 +2410,24 @@ procedure TImage32.RotateRect(const rec: TRect;
 var
   tmp: TImage32;
   rec2: TRect;
-  midPoint: TPointD;
+  recWidth, recHeight: integer;
 begin
-  midPoint.X := (rec.Left + rec.Right) /2;
-  midPoint.Y := (rec.Top + rec.Bottom) /2;
+  recWidth := (rec.Left + rec.Right);
+  recHeight := (rec.Top + rec.Bottom);
   //create a tmp image with a copy of the pixels inside rec ...
   tmp := TImage32.Create(self, rec);
   try
     tmp.Rotate(angleRads);
     //since rotating also resizes, get a centered
     //(clipped) rect of the rotated pixels ...
-    rec2.Left := (tmp.Width - RectWidth(rec)) div 2;
-    rec2.Top := (tmp.Height - RectHeight(rec)) div 2;
-    rec2.Right := rec2.Left + RectWidth(rec);
-    rec2.Bottom := rec2.Top + RectHeight(rec);
+    rec2.Left := (tmp.Width - recWidth) div 2;
+    rec2.Top := (tmp.Height - recHeight) div 2;
+    rec2.Right := rec2.Left + recWidth;
+    rec2.Bottom := rec2.Top + recHeight;
     //finally move the rotated rec back to the image ...
     if eraseColor <> clNone32 then
       FillRect(rec, eraseColor);
-    CopyFrom(tmp, rec2, rec);
+    CopyBlend(tmp, rec2, rec);
   finally
     tmp.Free;
   end;

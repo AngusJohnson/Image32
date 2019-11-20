@@ -2,8 +2,8 @@ unit Image32_Text;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.26                                                            *
-* Date      :  14 October 2019                                                 *
+* Version   :  1.28                                                            *
+* Date      :  21 November 2019                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module to support text in the Image32 library                   *
@@ -588,7 +588,11 @@ function DrawText(image: TImage32; x,y: double; const text: string;
 var
   paths: TArrayOfArrayOfPointD;
 begin
-  if (text = '') or image.IsEmpty or not assigned(renderer) then Exit;
+  if (text = '') or image.IsEmpty or not assigned(renderer) then
+  begin
+    Result := PointD(x,y);
+    Exit;
+  end;
   paths := GetTextOutline(x,y, text, fontInfo, textAlign, result, justifySpc);
   DrawPolygon(image, paths, frNonZero, renderer);
 end;
@@ -627,7 +631,7 @@ var
     else dec(Result); //no space found for an obvious break
   end;
 
-  procedure WrapText(measureOnly, lcd: Boolean);
+  function WrapText(measureOnly, lcd: Boolean): TPointD;
   var
     i, curr, spacesCnt: integer;
     textLine: string;
@@ -653,15 +657,14 @@ var
           justifySpace := (RectWidth(rec) - textWidth)/spacesCnt;
       end;
 
-      //draw the text unless just measuring
-      if measureOnly then
-        //do nothing
-      else if lcd then
-        DrawText_LCD(image, x, y,
-          textLine, fontInfo, textAlign, textColor, 0, justifySpace)
-      else
-        DrawText(image, x, y,
-          textLine, fontInfo, textAlign, textColor, justifySpace);
+      if not measureOnly then
+      begin
+        if lcd then
+          Result := DrawText_LCD(image, x, y,
+            textLine, fontInfo, textAlign, textColor, 0, justifySpace) else
+          Result := DrawText(image, x, y,
+            textLine, fontInfo, textAlign, textColor, justifySpace);
+      end;
 
       //vertical offset - either line of paragraph
       if (curr < len) and (text[curr] = #10) then
@@ -675,7 +678,18 @@ var
   end;
 
 begin
-  if (text = '') or (textColor shr 24 = 0) or image.IsEmpty then Exit;
+  case textAlign of
+    taCenter : x := (rec.Left + rec.Right) / 2;
+    taRight : x := rec.Right;
+    else x := rec.Left;
+  end;
+
+  if (text = '') or (textColor shr 24 = 0) or image.IsEmpty then
+  begin
+    Result := PointD(x, Rec.Top);
+    Exit;
+  end;
+
   if fontInfo = nil then
     fontInfo := FontManager.GetFontInfo(DefaultLogfont);
 
@@ -683,12 +697,6 @@ begin
   if lineSpacing < 0 then lineSpacing := fontHeight * 0.3333;
   if paraSpacing < 0 then paraSpacing := lineSpacing;
   MeasureText(text, fontInfo, bounds, charPos);
-
-  case textAlign of
-    taCenter : x := (rec.Left + rec.Right) / 2;
-    taRight : x := rec.Right;
-    else x := rec.Left;
-  end;
 
   dy := fontHeight + lineSpacing;
   y := rec.Top + dy;
@@ -709,7 +717,7 @@ begin
           y := rec.Top + dy + (rec.Bottom - y);
       end;
   end;
-  WrapText(false, lcd);      //drawing text here
+  Result := WrapText(false, lcd);      //drawing text here
 
 end;
 //------------------------------------------------------------------------------
@@ -745,7 +753,11 @@ var
   alpha: byte;
 begin
   alpha := textColor shr 24;
-  if (text = '') or (alpha = 0) or image.IsEmpty then Exit;
+  if (text = '') or (alpha = 0) or image.IsEmpty then
+  begin
+    Result := PointD(x,y);
+    Exit;
+  end;
 
   //if the background color hasn't been assigned, then use
   //the color of a pixel in the target image under the text
@@ -766,7 +778,7 @@ begin
   try
     DrawPolygon(tmpImg, paths, frNonZero, alpha shl 24);
     ApplyLcd(tmpImg, textColor, opaqueBkColor);
-    image.CopyFrom(tmpImg, tmpImg.Bounds, rec, BlendToOpaque);
+    image.CopyBlend(tmpImg, tmpImg.Bounds, rec, BlendToOpaque);
   finally
     tmpImg.Free;
   end;

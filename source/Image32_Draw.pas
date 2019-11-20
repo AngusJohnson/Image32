@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.25                                                            *
-* Date      :  6 October 2019                                                  *
+* Version   :  1.28                                                            *
+* Date      :  21 November 2019                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -57,6 +57,11 @@ type
     constructor Create(color: TColor32 = clNone32);
     function Initialize(targetImage: TImage32): Boolean; override;
     procedure SetColor(value: TColor32);
+    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
+  end;
+
+  TEraseRenderer = class(TCustomRenderer)
+  public
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   end;
 
@@ -146,6 +151,10 @@ type
     radius: double; color: TColor32); overload;
   procedure DrawPoint(img: TImage32; const pt: TPointD;
     radius: double; renderer: TCustomRenderer); overload;
+  procedure DrawPoint(img: TImage32; const points: TArrayOfPointD;
+    radius: double; color: TColor32); overload;
+  procedure DrawPoint(img: TImage32; const paths: TArrayOfArrayOfPointD;
+    radius: double; color: TColor32); overload;
 
   procedure DrawLine(img: TImage32;
     const line: TArrayOfPointD; lineWidth: double; color: TColor32;
@@ -189,6 +198,18 @@ type
   ///////////////////////////////////////////////////////////////////////////
   // MISCELLANEOUS FUNCTIONS
   ///////////////////////////////////////////////////////////////////////////
+
+  procedure ErasePolygon(img: TImage32;
+    const polygon: TArrayOfPointD; fillRule: TFillRule); overload;
+  procedure ErasePolygon(img: TImage32;
+    const polygons: TArrayOfArrayOfPointD; fillRule: TFillRule); overload;
+
+  //Both DrawBoolMask and DrawAlphaMask require
+  //'mask' length to equal 'img' width * height
+  procedure DrawBoolMask(img: TIMage32;
+    const mask: TArrayOfByte; color: TColor32 = clBlack32);
+  procedure DrawAlphaMask(img: TIMage32;
+    const mask: TArrayOfByte; color: TColor32 = clBlack32);
 
   procedure SetGamma(gamma: double);
 
@@ -748,10 +769,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-{$IF COMPILERVERSION < 23} //TRoundingMode - added in Delphi XE2
+{$IFNDEF TROUNDINGMODE}
 type
   TRoundingMode = Math.TFPURoundingMode;
-{$IFEND}
+{$ENDIF}
 
 procedure Rasterize(const paths: TArrayOfArrayOfPointD;
   const clipRec: TRect; fillRule: TFillRule; renderer: TCustomRenderer);
@@ -1313,6 +1334,23 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// TEraseRenderer
+//------------------------------------------------------------------------------
+
+procedure TEraseRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
+var
+  i: integer;
+  dst: PARGB;
+begin
+  dst := PARGB(GetDstPixel(x1,y));
+  for i := x1 to x2 do
+  begin
+    dst.A := MulTable[dst.A, not alpha^];
+    inc(dst); inc(alpha);
+  end;
+end;
+
+//------------------------------------------------------------------------------
 // Draw functions
 //------------------------------------------------------------------------------
 
@@ -1333,6 +1371,26 @@ var
 begin
   path := Ellipse(RectD(pt.X -radius, pt.Y -radius, pt.X +radius, pt.Y +radius));
   DrawPolygon(img, path, frEvenOdd, renderer);
+end;
+//------------------------------------------------------------------------------
+
+procedure DrawPoint(img: TImage32; const points: TArrayOfPointD;
+  radius: double; color: TColor32);
+var
+  i: integer;
+begin
+  for i := 0 to high(points) do
+    DrawPoint(img, points[i], radius, color);
+end;
+//------------------------------------------------------------------------------
+
+procedure DrawPoint(img: TImage32; const paths: TArrayOfArrayOfPointD;
+  radius: double; color: TColor32);
+var
+  i: integer;
+begin
+  for i := 0 to high(paths) do
+    DrawPoint(img, paths[i], radius, color);
 end;
 //------------------------------------------------------------------------------
 
@@ -1503,6 +1561,74 @@ begin
   if (not assigned(polygons)) or (not assigned(renderer)) then exit;
   if renderer.Initialize(img) then
     Rasterize(polygons, img.bounds, fillRule, renderer);
+end;
+//------------------------------------------------------------------------------
+
+procedure ErasePolygon(img: TImage32;
+  const polygon: TArrayOfPointD; fillRule: TFillRule);
+var
+  polygons: TArrayOfArrayOfPointD;
+begin
+  if not assigned(polygon) then exit;
+  setLength(polygons, 1);
+  polygons[0] := polygon;
+  ErasePolygon(img, polygons, fillRule);
+end;
+//------------------------------------------------------------------------------
+
+procedure ErasePolygon(img: TImage32;
+  const polygons: TArrayOfArrayOfPointD; fillRule: TFillRule);
+var
+  er: TEraseRenderer;
+begin
+  er := TEraseRenderer.Create;
+  try
+    if er.Initialize(img) then
+      Rasterize(polygons, img.bounds, fillRule, er);
+  finally
+    er.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure DrawBoolMask(img: TIMage32; const mask: TArrayOfByte; color: TColor32);
+var
+  i, len: integer;
+  pc: PColor32;
+  pb: PByte;
+begin
+  len := Length(mask);
+  if (len = 0) or (len <> img.Width * img.Height) then Exit;
+  pc := img.PixelBase;
+  pb := @mask[0];
+  for i := 0 to len -1 do
+  begin
+    if pb^ > 0 then
+      pc^ := color else
+      pc^ := clNone32;
+    inc(pc); inc(pb);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure DrawAlphaMask(img: TIMage32; const mask: TArrayOfByte; color: TColor32);
+var
+  i, len: integer;
+  pc: PColor32;
+  pb: PByte;
+begin
+  len := Length(mask);
+  if (len = 0) or (len <> img.Width * img.Height) then Exit;
+  color := color and $FFFFFF; //strip alpha value
+  pc := img.PixelBase;
+  pb := @mask[0];
+  for i := 0 to len -1 do
+  begin
+    if pb^ > 0 then
+      pc^ := color or pb^ shl 24 else
+      pc^ := clNone32;
+    inc(pc); inc(pb);
+  end;
 end;
 //------------------------------------------------------------------------------
 

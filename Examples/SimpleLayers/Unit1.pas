@@ -126,7 +126,7 @@ begin
   layer.image.Assign(image);
   layer.PositionCenteredAt(Point(layeredImage32.MidPoint));
 
-  DefaultButtonSize := DPI(8);
+  DefaultButtonSize := DPI(10);
 
   //DISPLAY WHAT'S ON SHOW
   PaintLayeredImage;
@@ -198,11 +198,12 @@ var
   dc: HDC;
 begin
   //copy the merged layeredImage32 to Panel1 (+/- designer layers)
-  //nb: some very old Delphi compilers don't support TBitmap.SetSize
-  //Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  {$IFDEF SETSIZE}
+  Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  {$ELSE}
   Panel1.Bitmap.Width := layeredImage32.Width;
   Panel1.Bitmap.Height := layeredImage32.Height;
-  //Panel1.ClearBitmap;
+  {$ENDIF}
   dc := Panel1.Bitmap.Canvas.Handle;
   layeredImage32.GetMergedImage(mnuHideControls.Checked).CopyToDc(dc,0,0,false);
   Panel1.Refresh;
@@ -229,7 +230,7 @@ procedure TForm1.AddButtons(layer: TLayer32);
 begin
   activeLayer := layer;
   CreateSizingBtnsGroup(activeLayer,
-    ssEdgesAndCorners, clBlue32, DefaultButtonSize, []);
+    ssEdgesAndCorners, $FF3333FF, DefaultButtonSize, [boDropShadow]);
 end;
 //------------------------------------------------------------------------------
 

@@ -12,8 +12,8 @@ unit Image32_JPG;
 
 interface
 
+{$IFNDEF FPC}
 {$I Image32.inc}
-
 uses
   SysUtils, Classes, Windows, Math, Image32, Graphics, JPEG;
 
@@ -32,7 +32,9 @@ var
   CF_JPG: Cardinal = 0;     //Windows Clipboard
   CF_IMAGEJPG: Cardinal = 0;
 
+{$ENDIF}
 implementation
+{$IFNDEF FPC}
 
 //------------------------------------------------------------------------------
 // Loading (reading) Jpeg images from file ...
@@ -105,4 +107,6 @@ initialization
   TImage32.RegisterImageFormatClass('JPEG', TImageFormat_JPG, cpLow);
   //don't bother with clipboard formats as PNG and BMP formats are preferred
 
+{$ENDIF}
 end.
+

@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.26                                                            *
-* Date      :  14 October 2019                                                 *
+* Version   :  1.28                                                            *
+* Date      :  21 November 2019                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Vector drawing for TImage32                                     *

@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.26                                                            *
-* Date      :  14 October 2019                                                 *
+* Version   :  1.28                                                            *
+* Date      :  21 November 2019                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -16,7 +16,8 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Windows, Math, Types, Image32, Image32_Draw;
+  SysUtils, Classes, Windows, Math, Types,
+  Image32, Image32_Draw, Image32_Vector;
 
 type
   //TCompareFunction: Function template for FloodFill procedure
@@ -90,15 +91,23 @@ procedure DrawButton(img: TImage32; const pt: TPointD;
   size: double; color: TColor32 = clNone32;
   buttonOptions: TButtonOptions = []);
 
-//FLOODFILL COMPARE COLOR FUNCTIONS ( see FloodFill )
+//MaskToPolygons: converts an image mask into polygons
+function MaskToPolygons(const mask: TArrayOfByte;
+  width: integer): TArrayOfArrayOfPointD;
 
-function FloodFillRGB(initial, current: TColor32; tolerance: Integer): Boolean;
-function FloodFillHue(initial, current: TColor32; tolerance: Integer): Boolean;
+//COMPARE COLOR FUNCTIONS ( see FloodFill )
+
+function CompareRGB(initial, current: TColor32; tolerance: Integer): Boolean;
+function CompareHue(initial, current: TColor32; tolerance: Integer): Boolean;
+function CompareAlpha(initial, current: TColor32; tolerance: Integer): Boolean;
+
+function CompareMask(img: TImage32; compareColor: TColor32;
+  compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
+
+function GetFloodFillMask(img: TImage32; x, y: Integer;
+  compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
 
 implementation
-
-uses
-  Image32_Vector;
 
 resourcestring
   rsDraw3DNeedsNonZeroFill =
@@ -155,17 +164,32 @@ type
 // FloodFill compare functions (examples) ...
 //------------------------------------------------------------------------------
 
-function FloodFillRGB(initial, current: TColor32; tolerance: Integer): Boolean;
+function CompareRGB(initial, current: TColor32; tolerance: Integer): Boolean;
 var
   curr: TARGB absolute current;
   comp: TARGB absolute initial;
 begin
-  result := (Abs(curr.R - comp.R) + Abs(curr.G - comp.G) +
-    Abs(curr.B - comp.B)) div 3 <= tolerance;
+  if initial = current then Result := true
+  else if tolerance = 0 then Result := false
+  else result :=
+    (Abs(curr.R - comp.R) < tolerance) and
+    (Abs(curr.G - comp.G) < tolerance) and
+    (Abs(curr.B - comp.B) < tolerance);
 end;
 //------------------------------------------------------------------------------
 
-function FloodFillHue(initial, current: TColor32; tolerance: Integer): Boolean;
+function CompareAlpha(initial, current: TColor32; tolerance: Integer): Boolean;
+var
+  curr: TARGB absolute current;
+  comp: TARGB absolute initial;
+begin
+  if comp.A = curr.A then Result := true
+  else if tolerance = 0 then Result := false
+  else result := Abs(curr.A - comp.A) < tolerance;
+end;
+//------------------------------------------------------------------------------
+
+function CompareHue(initial, current: TColor32; tolerance: Integer): Boolean;
 var
   curr, comp: THsl;
   val: Integer;
@@ -318,7 +342,7 @@ begin
     BoxBlur(shadowImg, shadowImg.Bounds, blurSize, rpt);
     if cutoutInsideShadow then
       Erase(shadowImg, polys, fillRule);
-    img.CopyFrom(shadowImg, shadowImg.Bounds, rec, BlendToAlpha);
+    img.CopyBlend(shadowImg, shadowImg.Bounds, rec, BlendToAlpha);
   finally
     shadowImg.Free;
   end;
@@ -352,9 +376,31 @@ begin
     DrawPolygon(glowImg, glowPolys, fillRule, color);
     BoxBlur(glowImg, glowImg.Bounds, Ceil(blurRadius/3), 2);
     glowImg.ScaleAlpha(4);
-    img.CopyFrom(glowImg, glowImg.Bounds, rec, BlendToAlpha);
+    img.CopyBlend(glowImg, glowImg.Bounds, rec, BlendToAlpha);
   finally
     glowImg.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function CompareMask(img: TImage32; compareColor: TColor32;
+  compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
+var
+  i: integer;
+  pa: PByte;
+  pc: PColor32;
+begin
+  result := nil;
+  if not assigned(img) or img.IsEmpty then Exit;
+  if not Assigned(compareFunc) then compareFunc := CompareRGB;
+  SetLength(Result, img.Width * img.Height);
+  pa := @Result[0];
+  pc := img.PixelBase;
+  for i := 0 to img.Width * img.Height -1 do
+  begin
+    if compareFunc(pc^, compareColor, tolerance) then
+      pa^ := 1 else pa^ := 0;
+    inc(pc); inc(pa);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -372,6 +418,8 @@ begin
     Exit;
   maxX := img.Width -1;
   maxY := img.Height -1;
+
+  if not Assigned(compareFunc) then compareFunc := CompareRGB;
 
   ffs := TFloodFillStack.create(maxY);
   try
@@ -465,6 +513,431 @@ begin
   while (Result.Right < img.Width -1) and ColHasFill(Result.Right) do
     inc(Result.Right);
 end;
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+type
+  TPntsContainer = class;
+  TPt = class
+    pnt        : TPoint;
+    owner      : TPntsContainer;
+    isStart    : Boolean;
+    nextInPath : TPt;
+    prevInPath : TPt;
+    nextInRow  : TPt;
+    prevInRow  : TPt;
+    destructor Destroy; override;
+    procedure Update(x, y: integer);
+    function GetCount: integer;
+    function GetPoints: TArrayOfPointD;
+  end;
+
+  TPntsContainer = class
+    lastRight: integer;
+    leftMostPt, rightMost: TPt;
+    resultPaths: TArrayOfArrayOfPointD;
+    procedure AddToResult(const path: TArrayOfPointD);
+    function StartNewPath(insertBefore: TPt;
+      xLeft, xRight, y: integer; isHole: Boolean): TPt;
+    procedure AddRange(var current: TPt; xLeft, xRight, y: integer);
+    procedure JoinAscDesc(path1, path2: TPt);
+    procedure JoinDescAsc(path1, path2: TPt);
+    procedure CheckRowEnds(leftPt, rightPt: TPt);
+  end;
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+destructor TPt.Destroy;
+var
+  startPt, endPt, pt: TPt;
+begin
+  if not isStart then Exit;
+  owner.AddToResult(GetPoints);
+  startPt := self;
+  endPt := startPt.prevInPath;
+
+  //remove 'endPt' from double linked list
+  if endPt = owner.rightMost then
+    owner.rightMost := endPt.prevInRow
+  else if assigned(endPt.nextInRow) then
+    endPt.nextInRow.prevInRow := endPt.prevInRow;
+  if endPt = owner.leftMostPt then
+    owner.leftMostPt := endPt.nextInRow
+  else if assigned(endPt.prevInRow) then
+    endPt.prevInRow.nextInRow := endPt.nextInRow;
+
+  //remove 'startPt' from double linked list
+  if startPt = owner.leftMostPt then
+    owner.leftMostPt := startPt.nextInRow
+  else if assigned(startPt.prevInRow) then
+    startPt.prevInRow.nextInRow := startPt.nextInRow;
+  if assigned(startPt.nextInRow) then
+    startPt.nextInRow.prevInRow := startPt.prevInRow;
+
+  //now Free the entire path (except self)
+  pt := startPt.nextInPath;
+  while pt <> startPt do
+  begin
+    endPt := pt;
+    pt := pt.nextInPath;
+    endPt.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function IsColinear(const pt1, pt2, pt3: TPoint): Boolean;
+begin
+  result := (pt1.X - pt2.X)*(pt2.Y - pt3.Y) = (pt2.X - pt3.X)*(pt1.Y - pt2.Y);
+end;
+//------------------------------------------------------------------------------
+
+procedure TPt.Update(x, y: integer);
+var
+  newPt, newPt2: TPt;
+begin
+  if isStart then
+  begin
+    if IsColinear(Point(x, y), pnt, nextInPath.pnt) then
+    begin
+      pnt := Point(x,y);
+      Exit;
+    end;
+
+    newPt := TPt.Create;
+    newPt.pnt := pnt;
+    newPt2 := TPt.Create;
+    newPt2.pnt := Point(pnt.X, pnt.Y +1);
+    pnt := Point(x,y);
+
+    //self -> 2 -> 1 -> nip
+    nextInPath.prevInPath := newPt;
+    newPt.nextInPath := nextInPath;
+    newPt2.nextInPath := newPt;
+    newPt.prevInPath := newPt2;
+    newPt2.prevInPath := self;
+    nextInPath := newPt2;
+  end else
+  begin
+    if IsColinear(Point(x, y), pnt, prevInPath.pnt) then
+    begin
+      pnt := Point(x,y);
+      Exit;
+    end;
+
+    newPt := TPt.Create;
+    newPt.pnt := pnt;
+    newPt2 := TPt.Create;
+    newPt2.pnt := Point(pnt.X, pnt.Y +1);
+    pnt := Point(x,y);
+
+    //self <- 2 <- 1 <- pip
+    newPt.prevInPath := prevInPath;
+    prevInPath.nextInPath := newPt;
+    newPt2.prevInPath := newPt;
+    newPt.nextInPath := newPt2;
+    newPt2.nextInPath := self;
+    prevInPath := newPt2;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TPt.GetCount: integer;
+var
+  pt: TPt;
+begin
+  result := 1;
+  pt := nextInPath;
+  while pt <> self do
+  begin
+    inc(Result);
+    pt := pt.nextInPath;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TPt.GetPoints: TArrayOfPointD;
+var
+  i, count: integer;
+  startPt: TPt;
+begin
+  if isStart then startPt := self else startPt := nextInPath;
+  with startPt do Update(pnt.X, pnt.Y+1);
+  with startPt.prevInPath do Update(pnt.X, pnt.Y+1);
+  count := GetCount;
+  SetLength(Result, count);
+
+  for i := 0 to GetCount -1 do
+  begin
+    Result[i] := PointD(startPt.pnt);
+    startPt := startPt.nextInPath;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPntsContainer.AddToResult(const path: TArrayOfPointD);
+var
+  len: integer;
+begin
+  len := Length(resultPaths);
+  SetLength(resultPaths, len + 1);
+  resultPaths[len] := path;
+end;
+//------------------------------------------------------------------------------
+
+function TPntsContainer.StartNewPath(insertBefore: TPt;
+  xLeft, xRight, y: integer; isHole: Boolean): TPt;
+var
+  ptL, ptR: TPt;
+begin
+  ptL := TPt.Create;
+  ptL.owner := self;
+  ptL.isStart := not isHole;
+  ptL.pnt := Point(xLeft, y);
+
+  ptR := TPt.Create;
+  ptR.owner := self;
+  ptR.isStart := isHole;
+  ptR.pnt := Point(xRight, y);
+
+  ptL.nextInPath := ptR;
+  ptL.prevInPath := ptR;
+  ptR.nextInPath := ptL;
+  ptR.prevInPath := ptL;
+
+  ptL.nextInRow := ptR;
+  ptR.prevInRow := ptL;
+  if not Assigned(insertBefore) then
+  begin
+    //must be a new rightMost path
+    ptL.prevInRow := rightMost;
+    if Assigned(rightMost) then rightMost.nextInRow := ptL;
+    ptR.nextInRow := nil;
+    rightMost := ptR;
+    if not Assigned(leftMostPt) then leftMostPt := ptL;
+  end else
+  begin
+    ptR.nextInRow := insertBefore;
+    if leftMostPt = insertBefore then
+    begin
+      //must be a new leftMostPt path
+      leftMostPt := ptL;
+      ptL.prevInRow := nil;
+    end else
+    begin
+      ptL.prevInRow := insertBefore.prevInRow;
+      insertBefore.prevInRow.nextInRow := ptL;
+    end;
+    insertBefore.prevInRow := ptR;
+  end;
+  result := ptR.nextInRow;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPntsContainer.CheckRowEnds(leftPt, rightPt: TPt);
+begin
+  if leftPt = leftMostPt then leftMostPt := rightPt.nextInRow;
+  if rightPt = rightMost then rightMost := leftPt.prevInRow;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPntsContainer.JoinAscDesc(path1, path2: TPt);
+begin
+  CheckRowEnds(path1, path2);
+  if path2 = path1.prevInPath then
+  begin
+    path1.Free;
+    Exit;
+  end;
+
+  inc(path1.pnt.Y);
+  inc(path2.pnt.Y);
+  path1.isStart := false;
+  //remove path1 from double linked list
+  if assigned(path1.nextInRow) then
+    path1.nextInRow.prevInRow := path1.prevInRow;
+  if assigned(path1.prevInRow) then
+    path1.prevInRow.nextInRow := path1.nextInRow;
+  //remove path2 from double linked list
+  if assigned(path2.nextInRow) then
+    path2.nextInRow.prevInRow := path2.prevInRow;
+  if assigned(path2.prevInRow) then
+    path2.prevInRow.nextInRow := path2.nextInRow;
+
+  path1.prevInPath.nextInPath := path2.nextInPath; //1e.n := 2s
+  path2.nextInPath.prevInPath := path1.prevInPath; //2s.p := 1e
+  path2.nextInPath := path1;
+  path1.prevInPath := path2;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPntsContainer.JoinDescAsc(path1, path2: TPt);
+begin
+  CheckRowEnds(path1, path2);
+  if path1 = path2.prevInPath then
+  begin
+    path2.Free;
+    Exit;
+  end;
+
+  inc(path1.pnt.Y);
+  inc(path2.pnt.Y);
+  path2.isStart := false;
+  //remove path1 'end' from double linked list
+  if assigned(path1.nextInRow) then
+    path1.nextInRow.prevInRow := path1.prevInRow;
+  if assigned(path1.prevInRow) then
+    path1.prevInRow.nextInRow := path1.nextInRow;
+  //remove path2 'start' from double linked list
+  if assigned(path2.nextInRow) then
+    path2.nextInRow.prevInRow := path2.prevInRow;
+  if assigned(path2.prevInRow) then
+    path2.prevInRow.nextInRow := path2.nextInRow;
+
+  path1.nextInPath.prevInPath := path2.prevInPath; //1s.p = 2e
+  path2.prevInPath.nextInPath := path1.nextInPath; //2e.n = 1s
+  path1.nextInPath := path2;
+  path2.prevInPath := path1;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPntsContainer.AddRange(var current: TPt;
+  xLeft, xRight, y: integer);
+var
+  tmp: TPt;
+begin
+  if (lastRight > 0) then
+  begin
+    if xLeft < current.pnt.X then
+    begin
+      //'current' must be descending and hence <lastRight-xLeft> a hole
+      current := StartNewPath(current, lastRight, xLeft, y, true);
+      lastRight := xRight;
+      Exit;
+    end;
+
+    while assigned(current) and assigned(current.nextInRow) and
+      (lastRight > current.nextInRow.pnt.X) do
+    begin
+      tmp := current.nextInRow.nextInRow;
+      if current.isStart then
+        JoinAscDesc(current, current.nextInRow) else
+        JoinDescAsc(current, current.nextInRow);
+      current := tmp;
+    end;
+
+    current.Update(lastRight, y);
+    current := current.nextInRow;
+    lastRight := 0;
+  end;
+
+  while assigned(current) and assigned(current.nextInRow) and
+    (xLeft > current.nextInRow.pnt.X) do
+  begin
+    tmp := current.nextInRow.nextInRow;
+    if current.isStart then
+      JoinAscDesc(current, current.nextInRow) else
+      JoinDescAsc(current, current.nextInRow);
+    current := tmp;
+  end;
+
+  if not assigned(current) or (xRight < current.pnt.X) then
+  begin
+    StartNewPath(current, xLeft, xRight, y, false);
+  end else
+  begin
+    //'range' somewhat overlaps one or more paths above
+    current.Update(xLeft, y);
+    current := current.nextInRow;
+    lastRight := xRight;
+  end
+end;
+//------------------------------------------------------------------------------
+
+function MaskToPolygons(const mask: TArrayOfByte;
+  width: integer): TArrayOfArrayOfPointD;
+var
+  i,j, len, height, blockStart: integer;
+  current, tmp: TPt;
+  ba: PByteArray;
+begin
+  Result := nil;
+  len := Length(mask);
+  if (len = 0) or (width = 0) or (len mod width <> 0) then Exit;
+  height := len div width;
+
+  with TPntsContainer.Create do
+  try
+    for i := 0 to height -1 do
+    begin
+      ba := @mask[width * i];
+      blockStart := -2;
+      current := leftMostPt;
+      for j := 0 to width -1 do
+      begin
+        if (ba[j] > 0) = (blockStart >= 0) then Continue;
+        if blockStart >= 0 then
+        begin
+          AddRange(current, blockStart, j, i);
+          blockStart := -1;
+        end else
+          blockStart := j;
+      end;
+
+      if blockStart >= 0 then
+        AddRange(current, blockStart, width, i);
+
+      if (lastRight > 0) then
+      begin
+        while Assigned(current.nextInRow) and
+          (lastRight >= current.nextInRow.pnt.X) do
+        begin
+          tmp := current.nextInRow.nextInRow;
+          if current.isStart then
+            JoinAscDesc(current, current.nextInRow) else
+            JoinDescAsc(current, current.nextInRow);
+          current := tmp;
+        end;
+        current.Update(lastRight, i);
+        lastRight := 0;
+      end;
+
+      if blockStart = -2 then //ie a completely blank row
+      begin
+        while assigned(current) do
+        begin
+          tmp := current.nextInRow.nextInRow;
+          if current.isStart then
+            JoinAscDesc(current, current.nextInRow) else
+            JoinDescAsc(current, current.nextInRow);
+          current := tmp;
+        end
+      end else if assigned(current) then
+      begin
+        current := current.nextInRow;
+        while assigned(current) and (current <> rightMost) do
+        begin
+          tmp := current.nextInRow.nextInRow;
+          if current.isStart then
+            JoinAscDesc(current, current.nextInRow) else
+            JoinDescAsc(current, current.nextInRow);
+          current := tmp;
+        end;
+      end;
+
+    end;
+
+    while Assigned(leftMostPt) do
+      if leftMostPt.isStart then
+        JoinAscDesc(leftMostPt, leftMostPt.nextInRow) else
+        JoinDescAsc(leftMostPt, leftMostPt.nextInRow);
+
+    Result := resultPaths;
+  finally
+    Free;
+  end;
+end;
 //------------------------------------------------------------------------------
 
 procedure FloodFill(img: TImage32; x, y: Integer; newColor: TColor32;
@@ -477,15 +950,15 @@ var
 begin
   if not assigned(compareFunc) then
   begin
-    compareFunc := FloodFillRGB;
+    compareFunc := CompareRGB;
     tolerance := FloodFillDefaultRGBTolerance;
   end;
 
   if (tolerance < 0) then
   begin
-    if Addr(compareFunc) = Addr(FloodFillRGB) then
+    if Addr(compareFunc) = Addr(CompareRGB) then
       tolerance := FloodFillDefaultRGBTolerance
-    else if Addr(compareFunc) = Addr(FloodFillHue) then
+    else if Addr(compareFunc) = Addr(CompareHue) then
       tolerance := FloodFillDefaultHueTolerance;
   end;
 
@@ -917,17 +1390,17 @@ begin
     //given the very small area and small radius of the blur, the
     //speed improvement of BoxBlur over GaussianBlur is inconsequential.
     GaussianBlur(mask, mask.Bounds, k);
-    img.CopyFrom(mask, mask.Bounds, cutoutRec, BlendToOpaque);
+    img.CopyBlend(mask, mask.Bounds, cutoutRec, BlendToOpaque);
 
     //gradient fill to clNone32 a mask to soften cutout's edges
     path := Ellipse(cutoutRec);
     radGrad.SetParameters(rect3, clBlack32, clNone32);
     DrawPolygon(mask, path, frNonZero, radGrad);
-    cutout.CopyFrom(mask, mask.Bounds, cutout.Bounds, BlendMask);
+    cutout.CopyBlend(mask, mask.Bounds, cutout.Bounds, BlendMask);
     //now remove red from the cutout
     EraseColor(cutout, clRed32);
     //finally replace the cutout ...
-    img.CopyFrom(cutout, cutout.Bounds, cutoutRec, BlendToOpaque);
+    img.CopyBlend(cutout, cutout.Bounds, cutoutRec, BlendToOpaque);
   finally
     mask.Free;
     cutout.Free;
@@ -946,8 +1419,8 @@ begin
   try
     DrawPolygon(mask, polygon, fillRule, clBlack32);
     if inverted then
-      img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendMask) else
-      img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendInvertedMask);
+      img.CopyBlend(mask, mask.Bounds, img.Bounds, BlendMask) else
+      img.CopyBlend(mask, mask.Bounds, img.Bounds, BlendInvertedMask);
   finally
     mask.Free;
   end;
@@ -964,8 +1437,8 @@ begin
   try
     DrawPolygon(mask, polygons, fillRule, clBlack32);
     if inverted then
-      img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendMask) else
-      img.CopyFrom(mask, mask.Bounds, img.Bounds, BlendInvertedMask);
+      img.CopyBlend(mask, mask.Bounds, img.Bounds, BlendMask) else
+      img.CopyBlend(mask, mask.Bounds, img.Bounds, BlendInvertedMask);
   finally
     mask.Free;
   end;
@@ -1007,7 +1480,7 @@ begin
       Erase(tmp, paths2, fillRule);
       BoxBlur(tmp, tmp.Bounds, Round(blurRadius), 2);
       Erase(tmp, paths, fillRule, true);
-      img.CopyFrom(tmp, tmp.Bounds, recI, BlendToAlpha);
+      img.CopyBlend(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;
 
     if colorDk shr 24 > 0 then
@@ -1017,7 +1490,7 @@ begin
       Erase(tmp, paths2, fillRule);
       BoxBlur(tmp, tmp.Bounds, Round(blurRadius), 2);
       Erase(tmp, paths, fillRule, true);
-      img.CopyFrom(tmp, tmp.Bounds, recI, BlendToAlpha);
+      img.CopyBlend(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;
   finally
     tmp.Free;
@@ -1033,8 +1506,8 @@ var
   shadowSize, shadowAngle: double;
 begin
   if (size < 5) then Exit;
-  size := size /2;
-  shadowSize := size / 4;
+  size := size * 0.5;
+  shadowSize := size * 0.25;
   rec := RectD(pt.X -size, pt.Y -size, pt.X +size, pt.Y +size);
   if boSquare in buttonOptions then
   begin
@@ -1049,12 +1522,12 @@ begin
   //the pending color fill is semi-transparent
   if (boDropShadow in buttonOptions) then
     DrawShadow(img, path, frNonZero, shadowSize,
-      255, $80000000, color shr 24 < 254);
+      255, $AA000000, color shr 24 < 254);
   if color shr 24 > 2 then
     DrawPolygon(img, path, frNonZero, color);
 
   Draw3D(img, path, frNonZero, shadowSize*2,
-    Ceil(shadowSize), $80000000, $DDFFFFFF, shadowAngle);
+    Ceil(shadowSize), $AA000000, $CCFFFFFF, shadowAngle);
   DrawLine(img, path, 1, clBlack32, esClosed);
 
   if not (boSquare in buttonOptions) then Exit;
@@ -1064,16 +1537,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-//function ColorDifference(color1, color2: TColor32): cardinal;
-//  {$IFDEF INLINE} inline; {$ENDIF}
-//var
-//  c1: TARGB absolute color1;
-//  c2: TARGB absolute color2;
-//begin
-//  result := Abs(c1.R - c2.R) + Abs(c1.G - c2.G) + Abs(c1.B - c2.B);
-//end;
-////------------------------------------------------------------------------------
-//
 function AlphaAverage(color1, color2: TColor32): cardinal;
   {$IFDEF INLINE} inline; {$ENDIF}
 var
@@ -1125,7 +1588,7 @@ begin
   try
     img2.InvertColors;
     BoxBlur(img2, img2.Bounds, intensity * 3, rpt);
-    img.CopyFrom(img2, img2.Bounds, img.Bounds, BlendColorDodge);
+    img.CopyBlend(img2, img2.Bounds, img.Bounds, BlendColorDodge);
   finally
     img2.Free;
   end;
