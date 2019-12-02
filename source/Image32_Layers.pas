@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.28                                                            *
-* Date      :  21 November 2019                                                *
+* Version   :  1.31                                                            *
+* Date      :  2 December 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -1106,7 +1106,7 @@ function CreateSizingBtnsGroup(targetLayer: TLayer32;
   buttonSize: integer; buttonOptions: TButtonOptions;
   buttonLayerClass: TButtonDesignerLayer32Class = nil): Boolean;
 var
-  i, startGroupIdx: integer;
+  i, idxFirstBtn: integer;
   rec: TRect;
   corners, edges: TArrayOfPointD;
   layer: TLayer32;
@@ -1121,7 +1121,7 @@ begin
   if not result then Exit;
 
   lim := targetLayer.fOwner;
-  startGroupIdx := lim.Count;
+  idxFirstBtn := lim.Count;
   if style = ssCustom then style := ssEdgesAndCorners;
   if not assigned(buttonLayerClass) then
     buttonLayerClass := TButtonDesignerLayer32;
@@ -1161,7 +1161,7 @@ begin
         layer.CursorId := edgeCursorIds[i];
       end;
   end;
-  lim.Group(startGroupIdx, layer.fIndex);
+  lim.Group(idxFirstBtn, layer.fIndex);
 end;
 //------------------------------------------------------------------------------
 

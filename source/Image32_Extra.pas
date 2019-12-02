@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.28                                                            *
-* Date      :  21 November 2019                                                *
+* Version   :  1.31                                                            *
+* Date      :  2 December 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -21,7 +21,7 @@ uses
 
 type
   //TCompareFunction: Function template for FloodFill procedure
-  TCompareFunction = function(current, compare: TColor32; data: integer): Boolean;
+  TCompareFunction = function(master, current: TColor32; data: integer): Boolean;
   TButtonOption = (boSquare, boPressed, boDropShadow);
   TButtonOptions = set of TButtonOption;
 
@@ -91,17 +91,17 @@ procedure DrawButton(img: TImage32; const pt: TPointD;
   size: double; color: TColor32 = clNone32;
   buttonOptions: TButtonOptions = []);
 
-//MaskToPolygons: converts an image mask into polygons
-function MaskToPolygons(const mask: TArrayOfByte;
-  width: integer): TArrayOfArrayOfPointD;
+//Vectorize: convert an image into polygon vectors
+function Vectorize(img: TImage32; compareColor: TColor32;
+  compareFunc: TCompareFunction; tolerance: Integer): TArrayOfArrayOfPointD;
 
 //COMPARE COLOR FUNCTIONS ( see FloodFill )
 
-function CompareRGB(initial, current: TColor32; tolerance: Integer): Boolean;
-function CompareHue(initial, current: TColor32; tolerance: Integer): Boolean;
-function CompareAlpha(initial, current: TColor32; tolerance: Integer): Boolean;
+function CompareRGB(master, current: TColor32; tolerance: Integer): Boolean;
+function CompareHue(master, current: TColor32; tolerance: Integer): Boolean;
+function CompareAlpha(master, current: TColor32; tolerance: Integer): Boolean;
 
-function CompareMask(img: TImage32; compareColor: TColor32;
+function GetMask(img: TImage32; compareColor: TColor32;
   compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
 
 function GetFloodFillMask(img: TImage32; x, y: Integer;
@@ -164,46 +164,55 @@ type
 // FloodFill compare functions (examples) ...
 //------------------------------------------------------------------------------
 
-function CompareRGB(initial, current: TColor32; tolerance: Integer): Boolean;
+function CompareRGB(master, current: TColor32; tolerance: Integer): Boolean;
 var
+  mast: TARGB absolute master;
   curr: TARGB absolute current;
-  comp: TARGB absolute initial;
 begin
-  if initial = current then Result := true
-  else if tolerance = 0 then Result := false
+  if curr.A = 0 then
+    Result := false
+  else if master and $FFFFFF = current and $FFFFFF then
+    Result := true
+  else if tolerance = 0 then
+    Result := false
   else result :=
-    (Abs(curr.R - comp.R) < tolerance) and
-    (Abs(curr.G - comp.G) < tolerance) and
-    (Abs(curr.B - comp.B) < tolerance);
+    (Abs(curr.R - mast.R) <= tolerance) and
+    (Abs(curr.G - mast.G) <= tolerance) and
+    (Abs(curr.B - mast.B) <= tolerance);
 end;
 //------------------------------------------------------------------------------
 
-function CompareAlpha(initial, current: TColor32; tolerance: Integer): Boolean;
+function CompareAlpha(master, current: TColor32; tolerance: Integer): Boolean;
 var
+  mast: TARGB absolute master;
   curr: TARGB absolute current;
-  comp: TARGB absolute initial;
 begin
-  if comp.A = curr.A then Result := true
+  if mast.A = curr.A then Result := true
   else if tolerance = 0 then Result := false
-  else result := Abs(curr.A - comp.A) < tolerance;
+  else result := Abs(curr.A - mast.A) <= tolerance;
 end;
 //------------------------------------------------------------------------------
 
-function CompareHue(initial, current: TColor32; tolerance: Integer): Boolean;
+function CompareHue(master, current: TColor32; tolerance: Integer): Boolean;
 var
-  curr, comp: THsl;
+  curr, mast: THsl;
   val: Integer;
 begin
-  curr := RGBtoHsl(current);
-  comp := RGBtoHsl(initial);
-  if curr.hue > comp.hue then
+  if TARGB(current).A = 0 then
   begin
-    val := curr.hue - comp.hue;
-    if val > 127 then val := comp.hue - curr.hue + 255;
+    Result := false;
+    Exit;
+  end;
+  curr := RGBtoHsl(current);
+  mast := RGBtoHsl(master);
+  if curr.hue > mast.hue then
+  begin
+    val := curr.hue - mast.hue;
+    if val > 127 then val := mast.hue - curr.hue + 255;
   end else
   begin
-    val := comp.hue - curr.hue;
-    if val > 127 then val := curr.hue - comp.hue + 255;
+    val := mast.hue - curr.hue;
+    if val > 127 then val := curr.hue - mast.hue + 255;
   end;
   result := val <= tolerance;
 end;
@@ -383,7 +392,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function CompareMask(img: TImage32; compareColor: TColor32;
+function GetMask(img: TImage32; compareColor: TColor32;
   compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
 var
   i: integer;
@@ -398,7 +407,7 @@ begin
   pc := img.PixelBase;
   for i := 0 to img.Width * img.Height -1 do
   begin
-    if compareFunc(pc^, compareColor, tolerance) then
+    if compareFunc(compareColor, pc^, tolerance) then
       pa^ := 1 else pa^ := 0;
     inc(pc); inc(pa);
   end;
@@ -515,6 +524,7 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// Classes used by MaskToPolygons function (vectorization)
 //------------------------------------------------------------------------------
 
 type
@@ -522,7 +532,7 @@ type
   TPt = class
     pnt        : TPoint;
     owner      : TPntsContainer;
-    isStart    : Boolean;
+    isStart    : Boolean; //always ascending
     nextInPath : TPt;
     prevInPath : TPt;
     nextInRow  : TPt;
@@ -530,6 +540,9 @@ type
     destructor Destroy; override;
     procedure Update(x, y: integer);
     function GetCount: integer;
+    procedure Clean1(var count: integer);
+    procedure Clean2(var count: integer);
+    procedure Clean3(var count: integer);
     function GetPoints: TArrayOfPointD;
   end;
 
@@ -554,7 +567,6 @@ var
   startPt, endPt, pt: TPt;
 begin
   if not isStart then Exit;
-  owner.AddToResult(GetPoints);
   startPt := self;
   endPt := startPt.prevInPath;
 
@@ -576,6 +588,8 @@ begin
   if assigned(startPt.nextInRow) then
     startPt.nextInRow.prevInRow := startPt.prevInRow;
 
+  owner.AddToResult(GetPoints);
+
   //now Free the entire path (except self)
   pt := startPt.nextInPath;
   while pt <> startPt do
@@ -587,9 +601,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function IsColinear(const pt1, pt2, pt3: TPoint): Boolean;
+function IsColinear(const pt1, pt2, pt3: TPoint): Boolean; overload;
 begin
+  //cross product = 0
   result := (pt1.X - pt2.X)*(pt2.Y - pt3.Y) = (pt2.X - pt3.X)*(pt1.Y - pt2.Y);
+end;
+//------------------------------------------------------------------------------
+
+function IsColinear(const pt1, pt2, pt3, pt4: TPoint): Boolean; overload;
+begin
+  result := (pt1.X - pt2.X)*(pt3.Y - pt4.Y) = (pt3.X - pt4.X)*(pt1.Y - pt2.Y);
 end;
 //------------------------------------------------------------------------------
 
@@ -657,21 +678,122 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TPt.Clean1(var count: integer);
+
+  procedure DeletePt(pt: TPt);
+  begin
+    pt.prevInPath.nextInPath := pt.nextInPath;
+    pt.nextInPath.prevInPath := pt.prevInPath;
+    pt.Free;
+  end;
+
+var
+  p1,p2,p3: TPt;
+begin
+  //strip micro steps
+  p1 := self; p2 := nextInPath; p3 := p2.nextInPath;
+  while true do
+  begin
+    if (abs(p1.pnt.X - p3.pnt.X) = 1) or
+      (abs(p1.pnt.Y - p3.pnt.Y) = 1) then
+    begin
+      if (p2 = self) then Break;
+      DeletePt(p2);
+      Dec(count);
+    end
+    else if (abs(p1.pnt.X - p2.pnt.X) <= 1) and
+      (abs(p1.pnt.Y - p2.pnt.Y) <= 1) then
+    begin
+      if (p2 = self) then Break;
+      DeletePt(p2);
+      Dec(count);
+    end;
+    p1 := p1.nextInPath; p2 := p1.nextInPath; p3 := p2.nextInPath;
+    if p1 = self then break; //circuit completed
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPt.Clean2(var count: integer);
+
+  procedure DeletePt(pt: TPt);
+  begin
+    pt.prevInPath.nextInPath := pt.nextInPath;
+    pt.nextInPath.prevInPath := pt.prevInPath;
+    pt.Free;
+  end;
+
+var
+  p1,p2,p3: TPt;
+begin
+  //merge colinear edges
+  p1 := self; p2 := nextInPath; p3 := p2.nextInPath;
+  while true do
+  begin
+    if IsColinear(p1.pnt, p2.pnt, p3.pnt) then
+    begin
+      if (p2 = self) then Break;
+      DeletePt(p2);
+      Dec(count);
+    end
+    else
+      p1 := p1.nextInPath;
+    p2 := p1.nextInPath; p3 := p2.nextInPath;
+    if p1 = self then break; //circuit completed
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPt.Clean3(var count: integer);
+
+  procedure DeletePt(pt: TPt);
+  begin
+    pt.prevInPath.nextInPath := pt.nextInPath;
+    pt.nextInPath.prevInPath := pt.prevInPath;
+    pt.Free;
+  end;
+
+var
+  p1,p2,p3,p4: TPt;
+begin
+  //strip micro step between colinear steps
+  p1 := self; p2 := nextInPath; p3 := p2.nextInPath; p4 := p3.nextInPath;
+  while true do
+  begin
+    if (abs(p2.pnt.X - p3.pnt.X) <= 1) and
+      (abs(p2.pnt.Y - p3.pnt.Y) <= 1) and
+        IsColinear(p1.pnt, p2.pnt, p3.pnt, p4.pnt) then
+    begin
+      if (p2 = self) or (p3 = self) then Break;
+      DeletePt(p2);
+      DeletePt(p3);
+      Dec(count, 2);
+    end else
+      p1 := p1.nextInPath;
+    p2 := p1.nextInPath; p3 := p2.nextInPath; p4 := p3.nextInPath;
+    if p1 = self then break; //circuit completed
+  end;
+end;
+//------------------------------------------------------------------------------
+
 function TPt.GetPoints: TArrayOfPointD;
 var
   i, count: integer;
-  startPt: TPt;
+  pt: TPt;
 begin
-  if isStart then startPt := self else startPt := nextInPath;
-  with startPt do Update(pnt.X, pnt.Y+1);
-  with startPt.prevInPath do Update(pnt.X, pnt.Y+1);
+  Update(pnt.X, pnt.Y+1);
+  with prevInPath do Update(pnt.X, pnt.Y+1); //path end
   count := GetCount;
+  Clean1(count);
+  Clean2(count);
+  Clean3(count);
   SetLength(Result, count);
 
-  for i := 0 to GetCount -1 do
+  pt := self;
+  for i := 0 to count -1 do
   begin
-    Result[i] := PointD(startPt.pnt);
-    startPt := startPt.nextInPath;
+    Result[i] := PointD(pt.pnt);
+    pt := pt.nextInPath;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -827,6 +949,15 @@ begin
       current := tmp;
     end;
 
+    if xLeft < current.pnt.X then
+    begin
+      StartNewPath(current, lastRight, xLeft, y, true);
+      current.Update(xRight, y);
+      current := current.nextInRow;
+      lastRight := 0;
+      exit;
+    end;
+
     current.Update(lastRight, y);
     current := current.nextInRow;
     lastRight := 0;
@@ -855,88 +986,87 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function MaskToPolygons(const mask: TArrayOfByte;
+function VectorizeMask(const mask: TArrayOfByte;
   width: integer): TArrayOfArrayOfPointD;
 var
   i,j, len, height, blockStart: integer;
   current, tmp: TPt;
   ba: PByteArray;
+  pntsContainer: TPntsContainer;
 begin
   Result := nil;
   len := Length(mask);
   if (len = 0) or (width = 0) or (len mod width <> 0) then Exit;
   height := len div width;
 
-  with TPntsContainer.Create do
+  pntsContainer := TPntsContainer.Create;
   try
     for i := 0 to height -1 do
     begin
       ba := @mask[width * i];
       blockStart := -2;
-      current := leftMostPt;
+      current := pntsContainer.leftMostPt;
       for j := 0 to width -1 do
       begin
         if (ba[j] > 0) = (blockStart >= 0) then Continue;
         if blockStart >= 0 then
         begin
-          AddRange(current, blockStart, j, i);
+          pntsContainer.AddRange(current, blockStart, j, i);
           blockStart := -1;
         end else
           blockStart := j;
       end;
 
       if blockStart >= 0 then
-        AddRange(current, blockStart, width, i);
+        pntsContainer.AddRange(current, blockStart, width, i);
 
-      if (lastRight > 0) then
+      if (pntsContainer.lastRight > 0) then
       begin
         while Assigned(current.nextInRow) and
-          (lastRight >= current.nextInRow.pnt.X) do
+          (pntsContainer.lastRight >= current.nextInRow.pnt.X) do
         begin
           tmp := current.nextInRow.nextInRow;
           if current.isStart then
-            JoinAscDesc(current, current.nextInRow) else
-            JoinDescAsc(current, current.nextInRow);
+            pntsContainer.JoinAscDesc(current, current.nextInRow) else
+            pntsContainer.JoinDescAsc(current, current.nextInRow);
           current := tmp;
         end;
-        current.Update(lastRight, i);
-        lastRight := 0;
-      end;
-
-      if blockStart = -2 then //ie a completely blank row
-      begin
-        while assigned(current) do
-        begin
-          tmp := current.nextInRow.nextInRow;
-          if current.isStart then
-            JoinAscDesc(current, current.nextInRow) else
-            JoinDescAsc(current, current.nextInRow);
-          current := tmp;
-        end
-      end else if assigned(current) then
-      begin
+        current.Update(pntsContainer.lastRight, i);
         current := current.nextInRow;
-        while assigned(current) and (current <> rightMost) do
-        begin
-          tmp := current.nextInRow.nextInRow;
-          if current.isStart then
-            JoinAscDesc(current, current.nextInRow) else
-            JoinDescAsc(current, current.nextInRow);
-          current := tmp;
-        end;
+        pntsContainer.lastRight := 0;
       end;
 
+      while assigned(current) do
+      begin
+        tmp := current.nextInRow.nextInRow;
+        if current.isStart then
+          pntsContainer.JoinAscDesc(current, current.nextInRow) else
+          pntsContainer.JoinDescAsc(current, current.nextInRow);
+        current := tmp;
+      end
     end;
 
-    while Assigned(leftMostPt) do
-      if leftMostPt.isStart then
-        JoinAscDesc(leftMostPt, leftMostPt.nextInRow) else
-        JoinDescAsc(leftMostPt, leftMostPt.nextInRow);
+    with pntsContainer do
+      while Assigned(leftMostPt) do
+        if leftMostPt.isStart then
+          JoinAscDesc(leftMostPt, leftMostPt.nextInRow) else
+          JoinDescAsc(leftMostPt, leftMostPt.nextInRow);
 
-    Result := resultPaths;
+    //Result := resultPaths;
+    Result := RamerDouglasPeucker(pntsContainer.resultPaths, 2);
   finally
-    Free;
+    pntsContainer.Free;
   end;
+end;
+//------------------------------------------------------------------------------
+
+function Vectorize(img: TImage32; compareColor: TColor32;
+  compareFunc: TCompareFunction; tolerance: Integer): TArrayOfArrayOfPointD;
+var
+  mask: TArrayOfByte;
+begin
+  mask := GetMask(img, compareColor, compareFunc, tolerance);
+  Result := VectorizeMask(mask, img.Width);
 end;
 //------------------------------------------------------------------------------
 

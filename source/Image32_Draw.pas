@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.28                                                            *
-* Date      :  21 November 2019                                                *
+* Version   :  1.31                                                            *
+* Date      :  2 December 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -519,7 +519,7 @@ begin
   begin
     inc(j, psl.count);
     //nb: 1. GetMem is faster than a dynamic array as it's not initialized
-    //    2. (j + 1) below prevents a very rare AV.
+    //    2. (j + 1) prevents a very rare AV.
     if j > 0 then
       GetMem(psl.fragments, (j +1) * SizeOf(TFragment));
     psl.count := 0;
@@ -631,6 +631,7 @@ begin
   if scanlineY < 0 then Exit;
 
   psl := @scanlines[scanlineY];
+  if not assigned(psl.fragments) then Exit; //a very rare event
   pFrag := @psl.fragments[psl.count];
   inc(psl.count);
   pFrag.botX := bot.X;
@@ -1359,7 +1360,9 @@ procedure DrawPoint(img: TImage32;
 var
   path: TArrayOfPointD;
 begin
-  path := Ellipse(RectD(pt.X -radius, pt.Y -radius, pt.X +radius, pt.Y +radius));
+  if radius <= 1 then
+    path := Rectangle(pt.X-radius, pt.Y-radius, pt.X+radius, pt.Y+radius) else
+    path := Ellipse(RectD(pt.X-radius, pt.Y-radius, pt.X+radius, pt.Y+radius));
   DrawPolygon(img, path, frEvenOdd, color);
 end;
 //------------------------------------------------------------------------------

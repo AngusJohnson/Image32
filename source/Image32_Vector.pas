@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.28                                                            *
-* Date      :  21 November 2019                                                *
+* Version   :  1.31                                                            *
+* Date      :  2 December 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -43,18 +43,21 @@ type
   function Arc(const rec: TRect; startAngle, endAngle: double): TArrayOfPointD;
   function Pie(const rec: TRect; StartAngle, EndAngle: double): TArrayOfPointD;
 
-  function QBezier(const pt1, pt2, pt3: TPointD): TArrayOfPointD; overload;
-  function QBezier(const pts: TArrayOfPointD): TArrayOfPointD; overload;
-  function CBezier(const pt1, pt2, pt3, pt4: TPointD): TArrayOfPointD; overload;
-  function CBezier(const pts: TArrayOfPointD): TArrayOfPointD; overload;
+  function FlattenQBezier(const pt1, pt2, pt3: TPointD): TArrayOfPointD; overload;
+  function FlattenQBezier(const pts: TArrayOfPointD): TArrayOfPointD; overload;
+  function FlattenQBezier(const pts: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD; overload;
 
-  //CSpline: Approximates the 'S' command inside the 'd' property of an
-  //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
-  function CSpline(const pts: TArrayOfPointD): TArrayOfPointD;
+  function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD): TArrayOfPointD; overload;
+  function FlattenCBezier(const pts: TArrayOfPointD): TArrayOfPointD; overload;
+  function FlattenCBezier(const pts: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD; overload;
 
-  //QSpline: Approximates the 'T' command inside the 'd' property of an
+  //FlattenCSpline: Approximates the 'S' command inside the 'd' property of an
   //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
-  function QSpline(const pts: TArrayOfPointD): TArrayOfPointD;
+  function FlattenCSpline(const pts: TArrayOfPointD): TArrayOfPointD;
+
+  //FlattenQSpline: Approximates the 'T' command inside the 'd' property of an
+  //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
+  function FlattenQSpline(const pts: TArrayOfPointD): TArrayOfPointD;
 
   //ArrowHead: The ctrlPt's only function is to control the angle of the arrow.
   function ArrowHead(const arrowTip, ctrlPt: TPointD; size: double;
@@ -64,6 +67,13 @@ type
 
   function ShortenPath(const path: TArrayOfPointD;
     pathEnd: TPathEnd; amount: double): TArrayOfPointD;
+
+  //RamerDouglasPeucker: simplifies paths, recursively removing vertices where
+  //they deviate no more than 'epsilon' from their adjacent vertices.
+  function RamerDouglasPeucker(const path: TArrayOfPointD;
+    epsilon: double): TArrayOfPointD; overload;
+  function RamerDouglasPeucker(const paths: TArrayOfArrayOfPointD;
+    epsilon: double): TArrayOfArrayOfPointD; overload;
 
   //GetDashPath: Returns a polyline (not polygons)
   function GetDashedPath(const path: TArrayOfPointD;
@@ -92,6 +102,7 @@ type
   function ReversePath(const path: TArrayOfPointD): TArrayOfPointD;
   function OpenPathToFlatPolygon(const path: TArrayOfPointD): TArrayOfPointD;
   function JoinPaths(const path1, path2: TArrayOfPointD):TArrayOfPointD;
+  procedure AppendPoint(var path: TArrayOfPointD; const extra: TPointD);
   procedure AppendPath(var paths: TArrayOfArrayOfPointD;
     const extra: TArrayOfPointD);
     {$IFDEF INLINE} inline; {$ENDIF} overload;
@@ -178,6 +189,7 @@ type
   function PointInPolygons(const pt: TPointD;
     const polygons: TArrayOfArrayOfPointD; fillRule: TFillRule): Boolean;
 
+  function PerpendicularDist(const pt, line1, line2: TPointD): double;
   function ClosestPointOnLine(const pt, linePt1, linePt2: TPointD): TPointD;
   function ClosestPointOnSegment(const pt, segPt1, segPt2: TPointD): TPointD;
 
@@ -204,6 +216,14 @@ type
   function Grow(const path, normals: TArrayOfPointD; delta: double;
     joinStyle: TJoinStyle; miterLimit: double): TArrayOfPointD;
 
+  //SmoothLine: based on
+  //"An Algorithm for Automatically Fitting Digitized Curves"
+  //by Philip J. Schneider in "Graphics Gems", Academic Press, 1990
+  function SmoothLine(const path: TArrayOfPointD;
+    closed: Boolean; amount: double): TArrayOfPointD; overload;
+  function SmoothLine(const paths: TArrayOfArrayOfPointD;
+    closed: Boolean; amount: double): TArrayOfArrayOfPointD; overload;
+
 const
   NullPoint: TPoint = (X: 0; Y: 0);
   NullPointD: TPointD = (X: 0; Y: 0);
@@ -227,8 +247,8 @@ var
 implementation
 
 resourcestring
-  rsInvalidQBezier = 'Invalid QBezier - requires 3 points';
-  rsInvalidCBezier = 'Invalid CBezier - requires 4 points';
+  rsInvalidQBezier = 'Invalid number of control points for a QBezier';
+  rsInvalidCBezier = 'Invalid number of control points for a CBezier';
 
 type
   TArray256Bytes = array[0..255] of byte;
@@ -786,7 +806,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-//ClosestPoint: ClosestPointOnLine or ClosestPointOnSegment
+function PerpendicularDist(const pt, line1, line2: TPointD): double;
+var
+  a,b,c,d: double;
+begin
+  //given: cross product of 2 vectors = area of parallelogram
+  //and given: area of parallelogram = length base * height
+  //height (ie perpendic. dist.) = cross product of 2 vectors / length base
+  a := pt.X - line1.X;
+  b := pt.Y - line1.Y;
+  c := line2.X - line1.X;
+  d := line2.Y - line1.Y;
+  result := abs(a * d - c * b) / Sqrt(c * c + d * d);
+end;
+//------------------------------------------------------------------------------
+
 function ClosestPoint(const pt, linePt1, linePt2: TPointD;
   constrainToSegment: Boolean): TPointD;
 var
@@ -1035,6 +1069,16 @@ begin
     setLength(Result, len1 + len2);
     Move(path2[0], Result[len1], len2 * SizeOf(TPointD));
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure AppendPoint(var path: TArrayOfPointD; const extra: TPointD);
+var
+  len: integer;
+begin
+  len := length(path);
+  SetLength(path, len +1);
+  path[len] := extra;
 end;
 //------------------------------------------------------------------------------
 
@@ -1317,8 +1361,9 @@ function Outline(const line: TArrayOfPointD; lineWidth: double;
   joinStyle: TJoinStyle; endStyle: TEndStyle;
   miterLimit: double): TArrayOfArrayOfPointD;
 begin
-  if not assigned(line) then exit;
-  if endStyle = esClosed then
+  if not assigned(line) then
+    Result := nil
+  else if endStyle = esClosed then
     result := GrowClosedLine(line, lineWidth, joinStyle, miterLimit)
   else
     result := GrowOpenLine(line, lineWidth, joinStyle, endStyle, miterLimit);
@@ -1505,6 +1550,7 @@ var
   centre, radius: TPointD;
   deltaX, deltaX2, deltaY: extended;
 begin
+  Result := nil;
   if (endAngle = startAngle) or IsEmptyRect(rec) then Exit;
   centre := PointD((rec.left+rec.right)/2, (rec.top+rec.bottom)/2);
   radius := PointD(RectWidth(rec)/2, RectHeight(rec)/2);
@@ -1672,6 +1718,82 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function PerpendicularDistSqrd(const pt, line1, line2: TPointD): double;
+var
+  a,b,c,d: double;
+begin
+  a := pt.X - line1.X;
+  b := pt.Y - line1.Y;
+  c := line2.X - line1.X;
+  d := line2.Y - line1.Y;
+  result := Sqr(a * d - c * b) / (c * c + d * d);
+end;
+//------------------------------------------------------------------------------
+
+procedure RDP(const path: TArrayOfPointD; startIdx, endIdx: integer;
+  epsilonSqrd: double; const flags: TArrayOfInteger);
+var
+  i, idx: integer;
+  d, maxD: double;
+begin
+  idx := 0;
+  maxD := 0;
+  for i := startIdx +1 to endIdx -1 do
+  begin
+    //PerpendicularDistSqrd - avoids expensive Sqrt()
+    d := PerpendicularDistSqrd(path[i], path[startIdx], path[endIdx]);
+    if d <= maxD then Continue;
+    maxD := d;
+    idx := i;
+  end;
+  if maxD < epsilonSqrd then Exit;
+  flags[idx] := 1;
+  if idx > startIdx + 1 then RDP(path, startIdx, idx, epsilonSqrd, flags);
+  if endIdx > idx + 1 then RDP(path, idx, endIdx, epsilonSqrd, flags);
+end;
+//------------------------------------------------------------------------------
+
+function RamerDouglasPeucker(const path: TArrayOfPointD;
+  epsilon: double): TArrayOfPointD;
+var
+  i,j, len: integer;
+  flags: TArrayOfInteger;
+begin
+  len := length(path);
+  if len < 3 then
+  begin
+    result := Copy(path, 0, len);
+    Exit;
+  end;
+  SetLength(flags, len); //flags zero initialized
+
+  flags[0] := 1;
+  flags[len -1] := 1;
+  RDP(path, 0, len -1, Sqr(epsilon), flags);
+  j := 0;
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    if flags[i] = 1 then
+    begin
+      Result[j] := path[i];
+      inc(j);
+    end;
+  SetLength(Result, j);
+end;
+//------------------------------------------------------------------------------
+
+function RamerDouglasPeucker(const paths: TArrayOfArrayOfPointD;
+  epsilon: double): TArrayOfArrayOfPointD;
+var
+  i, len: integer;
+begin
+  len := length(paths);
+  setLength(Result, len);
+  for i := 0 to len -1 do
+    Result[i] := RamerDouglasPeucker(paths[i], epsilon);
+end;
+//------------------------------------------------------------------------------
+
 function GetDashedPath(const path: TArrayOfPointD;
   closed: Boolean; const pattern: TArrayOfInteger;
   patternOffset: PDouble): TArrayOfArrayOfPointD;
@@ -1697,6 +1819,7 @@ var
   end;
 
 begin
+  Result := nil;
   paIdx := 0;
   patCnt := length(pattern);
 
@@ -1860,15 +1983,46 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function QBezier(const pts: TArrayOfPointD): TArrayOfPointD;
+function FlattenQBezier(const pts: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD;
+var
+  i, len: integer;
 begin
-  if Length(pts) < 3 then
-    raise Exception.Create(rsInvalidQBezier);
-  result := QBezier(pts[0], pts[1], pts[2]);
+  len := Length(pts);
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    Result[i] := FlattenQBezier(pts[i]);
 end;
 //------------------------------------------------------------------------------
 
-function QBezier(const pt1, pt2, pt3: TPointD): TArrayOfPointD;
+function FlattenQBezier(const pts: TArrayOfPointD): TArrayOfPointD;
+var
+  i, highI: integer;
+  p: TArrayOfPointD;
+begin
+  Result := nil;
+  highI := high(pts);
+  if highI < 0 then Exit;
+  if (highI < 2) or Odd(highI) then
+    raise Exception.Create(rsInvalidQBezier);
+  setLength(Result, 1);
+  Result[0] := pts[0];
+  for i := 0 to (highI div 2) -1 do
+  begin
+    if PointsEqual(pts[i*2], pts[i*2+1]) and
+      PointsEqual(pts[i*2+1], pts[i*2+2]) then
+    begin
+      AppendPoint(Result, pts[i*2]);
+      AppendPoint(Result, pts[i*2 +2]);
+    end else
+    begin
+      p := FlattenQBezier(pts[i*2], pts[i*2+1], pts[i*2+2]);
+      Result := JoinPaths(Result, Copy(p, 1, Length(p) -1));
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function FlattenQBezier(const pt1, pt2, pt3: TPointD): TArrayOfPointD;
 var
   resultCnt, resultLen: integer;
 
@@ -1918,15 +2072,46 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function CBezier(const pts: TArrayOfPointD): TArrayOfPointD;
+function FlattenCBezier(const pts: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD;
+var
+  i, len: integer;
 begin
-  if Length(pts) < 4 then
-    raise Exception.Create(rsInvalidCBezier);
-  result := CBezier(pts[0], pts[1], pts[2], pts[3]);
+  len := Length(pts);
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    Result[i] := FlattenCBezier(pts[i]);
 end;
 //------------------------------------------------------------------------------
 
-function CBezier(const pt1, pt2, pt3, pt4: TPointD): TArrayOfPointD;
+function FlattenCBezier(const pts: TArrayOfPointD): TArrayOfPointD;
+var
+  i, len: integer;
+  p: TArrayOfPointD;
+begin
+  Result := nil;
+  len := Length(pts) -1;
+  if len < 0 then Exit;
+  if (len < 3) or (len mod 3 <> 0) then
+    raise Exception.Create(rsInvalidCBezier);
+  setLength(Result, 1);
+  Result[0] := pts[0];
+  for i := 0 to (len div 3) -1 do
+  begin
+    if PointsEqual(pts[i*3], pts[i*3+1]) and
+      PointsEqual(pts[i*3+2], pts[i*3+3]) then
+    begin
+      AppendPoint(Result, pts[i*3]);
+      AppendPoint(Result, pts[i*3 +3]);
+    end else
+    begin
+      p := FlattenCBezier(pts[i*3], pts[i*3+1], pts[i*3+2], pts[i*3+3]);
+      Result := JoinPaths(Result, Copy(p, 1, Length(p) -1));
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD): TArrayOfPointD;
 var
   resultCnt, resultLen: integer;
 
@@ -1993,7 +2178,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function CSpline(const pts: TArrayOfPointD): TArrayOfPointD;
+function FlattenCSpline(const pts: TArrayOfPointD): TArrayOfPointD;
 var
   resultCnt, resultLen: integer;
 
@@ -2065,7 +2250,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function QSpline(const pts: TArrayOfPointD): TArrayOfPointD;
+function FlattenQSpline(const pts: TArrayOfPointD): TArrayOfPointD;
 var
   resultCnt, resultLen: integer;
 
@@ -2171,6 +2356,609 @@ begin
     Result[j].Y := y;
   end;
   setlength(Result, j+1);
+end;
+
+//------------------------------------------------------------------------------
+// SmoothLine() support structures and functions
+//------------------------------------------------------------------------------
+
+type
+  PPt2 = ^TPt2;
+  TPt2 = record
+    pt   : TPointD;
+    vec  : TPointD;
+    len  : double;
+    next : PPt2;
+    prev : PPt2;
+  end;
+
+  TFitCurveContainer = class
+  private
+    ppts      : PPt2;
+    solution  : TArrayOfPointD;
+    tolSqrd   : double;
+    function Count(first, last: PPt2): integer;
+    function AddPt(const pt: TPointD): PPt2;
+    procedure Clear;
+    function ComputeLeftTangent(p: PPt2): TPointD;
+    function ComputeRightTangent(p: PPt2): TPointD;
+    function ComputeCenterTangent(p: PPt2): TPointD;
+    function ChordLengthParameterize(
+      first, last: PPt2; count: integer): TArrayOfDouble;
+    function GenerateBezier(first, last: PPt2; count: integer;
+      const u: TArrayOfDouble; const firstTan, lastTan: TPointD): TArrayOfPointD;
+    function Reparameterize(first, last: PPt2; count: integer;
+      const u: TArrayOfDouble; const bezier: TArrayOfPointD): TArrayOfDouble;
+    function NewtonRaphsonRootFind(const q: TArrayOfPointD;
+      const pt: TPointD; u: double): double;
+    function ComputeMaxErrorSqrd(first, last: PPt2;
+      const bezier: TArrayOfPointD; const u: TArrayOfDouble;
+      out SplitPoint: PPt2): double;
+    function FitCubic(first, last: PPt2;
+      const firstTan, lastTan: TPointD): Boolean;
+    procedure AppendSolution(const bezier: TArrayOfPointD);
+  public
+    function FitCurve(const path: TArrayOfPointD;
+      closed: Boolean; tolerance: double): TArrayOfPointD;
+  end;
+
+//------------------------------------------------------------------------------
+
+function Scale(const vec: TPointD; newLen: double): TPointD;
+  {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result.X := vec.X * newLen;
+  Result.Y := vec.Y * newLen;
+end;
+//------------------------------------------------------------------------------
+
+function Mul(const vec: TPointD; val: double): TPointD;
+  {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result.X := vec.X * val;
+  Result.Y := vec.Y * val;
+end;
+//------------------------------------------------------------------------------
+
+function AddVecs(const vec1, vec2: TPointD): TPointD;
+  {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result.X := vec1.X + vec2.X;
+  Result.Y := vec1.Y + vec2.Y;
+end;
+//------------------------------------------------------------------------------
+
+function SubVecs(const vec1, vec2: TPointD): TPointD;
+  {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result.X := vec1.X - vec2.X;
+  Result.Y := vec1.Y - vec2.Y;
+end;
+//------------------------------------------------------------------------------
+
+function DotProdVecs(const vec1, vec2: TPointD): double;
+  {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  result := (vec1.X * vec2.X + vec1.Y * vec2.Y);
+end;
+//---------------------------------------------------------------------------
+
+function NormalizeVec(const vec: TPointD): TPointD;
+  {$IFDEF INLINE} inline; {$ENDIF}
+var
+  len: double;
+begin
+  len := Sqrt(vec.X * vec.X + vec.Y * vec.Y);
+  if len <> 0 then
+  begin
+    Result.X := vec.X / len;
+    Result.Y := vec.Y / len;
+  end else
+    result := vec;
+end;
+//------------------------------------------------------------------------------
+
+function NegateVec(vec: TPointD): TPointD;
+  {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result.X := -vec.X;
+  Result.Y := -vec.Y;
+end;
+//------------------------------------------------------------------------------
+
+function B0(u: double): double; {$IFDEF INLINE} inline; {$ENDIF}
+var
+  tmp: double;
+begin
+  tmp := 1.0 - u;
+  result := tmp * tmp * tmp;
+end;
+//------------------------------------------------------------------------------
+
+function B1(u: double): double; {$IFDEF INLINE} inline; {$ENDIF}
+var
+  tmp: double;
+begin
+  tmp := 1.0 - u;
+  result := 3 * u * tmp * tmp;
+end;
+//------------------------------------------------------------------------------
+
+function B2(u: double): double; {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  result := 3 * u * u * (1.0 - u);
+end;
+//------------------------------------------------------------------------------
+
+function B3(u: double): double; {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  result := u * u * u;
+end;
+//------------------------------------------------------------------------------
+
+function TFitCurveContainer.AddPt(const pt: TPointD): PPt2;
+begin
+  new(Result);
+  Result.pt := pt;
+  if not assigned(ppts) then
+  begin
+    Result.prev := Result;
+    Result.next := Result;
+    ppts := Result;
+  end else
+  begin
+    Result.prev := ppts.prev;
+    ppts.prev.next := Result;
+    ppts.prev := Result;
+    Result.next := ppts;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TFitCurveContainer.Clear;
+var
+  p: PPt2;
+begin
+  solution := nil;
+  ppts.prev.next := nil; //break loop
+  while assigned(ppts) do
+  begin
+    p := ppts;
+    ppts := ppts.next;
+    Dispose(p);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TFitCurveContainer.Count(first, last: PPt2): integer;
+begin
+  if first = last then
+    result := 0 else
+    result := 1;
+  repeat
+    inc(Result);
+    first := first.next;
+  until (first = last);
+end;
+//------------------------------------------------------------------------------
+
+function TFitCurveContainer.ComputeLeftTangent(p: PPt2): TPointD;
+begin
+  Result := NormalizeVec(p.vec);
+end;
+//------------------------------------------------------------------------------
+
+function TFitCurveContainer.ComputeRightTangent(p: PPt2): TPointD;
+begin
+  Result := NormalizeVec(NegateVec(p.prev.vec));
+end;
+//------------------------------------------------------------------------------
+
+function TFitCurveContainer.ComputeCenterTangent(p: PPt2): TPointD;
+var
+  v1, v2: TPointD;
+begin
+  v1 := SubVecs(p.prev.pt, p.pt);
+  v2 := SubVecs(p.pt, p.next.pt);
+  Result := AddVecs(v1, v2);
+  Result := NormalizeVec(Result);
+end;
+//------------------------------------------------------------------------------
+
+function TFitCurveContainer.ChordLengthParameterize(
+  first, last: PPt2; count: integer): TArrayOfDouble;
+var
+  d: double;
+  i: integer;
+begin
+  SetLength(Result, count);
+  Result[0] := 0;
+  d := 0;
+  for i := 1 to count -1 do
+  begin
+    d := d + first.len;
+    Result[i] := d;
+    first := first.next;
+  end;
+  for i := 1 to count -1 do
+    Result[i] := Result[i] / d;
+end;
+//------------------------------------------------------------------------------
+
+function TFitCurveContainer.GenerateBezier(first, last: PPt2; count: integer;
+  const u: TArrayOfDouble; const firstTan, lastTan: TPointD): TArrayOfPointD;
+var
+  i: integer;
+  p: PPt2;
+  danger: Boolean;
+  dist, epsilon: double;
+  v1,v2, tmp: TPointD;
+  a0, a1: TArrayOfPointD;
+  c: array [0..1, 0..1] of double;
+  x: array [0..1] of double;
+  det_c0_c1, det_c0_x, det_x_c1, alphaL, alphaR: double;
+begin
+  SetLength(a0, count);
+  SetLength(a1, count);
+
+  for i := 0 to count -1 do
+  begin
+		v1 := Scale(firstTan, B1(u[i]));
+		v2 := Scale(lastTan, B2(u[i]));
+		a0[i] := v1;
+		a1[i] := v2;
+  end;
+
+  FillChar(c[0][0], 4 * SizeOf(double), 0);
+  FillChar(x[0], 2 * SizeOf(double), 0);
+
+  p := first;
+  for i := 0 to count -1 do
+  begin
+		c[0][0] := c[0][0] + DotProdVecs(a0[i], (a0[i]));
+		c[0][1] := c[0][1] + DotProdVecs(a0[i], (a1[i]));
+		c[1][0] := c[0][1];
+		c[1][1] := c[1][1] + DotProdVecs(a1[i], (a1[i]));
+
+    tmp := SubVecs(p.pt,
+      AddVecs(Mul(first.pt, B0(u[i])),
+      AddVecs(Mul(first.pt, B1(u[i])),
+      AddVecs(Mul(last.pt, B2(u[i])),
+      Mul(last.pt, B3(u[i]))))));
+
+    x[0] := x[0] + DotProdVecs(a0[i], tmp);
+    x[1] := x[1] + DotProdVecs(a1[i], tmp);
+    p := p.next;
+  end;
+
+  det_c0_c1 := c[0][0] * c[1][1] - c[1][0] * c[0][1];
+	det_c0_x := c[0][0] * x[1] - c[1][0] * x[0];
+	det_x_c1 := x[0] * c[1][1] - x[1] * c[0][1];
+
+  if det_c0_c1 = 0 then
+    alphaL := 0 else
+    alphaL := det_x_c1 / det_c0_c1;
+
+  if det_c0_c1 = 0 then
+    alphaR := 0 else
+    alphaR := det_c0_x / det_c0_c1;
+
+  dist := Distance(first.pt, last.pt);
+  danger := (alphaL > dist * 2) or (alphaR > dist * 2);
+  epsilon := 1.0e-6 * dist;
+
+  SetLength(Result, 4);
+  Result[0] := first.pt;
+  Result[3] := last.pt;
+  if danger or (alphaL < epsilon) or (alphaR < epsilon) then
+  begin
+    dist := dist / 3;
+    Result[1] := AddVecs(Result[0], Scale(firstTan, dist));
+    Result[2] := AddVecs(Result[3], Scale(lastTan, dist));
+  end else
+  begin
+    Result[1] := AddVecs(Result[0], Scale(firstTan, alphaL));
+    Result[2] := AddVecs(Result[3], Scale(lastTan, alphaR));
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TFitCurveContainer.Reparameterize(first, last: PPt2; count: integer;
+  const u: TArrayOfDouble; const bezier: TArrayOfPointD): TArrayOfDouble;
+var
+  i: integer;
+begin
+  SetLength(Result, count);
+  for i := 0 to count -1 do
+  begin
+		Result[i] := NewtonRaphsonRootFind(bezier, first.pt, u[i]);
+    first := first.next;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function BezierII(degree: integer; const v: array of TPointD; t: double): TPointD;
+var
+  i,j: integer;
+  tmp: array[0..3] of TPointD;
+begin
+  Move(v[0], tmp[0], (degree +1) * sizeOf(TPointD));
+  for i := 1 to degree do
+    for j := 0 to degree - i do
+    begin
+      tmp[j].x := (1.0 - t) * tmp[j].x + t * tmp[j+1].x;
+      tmp[j].y := (1.0 - t) * tmp[j].y + t * tmp[j+1].y;
+    end;
+  Result := tmp[0];
+end;
+//------------------------------------------------------------------------------
+
+function TFitCurveContainer.ComputeMaxErrorSqrd(first, last: PPt2;
+	const bezier: TArrayOfPointD; const u: TArrayOfDouble;
+  out SplitPoint: PPt2): double;
+var
+  i: integer;
+  distSqrd: double;
+  v, pt: TPointD;
+  p: PPt2;
+begin
+	Result := 0;
+  i := 1;
+  SplitPoint := first.next;
+  p := first.next;
+	while p <> last do
+	begin
+		pt := BezierII(3, bezier, u[i]);
+		distSqrd := DistanceSqrd(pt, p.pt);
+		if (distSqrd >= Result) then
+    begin
+      Result := distSqrd;
+      SplitPoint := p;
+    end;
+    inc(i);
+    p := p.next;
+	end;
+end;
+//------------------------------------------------------------------------------
+
+function TFitCurveContainer.NewtonRaphsonRootFind(const q: TArrayOfPointD;
+  const pt: TPointD; u: double): double;
+var
+  i: integer;
+  numerator, denominator: double;
+  qu, q1u, q2u: TPointD;
+  q1: array[0..2] of TPointD;
+  q2: array[0..1] of TPointD;
+begin
+  qu := BezierII(3, q, u);
+
+  for i := 0 to 2 do
+  begin
+    q1[i].x := (q[i+1].x - q[i].x) * 3.0;
+    q1[i].y := (q[i+1].y - q[i].y) * 3.0;
+  end;
+
+  q2[0].x := (q1[1].x - q1[0].x) * 2.0;
+  q2[0].y := (q1[1].y - q1[0].y) * 2.0;
+  q2[1].x := (q1[2].x - q1[1].x) * 2.0;
+  q2[1].y := (q1[2].y - q1[1].y) * 2.0;
+
+  q1u := BezierII(2, q1, u);
+  q2u := BezierII(1, q2, u);
+
+  numerator := (qu.x - pt.x) * (q1u.x) + (qu.y - pt.y) * (q1u.y);
+  denominator := (q1u.x) * (q1u.x) + (q1u.y) * (q1u.y) +
+    (qu.x - pt.x) * (q2u.x) + (qu.y - pt.y) * (q2u.y);
+  if (denominator = 0) then
+    Result := u else
+    Result := u - (numerator/denominator);
+end;
+//------------------------------------------------------------------------------
+
+function TFitCurveContainer.FitCubic(first, last: PPt2;
+  const firstTan, lastTan: TPointD): Boolean;
+var
+  i, cnt: integer;
+  p, splitPoint: PPt2;
+  centerTan: TPointD;
+  bezier: TArrayOfPointD;
+  clps, uPrime: TArrayOfDouble;
+  dist, maxErrorSqrd: double;
+const
+  maxIterations = 4;
+begin
+  Result := true;
+  cnt := Count(first, last);
+  if cnt = 2 then
+  begin
+    dist := Distance(first.pt, last.pt) / 3;
+    SetLength(bezier, 4);
+    bezier[0] := first.pt;
+    bezier[3] := last.pt;
+    bezier[1] := AddVecs(bezier[0], Scale(firstTan, dist));
+    bezier[2] := AddVecs(bezier[3], Scale(lastTan, dist));
+    AppendSolution(bezier);
+    Exit;
+  end;
+  clps := ChordLengthParameterize(first, last, cnt);
+  bezier := GenerateBezier(first, last, cnt, clps, firstTan, lastTan);
+  maxErrorSqrd := ComputeMaxErrorSqrd(first, last, bezier, clps, splitPoint);
+  if (maxErrorSqrd < tolSqrd) then
+  begin
+    AppendSolution(bezier);
+    Exit;
+  end;
+
+  if (maxErrorSqrd < tolSqrd * 4) then
+  begin
+		for i := 1 to maxIterations do
+    begin
+			uPrime := Reparameterize(first, last, cnt, clps, bezier);
+      bezier := GenerateBezier(first, last, cnt, uPrime, firstTan, lastTan);
+      maxErrorSqrd :=
+        ComputeMaxErrorSqrd(first, last, bezier, uPrime, splitPoint);
+			if (maxErrorSqrd < tolSqrd) then
+      begin
+        AppendSolution(bezier);
+        Exit;
+			end;
+			clps := uPrime;
+		end;
+	end;
+
+  //when we're changing direction, treat splitPoint as a sharp angle
+  if TurnsLeft(splitPoint.prev.prev.pt, splitPoint.prev.pt, splitPoint.pt) <>
+    TurnsLeft(splitPoint.prev.pt, splitPoint.pt, splitPoint.next.pt) then
+  begin
+    centerTan := ComputeRightTangent(splitPoint);
+    FitCubic(first, splitPoint, firstTan, centerTan);
+    centerTan := ComputeLeftTangent(splitPoint);
+    FitCubic(splitPoint, last, centerTan, lastTan);
+  end else
+  begin
+    centerTan := ComputeCenterTangent(splitPoint);
+    FitCubic(first, splitPoint, firstTan, centerTan);
+    centerTan := NegateVec(centerTan);
+    FitCubic(splitPoint, last, centerTan, lastTan);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function BreakInCurveRequired(p: PPt2): Boolean;
+var
+  cosP: double;
+begin
+  if (p.prev.len * 4 < p.len) or (p.len * 4 < p.prev.len) then
+  begin
+    //The GenerateBezier() function performs poorly with significantly
+    //asymmetric segment lengths and so it's safest to split the curve here.
+    result := true;
+  end else
+  begin
+    //It's best breaking the curve when there's a significant bend at 'p'
+    //(ie > 60 degrees). It also make sense to break when the bend is
+    //< 5 degrees since a break won't even be noticed. (Uses Cosine rule.)
+    cosP := (Sqr(p.prev.len) + Sqr(p.len) -
+      DistanceSqrd(p.prev.pt, p.next.pt)) / (2 * p.prev.len * p.len);
+    Result := (cosP  > -0.5) or (cosP < -0.995);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TFitCurveContainer.FitCurve(const path: TArrayOfPointD;
+  closed: Boolean; tolerance: double): TArrayOfPointD;
+var
+  i,j, highP: integer;
+  d, t: double;
+  p, p2, pEnd: PPt2;
+const
+  minSegLength = 3; //very short segments are more likely to produce artifacts
+begin
+
+  //tolerance specifies the maximum allowed variance between existing paths
+  //and their bezier curve replacements (ie without resorting to curve
+  //subdivision). More tolerance produces smoother (and simpler) paths.
+  tolSqrd := Sqr(Max(1, Min(10, tolerance)));
+
+  highP     := High(path);
+  if closed then
+    while (highP > 0) and (Distance(path[highP], path[0]) < minSegLength) do
+      dec(highP);
+
+  ppts := AddPt(path[0]);
+  p := ppts;
+  j := 1;
+  for i := 1 to highP do
+  begin
+    d := Distance(p.pt, path[i]);
+    //skip line segments with lengths less than 'minSegLength'
+    if d < minSegLength then Continue;
+    p := AddPt(path[i]);
+    p.prev.len := d;
+    p.prev.vec := SubVecs(path[i], p.prev.pt);
+  end;
+  p.len := Distance(ppts.pt, p.pt);
+  p.vec := SubVecs(ppts.pt, p.pt);
+
+  if (p.next = p) or (closed and (p.next = p.prev)) then
+  begin
+    Clear;
+    result := nil;
+    Exit;
+  end;
+
+  if closed then
+  begin
+    //for closed paths, find a good starting point
+    p2 := ppts;
+    repeat
+      if BreakInCurveRequired(p2) then break;
+      p2 := p2.next;
+    until p2 = ppts;
+    pEnd := p2; p := p2; p2 := p.next;
+  end else
+  begin
+    pEnd := ppts.prev; p := ppts; p2 := ppts.next;
+  end;
+
+  repeat
+    //break smoothing at sharp angles
+    if BreakInCurveRequired(p2) then
+    begin
+      FitCubic(p, p2, ComputeLeftTangent(p), ComputeRightTangent(p2));
+      p := p2;
+    end;
+    p2 := p2.next;
+  until (p2 = pEnd);
+  FitCubic(p, p2, ComputeLeftTangent(p), ComputeRightTangent(p2));
+
+  Result := solution;
+  Clear;
+end;
+//------------------------------------------------------------------------------
+
+procedure TFitCurveContainer.AppendSolution(const bezier: TArrayOfPointD);
+var
+  i, len: integer;
+begin
+  len := Length(solution);
+  if len > 0 then
+  begin
+    SetLength(solution, len + 3);
+    for i := 0 to 2 do
+      solution[len +i] := bezier[i +1];
+  end else
+    solution := bezier;
+end;
+//------------------------------------------------------------------------------
+
+function SmoothLine(const path: TArrayOfPointD;
+  closed: Boolean; amount: double): TArrayOfPointD;
+var
+  paths, solution: TArrayOfArrayOfPointD;
+begin
+  SetLength(paths, 1);
+  paths[0] := path;
+  solution := SmoothLine(paths, closed, amount);
+  if solution <> nil then
+    Result := solution[0];
+end;
+//------------------------------------------------------------------------------
+
+function SmoothLine(const paths: TArrayOfArrayOfPointD;
+  closed: Boolean; amount: double): TArrayOfArrayOfPointD;
+var
+  i, len: integer;
+begin
+  len := Length(paths);
+  SetLength(Result, len);
+  with TFitCurveContainer.Create do
+  try
+    for i := 0 to len -1 do
+      Result[i] := FitCurve(paths[i], closed, amount);
+  finally
+    Free;
+  end;
 end;
 //------------------------------------------------------------------------------
 
