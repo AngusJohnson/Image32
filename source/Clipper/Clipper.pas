@@ -3,7 +3,7 @@ unit Clipper;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  10.0                                                            *
-* Date      :  9 March 2019                                                    *
+* Date      :  19 October 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  This is the main polygon clipping module                        *

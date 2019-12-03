@@ -157,7 +157,7 @@ object FrmMain: TFrmMain
       Checked = True
       GroupIndex = 1
       RadioItem = True
-      ShortCut = 16467
+      ShortCut = 16461
       OnClick = mnuSharpNoHdlsClick
     end
     object mnuSmoothAsym: TMenuItem
@@ -223,7 +223,7 @@ object FrmMain: TFrmMain
     object mnuDeleteButton: TMenuItem
       Caption = 'D&elete Last Button'
       GroupIndex = 1
-      ShortCut = 16452
+      ShortCut = 46
       OnClick = mnuDeleteButtonClick
     end
     object mnuDeleteAllButtonControls: TMenuItem
@@ -235,6 +235,7 @@ object FrmMain: TFrmMain
     object mnuDeleteLayer: TMenuItem
       Caption = 'Delete &Layer'
       GroupIndex = 1
+      ShortCut = 16473
       OnClick = mnuDeleteLayerClick
     end
   end

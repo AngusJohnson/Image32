@@ -2,8 +2,8 @@ unit Image32_SmoothPath;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.28                                                            *
-* Date      :  22 October 2019                                                 *
+* Version   :  1.32                                                            *
+* Date      :  4 December 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Supports paths with multiple sub-curves                         *
@@ -286,7 +286,7 @@ begin
   begin
     for k := j to j + 3 do
         tmp[k - j] := fCtrlPoints[k].Point;
-    Result := JoinPaths(Result, CBezier(tmp));
+    Result := JoinPaths(Result, FlattenCBezier(tmp));
     inc(j, 3);
   end;
   fFlattened := Result;

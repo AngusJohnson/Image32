@@ -3,7 +3,7 @@ unit BitmapPanels;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.11                                                            *
-* Date      :  21 November 2019                                                *
+* Date      :  4 December 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
@@ -910,7 +910,7 @@ begin
     tmpBmp := TBitmap.Create; //temporary bitmap for clipping
     try
       {$IFDEF SETSIZE}
-      tmpBmp.SetSize(srcRec.Width, srcRec.Height);
+      tmpBmp.SetSize(RectWidth(srcRec), RectHeight(srcRec));
       {$ELSE}
       tmpBmp.Width := RectWidth(srcRec);
       tmpBmp.Height := RectHeight(srcRec);

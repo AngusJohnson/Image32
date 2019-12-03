@@ -1,8 +1,8 @@
 
 Image32 is a 2D graphics library written in Delphi Pascal. It provides an extensive range of image manipulation functions. It also includes a polygon renderer for line and polygon drawing. The renderer supports a range of brush filling options including tiled images, and linear and radial gradient fills.
 
-Version: 1.31
-Uploaded: 2 December 2019
+Version: 1.32
+Uploaded: 10 December 2019
 Freeware for both open source and commercial applications released under 
 Boost Software License - see https://www.boost.org/LICENSE_1_0.txt
 Copyright © 2019 Angus Johnson
@@ -12,6 +12,9 @@ http://www.angusj.com/delphi/image32.php
 
 Recent changes:
 
+Version: 1.31
+  Changes in Image32_Vector
+   Added an extra (optional) parameter to the new SmoothLine function.
 Version: 1.31
   Changes in Image32_Vector
     Renamed CBezier to FlattenCBezier;

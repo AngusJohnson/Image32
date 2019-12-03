@@ -6,7 +6,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
   Types, Menus, ExtCtrls, ComCtrls, StdCtrls,
-  BitmapPanels, Image32, Image32_Layers, Image32_MixedPath;
+  BitmapPanels, Image32, Image32_Layers, Image32_SmoothPath;
 
 const
   UM_REPAINT = WM_USER +1;
@@ -52,12 +52,12 @@ type
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure pnlMainMouseDown(Sender: TObject; Button: TMouseButton;
+    procedure pnlMainMouseDown(Sender: TObject;
+      Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+    procedure pnlMainMouseMove(Sender: TObject;
       Shift: TShiftState; X, Y: Integer);
-    procedure pnlMainMouseMove(Sender: TObject; Shift: TShiftState; X,
-      Y: Integer);
-    procedure pnlMainMouseUp(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
+    procedure pnlMainMouseUp(Sender: TObject;
+      Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure CopytoClipboard1Click(Sender: TObject);
     procedure pnlMainDblClick(Sender: TObject);
     procedure mnuMakePolylineClick(Sender: TObject);
@@ -77,7 +77,7 @@ type
     rotatePoint   : TPoint;
     moveType      : TMoveType;
     clickedLayer  : TLayer32;
-    designLayer   : TLayer32;
+    designLayer   : TDesignerLayer32;
     buttonPath    : TSmoothPath;
     btnPathRegion : TArrayOfArrayOfPointD;
     dashes        : TArrayOfInteger;
@@ -92,6 +92,7 @@ type
   public
     { Public declarations }
   end;
+
 
   TLineLayer32 = class(TSmoothPathLayer32)
   public
@@ -250,7 +251,8 @@ begin
   HatchBackground(layer.Image, $FFF0F0F0, clWhite32);
 
   //and another designer layer
-  designLayer := layeredImage32.AddNewLayer(TDesignerLayer32, 'design layer');
+  designLayer := TDesignerLayer32(layeredImage32.AddNewLayer(
+    TDesignerLayer32, 'design layer'));
   designLayer.SetSize(layeredImage32.Width, layeredImage32.Height);
 
   Screen.Cursors[crRotate] :=
@@ -300,8 +302,14 @@ const
   btnColors: array [boolean] of TColor32 = (clBlue32, clGreen32);
   buttonOpts: array [boolean] of TButtonOptions = ([], [boSquare]);
 begin
+  clickedLayer := nil;
   layeredImage32.DeleteGroup(1);
-  if buttonPath.Count = 0  then Exit;
+
+  if buttonPath.Count = 0  then
+  begin
+    UpdatePanelBitmap;
+    Exit;
+  end;
 
   if buttonPath.Count = 1 then
     btnColor := clLime32 else
@@ -358,7 +366,6 @@ begin
   if not (layeredImage32.TopLayer is TButtonDesignerLayer32) then Exit;
   buttonPath.DeleteLast;
   UpdateButtonGroupFromPath;
-  clickedLayer := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -379,13 +386,11 @@ var
   i, d: integer;
   rec: TRect;
   path: TArrayOfPointD;
-  dl: TDesignerLayer32;
 begin
   if not Active then Exit; //just avoids several calls in FormCreate
 
   //Repaints the designer layer
-  dl := TDesignerLayer32(designLayer);
-  dl.Image.Clear;
+  designLayer.Image.Clear;
 
   //designer (non-rotation) buttons
   //though most of this is just arrow head stuff
@@ -393,9 +398,9 @@ begin
   if Assigned(path) then
   begin
     //draw plain old flattened button path
-    DrawLine(dl.Image, path, lineWidth, GetPenColor, esRound);
+    DrawLine(designLayer.Image, path, lineWidth, GetPenColor, esRound);
     //display control lines
-    DrawSmoothPathDesigner(buttonPath, dl);
+    DrawSmoothPathOnDesigner(buttonPath, designLayer);
   end;
 
   //outline selected button
@@ -405,23 +410,25 @@ begin
     rec.BottomRight := rec.TopLeft;
     i := Max(DefaultButtonSize, linewidth) div 2 + hitTestWidth;
     Windows.InflateRect(rec, i, i);
-    DrawPolygon(dl.Image, Ellipse(rec), frEvenOdd, $40AAAAAA);
-    DrawLine(dl.Image, Ellipse(rec), 1, $AAFF0000, esClosed);
+    DrawPolygon(designLayer.Image, Ellipse(rec), frEvenOdd, $40AAAAAA);
+    DrawLine(designLayer.Image, Ellipse(rec), 1, $AAFF0000, esClosed);
   end;
 
   //rotation (always group 2)
   i := layeredImage32.GetFirstInGroupIdx(2);
   if i > 0 then
   begin
-    DrawButton(dl.Image, PointD(rotatePoint), DefaultButtonSize, clSilver32);
+    DrawButton(designLayer.Image,
+      PointD(rotatePoint), DefaultButtonSize, clSilver32);
     d := Round(Distance(Point(layeredImage32.TopLayer.MidPoint), rotatePoint));
     with rotatePoint do rec := Rect(X - d, Y - d, X + d, Y + d);
-    dl.DrawEllipse(rec);
+    designLayer.DrawEllipse(rec);
   end;
 
   //display dashed hit-test outline for selected layer
   if Assigned(clickedLayer) and (clickedLayer is TSmoothPathLayer32) then
-    DrawDashedLine(dl.Image, TSmoothPathLayer32(clickedLayer).HitTestRegions,
+    DrawDashedLine(designLayer.Image,
+      TSmoothPathLayer32(clickedLayer).HitTestRegions,
       dashes, nil, 1, clRed32, esClosed);
 
   //and update Statusbar too
@@ -473,8 +480,7 @@ var
   polygonLayer: TPolygonLayer32;
   lineLayer: TLineLayer32;
 begin
-  if not buttonPath.CurrentCurveIsComplete or
-    not (layeredImage32.TopLayer is TButtonDesignerLayer32) then Exit;
+  if not (layeredImage32.TopLayer is TButtonDesignerLayer32) then Exit;
 
   //create a 'completed' path (either polyline or polygon) from the buttons
   if Sender = mnuMakePolygon then
@@ -512,9 +518,7 @@ begin
 
   buttonPath.Assign(TSmoothPathLayer32(clickedLayer).SmoothPath);
   layeredImage32.DeleteLayer(clickedLayer.Index);
-
   UpdateButtonGroupFromPath;
-  clickedLayer := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -542,6 +546,7 @@ begin
   //double click adds a button control layer
   buttonPath.Add(PointD(clickPoint), buttonPath.LastType);
   UpdateButtonGroupFromPath;
+  clickedLayer := layeredImage32.TopLayer;
 end;
 //------------------------------------------------------------------------------
 
@@ -701,8 +706,7 @@ procedure TFrmMain.PopupMenu1Popup(Sender: TObject);
 var
   nodeTypeEnabled: Boolean;
 begin
-  mnuMakePolyline.Enabled :=
-    (buttonPath.Count > 0) and buttonPath.CurrentCurveIsComplete;
+  mnuMakePolyline.Enabled := (buttonPath.Count > 0);
   mnuMakePolygon.Enabled := mnuMakePolyline.Enabled;
   mnuEditLayer.Enabled :=
     Assigned(clickedLayer) and (clickedLayer is TSmoothPathLayer32);
@@ -738,6 +742,7 @@ end;
 
 procedure TFrmMain.mnuSharpNoHdlsClick(Sender: TObject);
 var
+  i, clicklayerIdxInGroup: integer;
   newType, oldType: TSmoothType;
 begin
    //changing vertex point type
@@ -751,9 +756,12 @@ begin
   else newType := stSharpNoHdls;
   if newType = oldType then Exit;
 
-  buttonPath.PointTypes[clickedLayer.IndexInGroup] := newType;
-  //buttonPath shape may change with new point type
+  clicklayerIdxInGroup := clickedLayer.IndexInGroup;
+  buttonPath.PointTypes[clicklayerIdxInGroup] := newType;
   UpdateButtonGroupFromPath;
+  i := layeredImage32.GetFirstInGroupIdx(1) + clicklayerIdxInGroup;
+  clickedLayer := layeredImage32[i];
+  UpdatePanelBitmap;
 end;
 //------------------------------------------------------------------------------
 

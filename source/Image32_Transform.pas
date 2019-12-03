@@ -2,8 +2,8 @@ unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.17                                                            *
-* Date      :  11 August 2019                                                  *
+* Version   :  1.32                                                            *
+* Date      :  4 December 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -431,8 +431,8 @@ begin
   offset := NullPoint;
   //convert the top spline control points into a flattened path
   if splineType = stQuadratic then
-    topPath := QSpline(topSpline) else
-    topPath := CSpline(topSpline);
+    topPath := FlattenQSpline(topSpline) else
+    topPath := FlattenCSpline(topSpline);
 
   rec := GetBounds(topPath);
   //return false if the spline is invalid or there's no vertical transformation
@@ -540,8 +540,8 @@ begin
 
   //convert the left spline control points into a flattened path
   if splineType = stQuadratic then
-    leftPath := QSpline(leftSpline) else
-    leftPath := CSpline(leftSpline);
+    leftPath := FlattenQSpline(leftSpline) else
+    leftPath := FlattenCSpline(leftSpline);
   rec := GetBounds(leftPath);
   //return false if the spline is invalid or there's no horizontal transformation
   Result := not IsEmptyRect(rec);

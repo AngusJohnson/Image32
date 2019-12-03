@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.31                                                            *
-* Date      :  2 December 2019                                                 *
+* Version   :  1.32                                                            *
+* Date      :  4 December 2019                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -620,17 +620,17 @@ var
 begin
   if isStart then
   begin
-    if IsColinear(Point(x, y), pnt, nextInPath.pnt) then
+    if IsColinear(Types.Point(x, y), pnt, nextInPath.pnt) then
     begin
-      pnt := Point(x,y);
+      pnt := Types.Point(x,y);
       Exit;
     end;
 
     newPt := TPt.Create;
     newPt.pnt := pnt;
     newPt2 := TPt.Create;
-    newPt2.pnt := Point(pnt.X, pnt.Y +1);
-    pnt := Point(x,y);
+    newPt2.pnt := Types.Point(pnt.X, pnt.Y +1);
+    pnt := Types.Point(x,y);
 
     //self -> 2 -> 1 -> nip
     nextInPath.prevInPath := newPt;
@@ -641,17 +641,17 @@ begin
     nextInPath := newPt2;
   end else
   begin
-    if IsColinear(Point(x, y), pnt, prevInPath.pnt) then
+    if IsColinear(Types.Point(x, y), pnt, prevInPath.pnt) then
     begin
-      pnt := Point(x,y);
+      pnt := Types.Point(x,y);
       Exit;
     end;
 
     newPt := TPt.Create;
     newPt.pnt := pnt;
     newPt2 := TPt.Create;
-    newPt2.pnt := Point(pnt.X, pnt.Y +1);
-    pnt := Point(x,y);
+    newPt2.pnt := Types.Point(pnt.X, pnt.Y +1);
+    pnt := Types.Point(x,y);
 
     //self <- 2 <- 1 <- pip
     newPt.prevInPath := prevInPath;
@@ -816,12 +816,12 @@ begin
   ptL := TPt.Create;
   ptL.owner := self;
   ptL.isStart := not isHole;
-  ptL.pnt := Point(xLeft, y);
+  ptL.pnt := Types.Point(xLeft, y);
 
   ptR := TPt.Create;
   ptR.owner := self;
   ptR.isStart := isHole;
-  ptR.pnt := Point(xRight, y);
+  ptR.pnt := Types.Point(xRight, y);
 
   ptL.nextInPath := ptR;
   ptL.prevInPath := ptR;

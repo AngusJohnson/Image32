@@ -49,7 +49,6 @@ object FrmMain: TFrmMain
     Height = 105
     Align = alTop
     TabOrder = 0
-    ExplicitTop = -6
     object Label2: TLabel
       Left = 14
       Top = 45

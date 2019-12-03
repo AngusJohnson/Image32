@@ -6,7 +6,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
   Types, Menus, ExtCtrls, ComCtrls, StdCtrls, Dialogs,
-  BitmapPanels, Image32, Image32_Layers, Image32_MixedPath;
+  BitmapPanels, Image32, Image32_Layers, Image32_SmoothPath;
 
 type
   TMoveType = (mtNone, mtAllButtons, mtOneButton,
@@ -382,12 +382,14 @@ const
   buttonOpts: array [boolean] of TButtonOptions = ([], [boSquare]);
   btnColorLast: TColor32 = clLime32;
 begin
+  clickedLayer := nil;
   layeredImage32.DeleteGroup(1);
 
   if buttonPath.Count = 0  then
   begin
     btnPathRegion := nil;
     UpdateMenus;
+    UpdateLayeredImage;
     Exit;
   end;
 
@@ -436,6 +438,7 @@ begin
     btnPathRegion := InflateOpenPath(OpenPathToFlatPolygon(
       buttonPath.FlattenedPath), lineWidth + hitTestWidth, jsRound);
   UpdateMenus;
+  UpdateLayeredImage;
 end;
 //------------------------------------------------------------------------------
 
@@ -452,8 +455,6 @@ begin
     rbPolygonArrow.Checked then Exit;
   buttonPath.DeleteLast;
   UpdateButtonGroupFromPath;
-  clickedLayer := nil;
-  UpdateLayeredImage;
 end;
 //------------------------------------------------------------------------------
 
@@ -511,7 +512,6 @@ var
   flatPath: TArrayOfPointD;
   arrowHeads: TArrayOfArrayOfPointD;
   dl: TDesignerLayer32;
-  penClr: TColor32;
 const
   fillC: TColor32 = $40AAAAAA;
   penC: TColor32 = $AAFF0000;
@@ -527,24 +527,20 @@ begin
   flatPath := buttonPath.FlattenedPath;
   if Assigned(flatPath) then
   begin
-    if buttonPath.CurrentCurveIsComplete then
-      penClr := penColor else
-      penClr := $FFCC0000; //red
-
     //draw plain old flattened button path
     if rbPolygonArrow.Checked then
     begin
       DrawPolygon(dl.Image, flatPath, frEvenOdd, fillColor);
-      DrawLine(dl.Image, flatPath, lineWidth, penClr, esClosed);
+      DrawLine(dl.Image, flatPath, lineWidth, penColor, esClosed);
     end else
     begin
       arrowHeads := ShortenPathAndGetArrowHeads(flatPath);
       DrawPolygon(dl.Image, arrowHeads, frEvenOdd, fillColor);
-      DrawLine(dl.Image, arrowHeads, lineWidth, penClr, esClosed);
-      DrawLine(dl.Image, flatPath, lineWidth, penClr, esRound);
+      DrawLine(dl.Image, arrowHeads, lineWidth, penColor, esClosed);
+      DrawLine(dl.Image, flatPath, lineWidth, penColor, esRound);
     end;
     //display control lines
-    DrawSmoothPathDesigner(buttonPath, dl);
+    DrawSmoothPathOnDesigner(buttonPath, dl);
   end;
 
   //outline selected button
@@ -631,8 +627,7 @@ begin
   //convert the designer path into a completed open poly-line (+/- arrows)
   //or into a completed arrow polygon
 
-  if not buttonPath.CurrentCurveIsComplete or
-    not (layeredImage32.TopLayer is TButtonDesignerLayer32) then Exit;
+  if not (layeredImage32.TopLayer is TButtonDesignerLayer32) then Exit;
   try
     //just in case the rotation/scaling button is active ...
     ClearRotateSizeButton;
@@ -678,9 +673,7 @@ begin
 
   //finally delete the selected layer now we have the edit buttons
   layeredImage32.DeleteLayer(clickedLayer.Index);
-  clickedLayer := nil;
   UpdateButtonGroupFromPath;
-  UpdateLayeredImage;
 end;
 //------------------------------------------------------------------------------
 
@@ -729,6 +722,8 @@ begin
   end else
     buttonPath.Add(PointD(clickPoint), buttonPath.LastType);
   UpdateButtonGroupFromPath;
+  clickedLayer := layeredImage32.TopLayer;
+  UpdateLayeredImage;
 end;
 //------------------------------------------------------------------------------
 
@@ -1082,6 +1077,7 @@ end;
 procedure TFrmMain.mnuTypeChangeClick(Sender: TObject);
 var
   newType, oldType: TSmoothType;
+  i, clickedLayerIdxInGroup: integer;
 begin
    //changing vertex point type
   if disableTypeChangeClick then Exit;
@@ -1095,9 +1091,12 @@ begin
   else newType := stSharpNoHdls;
   if newType = oldType then Exit;
 
-  buttonPath.PointTypes[clickedLayer.IndexInGroup] := newType;
+  clickedLayerIdxInGroup := clickedLayer.IndexInGroup;
+  buttonPath.PointTypes[clickedLayerIdxInGroup] := newType;
   //buttonPath shape may change with new point type
   UpdateButtonGroupFromPath;
+  i := layeredImage32.GetFirstInGroupIdx(1) + clickedLayerIdxInGroup;
+  clickedLayer := layeredImage32[i];
   UpdateLayeredImage;
 end;
 //------------------------------------------------------------------------------
@@ -1106,8 +1105,7 @@ procedure TFrmMain.UpdateMenus;
 var
   nodeTypeEnabled: Boolean;
 begin
-  mnuEndEdit.Enabled :=
-    (buttonPath.Count > 0) and buttonPath.CurrentCurveIsComplete;
+  mnuEndEdit.Enabled := (buttonPath.Count > 0);
   mnuFinishEdit2.Enabled := mnuEndEdit.Enabled;
   mnuEditLayer.Enabled :=
     Assigned(clickedLayer) and (clickedLayer is TSmoothPathLayer32);
@@ -1183,6 +1181,7 @@ end;
 procedure TFrmMain.rbLineArrowClick(Sender: TObject);
 begin
   ClearRotateSizeButton;
+  clickedLayer := nil;
   if layeredImage32.GroupCount(1) > 0 then
   begin
     layeredImage32.DeleteGroup(1);
@@ -1191,9 +1190,7 @@ begin
     UpdateLayeredImage;
   end
   else if Sender = rbPolygonArrow then
-    StartPolygonArrow
-  else
-    UpdateButtonGroupFromPath;
+    StartPolygonArrow;
 
   cbArrowStart.Enabled := Sender = rbLineArrow;
   cbArrowEnd.Enabled := cbArrowStart.Enabled;
@@ -1215,8 +1212,6 @@ var
   defaultArrowPts: TArrayOfPointD;
 begin
   defaultArrowPts :=
-//    MakePathI([200,200, 250,150, 250,175,
-//      300,175, 300,225, 250,225, 250,250]);
     MakePathI([200,200, 300,100, 300,150,
       400,150, 400,250, 300,250, 300,300]);
   buttonPath.Clear;
@@ -1224,7 +1219,6 @@ begin
   for i := 1 to high(defaultArrowPts) do
     buttonPath.Add(defaultArrowPts[i]);
   UpdateButtonGroupFromPath;
-  UpdateLayeredImage;
 end;
 //------------------------------------------------------------------------------
 

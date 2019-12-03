@@ -15,7 +15,7 @@
   {$IF COMPILERVERSION >= 17}
     {$IFNDEF DEBUG}
       {$DEFINE INLINE}                   //Delphi 2005 - added inlining
-    {$IFEND}  
+    {$ENDIF}
     {$IF COMPILERVERSION >= 18}
       {$DEFINE ABSTRACT_CLASSES}         //Delphi 2006 - added abstract classes
       {$DEFINE RECORD_METHODS}           //Delphi 2006 - added records with methods

@@ -219,10 +219,10 @@ type
   //SmoothLine: based on
   //"An Algorithm for Automatically Fitting Digitized Curves"
   //by Philip J. Schneider in "Graphics Gems", Academic Press, 1990
-  function SmoothLine(const path: TArrayOfPointD;
-    closed: Boolean; amount: double): TArrayOfPointD; overload;
-  function SmoothLine(const paths: TArrayOfArrayOfPointD;
-    closed: Boolean; amount: double): TArrayOfArrayOfPointD; overload;
+  function SmoothLine(const path: TArrayOfPointD; closed: Boolean;
+    tolerance: double; minSegLength: double = 2): TArrayOfPointD; overload;
+  function SmoothLine(const paths: TArrayOfArrayOfPointD; closed: Boolean;
+    tolerance: double; minSegLength: double = 2): TArrayOfArrayOfPointD; overload;
 
 const
   NullPoint: TPoint = (X: 0; Y: 0);
@@ -2398,8 +2398,8 @@ type
       const firstTan, lastTan: TPointD): Boolean;
     procedure AppendSolution(const bezier: TArrayOfPointD);
   public
-    function FitCurve(const path: TArrayOfPointD;
-      closed: Boolean; tolerance: double): TArrayOfPointD;
+    function FitCurve(const path: TArrayOfPointD; closed: Boolean;
+      tolerance: double; minSegLength: double): TArrayOfPointD;
   end;
 
 //------------------------------------------------------------------------------
@@ -2449,6 +2449,19 @@ var
   len: double;
 begin
   len := Sqrt(vec.X * vec.X + vec.Y * vec.Y);
+  if len <> 0 then
+  begin
+    Result.X := vec.X / len;
+    Result.Y := vec.Y / len;
+  end else
+    result := vec;
+end;
+//------------------------------------------------------------------------------
+
+function NormalizePt2Vec(const pt2: PPt2): TPointD;
+  {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  with pt2^ do
   if len <> 0 then
   begin
     Result.X := vec.X / len;
@@ -2544,13 +2557,13 @@ end;
 
 function TFitCurveContainer.ComputeLeftTangent(p: PPt2): TPointD;
 begin
-  Result := NormalizeVec(p.vec);
+  Result := NormalizePt2Vec(p);
 end;
 //------------------------------------------------------------------------------
 
 function TFitCurveContainer.ComputeRightTangent(p: PPt2): TPointD;
 begin
-  Result := NormalizeVec(NegateVec(p.prev.vec));
+  Result := NegateVec(NormalizePt2Vec(p.prev));
 end;
 //------------------------------------------------------------------------------
 
@@ -2699,7 +2712,7 @@ function TFitCurveContainer.ComputeMaxErrorSqrd(first, last: PPt2;
 var
   i: integer;
   distSqrd: double;
-  v, pt: TPointD;
+  pt: TPointD;
   p: PPt2;
 begin
 	Result := 0;
@@ -2751,7 +2764,7 @@ begin
     (qu.x - pt.x) * (q2u.x) + (qu.y - pt.y) * (q2u.y);
   if (denominator = 0) then
     Result := u else
-    Result := u - (numerator/denominator);
+    Result := u - (numerator / denominator);
 end;
 //------------------------------------------------------------------------------
 
@@ -2759,11 +2772,11 @@ function TFitCurveContainer.FitCubic(first, last: PPt2;
   const firstTan, lastTan: TPointD): Boolean;
 var
   i, cnt: integer;
-  p, splitPoint: PPt2;
+  splitPoint: PPt2;
   centerTan: TPointD;
   bezier: TArrayOfPointD;
   clps, uPrime: TArrayOfDouble;
-  dist, maxErrorSqrd: double;
+  maxErrorSqrd: double;
 const
   maxIterations = 4;
 begin
@@ -2771,12 +2784,11 @@ begin
   cnt := Count(first, last);
   if cnt = 2 then
   begin
-    dist := Distance(first.pt, last.pt) / 3;
     SetLength(bezier, 4);
     bezier[0] := first.pt;
     bezier[3] := last.pt;
-    bezier[1] := AddVecs(bezier[0], Scale(firstTan, dist));
-    bezier[2] := AddVecs(bezier[3], Scale(lastTan, dist));
+    bezier[1] := bezier[0];
+    bezier[2] := bezier[3];
     AppendSolution(bezier);
     Exit;
   end;
@@ -2806,7 +2818,8 @@ begin
 		end;
 	end;
 
-  //when we're changing direction, treat splitPoint as a sharp angle
+  //We need to break the curve because it's too complex for a single Bezier.
+  //If we're changing direction then make this a 'hard' break (see below).
   if TurnsLeft(splitPoint.prev.prev.pt, splitPoint.prev.pt, splitPoint.pt) <>
     TurnsLeft(splitPoint.prev.pt, splitPoint.pt, splitPoint.next.pt) then
   begin
@@ -2824,51 +2837,65 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function BreakInCurveRequired(p: PPt2): Boolean;
+function HardBreakCheck(p: PPt2): Boolean;
 var
   cosP: double;
 begin
+  //A 'break' means starting a new Bezier, even if it's a straight edge.
+  //A 'hard' break avoids smoothing whereas a 'soft' break is still smoothed.
+  //There is as much art as science in determining where to smooth and where
+  //not to. For example, long edges are typically straight edges and not
+  //curved, but how long does an edge have to be to classed a 'long' edge?
   if (p.prev.len * 4 < p.len) or (p.len * 4 < p.prev.len) then
   begin
-    //The GenerateBezier() function performs poorly with significantly
-    //asymmetric segment lengths and so it's safest to split the curve here.
+    //It's best to hard break when there's significant asymmetry between
+    //segment lengths (because GenerateBezier() will perform poorly there).
     result := true;
   end else
   begin
-    //It's best breaking the curve when there's a significant bend at 'p'
-    //(ie > 60 degrees). It also make sense to break when the bend is
-    //< 5 degrees since a break won't even be noticed. (Uses Cosine rule.)
+    //It's also best to hard break the curve when there's a significant bend.
+    //Empirically a significant bend is >60 deg. (ie angle @ p is <120 deg.)
+    //It also makes sense to break when the bend is <5 deg. since breaking
+    //won't even be noticed. (Note use of Cosine Rule.)
     cosP := (Sqr(p.prev.len) + Sqr(p.len) -
       DistanceSqrd(p.prev.pt, p.next.pt)) / (2 * p.prev.len * p.len);
-    Result := (cosP  > -0.5) or (cosP < -0.995);
+    Result := (cosP  > -0.5) or (cosP < -0.996);
   end;
 end;
 //------------------------------------------------------------------------------
 
 function TFitCurveContainer.FitCurve(const path: TArrayOfPointD;
-  closed: Boolean; tolerance: double): TArrayOfPointD;
+  closed: Boolean; tolerance: double; minSegLength: double): TArrayOfPointD;
 var
-  i,j, highP: integer;
-  d, t: double;
+  i, highI: integer;
+  d: double;
   p, p2, pEnd: PPt2;
-const
-  minSegLength = 3; //very short segments are more likely to produce artifacts
 begin
-
-  //tolerance specifies the maximum allowed variance between existing paths
-  //and their bezier curve replacements (ie without resorting to curve
-  //subdivision). More tolerance produces smoother (and simpler) paths.
+  //tolerance: specifies the maximum allowed variance between the existing
+  //vertices and the new Bezier curves. More tolerance will produce
+  //fewer Beziers and simpler paths, but at the cost of less precison.
+  //Usually a tolerance of 3-4 produces the best results. Range: 1 - 10.
   tolSqrd := Sqr(Max(1, Min(10, tolerance)));
 
-  highP     := High(path);
+  //minSegLength: Typically when vectorizing a raster image, the produced
+  //vector path will have many series of axis aligned segments that trace pixel
+  //boundaries. These paths will also contain many 1 unit segments that are
+  //at right angles to adjacent segments. Importantly, unless these very short
+  //segments are trimmed, they'll cause artifacts in the solution. Usually
+  //just removing vertices that are within 1 unit of its preceding vertex will
+  //circumvent 'pixel' artifacts. However, when a bitmap has been enlarged
+  //before vectorization, meaningful pixel dimensions will also increase.
+  //Consequently, to avoid 'pixel' artifacts, 'minSegLength' should always be
+  //at least 1 unit larger than the source's 'meaningful' pixel width.
+
+  highI     := High(path);
   if closed then
-    while (highP > 0) and (Distance(path[highP], path[0]) < minSegLength) do
-      dec(highP);
+    while (highI > 0) and (Distance(path[highI], path[0]) < minSegLength) do
+      dec(highI);
 
   ppts := AddPt(path[0]);
   p := ppts;
-  j := 1;
-  for i := 1 to highP do
+  for i := 1 to highI do
   begin
     d := Distance(p.pt, path[i]);
     //skip line segments with lengths less than 'minSegLength'
@@ -2892,7 +2919,7 @@ begin
     //for closed paths, find a good starting point
     p2 := ppts;
     repeat
-      if BreakInCurveRequired(p2) then break;
+      if HardBreakCheck(p2) then break;
       p2 := p2.next;
     until p2 = ppts;
     pEnd := p2; p := p2; p2 := p.next;
@@ -2902,8 +2929,7 @@ begin
   end;
 
   repeat
-    //break smoothing at sharp angles
-    if BreakInCurveRequired(p2) then
+    if HardBreakCheck(p2) then
     begin
       FitCubic(p, p2, ComputeLeftTangent(p), ComputeRightTangent(p2));
       p := p2;
@@ -2932,21 +2958,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SmoothLine(const path: TArrayOfPointD;
-  closed: Boolean; amount: double): TArrayOfPointD;
+function SmoothLine(const path: TArrayOfPointD; closed: Boolean;
+  tolerance: double; minSegLength: double): TArrayOfPointD;
 var
   paths, solution: TArrayOfArrayOfPointD;
 begin
   SetLength(paths, 1);
   paths[0] := path;
-  solution := SmoothLine(paths, closed, amount);
+  solution := SmoothLine(paths, closed, tolerance, minSegLength);
   if solution <> nil then
     Result := solution[0];
 end;
 //------------------------------------------------------------------------------
 
-function SmoothLine(const paths: TArrayOfArrayOfPointD;
-  closed: Boolean; amount: double): TArrayOfArrayOfPointD;
+function SmoothLine(const paths: TArrayOfArrayOfPointD; closed: Boolean;
+  tolerance: double; minSegLength: double): TArrayOfArrayOfPointD;
 var
   i, len: integer;
 begin
@@ -2955,7 +2981,7 @@ begin
   with TFitCurveContainer.Create do
   try
     for i := 0 to len -1 do
-      Result[i] := FitCurve(paths[i], closed, amount);
+      Result[i] := FitCurve(paths[i], closed, tolerance, minSegLength);
   finally
     Free;
   end;
