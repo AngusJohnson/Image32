@@ -281,10 +281,12 @@ type
   private
     FScale : double;
     function  GetPathD: TPathD;
+    function  GetChild(index: Integer): TPolyPathD;
   protected
     procedure SetScale(scale : double);
   public
     property  PathD: TPathD read GetPathD;
+    property  Child[index: Integer]: TPolyPathD read GetChild;
   end;
 
   TPolyTreeD = class(TPolyPathD)
@@ -1188,6 +1190,7 @@ end;
 procedure TClipper.AddPath(const path64: TPath; PolyType: TPathType;
   isOpen: Boolean);
 begin
+  if Length(path64) < 2 then Exit;
   if isOpen then
   begin
     if (PolyType = ptClip) then RaiseError(rsClipper_OpenPathErr);
@@ -2831,6 +2834,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TPolyPathD.GetChild(index: Integer): TPolyPathD;
+begin
+  if (index < 0) or (index >= FChildList.Count) then
+    Result := nil else
+    Result := TPolyPathD(FChildList[index]);
+end;
+//------------------------------------------------------------------------------
+
 function TPolyPathD.GetPathD: TPathD;
 var
   i, len: integer;
@@ -2903,7 +2914,7 @@ begin
   end;
 
   for i := 0 to Poly.ChildCount - 1 do
-    AddPolyNodeToPathsD(TPolyPathD(Poly.Child[i]), Paths);
+    AddPolyNodeToPathsD(Poly.Child[i], Paths);
 end;
 //------------------------------------------------------------------------------
 

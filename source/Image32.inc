@@ -27,6 +27,7 @@
         {$DEFINE MAINFORMONTASKBAR}      //Delphi 2007 - added TApplication.MainFormOnTaskbar
         {$if CompilerVersion >= 20}
           {$DEFINE PBYTE}                //Delphi 2009 - added PByte
+          {$DEFINE CHARINSET}            //Delphi 2009 - added CharInSet function
           {$DEFINE EXIT_PARAM}           //Delphi 2009 - added Exit(value)
           {$DEFINE ALPHAFORMAT}          //Delphi 2009 - added TBitmap.AlphaFormat property
           {$IF COMPILERVERSION >= 21}

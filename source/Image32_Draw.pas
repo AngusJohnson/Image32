@@ -2,10 +2,10 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.31                                                            *
-* Date      :  2 December 2019                                                 *
+* Version   :  1.36                                                            *
+* Date      :  5 January 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2019                                         *
+* Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -199,10 +199,10 @@ type
   // MISCELLANEOUS FUNCTIONS
   ///////////////////////////////////////////////////////////////////////////
 
-  procedure ErasePolygon(img: TImage32;
-    const polygon: TArrayOfPointD; fillRule: TFillRule); overload;
-  procedure ErasePolygon(img: TImage32;
-    const polygons: TArrayOfArrayOfPointD; fillRule: TFillRule); overload;
+  procedure ErasePolygon(img: TImage32; const polygon: TArrayOfPointD;
+    fillRule: TFillRule); overload;
+  procedure ErasePolygon(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+    fillRule: TFillRule); overload;
 
   //Both DrawBoolMask and DrawAlphaMask require
   //'mask' length to equal 'img' width * height
@@ -1346,7 +1346,11 @@ begin
   dst := PARGB(GetDstPixel(x1,y));
   for i := x1 to x2 do
   begin
+    {$IFDEF PBYTE}
     dst.A := MulTable[dst.A, not alpha^];
+    {$ELSE}
+    dst.A := MulTable[dst.A, not Ord(alpha^)];
+    {$ENDIF}
     inc(dst); inc(alpha);
   end;
 end;
@@ -1567,8 +1571,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure ErasePolygon(img: TImage32;
-  const polygon: TArrayOfPointD; fillRule: TFillRule);
+procedure ErasePolygon(img: TImage32; const polygon: TArrayOfPointD;
+  fillRule: TFillRule);
 var
   polygons: TArrayOfArrayOfPointD;
 begin
@@ -1579,8 +1583,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure ErasePolygon(img: TImage32;
-  const polygons: TArrayOfArrayOfPointD; fillRule: TFillRule);
+procedure ErasePolygon(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+  fillRule: TFillRule);
 var
   er: TEraseRenderer;
 begin
@@ -1606,7 +1610,11 @@ begin
   pb := @mask[0];
   for i := 0 to len -1 do
   begin
+    {$IFDEF PBYTE}
     if pb^ > 0 then
+    {$ELSE}
+    if pb^ > #0 then
+    {$ENDIF}
       pc^ := color else
       pc^ := clNone32;
     inc(pc); inc(pb);
@@ -1627,9 +1635,15 @@ begin
   pb := @mask[0];
   for i := 0 to len -1 do
   begin
+    {$IFDEF PBYTE}
     if pb^ > 0 then
       pc^ := color or pb^ shl 24 else
       pc^ := clNone32;
+    {$ELSE}
+    if pb^ > #0 then
+      pc^ := color or Ord(pb^) shl 24 else
+      pc^ := clNone32;
+    {$ENDIF}
     inc(pc); inc(pb);
   end;
 end;

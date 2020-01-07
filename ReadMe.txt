@@ -1,20 +1,70 @@
 
-Image32 is a 2D graphics library written in Delphi Pascal. It provides an extensive range of image manipulation functions. It also includes a polygon renderer for line and polygon drawing. The renderer supports a range of brush filling options including tiled images, and linear and radial gradient fills.
+Image32 - 2D graphics library for Delphi Pascal
+Latest version: 1.36
+Released: 5 January 2020
 
-Version: 1.32
-Uploaded: 10 December 2019
-Freeware for both open source and commercial applications released under 
-Boost Software License - see https://www.boost.org/LICENSE_1_0.txt
-Copyright © 2019 Angus Johnson
+Copyright © 2019-2020 Angus Johnson
+Freeware released under Boost Software License
+https://www.boost.org/LICENSE_1_0.txt
 
-http://www.angusj.com/delphi/image32.php
-
+Website  : http://www.angusj.com/delphi/image32/Docs/_Body.htm
+download : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
-Version: 1.31
+Version: 1.36
+  Changes in Image32
+    Renamed TImage32.SetMonochromeColor to TImage32.SetRGB
+    Renamed TImage32.ConvertToMask to TImage32.ConvertToBoolMask
+    Added TImage32.ConvertToAlphaMask
+    Renamed GetMask function to GetBoolMask
+    Added GetByteMask function
+    Added CompareRgbEx & CompareAlphaEx functions    
+  Changes in Image32_CQ
+    Renamed CreatePalette to MakePalette because CreateXXXX 
+      tends to imply the returned structure will need freeing
+    Added MakeAndApplyPalette which is *much* faster than
+      MakePalette followed by ApplyPalette
+    Added TrimPalette and TrimPaletteByFraction functions
+  Changes in Examples
+    Updated RasterToSVG utility
+  
+Version: 1.35
+  Changes in Examples
+    Added a detailed RasterToSVG utility that converts both  
+    monochrome and colored raster images into SVG format
+  Changes in Image32
+    Added TImage32.ConvertToMonochrome method
+  Changes in Image32_Extra
+    Exposed VectorizeMask function
+  Changes in Image32_CQ
+    Added CreatePaletteEx function
+    
+Version: 1.34
+  Changes in Image32
+    Fixed a bug when saving images with no supplied path 
+    Added optional params to TImage32.ConvertToMask method 
   Changes in Image32_Vector
-   Added an extra (optional) parameter to the new SmoothLine function.
+    minor improvements to the SmoothLine function
+  Changes in Image32_CQ
+    added optional 'essentialColors' param to CreatePalette function
+    added GetIndexNearestPaletteColor function
+  Changes in BitmapPanels
+    fixed a minor bug with keyboard controls (using Ctrl + numeric)
+    
+Version: 1.33
+  Changes in Image32_Extra
+    Moved GetMask function to the Image32 unit.
+    Moved CompareRGB, CompareHue & CompareAlpha functions to Image32.
+    Much improved Vectorize function (it's now very accurate)
+  Changes in Image32
+    Added TImage32.ConvertToMask method
+
+Version: 1.32
+  Fixed numerous minor compiler bugs for older Delphi versions.
+  Changes in Image32_Vector
+    Added an extra (optional) parameter to the new SmoothLine function.
+    
 Version: 1.31
   Changes in Image32_Vector
     Renamed CBezier to FlattenCBezier;
@@ -26,11 +76,13 @@ Version: 1.31
     Minor improvement to the Vectorize function
   Changes in Examples
     Significant update to the Vectorize application
+    
 Version: 1.30
   Changes in Image32_Vector
     Added RamerDouglasPeucker function
   Changes in Image32_Extra
     Improved Vectorize function    
+    
 Version: 1.29
   Changes in Image32_Extra
     Improved CompareRGB function
@@ -38,6 +90,7 @@ Version: 1.29
     Bugfixed GetMask function
   Changes in Examples
     Updated Vectorize application
+    
 Version: 1.28
   Changes in Image32
     Renamed TImage32.CopyFrom method to CopyBlend
@@ -88,56 +141,4 @@ Version: 1.26
     Added OnBeginPaint property to TBitmapProperties
     Added OnKeyDown & OnKeyUp properties to TBitmapProperties
   Changes in Examples
-    Added Image,Arrows,Text utility
-    
-Version: 1.25
-  Changes in Image32_Layers
-    Renamed TLayer32.GroupIndex property to TLayer32.GroupId
-    Renamed TLayer32.GetIdxFirstLayerInGroup to GeFirstInGroupIdx
-    Renamed TLayer32.GetIdxLastLayerInGroup to GetLastInGroupIdx
-    Added TLayer32.IndexInGroup property
-    Merged THitTestLayer32 into TLayer32 class
-    Added TDesignerLayer32.DrawLine method
-    Added StartButtonGroup function
-    Modified AddToButtonGroup function
-  Changes in Image32_MixedPath
-    Fixed minor bug in TMixedPath.FlattenPath
-    Changed TMixedPath.Points property 
-    Added TMixedPath.PointTypes property
-    Changed TPointType to TMixedType (as there's now also a TSmoothType)
-    Added TSmoothPath class to Image32_MixedPath unit
-    Added a LayersAndSmoothPaths example
-    Added TMixedPathLayer32 & TSmoothPathLayer32 classes
-    Added DrawMixedPathDesigner & DrawSmoothPathDesigner functions
-  Changes in Image32_Vector  
-    Fixed bug in ShortenPath function
-    Added RotatePoint function
-    Added GetDefaultArrowHeadSize function
-    Amended GetAngle function
-  Changes in Image32_Text  
-    Added GetTextAlongPathOutine function
-  Minor bugfix to BitmapPanels
-  
-Version: 1.24
-  Added TMixedPath class in new Image32_MixedPath unit
-  Added LayersAndMixedPaths example.
-  Added InflateOpenPath and InflateOpenPaths function in Image32_Clipper
-  Added GetAngle functions in Image32_Vector
-  Renamed PointInPaths function to PointInPolygons in Image32_Vector
-  Updated THitTestLayer32 in Image32_Layers
-  Modified DrawCSplineDesign and DrawQSplineDesign methods in TDesignerLayer32
-  Modified CreateSizingBtnsGroup function in Image32_Layers
-  Modified CreateButtonGroup function in Image32_Layers
-  Renamed TLayeredImage32.CountLayersInGroup to TLayeredImage32.GroupCount
-  Fixed bug in CreatePalette in Image32_CQ (introduced in ver. 1.23)
-
-Version: 1.23
-  Added InflatePolygon function in Image32_Clipper
-  Added UnionPolygon function in Image32_Clipper
-  Added OpenPathToFlatPolygon function in Image32_Vector
-  Added PointInPaths function in Image32_Vector
-  Added THitTestLayer32 class in Image32_Layers
-  Added TButtonDesignerLayer32 class in Image32_Layers
-  Added TLayer32.SetBounds procedure 
-  Fixed TLayeredImage32.DeleteLayer that broke GroupIndexes
-  Added new LayersAndSplines example application
+    Added Image,Arrows,Text utility    

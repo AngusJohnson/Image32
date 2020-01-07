@@ -2,10 +2,10 @@ unit BitmapPanels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.11                                                            *
-* Date      :  4 December 2019                                                 *
+* Version   :  1.2                                                             *
+* Date      :  5 January 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2019                                         *
+* Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -149,8 +149,8 @@ type
     property Offset: TPoint read GetOffset write SetOffset;
     property ScaleType: TScaleType read GetScaleType write SetScaleType;
 
-    //Scale: SCALE_BEST_FIT, SCALE_STRETCHED, or a value between ScaleMin and
-    //ScaleMax.
+    //Scale: SCALE_BEST_FIT, SCALE_STRETCHED, or a value between
+    //ScaleMin and ScaleMax.
     property Scale: double read GetScale write SetScale;
     //ScaleMin: Default = 0.05;
     property ScaleMin: double read fMinScale write fMinScale;
@@ -174,6 +174,7 @@ type
 
     property OnResizing: TNotifyEvent
       read fOnBitmapResizing write fOnBitmapResizing;
+
     property OnScrolling: TNotifyEvent
       read fOnScrolling write fOnScrolling;
     property OnFileDrop: TFileDropEvent read fOnDragDrop write fOnDragDrop;
@@ -327,11 +328,8 @@ procedure TBitmapProperties.SetScaleType(value: TScaleType);
 begin
   if fOwner.fScaleType = value then Exit;
   fOwner.fScaleType := value;
-  if (fOwner.fScaleType = stFit) and assigned(fOnBitmapResizing) then
-  begin
-    fOwner.BitmapScaleBestFit;
+  if assigned(fOnBitmapResizing) then
     fOnBitmapResizing(self);
-  end;
   fOwner.Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -433,7 +431,6 @@ end;
 procedure TPanel.BmpChanged(Sender: TObject);
 begin
   if fResetPending and not fBmp.Empty then ClearBitmap;
-  if fScaleType = stFit  then BitmapScaleBestFit;
   //nb: also called when the bitmap canvas has been updated
   UpdateCursor;
   Invalidate;
@@ -483,8 +480,7 @@ begin
     if charCode = 0 then Exit;
   end;
 
-  if (Message.CharCode >= Ord('V')) and
-    (ssCtrl in KeyDataToShiftState(Message.KeyData)) and
+  if (Message.CharCode >= Ord('V')) and (ssCtrl in shiftState) and
     fBitmapProperties.fCopyPasteEnabled then
   begin
     PasteFromClipboard;
@@ -492,8 +488,7 @@ begin
   end;
 
   if fBmp.Empty then Exit;
-  if (Message.CharCode >= Ord('C')) and
-    (ssCtrl in KeyDataToShiftState(Message.KeyData)) and
+  if (Message.CharCode >= Ord('C')) and (ssCtrl in shiftState) and
     fBitmapProperties.fCopyPasteEnabled then
   begin
     CopyToClipboard;
@@ -506,7 +501,7 @@ begin
   if (Message.CharCode >= VK_LEFT) and (Message.CharCode <= VK_DOWN) then
   begin
     //zoom in and out with CTRL+UP and CTRL+DOWN respectively
-    if ssCtrl in KeyDataToShiftState(Message.KeyData) then
+    if ssCtrl in shiftState then
     begin
       midPoint := Point(ClientWidth div 2, ClientHeight div 2);
       case Message.CharCode of
@@ -514,12 +509,10 @@ begin
         VK_DOWN: BitmapScaleAtPos(fScale * 0.9, midPoint);
         else Exit;
       end;
-      if assigned(fBitmapProperties.fOnBitmapResizing) then
-        fBitmapProperties.fOnBitmapResizing(self);
     end
     else //otherwise scroll the image with the arrow keys
     begin
-      if ssShift in KeyDataToShiftState(Message.KeyData) then
+      if ssShift in shiftState then
         mul := 5 else //ie scrolls 5 times faster with Shift key down
         mul := 1;
       case Message.CharCode of
@@ -533,14 +526,15 @@ begin
     end;
     Invalidate;
   end
-  else if Message.CharCode = Ord('0') then
+  else if (Message.CharCode = Ord('0')) and not (ssCtrl in shiftState) then
   begin
     fBitmapProperties.SetScaleType(stFit);
   end
-  else if (Message.CharCode >= Ord('1')) and (Message.CharCode <= Ord('9')) then
+  else if (Message.CharCode >= Ord('1')) and
+    (Message.CharCode <= Ord('9')) and not (ssCtrl in shiftState) then
   begin
     fBitmapProperties.SetScaleType(stScaled);
-    if ssShift in KeyDataToShiftState(Message.KeyData) then
+    if ssShift in shiftState then
       fBitmapProperties.Scale := (Message.CharCode - Ord('0')) /10 else
       fBitmapProperties.Scale := Message.CharCode - Ord('0');
   end;
@@ -723,9 +717,7 @@ begin
     Clipboard.Close;
   end;
   fOffsetX := 0; fOffsetY := 0;
-  if fScaleType = stFit then
-    BitmapScaleBestFit else
-    fScale := 1;
+  if fScaleType <> stFit then fScale := 1;
   Invalidate;
   if assigned(fBitmapProperties.fOnPaste) then
     fBitmapProperties.fOnPaste(self);
@@ -909,12 +901,8 @@ begin
   begin
     tmpBmp := TBitmap.Create; //temporary bitmap for clipping
     try
-      {$IFDEF SETSIZE}
-      tmpBmp.SetSize(RectWidth(srcRec), RectHeight(srcRec));
-      {$ELSE}
       tmpBmp.Width := RectWidth(srcRec);
       tmpBmp.Height := RectHeight(srcRec);
-      {$ENDIF}
       tmpBmp.Canvas.CopyRect(Rect(0,0,RectWidth(srcRec),
         RectHeight(srcRec)), fBmp.Canvas, srcRec);
       Canvas.StretchDraw(fDstRect, tmpBmp);
@@ -1029,10 +1017,10 @@ begin
   fOffsetX := Round((mousePos.X + fOffsetX) * newScale/fScale - mousePos.X);
   fOffsetY := Round((mousePos.Y + fOffsetY) * newScale/fScale - mousePos.Y);
   fScale := newScale;
-  if fBmp.Empty or (fScaleType = stStretched) then Exit;
-  Invalidate;
+  if fBmp.Empty then Exit;
   if assigned(fBitmapProperties.fOnBitmapResizing) then
     fBitmapProperties.fOnBitmapResizing(self);
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -1066,8 +1054,6 @@ begin
           marg := GetInnerMargin;
           BitmapScaleAtPos(fScale * changeFrac,
             OffsetPoint(EventInfo.Location, -marg, -marg));
-          if assigned(fBitmapProperties.fOnBitmapResizing) then
-            fBitmapProperties.fOnBitmapResizing(self);
         end;
         FLastDIstance := EventInfo.Distance;
         Handled := true;

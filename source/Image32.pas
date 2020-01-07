@@ -2,10 +2,10 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.31                                                            *
-* Date      :  2 December 2019                                                 *
+* Version   :  1.36                                                            *
+* Date      :  5 January 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2019                                         *
+* Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  The core module of the Image32 library                          *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -67,8 +67,11 @@ type
     function PasteFromClipboard(img32: TImage32): Boolean; virtual; abstract;
   end;
 
-  //TBlendFunction: Function template for TImage32.CopyBlend.
   TBlendFunction = function(bgColor, fgColor: TColor32): TColor32;
+
+  TCompareFunction = function(master, current: TColor32; data: integer): Boolean;
+  TCompareFunctionEx = function(master, current: TColor32): Byte;
+
   TTileFillStyle = (tfsRepeat, tfsMirrorHorz, tfsMirrorVert, tfsRotate180);
 
   TImage32 = class
@@ -77,11 +80,13 @@ type
     fHeight: Integer;
     fAntiAliase: Boolean;
     fIsPremultiplied: Boolean;
+    fColorCount: integer;
     fPixels: TArrayOfColor32;
     fOnChange: TNotifyEvent;
     fUpdateCnt: integer;
     function GetPixel(x,y: Integer): TColor32;
     procedure SetPixel(x,y: Integer; color: TColor32);
+    function GetIsBlank: Boolean;
     function GetIsEmpty: Boolean;
     function GetPixelBase: PColor32;
     function GetPixelRow(row: Integer): PColor32;
@@ -141,11 +146,18 @@ type
     //Clear: Fills the entire image with the specified color
     procedure Clear(color: TColor32 = 0);
     procedure FillRect(rec: TRect; color: TColor32);
+    procedure ConvertToBoolMask(reference: TColor32;
+      tolerance: integer; colorFunc: TCompareFunction;
+      maskBg: TColor32 = clWhite32; maskFg: TColor32 = clBlack32);
+    procedure ConvertToAlphaMask(reference: TColor32;
+      colorFunc: TCompareFunctionEx);
     procedure FlipVertical;
     procedure FlipHorizontal;
     procedure PreMultiply;
     //SetAlpha: Sets 'alpha' to the alpha byte of every pixel in the image
     procedure SetAlpha(alpha: Byte);
+    //SetRGB: Sets the RGB channels leaving the alpha channel unchanged
+    procedure SetRGB(rgbColor: TColor32);
     //Grayscale: Only changes color channels. The alpha channel is untouched.
     procedure Grayscale;
     procedure InvertColors;
@@ -183,7 +195,7 @@ type
     class function IsRegisteredFormat(const ext: string): Boolean;
     //SaveToFile: Will fail if filename's extension hasn't been registered
     //as a supported storage format.<br>See TImage32.RegisterImageFormatClass.
-    function SaveToFile(const filename: string): Boolean;
+    function SaveToFile(filename: string): Boolean;
     function SaveToStream(stream: TStream; const FmtExt: string): Boolean;
     //LoadFromFile: Requires a TImageFormat registered with TImage32 that's
     //associated with filename's extension.<br>
@@ -198,6 +210,7 @@ type
     property Height: Integer read fHeight;
     //Bounds: Result := Rect(0, 0, Width, Height);
     property Bounds: TRect read GetBounds;
+    property IsBlank: Boolean read GetIsBlank;
     property IsEmpty: Boolean read GetIsEmpty;
     property MidPoint: TPointD read GetMidPoint;
     property Pixel[x,y: Integer]: TColor32 read GetPixel write SetPixel;
@@ -255,6 +268,7 @@ type
   TPathD = TArrayOfPointD;         //may cause ambiguity with Clipper.pas
   TArrayOfArrayOfPointD = array of TArrayOfPointD;
   TPathsD = TArrayOfArrayOfPointD; //may cause ambiguity with Clipper.pas
+  TArrayOfArrayOfArrayOfPointD = array of TArrayOfArrayOfPointD;
 
   TArrayOfDouble = array of double;
 
@@ -302,7 +316,23 @@ type
   function BlendInvertedMask(bgColor, mask: TColor32): TColor32;
   {$IFDEF INLINE} inline; {$ENDIF}
 
+  //COMPARE COLOR FUNCTIONS (ConvertToBoolMask, FloodFill, Vectorize etc.)
+
+  function CompareRGB(master, current: TColor32; tolerance: Integer): Boolean;
+  function CompareHue(master, current: TColor32; tolerance: Integer): Boolean;
+  function CompareAlpha(master, current: TColor32; tolerance: Integer): Boolean;
+
+  //CompareEx COLOR FUNCTIONS (see ConvertToAlphaMask)
+  function CompareRgbEx(master, current: TColor32): Byte;
+  function CompareAlphaEx(master, current: TColor32): Byte;
+
   //MISCELLANEOUS FUNCTIONS ...
+
+  function GetBoolMask(img: TImage32; reference: TColor32;
+    compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
+
+  function GetByteMask(img: TImage32; reference: TColor32;
+    compareFunc: TCompareFunctionEx): TArrayOfByte;
 
   //GetWeightedPixel: coordinates x256, y256 are scaled up by 256.
   function GetWeightedPixel(img: TImage32; x256, y256: Integer): TColor32;
@@ -313,6 +343,7 @@ type
   //RGBColor: Converts a TColor32 value into a COLORREF value
   function RGBColor(color: TColor32): Cardinal;
   function InvertColor(color: TColor32): TColor32;
+  procedure Monochrome(var color: TColor32);
 
   //RgbtoHsl: See https://en.wikipedia.org/wiki/HSL_and_HSV
   function RgbtoHsl(color: TColor32): THsl;
@@ -494,6 +525,97 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// Compare functions (see ConvertToBoolMask, FloodFill & Vectorize)
+//------------------------------------------------------------------------------
+
+function CompareRGB(master, current: TColor32; tolerance: Integer): Boolean;
+var
+  mast: TARGB absolute master;
+  curr: TARGB absolute current;
+begin
+  if curr.A < $80 then
+    Result := false
+  else if (master and $FFFFFF) = (current and $FFFFFF) then
+    Result := true
+  else if tolerance = 0 then
+    Result := false
+  else result :=
+    (Abs(curr.R - mast.R) <= tolerance) and
+    (Abs(curr.G - mast.G) <= tolerance) and
+    (Abs(curr.B - mast.B) <= tolerance);
+end;
+//------------------------------------------------------------------------------
+
+function CompareAlpha(master, current: TColor32; tolerance: Integer): Boolean;
+var
+  mast: TARGB absolute master;
+  curr: TARGB absolute current;
+begin
+  if mast.A = curr.A then Result := true
+  else if tolerance = 0 then Result := false
+  else result := Abs(curr.A - mast.A) <= tolerance;
+end;
+//------------------------------------------------------------------------------
+
+function CompareHue(master, current: TColor32; tolerance: Integer): Boolean;
+var
+  curr, mast: THsl;
+  val: Integer;
+begin
+  if TARGB(current).A = 0 then
+  begin
+    Result := false;
+    Exit;
+  end;
+  curr := RGBtoHsl(current);
+  mast := RGBtoHsl(master);
+  if curr.hue > mast.hue then
+  begin
+    val := curr.hue - mast.hue;
+    if val > 127 then val := mast.hue - curr.hue + 255;
+  end else
+  begin
+    val := mast.hue - curr.hue;
+    if val > 127 then val := curr.hue - mast.hue + 255;
+  end;
+  result := val <= tolerance;
+end;
+
+//------------------------------------------------------------------------------
+// CompareEx functions (see ConvertToAlphaMask)
+//------------------------------------------------------------------------------
+
+function CompareRgbEx(master, current: TColor32): Byte;
+var
+  mast: TARGB absolute master;
+  curr: TARGB absolute current;
+  res: Cardinal;
+begin
+  if curr.A = 0 then
+  begin
+    Result := 0;
+  end else
+  begin
+    res := Sqr(mast.R - curr.R) + Sqr(mast.G - curr.G) + Sqr(mast.B - curr.B);
+    if res >= 65025 then result := 0
+    else result := 255 - Round(Sqrt(res));
+    if curr.A < 255 then result := MulTable[result, curr.A];
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function CompareAlphaEx(master, current: TColor32): Byte;
+var
+  mast: TARGB absolute master;
+  curr: TARGB absolute current;
+  res: Cardinal;
+begin
+  res := Sqr(mast.A - curr.A);
+  if res >= 65025 then result := 0
+  else result := 255 - Round(Sqrt(res));
+end;
+
+//------------------------------------------------------------------------------
 // Miscellaneous functions ...
 //------------------------------------------------------------------------------
 
@@ -563,15 +685,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function AdjustHue(color: TColor32; percent: Integer): TColor32;
+procedure Monochrome(var color: TColor32);
 var
-  hsl: THsl;
+  c: TARGB absolute color;
 begin
-  percent := percent mod 100;
-  if percent < 0 then inc(percent, 100);
-  hsl := RgbtoHsl(color);
-  hsl.hue := (hsl.hue + Round(percent*255/100)) mod 256;
-  result := HslToRgb(hsl);
+  c.R := (c.R * 61 + c.G * 174 + c.B * 21) shr 8;
+  if c.R > 127 then c.R := 255 else c.R := 0;
+  c.G := c.R; c.B := c.R; c.A := 255;
 end;
 //------------------------------------------------------------------------------
 
@@ -729,6 +849,68 @@ begin
     if pts[i].Y < result.Top then result.Top := pts[i].Y;
     if pts[i].X > result.Right then result.Right := pts[i].X;
     if pts[i].Y > result.Bottom then result.Bottom := pts[i].Y;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function GetBoolMask(img: TImage32; reference: TColor32;
+  compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
+var
+  i: integer;
+  pa: PByte;
+  pc: PColor32;
+begin
+  result := nil;
+  if not assigned(img) or img.IsEmpty then Exit;
+  if not Assigned(compareFunc) then compareFunc := CompareRGB;
+  SetLength(Result, img.Width * img.Height);
+  pa := @Result[0];
+  pc := img.PixelBase;
+  for i := 0 to img.Width * img.Height -1 do
+  begin
+    if compareFunc(reference, pc^, tolerance) then
+  {$IFDEF PBYTE}
+      pa^ := 1 else
+      pa^ := 0;
+  {$ELSE}
+      pa^ := #1 else
+      pa^ := #0;
+  {$ENDIF}
+    inc(pc); inc(pa);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function GetAlpha(master, current: TColor32): Byte;
+{$IFDEF INLINE} inline; {$ENDIF}
+var
+  curr: TARGB absolute current;
+begin
+  result := curr.A; //nb: 'master' is ignored
+end;
+//------------------------------------------------------------------------------
+
+function GetByteMask(img: TImage32; reference: TColor32;
+  compareFunc: TCompareFunctionEx): TArrayOfByte;
+var
+  i: integer;
+  pa: PByte;
+  pc: PColor32;
+begin
+  result := nil;
+  if not assigned(img) or img.IsEmpty then Exit;
+  if not Assigned(compareFunc) then compareFunc := GetAlpha;
+  SetLength(Result, img.Width * img.Height);
+  pa := @Result[0];
+  pc := img.PixelBase;
+  for i := 0 to img.Width * img.Height -1 do
+  begin
+    {$IFDEF PBYTE}
+    pa^ := compareFunc(reference, pc^);
+    {$ELSE}
+    pa^ := Char(compareFunc(reference, pc^));
+    {$ENDIF}
+    inc(pc); inc(pa);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -909,6 +1091,18 @@ begin
     4: begin rgba.R := x + m; rgba.G := 0 + m; rgba.B := c + m; end;
     5: begin rgba.R := c + m; rgba.G := 0 + m; rgba.B := x + m; end;
   end;
+end;
+//------------------------------------------------------------------------------
+
+function AdjustHue(color: TColor32; percent: Integer): TColor32;
+var
+  hsl: THsl;
+begin
+  percent := percent mod 100;
+  if percent < 0 then inc(percent, 100);
+  hsl := RgbtoHsl(color);
+  hsl.hue := (hsl.hue + Round(percent*255/100)) mod 256;
+  result := HslToRgb(hsl);
 end;
 //------------------------------------------------------------------------------
 
@@ -1113,14 +1307,20 @@ procedure TImage32.AssignTo(dst: TImage32);
 begin
   dst.fAntiAliase := fAntiAliase;
   dst.fIsPremultiplied := fIsPremultiplied;
-  dst.SetSize(Width, Height);
-  if (Width > 0) and (Height > 0) then
-    move(fPixels[0], dst.fPixels[0], Width * Height * SizeOf(TColor32));
+  dst.fColorCount := 0;
+  try
+    dst.SetSize(Width, Height);
+    if (Width > 0) and (Height > 0) then
+      move(fPixels[0], dst.fPixels[0], Width * Height * SizeOf(TColor32));
+  except
+    dst.SetSize(0,0);
+  end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.Changed;
 begin
+  fColorCount := 0;
   if Assigned(fOnChange) then fOnChange(Self);
 end;
 //------------------------------------------------------------------------------
@@ -1543,14 +1743,21 @@ const
 begin
   result := 0;
   if IsEmpty then Exit;
-  //this is fast but, becuse it uses a chunk of memory, it's probably
-  //safer to allocate allColors on the heap rather than in the stack ...
+  if fColorCount > 0 then
+  begin
+    result := fColorCount;
+    Exit;
+  end;
+  //because 'allColors' uses quite a chunk of memory, it's
+  //allocated on the heap rather than the stack
   allColors := AllocMem(cube256); //nb: zero initialized
   try
     c := PixelBase;
     for i := 0 to Width * Height -1 do
     begin
-      allColors[c^ and $FFFFFF] := 1;
+      //ignore colors with signifcant transparency
+      if (c^ shr 24) > $80 then
+        allColors[c^ and $FFFFFF] := 1;
       inc(c);
     end;
     for i := 0 to cube256 -1 do
@@ -1558,6 +1765,7 @@ begin
   finally
     FreeMem(allColors);
   end;
+  fColorCount := Result; //avoids repeating the above unnecessarily
 end;
 //------------------------------------------------------------------------------
 
@@ -1578,12 +1786,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImage32.SaveToFile(const filename: string): Boolean;
+function TImage32.SaveToFile(filename: string): Boolean;
 var
   fileFormatClass: TImageFormatClass;
 begin
   result := false;
   if IsEmpty or (length(filename) < 5) then Exit;
+  //use the process's current working directory if no path supplied ...
+  if ExtractFilePath(filename) = '' then
+    filename := GetCurrentDir + '\'+ filename;
   fileFormatClass := GetImageFormatClass(ExtractFileExt(filename));
   if assigned(fileFormatClass) then
     with fileFormatClass.Create do
@@ -1692,6 +1903,23 @@ begin
   if (x < 0) or (x >= Width) or (y < 0) or (y >= Height) then Exit;
   fPixels[y * width + x] := color;
   //nb: no notify event here
+end;
+//------------------------------------------------------------------------------
+
+function TImage32.GetIsBlank: Boolean;
+var
+  i: integer;
+  pc: PARGB;
+begin
+  result := IsEmpty;
+  if result then Exit;
+  pc := PARGB(PixelBase);
+  for i := 0 to width * height -1 do
+  begin
+    if pc.A > 0 then Exit;
+    inc(pc);
+  end;
+  result := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -2000,6 +2228,56 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TImage32.ConvertToBoolMask(reference: TColor32; tolerance:
+  integer; colorFunc: TCompareFunction; maskBg: TColor32; maskFg: TColor32);
+var
+  i: Integer;
+  mask: TArrayOfByte;
+  c: PColor32;
+  b: PByte;
+begin
+  if IsEmpty then Exit;
+  mask := GetBoolMask(self, reference, colorFunc, tolerance);
+  c := PixelBase;
+  b := @mask[0];
+  for i := 0 to Width * Height -1 do
+  begin
+    {$IFDEF PBYTE}
+    if b^ = 0 then c^ := maskBg else c^ := maskFg;
+    {$ELSE}
+    if b^ = #0 then c^ := maskBg else c^ := maskFg;
+    {$ENDIF}
+    inc(c); inc(b);
+  end;
+  Changed;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.ConvertToAlphaMask(reference: TColor32;
+  colorFunc: TCompareFunctionEx);
+var
+  i: Integer;
+  mask: TArrayOfByte;
+  c: PColor32;
+  b: PByte;
+begin
+  if IsEmpty then Exit;
+  mask := GetByteMask(self, reference, colorFunc);
+  c := PixelBase;
+  b := @mask[0];
+  for i := 0 to Width * Height -1 do
+  begin
+    {$IFDEF PBYTE}
+    c^ := b^ shl 24;
+    {$ELSE}
+    c^ := Ord(b^) shl 24;
+    {$ENDIF}
+    inc(c); inc(b);
+  end;
+  Changed;
+end;
+//------------------------------------------------------------------------------
+
 procedure TImage32.FlipVertical;
 var
   i: Integer;
@@ -2067,11 +2345,34 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TImage32.SetRGB(rgbColor: TColor32);
+var
+  rgb: TARGB absolute rgbColor;
+  r,g,b: Byte;
+  i: Integer;
+  pc: PARGB;
+begin
+  //this method leaves the alpha channel untouched
+  if IsEmpty then Exit;
+  r := rgb.R; g := rgb.G; b := rgb.B;
+  pc := PARGB(PixelBase);
+  for i := 0 to Width * Height -1 do
+  begin
+    pc.R := r;
+    pc.G := g;
+    pc.B := b;
+    inc(pc);
+  end;
+  Changed;
+end;
+//------------------------------------------------------------------------------
+
 procedure TImage32.SetAlpha(alpha: Byte);
 var
   i: Integer;
   c: PARGB;
 begin
+  //this method only changes the alpha channel
   if IsEmpty then Exit;
   c := PARGB(PixelBase);
   for i := 0 to Width * Height -1 do

@@ -2,10 +2,10 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.31                                                            *
-* Date      :  2 December 2019                                                 *
+* Version   :  1.36                                                            *
+* Date      :  5 January 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2019                                         *
+* Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -97,9 +97,16 @@ type
     dx, dy: double): TArrayOfArrayOfPointD; overload;
   function ScalePath(const path: TArrayOfPointD;
     sx, sy: double): TArrayOfPointD; overload;
+  function ScalePath(const path: TArrayOfPointD;
+    scale: double): TArrayOfPointD; overload;
   function ScalePath(const paths: TArrayOfArrayOfPointD;
     sx, sy: double): TArrayOfArrayOfPointD; overload;
-  function ReversePath(const path: TArrayOfPointD): TArrayOfPointD;
+  function ScalePath(const paths: TArrayOfArrayOfPointD;
+    scale: double): TArrayOfArrayOfPointD; overload;
+
+  function ReversePath(const path: TArrayOfPointD): TArrayOfPointD; overload;
+  function ReversePath(const paths: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD; overload;
+
   function OpenPathToFlatPolygon(const path: TArrayOfPointD): TArrayOfPointD;
   function JoinPaths(const path1, path2: TArrayOfPointD):TArrayOfPointD;
   procedure AppendPoint(var path: TArrayOfPointD; const extra: TPointD);
@@ -132,6 +139,8 @@ type
 
   function Rect(const recD: TRectD): TRect; overload;
   function Rect(const l,t,r,b: integer): TRect; overload;
+
+  function Area(const path: TPathD): Double;
   function RectsEqual(const rec1, rec2: TRect): Boolean;
   procedure OffsetRect(var rec: TRectD; dx, dy: double); overload;
 
@@ -296,6 +305,25 @@ begin
   Result.Top := Floor(recD.Top);
   Result.Right := Ceil(recD.Right);
   Result.Bottom := Ceil(recD.Bottom);
+end;
+//------------------------------------------------------------------------------
+
+function Area(const path: TPathD): Double;
+var
+  i, j, highI: Integer;
+  d: Double;
+begin
+  Result := 0.0;
+  highI := High(path);
+  if (highI < 2) then Exit;
+  j := highI;
+  for i := 0 to highI do
+  begin
+    d := (path[j].X + path[i].X);
+    Result := Result + d * (path[j].Y - path[i].Y);
+    j := i;
+  end;
+  Result := -Result * 0.5;
 end;
 //------------------------------------------------------------------------------
 
@@ -537,6 +565,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function ScalePath(const path: TArrayOfPointD;
+  scale: double): TArrayOfPointD;
+begin
+  result := ScalePath(path, scale, scale);
+end;
+//------------------------------------------------------------------------------
+
 function ScalePath(const paths: TArrayOfArrayOfPointD;
   sx, sy: double): TArrayOfArrayOfPointD;
 var
@@ -549,6 +584,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function ScalePath(const paths: TArrayOfArrayOfPointD;
+  scale: double): TArrayOfArrayOfPointD;
+begin
+  result := ScalePath(paths, scale, scale);
+end;
+//------------------------------------------------------------------------------
+
 function ReversePath(const path: TArrayOfPointD): TArrayOfPointD;
 var
   i, highI: integer;
@@ -557,6 +599,17 @@ begin
   SetLength(result, highI +1);
   for i := 0 to highI do
     result[i] := path[highI -i];
+end;
+//------------------------------------------------------------------------------
+
+function ReversePath(const paths: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD;
+var
+  i, len: integer;
+begin
+  len := Length(paths);
+  SetLength(result, len);
+  for i := 0 to len -1 do
+    result[i] := ReversePath(paths[i]);
 end;
 //------------------------------------------------------------------------------
 
@@ -1087,13 +1140,11 @@ procedure AppendPath(var paths: TArrayOfArrayOfPointD;
 var
   len1, len2: integer;
 begin
-  len1 := length(paths);
   len2 := length(extra);
   if len2 = 0 then Exit;
+  len1 := length(paths);
   setLength(paths, len1 + 1);
-  if len1 = 0 then
-    paths[0] := Copy(extra, 0, len2) else
-    paths[len1] := Copy(extra, 0, len2);
+  paths[len1] := Copy(extra, 0, len2);
 end;
 //------------------------------------------------------------------------------
 
@@ -1102,14 +1153,12 @@ procedure AppendPath(var paths: TArrayOfArrayOfPointD;
 var
   i, len1, len2: integer;
 begin
-  len1 := length(paths);
   len2 := length(extra);
-  if len2 > 0 then
-  begin
-    setLength(paths, len1 + len2);
-    for i := 0 to len2 -1 do
-      paths[len1+i] := Copy(extra[i], 0, length(extra[i]));
-  end;
+  if len2 = 0 then Exit;
+  len1 := length(paths);
+  setLength(paths, len1 + len2);
+  for i := 0 to len2 -1 do
+    paths[len1+i] := Copy(extra[i], 0, length(extra[i]));
 end;
 //------------------------------------------------------------------------------
 
@@ -1726,7 +1775,9 @@ begin
   b := pt.Y - line1.Y;
   c := line2.X - line1.X;
   d := line2.Y - line1.Y;
-  result := Sqr(a * d - c * b) / (c * c + d * d);
+  if (c = 0) and (d = 0) then
+    result := 0 else
+    result := Sqr(a * d - c * b) / (c * c + d * d);
 end;
 //------------------------------------------------------------------------------
 
@@ -1757,7 +1808,7 @@ function RamerDouglasPeucker(const path: TArrayOfPointD;
   epsilon: double): TArrayOfPointD;
 var
   i,j, len: integer;
-  flags: TArrayOfInteger;
+  buffer: TArrayOfInteger;
 begin
   len := length(path);
   if len < 3 then
@@ -1765,15 +1816,15 @@ begin
     result := Copy(path, 0, len);
     Exit;
   end;
-  SetLength(flags, len); //flags zero initialized
+  SetLength(buffer, len); //buffer is zero initialized
 
-  flags[0] := 1;
-  flags[len -1] := 1;
-  RDP(path, 0, len -1, Sqr(epsilon), flags);
+  buffer[0] := 1;
+  buffer[len -1] := 1;
+  RDP(path, 0, len -1, Sqr(epsilon), buffer);
   j := 0;
   SetLength(Result, len);
   for i := 0 to len -1 do
-    if flags[i] = 1 then
+    if buffer[i] = 1 then
     begin
       Result[j] := path[i];
       inc(j);
@@ -1918,24 +1969,26 @@ function GetBoundsD(const paths: TArrayOfArrayOfPointD): TRectD;
 var
   i,j: integer;
   l,t,r,b: double;
-  ppd: PPointD;
+  p: PPointD;
 begin
   l := MaxInt; t := MaxInt;
   r := -MaxInt; b := -MaxInt;
   for i := 0 to high(paths) do
   begin
-    ppd := PPointD(paths[i]);
-    if assigned(ppd) then
-      for j := 0 to high(paths[i]) do
-      begin
-        if ppd.x < l then l := ppd.x;
-        if ppd.x > r then r := ppd.x;
-        if ppd.y < t then t := ppd.y;
-        if ppd.y > b then b := ppd.y;
-        inc(ppd);
-      end;
+    p := PPointD(paths[i]);
+    if not assigned(p) then Continue;
+    for j := 0 to high(paths[i]) do
+    begin
+      if p.x < l then l := p.x;
+      if p.x > r then r := p.x;
+      if p.y < t then t := p.y;
+      if p.y > b then b := p.y;
+      inc(p);
+    end;
   end;
-  result := RectD(l, t, r, b);
+  if r < l then
+    result := NullRectD else
+    result := RectD(l, t, r, b);
 end;
 //------------------------------------------------------------------------------
 
@@ -1943,23 +1996,24 @@ function GetBoundsD(const path: TArrayOfPointD): TRectD;
 var
   i,highI: integer;
   l,t,r,b: double;
-  ppd: PPointD;
+  p: PPointD;
 begin
-  result := NullRectD;
   highI := High(path);
-  if highI < 0 then Exit;
-  l := path[0].X;
-  t := path[0].Y;
-  r := l;
-  b := t;
-  ppd := PPointD(path);
+  if highI < 0 then
+  begin
+    Result := NullRectD;
+    Exit;
+  end;
+  l := path[0].X; r := l;
+  t := path[0].Y; b := t;
+  p := PPointD(path);
   for i := 1 to highI do
   begin
-    inc(ppd);
-    if ppd.x < l then l := ppd.x;
-    if ppd.x > r then r := ppd.x;
-    if ppd.y < t then t := ppd.y;
-    if ppd.y > b then b := ppd.y;
+    inc(p);
+    if p.x < l then l := p.x;
+    if p.x > r then r := p.x;
+    if p.y < t then t := p.y;
+    if p.y > b then b := p.y;
   end;
   result := RectD(l, t, r, b);
 end;
@@ -2458,16 +2512,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function NormalizePt2Vec(const pt2: PPt2): TPointD;
+function NormalizePt2(const pt2: PPt2): TPointD;
   {$IFDEF INLINE} inline; {$ENDIF}
 begin
   with pt2^ do
-  if len <> 0 then
-  begin
-    Result.X := vec.X / len;
-    Result.Y := vec.Y / len;
-  end else
-    result := vec;
+    if len <> 0 then
+    begin
+      Result.X := vec.X / len;
+      Result.Y := vec.Y / len;
+    end else
+      result := vec;
 end;
 //------------------------------------------------------------------------------
 
@@ -2557,13 +2611,13 @@ end;
 
 function TFitCurveContainer.ComputeLeftTangent(p: PPt2): TPointD;
 begin
-  Result := NormalizePt2Vec(p);
+  Result := NormalizePt2(p);
 end;
 //------------------------------------------------------------------------------
 
 function TFitCurveContainer.ComputeRightTangent(p: PPt2): TPointD;
 begin
-  Result := NegateVec(NormalizePt2Vec(p.prev));
+  Result := NegateVec(NormalizePt2(p.prev));
 end;
 //------------------------------------------------------------------------------
 
@@ -2603,7 +2657,6 @@ function TFitCurveContainer.GenerateBezier(first, last: PPt2; count: integer;
 var
   i: integer;
   p: PPt2;
-  danger: Boolean;
   dist, epsilon: double;
   v1,v2, tmp: TPointD;
   a0, a1: TArrayOfPointD;
@@ -2613,6 +2666,7 @@ var
 begin
   SetLength(a0, count);
   SetLength(a1, count);
+  dist := Distance(first.pt, last.pt);
 
   for i := 0 to count -1 do
   begin
@@ -2656,14 +2710,15 @@ begin
     alphaR := 0 else
     alphaR := det_c0_x / det_c0_c1;
 
-  dist := Distance(first.pt, last.pt);
-  danger := (alphaL > dist * 2) or (alphaR > dist * 2);
+  //check for unlikely fit
+  if (alphaL > dist * 2) then alphaL := 0
+  else if (alphaR > dist * 2) then alphaR := 0;
   epsilon := 1.0e-6 * dist;
 
   SetLength(Result, 4);
   Result[0] := first.pt;
   Result[3] := last.pt;
-  if danger or (alphaL < epsilon) or (alphaR < epsilon) then
+  if (alphaL < epsilon) or (alphaR < epsilon) then
   begin
     dist := dist / 3;
     Result[1] := AddVecs(Result[0], Scale(firstTan, dist));
@@ -2737,31 +2792,32 @@ end;
 function TFitCurveContainer.NewtonRaphsonRootFind(const q: TArrayOfPointD;
   const pt: TPointD; u: double): double;
 var
-  i: integer;
   numerator, denominator: double;
   qu, q1u, q2u: TPointD;
   q1: array[0..2] of TPointD;
   q2: array[0..1] of TPointD;
 begin
-  qu := BezierII(3, q, u);
 
-  for i := 0 to 2 do
-  begin
-    q1[i].x := (q[i+1].x - q[i].x) * 3.0;
-    q1[i].y := (q[i+1].y - q[i].y) * 3.0;
-  end;
+  q1[0].x := (q[1].x - q[0].x) * 3.0;
+  q1[0].y := (q[1].y - q[0].y) * 3.0;
+  q1[1].x := (q[2].x - q[1].x) * 3.0;
+  q1[1].y := (q[2].y - q[1].y) * 3.0;
+  q1[2].x := (q[3].x - q[2].x) * 3.0;
+  q1[2].y := (q[3].y - q[2].y) * 3.0;
 
   q2[0].x := (q1[1].x - q1[0].x) * 2.0;
   q2[0].y := (q1[1].y - q1[0].y) * 2.0;
   q2[1].x := (q1[2].x - q1[1].x) * 2.0;
   q2[1].y := (q1[2].y - q1[1].y) * 2.0;
 
+  qu  := BezierII(3, q, u);
   q1u := BezierII(2, q1, u);
   q2u := BezierII(1, q2, u);
 
   numerator := (qu.x - pt.x) * (q1u.x) + (qu.y - pt.y) * (q1u.y);
   denominator := (q1u.x) * (q1u.x) + (q1u.y) * (q1u.y) +
     (qu.x - pt.x) * (q2u.x) + (qu.y - pt.y) * (q2u.y);
+
   if (denominator = 0) then
     Result := u else
     Result := u - (numerator / denominator);
@@ -2778,7 +2834,7 @@ var
   clps, uPrime: TArrayOfDouble;
   maxErrorSqrd: double;
 const
-  maxIterations = 4;
+  maxRetries = 4;
 begin
   Result := true;
   cnt := Count(first, last);
@@ -2801,9 +2857,9 @@ begin
     Exit;
   end;
 
-  if (maxErrorSqrd < tolSqrd * 4) then
+  if (maxErrorSqrd < tolSqrd * 4) then //close enough to try again
   begin
-		for i := 1 to maxIterations do
+		for i := 1 to maxRetries do
     begin
 			uPrime := Reparameterize(first, last, cnt, clps, bezier);
       bezier := GenerateBezier(first, last, cnt, uPrime, firstTan, lastTan);
@@ -2837,29 +2893,37 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function HardBreakCheck(p: PPt2): Boolean;
+function HardBreakCheck(p: PPt2; compareLen: double): Boolean;
 var
-  cosP: double;
+  q: double;
 begin
-  //A 'break' means starting a new Bezier, even if it's a straight edge.
-  //A 'hard' break avoids smoothing whereas a 'soft' break is still smoothed.
-  //There is as much art as science in determining where to smooth and where
-  //not to. For example, long edges are typically straight edges and not
-  //curved, but how long does an edge have to be to classed a 'long' edge?
-  if (p.prev.len * 4 < p.len) or (p.len * 4 < p.prev.len) then
+  //A 'break' means starting a new Bezier. A 'hard' break avoids smoothing
+  //whereas a 'soft' break is still smoothed. There is as much art as science
+  //in determining where to smooth and where not to. For example, long edges
+  //should generally remain straight but how long does an edge have to be
+  //to be considered a 'long' edge?
+
+  if ((TurnsLeft(p.prev.prev.pt, p.prev.pt, p.pt) =
+    TurnsRight(p.prev.pt, p.pt, p.next.pt)) and
+    (p.prev.len > compareLen) and (p.len > compareLen)) or
+    (p.prev.len * 4 < p.len) or (p.len * 4 < p.prev.len) then
   begin
-    //It's best to hard break when there's significant asymmetry between
-    //segment lengths (because GenerateBezier() will perform poorly there).
+    //We'll hard break whenever there's an inflection point or
+    //when there's significant asymmetry between segment lengths
+    //(because GenerateBezier() will perform poorly).
     result := true;
   end else
   begin
-    //It's also best to hard break the curve when there's a significant bend.
-    //Empirically a significant bend is >60 deg. (ie angle @ p is <120 deg.)
-    //It also makes sense to break when the bend is <5 deg. since breaking
-    //won't even be noticed. (Note use of Cosine Rule.)
-    cosP := (Sqr(p.prev.len) + Sqr(p.len) -
-      DistanceSqrd(p.prev.pt, p.next.pt)) / (2 * p.prev.len * p.len);
-    Result := (cosP  > -0.5) or (cosP < -0.996);
+    compareLen := compareLen * 2;
+    //We'll also hard break where there's a significant bend. When both edges
+    //are relatively short (ie <compareLen) it's safer tolerating greater angles
+    //of deviation and assume they're artifacts. Empirically a significant bend
+    //for longer edges is >60 deg. (ie <120 deg. @ angle 'p'). Uses Cosine Rule.
+    if (p.prev.len < compareLen) and (p.len < compareLen) then
+      q := -0.0174524 else //tolerate up to 89 deg. for shorter edge bends
+      q := -0.5;           //but only up to 60 deg. for longer edges bends
+    Result := (Sqr(p.prev.len) + Sqr(p.len) -
+      DistanceSqrd(p.prev.pt, p.next.pt)) / (2 * p.prev.len * p.len) > q;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2874,27 +2938,19 @@ begin
   //tolerance: specifies the maximum allowed variance between the existing
   //vertices and the new Bezier curves. More tolerance will produce
   //fewer Beziers and simpler paths, but at the cost of less precison.
-  //Usually a tolerance of 3-4 produces the best results. Range: 1 - 10.
-  tolSqrd := Sqr(Max(1, Min(10, tolerance)));
+  tolSqrd := Sqr(Max(1, Min(10, tolerance))); //range 1..10
 
-  //minSegLength: Typically when vectorizing a raster image, the produced
-  //vector path will have many series of axis aligned segments that trace pixel
-  //boundaries. These paths will also contain many 1 unit segments that are
-  //at right angles to adjacent segments. Importantly, unless these very short
-  //segments are trimmed, they'll cause artifacts in the solution. Usually
-  //just removing vertices that are within 1 unit of its preceding vertex will
-  //circumvent 'pixel' artifacts. However, when a bitmap has been enlarged
-  //before vectorization, meaningful pixel dimensions will also increase.
-  //Consequently, to avoid 'pixel' artifacts, 'minSegLength' should always be
-  //at least 1 unit larger than the source's 'meaningful' pixel width.
-
+  //minSegLength: Typically when vectorizing raster images, the produced
+  //vector paths will have many series of axis aligned segments that trace
+  //pixel boundaries. These paths will also contain many 1 unit segments at
+  //right angles to adjacent segments. Importantly, these very short segments
+  //will cause artifacts in the solution unless they are trimmed.
   highI     := High(path);
   if closed then
     while (highI > 0) and (Distance(path[highI], path[0]) < minSegLength) do
       dec(highI);
 
-  ppts := AddPt(path[0]);
-  p := ppts;
+  p := AddPt(path[0]);
   for i := 1 to highI do
   begin
     d := Distance(p.pt, path[i]);
@@ -2906,6 +2962,7 @@ begin
   end;
   p.len := Distance(ppts.pt, p.pt);
   p.vec := SubVecs(ppts.pt, p.pt);
+  p := ppts;
 
   if (p.next = p) or (closed and (p.next = p.prev)) then
   begin
@@ -2914,22 +2971,20 @@ begin
     Exit;
   end;
 
+  //for closed paths, find a good starting point
   if closed then
   begin
-    //for closed paths, find a good starting point
-    p2 := ppts;
     repeat
-      if HardBreakCheck(p2) then break;
-      p2 := p2.next;
-    until p2 = ppts;
-    pEnd := p2; p := p2; p2 := p.next;
+      if HardBreakCheck(p, tolerance) then break;
+      p := p.next;
+    until p = ppts;
+    pEnd := p;
   end else
-  begin
-    pEnd := ppts.prev; p := ppts; p2 := ppts.next;
-  end;
+    pEnd := ppts.prev;
 
+  p2 := p.next;
   repeat
-    if HardBreakCheck(p2) then
+    if HardBreakCheck(p2, tolerance) then
     begin
       FitCubic(p, p2, ComputeLeftTangent(p), ComputeRightTangent(p2));
       p := p2;

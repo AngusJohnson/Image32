@@ -2,10 +2,10 @@ unit Image32_CQ;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.22                                                            *
-* Date      :  10 September 2019                                               *
+* Version   :  1.36                                                            *
+* Date      :  5 January 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2019                                         *
+* Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Color reduction for TImage32                                    *
 *           :  Uses Octree Color Quantization & Floyd / Steinberg Dithering    *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
@@ -17,17 +17,53 @@ interface
 
 uses Windows, SysUtils, Classes, Math, Image32;
 
-procedure ReduceColors(image: TImage32;
-  MaxColors: integer; UseDithering: Boolean = true);
-function CreatePalette(image: TImage32; MaxColors: integer): TArrayOfColor32;
-//nb: dithering is recommended for pretty much all palette reduction
-procedure ApplyPalette(image: TImage32; const palette: array of TColor32;
-  UseDithering: Boolean = true);
+function MakePalette(image: TImage32;
+  MaxColors: integer): TArrayOfColor32; overload;
+function MakePalette(image: TImage32; MaxColors: integer;
+  out frequencies: TArrayOfInteger): TArrayOfColor32; overload;
+
+procedure ApplyPalette(image: TImage32;
+  const palette: TArrayOfColor32; UseDithering: Boolean = true);
+
+//MakeAndApplyPalette: This is *much* faster than calling MakePalette and
+//ApplyPalette separately as it uses the internally constructed Octree
+//structure to apply palette colors to the image.
+function MakeAndApplyPalette(image: TImage32;
+  MaxColors: integer; UseDithering: Boolean): TArrayOfColor32; overload;
+function MakeAndApplyPalette(image: TImage32;
+  MaxColors: integer; UseDithering: Boolean;
+  out frequencies: TArrayOfInteger): TArrayOfColor32; overload;
+
+//TrimPalette: reduces the palette size by removing the least frequent colors
+function TrimPalette(const palette: TArrayOfColor32;
+  const colorFrequency: TArrayOfInteger; newSize: integer): TArrayOfColor32;
+
+//TrimPaletteByFraction: removes palette entries with 'colorFrequency' values
+//less than the specified fraction of the average palette color frequency.
+//Eg: when fraction = 0.1, then this function will remove palette entries with
+//'colorFrequency' less than 10% of the average frequency. [0 > range <= 0.25].
+function TrimPaletteByFraction(const palette: TArrayOfColor32;
+  const colorFrequency: TArrayOfInteger; fraction: double): TArrayOfColor32;
 
 function CreateLogPalette(const palColors: TArrayOfColor32): TMaxLogPalette;
 
+//GetNearestPaletteColor: This function is relatively slow so be
+//careful how you use it :).
+function GetNearestPaletteColor(color: TColor32;
+  const palette: TArrayOfColor32): TColor32;
+
+//GetColorDistance: returns Euclidean distance squared
+function GetColorDistance(color1, color2: TColor32): integer;
+{$IFDEF INLINE} inline; {$ENDIF}
+
+function MaxRgbDifference(color1, color2: TColor32): integer;
+{$IFDEF INLINE} inline; {$ENDIF}
+
 //DrawPalette: Useful for debugging
-procedure DrawPalette(image: TImage32; const palette: array of TColor32);
+procedure DrawPalette(image: TImage32; const palette: TArrayOfColor32);
+
+procedure QuickSort(var intArray: array of Integer; l, r: Integer);
+procedure QuickSortDesc(var intArray: array of Integer; l, r: Integer);
 
 const
 
@@ -48,6 +84,14 @@ const
 
 implementation
 
+resourcestring
+  rsTrimPalette  = 'TrimPalette: Invalid length of ''freq''.';
+  rsTrimPalette2 = 'TrimPalette: Invalid value for ''newSize''.';
+  rsTrimPaletteByFrac  =
+    'TrimPaletteByFraction: Invalid length of ''colorFrequency'' array.';
+  rsTrimPaletteByFrac2 =
+    'TrimPaletteByFraction: Invalid ''fraction'' value.';
+
 type
 
   //Octree Color Quantization:
@@ -59,17 +103,18 @@ type
 
   TOctNode = class
     protected
-      IsLeaf     : Boolean;
       Level      : integer;
       Count      : integer;
       Next       : TOctNode;
       Childs     : TOctNodes8;
-      TotalR     : integer;
-      TotalG     : integer;
-      TotalB     : integer;
+      TotalR     : Int64;
+      TotalG     : Int64;
+      TotalB     : Int64;
       procedure  Add(color: TColor32);
-      procedure  Get(var color: TColor32);
+      procedure  Get(out color: TColor32; out freq: integer);
       procedure  GetNearest(var color: TColor32);
+      function GetIsLeaf: Boolean;
+      property IsLeaf : Boolean read GetIsLeaf;
     public
       constructor Create(aLevel: byte);
       destructor Destroy; override;
@@ -80,19 +125,26 @@ type
       Leaves     : integer;
       MaxColors  : integer;
       Top        : TOctNode;
+      TotalCount : integer;
       Reducible8 : TOctNodes8;
       procedure  Reduce;
       procedure  Delete(var node: TOctNode);
     public
       constructor Create(aMaxColors: integer);
       destructor  Destroy; override;
-      procedure  Add(color: TColor32);
-      procedure  GetNearest(var color: TColor32);
-      function   GetPalette: TArrayOfColor32;
+      procedure   Add(color: TColor32);
+      procedure   GetNearest(var color: TColor32);
+      procedure   GetPalette(out colors: TArrayOfColor32;
+        out freq: TArrayOfInteger);
+      property PixelCount: integer read TotalCount;
   end;
 
   PARGBArray = ^TARGBArray;
   TARGBArray = array [0 .. $FFFFFF -1] of TARGB;
+
+  //redefine TByteArray (see also TByteArray in System.SysUtils)
+  TByteArray = array[0..MaxInt -1] of Byte;
+  PByteArray = ^TByteArray;
 
 const
   NullOctNodes8 : TOctNodes8 = (nil, nil, nil, nil, nil, nil, nil, nil);
@@ -101,30 +153,126 @@ const
 // Miscellaneous Octree functions
 //------------------------------------------------------------------------------
 
+//GetIndex: gets the nearest color index for a given level in OctTree
 function GetIndex(color: TColor32; level: byte): byte;
 {$IFDEF INLINE} inline; {$ENDIF}
-const
-  mask: array[0..7] of Byte= ($80, $40, $20, $10, $8, $4, $2, $1);
 var
   argb: TARGB absolute color;
-  shift: integer;
+  mask: Byte;
 begin
-  shift := 7 - level;
-  Result:=
-    ((argb.R   and mask[level]) shr (shift - 2)) or
-    ((argb.G and mask[level]) shr (shift - 1)) or
-    ((argb.B  and mask[level]) shr shift);
+  mask := $80 shr level;
+  result := 0;
+  if (argb.R and mask) <> 0 then result := 4;
+  if (argb.G and mask) <> 0 then result := result or 2;
+  if (argb.B and mask) <> 0 then result := result or 1;
 end;
 //------------------------------------------------------------------------------
 
-function GetDistance(color1,color2: TColor32): integer;
-{$IFDEF INLINE} inline; {$ENDIF}
+function GetColorDistance(color1, color2: TColor32): integer;
 var
   argb1: TARGB absolute color1;
   argb2: TARGB absolute color2;
 begin
-  result := abs(argb2.R - argb1.R) +
-    abs(argb2.G - argb1.G) + abs(argb2.B - argb1.B);
+  result := Sqr(argb2.R - argb1.R) +
+    Sqr(argb2.G - argb1.G) + Sqr(argb2.B - argb1.B);
+end;
+//------------------------------------------------------------------------------
+
+function MaxRgbDifference(color1, color2: TColor32): integer;
+var
+  argb1: TARGB absolute color1;
+  argb2: TARGB absolute color2;
+begin
+  result := Max(abs(argb2.R - argb1.R),
+    Max(abs(argb2.G - argb1.G), abs(argb2.B - argb1.B)));
+end;
+//------------------------------------------------------------------------------
+
+function GetNearestPaletteColorIndex(color: TColor32;
+  const palette: TArrayOfColor32): integer;
+var
+  i, highI, distI, distJ: integer;
+begin
+  highI := High(palette);
+  if (highI < 0) or (TARGB(color).A < $80) then
+  begin
+    Result := -1;
+    Exit;
+  end;
+  Result := 0;
+  distJ := GetColorDistance(color, palette[0]);
+  if distJ = 0 then Exit;
+  for i := 1 to highI do
+  begin
+    distI := GetColorDistance(color, palette[i]);
+    if distI >= distJ then Continue;
+    Result := i;
+    if distI = 0 then Exit;
+    distJ := distI;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function GetNearestPaletteColor(color: TColor32;
+  const palette: TArrayOfColor32): TColor32;
+var
+  i: integer;
+begin
+  i := GetNearestPaletteColorIndex(color, palette);
+  if i < 0 then Result := clNone32 else
+  Result := palette[i];
+end;
+//------------------------------------------------------------------------------
+
+procedure QuickSort(var intArray: array of Integer; l, r: Integer);
+var
+  i,j, P, T: integer;
+begin
+  repeat
+    i := l;
+    j := r;
+    P := intArray[(l + r) shr 1];
+    repeat
+      while intArray[i] < P do Inc(i);
+      while intArray[j] > P do Dec(j);
+      if i <= j then
+      begin
+        T := intArray[i];
+        intArray[i] := intArray[j];
+        intArray[j] := T;
+        Inc(i);
+        Dec(j);
+      end;
+    until i > j;
+    if l < j then QuickSort(intArray, l, j);
+    l := i;
+  until i >= r;
+end;
+//------------------------------------------------------------------------------
+
+procedure QuickSortDesc(var intArray: array of Integer; l, r: Integer);
+var
+  i,j, P, T: integer;
+begin
+  repeat
+    i := l;
+    j := r;
+    P := intArray[(l + r) shr 1];
+    repeat
+      while intArray[i] > P do Inc(i);
+      while intArray[j] < P do Dec(j);
+      if i <= j then
+      begin
+        T := intArray[i];
+        intArray[i] := intArray[j];
+        intArray[j] := T;
+        Inc(i);
+        Dec(j);
+      end;
+    until i > j;
+    if l < j then QuickSortDesc(intArray, l, j);
+    l := i;
+  until i >= r;
 end;
 
 //------------------------------------------------------------------------------
@@ -134,7 +282,6 @@ end;
 constructor TOctNode.Create(aLevel: byte);
 begin
   Level   := aLevel;
-  IsLeaf  := Level = 8;
   Next    := nil;
   Childs  := NullOctNodes8;
   TotalR  := 0;
@@ -153,6 +300,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TOctNode.GetIsLeaf: Boolean;
+begin
+  result := (Count > 0) or (Level = 8);
+end;
+//------------------------------------------------------------------------------
+
 procedure TOctNode.Add(color: TColor32);
 var
   argb: TARGB absolute color;
@@ -166,44 +319,42 @@ end;
 
 procedure TOctNode.GetNearest(var color: TColor32);
 var
-  i,j,k,distJ,distK: integer;
-  colorJ, colorK: TColor32;
+  i,j: integer;
 begin
   if IsLeaf then
   begin
-    Get(color);
-    Exit;
-  end;
-  i := GetIndex(color, level);
-  if assigned(Childs[i]) then
+    Get(color, j);
+  end else
   begin
-    Childs[i].GetNearest(color);
-    Exit;
-  end;
-  //when 'color' isn't found, pick the child that's closest
-  j := 0;
-  while not assigned(Childs[j]) do inc(j);
-  colorJ := color;
-  Childs[j].GetNearest(colorJ);
-  distJ := GetDistance(color, colorJ);
-  for k := j +1 to 7 do
-    if assigned(Childs[k]) then
+    i := GetIndex(color, level);
+    if Assigned(Childs[i]) then
     begin
-      colorK := color;
-      Childs[k].GetNearest(colorK);
-      distK := GetDistance(color, colorK);
-      if distK >= distJ then continue;
-      distJ := distK;
-      colorJ := colorK;
+      Childs[i].GetNearest(color);
+      Exit;
     end;
-  color := colorJ;
+    //we should only ever get here when this color wasn't in the
+    //the image from which Octree was constructed.
+    for j := 7 downto i+1 do
+      if assigned(Childs[j]) then
+      begin
+        Childs[j].GetNearest(color);
+        Exit;
+      end;
+    for j := 0 to i-1 do
+      if assigned(Childs[j]) then
+      begin
+        Childs[j].GetNearest(color);
+        Exit;
+      end;
+  end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TOctNode.Get(var color: TColor32);
+procedure TOctNode.Get(out color: TColor32; out freq: integer);
 var
   argb: TARGB absolute color;
 begin
+  freq := Count;
   if Count > 0 then
   begin
     argb.R := TotalR div Count;
@@ -219,7 +370,7 @@ end;
 
 constructor TOctree.Create(aMaxColors: integer);
 begin
-  MaxColors := Max(8, aMaxColors); //nb: fails when maxColors < 8
+  MaxColors := aMaxColors;
   Leaves := 0;
   Top := TOctNode.Create(0);
   Reducible8 := NullOctNodes8;
@@ -235,34 +386,59 @@ end;
 
 procedure TOctree.Reduce;
 var
-  i, childCnt: integer;
-  node: TOctNode;
+  i,j, childCnt: integer;
+  node, node2: TOctNode;
 begin
   //find the lowest level with a reducible node ...
   i := 7;
   while (i > 0) and not Assigned(Reducible8[i]) do Dec(i);
 
   //reduce the most recently added node at level 'i' ...
-  node          := Reducible8[i];
-  Reducible8[i] := node.Next;
-  node.IsLeaf   := True;
-  node.TotalR   := 0; node.TotalG := 0; node.TotalB := 0;
-  node.Count    := 0;
-  childCnt      := 0;
+  node := Reducible8[i];
 
-  //now merge the leaves into the parent node ...
-  for i:= 0 to 7 do
-    if Assigned (node.Childs[i]) then
+  if not assigned(node) then
+  begin
+    //ie we're at the 'top' node
+    for i := 0 to 7 do
     begin
-      Inc (node.TotalR, node.Childs[i].TotalR);
-      Inc (node.TotalG, node.Childs[i].TotalG);
-      Inc (node.TotalB, node.Childs[i].TotalB);
-      Inc (node.Count, node.Childs[i].Count);
-      node.Childs[i].Free;
-      node.Childs[i]:= nil;
-      inc(childCnt);
+      if assigned(node) then break
+      else if not assigned(top.Childs[i]) then Continue;
+      node := top.Childs[i];
+      for j := i +1 to 7 do
+      begin
+        if not assigned(top.Childs[j]) then Continue;
+        node2 := top.Childs[j];
+        //now merge siblings
+        top.Childs[j] := nil;
+        Inc (node.TotalR, node2.TotalR);
+        Inc (node.TotalG, node2.TotalG);
+        Inc (node.TotalB, node2.TotalB);
+        Inc (node.Count, node2.Count);
+        node2.Free;
+        Dec(Leaves, 1);
+        break;
+      end;
     end;
-  Dec(Leaves, childCnt -1);
+  end else
+  begin
+    Reducible8[i] := node.Next;
+    node.TotalR   := 0; node.TotalG := 0; node.TotalB := 0;
+    node.Count    := 0; childCnt      := 0;
+
+    //now merge the leaves into the parent node ...
+    for i:= 0 to 7 do
+      if Assigned (node.Childs[i]) then
+      begin
+        Inc (node.TotalR, node.Childs[i].TotalR);
+        Inc (node.TotalG, node.Childs[i].TotalG);
+        Inc (node.TotalB, node.Childs[i].TotalB);
+        Inc (node.Count, node.Childs[i].Count);
+        node.Childs[i].Free;
+        node.Childs[i]:= nil;
+        inc(childCnt);
+      end;
+    Dec(Leaves, childCnt -1);
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -291,6 +467,8 @@ var
  end;
 
 begin
+  if (color shr 24) < $80 then Exit;
+  inc(TotalCount);
   color := color and $FFFFFF;
   AddColor(Top, 0);
   while (Leaves > MaxColors) do
@@ -299,8 +477,12 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TOctree.GetNearest(var color: TColor32);
+var
+  a: TColor32;
 begin
+  a := color and $FF000000;
   Top.GetNearest(color);
+  color := (color and $FFFFFF) or a;
 end;
 //------------------------------------------------------------------------------
 
@@ -315,7 +497,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TOctree.GetPalette: TArrayOfColor32;
+procedure TOctree.GetPalette(out colors: TArrayOfColor32;
+  out freq: TArrayOfInteger);
 var
   count: integer;
 
@@ -323,9 +506,9 @@ var
   var
     i: integer;
   begin
-    if Node.IsLeaf then
+    if (Node.IsLeaf) then
     begin
-      Node.Get(Result[Count]);
+      Node.Get(colors[Count], freq[Count]);
       Inc(Count);
     end else
     begin
@@ -336,14 +519,16 @@ var
   end;
 
 begin
-  SetLength(result, Leaves);
+  SetLength(colors, Leaves);
+  SetLength(freq, Leaves +1);
   count := 0;
   FillPalette(Top);
+  freq[count] := TotalCount;
 end;
 
 //------------------------------------------------------------------------------
-// Floyd / Steinberg Dithering -
-// see https://en.wikipedia.org/wiki/Floyd%E2%80%93Steinberg_dithering
+// Floyd-Steinberg Dithering -
+// see https://en.wikipedia.org/wiki/Floyd-Steinberg_dithering
 //------------------------------------------------------------------------------
 
 type
@@ -354,16 +539,6 @@ var
   Mul3Div16Table: TMulDibTable;
   Mul5Div16Table: TMulDibTable;
   Mul7Div16Table: TMulDibTable;
-
-procedure Monochrome(var color: TColor32);
-var
-  c: TARGB absolute color;
-begin
-  c.R := (c.R * 61 + c.G * 174 + c.B * 21) shr 8;
-  if c.R > 127 then c.R := 255 else c.R := 0;
-  c.G := c.R; c.B := c.R; c.A := 255;
-end;
-//------------------------------------------------------------------------------
 
 function ClampByte(val: integer): Byte;
 {$IFDEF INLINE} inline; {$ENDIF}
@@ -381,7 +556,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Dither(image: TImage32; octree: TOctree);
+procedure Dither(image: TImage32; octree: TOctree); overload;
 var
   X, Y, W         : Integer;
   qeR,qeG, qeB    : integer;
@@ -410,9 +585,7 @@ begin
         begin
           oldC := newC^;
           //get the reduced color
-          if assigned(octree) then
-            octree.GetNearest(newC.Color) else
-            Monochrome(newC.Color);
+          octree.GetNearest(newC.Color);
 
           qeR := oldC.R - newC.R;
           qeG := oldC.G - newC.G;
@@ -443,63 +616,118 @@ begin
     tmp.Free;
   end;
 end;
+//------------------------------------------------------------------------------
+
+procedure Dither(image: TImage32; const palette: TArrayOfColor32); overload;
+var
+  qeRq,qeGq, qeBq : integer;
+
+  procedure AdjustPixel(pc: PARGB; r, g, b: integer);
+  begin
+    pc.R := ClampByte(pc.R + r);
+    pc.G := ClampByte(pc.G + g);
+    pc.B := ClampByte(pc.B + b);
+    dec(qeRq, r); dec(qeGq, g); dec(qeBq, b);
+  end;
+
+var
+  j            : Cardinal;
+  X, Y, W      : Integer;
+  qeR,qeG, qeB : integer;
+  oldC         : TARGB;
+  newC         : PARGB;
+  tmp          : TImage32;
+  allColors    : PByteArray;
+const
+  cube256 = 256 * 256 * 256;
+begin
+  allColors := AllocMem(cube256);
+  tmp := TImage32.Create(image);
+  try
+    W := image.Width;
+    newC := PARGB(image.PixelBase);
+    for Y := 0 to image.Height-1 do
+      for X := 0 to W -1 do
+      begin
+        if newC.A > 0 then
+        begin
+          oldC := newC^;
+
+          j := allColors[newC.Color and $FFFFFF];
+          if j = 0 then //not found
+          begin
+            j := GetNearestPaletteColorIndex(newC.Color, palette);
+            allColors[newC.Color and $FFFFFF] := j +1;
+            newC.Color := palette[j];
+          end else
+            newC.Color := palette[j -1];
+
+          qeR := oldC.R - newC.R;
+          qeG := oldC.G - newC.G;
+          qeB := oldC.B - newC.B;
+          qeRq := qeR; qeGq := qeG; qeBq := qeB;
+
+          if X < image.Width-1 then
+            AdjustPixel(GetPColor32(newC, +1),
+              Mul7Div16Table[qeR], Mul7Div16Table[qeG], Mul7Div16Table[qeB]);
+
+          if Y < image.Height -1 then
+          begin
+            if X > 0 then
+              AdjustPixel(GetPColor32(newC, W-1),
+                Mul3Div16Table[qeR], Mul3Div16Table[qeG], Mul3Div16Table[qeB]);
+
+            AdjustPixel(GetPColor32(newC, W),
+              Mul5Div16Table[qeR], Mul5Div16Table[qeG], Mul5Div16Table[qeB]);
+
+            if X < W -1 then
+              AdjustPixel(GetPColor32(newC, W +1),
+                Mul1Div16Table[qeRq], Mul1Div16Table[qeGq], Mul1Div16Table[qeBq]);
+          end;
+        end;
+        inc(newC);
+      end;
+  finally
+    tmp.Free;
+    FreeMem(allColors);
+  end;
+end;
 
 //------------------------------------------------------------------------------
 // CreatePalette...
 //------------------------------------------------------------------------------
 
-function CreatePalette(image: TImage32; MaxColors: integer): TArrayOfColor32;
+function CreatePaletteOctree(image: TImage32;
+  MaxColors: integer): TOctree;
+var
+  i: integer;
+  pc: PARGB;
+begin
+  MaxColors := Max(2, Min(256, MaxColors));
+  Result := TOctree.Create(MaxColors);
+  pc := PARGB(image.PixelBase);
+  for i := 0 to image.Width * image.Height - 1 do
+  begin
+    //ignore transparent and semi-transparent colors
+    if pc.A >= $80 then
+      Result.Add(pc.Color);
+    inc(pc);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function MakeAndApplyPalette(image: TImage32;
+  MaxColors: integer; UseDithering: Boolean;
+  out frequencies: TArrayOfInteger): TArrayOfColor32;
 var
   i: integer;
   pc: PARGB;
   octree: TOctree;
 begin
-
-  if MaxColors < 8 then
-  begin
-    setLength(Result, 2);
-    result[0] := clWhite32;
-    result[1] := clBlack32;
-    Exit;
-  end;
-
-  MaxColors := Min(256, MaxColors);
   result := nil;
-  octree := TOctree.Create(MaxColors);
+  octree := CreatePaletteOctree(image, MaxColors);
   try
-    pc := PARGB(image.PixelBase);
-    for i := 0 to image.Width * image.Height - 1 do
-    begin
-      octree.Add(pc.Color);
-      inc(pc);
-    end;
-    result :=  octree.GetPalette;
-  finally
-    octree.Free;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure ApplyPalette(image: TImage32; const palette: array of TColor32;
-  UseDithering: Boolean = true);
-var
-  i, len: integer;
-  pc: PARGB;
-  octree: TOctree;
-begin
-  len := Length(palette);
-
-  if len < 4 then
-  begin
-    Dither(image, nil);
-    Exit;
-  end;
-
-  octree := TOctree.Create(len);
-  try
-    for i := 0 to len - 1 do
-      octree.Add(palette[i]);
-
+    octree.GetPalette(result, frequencies);
     if UseDithering then
     begin
       Dither(image, octree);
@@ -508,24 +736,155 @@ begin
       pc := PARGB(image.PixelBase);
       for i := 0 to image.Width * image.Height - 1 do
       begin
-        octree.GetNearest(pc.Color);
+        if pc.A < $80 then
+          pc.Color := clNone32
+        else
+          octree.GetNearest(pc.Color);
         inc(pc);
       end;
     end;
-
   finally
     octree.Free;
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure ReduceColors(image: TImage32;
-  MaxColors: integer; UseDithering: Boolean = true);
+function MakeAndApplyPalette(image: TImage32;
+  MaxColors: integer; UseDithering: Boolean): TArrayOfColor32;
 var
-  pal: TArrayOfColor32;
+  dummy: TArrayOfInteger;
 begin
-  pal := CreatePalette(image, MaxColors);
-  ApplyPalette(image, pal, UseDithering);
+  Result := MakeAndApplyPalette(image, MaxColors, UseDithering, dummy);
+end;
+//------------------------------------------------------------------------------
+
+function MakePalette(image: TImage32; MaxColors: integer): TArrayOfColor32;
+var
+  dummy: TArrayOfInteger;
+begin
+  result := MakePalette(image, MaxColors, dummy);
+end;
+//------------------------------------------------------------------------------
+
+function MakePalette(image: TImage32; MaxColors: integer;
+  out frequencies: TArrayOfInteger): TArrayOfColor32;
+var
+  octree: TOctree;
+begin
+  MaxColors := Max(2, Min(512, MaxColors));
+  result := nil;
+  octree := CreatePaletteOctree(image, MaxColors);
+  try
+    octree.GetPalette(result, frequencies);
+  finally
+    octree.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure ApplyPalette(image: TImage32;
+  const palette: TArrayOfColor32; UseDithering: Boolean = true);
+var
+  i, len: integer;
+  j: cardinal;
+  pc: PARGB;
+  allColors: PByteArray;
+const
+  cube256 = 256 * 256 * 256;
+begin
+  len := Length(palette);
+  if len = 0 then Exit;
+
+  if UseDithering then
+  begin
+    Dither(image, palette);
+  end else
+  begin
+    pc := PARGB(image.PixelBase);
+    allColors := AllocMem(cube256);
+    try
+      for i := 0 to image.Width * image.Height - 1 do
+      begin
+        if pc.A >= $80 then
+        begin
+           j := allColors[pc.Color and $FFFFFF];
+           if j = 0 then //not found
+           begin
+             j := GetNearestPaletteColorIndex(pc.Color, palette);
+             allColors[pc.Color and $FFFFFF] := j +1;
+             pc.Color := palette[j];
+           end else
+             pc.Color := palette[j -1]
+        end else
+          pc.Color := clNone32;
+        inc(pc);
+      end;
+    finally
+      FreeMem(allColors);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TrimPalette(const palette: TArrayOfColor32;
+  const colorFrequency: TArrayOfInteger; newSize: integer): TArrayOfColor32;
+var
+  i,j, minFrequency, len, cnt: integer;
+  sortedFreq: TArrayOfInteger;
+begin
+  len := Length(palette);
+  if Length(colorFrequency) <> len + 1 then
+    raise Exception.Create(rsTrimPalette)
+  else if (newSize <= 0) then
+    raise Exception.Create(rsTrimPalette2)
+  else if (newSize >= len) or (len = 0) then
+  begin
+    Result := palette;
+    Exit;
+  end;
+
+  sortedFreq := Copy(colorFrequency, 0, len);
+  QuickSortDesc(sortedFreq, 0, len -1);
+  minFrequency := sortedFreq[newSize] +1;
+  SetLength(Result, newSize);
+  j := 0; cnt := 0;
+  for i := 0 to len -1 do
+    if colorFrequency[i] >= minFrequency then
+    begin
+      Result[j] := palette[i];
+      inc(j);
+    end;
+  SetLength(Result, j);
+end;
+//------------------------------------------------------------------------------
+
+function TrimPaletteByFraction(const palette: TArrayOfColor32;
+  const colorFrequency: TArrayOfInteger; fraction: double): TArrayOfColor32;
+var
+  i,j, minFrequency, len, cnt: integer;
+begin
+  len := Length(palette);
+  fraction := fraction / len;
+  if Length(colorFrequency) <> len + 1 then
+    raise Exception.Create(rsTrimPaletteByFrac)
+  else if (fraction >= 0.25) or (fraction <= 0.0) then
+    raise Exception.Create(rsTrimPaletteByFrac2)
+  else if (len = 0) then
+  begin
+    Result := nil;
+    Exit;
+  end;
+
+  minFrequency := Round(fraction * colorFrequency[len]);
+  SetLength(Result, len);
+  j := 0; cnt := 0;
+  for i := 0 to len -1 do
+    if colorFrequency[i] >= minFrequency then
+    begin
+      Result[j] := palette[i];
+      inc(j);
+    end;
+  SetLength(Result, j);
 end;
 //------------------------------------------------------------------------------
 
@@ -545,7 +904,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawPalette(image: TImage32; const palette: array of TColor32);
+procedure DrawPalette(image: TImage32; const palette: TArrayOfColor32);
 var
   i, w, h, len: integer;
   rec: TRect;

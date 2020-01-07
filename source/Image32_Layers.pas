@@ -2,10 +2,10 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.31                                                            *
-* Date      :  2 December 2019                                                 *
+* Version   :  1.36                                                            *
+* Date      :  5 January 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2019                                         *
+* Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Layer support for the Image32 library                           *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -190,10 +190,10 @@ type
   function UpdateSizingGroup(targetLayer, movedBtnLayer: TLayer32;
     masterImg: TImage32): Boolean;
 
-  procedure CreateButtonGroup(layeredImage32: TLayeredImage32;
+  function CreateButtonGroup(layeredImage32: TLayeredImage32;
     const buttonPts: TArrayOfPointD; buttonColor: TColor32;
     buttonSize: integer; buttonOptions: TButtonOptions;
-    buttonLayerClass: TButtonDesignerLayer32Class = nil);
+    buttonLayerClass: TButtonDesignerLayer32Class = nil): integer;
   function StartButtonGroup(layeredImage32: TLayeredImage32;
     const buttonPt: TPoint; buttonColor: TColor32;
     buttonSize: integer; buttonOptions: TButtonOptions;
@@ -407,6 +407,7 @@ var
   topIdx: integer;
 begin
   topIdx := fOwner.Count -1;
+  if newLevel > topIdx then newLevel := topIdx;
   Result := (newLevel > fIndex) and (fIndex < topIdx) and not IsInGroup;
   if not Result then Exit;
 
@@ -426,6 +427,7 @@ begin
   Result := (newLevel < fIndex) and (fIndex > 0) and not IsInGroup;
   if not Result then Exit;
 
+  if newLevel < 0 then newLevel := 0;
   while fOwner[newLevel].IsInGroup and (newLevel > 0) and
     (fOwner[newLevel].fGroupId = fOwner[newLevel-1].fGroupId) do
       dec(newLevel);
@@ -1263,16 +1265,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure CreateButtonGroup(layeredImage32: TLayeredImage32;
+function CreateButtonGroup(layeredImage32: TLayeredImage32;
   const buttonPts: TArrayOfPointD; buttonColor: TColor32;
   buttonSize: integer; buttonOptions: TButtonOptions;
-  buttonLayerClass: TButtonDesignerLayer32Class = nil);
+  buttonLayerClass: TButtonDesignerLayer32Class = nil): integer;
 var
   i: integer;
   layer: TButtonDesignerLayer32;
 begin
   layer := StartButtonGroup(layeredImage32, Point(buttonPts[0]), buttonColor,
     buttonSize, buttonOptions, buttonLayerClass);
+  Result := layer.GroupId;
   for i := 1 to High(buttonPts) do
     AddToButtonGroup(layeredImage32, layer.GroupId, Point(buttonPts[i]),
       buttonColor, buttonSize, buttonOptions);

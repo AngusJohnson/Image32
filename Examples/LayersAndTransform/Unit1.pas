@@ -41,11 +41,14 @@ type
     procedure CopytoClipboard1Click(Sender: TObject);
   private
     layeredImage32: TLayeredImage32;
-    fButtonClickedLayer: TLayer32;
+    buttonMovingLayer, hatchedLayer: TLayer32;
+    masterLayer, transformLayer: TLayer32;
+    designLayer: TDesignerLayer32;
     fClickPoint: TPoint;
     fImageIsClicked: Boolean;
     fSplinePts: TArrayOfPointD;
     fMargin: integer;
+    fButtonGroupId: integer;
     procedure ResetSplinePts;
     procedure UpdateLayeredImage(transform: Boolean);
   public
@@ -67,8 +70,6 @@ uses
 //------------------------------------------------------------------------------
 
 procedure TForm1.FormCreate(Sender: TObject);
-var
-  layer: TLayer32;
 begin
   //SETUP THE DISPLAY PANEL
 
@@ -83,20 +84,23 @@ begin
   fMargin := DPI(50);
 
   layeredImage32 := TLayeredImage32.Create;
+  //width & height will be set in UpdateLayeredImage method below
 
   //Layer 0: 'hatched' layer to highlight transparency
-  layeredImage32.AddNewLayer(TDesignerLayer32, 'background - hatched');
+  hatchedLayer :=
+    layeredImage32.AddNewLayer(TDesignerLayer32, 'background - hatched');
 
   //Layer 1: hidden layer contains the starting image
-  layer := layeredImage32.AddNewLayer(TDesignerLayer32, 'master - hidden');
-  layer.image.LoadFromResource('UNION_JACK', 'BMP');
-  layer.Visible := false;
+  masterLayer := layeredImage32.AddNewLayer(TDesignerLayer32, 'master - hidden');
+  masterLayer.image.LoadFromResource('UNION_JACK', 'BMP');
+  masterLayer.Visible := false;
 
   //Layer 2: for the transformed image
-  layeredImage32.AddNewLayer('transformed');
+  transformLayer := layeredImage32.AddNewLayer('transformed');
 
   //Layer 3: a design layer for design lines etc
-  layeredImage32.AddNewLayer(TDesignerLayer32, 'design');
+  designLayer := TDesignerLayer32(
+    layeredImage32.AddNewLayer(TDesignerLayer32, 'design'));
 
   //Layers 4+: button layers
   ResetSplinePts;
@@ -108,40 +112,42 @@ end;
 
 procedure TForm1.ResetSplinePts;
 begin
-  with layeredImage32 do
-    if Count > 4 then DeleteGroup(1); //button are the only group
+  if fButtonGroupId > 0 then
+  begin
+    layeredImage32.DeleteGroup(fButtonGroupId);
+    fButtonGroupId := 0;
+  end;
 
-  with layeredImage32[1].Image do     //with the master image
+  with masterLayer.Image do     //with the master image
     fSplinePts := MakePathI([0,0, Width div 2,fMargin, Width,0]);
   fSplinePts := OffsetPath(fSplinePts, fMargin, fMargin);
 
-  CreateButtonGroup(layeredImage32, fSplinePts, clGreen32, DefaultButtonSize, []);
+  fButtonGroupId := CreateButtonGroup(layeredImage32, fSplinePts,
+    clGreen32, DefaultButtonSize, [boDropShadow]);
 end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.UpdateLayeredImage(transform: Boolean);
 var
-  i,w,h: integer;
+  i, w,h, firstButtonIdx: integer;
   pt: TPoint;
   path: TArrayOfPointD;
 begin
   if transform then
   begin
-    with layeredImage32[2] do
-    begin
-      //using splinePts, update the 'transformed' layer
-      image.Assign(layeredImage32[1].Image); //copy the master image
-      if not SplineTransformVert(image, fSplinePts,
-        stQuadratic, clRed32, false, pt) then Exit;
-      PositionAt(pt); //nb: 'pt' returned by SplineTransformVert
+    //using splinePts, update the 'transformed' layer
+    transformLayer.image.Assign(masterLayer.Image); //copy the master image
+    if not SplineTransformVert(transformLayer.image, fSplinePts,
+      stQuadratic, clRed32, false, pt) then Exit;
+    transformLayer.PositionAt(pt); //nb: 'pt' returned by SplineTransformVert
 
-      //resize layeredImage32 so there's room for further transforms
-      w := image.Width + fMargin  + pt.X;
-      h := image.Height + fMargin + pt.Y;
-      layeredImage32.SetSize(w, h);
-      layeredImage32[0].SetSize(w, h);
-      HatchBackground(layeredImage32[0].Image, clWhite32, $FFE0E0E0);
-    end;
+    //resize layeredImage32 so there's room for further transforms
+    w := transformLayer.image.Width + fMargin  + pt.X;
+    h := transformLayer.image.Height + fMargin + pt.Y;
+    layeredImage32.SetSize(w, h);
+
+    hatchedLayer.SetSize(w, h);
+    HatchBackground(hatchedLayer.Image, clWhite32, $FFE0E0E0);
   end else
   begin
     w := layeredImage32.Width;
@@ -151,30 +157,36 @@ begin
   //draw spline's design lines and implicit buttons on the design layer
   if not mnuShowImage.Checked then
   begin
-    with TDesignerLayer32(layeredImage32[3]) do
+    designLayer.SetSize(w, h); //this also clears the layer
+    if mnuShowControls.Checked then
     begin
-      SetSize(w, h); //also clears layer
-      if mnuShowControls.Checked then
-      begin
-        path := QSpline(fSplinePts);
-        Image32_Draw.DrawLine(image, path, 1.5, clBlack32, esSquare);
-      end;
-      DrawQSplineDesign(fSplinePts);
+      path := FlattenQSpline(fSplinePts);
+      Image32_Draw.DrawLine(designLayer.image, path, 1.5, clBlack32, esSquare);
     end;
+    designLayer.DrawQSplineDesign(fSplinePts); //draws virtual buttons etc.
   end;
 
   //move the 'button' layers to the splinePts coordinates (index 4+)
+  firstButtonIdx := layeredImage32.GetFirstInGroupIdx(fButtonGroupId);
   for i := 0 to high(fSplinePts) do
-    with layeredImage32[4 +i] do
+    with layeredImage32[firstButtonIdx +i] do
       PositionCenteredAt(Point(fSplinePts[i]));
 
-  layeredImage32[2].Visible := not mnuShowControls.Checked;
+  //since transformLayer isn't a design layer,
+  //we need to manually change its visibility.
+  transformLayer.Visible := not mnuShowControls.Checked;
 
   //copy the merged layeredImage32 to Panel1
-  //Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  {$IFDEF SETSIZE}
+  Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  {$ELSE}
   Panel1.Bitmap.Width := layeredImage32.Width;
   Panel1.Bitmap.Height := layeredImage32.Height;
-  layeredImage32.GetMergedImage(mnuShowImage.Checked).CopyToDc(Panel1.Bitmap.Canvas.Handle);
+  {$ENDIF}
+  //when copying semi-transparent images, the panel's bitmap needs clearing
+  Panel1.ClearBitmap;
+  layeredImage32.GetMergedImage(mnuShowImage.Checked).CopyToDc(
+    Panel1.Bitmap.Canvas.Handle, 0, 0, true);
   Panel1.Refresh;
 end;
 //------------------------------------------------------------------------------
@@ -207,17 +219,17 @@ begin
     Exit;
   end;
 
-  fButtonClickedLayer := layeredImage32.GetLayerAt(pt);
-  if Assigned(fButtonClickedLayer) and
-    (fButtonClickedLayer.Name <> 'button') then
-      fButtonClickedLayer := nil;
+  buttonMovingLayer := layeredImage32.GetLayerAt(pt);
+  if Assigned(buttonMovingLayer) and
+    (buttonMovingLayer.Name <> 'button') then
+      buttonMovingLayer := nil;
 
-  if Assigned(fButtonClickedLayer) then
+  if Assigned(buttonMovingLayer) then
   begin
     //while moving buttons temporarily disable panel zoom and scroll
     panel1.BitmapProperties.ZoomAndScrollEnabled := false
   end
-  else if PtInRect(layeredImage32[2].Bounds, pt) then
+  else if PtInRect(transformLayer.Bounds, pt) then
   begin
     fClickPoint := pt;
     fImageIsClicked := true;
@@ -245,15 +257,15 @@ begin
     fSplinePts := OffsetPath(fSplinePts, dx, dy);
     //move (offset) the buttons and the image too
     layeredImage32.OffsetGroup(1, dx, dy);
-    layeredImage32[2].Offset(dx, dy);
+    transformLayer.Offset(dx, dy);
     UpdateLayeredImage(false);
   end
-  else if not Assigned(fButtonClickedLayer) then
+  else if not Assigned(buttonMovingLayer) then
   begin
     layer := layeredImage32.GetLayerAt(pt);
     if Assigned(layer) and (layer.Name = 'button') then
       Panel1.Cursor := crHandPoint
-    else if PtInRect(layeredImage32[2].Bounds, pt) then
+    else if PtInRect(transformLayer.Bounds, pt) then
       //nb: the 'designer' layer covers the 'transformed' layer
       //so if layer isn't a 'button' it'll be 'designer'
       Panel1.Cursor := crSizeAll
@@ -261,9 +273,9 @@ begin
       Panel1.Cursor := crDefault;
   end else
   begin
-    fButtonClickedLayer.PositionCenteredAt(pt);
+    buttonMovingLayer.PositionCenteredAt(pt);
     //nb: first 4 layers are non-button layers
-    fSplinePts[fButtonClickedLayer.Index -4] := PointD(pt);
+    fSplinePts[buttonMovingLayer.Index -4] := PointD(pt);
     UpdateLayeredImage(true);
   end;
 end;
@@ -273,7 +285,7 @@ procedure TForm1.Panel1MouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   fImageIsClicked := false;
-  fButtonClickedLayer := nil;
+  buttonMovingLayer := nil;
   //re-enable Panel1 zoom and scroll
   Panel1.BitmapProperties.ZoomAndScrollEnabled := true;
 end;
@@ -281,6 +293,7 @@ end;
 
 procedure TForm1.mnuShowControlsClick(Sender: TObject);
 begin
+  (Sender as TMenuItem).Checked := true;
   UpdateLayeredImage(false);
 end;
 //------------------------------------------------------------------------------
@@ -289,7 +302,7 @@ procedure TForm1.mnuOpenClick(Sender: TObject);
 begin
   if OpenDialog1.Execute then
   begin
-    layeredImage32[1].Image.LoadFromFile(OpenDialog1.FileName);
+    masterLayer.Image.LoadFromFile(OpenDialog1.FileName);
     ResetSplinePts;
     UpdateLayeredImage(true);
   end;
@@ -299,13 +312,13 @@ end;
 procedure TForm1.mnuSaveClick(Sender: TObject);
 begin
   if SaveDialog1.Execute then
-    layeredImage32[2].Image.SaveToFile(SaveDialog1.FileName);
+    transformLayer.Image.SaveToFile(SaveDialog1.FileName);
 end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.CopytoClipboard1Click(Sender: TObject);
 begin
-  layeredImage32[2].Image.CopyToClipBoard;
+  transformLayer.Image.CopyToClipBoard;
 end;
 //------------------------------------------------------------------------------
 

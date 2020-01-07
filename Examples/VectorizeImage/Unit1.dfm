@@ -7,16 +7,18 @@ object Form1: TForm1
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -12
+  Font.Height = -13
   Font.Name = 'Tahoma'
   Font.Style = []
+  KeyPreview = True
   Menu = MainMenu1
   OldCreateOrder = False
   Position = poDesktopCenter
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnKeyDown = FormKeyDown
   PixelsPerInch = 96
-  TextHeight = 14
+  TextHeight = 16
   object StatusBar1: TStatusBar
     Left = 0
     Top = 413
@@ -30,56 +32,74 @@ object Form1: TForm1
   object pnlMemo: TPanel
     Left = 0
     Top = 0
-    Width = 494
-    Height = 400
+    Width = 552
+    Height = 413
+    Align = alClient
     TabOrder = 1
     Visible = False
+    ExplicitWidth = 494
+    ExplicitHeight = 400
     object Panel3: TPanel
       Left = 1
       Top = 1
-      Width = 492
+      Width = 550
       Height = 41
       Align = alTop
       TabOrder = 0
+      ExplicitWidth = 492
       object btnCloseMemo: TButton
-        Left = 4
-        Top = 7
+        Left = 5
+        Top = 9
         Width = 75
         Height = 25
         Cancel = True
         Caption = '&Close'
+        Default = True
         TabOrder = 0
         OnClick = btnCloseMemoClick
       end
       object rbBeziers: TRadioButton
-        Left = 129
+        Left = 191
         Top = 13
-        Width = 113
+        Width = 97
         Height = 17
         Caption = '&Bezier Paths'
-        TabOrder = 1
+        TabOrder = 2
         OnClick = rbBeziersClick
       end
       object rbFlat: TRadioButton
-        Left = 246
+        Left = 299
         Top = 13
-        Width = 113
+        Width = 90
         Height = 17
         Caption = '&Flat Paths'
         Checked = True
-        TabOrder = 2
+        TabOrder = 3
         TabStop = True
+        OnClick = rbBeziersClick
+      end
+      object rbRaw: TRadioButton
+        Left = 100
+        Top = 13
+        Width = 85
+        Height = 17
+        Caption = '&Raw Paths'
+        TabOrder = 1
         OnClick = rbBeziersClick
       end
     end
     object Memo1: TMemo
       Left = 1
       Top = 42
-      Width = 492
-      Height = 357
+      Width = 550
+      Height = 370
       Align = alClient
+      HideSelection = False
+      ReadOnly = True
       ScrollBars = ssVertical
       TabOrder = 1
+      ExplicitWidth = 492
+      ExplicitHeight = 357
     end
   end
   object pnlDisplayParent: TPanel
@@ -114,7 +134,7 @@ object Form1: TForm1
         ShowSelRange = False
         TabOrder = 0
         TickStyle = tsNone
-        OnChange = mnuShowBothClick
+        OnChange = TrackBar1Change
       end
     end
     object DisplayPanel: TPanel
@@ -155,42 +175,41 @@ object Form1: TForm1
     end
     object View1: TMenuItem
       Caption = '&View'
-      object mnuShowImage: TMenuItem
-        AutoCheck = True
-        Caption = 'Show Monochrome &Image'
+      object mnuShowMonoImage: TMenuItem
+        Caption = 'Monochrome Im&age'
         GroupIndex = 1
         RadioItem = True
-        ShortCut = 16457
-        OnClick = mnuShowBothClick
+        ShortCut = 16433
+        OnClick = mnuShowSimplifiedClick
       end
-      object mnuShowPolygons: TMenuItem
-        AutoCheck = True
-        Caption = 'Show &Vector Polygons'
+      object mnuShowRawPoly: TMenuItem
+        Caption = '&Raw Vector Polygons'
+        GroupIndex = 1
+        RadioItem = True
+        ShortCut = 16434
+        OnClick = mnuShowSimplifiedClick
+      end
+      object mnuShowSimplified: TMenuItem
+        Caption = 'Simplified Ve&ctor Polygons'
+        GroupIndex = 1
+        RadioItem = True
+        ShortCut = 16435
+        OnClick = mnuShowSimplifiedClick
+      end
+      object mnuShowSmoothedOnly: TMenuItem
+        Caption = 'Smoothe&d (unsimplified) Polygons'
+        GroupIndex = 1
+        RadioItem = True
+        ShortCut = 16436
+        OnClick = mnuShowSimplifiedClick
+      end
+      object mnuShowSimplifiedSmoothed: TMenuItem
+        Caption = 'Smooth&ed && Simplified Polygons'
         Checked = True
         GroupIndex = 1
         RadioItem = True
-        ShortCut = 16470
-        OnClick = mnuShowBothClick
-      end
-      object mnuShowBoth: TMenuItem
-        AutoCheck = True
-        Caption = 'Show &Both Image and Polygons'
-        GroupIndex = 1
-        RadioItem = True
-        ShortCut = 16450
-        OnClick = mnuShowBothClick
-      end
-      object N2: TMenuItem
-        Caption = '-'
-        GroupIndex = 1
-      end
-      object mnuSmoothCurve: TMenuItem
-        AutoCheck = True
-        Caption = 'S&mooth Curve'
-        Checked = True
-        GroupIndex = 1
-        ShortCut = 16461
-        OnClick = mnuShowBothClick
+        ShortCut = 16437
+        OnClick = mnuShowSimplifiedClick
       end
       object N3: TMenuItem
         Caption = '-'
@@ -198,20 +217,20 @@ object Form1: TForm1
       end
       object mnuShowPolygonCoordinates: TMenuItem
         Caption = 'Show &Polygon Coordinates'
-        GroupIndex = 1
+        GroupIndex = 2
         ShortCut = 16464
         OnClick = mnuShowPolygonCoordinatesClick
       end
     end
   end
   object OpenDialog1: TOpenDialog
-    Filter = 'PNG Files|*.png'
+    Filter = 'Image Files|*.bmp;*.jpg;*.png'
     Left = 112
     Top = 144
   end
   object SaveDialog1: TSaveDialog
     DefaultExt = '.png'
-    Filter = 'PNG Image File (*.PNG)|*.png'
+    Filter = 'Image Files|*.bmp;*.jpg;*.png'
     Left = 112
     Top = 200
   end

@@ -1,9 +1,9 @@
 object Form1: TForm1
   Left = 618
   Top = 336
-  Width = 386
-  Height = 448
   Caption = 'Image32 - Layer and Transform example'
+  ClientHeight = 389
+  ClientWidth = 370
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -20,7 +20,7 @@ object Form1: TForm1
     Left = 0
     Top = 0
     Width = 370
-    Height = 371
+    Height = 370
     Align = alClient
     TabOrder = 0
     OnMouseDown = Panel1MouseDown
@@ -29,7 +29,7 @@ object Form1: TForm1
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 371
+    Top = 370
     Width = 370
     Height = 19
     Panels = <>
@@ -75,7 +75,6 @@ object Form1: TForm1
     object View1: TMenuItem
       Caption = '&View'
       object mnuShowAll: TMenuItem
-        AutoCheck = True
         Caption = 'Show &All'
         Checked = True
         GroupIndex = 1
@@ -84,7 +83,6 @@ object Form1: TForm1
         OnClick = mnuShowControlsClick
       end
       object mnuShowImage: TMenuItem
-        AutoCheck = True
         Caption = 'Show &Image'
         GroupIndex = 1
         RadioItem = True
@@ -92,7 +90,6 @@ object Form1: TForm1
         OnClick = mnuShowControlsClick
       end
       object mnuShowControls: TMenuItem
-        AutoCheck = True
         Caption = 'Show Co&ntrols'
         GroupIndex = 1
         RadioItem = True
