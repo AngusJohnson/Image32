@@ -2,8 +2,8 @@ unit Image32_Clipper;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.36                                                            *
-* Date      :  5 January 2020                                                  *
+* Version   :  1.37                                                            *
+* Date      :  15 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Wrapper module for the Clipper library                          *
@@ -73,7 +73,10 @@ begin
   case joinStyle of
     jsSquare: jt := jtSquare;
     jsMiter: jt :=  jtMiter;
-    else jt := jtRound;
+    jsRound: jt := jtRound;
+    else if abs(delta) <= 2 then
+      jt := jtSquare else
+      jt := jtRound;
   end;
   Result := TArrayOfArrayOfPointD(ClipperOffset.ClipperOffsetPaths(
     ClipperCore.TPathsD(polygons), delta, jt, etPolygon, miterLimit));

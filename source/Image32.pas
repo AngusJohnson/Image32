@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.36                                                            *
-* Date      :  5 January 2020                                                  *
+* Version   :  1.37                                                            *
+* Date      :  15 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -62,9 +62,9 @@ type
     function LoadFromStream(stream: TStream; img32: TImage32): Boolean; virtual; abstract;
     function LoadFromFile(const filename: string; img32: TImage32): Boolean; virtual;
     class function CanCopyToClipboard: Boolean; virtual;
-    function CopyToClipboard(img32: TImage32): Boolean; virtual; abstract;
+    class function CopyToClipboard(img32: TImage32): Boolean; virtual; abstract;
     class function CanPasteFromClipboard: Boolean; virtual; abstract;
-    function PasteFromClipboard(img32: TImage32): Boolean; virtual; abstract;
+    class function PasteFromClipboard(img32: TImage32): Boolean; virtual; abstract;
   end;
 
   TBlendFunction = function(bgColor, fgColor: TColor32): TColor32;
@@ -138,7 +138,7 @@ type
     procedure CopyToDc(dstDc: HDC; x: Integer = 0; y: Integer = 0;
       transparent: Boolean = true; bkColor: TColor32 = 0);
     function CopyToClipBoard: Boolean;
-    function CanPasteFromClipBoard: Boolean;
+    class function CanPasteFromClipBoard: Boolean;
     function PasteFromClipBoard: Boolean;
     procedure Crop(const rec: TRect);
     //SetBackgroundColor: Assumes the current image is semi-transparent.
@@ -2176,7 +2176,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImage32.CanPasteFromClipBoard: Boolean;
+class function TImage32.CanPasteFromClipBoard: Boolean;
 var
   i: Integer;
   formatClass: TImageFormatClass;

@@ -2,8 +2,8 @@ unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.36                                                            *
-* Date      :  5 January 2020                                                  *
+* Version   :  1.37                                                            *
+* Date      :  15 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -21,20 +21,25 @@ uses
 type
   TMatrixD = array [0..2, 0..2] of double;
 
-procedure AffineTransform(img: TImage32; matrix: TMatrixD);
-
-//Note: matrix multiplication is not symmetric
-function MultiplyMatrices(const current, new: TMatrixD): TMatrixD;
+procedure AffineTransform(img: TImage32;
+  matrix: TMatrixD); overload;
+procedure AffineTransform(img: TImage32;
+  matrix: TMatrixD; out offset: TPoint); overload;
 
 function ProjectiveTransform(img: TImage32;
-  const dstPts: TArrayOfPointD): Boolean;
+  const dstPts: TArrayOfPointD): Boolean; overload;
+function ProjectiveTransform(img: TImage32;
+  const dstPts: TArrayOfPointD; out offset: TPoint): Boolean; overload;
 
-function SplineTransformVert(img: TImage32; const topSpline: TArrayOfPointD;
+function SplineVertTransform(img: TImage32; const topSpline: TArrayOfPointD;
   splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
   out offset: TPoint): Boolean;
-function SplineTransformHorz(img: TImage32; const leftSpline: TArrayOfPointD;
+function SplineHorzTransform(img: TImage32; const leftSpline: TArrayOfPointD;
   splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
   out offset: TPoint): Boolean;
+
+//Note: matrix multiplication is not symmetric
+//function MultiplyMatrices(const current, new: TMatrixD): TMatrixD;
 
 const
   IdentityMatrix: TMatrixD = ((1, 0, 0),(0, 1, 0),(0, 0, 1));
@@ -168,6 +173,15 @@ end;
 
 procedure AffineTransform(img: TImage32; matrix: TMatrixD);
 var
+  dummy: TPoint;
+begin
+  AffineTransform(img, matrix, dummy);
+end;
+//------------------------------------------------------------------------------
+
+procedure AffineTransform(img: TImage32;
+  matrix: TMatrixD; out offset: TPoint); overload;
+var
   i,j, w,h, dx,dy: integer;
   x, y: double;
   pc: PColor32;
@@ -176,6 +190,8 @@ var
 begin
   if img.Width * img.Height = 0 then Exit;
   rec := GetTransformBounds(img, matrix);
+  offset := rec.TopLeft;
+
   dx := rec.Left; dy := rec.Top;
   w := RectWidth(rec); h := RectHeight(rec);
 
@@ -318,8 +334,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function ProjectiveTransform(img: TImage32; const dstPts: TArrayOfPointD): Boolean;
+var
+  dummy: TPoint;
+begin
+  Result := ProjectiveTransform(img, dstPts, dummy);
+end;
+//------------------------------------------------------------------------------
+
 function ProjectiveTransform(img: TImage32;
-  const dstPts: TArrayOfPointD): Boolean;
+  const dstPts: TArrayOfPointD; out offset: TPoint): Boolean;
 var
   w,h,i,j, dx,dy: integer;
   x,y: double;
@@ -334,6 +358,8 @@ begin
 
   invMatrix := GetProjectiveTransformInvMatrix(img.Bounds, dstPts);
   rec := GetBounds(dstPts);
+  offset := rec.TopLeft;
+
   w := RectWidth(rec); h := RectHeight(rec);
   dx := rec.Left;
   dy := rec.Top;
@@ -414,7 +440,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SplineTransformVert(img: TImage32; const topSpline: TArrayOfPointD;
+function SplineVertTransform(img: TImage32; const topSpline: TArrayOfPointD;
   splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
   out offset: TPoint): Boolean;
 var
@@ -523,7 +549,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SplineTransformHorz(img: TImage32; const leftSpline: TArrayOfPointD;
+function SplineHorzTransform(img: TImage32; const leftSpline: TArrayOfPointD;
   splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
   out offset: TPoint): Boolean;
 var

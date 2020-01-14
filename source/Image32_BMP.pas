@@ -2,8 +2,8 @@ unit Image32_BMP;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.36                                                            *
-* Date      :  5 January 2020                                                  *
+* Version   :  1.37                                                            *
+* Date      :  15 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  BMP file format extension for TImage32                          *
@@ -32,9 +32,9 @@ type
     function SaveToFile(const filename: string; img32: TImage32): Boolean; override;
     procedure SaveToStream(stream: TStream; img32: TImage32); override;
     class function CanCopyToClipboard: Boolean; override;
-    function CopyToClipboard(img32: TImage32): Boolean; override;
+    class function CopyToClipboard(img32: TImage32): Boolean; override;
     class function CanPasteFromClipboard: Boolean; override;
-    function PasteFromClipboard(img32: TImage32): Boolean; override;
+    class function PasteFromClipboard(img32: TImage32): Boolean; override;
   end;
 
   function LoadFromHBITMAP(img32: TImage32; bm: HBITMAP; pal: HPALETTE = 0): Boolean;
@@ -744,13 +744,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImageFormat_BMP.CopyToClipboard(img32: TImage32): Boolean;
+class function TImageFormat_BMP.CopyToClipboard(img32: TImage32): Boolean;
 var
   dataHdl: THandle;
   dataPtr: pointer;
   ms: TMemoryStream;
+  clipboardNeedsClosing: Boolean;
 begin
   result := true;
+  clipboardNeedsClosing := OpenClipboard(0);
   ms := TMemoryStream.Create;
   try
     with TImageFormat_BMP.Create do
@@ -761,7 +763,6 @@ begin
       free;
     end;
 
-    //nb: clipboard should already be open
     dataHdl := GlobalAlloc(GMEM_MOVEABLE or GMEM_SHARE, ms.Size);
     try
       dataPtr := GlobalLock(dataHdl);
@@ -779,6 +780,7 @@ begin
 
   finally
     ms.free;
+    if clipboardNeedsClosing then CloseClipboard;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -790,19 +792,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImageFormat_BMP.PasteFromClipboard(img32: TImage32): Boolean;
+class function TImageFormat_BMP.PasteFromClipboard(img32: TImage32): Boolean;
 var
   dataHdl: THandle;
   bitmapHdl: HBITMAP;
   paletteHdl: HPALETTE;
   dataPtr: pointer;
   ms: TMemoryStream;
+  clipboardNeedsClosing: Boolean;
 begin
   result := false;
 
-  //nb: clipboard should already be open
   if IsClipboardFormatAvailable(CF_DIB) then
   begin
+    //the clipboard may already be open, so ...
+    clipboardNeedsClosing := OpenClipboard(0);
     ms := TMemoryStream.Create;
     try
       dataHdl := GetClipboardData(CF_DIB);
@@ -826,6 +830,7 @@ begin
       end;
     finally
       ms.free;
+      if clipboardNeedsClosing then CloseClipboard;
     end;
   end
   else if IsClipboardFormatAvailable(CF_BITMAP) then

@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.36                                                            *
-* Date      :  5 January 2020                                                  *
+* Version   :  1.37                                                            *
+* Date      :  15 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -265,7 +265,7 @@ type
 const
   CBezierTolerance  = 0.5;
   QBezierTolerance  = 0.5;
-  BuffSize          = 128;
+  BuffSize          = 64;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -1811,7 +1811,7 @@ var
   buffer: TArrayOfInteger;
 begin
   len := length(path);
-  if len < 3 then
+  if len < 5 then
   begin
     result := Copy(path, 0, len);
     Exit;
@@ -1836,12 +1836,17 @@ end;
 function RamerDouglasPeucker(const paths: TArrayOfArrayOfPointD;
   epsilon: double): TArrayOfArrayOfPointD;
 var
-  i, len: integer;
+  i,j, len: integer;
 begin
+  j := 0;
   len := length(paths);
   setLength(Result, len);
   for i := 0 to len -1 do
+  begin
     Result[i] := RamerDouglasPeucker(paths[i], epsilon);
+    if Result[i] <> nil then inc(j);
+  end;
+  setLength(Result, j);
 end;
 //------------------------------------------------------------------------------
 
@@ -1850,23 +1855,38 @@ function GetDashedPath(const path: TArrayOfPointD;
   patternOffset: PDouble): TArrayOfArrayOfPointD;
 var
   i, highI, paIdx: integer;
-  vecs, path2: TArrayOfPointD;
-  patCnt, patLen, resCapacity, resCount: integer;
+  vecs, path2, dash: TArrayOfPointD;
+  patCnt, patLen: integer;
+  dashCapacity, dashCnt, ptsCapacity, ptsCnt: integer;
   segLen, residualPat, patOff: double;
   filling: Boolean;
   pt, pt2: TPointD;
 
-  procedure AddDash(const pt1, pt2: TPointD);
+  procedure NewDash;
   begin
-    if resCount = resCapacity then
+    if ptsCnt = 1 then ptsCnt := 0;
+    if ptsCnt = 0 then Exit;
+    if dashCnt = dashCapacity then
     begin
-      inc(resCapacity, BuffSize);
-      setLength(result, resCapacity);
+      inc(dashCapacity, BuffSize);
+      setLength(result, dashCapacity);
     end;
-    setLength( result[resCount], 2);
-    Result[resCount][0] := pt1;
-    Result[resCount][1] := pt2;
-    inc(resCount);
+    result[dashCnt] := Copy(dash, 0, ptsCnt);
+    inc(dashCnt);
+    ptsCapacity := BuffSize;
+    setLength(dash, ptsCapacity);
+    ptsCnt := 0;
+  end;
+
+  procedure ExtendDash(const pt: TPointD);
+  begin
+    if ptsCnt = ptsCapacity then
+    begin
+      inc(ptsCapacity, BuffSize);
+      setLength(dash, ptsCapacity);
+    end;
+    dash[ptsCnt] := pt;
+    inc(ptsCnt);
   end;
 
 begin
@@ -1899,9 +1919,13 @@ begin
     for i := 0 to patCnt -1 do inc(patLen, pattern[i]);
     patOff := patLen - patOff;
   end;
-  resCapacity := 0;
-  resCount := 0;
   paIdx := paIdx mod patCnt;
+
+  //nb: each dash is made up of 2 or more pts
+  dashCnt := 0;
+  dashCapacity := 0;
+  ptsCnt := 0;
+  ptsCapacity := 0;
 
   filling := true;
   while patOff >= pattern[paIdx] do
@@ -1913,13 +1937,14 @@ begin
   residualPat := pattern[paIdx] - patOff;
 
   pt := path2[0];
+  ExtendDash(pt);
   i := 0;
   while (i < highI) do
   begin
     segLen := Distance(pt, path2[i+1]);
     if residualPat > segLen then
     begin
-      if filling then AddDash(pt, path2[i+1]);
+      if filling then ExtendDash(path2[i+1]);
       residualPat := residualPat - segLen;
       pt := path2[i+1];
       inc(i);
@@ -1927,14 +1952,17 @@ begin
     begin
       pt2.X := pt.X + vecs[i].X * residualPat;
       pt2.Y := pt.Y + vecs[i].Y * residualPat;
-      if filling then AddDash(pt, pt2);
+      if filling then ExtendDash(pt2);
       filling := not filling;
+      NewDash;
       paIdx := (paIdx + 1) mod patCnt;
       residualPat := pattern[paIdx];
       pt := pt2;
+      ExtendDash(pt);
     end;
   end;
-  SetLength(Result, resCount);
+  NewDash;
+  SetLength(Result, dashCnt);
 
   if not assigned(patternOffset) then Exit;
   patOff := 0;
@@ -1954,14 +1982,9 @@ var
 begin
   Result := nil;
   tmp := GetDashedPath(path, closed, pattern, patternOffset);
-  if closed then
-    for i := 0 to high(tmp) do
-      AppendPath(Result, GrowClosedLine(tmp[i],
-        lineWidth, joinStyle, 2))
-  else
-    for i := 0 to high(tmp) do
-      AppendPath(Result, GrowOpenLine(tmp[i],
-        lineWidth, joinStyle, endStyle, 2));
+  for i := 0 to high(tmp) do
+    AppendPath(Result, GrowOpenLine(tmp[i],
+      lineWidth, joinStyle, endStyle, 2));
 end;
 //------------------------------------------------------------------------------
 
@@ -2449,7 +2472,7 @@ type
       const bezier: TArrayOfPointD; const u: TArrayOfDouble;
       out SplitPoint: PPt2): double;
     function FitCubic(first, last: PPt2;
-      const firstTan, lastTan: TPointD): Boolean;
+      firstTan, lastTan: TPointD): Boolean;
     procedure AppendSolution(const bezier: TArrayOfPointD);
   public
     function FitCurve(const path: TArrayOfPointD; closed: Boolean;
@@ -2625,8 +2648,8 @@ function TFitCurveContainer.ComputeCenterTangent(p: PPt2): TPointD;
 var
   v1, v2: TPointD;
 begin
-  v1 := SubVecs(p.prev.pt, p.pt);
-  v2 := SubVecs(p.pt, p.next.pt);
+  v1 := SubVecs(p.pt, p.prev.pt);
+  v2 := SubVecs(p.next.pt, p.pt);
   Result := AddVecs(v1, v2);
   Result := NormalizeVec(Result);
 end;
@@ -2825,7 +2848,7 @@ end;
 //------------------------------------------------------------------------------
 
 function TFitCurveContainer.FitCubic(first, last: PPt2;
-  const firstTan, lastTan: TPointD): Boolean;
+  firstTan, lastTan: TPointD): Boolean;
 var
   i, cnt: integer;
   splitPoint: PPt2;
@@ -2847,7 +2870,18 @@ begin
     bezier[2] := bezier[3];
     AppendSolution(bezier);
     Exit;
+  end
+  else if cnt = 3 then
+  begin
+    if TurnsLeft(first.prev.pt, first.pt, first.next.pt) =
+      TurnsLeft(first.pt, first.next.pt, last.pt) then
+        firstTan := ComputeCenterTangent(first);
+    if TurnsLeft(last.prev.pt, last.pt, last.next.pt) =
+      TurnsLeft(first.pt, first.next.pt, last.pt) then
+        lastTan := NegateVec(ComputeCenterTangent(last));
   end;
+
+
   clps := ChordLengthParameterize(first, last, cnt);
   bezier := GenerateBezier(first, last, cnt, clps, firstTan, lastTan);
   maxErrorSqrd := ComputeMaxErrorSqrd(first, last, bezier, clps, splitPoint);
@@ -2886,8 +2920,7 @@ begin
   end else
   begin
     centerTan := ComputeCenterTangent(splitPoint);
-    FitCubic(first, splitPoint, firstTan, centerTan);
-    centerTan := NegateVec(centerTan);
+    FitCubic(first, splitPoint, firstTan, NegateVec(centerTan));
     FitCubic(splitPoint, last, centerTan, lastTan);
   end;
 end;
@@ -2920,8 +2953,8 @@ begin
     //of deviation and assume they're artifacts. Empirically a significant bend
     //for longer edges is >60 deg. (ie <120 deg. @ angle 'p'). Uses Cosine Rule.
     if (p.prev.len < compareLen) and (p.len < compareLen) then
-      q := -0.0174524 else //tolerate up to 89 deg. for shorter edge bends
-      q := -0.5;           //but only up to 60 deg. for longer edges bends
+      q := -0.0174524 else   //tolerate up to 89 deg. for shorter edge bends
+      q := -0.17;             //but only up to 80 deg. for longer edges bends
     Result := (Sqr(p.prev.len) + Sqr(p.len) -
       DistanceSqrd(p.prev.pt, p.next.pt)) / (2 * p.prev.len * p.len) > q;
   end;
@@ -2958,10 +2991,10 @@ begin
     if d < minSegLength then Continue;
     p := AddPt(path[i]);
     p.prev.len := d;
-    p.prev.vec := SubVecs(path[i], p.prev.pt);
+    p.prev.vec := SubVecs(p.pt, p.prev.pt);
   end;
   p.len := Distance(ppts.pt, p.pt);
-  p.vec := SubVecs(ppts.pt, p.pt);
+  p.vec := SubVecs(p.next.pt, p.pt);
   p := ppts;
 
   if (p.next = p) or (closed and (p.next = p.prev)) then
@@ -3029,17 +3062,23 @@ end;
 function SmoothLine(const paths: TArrayOfArrayOfPointD; closed: Boolean;
   tolerance: double; minSegLength: double): TArrayOfArrayOfPointD;
 var
-  i, len: integer;
+  i,j, len: integer;
 begin
+  j := 0;
   len := Length(paths);
   SetLength(Result, len);
   with TFitCurveContainer.Create do
   try
     for i := 0 to len -1 do
-      Result[i] := FitCurve(paths[i], closed, tolerance, minSegLength);
+      if (paths[i] <> nil) and (Abs(Area(paths[i])) > Sqr(tolerance)) then
+      begin
+        Result[j] := FitCurve(paths[i], closed, tolerance, minSegLength);
+        inc(j);
+      end;
   finally
     Free;
   end;
+  SetLength(Result, j);
 end;
 //------------------------------------------------------------------------------
 

@@ -23,9 +23,9 @@ type
   public
     function LoadFromStream(stream: TStream; img32: TImage32): Boolean; override;
     procedure SaveToStream(stream: TStream; img32: TImage32); override;
-    function CopyToClipboard(img32: TImage32): Boolean; override;
+    class function CopyToClipboard(img32: TImage32): Boolean; override;
     class function CanPasteFromClipboard: Boolean; override;
-    function PasteFromClipboard(img32: TImage32): Boolean; override;
+    class function PasteFromClipboard(img32: TImage32): Boolean; override;
   end;
 
 implementation
@@ -71,7 +71,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImageFormat_GIF.CopyToClipboard(img32: TImage32): Boolean;
+class function TImageFormat_GIF.CopyToClipboard(img32: TImage32): Boolean;
 begin
   result := false; //not implemented
 end;
@@ -83,7 +83,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImageFormat_GIF.PasteFromClipboard(img32: TImage32): Boolean;
+class function TImageFormat_GIF.PasteFromClipboard(img32: TImage32): Boolean;
 begin
   result := false; //not implemented
 end;

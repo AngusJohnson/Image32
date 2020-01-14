@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 1.36
-Released: 5 January 2020
+Latest version: 1.37
+Released: 15 January 2020
 
 Copyright © 2019-2020 Angus Johnson
 Freeware released under Boost Software License
@@ -12,6 +12,20 @@ download : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
+Version: 1.37
+  Changes in Image32
+    TImage32.CanPasteFromClipboard is now a class function
+  Changes in Image32_Draw      
+    Added DrawInvertedLine, DrawInvertedDashedLine
+  Changes in Image32_Vector      
+    Fixed minor bug in GetDashedPath function
+  Changes to Image32_Transform
+    Renamed SplineTransformVert to SplineVertTransform
+    Renamed SplineTransformHorz to SplineHorzTransform
+  Changes in Examples
+    Major update to LayersAndTransform; also renamed to Transform
+    LayersAndTransform2 removed
+      
 Version: 1.36
   Changes in Image32
     Renamed TImage32.SetMonochromeColor to TImage32.SetRGB

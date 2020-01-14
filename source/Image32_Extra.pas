@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.36                                                            *
-* Date      :  5 January 2020                                                  *
+* Version   :  1.37                                                            *
+* Date      :  15 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -122,7 +122,7 @@ type
     xLeft     : Integer;
     xRight    : Integer;
     y         : Integer;
-    direction : Integer;
+    dirY      : Integer;
     next      : PFloodFillRec;
   end;
 
@@ -182,12 +182,12 @@ begin
   if ((y = 0) and (direction = -1)) or
     ((y = maxY) and (direction = 1)) then Exit;
   new(ffr);
-  ffr.xLeft     := xLeft;
-  ffr.xRight    := xRight;
-  ffr.y         := y;
-  ffr.direction := direction;
-  ffr.next := first;
-  first := ffr;
+  ffr.xLeft  := xLeft;
+  ffr.xRight := xRight;
+  ffr.y      := y;
+  ffr.dirY   := direction;
+  ffr.next   := first;
+  first      := ffr;
 end;
 //------------------------------------------------------------------------------
 
@@ -197,7 +197,7 @@ var
 begin
   xLeft     := first.xLeft;
   xRight    := first.xRight;
-  direction := first.direction;
+  direction := first.dirY;
   y         := first.y + direction;
   ffr := first;
   first := first.next;
@@ -330,7 +330,7 @@ end;
 function GetFloodFillMask(img: TImage32; x, y: Integer;
   compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
 var
-  xl, xr, xr2, direction: Integer;
+  xl, xr, xr2, dirY: Integer;
   maxX, maxY: Integer;
   ffs: TFloodFillStack;
   ffm: TFloodFillMask;
@@ -357,7 +357,7 @@ begin
     ffs.Push(xl, xr, y, 1);  //up
     while not ffs.IsEmpty do
     begin
-      ffs.Pop(xl, xr, y, direction);
+      ffs.Pop(xl, xr, y, dirY);
       ffm.SetCurrentY(y);
       xr2 := xl;
       //check left ...
@@ -365,11 +365,11 @@ begin
       begin
         while (xl > 0) and ffm.IsMatch(xl-1) do dec(xl);
         if xl <= xr2 -2 then
-          ffs.Push(xl, xr2-2, y, -direction);
+          ffs.Push(xl, xr2-2, y, -dirY);
         while (xr2 < maxX) and ffm.IsMatch(xr2+1) do inc(xr2);
-        ffs.Push(xl,xr2, y, direction);
+        ffs.Push(xl, xr2, y, dirY);
         if xr2 >= xr +2 then
-          ffs.Push(xr+2, xr2, y, -direction);
+          ffs.Push(xr+2, xr2, y, -dirY);
         xl := xr2 +2;
       end;
       //check right ...
@@ -378,10 +378,10 @@ begin
       begin
         xr2 := xl;
         while (xr2 < maxX) and ffm.IsMatch(xr2+1) do inc(xr2);
-        ffs.Push(xl, xr2, y, direction);
+        ffs.Push(xl, xr2, y, dirY);
         if xr2 >= xr +2 then
         begin
-          ffs.Push(xr+2,xr2,y, -direction);
+          ffs.Push(xr+2, xr2, y, -dirY);
           break;
         end;
         inc(xl, 2);
@@ -1289,7 +1289,7 @@ begin
       //add a pixel either below or beside
       if IsAscending then
         CreatePt2After(newPt2, PointD(x, pt.Y)) else
-        CreatePt2After(newPt2, PointD(pt.X, y))
+        CreatePt2After(newPt2, PointD(pt.X, y));
     end;
     pt := PointD(x,y);
   end;
@@ -1464,7 +1464,7 @@ end;
 function IsHeadingLeft(current: TPt2; l, r: integer): Boolean;
   {$IFDEF INLINE} inline; {$ENDIF}
 begin
-  Result := (l < current.pt.X) and (r <= current.pt.X);
+  Result := r <= current.pt.X;
 end;
 //------------------------------------------------------------------------------
 
@@ -1509,10 +1509,7 @@ begin
   //check if we're passing under a pending join
   while assigned(current) and assigned(current.nextInRow) and
     (xLeft > current.nextInRow.pt.X) do
-  begin
-    //Assert(current.IsAscending, 'oops!');
-    current := JoinAscDesc(current, current.nextInRow);
-  end;
+      current := JoinAscDesc(current, current.nextInRow);
 
   if not assigned(current) or (xRight <= current.pt.X) then
   begin
@@ -1521,7 +1518,6 @@ begin
   end else
   begin
     //'range' must somewhat overlap one or more paths above
-    //Assert(current.IsAscending, 'oops!');
     if IsHeadingLeft(current, xLeft, xRight) then
     begin
       if current.isHole then
@@ -1616,13 +1612,56 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function Tidy(const poly: TArrayOfPointD): TArrayOfPointD;
+var
+  i,j, highI: integer;
+  prev: TPointD;
+begin
+  //removes colinear coordinates (only verticals needed) and coordinates whose
+  //adjacent coordinates are separated by no more than a pixel's diagonal
+
+  highI := High(poly);
+  while  (HighI >= 0) and PointsEqual(poly[highI], poly[0]) do
+    dec(highI);
+  if highI < 1 then
+  begin
+    Result := nil;
+    Exit;
+  end
+  else if highI < 4 then
+  begin
+    Result := poly;
+    Exit
+  end;
+
+  prev := poly[highI];
+  SetLength(Result, highI +1);
+  j := 0;
+  result[0] := poly[0];
+  for i := 1 to highI do
+  begin
+    if ((prev.X <> result[j].X) or (prev.X <> poly[i].X)) and
+      (DistanceSqrd(prev, poly[i]) > 2.1) then
+    begin
+      prev := result[j];
+      inc(j);
+    end;
+    result[j] := poly[i];
+  end;
+  SetLength(Result, j +1);
+end;
+//------------------------------------------------------------------------------
+
 function Vectorize(img: TImage32; compareColor: TColor32;
   compareFunc: TCompareFunction; tolerance: Integer): TArrayOfArrayOfPointD;
 var
+  i: integer;
   mask: TArrayOfByte;
 begin
   mask := GetBoolMask(img, compareColor, compareFunc, tolerance);
   Result := VectorizeMask(mask, img.Width);
+  for i := 0 to high(Result) do
+    Result[i] := Tidy(Result[i]);
 end;
 //------------------------------------------------------------------------------
 

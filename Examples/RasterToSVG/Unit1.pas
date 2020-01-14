@@ -90,7 +90,6 @@ var
 implementation
 
 {$R *.dfm}
-{$R Image.res}
 
 uses
   Image32_Draw, Image32_Vector, Image32_Extra, Image32_BMP, Image32_JPG,
@@ -198,6 +197,19 @@ end;
 // Miscellaneous functions
 //------------------------------------------------------------------------------
 
+{$IFNDEF CHARINSET}
+function CharInSet(c: Char; const charSet: array of char): Boolean;
+var
+  i: integer;
+begin
+  Result := true;
+  for i := 0 to High(charSet) do
+    if c = charSet[i] then Exit;
+  Result := false;
+end;
+//------------------------------------------------------------------------------
+{$ENDIF}
+
 function GetFileSize(const Filename: string): Int64;
 var
   sr: TSearchRec;
@@ -253,6 +265,7 @@ begin
       (GetColorDistance(img.Pixels[cs[3]],img.Pixels[cs[1]]) < $20) then
         Result := img.Pixels[3];
   end;
+  if Result shr 24 < $80 then Result := clNone32;
 end;
 //------------------------------------------------------------------------------
 
@@ -365,7 +378,7 @@ begin
   pnlSVG.BitmapProperties.OnKeyDown := SvgPnlKeydown;
 
   palVectorsList  := TList.Create;
-  svgStringStream := TStringStream.Create;
+  svgStringStream := TStringStream.Create('');
   rasterImg       := TImage32.Create;
   svgImg         := TImage32.Create;
 
@@ -452,7 +465,7 @@ var
   pp: TArrayOfArrayOfPointD;
   pnc: PPathsNColor;
 begin
-  svgStringStream.Clear;
+  svgStringStream.Size := 0;
   ClearPalVectors;
 
   //get the raw vectors (either using transparency or filtering on black)
@@ -466,6 +479,22 @@ begin
   pnc.paths := pp;
   pnc.color := clBlack32;
   palVectorsList.Add(pnc);
+end;
+//------------------------------------------------------------------------------
+
+//DeletePath: is needed because Delete(polyPath, index, 1)
+//isn't supported in older versions of Delphi
+function DeletePath(const pp: TArrayOfArrayOfPointD;
+  index: integer): TArrayOfArrayOfPointD;
+var
+  i, highI: integer;
+begin
+  highI := High(pp);
+  SetLength(Result, highI);
+  for i := 0 to index -1 do
+    Result[i] := pp[i];
+  for i := index+1 to highI do
+    Result[i-1] := pp[i];
 end;
 //------------------------------------------------------------------------------
 
@@ -486,10 +515,9 @@ begin
   //rearranged (as is the case for black)
 
   if cancelOp then Exit;
-  svgStringStream.Clear;
+  svgStringStream.Size := 0;
   ClearPalVectors;
   shadow := nil; opaque := nil; shadowCnt := 0;
-  maxColors := Min(maxColors, tmpMasterImg.ColorCount);
 
   if mnuEraseBackground.Checked then
   begin
@@ -539,7 +567,10 @@ begin
 
   //get ready to separate the image into palette entry colors.
   //assigning extra colors before trimming the least used colors
+
   Dec(maxColors, shadowCnt);
+  maxColors := Min(maxColors, tmpMasterImg.ColorCount);
+
   pal := MakeAndApplyPalette(tmpMasterImg, maxColors, false, palFrequencies);
 
   maxColors := length(pal) + shadowCnt;
@@ -549,7 +580,7 @@ begin
 
   maxColors := length(pal) + shadowCnt;
 
-  if maxColors = 1 then
+  if (length(pal) <= 2) or (maxColors = 1) then
   begin
     if Assigned(shadow) then
       PPathsNColor(palVectorsList[0]).color := pal[0];
@@ -567,14 +598,13 @@ begin
   //TIDY UP OPAQUE/TRANSPARENT BOUNDARIES
 
   MakePartialFullyTransparent(tmpMasterImg);
-
   if assigned(opaque) then
   begin
     opaque := Image32_Clipper.InflatePolygons(opaque, 2 * scale);
     ErasePolygon(tmpMasterImg, opaque, Image32_Vector.frEvenOdd);
   end;
 
-//  pp := InflatePolygons(black, 0.25 * scale);
+//  pp := InflatePolygons(black, 0.1 * scale);
 //  DrawPolygon(tmpMasterImg, pp, Image32_Vector.frEvenOdd, clBlack32);
 
   StatusBar1.SimpleText := ' Starting color layers: ' +
@@ -584,8 +614,8 @@ begin
 
   //CREATE AND STORE COLORS (WITH BLACK LAST)
 
-  i := 0;
-  while MaxRgbDifference(clBlack32, pal[i+1]) < $20 do inc(i);
+  i := 1;
+  while (i < High(pal)) and (MaxRgbDifference(clBlack32, pal[i]) < $20) do inc(i);
 
   for i := i to high(pal) do
   begin
@@ -597,14 +627,16 @@ begin
     svgImg.Assign(tmpMasterImg);
     svgImg.ConvertToBoolMask(pal[i], 0, CompareRGB, clNone32, clBlack32);
     pp := Vectorize(svgImg, clBlack32, CompareAlpha, $0);
+    //join up diagonal adjacent solo pixels
+    pp := Image32_Clipper.InflatePolygons(pp, 0.5);
 
     for j := high(pp) downto 0 do
-      if Abs(Image32_Vector.Area(pp[j])) < 2 then
-        Delete(pp, j, 1);
+      if Abs(Image32_Vector.Area(pp[j])) < 4.2 * scale then
+        pp := DeletePath(pp, j);
     if pp = nil then Continue;
 
     pp := RamerDouglasPeucker(pp, 1.35 * scale);
-    pp := Image32_Clipper.InflatePolygons(pp, 2.8 * scale);
+    pp := Image32_Clipper.InflatePolygons(pp, 1.25 * scale, jsRound);
     pp := SmoothLine(pp, true, 2 * scale, 1);
 
     new(pathsAndColor);
@@ -613,11 +645,11 @@ begin
     palVectorsList.Add(pathsAndColor);
   end;
 
-  black := Image32_Clipper.InflatePolygons(black, 0.95 * scale);
-  black := RamerDouglasPeucker(black, (1 + smoothness * 0.1) * scale);
-  black := Image32_Clipper.InflatePolygons(black, -0.75 * scale);
-  black := SmoothLine(black, true, (smoothness +0.75) * scale, 1);
+  //join up diagonal adjacent solo pixels
+  black := Image32_Clipper.InflatePolygons(black, 0.25 * scale);
 
+  black := RamerDouglasPeucker(black, smoothness * 0.75 * scale);
+  black := SmoothLine(black, true, smoothness * scale, 1);
   new(pathsAndColor);
   pathsAndColor.paths := black;
   pathsAndColor.color := pal[0];
@@ -632,7 +664,7 @@ var
   pp: TArrayOfArrayOfPointD;
   svgSize: TSize;
 begin
-  svgStringStream.Clear;
+  svgStringStream.Size := 0;
   newWidth := Round(newWidth * scaling);
   newHeight := Round(newHeight * scaling);
   svgSize.cx := Round(ImageMargin*2 + newWidth);
@@ -703,7 +735,9 @@ var
   messageBoxOpts: TMessageBoxOptions;
 begin
   FillChar(messageBoxOpts, sizeof(messageBoxOpts), 0);
-  messageBoxOpts.buttonCaptions := ['&Continue', '&Cancel'];
+  SetLength(messageBoxOpts.buttonCaptions, 2);
+  messageBoxOpts.buttonCaptions[0] := '&Continue';
+  messageBoxOpts.buttonCaptions[1] := '&Cancel';
   messageBoxOpts.checkBoxCallBk := CheckboxOnJPGMessageDialog;
 
   Result := CustomDialogs.MessageBox(self, 'JPG Images',
@@ -756,8 +790,13 @@ begin
   try
     lblOptions.Caption := '';
     StatusBar1.SimpleText := ' Opening: ' + ExtractFilename(filename);
+    {$IFDEF SETSIZE}
     pnlRaster.Bitmap.SetSize(0,0);
     pnlSVG.Bitmap.SetSize(0,0);
+    {$ELSE}
+    pnlRaster.Bitmap.Width := 0;
+    pnlSVG.Bitmap.Width := 0;
+    {$ENDIF}
     lblRaster.Caption := 'Raster image:';
     lblSVG.Caption := 'SVG image:';
     Application.ProcessMessages;
@@ -848,10 +887,12 @@ begin
     screen.Cursor := crDefault;
     if cancelOp then
     begin
+      StatusBar1.SimpleText := ' Opening file either failed or was cancelled.';
       lblRaster.Caption := oldCaption1;
       lblSVG.Caption := oldCaption2;
       svgImg.Assign(oldSvgImg);
-    end;
+    end else
+    StatusBar1.SimpleText := ' Opened: ' + ExtractFilename(filename);
     cancelOp := false;
     newRasterImg.Free;
     newGoldRasterImg.Free;
@@ -884,7 +925,13 @@ begin
     ChangeFileExt(ExtractFilename(OpenDialog1.FileName), '.svg');
   if SaveDialog1.Execute then
   begin
-    svgStringStream.SaveToFile(SaveDialog1.FileName);
+    //svgStringStream.SaveToFile(SaveDialog1.FileName); //problems with D7 :(
+    with TFileStream.Create(SaveDialog1.FileName, fmCreate) do
+    try
+      CopyFrom(svgStringStream, 0);
+    finally
+      Free;
+    end;
     StatusBar1.SimpleText :=
       format(' %s saved.',[ExtractFilename(SaveDialog1.FileName)]);
   end;

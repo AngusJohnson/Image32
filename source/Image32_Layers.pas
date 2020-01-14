@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.36                                                            *
-* Date      :  5 January 2020                                                  *
+* Version   :  1.37                                                            *
+* Date      :  15 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -388,7 +388,7 @@ end;
 
 procedure TLayer32.SetVisible(value: Boolean);
 begin
-  if (value = fVisible) or (value and fImage.IsEmpty) then Exit;
+  if (value = fVisible) then Exit;
   fVisible := value;
   ImageChanged(self);
 end;
@@ -713,7 +713,7 @@ begin
     begin
       with Layer[i] do
       begin
-        if not Visible or (fOpacity < 2) or
+        if not Visible or (fOpacity < 2) or Image.IsEmpty or
           (hideDesigners and (layer[i] is TCustomDesignerLayer32)) then
             Continue;
 
@@ -873,7 +873,8 @@ begin
   Result := nil;
   for i := Count -1 downto 0 do
     with Layer[i] do
-      if Visible and PtInRect(Bounds, pt) and HitTest(pt) then
+      if Visible and not Image.IsEmpty and
+        PtInRect(Bounds, pt) and HitTest(pt) then
       begin
         Result := Layer[i];
         Break;

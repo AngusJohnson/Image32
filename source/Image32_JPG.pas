@@ -2,8 +2,8 @@ unit Image32_JPG;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.17                                                            *
-* Date      :  11 August 2019                                                  *
+* Version   :  1.37                                                            *
+* Date      :  15 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  JPG/JPEG file format extension for TImage32                     *
@@ -23,9 +23,9 @@ type
   public
     function LoadFromStream(stream: TStream; img32: TImage32): Boolean; override;
     procedure SaveToStream(stream: TStream; img32: TImage32); override;
-    function CopyToClipboard(img32: TImage32): Boolean; override;
+    class function CopyToClipboard(img32: TImage32): Boolean; override;
     class function CanPasteFromClipboard: Boolean; override;
-    function PasteFromClipboard(img32: TImage32): Boolean; override;
+    class function PasteFromClipboard(img32: TImage32): Boolean; override;
   end;
 
 var
@@ -82,7 +82,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImageFormat_JPG.CopyToClipboard(img32: TImage32): Boolean;
+class function TImageFormat_JPG.CopyToClipboard(img32: TImage32): Boolean;
 begin
   result := false; //not implemented
 end;
@@ -94,7 +94,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImageFormat_JPG.PasteFromClipboard(img32: TImage32): Boolean;
+class function TImageFormat_JPG.PasteFromClipboard(img32: TImage32): Boolean;
 begin
   result := false; //not implemented
 end;

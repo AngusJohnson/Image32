@@ -2,8 +2,8 @@ unit Image32_PNG;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.36                                                            *
-* Date      :  5 January 2020                                                  *
+* Version   :  1.37                                                            *
+* Date      :  15 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  PNG file format extension for TImage32                          *
@@ -25,9 +25,9 @@ type
     function LoadFromStream(stream: TStream; img32: TImage32): Boolean; override;
     procedure SaveToStream(stream: TStream; img32: TImage32); override;
     class function CanCopyToClipboard: Boolean; override;
-    function CopyToClipboard(img32: TImage32): Boolean; override;
+    class function CopyToClipboard(img32: TImage32): Boolean; override;
     class function CanPasteFromClipboard: Boolean; override;
-    function PasteFromClipboard(img32: TImage32): Boolean; override;
+    class function PasteFromClipboard(img32: TImage32): Boolean; override;
   end;
 
 var
@@ -212,15 +212,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImageFormat_PNG.CopyToClipboard(img32: TImage32): Boolean;
+class function TImageFormat_PNG.CopyToClipboard(img32: TImage32): Boolean;
 var
   dataHdl: THandle;
   dataPtr: pointer;
   ms: TMemoryStream;
+  clipboardNeedsClosing: Boolean;
 begin
   result := (CF_PNG > 0) or (CF_IMAGEPNG > 0);
   if not result then Exit;
 
+  clipboardNeedsClosing := OpenClipboard(0);
   ms := TMemoryStream.Create;
   try
     with TImageFormat_PNG.Create do
@@ -253,6 +255,7 @@ begin
 
   finally
     ms.free;
+    if clipboardNeedsClosing then CloseClipboard;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -264,16 +267,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImageFormat_PNG.PasteFromClipboard(img32: TImage32): Boolean;
+class function TImageFormat_PNG.PasteFromClipboard(img32: TImage32): Boolean;
 var
   dataHdl: THandle;
   dataPtr: pointer;
   ms: TMemoryStream;
+  clipboardNeedsClosing: Boolean;
 begin
   result := (CF_PNG > 0) or (CF_IMAGEPNG > 0);
   if not result then Exit;
 
-  //nb: clipboard should already be open
+  //the clipboard may already be open, so ...
+  clipboardNeedsClosing := OpenClipboard(0);
   ms := TMemoryStream.Create;
   try
     dataHdl := 0;
@@ -306,6 +311,7 @@ begin
 
   finally
     ms.free;
+    if clipboardNeedsClosing then CloseClipboard;
   end;
 end;
 
