@@ -36,7 +36,6 @@ object Form1: TForm1
     Panels = <>
     ParentFont = True
     SimplePanel = True
-    SimpleText = ' Right-click to add additional objects'
     UseSystemFont = False
   end
   object MainMenu1: TMainMenu
@@ -55,30 +54,69 @@ object Form1: TForm1
       object CopytoClipboard1: TMenuItem
         Caption = '&Copy to Clipboard'
         ShortCut = 16451
-        OnClick = CopytoClipboard1Click
+        OnClick = mnuCopytoClipboardClick
+      end
+      object PastefromClipboard1: TMenuItem
+        Caption = '&Paste from Clipboard'
+        ShortCut = 16470
+        OnClick = mnuPastefromClipboardClick
       end
       object N2: TMenuItem
         Caption = '-'
       end
       object Exit1: TMenuItem
         Caption = 'E&xit'
-        ShortCut = 27
-        OnClick = Exit1Click
+        OnClick = mnuExitClick
       end
     end
-    object View1: TMenuItem
-      Caption = '&View'
-      object mnuHideControls: TMenuItem
-        AutoCheck = True
-        Caption = '&Hide Controls'
-        GroupIndex = 1
-        ShortCut = 16456
-        OnClick = mnuHideControlsClick
+    object Action1: TMenuItem
+      Caption = '&Action'
+      OnClick = PopupMenu1Popup
+      object mnuAddImage2: TMenuItem
+        Caption = 'Add &Image ...'
+        ShortCut = 16457
+        OnClick = mnuAddImageClick
+      end
+      object mnuAddRectangle: TMenuItem
+        Caption = 'Add &Rectangle'
+        ShortCut = 16466
+        OnClick = mnuAddRectangleClick
+      end
+      object mnuAddEllipse: TMenuItem
+        Caption = 'Add &Ellipse'
+        ShortCut = 16453
+        OnClick = mnuAddEllipseClick
+      end
+      object mnuAddText: TMenuItem
+        Caption = 'Add &Text'
+        ShortCut = 16468
+        OnClick = mnuAddTextClick
+      end
+      object N5: TMenuItem
+        Caption = '-'
+      end
+      object mnuDeleteLayer2: TMenuItem
+        Caption = '&Delete Layer'
+        ShortCut = 46
+        OnClick = mnuDeleteLayerClick
+      end
+      object N6: TMenuItem
+        Caption = '-'
+      end
+      object mnuBringtoFront2: TMenuItem
+        Caption = '&Bring to &Front'
+        ShortCut = 16454
+        OnClick = mnuBringToFrontClick
+      end
+      object mnuSendtoBack2: TMenuItem
+        Caption = 'Send to &Back'
+        ShortCut = 16450
+        OnClick = mnuSendToBackClick
       end
     end
   end
   object SaveDialog1: TSaveDialog
-    DefaultExt = '*.bmp'
+    DefaultExt = '*.png'
     Filter = 'Image Files (BMP, PNG, JPG)|*.bmp;*.png;*.jpg'
     Left = 240
     Top = 80
@@ -87,17 +125,25 @@ object Form1: TForm1
     OnPopup = PopupMenu1Popup
     Left = 232
     Top = 152
+    object mnuAddImage: TMenuItem
+      Caption = 'Add &Image ...'
+      ShortCut = 16457
+      OnClick = mnuAddImageClick
+    end
     object AddEllipse1: TMenuItem
       Caption = 'Add &Ellipse'
-      OnClick = AddEllipse1Click
+      ShortCut = 16453
+      OnClick = mnuAddEllipseClick
     end
     object AddRectangle1: TMenuItem
       Caption = 'Add &Rectangle'
-      OnClick = AddRectangle1Click
+      ShortCut = 16466
+      OnClick = mnuAddRectangleClick
     end
     object AddText1: TMenuItem
       Caption = 'Add &Text'
-      OnClick = AddText1Click
+      ShortCut = 16468
+      OnClick = mnuAddTextClick
     end
     object N4: TMenuItem
       Caption = '-'
@@ -120,5 +166,11 @@ object Form1: TForm1
       ShortCut = 46
       OnClick = mnuDeleteLayerClick
     end
+  end
+  object OpenDialog1: TOpenDialog
+    DefaultExt = '*.png'
+    Filter = 'Image Files (BMP, PNG, JPG)|*.bmp;*.png;*.jpg'
+    Left = 128
+    Top = 144
   end
 end

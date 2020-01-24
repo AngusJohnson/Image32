@@ -3,9 +3,9 @@ unit BitmapPanels;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.2                                                             *
-* Date      :  5 January 2020                                                  *
+* Date      :  20 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2020                                         *
+* Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -438,13 +438,16 @@ end;
 //------------------------------------------------------------------------------
 
 function TPanel.ClientToBitmap(var clientPt: TPoint): Boolean;
+var
+  pt: TPoint;
 begin
   Result := not fBmp.Empty and PtInRect(InnerClientRect, clientPt);
   if not Result then Exit;
-  clientPt.X := Round((clientPt.X -fDstRect.Left + fOffsetX)/fScale);
-  clientPt.Y := Round((clientPt.Y -fDstRect.Top + fOffsetY)/fScale);
-  Result := (clientPt.X >= 0) and (clientPt.X < fBmp.Width) and
-    (clientPt.Y >= 0) and (clientPt.Y < fBmp.Height);
+  pt.X := Round((clientPt.X -fDstRect.Left + fOffsetX)/fScale);
+  pt.Y := Round((clientPt.Y -fDstRect.Top + fOffsetY)/fScale);
+  Result := (pt.X >= 0) and (pt.X < fBmp.Width) and
+    (pt.Y >= 0) and (pt.Y < fBmp.Height);
+  if Result then clientPt := pt;
 end;
 //------------------------------------------------------------------------------
 

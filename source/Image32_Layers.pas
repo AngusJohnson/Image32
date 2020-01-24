@@ -2,10 +2,10 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.37                                                            *
-* Date      :  15 January 2020                                                 *
+* Version   :  1.38                                                            *
+* Date      :  20 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2020                                         *
+* Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Layer support for the Image32 library                           *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -161,7 +161,7 @@ type
     function GetLayerAt(const pt: TPoint): TLayer32;
     function GetMergedImage(hideDesigners: Boolean = false): TImage32;
 
-    function Group(startIdx, endIdx: integer): Boolean;
+    function Group(startIdx, endIdx: integer): integer;
     procedure UnGroup(GroupId: integer);
     function GroupCount(groupId: integer): integer;
     function GetFirstInGroupIdx(GroupId: integer): integer;
@@ -169,7 +169,7 @@ type
     function BringGroupForward(GroupId, newLevel: integer): Boolean;
     function SendGroupBack(GroupId, newLevel: integer): Boolean;
     procedure OffsetGroup(GroupId, dx, dy: integer);
-    procedure DeleteGroup(GroupId: integer);
+    function DeleteGroup(GroupId: integer): Boolean;
     procedure HideGroup(GroupId: integer);
     procedure ShowGroup(GroupId: integer);
 
@@ -186,10 +186,8 @@ type
   function CreateSizingBtnsGroup(targetLayer: TLayer32;
     style: TSizingStyle; buttonColor: TColor32;
     buttonSize: integer; buttonOptions: TButtonOptions;
-    buttonLayerClass: TButtonDesignerLayer32Class = nil): Boolean;
-  function UpdateSizingGroup(targetLayer, movedBtnLayer: TLayer32;
-    masterImg: TImage32): Boolean;
-
+    buttonLayerClass: TButtonDesignerLayer32Class = nil): integer;
+  function UpdateButtonSizingGroup(movedBtnLayer: TButtonDesignerLayer32): TRect;
   function CreateButtonGroup(layeredImage32: TLayeredImage32;
     const buttonPts: TArrayOfPointD; buttonColor: TColor32;
     buttonSize: integer; buttonOptions: TButtonOptions;
@@ -277,15 +275,17 @@ end;
 
 function TLayer32.HitTest(const pt: TPoint): Boolean;
 begin
-if assigned(fHitTestRegions) then
-  Result := PointInPolygons(PointD(pt), fHitTestRegions, frEvenOdd) else
-  Result := true;
+  Result := PtInRect(Bounds, pt);
+  if Result and assigned(fHitTestRegions) then
+    Result := PointInPolygons(
+      OffsetPoint(PointD(pt),-left,-top),fHitTestRegions,frEvenOdd)
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayer32.SetSize(width, height: integer);
 begin
-  fImage.SetSize(width, height);
+  if (width <> fImage.Width) or (height <> fImage.Height) then
+    fImage.SetSize(width, height);
 end;
 //------------------------------------------------------------------------------
 
@@ -381,8 +381,6 @@ end;
 procedure TLayer32.Offset(dx, dy: integer);
 begin
   PositionAt(Types.Point(Left + dx, Top + dy));
-  if assigned(fHitTestRegions) then
-    fHitTestRegions := OffsetPath(fHitTestRegions, dx, dy);
 end;
 //------------------------------------------------------------------------------
 
@@ -408,7 +406,7 @@ var
 begin
   topIdx := fOwner.Count -1;
   if newLevel > topIdx then newLevel := topIdx;
-  Result := (newLevel > fIndex) and (fIndex < topIdx) and not IsInGroup;
+  Result := (newLevel > fIndex) and not IsInGroup;
   if not Result then Exit;
 
   if fOwner[newLevel].IsInGroup then
@@ -424,10 +422,10 @@ end;
 
 function TLayer32.SendBack(newLevel: integer): Boolean;
 begin
-  Result := (newLevel < fIndex) and (fIndex > 0) and not IsInGroup;
+  if newLevel < 0 then newLevel := 0;
+  Result := (newLevel < fIndex) and not IsInGroup;
   if not Result then Exit;
 
-  if newLevel < 0 then newLevel := 0;
   while fOwner[newLevel].IsInGroup and (newLevel > 0) and
     (fOwner[newLevel].fGroupId = fOwner[newLevel-1].fGroupId) do
       dec(newLevel);
@@ -873,8 +871,7 @@ begin
   Result := nil;
   for i := Count -1 downto 0 do
     with Layer[i] do
-      if Visible and not Image.IsEmpty and
-        PtInRect(Bounds, pt) and HitTest(pt) then
+      if Visible and not Image.IsEmpty and HitTest(pt) then
       begin
         Result := Layer[i];
         Break;
@@ -882,32 +879,31 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.Group(startIdx, endIdx: integer): Boolean;
+function TLayeredImage32.Group(startIdx, endIdx: integer): integer;
 var
-  i, GroupId: integer;
+  i: integer;
 begin
-  Result := false;
+  Result := 0;
   startIdx := Max(0, startIdx);
   endIdx := Min(Count -1, endIdx);
   for i := startIdx to endIdx do
     if Layer[i].IsInGroup then Exit;
 
   //first look for an expired group (negative values => expired group)
-  GroupId := fGroupList.Count +1;
+  Result := fGroupList.Count +1;
   for i := 0 to fGroupList.Count -1 do
     if integer(fGroupList[i]) < 0 then
     begin
-      GroupId := i +1;
+      Result := i +1;
       fGroupList[i] := Pointer(startIdx);
       Break;
     end;
   //if no expired groups then add the new group index
-  if GroupId > fGroupList.Count then
+  if Result > fGroupList.Count then
     fGroupList.Add(pointer(startIdx));
 
   for i := startIdx to endIdx do
-    Layer[i].fGroupId := GroupId;
-  Result := true;
+    Layer[i].fGroupId := Result;
 end;
 //------------------------------------------------------------------------------
 
@@ -1015,12 +1011,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TLayeredImage32.DeleteGroup(GroupId: integer);
+function TLayeredImage32.DeleteGroup(GroupId: integer): Boolean;
 var
   i, fig, lig: integer;
 begin
   fig := GetFirstInGroupIdx(GroupId);
-  if fig < 0 then Exit;
+  result := fig >= 0;
+  if not Result then Exit;
   lig := GetLastInGroupIdx(GroupId);
   for i := lig downto fig do
   begin
@@ -1107,7 +1104,7 @@ end;
 function CreateSizingBtnsGroup(targetLayer: TLayer32;
   style: TSizingStyle; buttonColor: TColor32;
   buttonSize: integer; buttonOptions: TButtonOptions;
-  buttonLayerClass: TButtonDesignerLayer32Class = nil): Boolean;
+  buttonLayerClass: TButtonDesignerLayer32Class = nil): integer;
 var
   i, idxFirstBtn: integer;
   rec: TRect;
@@ -1120,8 +1117,9 @@ const
   edgeCursorIds: array [0..3] of integer =
     (crSizeNS, crSizeWE, crSizeNS, crSizeWE);
 begin
-  result := not targetLayer.IsInGroup and not targetLayer.Image.IsEmpty;
-  if not result then Exit;
+  result := 0;
+  if targetLayer is TDesignerLayer32 or
+    targetLayer.IsInGroup or targetLayer.Image.IsEmpty then Exit;
 
   lim := targetLayer.fOwner;
   idxFirstBtn := lim.Count;
@@ -1164,29 +1162,24 @@ begin
         layer.CursorId := edgeCursorIds[i];
       end;
   end;
-  lim.Group(idxFirstBtn, layer.fIndex);
+  Result := lim.Group(idxFirstBtn, layer.fIndex);
 end;
 //------------------------------------------------------------------------------
 
-function UpdateSizingGroup(targetLayer, movedBtnLayer: TLayer32;
-    masterImg: TImage32): Boolean;
+function UpdateButtonSizingGroup(movedBtnLayer: TButtonDesignerLayer32): TRect;
 var
   i, btnIdx, cnt, fig: integer;
   lim: TLayeredImage32;
-  rec: TRect;
   btnMP: TPoint;
   corners, edgeMps: TArrayOfPointD;
   style: TSizingStyle;
 begin
-  result := movedBtnLayer.IsInGroup;
-  if not result then Exit;
   lim := movedBtnLayer.Owner;
   fig := lim.GetFirstInGroupIdx(movedBtnLayer.GroupId);
   cnt := lim.GroupCount(movedBtnLayer.GroupId);
+  if (cnt <> 4) and (cnt = 8) then Exit; //not a recognised button group
 
-  result := (cnt = 4) or (cnt = 8);
-  if not result then Exit;
-  rec := GetRectFromGroupButtons(lim, movedBtnLayer.GroupId);
+  Result := GetRectFromGroupButtons(lim, movedBtnLayer.GroupId);
 
   //ADJUST REC ACCORDING TO THE NEW POSITION OF MOVEDBTNLAYER
 
@@ -1206,31 +1199,31 @@ begin
   if cnt = 8 then
   begin
     case btnIdx of
-      0: begin rec.Left := btnMP.X; rec.Top := btnMP.Y; end;
-      1: rec.Top := btnMP.Y;
-      2: begin rec.Right := btnMP.X; rec.Top := btnMP.Y; end;
-      3: rec.Right := btnMP.X;
-      4: begin rec.Right := btnMP.X; rec.Bottom := btnMP.Y; end;
-      5: rec.Bottom := btnMP.Y;
-      6: begin rec.Left := btnMP.X; rec.Bottom := btnMP.Y; end;
-      7: rec.Left := btnMP.X;
+      0: begin Result.Left := btnMP.X; Result.Top := btnMP.Y; end;
+      1: Result.Top := btnMP.Y;
+      2: begin Result.Right := btnMP.X; Result.Top := btnMP.Y; end;
+      3: Result.Right := btnMP.X;
+      4: begin Result.Right := btnMP.X; Result.Bottom := btnMP.Y; end;
+      5: Result.Bottom := btnMP.Y;
+      6: begin Result.Left := btnMP.X; Result.Bottom := btnMP.Y; end;
+      7: Result.Left := btnMP.X;
     end;
   end
   else if style = ssCorners then
   begin
     case btnIdx of
-      0: begin rec.Left := btnMP.X; rec.Top := btnMP.Y; end;
-      1: begin rec.Right := btnMP.X; rec.Top := btnMP.Y; end;
-      2: begin rec.Right := btnMP.X; rec.Bottom := btnMP.Y; end;
-      3: begin rec.Left := btnMP.X; rec.Bottom := btnMP.Y; end;
+      0: begin Result.Left := btnMP.X; Result.Top := btnMP.Y; end;
+      1: begin Result.Right := btnMP.X; Result.Top := btnMP.Y; end;
+      2: begin Result.Right := btnMP.X; Result.Bottom := btnMP.Y; end;
+      3: begin Result.Left := btnMP.X; Result.Bottom := btnMP.Y; end;
     end;
   end else
   begin
     case btnIdx of
-      0: rec.Top := btnMP.Y;
-      1: rec.Right := btnMP.X;
-      2: rec.Bottom := btnMP.Y;
-      3: rec.Left := btnMP.X;
+      0: Result.Top := btnMP.Y;
+      1: Result.Right := btnMP.X;
+      2: Result.Bottom := btnMP.Y;
+      3: Result.Left := btnMP.X;
     end;
   end;
 
@@ -1239,8 +1232,8 @@ begin
 
   if cnt = 8 then
   begin
-    corners := GetRectCorners(rec);
-    edgeMps :=  GetRectEdgeMidPoints(rec);
+    corners := GetRectCorners(Result);
+    edgeMps :=  GetRectEdgeMidPoints(Result);
     for i := 0 to 3 do
     begin
       lim[fig + i*2].PositionCenteredAt(Point(corners[i]));
@@ -1249,20 +1242,15 @@ begin
   end
   else if style = ssCorners then
   begin
-    corners := GetRectCorners(rec);
+    corners := GetRectCorners(Result);
     for i := 0 to 3 do
       lim[fig + i].PositionCenteredAt(Point(corners[i]));
   end else
   begin
-    edgeMps :=  GetRectEdgeMidPoints(rec);
+    edgeMps :=  GetRectEdgeMidPoints(Result);
     for i := 0 to 3 do
       lim[fig + i].PositionCenteredAt(Point(edgeMps[i]));
   end;
-
-  //copy the master image to the target image, then resize and reposition
-  targetLayer.Image.Assign(masterImg);
-  targetLayer.Image.Resize(RectWidth(rec), RectHeight(rec));
-  targetLayer.PositionAt(rec.TopLeft);
 end;
 //------------------------------------------------------------------------------
 

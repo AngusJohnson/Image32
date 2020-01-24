@@ -383,6 +383,25 @@ begin
   svgImg         := TImage32.Create;
 
   DisplayImages;
+
+  //mnuEraseBackground.Checked := false;
+  //OpenDialog1.FileName := 'sample_images\tree.png';
+  //OpenDialog1.FileName := 'C:\Users\awj19\Documents\Pictures\simpsons.jpg';
+  //OpenDialog1.FileName := 'sample_images\man.png';
+  //OpenDialog1.FileName := 'sample_images\comic.png';
+  //OpenDialog1.FileName := 'sample_images\candle.png';
+  //OpenDialog1.FileName := 'sample_images\text.png';
+  //OpenDialog1.FileName := 'sample_images\floorplan.png';
+  //OpenDialog1.FileName := 'sample_images\christmas_tree.png';
+  //OpenDialog1.FileName := 'sample_images\easter_bunny.png';
+  //OpenDialog1.FileName := 'sample_images\balloons.png';
+  //OpenDialog1.FileName := 'sample_images\beetle.png';
+  //OpenDialog1.FileName := 'sample_images\architect3.png';
+  //OpenDialog1.FileName := 'sample_images\snowman2.png';
+
+  DoOpenFile(OpenDialog1.FileName, false);
+//  svgStringStream.SaveToFile(ChangeFileExt(OpenDialog1.FileName, '.svg'));
+  WindowState := wsMaximized;
 end;
 //------------------------------------------------------------------------------
 
@@ -575,8 +594,9 @@ begin
 
   maxColors := length(pal) + shadowCnt;
   pal := TrimPaletteByFraction(pal, palFrequencies, 0.1);
-  //ApplyPalette(tmpMasterImg, pal, false);
+
   //don't bother re-applying the palette, we'll just ignore the deleted colors
+  //ApplyPalette(tmpMasterImg, pal, false);
 
   maxColors := length(pal) + shadowCnt;
 

@@ -2,11 +2,10 @@ unit Unit1;
 
 interface
 
-//nb: Add Image32's Library folder to the project's search path
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
-  Types, Menus, ExtCtrls, ComCtrls, Image32, Image32_Layers, BitmapPanels,
-  Dialogs;
+  Windows, Messages, SysUtils, Classes, Graphics, Controls,
+  Forms, Math, Types, Menus, ExtCtrls, ComCtrls, Dialogs,
+  Image32, Image32_Layers, BitmapPanels;
 
 type
   TForm1 = class(TForm)
@@ -14,11 +13,9 @@ type
     MainMenu1: TMainMenu;
     File1: TMenuItem;
     Exit1: TMenuItem;
-    mnuHideControls: TMenuItem;
     N1: TMenuItem;
     StatusBar1: TStatusBar;
     SaveDialog1: TSaveDialog;
-    View1: TMenuItem;
     mnuSave: TMenuItem;
     N2: TMenuItem;
     CopytoClipboard1: TMenuItem;
@@ -31,7 +28,20 @@ type
     N4: TMenuItem;
     AddRectangle1: TMenuItem;
     AddText1: TMenuItem;
-    procedure Exit1Click(Sender: TObject);
+    OpenDialog1: TOpenDialog;
+    PastefromClipboard1: TMenuItem;
+    Action1: TMenuItem;
+    mnuAddImage2: TMenuItem;
+    mnuAddRectangle: TMenuItem;
+    mnuAddEllipse: TMenuItem;
+    mnuAddText: TMenuItem;
+    N5: TMenuItem;
+    mnuDeleteLayer2: TMenuItem;
+    N6: TMenuItem;
+    mnuBringtoFront2: TMenuItem;
+    mnuSendtoBack2: TMenuItem;
+    mnuAddImage: TMenuItem;
+    procedure mnuExitClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure Panel1MouseDown(Sender: TObject; Button: TMouseButton;
@@ -40,30 +50,35 @@ type
       Y: Integer);
     procedure Panel1MouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure mnuHideControlsClick(Sender: TObject);
     procedure mnuSaveClick(Sender: TObject);
-    procedure CopytoClipboard1Click(Sender: TObject);
+    procedure mnuCopytoClipboardClick(Sender: TObject);
     procedure mnuBringToFrontClick(Sender: TObject);
     procedure mnuSendToBackClick(Sender: TObject);
     procedure mnuDeleteLayerClick(Sender: TObject);
     procedure PopupMenu1Popup(Sender: TObject);
-    procedure AddEllipse1Click(Sender: TObject);
-    procedure AddRectangle1Click(Sender: TObject);
-    procedure AddText1Click(Sender: TObject);
+    procedure mnuAddEllipseClick(Sender: TObject);
+    procedure mnuAddRectangleClick(Sender: TObject);
+    procedure mnuAddTextClick(Sender: TObject);
+    procedure mnuPastefromClipboardClick(Sender: TObject);
+    procedure mnuAddImageClick(Sender: TObject);
   private
     masterImageList: TImageList32;
     layeredImage32: TLayeredImage32;
-    activeLayerClicked: Boolean;
+    activeLayerMouseDown: Boolean;
     activeLayer: TLayer32;
-    buttonMovingLayer: TLayer32;
+    activeButtonLayer: TButtonDesignerLayer32;
+    buttonGroupId: integer;
     popupPoint: TPoint;
     clickPoint: TPoint;
     function AddRectangle(const pt: TPoint): TLayer32;
     function AddEllipse(const pt: TPoint): TLayer32;
     function AddText(const pt: TPoint): TLayer32;
     procedure DeleteButtons;
-    procedure AddButtons(layer: TLayer32);
+    procedure MakeLayerActive(layer: TLayer32);
     procedure PaintLayeredImage;
+    procedure DoDropImage(Sender: TObject; const filename: string);
+    procedure DoKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure SizeAndDrawLayer(layer: TLayer32; newWidth, newHeight: integer);
   public
     { Public declarations }
   end;
@@ -74,7 +89,6 @@ var
 implementation
 
 {$R *.dfm}
-{$R image.res}
 
 uses
   Image32_BMP, Image32_PNG, Image32_JPG, Image32_Draw, Image32_Vector,
@@ -84,13 +98,36 @@ const
   margin = 100;
 
 //------------------------------------------------------------------------------
+// TMyImageLayer32: just some fun so only opaque pixels can be clicked in images
+//------------------------------------------------------------------------------
+
+type
+  TMyImageLayer32 = class(TLayer32)
+  protected
+    function HitTest(const pt: TPoint): Boolean; override;
+  end;
+
+function TMyImageLayer32.HitTest(const pt: TPoint): Boolean;
+begin
+  Result := PtInRect(Bounds, pt);
+  if not Result then Exit;
+  //nb: pt is relative to layeredImage32, so offset so it's relative to Image
+  with OffsetPoint(pt, -left,-top) do
+    Result := (Image.Pixel[X, Y] shr 24 > 0);
+end;
+
+//------------------------------------------------------------------------------
+// TForm1 methods
+//------------------------------------------------------------------------------
 
 procedure TForm1.FormCreate(Sender: TObject);
 var
   layer: TLayer32;
   rec: TRect;
-  image: TImage32;
 begin
+  Randomize;
+  DefaultButtonSize := DPI(10); //ie the layered image's control buttons
+
   //SETUP THE DISPLAY PANEL
   Panel1.BorderWidth := DPI(16);
   Panel1.BevelInner := bvLowered;
@@ -98,114 +135,229 @@ begin
   Panel1.TabStop := true;
   Panel1.FocusedColor := clGradientInactiveCaption;
   Panel1.BitmapProperties.Scale := 1;
+  //enable (image) file drop
+  Panel1.BitmapProperties.FileDropEnabled := true;
+  Panel1.BitmapProperties.OnFileDrop := DoDropImage;
+  //capture key events so ESC will clear ActiveLayer
+  Panel1.BitmapProperties.OnKeyDown := DoKeyDown;
 
-  //SETUP THE MASTERIMAGE LIST (containing a list of off-screen images)
+  //MASTER IMAGE LIST
   masterImageList := TImageList32.Create;
-  //and add a dummy image to masterImageList so masterImageList's images
-  //directly correlate with layeredImage32's display images (given that
-  //layeredImage32's first image will simply be a background image)
-  masterImageList.Add(TImage32.Create);
 
   //SETUP LAYEREDIMAGE32
 
   rec := Panel1.InnerClientRect;
-  layeredImage32 := TLayeredImage32.Create(RectWidth(rec), RectHeight(rec));
-  //nb: we don't need to worry about BackgroundColor as we're
-  //going to add a hatched image for the background instead.
+  layeredImage32 :=
+    TLayeredImage32.Create(RectWidth(rec), RectHeight(rec));
+  //we don't need to worry about BackgroundColor here as
+  //we're using a hatched image for the background instead.
 
-  layer := layeredImage32.AddNewLayer(TDesignerLayer32, 'hatched background');
+  layer := layeredImage32.AddNewLayer(TDesignerLayer32, 'hatched bkgnd');
+  //layer.SetSize() is the same as layer.image.SetSize()
   layer.SetSize(layeredImage32.Width, layeredImage32.Height);
   HatchBackground(layer.Image, $FFF0F0F0, clWhite32);
 
-  //LOAD A SINGLE IMAGE (OTHERS CAN BE ADDED LATER WITH A RIGHT-CLICK).
-  image := TImage32.Create;
-  image.LoadFromResource('UNION_JACK', 'BMP');
-  masterImageList.Add(image);
+  //add a dummy image to masterImageList to simplify
+  //sync'ing masterImageList with layeredImage32's layers.
+  masterImageList.Add(nil);
 
-  layer := layeredImage32.AddNewLayer('');
-  layer.image.Assign(image);
-  layer.PositionCenteredAt(Point(layeredImage32.MidPoint));
-
-  DefaultButtonSize := DPI(10);
-
-  //DISPLAY WHAT'S ON SHOW
+  //DISPLAY STUFF - so far, just the hatched background :)
   PaintLayeredImage;
 end;
 //------------------------------------------------------------------------------
 
-function TForm1.AddRectangle(const pt: TPoint): TLayer32;
-var
-  image: TImage32;
-  rec: TRect;
-  path: TArrayOfPointD;
+procedure TForm1.mnuAddEllipseClick(Sender: TObject);
 begin
-  image := TImage32.Create(192,192);
-  rec := image.Bounds;
-  Windows.InflateRect(rec, -10, -10);
-  path := Rectangle(rec);
-  DrawPolygon(image, path, frNonZero, $AA00FFFF);
-  DrawLine(image, path, 5, clNavy32, esClosed);
-  masterImageList.Add(image);
+  MakeLayerActive(AddEllipse(popupPoint));
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.mnuAddRectangleClick(Sender: TObject);
+begin
+  MakeLayerActive(AddRectangle(popupPoint));
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.mnuAddTextClick(Sender: TObject);
+begin
+  MakeLayerActive(AddText(popupPoint));
+end;
+//------------------------------------------------------------------------------
+
+function TForm1.AddRectangle(const pt: TPoint): TLayer32;
+begin
+  masterImageList.Add(nil); //just a place filler
   Result := layeredImage32.AddNewLayer('rectangle');
-  Result.image.Assign(image);
+  SizeAndDrawLayer(Result, 128, 192);
   Result.PositionCenteredAt(pt);
 end;
 //------------------------------------------------------------------------------
 
 function TForm1.AddEllipse(const pt: TPoint): TLayer32;
-var
-  image: TImage32;
-  rec: TRect;
-  paths: TArrayOfArrayOfPointD;
 begin
-  image := TImage32.Create(256,192);
-  rec := image.Bounds;
-  Windows.InflateRect(rec, -10, -10);
-  SetLength(paths, 1);
-  paths[0] := Ellipse(rec);
-  DrawPolygon(image, paths, frNonZero, $AAFFFF00);
-  DrawLine(image, paths, 5, clMaroon32, esClosed);
-  masterImageList.Add(image);
-  //since this is a non-rectangular region, use THitTestLayer32
+  masterImageList.Add(nil); //just a place filler
   Result := layeredImage32.AddNewLayer('ellipse');
-  Result.image.Assign(image);
+  SizeAndDrawLayer(Result, 192, 150);
   Result.PositionCenteredAt(pt);
-  //since this is an ellipse, define and assign the hit-test region
-  paths := OffsetPath(paths, Result.Left, Result.Top);
-  Result.HitTestRegions := paths;
 end;
 //------------------------------------------------------------------------------
 
 function TForm1.AddText(const pt: TPoint): TLayer32;
 var
-  image: TImage32;
   lf: TLogfont;
+  rec: TRect;
+  paths: TArrayOfArrayOfPointD;
+  endPt: TPointD;
+const
+  RandText: array [0..5] of string =
+    ('this','is','a','good','graphics','sample');
 begin
-  image := TImage32.Create(312,128);
+  masterImageList.Add(nil); //just a place filler
+
   lf := DefaultLogfont;
   lf.lfHeight := -96;
   lf.lfFaceName := 'Impact';
-  DrawText(image, 10, 100, 'Testing', GetFontInfo(lf));
-  masterImageList.Add(image);
-  Result := layeredImage32.AddNewLayer('text');
-  Result.image.Assign(image);
+
+  //get the text's outline and store it in Result.HitTestRegions
+  //ready to draw it (see DrawLayer).
+  Result := layeredImage32.AddNewLayer(RandText[Random(6)]);
+  paths := GetTextOutline(10, 90,
+    Result.Name, GetFontInfo(lf), taLeft, endPt);
+  Result.HitTestRegions := paths;
+
+  rec := GetBounds(paths);
+  SizeAndDrawLayer(Result, RectWidth(rec), RectHeight(rec));
   Result.PositionCenteredAt(pt);
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.PaintLayeredImage;
+procedure TForm1.mnuAddImageClick(Sender: TObject);
 var
-  dc: HDC;
+  masterImage: TImage32;
 begin
-  //copy the merged layeredImage32 to Panel1 (+/- designer layers)
+  //add a raster image
+  if not OpenDialog1.Execute then Exit;
+  masterImage := TImage32.Create;
+  masterImageList.Add(masterImage);
+  masterImage.LoadFromFile(OpenDialog1.FileName);
+  masterImage.CropTransparentPixels;
+  with layeredImage32.AddNewLayer(TMyImageLayer32) do
+  begin
+    image.Assign(masterImage);
+    PositionCenteredAt(layeredImage32.MidPoint);
+  end;
+  PaintLayeredImage;
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.SizeAndDrawLayer(layer: TLayer32; newWidth, newHeight: integer);
+var
+  paths: TArrayOfArrayOfPointD;
+  img: TImage32;
+  rec: TRect;
+begin
+  //draws everything except raster images
+  img := layer.Image;
+  img.SetSize(newWidth, newHeight);
+  if img.IsEmpty then Exit;
+  rec := Rect(0,0, newWidth, newHeight);
+
+  if layer.Name = '' then
+  begin
+    //layer contains a raster image
+    layer.Image.Assign(masterImageList[layer.Index]);
+    layer.Image.Resize(newWidth, newHeight);
+  end
+  else if layer.Name = 'rectangle' then
+  begin
+    //allow room for line drawing (below)
+    Windows.InflateRect(rec, -3, -3);
+    SetLength(paths, 1);
+    paths[0] := Rectangle(rec);
+    DrawPolygon(img, paths, frNonZero, $AAFFDD66);
+    DrawLine(img, paths, 6, $FFAA6600, esClosed);
+  end
+  else if layer.Name = 'ellipse' then
+  begin
+    //allow room for line drawing (below)
+    Windows.InflateRect(rec, -3, -3);
+    SetLength(paths, 1);
+    paths[0] := Ellipse(rec);
+    DrawPolygon(img, paths, frNonZero, $AA99FF99);
+    DrawLine(img, paths, 6, clGreen32, esClosed);
+  end else
+  begin
+    //layer contains text
+    if not assigned(layer.HitTestRegions) then Exit;
+    rec := GetBounds(layer.HitTestRegions);
+    paths := OffsetPath(layer.HitTestRegions, -rec.Left, -rec.Top);
+    paths := ScalePath(paths, layer.width/rec.Width, layer.Height/rec.Height);
+
+    DrawShadow(img, paths, frNonZero, 3);
+    DrawPolygon(img, paths, frNonZero, $FF00DD00);
+    Draw3D(img, paths, frNonZero, 3,4);
+    DrawLine(img, paths, 1, clBlack32, esClosed);
+  end;
+  if layer.Name <> '' then
+    layer.HitTestRegions := paths;
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.mnuPastefromClipboardClick(Sender: TObject);
+var
+  masterImage: TImage32;
+begin
+  //paste (add) a raster image
+  if not TImage32.CanPasteFromClipBoard then Exit;
+  masterImage := TImage32.Create;
+  masterImageList.Add(masterImage);
+  masterImage.PasteFromClipBoard;
+  masterImage.CropTransparentPixels;
+  with layeredImage32.AddNewLayer(TMyImageLayer32) do
+  begin
+    image.Assign(masterImage);
+    PositionCenteredAt(layeredImage32.MidPoint);
+  end;
+  PaintLayeredImage;
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.DoDropImage(Sender: TObject; const filename: string);
+var
+  masterImage: TImage32;
+  pt: TPoint;
+begin
+  //drag drop (add) a raster image
+  if not TImage32.IsRegisteredFormat(ExtractFileExt(filename)) then Exit;
+
+  GetCursorPos(pt);
+  pt := Panel1.ScreenToClient(pt);
+  Panel1.ClientToBitmap(pt);
+
+  masterImage := TImage32.Create;
+  masterImageList.Add(masterImage);
+  masterImage.LoadFromFile(FileName);
+  masterImage.CropTransparentPixels;
+  with layeredImage32.AddNewLayer(TMyImageLayer32) do
+  begin
+    image.Assign(masterImage);
+    PositionCenteredAt(pt);
+  end;
+  PaintLayeredImage;
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.PaintLayeredImage;
+begin
+  //nb: BitmapPanels doesn't have to be used as it is here.
+  //Image32 can draw to any component containing a TCanvas control.
   {$IFDEF SETSIZE}
   Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
   {$ELSE}
   Panel1.Bitmap.Width := layeredImage32.Width;
   Panel1.Bitmap.Height := layeredImage32.Height;
   {$ENDIF}
-  dc := Panel1.Bitmap.Canvas.Handle;
-  layeredImage32.GetMergedImage(mnuHideControls.Checked).CopyToDc(dc,0,0,false);
+  layeredImage32.GetMergedImage(false).CopyToDc(Panel1.Bitmap.Canvas.Handle);
   Panel1.Refresh;
 end;
 //------------------------------------------------------------------------------
@@ -217,59 +369,71 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TForm1.DoKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+begin
+  if (Key = VK_ESCAPE) and Assigned(activeLayer) then
+  begin
+    //deselect the active control
+    MakeLayerActive(nil);
+    Key := 0;
+  end;
+end;
+//------------------------------------------------------------------------------
+
 procedure TForm1.DeleteButtons;
 begin
-  if not assigned(activeLayer) then Exit;
-  with layeredImage32 do
-    DeleteGroup(TopLayer.GroupId);
+  //deletes layer buttons (ie button layers)
+  layeredImage32.DeleteGroup(buttonGroupId);
+  buttonGroupId := 0;
   activeLayer := nil;
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.AddButtons(layer: TLayer32);
+procedure TForm1.MakeLayerActive(layer: TLayer32);
 begin
+  DeleteButtons;
   activeLayer := layer;
-  CreateSizingBtnsGroup(activeLayer,
-    ssEdgesAndCorners, $FF3333FF, DefaultButtonSize, [boDropShadow]);
+  if assigned(layer) then
+    buttonGroupId := CreateSizingBtnsGroup(activeLayer,
+      ssCorners, $FF3333FF, DefaultButtonSize, [boDropShadow]);
+  PaintLayeredImage;
 end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.Panel1MouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
-  pt: TPoint;
   clickedLayer: TLayer32;
 begin
-  buttonMovingLayer := nil;
-  //convert Panel1 client coordinates to bitmap coordinates
-  pt := Types.Point(X,Y);
-  if not Panel1.ClientToBitmap(pt) then Exit;
+  clickPoint := Types.Point(X,Y);
+  //convert clickPoint from Panel coordinates to bitmap coordinates
+  if not Panel1.ClientToBitmap(clickPoint) then Exit;
 
-  //find out which layer was clicked (if any)
-  clickPoint := pt;
-  clickedLayer := layeredImage32.GetLayerAt(pt);
+  //get the clicked layer (if any)
+  clickedLayer := layeredImage32.GetLayerAt(clickPoint);
+
   //disable panel1 scrolling if we're about to move an image or a button
   panel1.BitmapProperties.ZoomAndScrollEnabled := not Assigned(clickedLayer);
 
   //if a control button was clicked then get ready to move it
-  if Assigned(clickedLayer) and (clickedLayer.Name = 'button') then
+  if Assigned(clickedLayer) and (clickedLayer is TButtonDesignerLayer32) then
   begin
-    buttonMovingLayer := clickedLayer;
+    activeButtonLayer := TButtonDesignerLayer32(clickedLayer);
+    //the activeLayer can't be a TButtonDesignerLayer32 so exit here
     Exit;
-  end;
+  end else
+    activeButtonLayer := nil;
 
   //if anything but the activelayer was clicked then delete buttons
   if assigned(activeLayer) and  (activeLayer <> clickedLayer) then
     DeleteButtons;
 
-  if Assigned(clickedLayer) then
+  if Assigned(clickedLayer) then //assign a new activeLayer
   begin
-    //assign a new activeLayer
-    if not Assigned(activeLayer) then AddButtons(clickedLayer);
-    activeLayerClicked := true;
-  end;
-
-  PaintLayeredImage;
+    if not Assigned(activeLayer) then MakeLayerActive(clickedLayer);
+    activeLayerMouseDown := true;
+  end else
+    PaintLayeredImage;
 end;
 //------------------------------------------------------------------------------
 
@@ -279,32 +443,27 @@ var
   dx, dy: integer;
   pt: TPoint;
   layer: TLayer32;
+  rec: TRect;
 begin
   pt := Types.Point(X,Y);
   if not Panel1.ClientToBitmap(pt) then Exit;
   dx := pt.X - clickPoint.X;
   dy := pt.Y - clickPoint.Y;
 
-  if activeLayerClicked then
+  if activeLayerMouseDown then              //moving image (and buttons)
   begin
-    //move the image and its buttons too
     activeLayer.Offset(dx, dy);
-    with layeredImage32 do OffsetGroup(1, dx, dy);
+    layeredImage32.OffsetGroup(buttonGroupId, dx, dy);
   end
-  else if assigned(buttonMovingLayer) then
+  else if assigned(activeButtonLayer) then  //moving a button
   begin
-    //moving a 'resize' button
-    if buttonMovingLayer.CursorId = crSizeNS then
-      buttonMovingLayer.Offset(0, dy)
-    else if buttonMovingLayer.CursorId = crSizeWE then
-      buttonMovingLayer.Offset(dx, 0)
-    else
-      buttonMovingLayer.Offset(dx, dy);
-    UpdateSizingGroup(activeLayer, buttonMovingLayer,
-      masterImageList[activeLayer.Index]);
+    activeButtonLayer.Offset(dx, dy);
+    rec := UpdateButtonSizingGroup(activeButtonLayer);
+    SizeAndDrawLayer(activeLayer, RectWidth(rec), RectHeight(rec));
+    activeLayer.PositionAt(rec.TopLeft);
   end else
   begin
-    //neither image nor button clicked so just update the cursor
+    //not moving anything so just update the cursor
     layer := layeredImage32.GetLayerAt(pt);
     if Assigned(layer) then
       Panel1.Cursor := layer.CursorId else
@@ -319,17 +478,10 @@ end;
 procedure TForm1.Panel1MouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  activeLayerClicked := false;
-  buttonMovingLayer := nil;
+  activeLayerMouseDown := false;
+  activeButtonLayer := nil;
   //re-enable Panel1 zoom and scroll
   Panel1.BitmapProperties.ZoomAndScrollEnabled := true;
-end;
-//------------------------------------------------------------------------------
-
-procedure TForm1.mnuHideControlsClick(Sender: TObject);
-begin
-  layeredImage32.Invalidate;
-  PaintLayeredImage;
 end;
 //------------------------------------------------------------------------------
 
@@ -340,13 +492,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.CopytoClipboard1Click(Sender: TObject);
+procedure TForm1.mnuCopytoClipboardClick(Sender: TObject);
 begin
   layeredImage32.GetMergedImage(true).CopyToClipBoard;
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.Exit1Click(Sender: TObject);
+procedure TForm1.mnuExitClick(Sender: TObject);
 begin
   Close;
 end;
@@ -354,12 +506,16 @@ end;
 
 procedure TForm1.mnuBringToFrontClick(Sender: TObject);
 var
-  idx: integer;
+  oldIdx, newIdx: integer;
 begin
-  idx := activeLayer.Index;
-  if activeLayer.BringForward(idx +1) then
+  if not assigned(activeLayer) or (buttonGroupId <= 0) then Exit;
+  oldIdx := activeLayer.Index;
+  //don't bring the active layer in front of button control layers ...
+  newIdx := layeredImage32.GetFirstInGroupIdx(buttonGroupId) -1;
+
+  if (newIdx > oldIdx) and activeLayer.BringForward(newIdx) then
   begin
-    masterImageList.Move(idx, idx +1);
+    masterImageList.Move(oldIdx, activeLayer.Index);
     PaintLayeredImage;
   end;
 end;
@@ -367,13 +523,14 @@ end;
 
 procedure TForm1.mnuSendToBackClick(Sender: TObject);
 var
-  idx: integer;
+  oldIdx: integer;
 begin
-  idx := activeLayer.Index;
-  if idx = 1 then Exit; //don't send an image behind the hatched background
-  if activeLayer.SendBack(idx -1) then
+  oldIdx := activeLayer.Index;
+  //send to bottom except for the hatched background (index = 0)
+  if oldIdx = 1 then Exit;
+  if activeLayer.SendBack(1) then
   begin
-    masterImageList.Move(idx, idx-1);
+    masterImageList.Move(oldIdx, activeLayer.Index);
     PaintLayeredImage;
   end;
 end;
@@ -383,9 +540,8 @@ procedure TForm1.mnuDeleteLayerClick(Sender: TObject);
 begin
   if not assigned(activeLayer) then Exit;
   masterImageList.Delete(activeLayer.Index);
-  with layeredImage32 do DeleteGroup(TopLayer.GroupId);
   layeredImage32.DeleteLayer(activeLayer.Index);
-  activeLayer := nil;
+  DeleteButtons;
   PaintLayeredImage;
 end;
 //------------------------------------------------------------------------------
@@ -394,36 +550,19 @@ procedure TForm1.PopupMenu1Popup(Sender: TObject);
 begin
   mnuBringToFront.Enabled := assigned(activeLayer) and
     (activeLayer.Index < masterImageList.Count -1);
+  mnuBringtoFront2.Enabled := mnuBringtoFront.Enabled;
   mnuSendToBack.Enabled := assigned(activeLayer) and (activeLayer.Index > 1);
+  mnuSendtoBack2.Enabled := mnuSendtoBack.Enabled;
   mnuDeleteLayer.Enabled := assigned(activeLayer);
+  mnuDeleteLayer2.Enabled := mnuDeleteLayer.Enabled;
 
-  GetCursorPos(popupPoint);
-  popupPoint := Panel1.ScreenToClient(popupPoint);
-  Panel1.ClientToBitmap(popupPoint);
-end;
-//------------------------------------------------------------------------------
-
-procedure TForm1.AddEllipse1Click(Sender: TObject);
-begin
-  DeleteButtons;
-  AddButtons(AddEllipse(popupPoint));
-  PaintLayeredImage;
-end;
-//------------------------------------------------------------------------------
-
-procedure TForm1.AddRectangle1Click(Sender: TObject);
-begin
-  DeleteButtons;
-  AddButtons(AddRectangle(popupPoint));
-  PaintLayeredImage;
-end;
-//------------------------------------------------------------------------------
-
-procedure TForm1.AddText1Click(Sender: TObject);
-begin
-  DeleteButtons;
-  AddButtons(AddText(popupPoint));
-  PaintLayeredImage;
+  if Sender = PopupMenu1 then
+  begin
+    GetCursorPos(popupPoint);
+    popupPoint := Panel1.ScreenToClient(popupPoint);
+    Panel1.ClientToBitmap(popupPoint);
+  end else
+    popupPoint := Point(layeredImage32.MidPoint);
 end;
 //------------------------------------------------------------------------------
 

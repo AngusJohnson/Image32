@@ -2,10 +2,10 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.37                                                            *
-* Date      :  15 January 2020                                                 *
+* Version   :  1.38                                                            *
+* Date      :  20 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2020                                         *
+* Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  The core module of the Image32 library                          *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -83,6 +83,7 @@ type
     fColorCount: integer;
     fPixels: TArrayOfColor32;
     fOnChange: TNotifyEvent;
+    fOnResize: TNotifyEvent;
     fUpdateCnt: integer;
     function GetPixel(x,y: Integer): TColor32;
     procedure SetPixel(x,y: Integer; color: TColor32);
@@ -104,9 +105,10 @@ type
     //CopyInternal: Internal routine (has no bounds checking)
     procedure CopyInternal(src: TImage32;
       const srcRec, dstRec: TRect; blendFunc: TBlendFunction);
-    procedure Changed;
     procedure BeginUpdate;
     procedure EndUpdate;
+    procedure Changed; virtual;
+    procedure Resized; virtual;
   public
     constructor Create(width: Integer = 0; height: Integer = 0); overload;
     constructor Create(src: TImage32); overload;
@@ -123,6 +125,7 @@ type
     procedure Resize(newWidth, newHeight: Integer; stretchImage: Boolean = true);
     procedure Scale(s: single); overload;
     procedure Scale(sx, sy: single); overload;
+    function Copy(src: TImage32; srcRec, dstRec: TRect): Boolean;
     //CopyBlend: Copies part or all of another TImage32 image (src).
     //If no blend function is provided, then the pixels in src's srcRec
     //simply replace whatever is in 'dstRec'. If a blend function is provided,
@@ -223,6 +226,7 @@ type
     //AntiAliased: Antialiasing is used in scaling and rotation transforms
     property AntiAliased: Boolean read fAntiAliase write fAntiAliase;
     property OnChange: TNotifyEvent read fOnChange write fOnChange;
+    property OnResize: TNotifyEvent read fOnResize write fOnResize;
   end;
 
   TImageList32 = class
@@ -1198,7 +1202,7 @@ end;
 constructor TImage32.Create(width: Integer; height: Integer);
 begin
   fAntiAliase := true;
-  SetSize(width, height, clNone32);
+  SetSize(width, height);
 end;
 //------------------------------------------------------------------------------
 
@@ -1259,7 +1263,7 @@ begin
   for i := imageFormatClassList.count -1 downto 0 do
   begin
     //nb: ignore the first (priority) char ...
-    matchStr := Copy(imageFormatClassList[i], 2, 80);
+    matchStr := System.Copy(imageFormatClassList[i], 2, 80);
     if not SameText(matchStr, pattern) then Continue;
     Result := TImageFormatClass(ImageFormatClassList.objects[i]);
     break;
@@ -1305,6 +1309,7 @@ end;
 
 procedure TImage32.AssignTo(dst: TImage32);
 begin
+  if dst = self then Exit;
   dst.fAntiAliase := fAntiAliase;
   dst.fIsPremultiplied := fIsPremultiplied;
   dst.fColorCount := 0;
@@ -1322,6 +1327,13 @@ procedure TImage32.Changed;
 begin
   fColorCount := 0;
   if Assigned(fOnChange) then fOnChange(Self);
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.Resized;
+begin
+  if Assigned(fOnResize) then fOnResize(Self)
+  else if Assigned(fOnChange) then fOnChange(Self);
 end;
 //------------------------------------------------------------------------------
 
@@ -1512,13 +1524,13 @@ procedure TImage32.SetSize(newWidth, newHeight: Integer; color: TColor32);
 begin
   fwidth := Max(0, newWidth);
   fheight := Max(0, newHeight);
-  fPixels := nil;
+  if color = 0 then fPixels := nil; //clear image in case old size == new size
   setLength(fPixels, fwidth * fheight);
   fIsPremultiplied := false;
   //nb: dynamic arrays are zero-initialized with SetLength() unless the array
   //is returned as a function result. And so SetSize() zero-initializes pixels.
   if color > 0 then Clear(color);
-  Changed;
+  Resized;
 end;
 //------------------------------------------------------------------------------
 
@@ -1533,6 +1545,7 @@ begin
     Exit;
   end;
   if (newWidth = fwidth) and (newHeight = fheight) then Exit;
+
   if IsEmpty then
   begin
     SetSize(newWidth, newHeight);
@@ -1557,6 +1570,7 @@ begin
       EndUpdate;
     end;
   end;
+  Resized;
 end;
 //------------------------------------------------------------------------------
 
@@ -1593,7 +1607,6 @@ begin
   fPixels := tmp;
   fwidth := newWidth;
   fheight := newHeight;
-  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1632,7 +1645,6 @@ begin
   fPixels := tmp;
   fwidth := newWidth;
   fheight := newHeight;
-  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1972,6 +1984,12 @@ begin
       inc(s, src.Width);
       inc(d, Width);
     end;
+end;
+//------------------------------------------------------------------------------
+
+function TImage32.Copy(src: TImage32; srcRec, dstRec: TRect): Boolean;
+begin
+  Result := CopyBlend(src, srcRec, dstRec, nil);
 end;
 //------------------------------------------------------------------------------
 

@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 1.37
-Released: 15 January 2020
+Latest version: 1.38
+Released: 17 January 2020
 
 Copyright © 2019-2020 Angus Johnson
 Freeware released under Boost Software License
@@ -12,6 +12,23 @@ download : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
+Version: 1.38
+  Changes in Image32
+    Added TImage32.Copy method 
+      (it's the same as CopyBlend with nil blend)
+  Changes in Image32_Layers
+    TLayeredImage32.Group method now returns the GroupId
+    CreateButtonGroup and CreateSizingBtnsGroup functions now 
+      return the newly created group's GroupId
+    Replace UpdateSizingGroup function with UpdateButtonSizingGroup 
+      function (and significantly changed its functionality).
+    TLayer.HitTestRegions coordinates are now relative to 
+      the layer itself (not the TLayeredImage32 control).
+  Changes in Image32_CQ
+    Removed TrimPaletteByFraction and overloaded TrimPalette
+  Changes in Examples
+    Significantly updated SimpleLayers example
+    
 Version: 1.37
   Changes in Image32
     TImage32.CanPasteFromClipboard is now a class function
@@ -97,62 +114,3 @@ Version: 1.30
   Changes in Image32_Extra
     Improved Vectorize function    
     
-Version: 1.29
-  Changes in Image32_Extra
-    Improved CompareRGB function
-    Replaced MaskToPolygons function with Vectorize function
-    Bugfixed GetMask function
-  Changes in Examples
-    Updated Vectorize application
-    
-Version: 1.28
-  Changes in Image32
-    Renamed TImage32.CopyFrom method to CopyBlend
-  Changes in Image32_MixedPath
-    Deleted deprecated TMixedPath class in Image32_MixedPath
-    Renamed Image32_MixedPath to Image32_SmoothPath
-    Renamed DrawSmoothPathDesigner to DrawSmoothPathOntoDesigner
-  Changes in Image32_Extra
-    Changed and renamed FloodFillRGB function to CompareRGB
-    Changed and renamed FloodFillHue function to CompareHue
-    Exposed GetFloodFillMask function
-    Added GetMask function
-    Added Vectorize function (see documentation)
-  Changes in Image32_Draw
-    Added ErasePolygon function
-    Added DrawBoolMask function
-    Added DrawAlphaMask function
-  Changes in BitmapPanels
-    Added TPanel.BitmapProperties.ScaleType property
-    Removed TPanel.BitmapProperties.RawScale property
-    Modified TPanel.ClearBitmap (see documentation)
-  Changes in Examples
-    Added Vectorize application
-    
-Version: 1.27
-  Changes in Image32
-    Fixed bug in Color32 function
-  Changes in Image32_Vector  
-    Renamed AddToPath function to JoinPaths
-  Changes in Image32_Text
-    Added TFontInfo.MeasureText method
-  Changes in BitmapPanels
-    Changed TPanel.ClearBitmap pixelFormat parameter default (now pf24bit)
-    Added TPanel.BitmapProperties.AutoCenter property (default = True)
-  Changes in Image32_Layers
-    Renamed TLayeredImage32.GetLayerNamed to FindLayerNamed
-  Changes in Examples
-    Updated several examples
-    
-Version: 1.26
-  Changes in Image32
-    Added IsImageOwner property to TImageList32
-  Changes in Image32_Layers
-    Fixed several bugs
-  Changes in Image32_Vector  
-    Added ClosestPointOnLine and ClosestPointOnSegment functions
-  Changes in BitmapPanels
-    Added OnBeginPaint property to TBitmapProperties
-    Added OnKeyDown & OnKeyUp properties to TBitmapProperties
-  Changes in Examples
-    Added Image,Arrows,Text utility    

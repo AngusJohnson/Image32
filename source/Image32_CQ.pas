@@ -2,10 +2,10 @@ unit Image32_CQ;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.37                                                            *
-* Date      :  15 January 2020                                                 *
+* Version   :  1.38                                                            *
+* Date      :  20 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2020                                         *
+* Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Color reduction for TImage32                                    *
 *           :  Uses Octree Color Quantization & Floyd / Steinberg Dithering    *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
@@ -34,16 +34,13 @@ function MakeAndApplyPalette(image: TImage32;
   MaxColors: integer; UseDithering: Boolean;
   out frequencies: TArrayOfInteger): TArrayOfColor32; overload;
 
-//TrimPalette: reduces the palette size by removing the least frequent colors
+//TrimPalette: reduces the palette size
 function TrimPalette(const palette: TArrayOfColor32;
-  const colorFrequency: TArrayOfInteger; newSize: integer): TArrayOfColor32;
-
-//TrimPaletteByFraction: removes palette entries with 'colorFrequency' values
-//less than the specified fraction of the average palette color frequency.
-//Eg: when fraction = 0.1, then this function will remove palette entries with
-//'colorFrequency' less than 10% of the average frequency. [0 > range <= 0.25].
-function TrimPaletteByFraction(const palette: TArrayOfColor32;
-  const colorFrequency: TArrayOfInteger; fraction: double): TArrayOfColor32;
+  const colorFrequency: TArrayOfInteger;
+  newSize: integer): TArrayOfColor32; overload;
+function TrimPalette(const palette: TArrayOfColor32;
+  const colorFrequency: TArrayOfInteger;
+  fraction: double): TArrayOfColor32; overload;
 
 function CreateLogPalette(const palColors: TArrayOfColor32): TMaxLogPalette;
 
@@ -65,22 +62,12 @@ procedure DrawPalette(image: TImage32; const palette: TArrayOfColor32);
 procedure QuickSort(var intArray: array of Integer; l, r: Integer);
 procedure QuickSortDesc(var intArray: array of Integer; l, r: Integer);
 
-const
 
-  MonoPal2: array [0..1] of TColor32 = (
-    $FF000000, $FFFFFFFF);
+//https://en.wikipedia.org/wiki/List_of_software_palettes
 
-  macPal16: array [0 .. 15] of TColor32 = (
-    $FFFFFFFF, $FF05F3FC, $FF0264FF, $FF0608DD,
-    $FF8408F2, $FFA50046, $FFD40000, $FFEAAB02,
-    $FF14B71F, $FF126400, $FF052C56, $FF3A7190,
-    $FFC0C0C0, $FF808080, $FF404040, $FF000000);
-
-  winPal16: array [0..15] of TColor32 = (
-    $FF000000, $FF800000, $FF008000, $FF000080,
-    $FF808000, $FF008080, $FF800080, $FF808080,
-    $FFC0C0C0, $FFFF0000, $FF00FF00, $FF0000FF,
-    $FFFFFF00, $FFFF00FF, $FF00FFFF, $FFFFFFFF);
+function BlackWhitePal: TArrayOfColor32;
+function DefaultMacPal16: TArrayOfColor32;
+function DefaultWinPal16: TArrayOfColor32;
 
 implementation
 
@@ -113,6 +100,7 @@ type
       procedure  Add(color: TColor32);
       procedure  Get(out color: TColor32; out freq: integer);
       procedure  GetNearest(var color: TColor32);
+      procedure  GetAny(var color: TColor32);
       function GetIsLeaf: Boolean;
       property IsLeaf : Boolean read GetIsLeaf;
     public
@@ -148,6 +136,21 @@ type
 
 const
   NullOctNodes8 : TOctNodes8 = (nil, nil, nil, nil, nil, nil, nil, nil);
+
+  MonoPal2: array [0..1] of TColor32 = (
+    $FF000000, $FFFFFFFF);
+
+  macPal16: array [0 .. 15] of TColor32 = (
+    $FF000000, $FF404040, $FF808080, $FFC0C0C0,
+    $FF3A7190, $FF052C56, $FF126400, $FF14B71F,
+    $FFEAAB02, $FFD40000, $FFA50046, $FF8408F2,
+    $FF0608DD, $FF0264FF, $FF05F3FC, $FFFFFFFF);
+
+  winPal16_int: array [0..15] of TColor32 = (
+    $FF000000, $FF800000, $FF008000, $FF000080,
+    $FF808000, $FF008080, $FF800080, $FF808080,
+    $FFC0C0C0, $FFFF0000, $FF00FF00, $FF0000FF,
+    $FFFFFF00, $FFFF00FF, $FF00FFFF, $FFFFFFFF);
 
 //------------------------------------------------------------------------------
 // Miscellaneous Octree functions
@@ -332,21 +335,46 @@ begin
       Childs[i].GetNearest(color);
       Exit;
     end;
-    //we should only ever get here when this color wasn't in the
-    //the image from which Octree was constructed.
-    for j := 7 downto i+1 do
+    //we should only get here when this color wasn't in the
+    //the image that was used to construct the Octree.
+    for j := 7 downto i +1 do
       if assigned(Childs[j]) then
       begin
-        Childs[j].GetNearest(color);
+        Childs[j].GetAny(color);
         Exit;
       end;
-    for j := 0 to i-1 do
+    for j := 0 to i -1 do
       if assigned(Childs[j]) then
       begin
-        Childs[j].GetNearest(color);
-        Exit;
+        Childs[j].GetAny(color);
+        Break;
       end;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure  TOctNode.GetAny(var color: TColor32);
+var
+  j, dummy: integer;
+begin
+  if IsLeaf then
+  begin
+    Get(color, dummy);
+    Exit;
+  end;
+
+  for j := 7 downto 4 do
+    if assigned(Childs[j]) then
+    begin
+      Childs[j].GetAny(color);
+      Exit;
+    end;
+  for j := 0 to 3 do
+    if assigned(Childs[j]) then
+    begin
+      Childs[j].GetAny(color);
+      Break;
+    end;
 end;
 //------------------------------------------------------------------------------
 
@@ -446,7 +474,7 @@ procedure TOctree.Add(color: TColor32);
 var
   argb: TARGB absolute color;
 
- procedure AddColor(var node: TOctNode; level: byte);
+ procedure AddColor(var node: TOctNode; level: integer);
  begin
    if not Assigned(node) then
    begin
@@ -858,7 +886,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TrimPaletteByFraction(const palette: TArrayOfColor32;
+function TrimPalette(const palette: TArrayOfColor32;
   const colorFrequency: TArrayOfInteger; fraction: double): TArrayOfColor32;
 var
   i,j, minFrequency, len, cnt: integer;
@@ -921,6 +949,37 @@ begin
       OffsetRect(rec, -15 * w, 16) else
       OffsetRect(rec, 16, 0);
   end;
+end;
+
+//------------------------------------------------------------------------------
+
+function BlackWhitePal: TArrayOfColor32;
+var
+  i, len: integer;
+begin
+  len := Length(MonoPal2);
+  SetLength(Result, len);
+  for i := 0 to len -1 do Result[i] := MonoPal2[i];
+end;
+//------------------------------------------------------------------------------
+
+function DefaultMacPal16: TArrayOfColor32;
+var
+  i, len: integer;
+begin
+  len := Length(macPal16);
+  SetLength(Result, len);
+  for i := 0 to len -1 do Result[i] := macPal16[i];
+end;
+//------------------------------------------------------------------------------
+
+function DefaultWinPal16: TArrayOfColor32;
+var
+  i, len: integer;
+begin
+  len := Length(winPal16_int);
+  SetLength(Result, len);
+  for i := 0 to len -1 do Result[i] := winPal16_int[i];
 end;
 
 //------------------------------------------------------------------------------

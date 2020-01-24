@@ -2,10 +2,10 @@ unit Image32_Text;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.37                                                            *
-* Date      :  15 January 2020                                                 *
+* Version   :  1.38                                                            *
+* Date      :  20 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2020                                         *
+* Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Module to support text in the Image32 library                   *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -145,8 +145,10 @@ type
   //MeasureText also returns via 'charOffsets' the offset for the start
   //of each character PLUS the offset of the next anticipated character.<br>
   //Hence Length(charPos) = Length(text) +1;
+  procedure MeasureText(const text: string;
+    fontInfo: TFontInfo; out bounds: TRectD); overload;
   procedure MeasureText(const text: string; fontInfo: TFontInfo;
-    out bounds: TRectD; out charOffsets: TArrayOfPointD);
+    out bounds: TRectD; out charOffsets: TArrayOfPointD); overload;
 
   //GetFontSize: Returns the font's 'point size' (DPI independant)
   function GetFontSize(logFont: TLogFont): integer;
@@ -876,6 +878,14 @@ begin
     AppendPath(Result, tmpPaths);
     left := left + glyph.gm.gmCellIncX + charSpacing;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure MeasureText(const text: string; fontInfo: TFontInfo; out bounds: TRectD);
+var
+  charOffsets: TArrayOfPointD;
+begin
+  MeasureText(text, fontInfo, bounds, charOffsets);
 end;
 //------------------------------------------------------------------------------
 
