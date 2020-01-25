@@ -2,7 +2,7 @@ object Form1: TForm1
   Left = 594
   Top = 418
   Caption = 'Image32 - Layers example'
-  ClientHeight = 413
+  ClientHeight = 412
   ClientWidth = 403
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -20,7 +20,7 @@ object Form1: TForm1
     Left = 0
     Top = 0
     Width = 403
-    Height = 387
+    Height = 386
     Align = alClient
     PopupMenu = PopupMenu1
     TabOrder = 0
@@ -30,7 +30,7 @@ object Form1: TForm1
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 387
+    Top = 386
     Width = 403
     Height = 26
     Panels = <>

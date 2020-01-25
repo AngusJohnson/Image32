@@ -34,6 +34,7 @@
             {$DEFINE GESTURES}           //Delphi 2010 - added screen gesture support
             {$IF COMPILERVERSION >= 23}
               {$DEFINE UITYPES}          //DelphiXE2   - added UITypes unit
+              {$DEFINE STYLESERVICES}    //DelphiXE2   - added StyleServices unit
             {$IFEND}
           {$IFEND}
         {$IFEND}

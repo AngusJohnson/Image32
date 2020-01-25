@@ -2,8 +2,8 @@ unit BitmapPanels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.2                                                             *
-* Date      :  20 January 2020                                                 *
+* Version   :  2.0                                                             *
+* Date      :  26 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
@@ -14,7 +14,7 @@ interface
 
 uses
   SysUtils, Classes, Windows, Messages, Types, Graphics,
-  Controls, Forms, ExtCtrls, Math, ShellApi, ClipBrd;
+  Controls, Forms, ExtCtrls, Themes, uxtheme, Math, ShellApi, ClipBrd;
 
 {$I Image32.inc}
 
@@ -46,20 +46,22 @@ type
     fLastLocation: TPoint;
 {$ENDIF}
     fMouseDown: Boolean;
-    fMouseOverBevelHorz: Boolean;
     fMouseOverBevelVert: Boolean;
+    fMouseOverBevelHorz: Boolean;
     fMouseDownOverBevelH: Boolean;
     fMouseDownOverBevelV: Boolean;
     fMousePos: TPoint;
     fFocusedColor: TColor;
     fBitmapProperties: TBitmapProperties;
-    procedure SetFocusedColor(aColor: TColor);
     procedure UpdateCursor;
     procedure BitmapScaleBestFit;
+    function GetMouseIsInsideBorder: Boolean;
 {$IFDEF GESTURES}
     procedure Gesture(Sender: TObject;
       const EventInfo: TGestureEventInfo; var Handled: Boolean);
 {$ENDIF}
+    function ShowHorzScrollButton: Boolean;
+    function ShowVertScrollButton: Boolean;
   protected
     procedure CreateWnd; override;
     procedure DestroyWnd; override;
@@ -97,10 +99,12 @@ type
     property Bitmap: TBitmap read fBmp;
     property BitmapProperties: TBitmapProperties read fBitmapProperties;
     //FocusedColor: Panel's border color when focused (ie if TabStop = true)
-    property FocusedColor: TColor read fFocusedColor write SetFocusedColor;
+    property FocusedColor: TColor read fFocusedColor write fFocusedColor;
+
     //InnerMargin = BorderWidth + BevelWidth *2 (if bevels assigned)
     property InnerMargin: integer read GetInnerMargin;
     property InnerClientRect: TRect read GetInnerClientRect;
+    property MouseIsInsideBorder: Boolean read GetMouseIsInsideBorder;
   end;
 
   TBitmapProperties = class
@@ -253,6 +257,48 @@ end;
 function DpiScale(value: integer): integer;
 begin
   result := Round(value * Screen.PixelsPerInch div 96);
+end;
+//------------------------------------------------------------------------------
+
+function HasThemeManifest: boolean;
+begin
+  result := FindResource(hInstance, makeintresource(1), MakeIntResource(24)) > 0;
+end;
+//------------------------------------------------------------------------------
+
+function GetThemeColor(const className: string;
+  part, state, propID: integer; out Color: TColor): boolean;
+var
+  thmHdl: HTheme;
+  clrRef: COLORREF ABSOLUTE Color;
+begin
+  result := false;
+{$IFDEF STYLESERVICES}
+  if not StyleServices.Enabled or not HasThemeManifest then exit;
+{$ELSE}
+  if not ThemeServices.ThemesEnabled or not HasThemeManifest then exit;
+{$ENDIF}
+  thmHdl := OpenThemeData(0, PChar(className));
+  if thmHdl <> 0 then
+  try
+    if Succeeded(uxTheme.GetThemeColor(thmHdl, part, state, propID, clrRef)) then
+      result := true;
+  finally
+    CloseThemeData(thmHdl);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function OffsetPoint(const pt: TPoint; dx, dy: integer): TPoint;
+begin
+  Result.X := pt.X + dx;
+  Result.Y := pt.Y + dy;
+end;
+//------------------------------------------------------------------------------
+
+function LeftMouseBtnDown: Boolean;
+begin
+  Result := (GetKeyState(VK_LBUTTON) shr 8 > 0);
 end;
 //------------------------------------------------------------------------------
 
@@ -574,8 +620,7 @@ var
   rec: TRect;
 begin
   inherited;
-  if not fBmp.Empty and
-    fBitmapProperties.fZoomScrollEnabled and
+  if not fBmp.Empty and fBitmapProperties.fZoomScrollEnabled and
     (fScaleType <> stStretched) then
   begin
     fMouseDown := true;
@@ -599,34 +644,43 @@ var
   btnLeft, btnTop, innerMarg: integer;
   ratio: double;
   rec: TRect;
-  mobV, mobH: Boolean;
+  mobH, mobV: Boolean;
 begin
-  inherited;
+  if MouseIsInsideBorder then
+    inherited;
 
   if not fMouseDown then
   begin
     if fBitmapProperties.fShowScrollbars then
     begin
-     innerMarg := GetInnerMargin;
-      mobH := (X <= innerMarg) or (X > ClientWidth - innerMarg);
-      mobV := (Y <= innerMarg) or (Y > ClientHeight - innerMarg);
+      innerMarg := GetInnerMargin;
+      mobV := (X > ClientWidth - innerMarg);
+      mobH := (Y > ClientHeight - innerMarg);
       //now check for change in state ...
-      if fMouseOverBevelHorz <> mobH then
-      begin
-        fMouseOverBevelHorz := mobH;
-        Invalidate;
-      end;
       if fMouseOverBevelVert <> mobV then
       begin
         fMouseOverBevelVert := mobV;
+        if mobV and ShowVertScrollButton then
+          Cursor := crSizeNS else
+          Cursor := crDefault;
         Invalidate;
       end;
+      if fMouseOverBevelHorz <> mobH then
+      begin
+        fMouseOverBevelHorz := mobH;
+        if mobH and ShowHorzScrollButton then
+          Cursor := crSizeWE else
+          Cursor := crDefault;
+        Invalidate;
+      end;
+      if (X < innerMarg) or (Y < innerMarg) then
+        Cursor := crDefault;
     end;
     Exit;
   end;
 
-  fMouseOverBevelHorz := false;
   fMouseOverBevelVert := false;
+  fMouseOverBevelHorz := false;
   if fMouseDownOverBevelV then
   begin
     //click and drag vertical scrollbar
@@ -646,6 +700,7 @@ begin
     fOffsetX := Round((btnLeft - rec.Left) / ratio);
   end else
   begin
+    //click and drag to alter view (ie offset :))
     fOffsetX := fOffsetX + (fMousePos.X - X);
     fOffsetY := fOffsetY + (fMousePos.Y - Y);
   end;
@@ -664,8 +719,8 @@ begin
   fMouseDown := false;
   fMouseDownOverBevelH := false;
   fMouseDownOverBevelV := false;
-  fMouseOverBevelHorz := false;
   fMouseOverBevelVert := false;
+  fMouseOverBevelHorz := false;
   invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -673,10 +728,10 @@ end;
 procedure TPanel.CMMouseLeave(var Message: TMessage);
 begin
   inherited;
-  if fMouseOverBevelHorz then
-    fMouseOverBevelHorz := false
-  else if fMouseOverBevelVert then
+  if fMouseOverBevelVert then
     fMouseOverBevelVert := false
+  else if fMouseOverBevelHorz then
+    fMouseOverBevelHorz := false
   else Exit;
   Invalidate;
 end;
@@ -784,12 +839,32 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TPanel.ShowHorzScrollButton: Boolean;
+begin
+  Result := (fBmp.Width * fScale > ClientWidth - GetInnerMargin *2 +1);
+end;
+//------------------------------------------------------------------------------
+
+function TPanel.ShowVertScrollButton: Boolean;
+begin
+  Result := (fBmp.Height * fScale > ClientHeight - GetInnerMargin *2 +1);
+end;
+//------------------------------------------------------------------------------
+
+type TControl = class(Controls.TControl); //just to access (protected) Color
+
 procedure TPanel.Paint;
+const
+  Alignments: array[TAlignment] of Longint = (DT_LEFT, DT_RIGHT, DT_CENTER);
+  VAlignments: array[TVerticalAlignment] of Longint = (DT_TOP, DT_BOTTOM, DT_VCENTER);
 var
   marginOff, w,h: integer;
   tmpRec, srcRec, srcScaled: TRect;
   tmpBmp: TBitmap;
   bf: BLENDFUNCTION;
+  backgroundPainted: Boolean;
+  Flags: Longint;
+  themeColor: TColor;
 
   procedure DrawScrollButton(const rec: TRect; raised: Boolean);
   begin
@@ -807,24 +882,70 @@ var
   end;
 
 begin
+  //paint borders
   fDstRect := ClientRect;
   if TabStop and Focused then
-    Canvas.Brush.Color := fFocusedColor else
-    Canvas.Brush.Color := color;
-  Canvas.FillRect(fDstRect); //needed because of WMEraseBkgnd result
+  begin
+    Canvas.Brush.Color := fFocusedColor;
+    Canvas.FillRect(fDstRect);
+    fDstRect := InnerClientRect;
+  end;
 
-  marginOff := GetInnerMargin;
-  InflateRect(fDstRect, -marginOff, -marginOff);
-  Canvas.Brush.Color := clBtnFace;
-  Canvas.FillRect(fDstRect);
+  //paint inner client rect or all of client rect if not focused
+  backgroundPainted := ParentBackground and
+{$IFDEF STYLESERVICES}
+    StyleServices.Enabled and (seClient in StyleElements) and
+{$ELSE}
+    ThemeServices.ThemesEnabled and
+{$ENDIF}
+    Succeeded(DrawThemeParentBackground(Handle, Canvas.Handle, @fDstRect));
+  if not backgroundPainted then
+  begin
+    if ParentColor then
+      Canvas.Brush.Color := TControl(parent).Color else
+      Canvas.Brush.Color := self.Color;
+    Canvas.FillRect(fDstRect);
+  end;
 
-  //calling inherited draws the bevels and panel caption.
-  inherited;
+  //paint the outer bevel
+  fDstRect := ClientRect;
+  case BevelOuter of
+    bvLowered: Frame3D(Canvas, fDstRect, clBtnShadow, clBtnHighlight, 1);
+    bvRaised:  Frame3D(Canvas, fDstRect, clBtnHighlight, clBtnShadow, 1);
+  end;
 
-  if Assigned(fBitmapProperties.fOnBeforePaint) then
-    fBitmapProperties.fOnBeforePaint(Self);
+  //paint the inner bevel
+  fDstRect := InnerClientRect;
+  case BevelInner of
+    bvLowered: Frame3D(Canvas, fDstRect, clBtnShadow, clBtnHighlight, 1);
+    bvRaised:  Frame3D(Canvas, fDstRect, clBtnHighlight, clBtnShadow, 1);
+  end;
+
+  //paint panel caption
+  if ShowCaption and (Caption <> '') then
+  begin
+    canvas.Brush.Style := bsClear;
+    canvas.Font := Self.Font;
+    Flags := DT_EXPANDTABS or DT_SINGLELINE or
+      VAlignments[VerticalAlignment] or Alignments[Alignment];
+    Flags := DrawTextBiDiModeFlags(Flags);
+{$IFDEF STYLESERVICES}
+    if StyleServices.Enabled and (seFont in StyleElements) and
+      GetThemeColor('BUTTON', BP_GROUPBOX, 0, TMT_TEXTCOLOR, themeColor) then
+        Canvas.Font.Color := themeColor;
+{$ELSE}
+    if ThemeServices.ThemesEnabled and
+      GetThemeColor('BUTTON', BP_GROUPBOX, 0, TMT_TEXTCOLOR, themeColor) then
+        Canvas.Font.Color := themeColor;
+{$ENDIF}
+    DrawText(canvas.Handle, Caption, -1, fDstRect, Flags);
+  end;
 
   if fBmp.Empty then Exit;
+
+  marginOff := GetInnerMargin;
+  if Assigned(fBitmapProperties.fOnBeforePaint) then
+    fBitmapProperties.fOnBeforePaint(Self);
 
   srcRec := Rect(0, 0, fBmp.Width, fBmp.Height);
 
@@ -919,7 +1040,7 @@ begin
 
   //draw vertical scrollbar
   tmpRec := GetInnerClientRect;
-  if (fBmp.Height * fScale > RectHeight(tmpRec) +1) then
+  if ShowVertScrollButton then
   begin
     h := Round(fBmp.Height * fScale);
     w := ClientWidth;
@@ -927,16 +1048,17 @@ begin
     tmpRec.Right := w - DpiScale(3);
     OffsetRect(tmpRec, 0, Round(fOffsetY * RectHeight(tmpRec) / h));
     SetRectHeight(tmpRec, RectHeight(tmpRec) * RectHeight(tmpRec) div h);
-    if fMouseDownOverBevelV or fMouseOverBevelHorz then
-      Canvas.Brush.Color := fBitmapProperties.fScrollButtonColorHot else
-      Canvas.Brush.Color := fBitmapProperties.fScrollButtonColor;
+    if fMouseDownOverBevelV or
+      (not LeftMouseBtnDown and fMouseOverBevelVert) then
+        Canvas.Brush.Color := fBitmapProperties.fScrollButtonColorHot else
+        Canvas.Brush.Color := fBitmapProperties.fScrollButtonColor;
     Canvas.FillRect(tmpRec);
     DrawScrollButton(tmpRec, true);
   end;
 
   //draw horizontal scrollbar
   tmpRec := GetInnerClientRect;
-  if (fBmp.Width * fScale > RectWidth(tmpRec) +1) then
+  if ShowHorzScrollButton then
   begin
     w := Round(fBmp.Width * fScale);
     h := ClientHeight;
@@ -944,9 +1066,10 @@ begin
     tmpRec.Bottom := h - DpiScale(3);
     OffsetRect(tmpRec, Round(fOffsetX * RectWidth(tmpRec) / w), 0);
     SetRectWidth(tmpRec, RectWidth(tmpRec) * RectWidth(tmpRec) div w);
-    if fMouseDownOverBevelH or fMouseOverBevelVert then
-      Canvas.Brush.Color := fBitmapProperties.fScrollButtonColorHot else
-      Canvas.Brush.Color := fBitmapProperties.fScrollButtonColor;
+    if fMouseDownOverBevelH or
+      (not LeftMouseBtnDown and fMouseOverBevelHorz) then
+        Canvas.Brush.Color := fBitmapProperties.fScrollButtonColorHot else
+        Canvas.Brush.Color := fBitmapProperties.fScrollButtonColor;
     Canvas.FillRect(tmpRec);
     DrawScrollButton(tmpRec, true);
   end;
@@ -955,6 +1078,7 @@ end;
 
 procedure TPanel.CMFocusChanged(var Message: TMessage);
 begin
+  inherited;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -993,16 +1117,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPanel.SetFocusedColor(aColor: TColor);
+function TPanel.GetMouseIsInsideBorder: Boolean;
+var
+  mousePos: TPoint;
 begin
-  fFocusedColor := aColor;
-  Invalidate;
+  GetCursorPos(mousePos);
+  mousePos := ScreenToClient(mousePos);
+  Result := PtInRect(GetInnerClientRect, mousePos);
 end;
 //------------------------------------------------------------------------------
 
 procedure TPanel.UpdateCursor;
 begin
-  if fBmp.Empty or not fBitmapProperties.fZoomScrollEnabled or
+  if not MouseIsInsideBorder then
+    cursor := crHandPoint
+  else if fBmp.Empty or not fBitmapProperties.fZoomScrollEnabled or
     (fScaleType = stStretched) then
       cursor := crDefault
   else if fBitmapProperties.fScalingCursor <> 0 then
@@ -1024,13 +1153,6 @@ begin
   if assigned(fBitmapProperties.fOnBitmapResizing) then
     fBitmapProperties.fOnBitmapResizing(self);
   Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-function OffsetPoint(const pt: TPoint; dx, dy: integer): TPoint;
-begin
-  Result.X := pt.X + dx;
-  Result.Y := pt.Y + dy;
 end;
 //------------------------------------------------------------------------------
 

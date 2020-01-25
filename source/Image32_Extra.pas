@@ -1476,7 +1476,7 @@ begin
     //nb: prevRight always ends a range (whether a hole or an outer)
 
     //check if we're about to start a hole
-    if xLeft <= current.pt.X then
+    if xLeft < current.pt.X then
     begin
       //'current' must be descending and hence prevRight->xLeft a hole
       current := StartNewPath(current, prevRight, xLeft -1, y, true);
@@ -1494,7 +1494,7 @@ begin
     end;
 
     //check again for a new hole
-    if (xLeft <= current.pt.X) then
+    if (xLeft < current.pt.X) then
     begin
       current := StartNewPath(current, prevRight, xLeft -1, y, true);
       prevRight := xRight;
@@ -1511,7 +1511,7 @@ begin
     (xLeft > current.nextInRow.pt.X) do
       current := JoinAscDesc(current, current.nextInRow);
 
-  if not assigned(current) or (xRight <= current.pt.X) then
+  if not assigned(current) or (xRight < current.pt.X) then
   begin
     StartNewPath(current, xLeft, xRight -1, y, false);
     //nb: current remains unchanged
@@ -1617,38 +1617,37 @@ var
   i,j, highI: integer;
   prev: TPointD;
 begin
-  //removes colinear coordinates (only verticals needed) and coordinates whose
-  //adjacent coordinates are separated by no more than a pixel's diagonal
-
   highI := High(poly);
-  while  (HighI >= 0) and PointsEqual(poly[highI], poly[0]) do
-    dec(highI);
+  while  (HighI >= 0) and PointsEqual(poly[highI], poly[0]) do dec(highI);
   if highI < 1 then
   begin
     Result := nil;
     Exit;
-  end
-  else if highI < 4 then
-  begin
-    Result := poly;
-    Exit
   end;
 
-  prev := poly[highI];
   SetLength(Result, highI +1);
-  j := 0;
-  result[0] := poly[0];
-  for i := 1 to highI do
+  prev := poly[highI];
+  Result[0] := prev;
+  Result[1] := poly[0];
+  j := 1;
+  for i := 1 to highI -1 do
   begin
-    if ((prev.X <> result[j].X) or (prev.X <> poly[i].X)) and
-      (DistanceSqrd(prev, poly[i]) > 2.1) then
+    if ((DistanceSqrd(prev, Result[j]) > 2.1) and
+        (DistanceSqrd(Result[j], poly[i]) > 2.1)) or
+      (TurnsRight(prev, result[j], poly[i]) or
+        TurnsLeft(result[j], poly[i], poly[i+1])) then
     begin
       prev := result[j];
       inc(j);
     end;
     result[j] := poly[i];
   end;
-  SetLength(Result, j +1);
+  if ((DistanceSqrd(prev, Result[j]) > 2.1) and
+    (DistanceSqrd(Result[j], Result[0]) > 2.1)) or
+    TurnsRight(prev, result[j], Result[0]) or
+    TurnsLeft(result[j], Result[0], Result[1]) then
+      SetLength(Result, j +1) else
+      SetLength(Result, j);
 end;
 //------------------------------------------------------------------------------
 

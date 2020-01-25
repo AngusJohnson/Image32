@@ -119,8 +119,8 @@ object Form1: TForm1
       object Label1: TLabel
         Left = 5
         Top = 6
-        Width = 50
-        Height = 33
+        Width = 44
+        Height = 32
         Caption = 'Smooth'#10'Amount'
       end
       object TrackBar1: TTrackBar
@@ -132,7 +132,7 @@ object Form1: TForm1
         Min = 1
         Orientation = trVertical
         PageSize = 0
-        Position = 6
+        Position = 3
         ShowSelRange = False
         TabOrder = 0
         TickStyle = tsNone
@@ -147,9 +147,9 @@ object Form1: TForm1
       Align = alClient
       BevelInner = bvLowered
       BorderWidth = 16
+      Color = clHighlight
       TabOrder = 0
       TabStop = True
-      ExplicitWidth = 223
     end
   end
   object MainMenu1: TMainMenu

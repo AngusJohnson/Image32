@@ -163,7 +163,7 @@ begin
     //Epsilon should be +1 greater than meaningful pixel size.
     if mnuShowSimplified.Checked or mnuShowSimplifiedSmoothed.Checked then
     begin
-      flattenedPaths := RamerDouglasPeucker(rawPaths, 3)
+      flattenedPaths := RamerDouglasPeucker(rawPaths, 2)
     end else
       flattenedPaths := rawPaths;
 

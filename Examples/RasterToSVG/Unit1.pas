@@ -383,25 +383,6 @@ begin
   svgImg         := TImage32.Create;
 
   DisplayImages;
-
-  //mnuEraseBackground.Checked := false;
-  //OpenDialog1.FileName := 'sample_images\tree.png';
-  //OpenDialog1.FileName := 'C:\Users\awj19\Documents\Pictures\simpsons.jpg';
-  //OpenDialog1.FileName := 'sample_images\man.png';
-  //OpenDialog1.FileName := 'sample_images\comic.png';
-  //OpenDialog1.FileName := 'sample_images\candle.png';
-  //OpenDialog1.FileName := 'sample_images\text.png';
-  //OpenDialog1.FileName := 'sample_images\floorplan.png';
-  //OpenDialog1.FileName := 'sample_images\christmas_tree.png';
-  //OpenDialog1.FileName := 'sample_images\easter_bunny.png';
-  //OpenDialog1.FileName := 'sample_images\balloons.png';
-  //OpenDialog1.FileName := 'sample_images\beetle.png';
-  //OpenDialog1.FileName := 'sample_images\architect3.png';
-  //OpenDialog1.FileName := 'sample_images\snowman2.png';
-
-  DoOpenFile(OpenDialog1.FileName, false);
-//  svgStringStream.SaveToFile(ChangeFileExt(OpenDialog1.FileName, '.svg'));
-  WindowState := wsMaximized;
 end;
 //------------------------------------------------------------------------------
 
@@ -493,7 +474,7 @@ begin
     pp := Vectorize(tmpMasterImg, $FF000000, CompareRGB, $80);
 
   pp := RamerDouglasPeucker(pp, smoothness * 1.5 * scale);
-  pp := SmoothLine(pp, true, smoothness * 1.5 * scale, scale);
+  pp := SmoothLine(pp, true, smoothness * scale, scale);
   new(pnc);
   pnc.paths := pp;
   pnc.color := clBlack32;
@@ -525,8 +506,6 @@ var
   palFrequencies: TArrayOfInteger;
   pp, shadow, black, opaque: TArrayOfArrayOfPointD;
   shadowImg: TImage32;
-const
-  nearBlackTolerance = $60;
 begin
   //convert palette entres into vectors and store them in palVectorsList.
   //Note that lower palette entries are darker than higher ones and so
@@ -569,8 +548,8 @@ begin
     end;
 
     if not Assigned(shadow) then Exit; //ie nothing reasonably opaque
-    shadow := RamerDouglasPeucker(shadow, 1.3* scale);
-    shadow := SmoothLine(shadow, true, smoothness *2, 1);
+    shadow := RamerDouglasPeucker(shadow, 0.5 * scale);
+    shadow := SmoothLine(shadow, true, smoothness * 0.5, 1);
     new(pathsAndColor);
     pathsAndColor.paths := shadow;
     pathsAndColor.color := $FFC0C0C0;; //light gray
@@ -593,7 +572,7 @@ begin
   pal := MakeAndApplyPalette(tmpMasterImg, maxColors, false, palFrequencies);
 
   maxColors := length(pal) + shadowCnt;
-  pal := TrimPaletteByFraction(pal, palFrequencies, 0.1);
+  pal := TrimPalette(pal, palFrequencies, 0.1);
 
   //don't bother re-applying the palette, we'll just ignore the deleted colors
   //ApplyPalette(tmpMasterImg, pal, false);
@@ -624,9 +603,6 @@ begin
     ErasePolygon(tmpMasterImg, opaque, Image32_Vector.frEvenOdd);
   end;
 
-//  pp := InflatePolygons(black, 0.1 * scale);
-//  DrawPolygon(tmpMasterImg, pp, Image32_Vector.frEvenOdd, clBlack32);
-
   StatusBar1.SimpleText := ' Starting color layers: ' +
     ExtractFilename(OpenDialog1.FileName);
   Application.ProcessMessages;
@@ -647,29 +623,24 @@ begin
     svgImg.Assign(tmpMasterImg);
     svgImg.ConvertToBoolMask(pal[i], 0, CompareRGB, clNone32, clBlack32);
     pp := Vectorize(svgImg, clBlack32, CompareAlpha, $0);
-    //join up diagonal adjacent solo pixels
-    pp := Image32_Clipper.InflatePolygons(pp, 0.5);
 
     for j := high(pp) downto 0 do
-      if Abs(Image32_Vector.Area(pp[j])) < 4.2 * scale then
+      if Abs(Image32_Vector.Area(pp[j])) < 2.2 * scale then
         pp := DeletePath(pp, j);
-    if pp = nil then Continue;
 
-    pp := RamerDouglasPeucker(pp, 1.35 * scale);
+    if pp = nil then Continue;
+    pp := RamerDouglasPeucker(pp, 0.25 * scale);
     pp := Image32_Clipper.InflatePolygons(pp, 1.25 * scale, jsRound);
-    pp := SmoothLine(pp, true, 2 * scale, 1);
+    pp := SmoothLine(pp, true, scale, 1);
 
     new(pathsAndColor);
     pathsAndColor.paths := pp;
     pathsAndColor.color := pal[i];
     palVectorsList.Add(pathsAndColor);
   end;
-
-  //join up diagonal adjacent solo pixels
-  black := Image32_Clipper.InflatePolygons(black, 0.25 * scale);
-
-  black := RamerDouglasPeucker(black, smoothness * 0.75 * scale);
+  black := RamerDouglasPeucker(black, smoothness * 0.33 * scale);
   black := SmoothLine(black, true, smoothness * scale, 1);
+
   new(pathsAndColor);
   pathsAndColor.paths := black;
   pathsAndColor.color := pal[0];

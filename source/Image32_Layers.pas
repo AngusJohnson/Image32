@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.38                                                            *
-* Date      :  20 January 2020                                                 *
+* Version   :  1.39                                                            *
+* Date      :  24 January 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -285,7 +285,8 @@ end;
 procedure TLayer32.SetSize(width, height: integer);
 begin
   if (width <> fImage.Width) or (height <> fImage.Height) then
-    fImage.SetSize(width, height);
+    fImage.SetSize(width, height) else
+    fImage.Clear;
 end;
 //------------------------------------------------------------------------------
 

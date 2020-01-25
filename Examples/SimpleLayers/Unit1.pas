@@ -98,12 +98,20 @@ const
   margin = 100;
 
 //------------------------------------------------------------------------------
-// TMyImageLayer32: just some fun so only opaque pixels can be clicked in images
+// A couple of custom layer classes - one for images and one for drawing
 //------------------------------------------------------------------------------
 
 type
+  TMyDrawLayer32 = class(TLayer32)
+  public
+    //store drawing attributes
+    penColor: TColor32;
+    brushColor: TColor32;
+  end;
+
   TMyImageLayer32 = class(TLayer32)
   protected
+    //override HitTest so only opaque pixels will return true
     function HitTest(const pt: TPoint): Boolean; override;
   end;
 
@@ -111,9 +119,41 @@ function TMyImageLayer32.HitTest(const pt: TPoint): Boolean;
 begin
   Result := PtInRect(Bounds, pt);
   if not Result then Exit;
-  //nb: pt is relative to layeredImage32, so offset so it's relative to Image
-  with OffsetPoint(pt, -left,-top) do
+  //nb: the pt parameter here is relative to the layeredImage32 container,
+  //so it now needs to be offset so it's relative to the layer, remembering
+  //too that both the image and the layer have the same dimensions
+  with OffsetPoint(pt, -left, -top) do
     Result := (Image.Pixel[X, Y] shr 24 > 0);
+end;
+
+//------------------------------------------------------------------------------
+// Miscellaneous functions
+//------------------------------------------------------------------------------
+
+function MakeDarker(color: TColor32; percent: integer): TColor32;
+var
+  pcFrac: double;
+  r: TARGB absolute Result;
+begin
+  percent := Max(0, Min(100, percent));
+  pcFrac := percent/100;
+  Result := color;
+  r.R := r.R - Round(r.R * pcFrac);
+  r.G := r.G - Round(r.G * pcFrac);
+  r.B := r.B - Round(r.B * pcFrac);
+end;
+//------------------------------------------------------------------------------
+
+procedure GetRandomColors(out brushColor, penColor: TColor32);
+var
+  hsl: THsl;
+begin
+  hsl.hue := Random(256);
+  hsl.sat := 240;
+  hsl.lum := 200;
+  hsl.Alpha := 190;
+  brushColor := HslToRgb(hsl);
+  penColor := MakeDarker(brushColor, 60) or $FF000000;
 end;
 
 //------------------------------------------------------------------------------
@@ -187,7 +227,8 @@ end;
 function TForm1.AddRectangle(const pt: TPoint): TLayer32;
 begin
   masterImageList.Add(nil); //just a place filler
-  Result := layeredImage32.AddNewLayer('rectangle');
+  Result := layeredImage32.AddNewLayer(TMyDrawLayer32, 'rectangle');
+  with TMyDrawLayer32(Result) do GetRandomColors(brushColor, penColor);
   SizeAndDrawLayer(Result, 128, 192);
   Result.PositionCenteredAt(pt);
 end;
@@ -196,7 +237,8 @@ end;
 function TForm1.AddEllipse(const pt: TPoint): TLayer32;
 begin
   masterImageList.Add(nil); //just a place filler
-  Result := layeredImage32.AddNewLayer('ellipse');
+  Result := layeredImage32.AddNewLayer(TMyDrawLayer32, 'ellipse');
+  with TMyDrawLayer32(Result) do GetRandomColors(brushColor, penColor);
   SizeAndDrawLayer(Result, 192, 150);
   Result.PositionCenteredAt(pt);
 end;
@@ -220,7 +262,8 @@ begin
 
   //get the text's outline and store it in Result.HitTestRegions
   //ready to draw it (see DrawLayer).
-  Result := layeredImage32.AddNewLayer(RandText[Random(6)]);
+  Result := layeredImage32.AddNewLayer(TMyDrawLayer32, RandText[Random(6)]);
+  with TMyDrawLayer32(Result) do GetRandomColors(brushColor, penColor);
   paths := GetTextOutline(10, 90,
     Result.Name, GetFontInfo(lf), taLeft, endPt);
   Result.HitTestRegions := paths;
@@ -255,12 +298,23 @@ var
   paths: TArrayOfArrayOfPointD;
   img: TImage32;
   rec: TRect;
+  brushColor, penColor: TColor;
 begin
   //draws everything except raster images
   img := layer.Image;
   img.SetSize(newWidth, newHeight);
   if img.IsEmpty then Exit;
   rec := Rect(0,0, newWidth, newHeight);
+
+  if layer is TMyDrawLayer32 then
+  begin
+    brushColor := TMyDrawLayer32(layer).brushColor;
+    penColor := TMyDrawLayer32(layer).penColor;
+  end else
+  begin
+    //layer is TMyImageLayer32, so to avoid warnings ...
+    brushColor := clNone32; penColor := clNone32;
+  end;
 
   if layer.Name = '' then
   begin
@@ -274,8 +328,8 @@ begin
     Windows.InflateRect(rec, -3, -3);
     SetLength(paths, 1);
     paths[0] := Rectangle(rec);
-    DrawPolygon(img, paths, frNonZero, $AAFFDD66);
-    DrawLine(img, paths, 6, $FFAA6600, esClosed);
+    DrawPolygon(img, paths, frNonZero, brushColor);
+    DrawLine(img, paths, 6, penColor, esClosed);
   end
   else if layer.Name = 'ellipse' then
   begin
@@ -283,20 +337,21 @@ begin
     Windows.InflateRect(rec, -3, -3);
     SetLength(paths, 1);
     paths[0] := Ellipse(rec);
-    DrawPolygon(img, paths, frNonZero, $AA99FF99);
-    DrawLine(img, paths, 6, clGreen32, esClosed);
+    DrawPolygon(img, paths, frNonZero, brushColor);
+    DrawLine(img, paths, 6, penColor, esClosed);
   end else
   begin
     //layer contains text
     if not assigned(layer.HitTestRegions) then Exit;
     rec := GetBounds(layer.HitTestRegions);
     paths := OffsetPath(layer.HitTestRegions, -rec.Left, -rec.Top);
-    paths := ScalePath(paths, layer.width/rec.Width, layer.Height/rec.Height);
+    paths := ScalePath(paths,
+      layer.width / RectWidth(rec), layer.Height/ RectHeight(rec));
 
     DrawShadow(img, paths, frNonZero, 3);
-    DrawPolygon(img, paths, frNonZero, $FF00DD00);
+    DrawPolygon(img, paths, frNonZero, brushColor);
     Draw3D(img, paths, frNonZero, 3,4);
-    DrawLine(img, paths, 1, clBlack32, esClosed);
+    DrawLine(img, paths, 2, clBlack32, esClosed);
   end;
   if layer.Name <> '' then
     layer.HitTestRegions := paths;
@@ -447,8 +502,10 @@ var
 begin
   pt := Types.Point(X,Y);
   if not Panel1.ClientToBitmap(pt) then Exit;
+
   dx := pt.X - clickPoint.X;
   dy := pt.Y - clickPoint.Y;
+  clickPoint := pt;
 
   if activeLayerMouseDown then              //moving image (and buttons)
   begin
@@ -465,12 +522,11 @@ begin
   begin
     //not moving anything so just update the cursor
     layer := layeredImage32.GetLayerAt(pt);
-    if Assigned(layer) then
+    if Assigned(layer) and Panel1.MouseIsInsideBorder then
       Panel1.Cursor := layer.CursorId else
       Panel1.Cursor := crDefault;
     Exit;
   end;
-  clickPoint := pt;
   PaintLayeredImage;
 end;
 //------------------------------------------------------------------------------
