@@ -53,12 +53,14 @@ var
   BitDepth: integer;
   pAlpha, pColor: PByte;
   pDst: PARGB;
+  transColor: ColorRef;
   palleteChunk: TChunkPLTE;
 begin
   result := false;
   png := TPngImage.Create;
   try
     png.LoadFromStream(stream);
+    transColor := png.TransparentColor;
     if png.Empty then Exit;
     img32.SetSize(png.Header.Width, png.Header.Height);
 
@@ -77,7 +79,9 @@ begin
             pDst.B := pColor^;
             pDst.G := pColor^;
             pDst.R := pColor^;
-            pDst.A := 255;
+            if pDst.Color = transColor then
+              pDst.A := 0 else
+              pDst.A := 255;
             inc(pColor); inc(pDst);
           end;
         end;
@@ -94,7 +98,9 @@ begin
           for j := 0 to img32.Width -1 do
           begin
             pDst.Color := TColor32(palleteChunk.Item[pColor^]);
-            pDst.A := 255;
+            if pDst.Color = transColor then
+              pDst.A := 0 else
+              pDst.A := 255;
             inc(pColor); inc(pDst);
           end;
         end;
@@ -126,10 +132,12 @@ begin
           pDst := PARGB(img32.PixelRow[i]);
           for j := 0 to img32.Width -1 do
           begin
-            pDst.A := 255;
             pDst.B := pColor^;  inc(pColor);
             pDst.G := pColor^;  inc(pColor);
             pDst.R := pColor^;  inc(pColor);
+            if pDst.Color = transColor then
+              pDst.A := 0 else
+              pDst.A := 255;
             inc(pDst);
           end;
         end;

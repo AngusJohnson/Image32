@@ -2,7 +2,7 @@ object Form1: TForm1
   Left = 618
   Top = 336
   Caption = 'Image32 - Transform'
-  ClientHeight = 389
+  ClientHeight = 388
   ClientWidth = 370
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -20,19 +20,17 @@ object Form1: TForm1
     Left = 0
     Top = 0
     Width = 370
-    Height = 370
+    Height = 369
     Align = alClient
     PopupMenu = PopupMenu1
     TabOrder = 0
     OnMouseDown = Panel1MouseDown
     OnMouseMove = Panel1MouseMove
     OnMouseUp = Panel1MouseUp
-    ExplicitLeft = 8
-    ExplicitTop = -6
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 370
+    Top = 369
     Width = 370
     Height = 19
     Panels = <>

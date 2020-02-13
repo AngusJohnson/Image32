@@ -106,6 +106,7 @@ type
     procedure mnuFontClick(Sender: TObject);
     procedure PopupMenu1Popup(Sender: TObject);
     procedure edPenColorChange(Sender: TObject);
+    procedure FormResize(Sender: TObject);
   private
     layeredImage32: TLayeredImage32;
     clickPoint    : TPoint;
@@ -121,13 +122,13 @@ type
     procedure RefreshButtonPositionsFromPath;
     procedure UpdateButtonGroupFromPath;
     function HitTestButtonPath(const pt: TPoint): Boolean;
-    procedure BeginPanelPaint(Sender: TObject);
+    procedure BeforePanelPaint(Sender: TObject);
     procedure UpdateLayeredImage;
     procedure StartPolygonArrow;
     function ClearRotateSizeButton: Boolean;
     procedure UpdateMenus;
     procedure DisplayFont;
-    function ShortenPathAndGetArrowHeads(var path: TArrayOfPointD):
+    function ShortenPathAndReturnArrowHeads(var path: TArrayOfPointD):
       TArrayOfArrayOfPointD;
     procedure AdjustArrow(index: integer; newPt: TPointD);
     procedure PanelKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -199,20 +200,21 @@ begin
   CursorId := crMove;
 
   flatPath := smoothPath.FlattenedPath;
-  paths := FrmMain.ShortenPathAndGetArrowHeads(flatPath);
-
-  //nb: flatpath may have been shortened by GetArrowHeads above
+  paths := FrmMain.ShortenPathAndReturnArrowHeads(flatPath);
+  //flatpath will also be shortened above
+  //now combine an outline of the shortened path with the arrow head polygons
   AppendPath(paths, OpenPathToFlatPolygon(flatPath));
   HitTestRegions :=
     InflatePolygons(paths, (lineWidth + hitTestWidth) * 0.5, jsAuto);
+  rec := GetBounds(HitTestRegions);
+  self.SetBounds(rec);
+  HitTestRegions := OffsetPath(HitTestRegions, -Left, -Top);
 
-  //now remove inflated flatpath that was just added to paths
+  //now remove the flatpath outine that was just added to paths
+  //so we're left with the arrow head polys
   SetLength(paths, Length(paths) -1);
 
   //draw flattened line
-  rec := GetBounds(HitTestRegions);
-  self.SetBounds(rec);
-
   flatPath := OffsetPath(flatPath, -Left, -Top);
   paths := OffsetPath(paths, -Left, -Top);
   Image.Clear;
@@ -238,13 +240,13 @@ begin
   self.HitTestRegions := UnionPolygon(flattened, frEvenOdd);
   HitTestRegions :=
     InflatePolygons(HitTestRegions, (lineWidth + hitTestWidth) *0.5);
-
+  rec := GetBounds(HitTestRegions);
+  SetBounds(rec);
+  HitTestRegions := OffsetPath(HitTestRegions, -Left, -Top);
   self.SmoothPath.Assign(smoothPath);
   CursorId := crMove;
 
   //draw polygon
-  rec := GetBounds(HitTestRegions);
-  self.SetBounds(rec);
   flattened := OffsetPath(flattened, -Left, -Top);
   Image.Clear;
   DrawPolygon(Image, flattened, frNonZero, fillColor);
@@ -302,9 +304,9 @@ begin
   //set pnlMain.Tabstop -> true to enable keyboard controls
   pnlMain.TabStop := true;
   pnlMain.FocusedColor := clGradientInactiveCaption;
-  pnlMain.BitmapProperties.Scale := 1;
-  pnlMain.BitmapProperties.OnBeginPaint := BeginPanelPaint;
-  pnlMain.BitmapProperties.OnKeyDown := PanelKeyDown;
+  pnlMain.Scale := 1;
+  pnlMain.OnBeginPaint := BeforePanelPaint;
+  pnlMain.OnKeyDown := PanelKeyDown;
   pnlMain.Bitmap.PixelFormat := pf32bit; //for alpha transparency
 
   //SETUP LAYEREDIMAGE32
@@ -312,17 +314,17 @@ begin
   layeredImage32 := TLayeredImage32.Create(RectWidth(rec), RectHeight(rec));
 
   //hatched image layer is TDesignerLayer32 so it's 'non-clickable'
-  layer := layeredImage32.AddNewLayer(TDesignerLayer32, 'hatched background');
+  layer := layeredImage32.AddLayer(TDesignerLayer32);
   layer.SetSize(layeredImage32.Width, layeredImage32.Height);
   HatchBackground(layer.Image);
 
   //layer for an opened image
-  layer := layeredImage32.AddNewLayer('loaded image ');
+  layer := layeredImage32.AddLayer;
   layer.CursorId := crMove2; //custom move cursor
   layer.Visible := false;
 
   //and another designer layer
-  designLayer := layeredImage32.AddNewLayer(TDesignerLayer32, 'designer');
+  designLayer := layeredImage32.AddLayer(TDesignerLayer32);
   designLayer.SetSize(layeredImage32.Width, layeredImage32.Height);
 
   Screen.Cursors[crRotate] :=
@@ -470,7 +472,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFrmMain.ShortenPathAndGetArrowHeads(var path: TArrayOfPointD):
+function TFrmMain.ShortenPathAndReturnArrowHeads(var path: TArrayOfPointD):
   TArrayOfArrayOfPointD;
 var
   pt1, pt2: TPointD;
@@ -488,7 +490,9 @@ begin
     pathEnd := peEnd;
   arrowSize := GetDefaultArrowHeadSize(lineWidth);
   pt1 := path[0]; pt2 := path[High(path)];
+  //////////////////////////////////////////////
   path := ShortenPath(path, pathEnd, arrowSize);
+  //////////////////////////////////////////////
   case pathEnd of
     peStart: AppendPath(Result, ArrowHead(pt1, path[0],
       arrowSize, TArrowStyle(cbArrowStart.ItemIndex)));
@@ -510,7 +514,7 @@ var
   i, d: integer;
   rec: TRect;
   flatPath: TArrayOfPointD;
-  arrowHeads: TArrayOfArrayOfPointD;
+  htPaths, arrowHeads: TArrayOfArrayOfPointD;
   dl: TDesignerLayer32;
 const
   fillC: TColor32 = $40AAAAAA;
@@ -534,13 +538,13 @@ begin
       DrawLine(dl.Image, flatPath, lineWidth, penColor, esClosed);
     end else
     begin
-      arrowHeads := ShortenPathAndGetArrowHeads(flatPath);
+      arrowHeads := ShortenPathAndReturnArrowHeads(flatPath);
       DrawPolygon(dl.Image, arrowHeads, frEvenOdd, fillColor);
       DrawLine(dl.Image, arrowHeads, lineWidth, penColor, esClosed);
       DrawLine(dl.Image, flatPath, lineWidth, penColor, esRound);
     end;
     //display control lines
-    DrawSmoothPathOnDesigner(buttonPath, dl);
+    DrawSmoothPathCtrlLinesOnDesigner(buttonPath, dl);
   end;
 
   //outline selected button
@@ -568,8 +572,12 @@ begin
   if Assigned(clickedLayer) then
   begin
     if (clickedLayer is TSmoothPathLayer32) then
-      DrawDashedLine(dl.Image, clickedLayer.HitTestRegions,
-        dashes, nil, 1, clRed32, esClosed)
+    begin
+      //convert HitTestRegions from layer to layeredImage32 coordinates
+      with clickedLayer do
+        htPaths := OffsetPath(HitTestRegions, Left, Top);
+      DrawDashedLine(dl.Image, htPaths, dashes, nil, 1, clRed32, esClosed)
+    end
     else if (clickedLayer is TTextLayer32) then
       DrawDashedLine(dl.Image, Rectangle(clickedLayer.Bounds),
         dashes, nil, 1, clRed32, esClosed)
@@ -603,19 +611,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TFrmMain.BeginPanelPaint(Sender: TObject);
+procedure TFrmMain.BeforePanelPaint(Sender: TObject);
 var
   dc: HDC;
 begin
-  //update pnlMain.Bitmap with layeredImage32's merged image
-  {$IFDEF SETSIZE}
-  pnlMain.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
-  {$ELSE}
-  pnlMain.Bitmap.Width := layeredImage32.Width;
-  pnlMain.Bitmap.Height := layeredImage32.Height;
-  {$ENDIF}
+  //update the bitmap before repainting the panel
   dc := pnlMain.Bitmap.Canvas.Handle;
-  layeredImage32.GetMergedImage(not mnuShowDesigner.Checked).CopyToDc(dc,0,0,false);
+  layeredImage32.GetMergedImage(not mnuShowDesigner.Checked).CopyToDc(dc);
 end;
 //------------------------------------------------------------------------------
 
@@ -637,7 +639,7 @@ begin
     begin
       layeredImage32.DeleteGroup(1);
       polygonLayer :=
-        TPolygonLayer32(layeredImage32.AddNewLayer(TPolygonLayer32, 'polygon'));
+        TPolygonLayer32(layeredImage32.AddLayer(TPolygonLayer32));
       polygonLayer.SetSmoothPathAndDraw(buttonPath);
       designLayer.BringForward(polygonLayer.Index);
     end else
@@ -645,7 +647,7 @@ begin
       if buttonPath.Count < 2 then Exit;
       layeredImage32.DeleteGroup(1);
       lineLayer :=
-        TLineLayer32(layeredImage32.AddNewLayer(TLineLayer32, 'line'));
+        TLineLayer32(layeredImage32.AddLayer(TLineLayer32));
       lineLayer.SetSmoothPathAndDraw(buttonPath);
       designLayer.BringForward(lineLayer.Index);
     end;
@@ -767,7 +769,7 @@ begin
     ClearRotateSizeButton;
 
   //disable pnlMain scrolling if we're about to move a layer
-  pnlMain.BitmapProperties.ZoomAndScrollEnabled := moveType = mtNone;
+  pnlMain.ZoomAndScrollEnabled := moveType = mtNone;
 
   UpdateLayeredImage;
   UpdateMenus;
@@ -955,7 +957,7 @@ procedure TFrmMain.pnlMainMouseUp(Sender: TObject; Button: TMouseButton;
 begin
   moveType := mtNone;
   //re-enable pnlMain zoom and scroll
-  pnlMain.BitmapProperties.ZoomAndScrollEnabled := true;
+  pnlMain.ZoomAndScrollEnabled := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -972,20 +974,18 @@ begin
 
   if clickedLayer is TTextLayer32 then
   begin
-    dup  := layeredImage32.InsertNewLayer(TTextLayer32,
-      clickedLayer.Index +1, clickedLayer.Name);
+    dup  := layeredImage32.InsertLayer(TTextLayer32,
+      clickedLayer.Index +1);
     TTextLayer32(dup).PositionTextAndDraw(clickedLayer.Bounds.TopLeft);
   end
   else if clickedLayer is TPolygonLayer32 then
   begin
-    dup  := layeredImage32.InsertNewLayer(TPolygonLayer32,
-      clickedLayer.Index +1, 'polygon');
+    dup  := layeredImage32.InsertLayer(TPolygonLayer32, clickedLayer.Index +1);
     TPolygonLayer32(dup).SetSmoothPathAndDraw(
       TPolygonLayer32(clickedLayer).SmoothPath);
   end else
   begin
-    dup  := layeredImage32.InsertNewLayer(TLineLayer32,
-      clickedLayer.Index +1, 'line');
+    dup  := layeredImage32.InsertLayer(TLineLayer32, clickedLayer.Index +1);
     TLineLayer32(dup).SetSmoothPathAndDraw(TLineLayer32(clickedLayer).SmoothPath);
   end;
 
@@ -1242,8 +1242,8 @@ begin
   text := InputBox(Self.Caption, 'Enter Text:', '');
   if text = '' then Exit;
 
-  textLayer  := layeredImage32.InsertNewLayer(TTextLayer32,
-    designLayer.Index, text);
+  textLayer  := layeredImage32.InsertLayer(TTextLayer32, designLayer.Index);
+  textLayer.Name := text;
   TTextLayer32(textLayer).PositionTextAndDraw(popupPos);
 
   clickedLayer := textLayer;
@@ -1253,34 +1253,34 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TFrmMain.mnuLoadImageClick(Sender: TObject);
+procedure TFrmMain.FormResize(Sender: TObject);
 var
-  i: integer;
-  resized: Boolean;
+  rec: TRect;
+  w,h: integer;
+begin
+  if not visible then Exit; //closing
+  rec := pnlMain.InnerClientRect;
+  w := RectWidth(rec); h := RectHeight(rec);
+  //pnlMain.Bitmap.SetSize(w, h);
+  pnlMain.Bitmap.Width := w;
+  pnlMain.Bitmap.Height := h;
+  layeredImage32.SetSize(w,h);
+
+  layeredImage32[0].SetSize(w,h); //hatched background layer
+  HatchBackground(layeredImage32[0].Image);
+
+//  layeredImage32[1].SetSize(w,h); //image layer
+//  if OpenDialog1.FileName <> '' then
+//    layeredImage32[1].Image.LoadFromFile(OpenDialog1.FileName);
+
+  layeredImage32[2].SetSize(w,h); //designer layer
+end;
+//------------------------------------------------------------------------------
+
+procedure TFrmMain.mnuLoadImageClick(Sender: TObject);
 begin
   if not OpenDialog1.Execute then Exit;
   layeredImage32[1].Image.LoadFromFile(OpenDialog1.FileName);
-  resized := false;
-  if layeredImage32.Width < layeredImage32[1].Image.Width then
-  begin
-    layeredImage32.Width := layeredImage32[1].Image.Width;
-    resized := true;
-  end;
-  if layeredImage32.Height < layeredImage32[1].Image.Height then
-  begin
-    layeredImage32.Height := layeredImage32[1].Image.Height;
-    resized := true;
-  end;
-  if resized then
-    with layeredImage32 do
-    begin
-      layeredImage32[0].SetSize(Width, Height);
-      HatchBackground(layeredImage32[0].Image);
-
-      i := 2;
-      while layeredImage32[i].Name <> 'designer' do inc(i);
-      layeredImage32[i].SetSize(Width, Height);
-    end;
   layeredImage32[1].Visible := true;
   UpdateLayeredImage;
   UpdateMenus;

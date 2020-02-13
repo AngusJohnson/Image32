@@ -1,9 +1,9 @@
 object Form1: TForm1
   Left = 514
   Top = 310
-  Caption = 'Image32: Simple animation'
+  Caption = 'Simple animation'
   ClientHeight = 444
-  ClientWidth = 324
+  ClientWidth = 261
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -12,6 +12,7 @@ object Form1: TForm1
   Font.Style = []
   Menu = MainMenu1
   OldCreateOrder = False
+  Position = poScreenCenter
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   PixelsPerInch = 96
@@ -19,7 +20,7 @@ object Form1: TForm1
   object Panel1: TPanel
     Left = 0
     Top = 0
-    Width = 324
+    Width = 261
     Height = 418
     Align = alClient
     TabOrder = 0
@@ -28,12 +29,12 @@ object Form1: TForm1
   object StatusBar1: TStatusBar
     Left = 0
     Top = 418
-    Width = 324
+    Width = 261
     Height = 26
     Panels = <>
     ParentFont = True
     SimplePanel = True
-    SimpleText = ' Double click to slow animation'
+    SimpleText = ' Double click to slow the animation'
     UseSystemFont = False
   end
   object MainMenu1: TMainMenu

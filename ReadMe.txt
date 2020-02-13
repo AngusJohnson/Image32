@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 1.40
-Released: 26 January 2020
+Latest version: 1.41
+Released: 14 February 2020
 
 Copyright © 2019-2020 Angus Johnson
 Freeware released under Boost Software License
@@ -11,6 +11,23 @@ Website  : http://www.angusj.com/delphi/image32/Docs/_Body.htm
 download : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
+
+Version: 1.41
+  CHANGES IN BITMAPPANELS
+    MAJOR UPDATE INCLUDING THE REMOVAL OF THE CONFUSING 
+      BITMAPPROPERTIES PROPERTY, AND WITH SEVERAL BUGFIXES
+  Changes in Image32
+    Added TImage32.ScaleToFit method
+  Changes in Image32_PNG
+    Improved transparency detection
+  Changes in Image32_Layers
+    Changed and renamed AddNewLayer to AddLayer
+    Changed and renamed InsertNewLayer to InsertLayer
+  Changes in Image32_SmoothPath
+    Renamed DrawSmoothPathOnDesigner to
+      DrawSmoothPathCtrlLinesOnDesigner
+  Changes in Examples
+    Added "Photo" application, an image viewer
 
 Version: 1.40
   Changes in Image32_Extra

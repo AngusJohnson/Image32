@@ -1,9 +1,9 @@
 object FrmMain: TFrmMain
   Left = 554
   Top = 394
+  Width = 482
+  Height = 470
   Caption = 'Image32 - Layers & SmoothPaths'
-  ClientHeight = 412
-  ClientWidth = 466
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -14,6 +14,7 @@ object FrmMain: TFrmMain
   OldCreateOrder = False
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnResize = FormResize
   PixelsPerInch = 96
   TextHeight = 14
   object pnlMain: TPanel

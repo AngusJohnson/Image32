@@ -174,12 +174,12 @@ begin
   //set Panel1.Tabstop := true to enable keyboard controls
   Panel1.TabStop := true;
   Panel1.FocusedColor := clGradientInactiveCaption;
-  Panel1.BitmapProperties.Scale := 1;
+  Panel1.Scale := 1;
   //enable (image) file drop
-  Panel1.BitmapProperties.FileDropEnabled := true;
-  Panel1.BitmapProperties.OnFileDrop := DoDropImage;
+  Panel1.FileDropEnabled := true;
+  Panel1.OnFileDrop := DoDropImage;
   //capture key events so ESC will clear ActiveLayer
-  Panel1.BitmapProperties.OnKeyDown := DoKeyDown;
+  Panel1.OnKeyDown := DoKeyDown;
 
   //MASTER IMAGE LIST
   masterImageList := TImageList32.Create;
@@ -192,7 +192,7 @@ begin
   //we don't need to worry about BackgroundColor here as
   //we're using a hatched image for the background instead.
 
-  layer := layeredImage32.AddNewLayer(TDesignerLayer32, 'hatched bkgnd');
+  layer := layeredImage32.AddLayer(TDesignerLayer32);
   //layer.SetSize() is the same as layer.image.SetSize()
   layer.SetSize(layeredImage32.Width, layeredImage32.Height);
   HatchBackground(layer.Image, $FFF0F0F0, clWhite32);
@@ -227,7 +227,8 @@ end;
 function TForm1.AddRectangle(const pt: TPoint): TLayer32;
 begin
   masterImageList.Add(nil); //just a place filler
-  Result := layeredImage32.AddNewLayer(TMyDrawLayer32, 'rectangle');
+  Result := layeredImage32.AddLayer(TMyDrawLayer32);
+  Result.Name := 'rectangle';
   with TMyDrawLayer32(Result) do GetRandomColors(brushColor, penColor);
   SizeAndDrawLayer(Result, 128, 192);
   Result.PositionCenteredAt(pt);
@@ -237,7 +238,8 @@ end;
 function TForm1.AddEllipse(const pt: TPoint): TLayer32;
 begin
   masterImageList.Add(nil); //just a place filler
-  Result := layeredImage32.AddNewLayer(TMyDrawLayer32, 'ellipse');
+  Result := layeredImage32.AddLayer(TMyDrawLayer32);
+  Result.Name := 'ellipse';
   with TMyDrawLayer32(Result) do GetRandomColors(brushColor, penColor);
   SizeAndDrawLayer(Result, 192, 150);
   Result.PositionCenteredAt(pt);
@@ -262,7 +264,8 @@ begin
 
   //get the text's outline and store it in Result.HitTestRegions
   //ready to draw it (see DrawLayer).
-  Result := layeredImage32.AddNewLayer(TMyDrawLayer32, RandText[Random(6)]);
+  Result := layeredImage32.AddLayer(TMyDrawLayer32);
+  Result.Name := RandText[Random(6)];
   with TMyDrawLayer32(Result) do GetRandomColors(brushColor, penColor);
   paths := GetTextOutline(10, 90,
     Result.Name, GetFontInfo(lf), taLeft, endPt);
@@ -284,7 +287,7 @@ begin
   masterImageList.Add(masterImage);
   masterImage.LoadFromFile(OpenDialog1.FileName);
   masterImage.CropTransparentPixels;
-  with layeredImage32.AddNewLayer(TMyImageLayer32) do
+  with layeredImage32.AddLayer(TMyImageLayer32) do
   begin
     image.Assign(masterImage);
     PositionCenteredAt(layeredImage32.MidPoint);
@@ -368,7 +371,7 @@ begin
   masterImageList.Add(masterImage);
   masterImage.PasteFromClipBoard;
   masterImage.CropTransparentPixels;
-  with layeredImage32.AddNewLayer(TMyImageLayer32) do
+  with layeredImage32.AddLayer(TMyImageLayer32) do
   begin
     image.Assign(masterImage);
     PositionCenteredAt(layeredImage32.MidPoint);
@@ -393,7 +396,7 @@ begin
   masterImageList.Add(masterImage);
   masterImage.LoadFromFile(FileName);
   masterImage.CropTransparentPixels;
-  with layeredImage32.AddNewLayer(TMyImageLayer32) do
+  with layeredImage32.AddLayer(TMyImageLayer32) do
   begin
     image.Assign(masterImage);
     PositionCenteredAt(pt);
@@ -468,7 +471,7 @@ begin
   clickedLayer := layeredImage32.GetLayerAt(clickPoint);
 
   //disable panel1 scrolling if we're about to move an image or a button
-  panel1.BitmapProperties.ZoomAndScrollEnabled := not Assigned(clickedLayer);
+  panel1.ZoomAndScrollEnabled := not Assigned(clickedLayer);
 
   //if a control button was clicked then get ready to move it
   if Assigned(clickedLayer) and (clickedLayer is TButtonDesignerLayer32) then
@@ -522,7 +525,7 @@ begin
   begin
     //not moving anything so just update the cursor
     layer := layeredImage32.GetLayerAt(pt);
-    if Assigned(layer) and Panel1.MouseIsInsideBorder then
+    if Assigned(layer) then
       Panel1.Cursor := layer.CursorId else
       Panel1.Cursor := crDefault;
     Exit;
@@ -537,7 +540,7 @@ begin
   activeLayerMouseDown := false;
   activeButtonLayer := nil;
   //re-enable Panel1 zoom and scroll
-  Panel1.BitmapProperties.ZoomAndScrollEnabled := true;
+  Panel1.ZoomAndScrollEnabled := true;
 end;
 //------------------------------------------------------------------------------
 

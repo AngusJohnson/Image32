@@ -6,7 +6,7 @@ interface
 uses
   Windows, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls,
-  Image32, BitmapPanels, Timer;
+  Image32, BitmapPanels;
 
 type
   TForm1 = class(TForm)
@@ -22,7 +22,7 @@ type
     procedure Panel1DblClick(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
   private
-    timer: TTimerEx;
+    timer: TTimer;
     reversing: Boolean;
     imgIndex: integer;
     masterImageList: TImageList32;
@@ -66,7 +66,7 @@ begin
   //enable bitmap transparency (ie to the panel background)
   Panel1.Bitmap.PixelFormat := pf32bit;
   //since ScaleType defaults to stFit, change to ...
-  Panel1.BitmapProperties.ScaleType := stScaled; //(scale = 1)
+  Panel1.ScaleType := stScaled; //(scale = 1)
 
   {$IFDEF SETSIZE}
   Panel1.Bitmap.SetSize(ImageSize, ImageSize + SpaceAbove);
@@ -120,17 +120,20 @@ begin
   end;
   img.Free;
 
-  //setup my threaded timer to kick things off
-  timer := TTimerEx.Create;
+  //set up the timer to kick things off
+  timer := TTimer.Create(self);
   timer.OnTimer := DoTimer;
-  timer.Interval := 1000/60; //1000msec/60frames = 60frames/sec
-  timer.Priority := tpLowest;
+  //There are 60 images to cycle through here every second so, given that the
+  //time to execute the OnTimer event is negligble, I'd expect to set the timer
+  //interval to about 17 msec (ie 1000/60). Unfortunately Delphi's TTimer
+  //(a wrapper for the Windows timer) isn't very accurate and, at least on my
+  //PC, even a 16 msec interval takes ~1.3 secs to complete. And the timer
+  //isn't uniformly slow since a 15 msec interval completes in ~0.9 secs, as
+  //expected. Anyhow, if I wanted an accurate metronome, I'd need to replace
+  //the TTimer component with a much more accurate one.
+  timer.Interval := 15;
   timer.Enabled := true;
 
-//  //Unfortunately Delphi's TTimer component isn't time accurate. If you swap
-//  //timers here, you'll see that TTimer is noticeably slower than expected.
-//  Timer1.Interval := 1000 div 60; //1000msec/60frames = 60frames/sec
-//  Timer1.Enabled := True;
 end;
 //------------------------------------------------------------------------------
 

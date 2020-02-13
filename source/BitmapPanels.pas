@@ -2,8 +2,8 @@ unit BitmapPanels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.0                                                             *
-* Date      :  26 January 2020                                                 *
+* Version   :  3.0                                                             *
+* Date      :  14 February 2020                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
@@ -14,33 +14,43 @@ interface
 
 uses
   SysUtils, Classes, Windows, Messages, Types, Graphics,
-  Controls, Forms, ExtCtrls, Themes, uxtheme, Math, ShellApi, ClipBrd;
+  Controls, Forms, ExtCtrls, Themes, uxTheme, Math, ShellApi, ClipBrd;
 
 {$I Image32.inc}
 
 type
-  TBitmapProperties = class;
-
-  //TFileDropEvent: Method template for TBitmapProperties.OnFileDrop
   TFileDropEvent = procedure (Sender: TObject; const filename: string) of Object;
-
-  {$IFNDEF NESTED_TYPES}
-  //TScaleType: Internal use only
   TScaleType = (stScaled, stFit, stStretched);
-  {$ENDIF}
+
+  TBitmap = class; //forward declaration
 
   TPanel = class(ExtCtrls.TPanel)
-    {$IFDEF NESTED_TYPES}
-    type TScaleType = (stScaled, stFit, stStretched);
-    {$ENDIF}
   private
-    fBmp          : TBitmap;
-    fResetPending : Boolean;
-    fScale        : double;
-    fScaleType    : TScaleType;
-    fDstRect      : TRect;
-    fOffsetX      : integer;
-    fOffsetY      : integer;
+    fBmp           : TBitmap;
+    fScale         : double;
+    fMinScale      : double;
+    fMaxScale      : double;
+    fScaleType     : TScaleType;
+    fDstRect       : TRect;
+    fOffsetX       : integer;
+    fOffsetY       : integer;
+    fOnScrolling   : TNotifyEvent;
+    fOnDragDrop    : TFileDropEvent;
+    fOnPaste       : TNotifyEvent;
+    fOnBeginPaint  : TNotifyEvent;
+    fOnEndPaint    : TNotifyEvent;
+    fOnKeyDown     : TKeyEvent;
+    fOnKeyUp       : TKeyEvent;
+
+    fScalingCursor        : integer;
+    fShowScrollbars       : Boolean;
+    fAutoCenter           : Boolean;
+    fScrollButtonColor    : TColor;
+    fScrollButtonColorHot : TColor;
+    fZoomScrollEnabled    : Boolean;
+    fFileDropEnabled      : Boolean;
+    fCopyPasteEnabled     : Boolean;
+
 {$IFDEF GESTURES}
     fLastDistance: integer;
     fLastLocation: TPoint;
@@ -52,20 +62,29 @@ type
     fMouseDownOverBevelV: Boolean;
     fMousePos: TPoint;
     fFocusedColor: TColor;
-    fBitmapProperties: TBitmapProperties;
     procedure UpdateCursor;
     procedure BitmapScaleBestFit;
-    function GetMouseIsInsideBorder: Boolean;
+    function MouseInsideInnerClientRect: Boolean;
 {$IFDEF GESTURES}
     procedure Gesture(Sender: TObject;
       const EventInfo: TGestureEventInfo; var Handled: Boolean);
 {$ENDIF}
     function ShowHorzScrollButton: Boolean;
     function ShowVertScrollButton: Boolean;
+    procedure SetZoomScrollEnabled(value: Boolean);
+    procedure SetScrollbarsVisible(value: Boolean);
+    procedure SetAutoCenter(value: Boolean);
+    procedure SetFileDropEnabled(value: Boolean);
+    procedure SetScalingCursor(value: integer);
+
+    function GetOffset: TPoint;
+    procedure SetOffset(const Pt: TPoint);
+    function GetScale: double;
+    procedure SetScaleType(value: TScaleType);
+    procedure SetScale(value: double);
   protected
     procedure CreateWnd; override;
     procedure DestroyWnd; override;
-    procedure Resize; override;
     procedure Paint; override;
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState;
       X, Y: Integer); override;
@@ -81,7 +100,6 @@ type
     function DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint): Boolean; override;
     function DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint): Boolean; override;
     procedure CMFocusChanged(var Message: TMessage); message CM_FOCUSCHANGED;
-    procedure BmpChanged(Sender: TObject);
     procedure BitmapScaleAtPos(newScale: double; const mousePos: TPoint);
     function GetInnerMargin: integer;
     function GetInnerClientRect: TRect;
@@ -92,101 +110,56 @@ type
     function ClientToBitmap(var clientPt: TPoint): Boolean;
     //BitmapToClient: Convert bitmap coordinates to panel client coordinates
     procedure BitmapToClient(var pt: TPoint);
+    procedure ClearBitmap;
+
     function CopyToClipboard: Boolean;
     function PasteFromClipboard: Boolean;
-    //ClearBitmap: Required only when drawing to the bitmap's Canvas property.
-    procedure ClearBitmap;
-    property Bitmap: TBitmap read fBmp;
-    property BitmapProperties: TBitmapProperties read fBitmapProperties;
-    //FocusedColor: Panel's border color when focused (ie if TabStop = true)
-    property FocusedColor: TColor read fFocusedColor write fFocusedColor;
 
-    //InnerMargin = BorderWidth + BevelWidth *2 (if bevels assigned)
+    property AutoCenter: Boolean                      //Default = true.
+      read fAutoCenter write SetAutoCenter;
+    property Bitmap: TBitmap read fBmp;
+    property CopyPasteEnabled: Boolean                //Default = false.
+      read fCopyPasteEnabled write fCopyPasteEnabled;
+    property FileDropEnabled: Boolean                 //Default = false.
+      read fFileDropEnabled write SetFileDropEnabled;
+
+    property FocusedColor: TColor read fFocusedColor write fFocusedColor;
     property InnerMargin: integer read GetInnerMargin;
     property InnerClientRect: TRect read GetInnerClientRect;
-    property MouseIsInsideBorder: Boolean read GetMouseIsInsideBorder;
-  end;
-
-  TBitmapProperties = class
-  private
-    fOwner: TPanel;
-    fMinScale: double;
-    fMaxScale: double;
-    fZoomScrollEnabled: Boolean;
-    fShowScrollbars: Boolean;
-    fScalingCursor: integer;
-    fScrollButtonColor: TColor;
-    fScrollButtonColorHot: TColor;
-    fAutoCenter: Boolean;
-    fOnBitmapResizing: TNotifyEvent;
-    fOnScrolling: TNotifyEvent;
-    fOnDragDrop: TFileDropEvent;
-    fOnPaste: TNotifyEvent;
-    fOnBeforePaint: TNotifyEvent;
-    fFileDropEnabled: Boolean;
-    fCopyPasteEnabled: Boolean;
-    fOnKeyDown: TKeyEvent;
-    fOnKeyUp  : TKeyEvent;
-    function GetOffset: TPoint;
-    procedure SetOffset(const Pt: TPoint);
-    function GetScaleType: TScaleType;
-    function GetScale: double;
-    procedure SetScaleType(value: TScaleType);
-    procedure SetScale(value: double);
-    procedure SetFileDropEnabled(value: Boolean);
-    procedure SetZoomScrollEnabled(value: Boolean);
-    procedure SetScrollbarsVisible(value: Boolean);
-    procedure SetScalingCursor(value: integer);
-    procedure SetAutoCenter(value: Boolean);
-  public
-    constructor Create(ownerPanel: TPanel);
-    procedure ResetBitmap;
-    property AutoCenter: Boolean read fAutoCenter write SetAutoCenter;
-    //CopyPasteEnabled: Default = false.
-    property CopyPasteEnabled: Boolean
-      read fCopyPasteEnabled write fCopyPasteEnabled;
-    //FileDropEnabled: Default = false.
-    property FileDropEnabled: Boolean
-      read fFileDropEnabled write SetFileDropEnabled;
-    //Offset: The amount to offset the image.<br>
-    //(Assumes the display image size exceeds the panel's display area.)
     property Offset: TPoint read GetOffset write SetOffset;
-    property ScaleType: TScaleType read GetScaleType write SetScaleType;
-
-    //Scale: SCALE_BEST_FIT, SCALE_STRETCHED, or a value between
-    //ScaleMin and ScaleMax.
-    property Scale: double read GetScale write SetScale;
-    //ScaleMin: Default = 0.05;
-    property ScaleMin: double read fMinScale write fMinScale;
-    //ScaleMax: Default = 10.0;
-    property ScaleMax: double read fMaxScale write fMaxScale;
-    //ScalingCursor: Default = crHandPoint
     property ScalingCursor: integer read fScalingCursor write SetScalingCursor;
-    //ZoomAndScrollEnabled: Default = True
-    property ZoomAndScrollEnabled: Boolean
-      read fZoomScrollEnabled write SetZoomScrollEnabled;
-    //ScrollButtonsVisible: Default = True (but scroll buttons will only
-    //be visible when the image size exceeds the panel's display area.
-    property ScrollButtonsVisible: boolean read
-      fShowScrollbars write SetScrollbarsVisible;
-    //ScrollButtonColor: Default = 20% darker than clBtnFace
+
+    property ScaleType: TScaleType read fScaleType write SetScaleType;
+    property Scale: double read GetScale write SetScale;
+    property ScaleMin: double read fMinScale write fMinScale;
+    property ScaleMax: double read fMaxScale write fMaxScale;
+
     property ScrollButtonColor: TColor read
       fScrollButtonColor write fScrollButtonColor;
-    //ScrollButtonColorHot: Default = clHotLight
     property ScrollButtonColorHot: TColor
       read fScrollButtonColorHot write fScrollButtonColorHot;
-
-    property OnResizing: TNotifyEvent
-      read fOnBitmapResizing write fOnBitmapResizing;
+    property ScrollButtonsVisible: boolean read
+      fShowScrollbars write SetScrollbarsVisible;
+    property ZoomAndScrollEnabled: Boolean
+      read fZoomScrollEnabled write SetZoomScrollEnabled;
 
     property OnScrolling: TNotifyEvent
       read fOnScrolling write fOnScrolling;
     property OnFileDrop: TFileDropEvent read fOnDragDrop write fOnDragDrop;
     property OnPaste: TNotifyEvent read fOnPaste write fOnPaste;
-
-    property OnBeginPaint: TNotifyEvent read fOnBeforePaint write fOnBeforePaint;
+    property OnBeginPaint: TNotifyEvent read fOnBeginPaint write fOnBeginPaint;
+    property OnEndPaint: TNotifyEvent read fOnEndPaint write fOnEndPaint;
     property OnKeyDown: TKeyEvent read fOnKeyDown write fOnKeyDown;
     property OnKeyUp: TKeyEvent read fOnKeyUp write fOnKeyUp;
+  end;
+
+  TBitmap = class(Graphics.TBitmap)
+  private
+    fOwner: TPanel;
+  protected
+    procedure Changed(Sender: TObject); override;
+  public
+    constructor Create(ownerPanel: TPanel); reintroduce; overload;
   end;
 
 {$IFDEF FPC}
@@ -202,9 +175,9 @@ const
 
 implementation
 
-resourcestring
-  rsClearBitmapError = 'Error in BitmapPanels.TPanel.ClearBitmap - bitmap is empty.';
-  rsScaleError = 'Error: Scale must be a value larger than 0';
+const
+  MinBitmapScale = 0.05;
+  MaxBitmapScale = 20;
 
 type
   PColor32 = ^TColor32;
@@ -219,7 +192,7 @@ type
 //------------------------------------------------------------------------------
 
 //Since record methods were only added to Delphi in version D2006,
-//the following functions provide compatability for earlier versions
+//the following functions provide backward compatability
 
 function RectWidth(const rec: TRect): integer;
 {$IFDEF INLINE} inline; {$ENDIF}
@@ -266,7 +239,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetThemeColor(const className: string;
+function GetThemeColor(const className: widestring;
   part, state, propID: integer; out Color: TColor): boolean;
 var
   thmHdl: HTheme;
@@ -278,11 +251,11 @@ begin
 {$ELSE}
   if not ThemeServices.ThemesEnabled or not HasThemeManifest then exit;
 {$ENDIF}
-  thmHdl := OpenThemeData(0, PChar(className));
+  thmHdl := OpenThemeData(0, LPCWSTR(className));
   if thmHdl <> 0 then
   try
-    if Succeeded(uxTheme.GetThemeColor(thmHdl, part, state, propID, clrRef)) then
-      result := true;
+    result :=
+      Succeeded(uxTheme.GetThemeColor(thmHdl, part, state, propID, clrRef));
   finally
     CloseThemeData(thmHdl);
   end;
@@ -316,151 +289,52 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TBitmapProperties class
+// TBitmap class
 //------------------------------------------------------------------------------
 
-constructor TBitmapProperties.Create(ownerPanel: TPanel);
+constructor TBitmap.Create(ownerPanel: TPanel);
 begin
+  inherited Create;
   fOwner := ownerPanel;
-  fOwner.fScale := 1;
-  fOwner.fScaleType := stFit;
-  fMinScale := 0.05; //default min
-  fMaxScale := 20;   //default max
-  fShowScrollbars := true;
-  fAutoCenter := true;
-  fScrollButtonColor := MakeDarker(clBtnFace, 20); //ie 20% darker
-  fScrollButtonColorHot := clHotLight;
-  fZoomScrollEnabled := true;
+  PixelFormat := pf24bit;
+  {$IFDEF ALPHAFORMAT}
+  AlphaFormat := afPremultiplied;
+  {$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
-procedure TBitmapProperties.ResetBitmap;
+procedure TBitmap.Changed(Sender: TObject);
 begin
-  fOwner.fScale := 1;
-  fOwner.fOffsetX := 0;
-  fOwner.fOffsetY := 0;
-  fOwner.Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-function TBitmapProperties.GetOffset: TPoint;
-begin
-  result := Point(fOwner.fOffsetX, fOwner.fOffsetY);
-end;
-//------------------------------------------------------------------------------
-
-procedure TBitmapProperties.SetOffset(const Pt: TPoint);
-begin
-  fOwner.fOffsetX := pt.X;
-  fOwner.fOffsetY := pt.Y;
-  fOwner.Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-function TBitmapProperties.GetScaleType: TScaleType;
-begin
-  Result := fOwner.fScaleType;
-end;
-//------------------------------------------------------------------------------
-
-function TBitmapProperties.GetScale: double;
-begin
-  if fOwner.fScaleType = stStretched then result := 1
-  else Result := fOwner.fScale;
-end;
-//------------------------------------------------------------------------------
-
-procedure TBitmapProperties.SetScaleType(value: TScaleType);
-begin
-  if fOwner.fScaleType = value then Exit;
-  fOwner.fScaleType := value;
-  if assigned(fOnBitmapResizing) then
-    fOnBitmapResizing(self);
-  fOwner.Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-procedure TBitmapProperties.SetScale(value: double);
-var
-  rec: TRect;
-begin
-  if value < fMinScale then value := fMinScale
-  else if value > fMaxScale then value := fMaxScale;
-  fOwner.fScaleType := stScaled;
-  //zoom in or out relative to the center of the image
-  rec := fOwner.ClientRect;
-  fOwner.BitmapScaleAtPos(value,
-    Point(RectWidth(rec) div 2, RectHeight(rec) div 2));
-end;
-//------------------------------------------------------------------------------
-
-procedure TBitmapProperties.SetScalingCursor(value: integer);
-begin
-  fScalingCursor := value;
-  fOwner.UpdateCursor;
-end;
-//------------------------------------------------------------------------------
-
-
-procedure TBitmapProperties.SetFileDropEnabled(value: Boolean);
-begin
-  if fFileDropEnabled = value then Exit;
-  if fOwner.HandleAllocated then
-  begin
-    if fFileDropEnabled then
-      DragAcceptFiles(fOwner.Handle, false) else
-      DragAcceptFiles(fOwner.Handle, true);
-  end;
-  fFileDropEnabled := value;
-end;
-//------------------------------------------------------------------------------
-
-procedure TBitmapProperties.SetZoomScrollEnabled(value: Boolean);
-begin
-  fZoomScrollEnabled := value;
-  fOwner.UpdateCursor;
-end;
-//------------------------------------------------------------------------------
-
-procedure TBitmapProperties.SetScrollbarsVisible(value: Boolean);
-begin
-  fShowScrollbars := value;
-  fOwner.Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-procedure TBitmapProperties.SetAutoCenter(value: Boolean);
-begin
-  if value = fAutoCenter then Exit;
-  fAutoCenter := value;
-  //when fAutoCenter is disabled, then neither
-  //SCALE_BEST_FIT or SCALE_STRETCHED work sensibly
-  if not fAutoCenter then SetScale(1);
+  inherited;
+  if Assigned(fOwner) then fOwner.Invalidate;
 end;
 
 //------------------------------------------------------------------------------
-// Imaged enhanced TPanel class
+// Enhanced TPanel class
 //------------------------------------------------------------------------------
 
 constructor TPanel.Create(AOwner: TComponent);
 begin
   inherited;
-  fBitmapProperties := TBitmapProperties.Create(self);
   fScale := 1;
+  fScaleType := stFit;
+  fMinScale := MinBitmapScale;
+  fMaxScale := MaxBitmapScale;
   fOffsetX := 0;
   fOffsetY := 0;
-  fBmp := TBitmap.Create;
-  fBmp.PixelFormat := pf24bit;
-  fResetPending := true;
-  {$IFDEF ALPHAFORMAT}
-  fBmp.AlphaFormat := afPremultiplied;
-  {$ENDIF}
+
+  fShowScrollbars := true;
+  fAutoCenter := true;
+  fScrollButtonColor := MakeDarker(clBtnFace, 20); //ie 20% darker
+  fScrollButtonColorHot := clHotLight;
+  fZoomScrollEnabled := true;
+
   {$IFDEF GESTURES}
   OnGesture := Gesture;
   Touch.InteractiveGestures := [igZoom, igPan];
   {$ENDIF}
+  fBmp := TBitmap.Create(self);
   fBmp.Canvas.Brush.Color := Color;
-  fBmp.OnChange := {$IFDEF FPC}@{$ENDIF}BmpChanged;
   fFocusedColor := Color;
   DoubleBuffered := true;
 end;
@@ -469,17 +343,49 @@ end;
 destructor TPanel.Destroy;
 begin
   fBmp.Free;
-  fBitmapProperties.Free;
   inherited;
 end;
 //------------------------------------------------------------------------------
 
-procedure TPanel.BmpChanged(Sender: TObject);
+function TPanel.GetOffset: TPoint;
 begin
-  if fResetPending and not fBmp.Empty then ClearBitmap;
-  //nb: also called when the bitmap canvas has been updated
-  UpdateCursor;
+  result := Point(fOffsetX, fOffsetY);
+end;
+//------------------------------------------------------------------------------
+
+procedure TPanel.SetOffset(const Pt: TPoint);
+begin
+  fOffsetX := pt.X;
+  fOffsetY := pt.Y;
   Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+function TPanel.GetScale: double;
+begin
+  if fScaleType = stStretched then result := 1
+  else Result := fScale;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPanel.SetScaleType(value: TScaleType);
+begin
+  if fScaleType = value then Exit;
+  fScaleType := value;
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPanel.SetScale(value: double);
+var
+  rec: TRect;
+begin
+  if value < fMinScale then value := fMinScale
+  else if value > fMaxScale then value := fMaxScale;
+  fScaleType := stScaled;
+  //zoom in or out relative to the center of the image
+  rec := ClientRect;
+  BitmapScaleAtPos(value, Point(RectWidth(rec) div 2, RectHeight(rec) div 2));
 end;
 //------------------------------------------------------------------------------
 
@@ -522,70 +428,68 @@ begin
   inherited;
   shiftState := KeyDataToShiftState(Message.KeyData);
 
-  if Assigned(fBitmapProperties.fOnKeyDown) then
+  if Assigned(fOnKeyDown) then
   begin
     charCode := Message.CharCode;
-    fBitmapProperties.fOnKeyDown(Self, charCode, shiftState);
+    fOnKeyDown(Self, charCode, shiftState);
     if charCode = 0 then Exit;
   end;
 
   if (Message.CharCode >= Ord('V')) and (ssCtrl in shiftState) and
-    fBitmapProperties.fCopyPasteEnabled then
+    fCopyPasteEnabled then
   begin
     PasteFromClipboard;
     Exit;
   end;
 
   if fBmp.Empty then Exit;
+
   if (Message.CharCode >= Ord('C')) and (ssCtrl in shiftState) and
-    fBitmapProperties.fCopyPasteEnabled then
+    fCopyPasteEnabled then
   begin
     CopyToClipboard;
     Exit;
   end;
 
-  if (fScaleType = stStretched) or
-    not fBitmapProperties.fZoomScrollEnabled then Exit;
+  if (fScaleType = stStretched) or not fZoomScrollEnabled then Exit;
 
-  if (Message.CharCode >= VK_LEFT) and (Message.CharCode <= VK_DOWN) then
-  begin
-    //zoom in and out with CTRL+UP and CTRL+DOWN respectively
-    if ssCtrl in shiftState then
-    begin
-      midPoint := Point(ClientWidth div 2, ClientHeight div 2);
-      case Message.CharCode of
-        VK_UP: BitmapScaleAtPos(fScale * 1.1, midPoint);
-        VK_DOWN: BitmapScaleAtPos(fScale * 0.9, midPoint);
-        else Exit;
+  case Message.CharCode of
+    VK_LEFT..VK_DOWN:
+      begin
+        if ssCtrl in shiftState then
+        begin
+          //zoom in and out with CTRL+UP and CTRL+DOWN respectively
+          midPoint := Point(ClientWidth div 2, ClientHeight div 2);
+          case Message.CharCode of
+            VK_UP: BitmapScaleAtPos(fScale * 0.9, midPoint);
+            VK_DOWN: BitmapScaleAtPos(fScale * 1.1, midPoint);
+            else Exit;
+          end;
+        end else
+        begin
+          //otherwise scroll the image with the arrow keys
+          if ssShift in shiftState then
+            mul := 5 else //ie scrolls 5 times faster with Shift key down
+            mul := 1;
+          case Message.CharCode of
+            VK_LEFT: dec(fOffsetX, 5 * mul);
+            VK_RIGHT: inc(fOffsetX, 5 * mul);
+            VK_UP: dec(fOffsetY, 5 * mul);
+            VK_DOWN: inc(fOffsetY, 5 * mul);
+          end;
+          if assigned(fOnScrolling) then fOnScrolling(self);
+        end;
+        Invalidate;
       end;
-    end
-    else //otherwise scroll the image with the arrow keys
-    begin
-      if ssShift in shiftState then
-        mul := 5 else //ie scrolls 5 times faster with Shift key down
-        mul := 1;
-      case Message.CharCode of
-        VK_LEFT: dec(fOffsetX, 5 * mul);
-        VK_RIGHT: inc(fOffsetX, 5 * mul);
-        VK_UP: dec(fOffsetY, 5 * mul);
-        VK_DOWN: inc(fOffsetY, 5 * mul);
-      end;
-      if assigned(fBitmapProperties.fOnScrolling) then
-        fBitmapProperties.fOnScrolling(self);
-    end;
-    Invalidate;
-  end
-  else if (Message.CharCode = Ord('0')) and not (ssCtrl in shiftState) then
-  begin
-    fBitmapProperties.SetScaleType(stFit);
-  end
-  else if (Message.CharCode >= Ord('1')) and
-    (Message.CharCode <= Ord('9')) and not (ssCtrl in shiftState) then
-  begin
-    fBitmapProperties.SetScaleType(stScaled);
-    if ssShift in shiftState then
-      fBitmapProperties.Scale := (Message.CharCode - Ord('0')) /10 else
-      fBitmapProperties.Scale := Message.CharCode - Ord('0');
+
+      Ord('0'): if not (ssCtrl in shiftState) then SetScaleType(stFit);
+      Ord('1')..Ord('9'): if not (ssCtrl in shiftState) then
+        begin
+          SetScaleType(stScaled);
+          if ssShift in shiftState then
+            Scale := (Message.CharCode - Ord('0')) /10 else
+            Scale := Message.CharCode - Ord('0');
+        end;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -595,11 +499,11 @@ var
   charCode: Word;
   shiftState: TShiftState;
 begin
-  if Assigned(fBitmapProperties.fOnKeyUp) then
+  if Assigned(fOnKeyUp) then
   begin
     shiftState := KeyDataToShiftState(Message.KeyData);
     charCode := Message.CharCode;
-    fBitmapProperties.fOnKeyUp(Self, charCode, shiftState);
+    fOnKeyUp(Self, charCode, shiftState);
     if charCode = 0 then Exit;
   end;
   inherited;
@@ -620,7 +524,7 @@ var
   rec: TRect;
 begin
   inherited;
-  if not fBmp.Empty and fBitmapProperties.fZoomScrollEnabled and
+  if not fBmp.Empty and fZoomScrollEnabled and
     (fScaleType <> stStretched) then
   begin
     fMouseDown := true;
@@ -646,12 +550,12 @@ var
   rec: TRect;
   mobH, mobV: Boolean;
 begin
-  if MouseIsInsideBorder then
+  if MouseInsideInnerClientRect then
     inherited;
 
   if not fMouseDown then
   begin
-    if fBitmapProperties.fShowScrollbars then
+    if fShowScrollbars then
     begin
       innerMarg := GetInnerMargin;
       mobV := (X > ClientWidth - innerMarg);
@@ -661,20 +565,16 @@ begin
       begin
         fMouseOverBevelVert := mobV;
         if mobV and ShowVertScrollButton then
-          Cursor := crSizeNS else
-          Cursor := crDefault;
+          Cursor := crSizeNS;
         Invalidate;
       end;
       if fMouseOverBevelHorz <> mobH then
       begin
         fMouseOverBevelHorz := mobH;
         if mobH and ShowHorzScrollButton then
-          Cursor := crSizeWE else
-          Cursor := crDefault;
+          Cursor := crSizeWE;
         Invalidate;
       end;
-      if (X < innerMarg) or (Y < innerMarg) then
-        Cursor := crDefault;
     end;
     Exit;
   end;
@@ -704,8 +604,7 @@ begin
     fOffsetX := fOffsetX + (fMousePos.X - X);
     fOffsetY := fOffsetY + (fMousePos.Y - Y);
   end;
-  if assigned(fBitmapProperties.fOnScrolling) then
-    fBitmapProperties.fOnScrolling(self);
+  if assigned(fOnScrolling) then fOnScrolling(self);
   Invalidate;
   fMousePos := Point(X, Y);
 end;
@@ -733,6 +632,40 @@ begin
   else if fMouseOverBevelHorz then
     fMouseOverBevelHorz := false
   else Exit;
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPanel.SetFileDropEnabled(value: Boolean);
+begin
+  if fFileDropEnabled = value then Exit;
+  if HandleAllocated then
+  begin
+    if fFileDropEnabled then
+      DragAcceptFiles(Handle, false) else
+      DragAcceptFiles(Handle, true);
+  end;
+  fFileDropEnabled := value;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPanel.SetScalingCursor(value: integer);
+begin
+  fScalingCursor := value;
+  UpdateCursor;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPanel.SetZoomScrollEnabled(value: Boolean);
+begin
+  fZoomScrollEnabled := value;
+  UpdateCursor;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPanel.SetScrollbarsVisible(value: Boolean);
+begin
+  fShowScrollbars := value;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -777,8 +710,7 @@ begin
   fOffsetX := 0; fOffsetY := 0;
   if fScaleType <> stFit then fScale := 1;
   Invalidate;
-  if assigned(fBitmapProperties.fOnPaste) then
-    fBitmapProperties.fOnPaste(self);
+  if assigned(fOnPaste) then fOnPaste(self);
 end;
 //------------------------------------------------------------------------------
 
@@ -789,51 +721,47 @@ var
   filename: string;
 begin
   Msg.Result := 0;
-  if not assigned(fBitmapProperties.fOnDragDrop) then Exit;
   hDrop:= Msg.wParam;
   filenameLen := DragQueryFile(hDrop, 0, nil, 0);
   SetLength(filename, filenameLen);
   DragQueryFile(hDrop, 0, Pointer(filename), filenameLen+1);
   DragFinish(hDrop);
-  fBitmapProperties.fOnDragDrop(Self, filename);
+
+  if assigned(fOnDragDrop) then
+    fOnDragDrop(Self, filename)
+  else if (Lowercase(ExtractFileExt(filename)) = '.bmp') then
+  try
+    fBmp.LoadFromFile(filename);
+  except
+  end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TPanel.CreateWnd;
 begin
   inherited;
-  if fBitmapProperties.fFileDropEnabled then
+  if fFileDropEnabled then
     DragAcceptFiles(Handle, True);
 end;
 //------------------------------------------------------------------------------
 
 procedure TPanel.DestroyWnd;
 begin
-  if fBitmapProperties.fFileDropEnabled then DragAcceptFiles(Handle, False);
+  if fFileDropEnabled then DragAcceptFiles(Handle, False);
   inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TPanel.Resize;
-begin
-  inherited;
-  if (fScaleType = stFit) and
-    assigned(fBitmapProperties.fOnBitmapResizing) then
-      fBitmapProperties.fOnBitmapResizing(self);
 end;
 //------------------------------------------------------------------------------
 
 procedure TPanel.ClearBitmap;
 begin
-  fResetPending := fBmp.Empty;
-  if fResetPending then Exit;
+  if fBmp.Empty then Exit;
   if fBmp.PixelFormat = pf32bit then
   begin
-    FillChar(fBmp.ScanLine[fBmp.Height -1]^, fBmp.Width * fBmp.Height * 4, 0);
+    with fBmp do FillChar(ScanLine[Height -1]^, Width * Height * 4, 0);
   end else
   begin
-    fBmp.Canvas.Brush.Color := Self.Color;
-    fBmp.Canvas.FillRect(Rect(0, 0, fBmp.Width, fBmp.Height));
+    fBmp.Canvas.Brush.Color := Color;
+    with fBmp do Canvas.FillRect(Rect(0, 0, Width, Height));
   end;
   Invalidate;
 end;
@@ -856,7 +784,9 @@ type TControl = class(Controls.TControl); //just to access (protected) Color
 procedure TPanel.Paint;
 const
   Alignments: array[TAlignment] of Longint = (DT_LEFT, DT_RIGHT, DT_CENTER);
-  VAlignments: array[TVerticalAlignment] of Longint = (DT_TOP, DT_BOTTOM, DT_VCENTER);
+{$IF COMPILERVERSION >= 17} //?? when was TVerticalAlignment introduced?
+  VAlignments: array[TVerticalAlignment] of Longint = (DT_TOP,DT_BOTTOM,DT_VCENTER);
+{$IFEND}
 var
   marginOff, w,h: integer;
   tmpRec, srcRec, srcScaled: TRect;
@@ -899,6 +829,7 @@ begin
     ThemeServices.ThemesEnabled and
 {$ENDIF}
     Succeeded(DrawThemeParentBackground(Handle, Canvas.Handle, @fDstRect));
+
   if not backgroundPainted then
   begin
     if ParentColor then
@@ -922,13 +853,15 @@ begin
   end;
 
   //paint panel caption
-  if ShowCaption and (Caption <> '') then
+  if Caption <> '' then
   begin
     canvas.Brush.Style := bsClear;
     canvas.Font := Self.Font;
-    Flags := DT_EXPANDTABS or DT_SINGLELINE or
-      VAlignments[VerticalAlignment] or Alignments[Alignment];
+
+    Flags := DT_EXPANDTABS or DT_SINGLELINE  or Alignments[Alignment] or
+{$IF COMPILERVERSION >= 17} VAlignments[VerticalAlignment]; {$ELSE} DT_VCENTER; {$IFEND}
     Flags := DrawTextBiDiModeFlags(Flags);
+
 {$IFDEF STYLESERVICES}
     if StyleServices.Enabled and (seFont in StyleElements) and
       GetThemeColor('BUTTON', BP_GROUPBOX, 0, TMT_TEXTCOLOR, themeColor) then
@@ -938,14 +871,13 @@ begin
       GetThemeColor('BUTTON', BP_GROUPBOX, 0, TMT_TEXTCOLOR, themeColor) then
         Canvas.Font.Color := themeColor;
 {$ENDIF}
-    DrawText(canvas.Handle, Caption, -1, fDstRect, Flags);
+    DrawText(canvas.Handle, PChar(Caption), -1, fDstRect, Flags);
   end;
 
   if fBmp.Empty then Exit;
 
   marginOff := GetInnerMargin;
-  if Assigned(fBitmapProperties.fOnBeforePaint) then
-    fBitmapProperties.fOnBeforePaint(Self);
+  if Assigned(fOnBeginPaint) then fOnBeginPaint(Self);
 
   srcRec := Rect(0, 0, fBmp.Width, fBmp.Height);
 
@@ -986,7 +918,7 @@ begin
     end;
 
     OffsetRect(srcRec, Round(fOffsetX/fscale), Round(fOffsetY/fscale));
-    if BitmapProperties.fAutoCenter then
+    if fAutoCenter then
     begin
       //if srcScaled is smaller than dstRect then center the image
       if (RectWidth(srcScaled) < RectWidth(fDstRect)) then
@@ -1035,44 +967,45 @@ begin
     end;
   end;
 
-  if not fBitmapProperties.fShowScrollbars or
-    (BorderWidth < DpiScale(FMinScrollBtnSize + 5)) then Exit;
-
-  //draw vertical scrollbar
-  tmpRec := GetInnerClientRect;
-  if ShowVertScrollButton then
+  if fShowScrollbars and (BorderWidth < DpiScale(FMinScrollBtnSize + 5)) then
   begin
-    h := Round(fBmp.Height * fScale);
-    w := ClientWidth;
-    tmpRec.Left := w - marginOff + DpiScale(2);
-    tmpRec.Right := w - DpiScale(3);
-    OffsetRect(tmpRec, 0, Round(fOffsetY * RectHeight(tmpRec) / h));
-    SetRectHeight(tmpRec, RectHeight(tmpRec) * RectHeight(tmpRec) div h);
-    if fMouseDownOverBevelV or
-      (not LeftMouseBtnDown and fMouseOverBevelVert) then
-        Canvas.Brush.Color := fBitmapProperties.fScrollButtonColorHot else
-        Canvas.Brush.Color := fBitmapProperties.fScrollButtonColor;
-    Canvas.FillRect(tmpRec);
-    DrawScrollButton(tmpRec, true);
-  end;
+    //draw vertical scrollbar
+    tmpRec := GetInnerClientRect;
+    if ShowVertScrollButton then
+    begin
+      h := Round(fBmp.Height * fScale);
+      w := ClientWidth;
+      tmpRec.Left := w - marginOff + DpiScale(2);
+      tmpRec.Right := w - DpiScale(3);
+      OffsetRect(tmpRec, 0, Round(fOffsetY * RectHeight(tmpRec) / h));
+      SetRectHeight(tmpRec, RectHeight(tmpRec) * RectHeight(tmpRec) div h);
+      if fMouseDownOverBevelV or
+        (not LeftMouseBtnDown and fMouseOverBevelVert) then
+          Canvas.Brush.Color := fScrollButtonColorHot else
+          Canvas.Brush.Color := fScrollButtonColor;
+      Canvas.FillRect(tmpRec);
+      DrawScrollButton(tmpRec, true);
+    end;
 
-  //draw horizontal scrollbar
-  tmpRec := GetInnerClientRect;
-  if ShowHorzScrollButton then
-  begin
-    w := Round(fBmp.Width * fScale);
-    h := ClientHeight;
-    tmpRec.Top := h - marginOff + DpiScale(2);
-    tmpRec.Bottom := h - DpiScale(3);
-    OffsetRect(tmpRec, Round(fOffsetX * RectWidth(tmpRec) / w), 0);
-    SetRectWidth(tmpRec, RectWidth(tmpRec) * RectWidth(tmpRec) div w);
-    if fMouseDownOverBevelH or
-      (not LeftMouseBtnDown and fMouseOverBevelHorz) then
-        Canvas.Brush.Color := fBitmapProperties.fScrollButtonColorHot else
-        Canvas.Brush.Color := fBitmapProperties.fScrollButtonColor;
-    Canvas.FillRect(tmpRec);
-    DrawScrollButton(tmpRec, true);
+    //draw horizontal scrollbar
+    tmpRec := GetInnerClientRect;
+    if ShowHorzScrollButton then
+    begin
+      w := Round(fBmp.Width * fScale);
+      h := ClientHeight;
+      tmpRec.Top := h - marginOff + DpiScale(2);
+      tmpRec.Bottom := h - DpiScale(3);
+      OffsetRect(tmpRec, Round(fOffsetX * RectWidth(tmpRec) / w), 0);
+      SetRectWidth(tmpRec, RectWidth(tmpRec) * RectWidth(tmpRec) div w);
+      if fMouseDownOverBevelH or
+        (not LeftMouseBtnDown and fMouseOverBevelHorz) then
+          Canvas.Brush.Color := fScrollButtonColorHot else
+          Canvas.Brush.Color := fScrollButtonColor;
+      Canvas.FillRect(tmpRec);
+      DrawScrollButton(tmpRec, true);
+    end;
   end;
+  if Assigned(fOnEndPaint) then fOnEndPaint(Self);
 end;
 //------------------------------------------------------------------------------
 
@@ -1117,7 +1050,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TPanel.GetMouseIsInsideBorder: Boolean;
+function TPanel.MouseInsideInnerClientRect: Boolean;
 var
   mousePos: TPoint;
 begin
@@ -1127,31 +1060,33 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TPanel.SetAutoCenter(value: Boolean);
+begin
+  if value = fAutoCenter then Exit;
+  fAutoCenter := value;
+  //when fAutoCenter is disabled, then neither
+  //SCALE_BEST_FIT or SCALE_STRETCHED work sensibly
+  if not fAutoCenter then SetScale(1);
+end;
+//------------------------------------------------------------------------------
+
 procedure TPanel.UpdateCursor;
 begin
-  if not MouseIsInsideBorder then
-    cursor := crHandPoint
-  else if fBmp.Empty or not fBitmapProperties.fZoomScrollEnabled or
-    (fScaleType = stStretched) then
-      cursor := crDefault
-  else if fBitmapProperties.fScalingCursor <> 0 then
-    cursor := fBitmapProperties.fScalingCursor
-  else
-    cursor := crHandPoint;
+  if not fBmp.Empty and MouseInsideInnerClientRect and
+    (fScaleType <> stStretched) and
+    fZoomScrollEnabled and
+    (fScalingCursor <> 0) then cursor := fScalingCursor;
 end;
 //------------------------------------------------------------------------------
 
 procedure TPanel.BitmapScaleAtPos(newScale: double; const mousePos: TPoint);
 begin
-  newScale := Max(fBitmapProperties.fMinScale,
-    Min(fBitmapProperties.fMaxScale, newScale));
+  newScale := Max(fMinScale, Min(fMaxScale, newScale));
   fScaleType := stScaled;
   fOffsetX := Round((mousePos.X + fOffsetX) * newScale/fScale - mousePos.X);
   fOffsetY := Round((mousePos.Y + fOffsetY) * newScale/fScale - mousePos.Y);
   fScale := newScale;
   if fBmp.Empty then Exit;
-  if assigned(fBitmapProperties.fOnBitmapResizing) then
-    fBitmapProperties.fOnBitmapResizing(self);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -1163,7 +1098,7 @@ var
   changeFrac: double;
   marg: integer;
 begin
-  if fBmp.Empty or not fBitmapProperties.fZoomScrollEnabled or
+  if fBmp.Empty or not fZoomScrollEnabled or
     (fScaleType = stStretched) then
   begin
     inherited;
@@ -1189,8 +1124,7 @@ begin
         begin
           fOffsetX := fOffsetX + (FLastLocation.X - EventInfo.Location.X);
           fOffsetY := fOffsetY + (FLastLocation.Y - EventInfo.Location.Y);
-          if assigned(fBitmapProperties.fOnScrolling) then
-            fBitmapProperties.fOnScrolling(self);
+          if assigned(fOnScrolling) then fOnScrolling(self);
           Invalidate;
         end;
         FLastLocation := EventInfo.Location;
@@ -1207,7 +1141,7 @@ var
 begin
   Result := inherited DoMouseWheelDown(Shift, MousePos);
   if Result then Exit;
-  if fBmp.Empty or not fBitmapProperties.fZoomScrollEnabled or
+  if fBmp.Empty or not fZoomScrollEnabled or
     (fScaleType = stStretched) then Exit;
   {$IFNDEF FPC}
   MousePos := ScreenToClient(MousePos);
@@ -1225,7 +1159,7 @@ var
 begin
   Result := inherited DoMouseWheelUp(Shift, MousePos);
   if Result then Exit;
-  if fBmp.Empty or not fBitmapProperties.fZoomScrollEnabled or
+  if fBmp.Empty or not fZoomScrollEnabled or
     (fScaleType = stStretched) then Exit;
   {$IFNDEF FPC}
   MousePos := ScreenToClient(MousePos);

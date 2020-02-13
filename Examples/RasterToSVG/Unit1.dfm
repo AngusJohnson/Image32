@@ -156,6 +156,11 @@ object MainForm: TMainForm
       object N5: TMenuItem
         Caption = '-'
       end
+      object ChangeSimpleness1: TMenuItem
+        Caption = 'Change Simple&ness ...'
+        ShortCut = 16462
+        OnClick = ChangeSimpleness1Click
+      end
       object mnuChangeSmoothness: TMenuItem
         Caption = 'Change S&moothness ...'
         ShortCut = 16461

@@ -1,9 +1,9 @@
 object FrmMain: TFrmMain
   Left = 554
   Top = 394
+  Width = 489
+  Height = 526
   Caption = 'Image, Arrows & Text'
-  ClientHeight = 468
-  ClientWidth = 473
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -14,6 +14,7 @@ object FrmMain: TFrmMain
   OldCreateOrder = False
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnResize = FormResize
   PixelsPerInch = 96
   TextHeight = 14
   object pnlMain: TPanel
@@ -165,6 +166,7 @@ object FrmMain: TFrmMain
       Width = 80
       Height = 22
       Style = csDropDownList
+      ItemHeight = 14
       ItemIndex = 0
       TabOrder = 5
       Text = 'None'
@@ -183,6 +185,7 @@ object FrmMain: TFrmMain
       Width = 80
       Height = 22
       Style = csDropDownList
+      ItemHeight = 14
       ItemIndex = 1
       TabOrder = 6
       Text = 'Simple'

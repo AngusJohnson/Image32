@@ -115,14 +115,15 @@ begin
   //Panel1.BevelInner := bvLowered;     //set in IDE
   //Panel1.TabStop := true;             //set in IDE (for keyboard controls)
   DisplayPanel.FocusedColor := clGradientInactiveCaption;
-  DisplayPanel.BitmapProperties.Scale := 1;
+  DisplayPanel.Scale := 1;
   //enable image transparency - at least, as far as the panel background ;)
   DisplayPanel.Bitmap.PixelFormat := pf32bit;
   //and set initial image scaling
-  DisplayPanel.BitmapProperties.ScaleType := stFit;
+  DisplayPanel.ScaleType := stFit;
 
   masterImg := TImage32.Create;
-  masterImg.LoadFromResource('sample2', 'PNG');
+  //masterImg.LoadFromResource('sample2', 'PNG');
+  masterImg.LoadFromFile('floorplan.png');
   workImg := TImage32.Create;
 
   DisplayImage;
@@ -161,10 +162,11 @@ begin
     //nb: the 'epsilon' value may need to be increased when the image was
     //enlarged before vectorizing, effectively making pixel dimensions >1.
     //Epsilon should be +1 greater than meaningful pixel size.
-    if mnuShowSimplified.Checked or mnuShowSimplifiedSmoothed.Checked then
-    begin
-      flattenedPaths := RamerDouglasPeucker(rawPaths, 2)
-    end else
+    if mnuShowSimplified.Checked then
+      flattenedPaths := RamerDouglasPeucker(rawPaths, 1)
+    else if mnuShowSimplifiedSmoothed.Checked then
+      flattenedPaths := RamerDouglasPeucker(rawPaths, Min(3, TrackBar1.Position /2))
+    else
       flattenedPaths := rawPaths;
 
     if mnuShowSmoothedOnly.Checked then
@@ -213,7 +215,7 @@ begin
   if not OpenDialog1.Execute then Exit;
   btnCloseMemoClick(nil);
   masterImg.LoadFromFile(OpenDialog1.FileName);
-  DisplayPanel.BitmapProperties.ScaleType := stFit;
+  DisplayPanel.ScaleType := stFit;
   DisplayImage;
 end;
 //------------------------------------------------------------------------------

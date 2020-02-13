@@ -2,8 +2,7 @@ program SimpleAnimation;
 
 uses
   Forms,
-  Unit1 in 'Unit1.pas' {Form1},
-  Timer in 'Timer.pas';
+  Unit1 in 'Unit1.pas' {Form1};
 
 {$R *.res}
 {$I Image32.inc}

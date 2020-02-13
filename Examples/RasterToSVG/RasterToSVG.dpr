@@ -1,9 +1,10 @@
 program RasterToSVG;
 
+{%File 'RecWidth('}
+
 uses
   Forms,
   Unit1 in 'Unit1.pas' {MainForm},
-  CustomDialogs in 'CustomDialogs.pas',
   GifImage in 'GifImage.pas',
   Image32_GIF in 'Image32_GIF.pas';
 

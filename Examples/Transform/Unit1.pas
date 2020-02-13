@@ -92,7 +92,7 @@ begin
   Panel1.BevelInner := bvLowered;
   Panel1.TabStop := true; //enables keyboard control
   Panel1.FocusedColor := clGradientInactiveCaption;
-  Panel1.BitmapProperties.Scale := 1;
+  Panel1.Scale := 1;
 
   //SETUP THE LAYERED IMAGE
   DefaultButtonSize := DPI(10);
@@ -103,19 +103,19 @@ begin
 
   //Layer 0: 'hatched' layer to highlight transparency
   hatchedLayer :=
-    layeredImage32.AddNewLayer(TDesignerLayer32, 'background - hatched');
+    layeredImage32.AddLayer(TDesignerLayer32);
 
   //Layer 1: hidden layer contains the master image
-  masterLayer := layeredImage32.AddNewLayer(TDesignerLayer32, 'master - hidden');
+  masterLayer := layeredImage32.AddLayer(TDesignerLayer32);
   masterLayer.image.LoadFromResource('UNION_JACK', 'BMP');
   masterLayer.Visible := false;
 
   //Layer 2: for the transformed image
-  transformLayer := layeredImage32.AddNewLayer('transformed');
+  transformLayer := layeredImage32.AddLayer;
 
   //Layer 3: a design layer for design lines etc
   designLayer := TDesignerLayer32(
-    layeredImage32.AddNewLayer(TDesignerLayer32, 'design'));
+    layeredImage32.AddLayer(TDesignerLayer32));
 
   fTransformType := ttAfine;
   ResetSkew;
@@ -194,7 +194,6 @@ procedure TForm1.UpdateImage(transform: Boolean);
 var
   w,h: integer;
   pt: TPoint;
-  path: TArrayOfPointD;
   matrix: TMatrixD;
 begin
   if transform then
@@ -241,7 +240,7 @@ begin
   end else
   begin
     w := layeredImage32.Width;
-    h := layeredImage32.Height;
+    h := layeredImage32. Height;
   end;
 
   if not mnuHideControls.Checked and designLayer.Visible then
@@ -257,7 +256,6 @@ end;
 
 procedure TForm1.RedrawPanel;
 begin
-  Panel1.ClearBitmap;
   //copy the merged layeredImage32 to Panel1
   {$IFDEF SETSIZE}
   Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
@@ -317,19 +315,19 @@ begin
 
   buttonMovingLayer := layeredImage32.GetLayerAt(pt);
   if Assigned(buttonMovingLayer) and
-    (buttonMovingLayer.Name <> 'button') then
+    not (buttonMovingLayer is TButtonDesignerLayer32) then
       buttonMovingLayer := nil;
 
   if Assigned(buttonMovingLayer) then
   begin
     //while moving buttons temporarily disable panel zoom and scroll
-    panel1.BitmapProperties.ZoomAndScrollEnabled := false
+    panel1.ZoomAndScrollEnabled := false
   end
   else if PtInRect(transformLayer.Bounds, pt) then
   begin
     fImageIsClicked := true;
     //while moving the image temporarily disable panel zoom and scroll
-    panel1.BitmapProperties.ZoomAndScrollEnabled := false;
+    panel1.ZoomAndScrollEnabled := false;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -359,7 +357,7 @@ begin
   else if not Assigned(buttonMovingLayer) then
   begin
     layer := layeredImage32.GetLayerAt(pt);
-    if Assigned(layer) and (layer.Name = ButtonLayerName) then
+    if Assigned(layer) and (layer is TButtonDesignerLayer32) then
       Panel1.Cursor := crHandPoint
     else if PtInRect(transformLayer.Bounds, pt) then
       //nb: the 'designer' layer covers the 'transformed' layer
@@ -369,6 +367,7 @@ begin
       Panel1.Cursor := crDefault;
   end else
   begin
+    Panel1.Cursor := crHandPoint;
 
     //keep button controls axis aligned for appropriate transforms, otherwise
     //comment out below for an unrestricted skews (and change UpdateImage too)
@@ -401,7 +400,7 @@ begin
   fImageIsClicked := false;
   buttonMovingLayer := nil;
   //re-enable Panel1 zoom and scroll
-  Panel1.BitmapProperties.ZoomAndScrollEnabled := true;
+  Panel1.ZoomAndScrollEnabled := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -466,6 +465,5 @@ begin
   Close;
 end;
 //------------------------------------------------------------------------------
-
 
 end.

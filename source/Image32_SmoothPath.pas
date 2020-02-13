@@ -2,8 +2,8 @@ unit Image32_SmoothPath;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.37                                                            *
-* Date      :  15 January 2020                                                 *
+* Version   :  1.41                                                            *
+* Date      :  14 February 2020                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Supports paths with multiple sub-curves                         *
@@ -81,7 +81,7 @@ type
     property SmoothPath: TSmoothPath read fSmoothPath;
   end;
 
-  procedure DrawSmoothPathOnDesigner(const smoothPath: TSmoothPath;
+  procedure DrawSmoothPathCtrlLinesOnDesigner(const smoothPath: TSmoothPath;
     designerLayer: TDesignerLayer32);
 
 implementation
@@ -545,7 +545,7 @@ end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-procedure DrawSmoothPathOnDesigner(const smoothPath: TSmoothPath;
+procedure DrawSmoothPathCtrlLinesOnDesigner(const smoothPath: TSmoothPath;
   designerLayer: TDesignerLayer32);
 var
   i, highI: integer;

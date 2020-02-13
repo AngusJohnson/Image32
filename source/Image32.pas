@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.38                                                            *
-* Date      :  20 January 2020                                                 *
+* Version   :  1.41                                                            *
+* Date      :  14 February 2020                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -125,6 +125,8 @@ type
     procedure Resize(newWidth, newHeight: Integer; stretchImage: Boolean = true);
     procedure Scale(s: single); overload;
     procedure Scale(sx, sy: single); overload;
+    procedure ScaleToFit(const rec: TRect);
+
     function Copy(src: TImage32; srcRec, dstRec: TRect): Boolean;
     //CopyBlend: Copies part or all of another TImage32 image (src).
     //If no blend function is provided, then the pixels in src's srcRec
@@ -1659,6 +1661,19 @@ begin
   sx := Min(sx, 100); sy := Min(sy, 100);
   if (sx > 0) and (sy > 0) then
     ReSize(Round(width * sx), Round(height * sy));
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.ScaleToFit(const rec: TRect);
+var
+  sx, sy: double;
+begin
+  if IsEmptyRect(rec) then Exit;
+  sx := RectWidth(rec) / Width;
+  sy := RectHeight(rec) / Height;
+  if sx <= sy then
+    Scale(sx) else
+    Scale(sy);
 end;
 //------------------------------------------------------------------------------
 

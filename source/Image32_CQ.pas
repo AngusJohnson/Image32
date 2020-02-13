@@ -857,7 +857,7 @@ end;
 function TrimPalette(const palette: TArrayOfColor32;
   const colorFrequency: TArrayOfInteger; newSize: integer): TArrayOfColor32;
 var
-  i,j, minFrequency, len, cnt: integer;
+  i,j, minFrequency, len: integer;
   sortedFreq: TArrayOfInteger;
 begin
   len := Length(palette);
@@ -875,7 +875,7 @@ begin
   QuickSortDesc(sortedFreq, 0, len -1);
   minFrequency := sortedFreq[newSize] +1;
   SetLength(Result, newSize);
-  j := 0; cnt := 0;
+  j := 0;
   for i := 0 to len -1 do
     if colorFrequency[i] >= minFrequency then
     begin
@@ -889,7 +889,7 @@ end;
 function TrimPalette(const palette: TArrayOfColor32;
   const colorFrequency: TArrayOfInteger; fraction: double): TArrayOfColor32;
 var
-  i,j, minFrequency, len, cnt: integer;
+  i,j, minFrequency, len: integer;
 begin
   len := Length(palette);
   fraction := fraction / len;
@@ -905,7 +905,7 @@ begin
 
   minFrequency := Round(fraction * colorFrequency[len]);
   SetLength(Result, len);
-  j := 0; cnt := 0;
+  j := 0;
   for i := 0 to len -1 do
     if colorFrequency[i] >= minFrequency then
     begin
@@ -1003,6 +1003,17 @@ begin
     Mul7Div16Table[i] := Round(i * SevenDiv16);
   end;
 end;
+
+(*
+  debugging
+  i := Length(pal);
+  img := TImage32.Create(i * 16, 16);
+  for i := 0 to i -1 do
+    DrawPolygon(img, Rectangle(i * 16, 0, (i +1) * 16, 16),
+      Image32_Vector.frEvenOdd, pal[i]);
+  img.SaveToFile('tmp.png');
+  img.Free;
+*)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------

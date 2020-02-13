@@ -144,6 +144,7 @@ type
   function RectsEqual(const rec1, rec2: TRect): Boolean;
   procedure OffsetRect(var rec: TRectD; dx, dy: double); overload;
 
+  function Point(X,Y: Integer): TPoint; overload;
   function Point(const pt: TPointD): TPoint; overload;
 
   function PointsEqual(const pt1, pt2: TPointD): Boolean; overload;
@@ -274,6 +275,13 @@ function RectsEqual(const rec1, rec2: TRect): Boolean;
 begin
   result := (rec1.Left = rec2.Left) and (rec1.Top = rec2.Top) and
     (rec1.Right = rec2.Right) and (rec1.Bottom = rec2.Bottom);
+end;
+//------------------------------------------------------------------------------
+
+function Point(X,Y: Integer): TPoint;
+begin
+  result.X := X;
+  result.Y := Y;
 end;
 //------------------------------------------------------------------------------
 
@@ -2440,38 +2448,38 @@ end;
 //------------------------------------------------------------------------------
 
 type
-  PPt2 = ^TPt2;
-  TPt2 = record
+  PPt = ^TPt;
+  TPt = record
     pt   : TPointD;
     vec  : TPointD;
     len  : double;
-    next : PPt2;
-    prev : PPt2;
+    next : PPt;
+    prev : PPt;
   end;
 
   TFitCurveContainer = class
   private
-    ppts      : PPt2;
+    ppts      : PPt;
     solution  : TArrayOfPointD;
     tolSqrd   : double;
-    function Count(first, last: PPt2): integer;
-    function AddPt(const pt: TPointD): PPt2;
+    function Count(first, last: PPt): integer;
+    function AddPt(const pt: TPointD): PPt;
     procedure Clear;
-    function ComputeLeftTangent(p: PPt2): TPointD;
-    function ComputeRightTangent(p: PPt2): TPointD;
-    function ComputeCenterTangent(p: PPt2): TPointD;
+    function ComputeLeftTangent(p: PPt): TPointD;
+    function ComputeRightTangent(p: PPt): TPointD;
+    function ComputeCenterTangent(p: PPt): TPointD;
     function ChordLengthParameterize(
-      first, last: PPt2; count: integer): TArrayOfDouble;
-    function GenerateBezier(first, last: PPt2; count: integer;
+      first, last: PPt; count: integer): TArrayOfDouble;
+    function GenerateBezier(first, last: PPt; count: integer;
       const u: TArrayOfDouble; const firstTan, lastTan: TPointD): TArrayOfPointD;
-    function Reparameterize(first, last: PPt2; count: integer;
+    function Reparameterize(first, last: PPt; count: integer;
       const u: TArrayOfDouble; const bezier: TArrayOfPointD): TArrayOfDouble;
     function NewtonRaphsonRootFind(const q: TArrayOfPointD;
       const pt: TPointD; u: double): double;
-    function ComputeMaxErrorSqrd(first, last: PPt2;
+    function ComputeMaxErrorSqrd(first, last: PPt;
       const bezier: TArrayOfPointD; const u: TArrayOfDouble;
-      out SplitPoint: PPt2): double;
-    function FitCubic(first, last: PPt2;
+      out SplitPoint: PPt): double;
+    function FitCubic(first, last: PPt;
       firstTan, lastTan: TPointD): Boolean;
     procedure AppendSolution(const bezier: TArrayOfPointD);
   public
@@ -2535,7 +2543,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function NormalizePt2(const pt2: PPt2): TPointD;
+function NormalizePt2(const pt2: PPt): TPointD;
   {$IFDEF INLINE} inline; {$ENDIF}
 begin
   with pt2^ do
@@ -2586,7 +2594,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFitCurveContainer.AddPt(const pt: TPointD): PPt2;
+function TFitCurveContainer.AddPt(const pt: TPointD): PPt;
 begin
   new(Result);
   Result.pt := pt;
@@ -2607,7 +2615,7 @@ end;
 
 procedure TFitCurveContainer.Clear;
 var
-  p: PPt2;
+  p: PPt;
 begin
   solution := nil;
   ppts.prev.next := nil; //break loop
@@ -2620,7 +2628,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFitCurveContainer.Count(first, last: PPt2): integer;
+function TFitCurveContainer.Count(first, last: PPt): integer;
 begin
   if first = last then
     result := 0 else
@@ -2632,19 +2640,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFitCurveContainer.ComputeLeftTangent(p: PPt2): TPointD;
+function TFitCurveContainer.ComputeLeftTangent(p: PPt): TPointD;
 begin
   Result := NormalizePt2(p);
 end;
 //------------------------------------------------------------------------------
 
-function TFitCurveContainer.ComputeRightTangent(p: PPt2): TPointD;
+function TFitCurveContainer.ComputeRightTangent(p: PPt): TPointD;
 begin
   Result := NegateVec(NormalizePt2(p.prev));
 end;
 //------------------------------------------------------------------------------
 
-function TFitCurveContainer.ComputeCenterTangent(p: PPt2): TPointD;
+function TFitCurveContainer.ComputeCenterTangent(p: PPt): TPointD;
 var
   v1, v2: TPointD;
 begin
@@ -2656,7 +2664,7 @@ end;
 //------------------------------------------------------------------------------
 
 function TFitCurveContainer.ChordLengthParameterize(
-  first, last: PPt2; count: integer): TArrayOfDouble;
+  first, last: PPt; count: integer): TArrayOfDouble;
 var
   d: double;
   i: integer;
@@ -2675,11 +2683,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFitCurveContainer.GenerateBezier(first, last: PPt2; count: integer;
+function TFitCurveContainer.GenerateBezier(first, last: PPt; count: integer;
   const u: TArrayOfDouble; const firstTan, lastTan: TPointD): TArrayOfPointD;
 var
   i: integer;
-  p: PPt2;
+  p: PPt;
   dist, epsilon: double;
   v1,v2, tmp: TPointD;
   a0, a1: TArrayOfPointD;
@@ -2754,7 +2762,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFitCurveContainer.Reparameterize(first, last: PPt2; count: integer;
+function TFitCurveContainer.Reparameterize(first, last: PPt; count: integer;
   const u: TArrayOfDouble; const bezier: TArrayOfPointD): TArrayOfDouble;
 var
   i: integer;
@@ -2784,14 +2792,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFitCurveContainer.ComputeMaxErrorSqrd(first, last: PPt2;
+function TFitCurveContainer.ComputeMaxErrorSqrd(first, last: PPt;
 	const bezier: TArrayOfPointD; const u: TArrayOfDouble;
-  out SplitPoint: PPt2): double;
+  out SplitPoint: PPt): double;
 var
   i: integer;
   distSqrd: double;
   pt: TPointD;
-  p: PPt2;
+  p: PPt;
 begin
 	Result := 0;
   i := 1;
@@ -2847,11 +2855,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFitCurveContainer.FitCubic(first, last: PPt2;
+function TFitCurveContainer.FitCubic(first, last: PPt;
   firstTan, lastTan: TPointD): Boolean;
 var
   i, cnt: integer;
-  splitPoint: PPt2;
+  splitPoint: PPt;
   centerTan: TPointD;
   bezier: TArrayOfPointD;
   clps, uPrime: TArrayOfDouble;
@@ -2926,37 +2934,44 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function HardBreakCheck(p: PPt2; compareLen: double): Boolean;
+function HardBreakCheck(ppt: PPt; compareLen: double): Boolean;
 var
   q: double;
+const
+  longLen = 15;
 begin
   //A 'break' means starting a new Bezier. A 'hard' break avoids smoothing
-  //whereas a 'soft' break is still smoothed. There is as much art as science
-  //in determining where to smooth and where not to. For example, long edges
-  //should generally remain straight but how long does an edge have to be
-  //to be considered a 'long' edge?
+  //whereas a 'soft' break will still be smoothed. There is as much art as
+  //science in determining where to smooth and where not to. For example,
+  //long edges should generally remain straight but how long does an edge
+  //have to be to be considered a 'long' edge?
 
-  if ((TurnsLeft(p.prev.prev.pt, p.prev.pt, p.pt) =
-    TurnsRight(p.prev.pt, p.pt, p.next.pt)) and
-    (p.prev.len > compareLen) and (p.len > compareLen)) or
-    (p.prev.len * 4 < p.len) or (p.len * 4 < p.prev.len) then
+  if (ppt.prev.len * 4 < ppt.len) or (ppt.len * 4 < ppt.prev.len) then
   begin
-    //We'll hard break whenever there's an inflection point or
-    //when there's significant asymmetry between segment lengths
-    //(because GenerateBezier() will perform poorly).
+    //We'll hard break whenever there's significant asymmetry between
+    //segment lengths because GenerateBezier() will perform poorly.
+    result := true;
+  end
+  else if ((ppt.prev.len > longLen) and (ppt.len > longLen)) then
+  begin
+    //hard break long segments only when turning by more than ~45 degrees
+    q := (Sqr(ppt.prev.len) + Sqr(ppt.len) - DistanceSqrd(ppt.prev.pt, ppt.next.pt)) /
+      (2 * ppt.prev.len * ppt.len); //Cosine Rule.
+    result := (1 - abs(q)) > 0.3;
+  end
+  else if ((TurnsLeft(ppt.prev.prev.pt, ppt.prev.pt, ppt.pt) =
+    TurnsRight(ppt.prev.pt, ppt.pt, ppt.next.pt)) and
+    (ppt.prev.len > compareLen) and (ppt.len > compareLen)) then
+  begin
+    //we'll also hard break whenever there's a significant inflection point
     result := true;
   end else
   begin
-    compareLen := compareLen * 2;
-    //We'll also hard break where there's a significant bend. When both edges
-    //are relatively short (ie <compareLen) it's safer tolerating greater angles
-    //of deviation and assume they're artifacts. Empirically a significant bend
-    //for longer edges is >60 deg. (ie <120 deg. @ angle 'p'). Uses Cosine Rule.
-    if (p.prev.len < compareLen) and (p.len < compareLen) then
-      q := -0.0174524 else   //tolerate up to 89 deg. for shorter edge bends
-      q := -0.17;             //but only up to 80 deg. for longer edges bends
-    Result := (Sqr(p.prev.len) + Sqr(p.len) -
-      DistanceSqrd(p.prev.pt, p.next.pt)) / (2 * p.prev.len * p.len) > q;
+    //Finally, we'll also force a 'hard' break when there's a significant bend.
+    //Again uses the Cosine Rule.
+    q :=(Sqr(ppt.prev.len) + Sqr(ppt.len) -
+      DistanceSqrd(ppt.prev.pt, ppt.next.pt)) / (2 * ppt.prev.len * ppt.len);
+    Result := (q > -0.2); //ie more than 90%
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2966,7 +2981,7 @@ function TFitCurveContainer.FitCurve(const path: TArrayOfPointD;
 var
   i, highI: integer;
   d: double;
-  p, p2, pEnd: PPt2;
+  p, p2, pEnd: PPt;
 begin
   //tolerance: specifies the maximum allowed variance between the existing
   //vertices and the new Bezier curves. More tolerance will produce

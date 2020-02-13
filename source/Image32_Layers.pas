@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.39                                                            *
-* Date      :  24 January 2020                                                 *
+* Version   :  1.41                                                            *
+* Date      :  14 February 2020                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -60,7 +60,9 @@ type
     function BringForward(newLevel: integer): Boolean;
     function SendBack(newLevel: integer): Boolean;
     procedure Offset(dx, dy: integer); virtual;
-    procedure PositionAt(const pt: TPoint);
+    procedure PositionAt(const pt: TPoint); overload;
+    procedure PositionAt(x, y: integer); overload;
+    procedure PositionCenteredAt(X, Y: integer); overload;
     procedure PositionCenteredAt(const pt: TPoint); overload;
     procedure PositionCenteredAt(const pt: TPointD); overload;
     procedure SetBounds(const bounds: TRect);
@@ -147,13 +149,11 @@ type
     constructor Create(Width: integer = 0; Height: integer =0); virtual;
     destructor Destroy; override;
     procedure SetSize(width, height: integer);
-    function AddNewLayer(layerClass: TLayer32Class;
-      const layerName: string = ''): TLayer32; overload;
-    function AddNewLayer(const layerName: string = ''): TLayer32; overload;
-    function InsertNewLayer(layerClass: TLayer32Class;
-      index: integer; const layerName: string = ''): TLayer32; overload;
-    function InsertNewLayer(index: integer;
-      const layerName: string = ''): TLayer32; overload;
+    function AddLayer(layerClass: TLayer32Class): TLayer32; overload;
+    function AddLayer: TLayer32; overload;
+    function InsertLayer(layerClass: TLayer32Class;
+      index: integer): TLayer32; overload;
+    function InsertLayer(index: integer): TLayer32; overload;
     procedure DeleteLayer(index: integer);
     procedure Clear;
     procedure Invalidate;
@@ -356,6 +356,22 @@ begin
   if (pt.X = fPosition.X) and (pt.Y = fPosition.Y) then Exit;
   fPosition := pt;
   fOwner.Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.PositionAt(x, y: integer);
+begin
+  PositionAt(Types.Point(x, y));
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.PositionCenteredAt(X, Y: integer);
+var
+  pt2: TPoint;
+begin
+  pt2.X := X - fImage.Width div 2;
+  pt2.Y := Y - fImage.Height div 2;
+  PositionAt(pt2);
 end;
 //------------------------------------------------------------------------------
 
@@ -797,28 +813,26 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.AddNewLayer(layerClass: TLayer32Class;
-  const layerName: string = ''): TLayer32;
+function TLayeredImage32.AddLayer(layerClass: TLayer32Class): TLayer32;
 begin
-  Result := InsertNewLayer(layerClass, Count, layerName);
+  Result := InsertLayer(layerClass, Count);
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.AddNewLayer(const layerName: string = ''): TLayer32;
+function TLayeredImage32.AddLayer: TLayer32;
 begin
-  Result := AddNewLayer(TLayer32, layerName);
+  Result := AddLayer(TLayer32);
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.InsertNewLayer(index: integer;
-  const layerName: string = ''): TLayer32;
+function TLayeredImage32.InsertLayer(index: integer): TLayer32;
 begin
-  Result := InsertNewLayer(TLayer32, index, layerName);
+  Result := InsertLayer(TLayer32, index);
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.InsertNewLayer(layerClass: TLayer32Class;
-  index: integer; const layerName: string = ''): TLayer32;
+function TLayeredImage32.InsertLayer(layerClass: TLayer32Class;
+  index: integer): TLayer32;
 begin
   if (index < 0) or (index > Count) then
     raise Exception.Create(rsImageLayerRangeError);
@@ -831,7 +845,6 @@ begin
 
   //insert new layer into fList and update indexes
   Result := layerClass.Create(Self);
-  Result.Name := layerName;
   fList.Insert(index, Result);
   ReIndexFrom(index, Count -1);
   Invalidate;
@@ -1136,7 +1149,8 @@ begin
     ssCorners:
       for i := 0 to 3 do
       begin
-        layer := lim.AddNewLayer(buttonLayerClass, ButtonLayerName);
+        layer := lim.AddLayer(buttonLayerClass);
+        layer.Name := ButtonLayerName;
         SizeAndDrawButtonLayer(layer, buttonSize, buttonColor, buttonOptions);
         layer.PositionCenteredAt(Point(corners[i]));
         layer.CursorId := cnrCursorIds[i];
@@ -1144,7 +1158,8 @@ begin
     ssEdges:
       for i := 0 to 3 do
       begin
-        layer := lim.AddNewLayer(buttonLayerClass, ButtonLayerName);
+        layer := lim.AddLayer(buttonLayerClass);
+        layer.Name := ButtonLayerName;
         SizeAndDrawButtonLayer(layer, buttonSize, buttonColor, buttonOptions);
         layer.PositionCenteredAt(Point(edges[i]));
         layer.CursorId := edgeCursorIds[i];
@@ -1152,12 +1167,14 @@ begin
     else
       for i := 0 to 3 do
       begin
-        layer := lim.AddNewLayer(buttonLayerClass, ButtonLayerName);
+        layer := lim.AddLayer(buttonLayerClass);
+        layer.Name := ButtonLayerName;
         SizeAndDrawButtonLayer(layer, buttonSize, buttonColor, buttonOptions);
         layer.PositionCenteredAt(Point(corners[i]));
         layer.CursorId := cnrCursorIds[i];
 
-        layer := lim.AddNewLayer(buttonLayerClass, ButtonLayerName);
+        layer := lim.AddLayer(buttonLayerClass);
+        layer.Name := ButtonLayerName;
         SizeAndDrawButtonLayer(layer, buttonSize, buttonColor, buttonOptions);
         layer.PositionCenteredAt(Point(edges[i]));
         layer.CursorId := edgeCursorIds[i];
@@ -1280,8 +1297,8 @@ begin
   if not assigned(buttonLayerClass) then
     buttonLayerClass := TButtonDesignerLayer32;
 
-  Result := TButtonDesignerLayer32(
-    layeredImage32.AddNewLayer(buttonLayerClass, ButtonLayerName));
+  Result := TButtonDesignerLayer32(layeredImage32.AddLayer(buttonLayerClass));
+  Result.Name := ButtonLayerName;
   SizeAndDrawButtonLayer(Result, buttonSize, buttonColor, buttonOptions);
   Result.PositionCenteredAt(buttonPt);
   Result.CursorId := crHandPoint;
@@ -1302,9 +1319,9 @@ begin
   //nb: the only way to add to a group is to temporarily ungroup
   layeredImage32.UnGroup(GroupId);
   //create a new layer of the same class type as the first button layer
-  Result := TButtonDesignerLayer32(layeredImage32.InsertNewLayer(
-    TButtonDesignerLayer32Class(layeredImage32[fig].ClassType),
-    lig+1, ButtonLayerName));
+  Result := TButtonDesignerLayer32(layeredImage32.InsertLayer(
+    TButtonDesignerLayer32Class(layeredImage32[fig].ClassType), lig+1));
+  Result.Name := ButtonLayerName;
   SizeAndDrawButtonLayer(Result, buttonSize, buttonColor, buttonOptions);
   Result.PositionCenteredAt(pt);
   Result.CursorId := crHandPoint;

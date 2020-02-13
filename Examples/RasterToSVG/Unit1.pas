@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
   Types, Menus, StdCtrls, ExtCtrls, ComCtrls, ShellApi, IniFiles, Dialogs,
-  Image32, BitmapPanels, CustomDialogs;
+  Image32, BitmapPanels, DialogsEx;
 
 type
   TMainForm = class(TForm)
@@ -38,6 +38,7 @@ type
     mnuManualPaletteSizes: TMenuItem;
     mnuChangeSmoothness: TMenuItem;
     N5: TMenuItem;
+    ChangeSimpleness1: TMenuItem;
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -50,6 +51,7 @@ type
     procedure mnuOptionsClick(Sender: TObject);
     procedure mnuIniOptionsClick(Sender: TObject);
     procedure mnuChangeSmoothnessClick(Sender: TObject);
+    procedure ChangeSimpleness1Click(Sender: TObject);
   private
     rasterScale        : integer;
     cancelOp           : boolean;
@@ -58,6 +60,7 @@ type
     isDrawing          : Boolean;
     maxColors          : integer;
     maximumColors      : integer;
+    simpleness         : integer;
     smoothness         : integer;
     ImageMargin        : integer;
     hideJPGMessage     : Boolean;
@@ -65,10 +68,11 @@ type
     palVectorsList: TList;
     procedure LoadIniSettings;
     procedure WMDropFiles(var msg: TWMDropFiles); message WM_DROPFILES;
-    procedure DoOpenFile(const filename: string; forceColorCheck: Boolean);
+    procedure DoOpenFile(forceColorCheck: Boolean);
     function CheckJpg(const filename: string): Boolean;
     procedure BuildVectorListFromMonochromeImage(tmpMasterImg: TImage32; scale: double);
-    procedure BuildVectorListFromColorDrawing(tmpMasterImg: TImage32; scale: double);
+    procedure BuildVectorListFromColorDrawing(scale: double);
+    procedure BuildPaletteImages(tmpMasterImg: TImage32; scale: double);
     procedure BuildSvgFromVectorList(
       newWidth, newHeight: integer; scaling: double);
     function GetMaxColors(forceCheck: Boolean): Boolean;
@@ -81,7 +85,8 @@ type
     procedure SvgPnlKeydown(Sender: TObject; var Key: Word;
     Shift: TShiftState);
   public
-    { Public declarations }
+    paletteImages: TImageList32;
+    paletteColors: TList;
   end;
 
 var
@@ -114,10 +119,9 @@ resourcestring
     'this option is unchecked, ''Refreshing'' (Crtl+R) will still '+
     'require manually setting the palette size.)';
   jpgWarning =
-    'Warning: JPG images rarely convert well into SVG format. Not only do '+
-    'they normally contain photos that are unsuited to SVGs, '+
-    'but they also contain ''lossy'' compression  artifacts that '+
-    'tend to spoil conversions.';
+    'Warning: JPG images rarely convert well into SVG format. Usually they '+
+    'contain photos that are unsuited to SVGs, and ''lossy'' compression '+
+    'artifacts also tend to spoil conversions.';
   colorCountMessage =
     'The raster image uses %1.0n different colors.'#10#10+
     'Select the number of colors you want to use in the new SVG image. '+
@@ -130,7 +134,7 @@ resourcestring
 
 const
   FillRule: array[TFillRule] of string = ('evenodd', 'nonzero', '', '');
-  SvgHeader: string = //expects with and height %d replacement
+  SvgHeader: string = //expects width and height %d replacement
      '<?xml version="1.0" standalone="no"?>'#10+
      '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"'#10+
      '  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">'#10+
@@ -188,6 +192,32 @@ begin
           formatPoint(path[i][k+2]) + formatPoint(path[i][k+3]));
         prevOp := 'C';
       end;
+    end;
+  end;
+  ss.WriteString('Z" />'#10);
+end;
+//------------------------------------------------------------------------------
+
+procedure WriteFlattenedPathToSvgStringStream(ss: TStringStream;
+  const path: TArrayOfArrayOfPointD; index: integer);
+var
+  i,j,highI,highJ: integer;
+  prevOp: Char;
+begin
+  highI := High(path);
+  if (highI < 0) then Exit;
+  ss.WriteString(Format('  <path class="style_%3.3d"  d=" ',[index]));
+  for i := 0 to highI do
+  begin
+    highJ := High(path[i]);
+    if (highJ < 1) then Continue;
+    ss.WriteString('M ' + formatPoint(path[i][0]));
+    prevOp := 'M';
+    for j := 1 to highJ do
+    begin
+      if prevOp <> 'L' then ss.WriteString('L ');
+      ss.WriteString(formatPoint(path[i][j]));
+      prevOp := 'L';
     end;
   end;
   ss.WriteString('Z" />'#10);
@@ -354,12 +384,15 @@ end;
 
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
+  simpleness := 0;
   smoothness := 2;
   LoadIniSettings;
   DragAcceptFiles(Handle, True);
   lblRaster.Left := DPI(16);
   UpdateOptions(true);
 
+  paletteImages := TImageList32.Create;
+  paletteColors := TList.Create;
   //SETUP THE 2 DISPLAY PANELS
   pnlRaster.BorderWidth := DPI(16);
   pnlSVG.BorderWidth := DPI(16);
@@ -367,20 +400,24 @@ begin
   //TabStop := true;             //set in IDE (for keyboard controls)
   pnlRaster.FocusedColor := clGradientInactiveCaption;
   pnlSVG.FocusedColor := clGradientInactiveCaption;
-  pnlRaster.BitmapProperties.Scale := 1;
-  pnlSVG.BitmapProperties.Scale := 1;
+  pnlRaster.Scale := 1;
+  pnlSVG.Scale := 1;
   //enable image transparency - at least, as far as the panel background ;)
   pnlRaster.Bitmap.PixelFormat := pf32bit;
   pnlSVG.Bitmap.PixelFormat := pf32bit;
   //and set initial image scale
-  pnlRaster.BitmapProperties.ScaleType := stFit;
-  pnlSVG.BitmapProperties.ScaleType := stFit;
-  pnlSVG.BitmapProperties.OnKeyDown := SvgPnlKeydown;
+  pnlRaster.ScaleType := stFit;
+  pnlSVG.ScaleType := stFit;
+  pnlSVG.OnKeyDown := SvgPnlKeydown;
 
   palVectorsList  := TList.Create;
   svgStringStream := TStringStream.Create('');
   rasterImg       := TImage32.Create;
   svgImg         := TImage32.Create;
+
+//  OpenDialog1.FileName := './sample_images/mono_ab.png';
+//  DoOpenFile(OpenDialog1.FileName, false);
+//  WindowState := wsMaximized;
 
   DisplayImages;
 end;
@@ -394,6 +431,8 @@ begin
   palVectorsList.Free;
   rasterImg.Free;
   svgImg.Free;
+  paletteImages.Free;
+  paletteColors.Free;
 end;
 //------------------------------------------------------------------------------
 
@@ -411,8 +450,7 @@ begin
   try
     mnuManualPaletteSizes.Checked :=
       not StringToBoolean(ini.ReadString('Setup', 'AutoAssignPaletteSize', 'Y'));
-    maximumColors :=
-      Max(8,(Min(512,ini.ReadInteger('Setup', 'MaximumColors', 256))));
+    maximumColors := Max(8,(Min(512, ini.ReadInteger('Setup', 'MaximumColors', 256))));
     ImageMargin := Max(0,(Min(200,ini.ReadInteger('Setup', 'ImageMargin', 0))));
   finally
     ini.Free;
@@ -434,7 +472,8 @@ begin
   OpenDialog1.FileName := filename;
   if TImage32.IsRegisteredFormat(ExtractFileExt(filename)) then
   begin
-    DoOpenFile(filename, false);
+    paletteImages.Clear;
+    DoOpenFile(false);
   end;
   DragFinish(dropHdl);
   msg.Result := 0;     //ie message has been handled
@@ -444,8 +483,9 @@ end;
 type
   PPathsNColor = ^TPathsNColor;
   TPathsNColor = record
-    paths: TArrayOfArrayOfPointD;
-    color: TColor32;
+    isFlat : Boolean;
+    paths  : TArrayOfArrayOfPointD;
+    color  : TColor32;
   end;
 
 //------------------------------------------------------------------------------
@@ -470,12 +510,16 @@ begin
 
   //get the raw vectors (either using transparency or filtering on black)
   if tmpMasterImg.HasTransparency then
-    pp := Vectorize(tmpMasterImg, $FF000000, CompareAlpha, $80) else
-    pp := Vectorize(tmpMasterImg, $FF000000, CompareRGB, $80);
+    pp := Vectorize(tmpMasterImg, $FF000000, CompareAlpha, $80, 3) else
+    pp := Vectorize(tmpMasterImg, $FF000000, CompareRGB, $80, 3);
 
-  pp := RamerDouglasPeucker(pp, smoothness * 1.5 * scale);
-  pp := SmoothLine(pp, true, smoothness * scale, scale);
+  if simpleness > 0 then
+    pp := RamerDouglasPeucker(pp, simpleness * scale);
+  if smoothness > 0 then
+    pp := SmoothLine(pp, true, smoothness * scale, smoothness);
+
   new(pnc);
+  pnc.isFlat := smoothness = 0;
   pnc.paths := pp;
   pnc.color := clBlack32;
   palVectorsList.Add(pnc);
@@ -498,14 +542,101 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.BuildVectorListFromColorDrawing(tmpMasterImg: TImage32; scale: double);
+procedure TMainForm.BuildPaletteImages(tmpMasterImg: TImage32; scale: double);
 var
-  i,j, shadowCnt: integer;
-  pathsAndColor: PPathsNColor;
+  i, shadowCount: integer;
+  img: TImage32;
   pal: TArrayOfColor32;
   palFrequencies: TArrayOfInteger;
+  opaque: TArrayOfArrayOfPointD;
+begin
+  paletteImages.Clear;
+  paletteColors.Clear;
+
+  maxColors := Min(maxColors, tmpMasterImg.ColorCount);
+  ProgressBar.Position := Round( (1 * 50) / maxColors);
+  application.processmessages;
+
+  //BACKGROUND
+  if mnuEraseBackground.Checked then
+    EraseBackgroundIncludeHolesInside(tmpMasterImg, $20);
+
+  //SHADOW
+  opaque := nil;
+  if tmpMasterImg.HasTransparency then
+  begin
+    img := TImage32.Create(tmpMasterImg);
+    img.ConvertToBoolMask($FF000000, $0, CompareAlpha, clNone32, clBlack32);
+    opaque := Vectorize(img, clNone32, CompareAlpha, 0, 3);
+
+    img.Assign(tmpMasterImg);
+    img.ConvertToBoolMask($FF000000, $CC, CompareAlpha, clNone32, clBlack32);
+    paletteImages.Add(img);
+    paletteColors.Add(Pointer(0));
+    shadowCount := 1;
+  end else
+  begin
+    //otherwise add to dummy (empty) images
+    img := TImage32.Create;
+    paletteImages.Add(img);
+    paletteColors.Add(Pointer(0));
+    shadowCount := 0;
+    Dec(maxColors);
+  end;
+
+  //PALETTE
+  pal := MakeAndApplyPalette(tmpMasterImg, maxColors, false, palFrequencies);
+  maxColors := length(pal) + shadowCount;
+  pal := TrimPalette(pal, palFrequencies, 0.1);
+  maxColors := length(pal) + shadowCount;
+
+  if (length(pal) <= 2) or (maxColors = 1) then
+    Exit;
+
+  ProgressBar.Position := Round( (1 * 50) / maxColors);
+  application.processmessages;
+
+  //BLACK
+  img := TImage32.Create(tmpMasterImg);
+  img.Grayscale;
+  Sharpen(img, 5, 10);
+  img.ConvertToBoolMask(clBlack32, $20, CompareRGB, clNone32, clBlack32);
+  paletteImages.Add(img);
+  paletteColors.Add(Pointer(pal[0]));
+
+  //TIDY UP OPAQUE/TRANSPARENT BOUNDARIES
+  MakePartialFullyTransparent(tmpMasterImg);
+
+  if assigned(opaque) then
+  begin
+    opaque := Image32_Clipper.InflatePolygons(opaque, 2 * scale);
+    ErasePolygon(tmpMasterImg, opaque, Image32_Vector.frEvenOdd);
+  end;
+
+  //COLORS
+  i := 1;
+  while (i < High(pal)) and (MaxRgbDifference(clBlack32, pal[i]) < $20) do
+    inc(i);
+  for i := i to high(pal) do
+  begin
+    ProgressBar.Position := Round( (i * 100) / maxColors);
+    application.processmessages;
+    if cancelOp then Exit;
+
+    img := TImage32.Create(tmpMasterImg);
+    img.ConvertToBoolMask(pal[i], 0, CompareRGB, clNone32, clBlack32);
+    paletteImages.Add(img);
+    paletteColors.Add(Pointer(pal[i]));
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.BuildVectorListFromColorDrawing(scale: double);
+var
+  i,j: integer;
+  pathsAndColor: PPathsNColor;
   pp, shadow, black, opaque: TArrayOfArrayOfPointD;
-  shadowImg: TImage32;
+  filename: string;
 begin
   //convert palette entres into vectors and store them in palVectorsList.
   //Note that lower palette entries are darker than higher ones and so
@@ -515,135 +646,69 @@ begin
   if cancelOp then Exit;
   svgStringStream.Size := 0;
   ClearPalVectors;
-  shadow := nil; opaque := nil; shadowCnt := 0;
-
-  if mnuEraseBackground.Checked then
-  begin
-    StatusBar1.SimpleText := ' Erasing Background: ' +
-      ExtractFilename(OpenDialog1.FileName);
-    Application.ProcessMessages;
-    EraseBackgroundIncludeHolesInside(tmpMasterImg, $20);
-    //alternatively ... EraseBackgroundFromEdges(tmpMasterImg, $20);
-  end;
+  shadow := nil; opaque := nil;
+  filename := ExtractFilename(OpenDialog1.FileName);
 
   //VECTORIZE A SEMI-TRANSPARENT 'SHADOW'
 
-  if tmpMasterImg.HasTransparency then
+  if not paletteImages[0].IsEmpty then
   begin
-    StatusBar1.SimpleText := ' Creating Shadow layer: ' +
-      ExtractFilename(OpenDialog1.FileName);
-    Application.ProcessMessages;
-
-    //vectorize 'shadow' from all pixels with at least 20% opacity
-    shadowImg := TImage32.Create(tmpMasterImg);
-    try
-      shadowImg.ConvertToBoolMask($FF000000, $CC, CompareAlpha, clNone32, clBlack32);
-      shadow := Vectorize(shadowImg, clBlack32, CompareAlpha, 0);
-
-      shadowImg.Assign(tmpMasterImg);
-      shadowImg.ConvertToBoolMask($FF000000, $0, CompareAlpha, clNone32, clBlack32);
-      opaque := Vectorize(shadowImg, clNone32, CompareAlpha, 0);
-    finally
-      shadowImg.Free;
-    end;
-
+    shadow := Vectorize(paletteImages[0], clBlack32, CompareAlpha, 0, 3);
     if not Assigned(shadow) then Exit; //ie nothing reasonably opaque
-    shadow := RamerDouglasPeucker(shadow, 0.5 * scale);
-    shadow := SmoothLine(shadow, true, smoothness * 0.5, 1);
+
+    if simpleness > 0 then
+      shadow := RamerDouglasPeucker(shadow, simpleness * scale);
+    if smoothness > 0 then
+      shadow := SmoothLine(shadow, true, smoothness * 0.5, 1);
     new(pathsAndColor);
+    pathsAndColor.isFlat := smoothness = 0;
     pathsAndColor.paths := shadow;
     pathsAndColor.color := $FFC0C0C0;; //light gray
     palVectorsList.Add(pathsAndColor);
-    shadowCnt := 1;
   end;
 
-  //PALETTE
-
-  StatusBar1.SimpleText := ' Creating Palette: ' +
-    ExtractFilename(OpenDialog1.FileName);
-  Application.ProcessMessages;
-
-  //get ready to separate the image into palette entry colors.
-  //assigning extra colors before trimming the least used colors
-
-  Dec(maxColors, shadowCnt);
-  maxColors := Min(maxColors, tmpMasterImg.ColorCount);
-
-  pal := MakeAndApplyPalette(tmpMasterImg, maxColors, false, palFrequencies);
-
-  maxColors := length(pal) + shadowCnt;
-  pal := TrimPalette(pal, palFrequencies, 0.1);
-
-  //don't bother re-applying the palette, we'll just ignore the deleted colors
-  //ApplyPalette(tmpMasterImg, pal, false);
-
-  maxColors := length(pal) + shadowCnt;
-
-  if (length(pal) <= 2) or (maxColors = 1) then
-  begin
-    if Assigned(shadow) then
-      PPathsNColor(palVectorsList[0]).color := pal[0];
-    Exit;
-  end;
+  if paletteImages.Count < 3 then Exit;  //todo!!!!
 
   //BLACK (WITH GRAYSCALE PALETTE)
+  black := Vectorize(paletteImages[1], clBlack32, CompareAlpha, 0, 3);
 
-  svgImg.Assign(tmpMasterImg);
-  svgImg.Grayscale;
-  Sharpen(svgImg, 5, 10);
-  svgImg.ConvertToBoolMask(clBlack32, $20, CompareRGB, clNone32, clBlack32);
-  black := Vectorize(svgImg, clBlack32, CompareAlpha, $0);
-
-  //TIDY UP OPAQUE/TRANSPARENT BOUNDARIES
-
-  MakePartialFullyTransparent(tmpMasterImg);
-  if assigned(opaque) then
+  for i := 2 to paletteImages.Count -1 do
   begin
-    opaque := Image32_Clipper.InflatePolygons(opaque, 2 * scale);
-    ErasePolygon(tmpMasterImg, opaque, Image32_Vector.frEvenOdd);
-  end;
-
-  StatusBar1.SimpleText := ' Starting color layers: ' +
-    ExtractFilename(OpenDialog1.FileName);
-  Application.ProcessMessages;
-  if cancelOp then Exit;
-
-  //CREATE AND STORE COLORS (WITH BLACK LAST)
-
-  i := 1;
-  while (i < High(pal)) and (MaxRgbDifference(clBlack32, pal[i]) < $20) do inc(i);
-
-  for i := i to high(pal) do
-  begin
-    ProgressBar.Position := Round( (i * 100) / maxColors);
+    if ProgressBar.Max = 100 then
+      ProgressBar.Position := 50 + Round( (i * 50) / paletteImages.Count) else
+      ProgressBar.Position := Round( (i * 50) / paletteImages.Count);
     application.processmessages;
     if cancelOp then Exit;
 
     //create a mask for each color in the palatte and vectorize it
-    svgImg.Assign(tmpMasterImg);
-    svgImg.ConvertToBoolMask(pal[i], 0, CompareRGB, clNone32, clBlack32);
-    pp := Vectorize(svgImg, clBlack32, CompareAlpha, $0);
+    pp := Vectorize(paletteImages[i], clBlack32, CompareAlpha, 0, 3);
 
     for j := high(pp) downto 0 do
-      if Abs(Image32_Vector.Area(pp[j])) < 2.2 * scale then
+      if Abs(Image32_Vector.Area(pp[j])) < 1.2 * scale then
         pp := DeletePath(pp, j);
-
     if pp = nil then Continue;
-    pp := RamerDouglasPeucker(pp, 0.25 * scale);
+
+    if simpleness > 0 then
+      pp := RamerDouglasPeucker(pp, simpleness * scale);
     pp := Image32_Clipper.InflatePolygons(pp, 1.25 * scale, jsRound);
-    pp := SmoothLine(pp, true, scale, 1);
+    if smoothness > 0 then
+      pp := SmoothLine(pp, true, scale, 1);
 
     new(pathsAndColor);
+    pathsAndColor.isFlat := smoothness = 0;
     pathsAndColor.paths := pp;
-    pathsAndColor.color := pal[i];
+    pathsAndColor.color := TColor32(paletteColors[i]);
     palVectorsList.Add(pathsAndColor);
   end;
-  black := RamerDouglasPeucker(black, smoothness * 0.33 * scale);
-  black := SmoothLine(black, true, smoothness * scale, 1);
+  if simpleness > 0 then
+    black := RamerDouglasPeucker(black, simpleness * scale);
+  if smoothness > 0 then
+    black := SmoothLine(black, true, smoothness * scale, 1);
 
   new(pathsAndColor);
+  pathsAndColor.isFlat := smoothness = 0;
   pathsAndColor.paths := black;
-  pathsAndColor.color := pal[0];
+  pathsAndColor.color := TColor32(paletteColors[1]);
   palVectorsList.Add(pathsAndColor);
 end;
 //------------------------------------------------------------------------------
@@ -655,6 +720,7 @@ var
   pp: TArrayOfArrayOfPointD;
   svgSize: TSize;
 begin
+  if palVectorsList.Count = 0 then Exit;
   svgStringStream.Size := 0;
   newWidth := Round(newWidth * scaling);
   newHeight := Round(newHeight * scaling);
@@ -688,8 +754,15 @@ begin
         paths := OffsetPath(paths, ImageMargin, ImageMargin);
       if scaling <> 1 then
         paths := Image32_Vector.ScalePath(paths, scaling, scaling);
-      WriteCBezierPathToSvgStringStream(svgStringStream, paths, i+1);
-      pp := FlattenCBezier(paths);
+      if isFlat then
+      begin
+        WriteFlattenedPathToSvgStringStream(svgStringStream, paths, i+1);
+        pp := paths;
+      end else
+      begin
+        WriteCBezierPathToSvgStringStream(svgStringStream, paths, i+1);
+        pp := FlattenCBezier(paths);
+      end;
       pp := ScalePath(pp, rasterScale, rasterScale);
       DrawPolygon(svgImg, pp, Image32_Vector.frEvenOdd, color);
     end;
@@ -707,7 +780,7 @@ begin
 
   pnlSVG.Bitmap.Width := svgImg.Width;
   pnlSVG.Bitmap.Height := svgImg.Height;
-  pnlSVG.ClearBitmap; //otherwise images will be blended
+  pnlSVG.ClearBitmap;
   svgImg.CopyToDc(pnlSVG.Bitmap.Canvas.Handle);
 end;
 
@@ -725,13 +798,12 @@ function TMainForm.CheckJpg(const filename: string): Boolean;
 var
   messageBoxOpts: TMessageBoxOptions;
 begin
-  FillChar(messageBoxOpts, sizeof(messageBoxOpts), 0);
-  SetLength(messageBoxOpts.buttonCaptions, 2);
-  messageBoxOpts.buttonCaptions[0] := '&Continue';
-  messageBoxOpts.buttonCaptions[1] := '&Cancel';
-  messageBoxOpts.checkBoxCallBk := CheckboxOnJPGMessageDialog;
+  messageBoxOpts.Init;
+  messageBoxOpts.AddCustomButtonCaption('&Continue');
+  messageBoxOpts.AddCustomButtonCaption('&Cancel');
+  messageBoxOpts.CheckBoxCallBk := CheckboxOnJPGMessageDialog;
 
-  Result := CustomDialogs.MessageBox(self, 'JPG Images',
+  Result := DialogsEx.MessageBox(self, 'JPG Images',
     jpgWarning, 'Image32 - JPG files', MB_YESNO or MB_ICONWARNING,
     messageBoxOpts) = mrYes;
 end;
@@ -749,11 +821,12 @@ begin
     Result := true;
   end else
   begin
-    FillChar(numBoxOpts, sizeof(numBoxOpts), 0);
+    numBoxOpts.Init;
+    numBoxOpts.CustomIcon := Application.Icon;
     numBoxOpts.minVal := 4;
     numBoxOpts.maxVal := 256;
 
-    result := CustomDialogs.NumInputBox(self, 'Maximum Color Count',
+    result := DialogsEx.NumInputBox(self, 'Maximum Color Count',
       format(colorCountMessage,[maxColors/1.0]),
       'Image32 - Image Color Count', newMaxColors, numBoxOpts);
     if Result then maxColors := newMaxColors;
@@ -761,17 +834,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.DoOpenFile(const filename: string; forceColorCheck: Boolean);
+procedure TMainForm.DoOpenFile(forceColorCheck: Boolean);
 var
   oldSvgImg, newRasterImg, newGoldRasterImg: TImage32;
   oldCaption1, oldCaption2: string;
   origMaxColors: integer;
-  s: string;
+  fn, s: string;
   scaling: double;
 begin
   //before proceeding, save copies of masterImg and workImg
   //in case processing of the new image is cancelled.
 
+  fn := OpenDialog1.FileName;
   screen.Cursor := crHourGlass;
   oldCaption1 := lblRaster.Caption;
   oldCaption2 := lblSVG.Caption;
@@ -780,7 +854,7 @@ begin
   newGoldRasterImg := TImage32.Create;
   try
     lblOptions.Caption := '';
-    StatusBar1.SimpleText := ' Opening: ' + ExtractFilename(filename);
+    StatusBar1.SimpleText := ' Opening: ' + ExtractFilename(fn);
     {$IFDEF SETSIZE}
     pnlRaster.Bitmap.SetSize(0,0);
     pnlSVG.Bitmap.SetSize(0,0);
@@ -793,8 +867,7 @@ begin
     Application.ProcessMessages;
 
     isDrawing := true;
-    if newRasterImg.LoadFromFile(fileName) and
-      not newRasterImg.IsEmpty then
+    if newRasterImg.LoadFromFile(fn) and not newRasterImg.IsEmpty then
     begin
       //display the just loaded 'tmpImg' in pnlRaster
       pnlRaster.Bitmap.Width := newRasterImg.Width;
@@ -802,15 +875,15 @@ begin
       pnlRaster.ClearBitmap;
       newRasterImg.CopyToDc(pnlRaster.Bitmap.Canvas.Handle);
 
-      pnlRaster.BitmapProperties.ScaleType := stFit;
+      pnlRaster.ScaleType := stFit;
 
       origMaxColors := newRasterImg.ColorCount;
       maxColors := origMaxColors;
       if newRasterImg.HasTransparency then inc(maxColors);
       cancelOp := cancelOp or
         ((maxColors > 2) and not GetMaxColors(forceColorCheck)) or
-        ((lowercase(ExtractFileExt(filename)) = '.jpg') and
-        not hideJPGMessage and not CheckJpg(filename));
+        ((lowercase(ExtractFileExt(fn)) = '.jpg') and
+        not hideJPGMessage and not CheckJpg(fn));
     end else
     begin
       cancelOp := true;
@@ -836,9 +909,9 @@ begin
     lblRaster.Caption :=
       format('Raster: %d x %d; file size: %1.0n; colors: %d.',
       [newRasterImg.Width, newRasterImg.Height,
-      GetFileSize(fileName)/1.0, origMaxColors]);
+      GetFileSize(fn)/1.0, origMaxColors]);
 
-    StatusBar1.SimpleText := ' Transforming: ' + ExtractFilename(filename);
+    StatusBar1.SimpleText := ' Transforming: ' + ExtractFilename(fn);
     Application.ProcessMessages;
 
     if cancelOp then Exit;
@@ -847,8 +920,20 @@ begin
     newRasterImg.Scale(scaling);
 
     if (maxColors <= 2) then //or IsGrayscale(newRasterImg.Pixels, $20) then
-      BuildVectorListFromMonochromeImage(newRasterImg, scaling) else
-      BuildVectorListFromColorDrawing(newRasterImg, scaling);
+      BuildVectorListFromMonochromeImage(newRasterImg, scaling)
+    else
+    begin
+      if paletteImages.Count = 0 then
+      begin
+        ProgressBar.Max := 100;
+        BuildPaletteImages(newRasterImg, scaling);
+        BuildVectorListFromColorDrawing(scaling);
+      end else
+      begin
+        ProgressBar.Max := 50;
+        BuildVectorListFromColorDrawing(scaling);
+      end;
+    end;
 
     Application.ProcessMessages;
     if cancelOp then Exit;
@@ -859,8 +944,7 @@ begin
 
     //all done !!
 
-    pnlSVG.BitmapProperties.ScaleType := stFit;
-    //pnlSVG.BitmapProperties.Scale := 1/rasterScale;
+    pnlSVG.ScaleType := stFit;
 
     lblSVG.Caption :=
       format('SVG: %1.0n x %1.0n; file size: %1.0n; colors: %d.',
@@ -882,8 +966,10 @@ begin
       lblRaster.Caption := oldCaption1;
       lblSVG.Caption := oldCaption2;
       svgImg.Assign(oldSvgImg);
-    end else
-    StatusBar1.SimpleText := ' Opened: ' + ExtractFilename(filename);
+    end
+    else
+      StatusBar1.SimpleText := ' Opened: ' + ExtractFilename(fn);
+
     cancelOp := false;
     newRasterImg.Free;
     newGoldRasterImg.Free;
@@ -896,15 +982,19 @@ end;
 procedure TMainForm.Open1Click(Sender: TObject);
 begin
   if OpenDialog1.Execute then
-    DoOpenFile(OpenDialog1.FileName, false);
+  begin
+    paletteImages.Clear;
+    DoOpenFile(false);
+  end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.Refresh1Click(Sender: TObject);
 begin
+  paletteImages.Clear;
   if OpenDialog1.FileName = '' then
     Open1Click(nil) else
-    DoOpenFile(OpenDialog1.FileName, true);
+    DoOpenFile(true);
 end;
 //------------------------------------------------------------------------------
 
@@ -942,24 +1032,19 @@ procedure TMainForm.mnuTipsClick(Sender: TObject);
 var
   messageBoxOpts: TMessageBoxOptions;
 begin
-  FillChar(messageBoxOpts, sizeof(messageBoxOpts), 0);
-  messageBoxOpts.customIcon := Application.Icon;
-
-  CustomDialogs.MessageBox(self, 'RasterToSVG Tips', menuTips,
+  messageBoxOpts.Init;
+  messageBoxOpts.CustomIcon := Application.Icon;
+  DialogsEx.MessageBox(self, 'RasterToSVG Tips', menuTips,
     'RasterToSVG', MB_OK, messageBoxOpts);
 end;
 //------------------------------------------------------------------------------
 
 function TMainForm.GetTransformOptions(isDrawing: Boolean): string;
-const
-  smooth: array [0..3] of string =
-    ('Minimal', 'Normal', 'High', 'Very High');
 begin
   if isDrawing then
   begin
-    Result := Format(' %s smoothing', [smooth[smoothness -1]]);
-    if mnuEraseBackground.Checked then
-      Result := Result + ' + Erase Background';
+    Result := Format(' Simplify: %d; Smoothing: %d', [simpleness, smoothness]);
+    if mnuEraseBackground.Checked then Result := Result + '; Erase Background';
   end
   else
     Result := '';
@@ -991,20 +1076,45 @@ var
   comboboxOpts: TComboboxOptions;
   num: integer;
 begin
-  FillChar(comboboxOpts, sizeof(comboboxOpts), 0);
-  SetLength(comboboxOpts.comboItems, 4);
-  comboboxOpts.comboItems[0] := 'Very high';
-  comboboxOpts.comboItems[1] := 'High';
-  comboboxOpts.comboItems[2] := 'Normal';
-  comboboxOpts.comboItems[3] := 'Minimal';
+  comboboxOpts.Init;
+  comboboxOpts.CustomIcon := Application.Icon;
+  comboboxOpts.AddComboboxItem('4 - Very High');
+  comboboxOpts.AddComboboxItem('3 - High');
+  comboboxOpts.AddComboboxItem('2 - Medium');
+  comboboxOpts.AddComboboxItem('1 - Low');
+  comboboxOpts.AddComboboxItem('0 - None');
   num := 4 -smoothness;
 
-  if not CustomDialogs.ComboInputBox(Self, 'Drawing Smoothness', '',
-    'RasterToSVG', num, comboboxOpts) or (4 - num = smoothness) then Exit;
+  if not DialogsEx.ComboInputBox(Self, 'Drawing Smoothness',
+    'A small amount of ''Smoothness'' usually improves the drawing and '+
+    'can significantly reduce file size.'#10'But you can have too much '+
+    'of a good thing too :).', 'RasterToSVG',
+    num, comboboxOpts) or (4 - num = smoothness) then Exit;
 
   smoothness := 4 - num;
   if OpenDialog1.FileName <> '' then
-    DoOpenFile(OpenDialog1.FileName, false) else
+    DoOpenFile(false) else
+    UpdateOptions(true);
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.ChangeSimpleness1Click(Sender: TObject);
+var
+  val: integer;
+  numOpts: TNumBoxOptions;
+begin
+  numOpts.Init;
+  numOpts.minVal := 0;
+  numOpts.maxVal := 2;
+  numOpts.CustomIcon := Application.Icon;
+  val := simpleness;
+  if not DialogsEx.NumInputBox(Self, 'Simplify Drawing',
+    'Increasing ''Simplify'' will reduce the file size, but it can also '+
+    'significantly degrade the drawing. Try it and see.',
+    'RasterToSVG', val, numOpts) or (val = simpleness) then Exit;
+  simpleness := val;
+  if OpenDialog1.FileName <> '' then
+    DoOpenFile(false) else
     UpdateOptions(true);
 end;
 //------------------------------------------------------------------------------
@@ -1021,8 +1131,8 @@ begin
   if Key in [Ord('1')..Ord('9')] then
   begin
     if Shift = [ssShift] then
-      pnlSVG.BitmapProperties.Scale := (Key - Ord('0')) * 0.1/rasterScale else
-      pnlSVG.BitmapProperties.Scale := (Key - Ord('0')) * 1/rasterScale;
+      pnlSVG.Scale := (Key - Ord('0')) * 0.1/rasterScale else
+      pnlSVG.Scale := (Key - Ord('0')) * 1/rasterScale;
     pnlSVG.Invalidate;
     Key := 0;
   end;
@@ -1041,10 +1151,10 @@ procedure TMainForm.About1Click(Sender: TObject);
 var
   messageBoxOpts: TMessageBoxOptions;
 begin
-  FillChar(messageBoxOpts, sizeof(messageBoxOpts), 0);
+  messageBoxOpts.Init;
   messageBoxOpts.customIcon := Application.Icon;
 
-  CustomDialogs.MessageBox(self, 'RasterToSVG',
+  DialogsEx.MessageBox(self, 'RasterToSVG',
     'Version 1.6'#10+
     'Created by Angus Johnson'#10#10+
     'Open source freeware.'#10+

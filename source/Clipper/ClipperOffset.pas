@@ -3,7 +3,7 @@ unit ClipperOffset;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  10.0 (beta)                                                     *
-* Date      :  13 July 2019                                                    *
+* Date      :  14 February 2020                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2017                                         *
 * Purpose   :  Offset paths and clipping solutions                             *
@@ -728,10 +728,11 @@ var
   paths64, sol64: TPaths;
 const
   scalingFactor = 100;
+  scalingFactorDiv10 = scalingFactor/10;
   invScalingFactor = 1/scalingFactor;
 begin
   paths64 := ScalePaths(paths, scalingFactor, scalingFactor);
-  with TClipperOffset.Create(miterLimit) do
+  with TClipperOffset.Create(miterLimit, scalingFactorDiv10) do
   try
     AddPaths(paths64);
     Execute(delta * scalingFactor, jt, et, sol64);
