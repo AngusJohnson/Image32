@@ -168,7 +168,7 @@ resourcestring
   rsRenameFile        = 'Rename File';
   rsCancelLoad        = 'Image loading cancelled.';
   rsStatusbar1        = '%s  (Dimensions: %1.0n x %1.0n; Size: %1.0n KB)';
-  rsStatusbar2        = '%s  (image %1.0n out of %1.0n images in folder)';
+  rsStatusbar2        = '%s  (image %1.0n out of %1.0n images)';
   rsOpenFolder        = 'Open Folder';
   rsLoadingFolder     = 'Loading folder ... ';
   rsBackColor         = 'Background Color';
@@ -584,7 +584,9 @@ begin
     //as the images as this dramatically speeds up subsequent folder previews.
     //So if we've previewed this folder previously, load thumbnails from the
     //zip file 'photo.bin', adding new images and replacing modified ones.
-    if FileExists(folder + 'photo.bin') then
+    if FileExists(folder + 'photo.bin') and
+      (GetFileSize(folder + 'photo.bin') >
+        SizeOf(TEndOfCentralHeader) + SizeOf(TCentralFileHeader)) then
     begin
       RenameFile(folder + 'photo.bin', folder + 'photo.bak');
       zipIn.Open(folder + 'photo.bak', zmRead);
@@ -689,6 +691,9 @@ begin
   isLoading := false;
   if (cw <> sbMain.ClientWidth) or (thumbSize <> thumbnailSize) then
     RepositionThumbnails;
+
+  if (currentIdx >= 0) and (currentIdx < sbMain.ControlCount) then
+    PanelOnEnter(sbMain.Controls[currentIdx]);
 end;
 //------------------------------------------------------------------------------
 
@@ -718,8 +723,7 @@ begin
   pnl.FocusedColor := focusedRectColor;
   pnl.PopupMenu := PopupMenu1;
   pnl.TabStop := true;
-  pnl.ClearBitmap; //needed when bitmaps have transparency
-  img.CopyToDc(pnl.Bitmap.Canvas.Handle);
+  img.CopyToDc(pnl.Bitmap.Canvas.Handle, 0,0, false);
   pnl.Visible := true;
 end;
 //------------------------------------------------------------------------------
@@ -893,8 +897,8 @@ begin
       StatusBar1.Panels[0].Text := ' ' + ExtractFilename(imageNames[currentIdx]);
     end;
 
-    largeImagePanel.ClearBitmap; //needed when bitmaps have transparency
-    layeredImg.GetMergedImage.CopyToDc(largeImagePanel.Bitmap.Canvas.Handle);
+    layeredImg.GetMergedImage.CopyToDc(
+      largeImagePanel.Bitmap.Canvas.Handle, 0,0, false);
     largeImagePanel.Repaint;
   end else
   begin
@@ -964,8 +968,8 @@ begin
   slideShowTimer.Enabled := true;
 
   largeImagePanel.Bitmap.SetSize(w,h);
-  largeImagePanel.ClearBitmap; //needed when bitmaps have transparency
-  layeredImg.GetMergedImage.CopyToDc(largeImagePanel.Bitmap.Canvas.Handle);
+  layeredImg.GetMergedImage.CopyToDc(
+    largeImagePanel.Bitmap.Canvas.Handle, 0,0, false);
   largeImagePanel.Repaint;
 end;
 //------------------------------------------------------------------------------
@@ -1097,8 +1101,8 @@ begin
     end;
 
     largeImagePanel.Bitmap.SetSize(layeredImg.Width, layeredImg.Height);
-    largeImagePanel.ClearBitmap;
-    layeredImg.GetMergedImage.CopyToDc(largeImagePanel.Bitmap.Canvas.Handle);
+    layeredImg.GetMergedImage.CopyToDc(
+      largeImagePanel.Bitmap.Canvas.Handle, 0,0, false);
 
     largeImagePanel.ScaleType := stFit;
     largeImagePanel.Invalidate;

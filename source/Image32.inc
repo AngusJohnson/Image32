@@ -5,16 +5,18 @@
   //{$modeSwitch advancedRecords}
   {$DEFINE PBYTE}
   {$DEFINE UITYPES}
+  {$DEFINE NESTED_TYPES}      
   {$IFNDEF DEBUG}
     {$DEFINE INLINE}
   {$ENDIF}
 {$ELSE}
   {$IF COMPILERVERSION < 15}
-    Your version of Delphi is not supported (requires Delphi ver. 7 or above).
+    Your version of Delphi is not supported (Image32 requires Delphi version 7 or above)
   {$IFEND}
   {$IF COMPILERVERSION >= 17}
     {$IFNDEF DEBUG}
       {$DEFINE INLINE}                   //Delphi 2005 - added inlining
+      {$DEFINE NESTED_TYPES}             //Delphi 2005 - added nested types & nested constants
     {$ENDIF}
     {$IF COMPILERVERSION >= 18}
       {$DEFINE ABSTRACT_CLASSES}         //Delphi 2006 - added abstract classes
@@ -24,6 +26,7 @@
       {$DEFINE SETSIZE}                  //Delphi 2006 - added TBitmap.SetSize
       {$IF COMPILERVERSION >= 18.5}
         {$DEFINE DELPHI_PNG}             //Delphi 2007 - added PNG support
+        {$DEFINE DELPHI_GIF}             //Delphi 2007 - added GIF support
         {$DEFINE MAINFORMONTASKBAR}      //Delphi 2007 - added TApplication.MainFormOnTaskbar
         {$if CompilerVersion >= 20}
           {$DEFINE PBYTE}                //Delphi 2009 - added PByte

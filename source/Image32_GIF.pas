@@ -2,12 +2,11 @@ unit Image32_GIF;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.17                                                            *
-* Date      :  11 August 2019                                                  *
+* Version   :  1.42                                                            *
+* Date      :  15 February 2020                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  GIF file format extension for TImage32                          *
-* Dependency:  Requires GifImage.pas from http://www.tolderlund.eu/delphi/     *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
@@ -15,7 +14,8 @@ interface
 
 {$I Image32.inc}
 uses
-  SysUtils, Classes, Windows, Math, Image32, Graphics, GifImage;
+  SysUtils, Classes, Windows, Math, Image32, Graphics,
+  {$IFDEF DELPHI_GIF} GifImg {$ELSE} GifImage{$ENDIF};
 
 type
 
@@ -37,17 +37,43 @@ implementation
 function TImageFormat_GIF.LoadFromStream(stream: TStream; img32: TImage32): Boolean;
 var
   gif: TGIFImage;
+  i, w,h: integer;
+  bmp, bmpT: TBitmap;
+  pcT, pc: PARGB;
 begin
   result := false;
+  bmp := TBitmap.Create;
+  bmpT := TBitmap.Create;
   gif := TGIFImage.Create;
   try
     gif.LoadFromStream(stream);
     if gif.Empty then Exit;
-    with gif.Bitmap do
-      img32.CopyFromDC(Canvas.Handle, Rect(0,0, Width, Height));
+    w := gif.Width; h := gif.Height;
+    bmp.SetSize(w, h);
+    bmp.PixelFormat := pf32bit;
+    bmpT.Assign(bmp);
+    //get transparent pixels
+    gif.Images[0].Draw(bmpT.Canvas, bmpT.Canvas.ClipRect, true, false);
+    //get color pixels
+    gif.Images[0].Draw(bmp.Canvas, bmp.Canvas.ClipRect, false, false);
+
+    //set the alpha in bmp for each pixel in bmpT that's not transparent
+    pcT := bmpT.ScanLine[h-1];
+    pc := bmp.ScanLine[h-1];
+    for I := 0 to w * h -1 do
+    begin
+      if pcT.A = 0 then pc.A := 255;
+      inc(pcT); inc(pc);
+    end;
+    //copy bmp to img32
+    img32.SetSize(w, h);
+    for I := 0 to h -1 do
+      Move(bmp.ScanLine[i]^, img32.PixelRow[i]^, w * 4);
     result := true;
   finally
     gif.Free;
+    bmp.Free;
+    bmpT.Free;
   end;
 end;
 
