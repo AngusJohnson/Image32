@@ -51,19 +51,22 @@ begin
     w := gif.Width; h := gif.Height;
     bmp.SetSize(w, h);
     bmp.PixelFormat := pf32bit;
-    bmpT.Assign(bmp);
-    //get transparent pixels
-    gif.Images[0].Draw(bmpT.Canvas, bmpT.Canvas.ClipRect, true, false);
     //get color pixels
     gif.Images[0].Draw(bmp.Canvas, bmp.Canvas.ClipRect, false, false);
-
-    //set the alpha in bmp for each pixel in bmpT that's not transparent
-    pcT := bmpT.ScanLine[h-1];
-    pc := bmp.ScanLine[h-1];
-    for I := 0 to w * h -1 do
+    if gif.Transparent then
     begin
-      if pcT.A = 0 then pc.A := 255;
-      inc(pcT); inc(pc);
+      bmpT.SetSize(w, h);
+      bmpT.PixelFormat := pf32bit;
+      //get transparent pixels
+      gif.Images[0].Draw(bmpT.Canvas, bmpT.Canvas.ClipRect, true, false);
+      //set the alpha in bmp for each pixel in bmpT that's not transparent
+      pcT := bmpT.ScanLine[h-1];
+      pc := bmp.ScanLine[h-1];
+      for I := 0 to w * h -1 do
+      begin
+        if pcT.A = 0 then pc.A := 255;
+        inc(pcT); inc(pc);
+      end;
     end;
     //copy bmp to img32
     img32.SetSize(w, h);

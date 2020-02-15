@@ -2,8 +2,8 @@ unit Image32_PNG;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.37                                                            *
-* Date      :  15 January 2020                                                 *
+* Version   :  1.42                                                            *
+* Date      :  15 February 2020                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  PNG file format extension for TImage32                          *
@@ -60,7 +60,9 @@ begin
   png := TPngImage.Create;
   try
     png.LoadFromStream(stream);
-    transColor := png.TransparentColor;
+    if png.Transparent then
+      transColor := png.TransparentColor else
+      transColor := DWord(-1);
     if png.Empty then Exit;
     img32.SetSize(png.Header.Width, png.Header.Height);
 
@@ -79,7 +81,7 @@ begin
             pDst.B := pColor^;
             pDst.G := pColor^;
             pDst.R := pColor^;
-            if pDst.Color = transColor then
+            if (pDst.Color = transColor) then
               pDst.A := 0 else
               pDst.A := 255;
             inc(pColor); inc(pDst);
@@ -98,7 +100,7 @@ begin
           for j := 0 to img32.Width -1 do
           begin
             pDst.Color := TColor32(palleteChunk.Item[pColor^]);
-            if pDst.Color = transColor then
+            if (pDst.Color = transColor) then
               pDst.A := 0 else
               pDst.A := 255;
             inc(pColor); inc(pDst);
@@ -135,7 +137,7 @@ begin
             pDst.B := pColor^;  inc(pColor);
             pDst.G := pColor^;  inc(pColor);
             pDst.R := pColor^;  inc(pColor);
-            if pDst.Color = transColor then
+            if (pDst.Color = transColor) then
               pDst.A := 0 else
               pDst.A := 255;
             inc(pDst);
