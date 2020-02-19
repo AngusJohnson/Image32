@@ -2,7 +2,6 @@ unit Unit1;
 
 interface
 
-//nb: Add Image32's Library folder to the project's search path
 uses
   Windows, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls,
@@ -15,7 +14,6 @@ type
     File1: TMenuItem;
     Exit1: TMenuItem;
     StatusBar1: TStatusBar;
-    Timer1: TTimer;
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -26,7 +24,6 @@ type
     reversing: Boolean;
     imgIndex: integer;
     masterImageList: TImageList32;
-    procedure DoTimer(sender: TObject);
   public
     { Public declarations }
   end;
@@ -122,7 +119,7 @@ begin
 
   //set up the timer to kick things off
   timer := TTimer.Create(self);
-  timer.OnTimer := DoTimer;
+  timer.OnTimer := Timer1Timer;
   //There are 60 images to cycle through here every second so, given that the
   //time to execute the OnTimer event is negligble, I'd expect to set the timer
   //interval to about 17 msec (ie 1000/60). Unfortunately Delphi's TTimer
@@ -145,22 +142,6 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.Timer1Timer(Sender: TObject);
-begin
-  masterImageList[imgIndex].CopyToDc(Panel1.Bitmap.Canvas.Handle, 0,0, false);
-  Panel1.Repaint;
-  if reversing then
-  begin
-    dec(imgIndex);
-    if (imgIndex = 0) then reversing := false;
-  end else
-  begin
-    inc(imgIndex);
-    if (imgIndex = masterImageList.Count -1) then reversing := true;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TForm1.DoTimer(sender: TObject);
 begin
   masterImageList[imgIndex].CopyToDc(Panel1.Bitmap.Canvas.Handle, 0,0, false);
   Panel1.Repaint;

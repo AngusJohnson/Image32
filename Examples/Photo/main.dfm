@@ -96,18 +96,21 @@ object MainForm: TMainForm
       OnClick = mnuEditClick
       object mnuEdit2: TMenuItem
         Caption = '&Edit'
+        Enabled = False
         ShortCut = 122
         OnClick = mnuEditImageClick
       end
       object mnuRename2: TMenuItem
         Caption = '&Rename'
+        Enabled = False
         ShortCut = 113
-        OnClick = mnuRenameImageClick
+        OnClick = mnuRenameClick
       end
       object mnuDelete2: TMenuItem
         Caption = '&Delete'
+        Enabled = False
         ShortCut = 46
-        OnClick = mnuDeleteImageClick
+        OnClick = mnuDeleteClick
       end
       object N5: TMenuItem
         Caption = '-'
@@ -138,13 +141,13 @@ object MainForm: TMainForm
           OnClick = mnuTransitionClick
         end
         object mnuFadeInWithOut: TMenuItem
-          Caption = 'Fade &In With Out'
+          Caption = 'C&oncurrent Fade'
           GroupIndex = 1
           RadioItem = True
           OnClick = mnuTransitionClick
         end
         object mnuFadeOutThenIn: TMenuItem
-          Caption = 'Fade &Out Then In'
+          Caption = 'Cons&ecutive Fade'
           GroupIndex = 1
           RadioItem = True
           OnClick = mnuTransitionClick
@@ -204,6 +207,10 @@ object MainForm: TMainForm
     end
     object Help1: TMenuItem
       Caption = '&Help'
+      object ips1: TMenuItem
+        Caption = '&Tips'
+        OnClick = ips1Click
+      end
       object About1: TMenuItem
         Caption = '&About'
         ShortCut = 112
@@ -216,6 +223,7 @@ object MainForm: TMainForm
     Top = 8
   end
   object PopupMenu1: TPopupMenu
+    OnPopup = PopupMenu1Popup
     Left = 73
     Top = 10
     object mnuEditImage: TMenuItem
@@ -223,15 +231,15 @@ object MainForm: TMainForm
       ShortCut = 122
       OnClick = mnuEditImageClick
     end
-    object mnuRenameImage: TMenuItem
+    object mnuRename: TMenuItem
       Caption = '&Rename'
       ShortCut = 113
-      OnClick = mnuRenameImageClick
+      OnClick = mnuRenameClick
     end
-    object mnuDeleteImage: TMenuItem
+    object mnuDelete: TMenuItem
       Caption = '&Delete'
       ShortCut = 46
-      OnClick = mnuDeleteImageClick
+      OnClick = mnuDeleteClick
     end
     object N3: TMenuItem
       Caption = '-'

@@ -49,10 +49,4 @@ object Form1: TForm1
       end
     end
   end
-  object Timer1: TTimer
-    Enabled = False
-    OnTimer = Timer1Timer
-    Left = 120
-    Top = 152
-  end
 end

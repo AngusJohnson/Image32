@@ -2141,7 +2141,7 @@ begin
   try
     tmp.FlipVertical; //DIB sections store pixels Y-inverted
     hasTransparency :=
-      transparent and (bkColor < 255) and Self.HasTransparency;
+      transparent and (TARGB(bkColor).A < 255) and Self.HasTransparency;
     tmp.Premultiply;  //this is required for DIB sections
     if bkColor <> 0 then
       tmp.SetBackgroundColor(bkColor);

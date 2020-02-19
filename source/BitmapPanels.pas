@@ -2,8 +2,8 @@ unit BitmapPanels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.0                                                             *
-* Date      :  14 February 2020                                                *
+* Version   :  3.1                                                             *
+* Date      :  19 February 2020                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
@@ -372,6 +372,7 @@ procedure TPanel.SetScaleType(value: TScaleType);
 begin
   if fScaleType = value then Exit;
   fScaleType := value;
+  UpdateCursor;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -382,7 +383,7 @@ var
 begin
   if value < fMinScale then value := fMinScale
   else if value > fMaxScale then value := fMaxScale;
-  fScaleType := stScaled;
+  SetScaleType(stScaled);
   //zoom in or out relative to the center of the image
   rec := ClientRect;
   BitmapScaleAtPos(value, Point(RectWidth(rec) div 2, RectHeight(rec) div 2));
@@ -551,7 +552,10 @@ var
   mobH, mobV: Boolean;
 begin
   if MouseInsideInnerClientRect then
+  begin
+    UpdateCursor;
     inherited;
+  end;
 
   if not fMouseDown then
   begin
@@ -967,7 +971,7 @@ begin
     end;
   end;
 
-  if fShowScrollbars and (BorderWidth < DpiScale(FMinScrollBtnSize + 5)) then
+  if fShowScrollbars and (BorderWidth > DpiScale(FMinScrollBtnSize + 5)) then
   begin
     //draw vertical scrollbar
     tmpRec := GetInnerClientRect;
@@ -1073,16 +1077,19 @@ end;
 procedure TPanel.UpdateCursor;
 begin
   if not fBmp.Empty and MouseInsideInnerClientRect and
-    (fScaleType <> stStretched) and
-    fZoomScrollEnabled and
-    (fScalingCursor <> 0) then cursor := fScalingCursor;
+    (fScaleType = stScaled) and fZoomScrollEnabled then
+  begin
+    if (fScalingCursor <> 0) then cursor := fScalingCursor
+    else cursor := crHandPoint;
+  end
+    else cursor := crDefault;
 end;
 //------------------------------------------------------------------------------
 
 procedure TPanel.BitmapScaleAtPos(newScale: double; const mousePos: TPoint);
 begin
   newScale := Max(fMinScale, Min(fMaxScale, newScale));
-  fScaleType := stScaled;
+  SetScaleType(stScaled);
   fOffsetX := Round((mousePos.X + fOffsetX) * newScale/fScale - mousePos.X);
   fOffsetY := Round((mousePos.Y + fOffsetY) * newScale/fScale - mousePos.Y);
   fScale := newScale;

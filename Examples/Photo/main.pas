@@ -29,8 +29,8 @@ type
     About1: TMenuItem;
     PopupMenu1: TPopupMenu;
     mnuEditImage: TMenuItem;
-    mnuDeleteImage: TMenuItem;
-    mnuRenameImage: TMenuItem;
+    mnuDelete: TMenuItem;
+    mnuRename: TMenuItem;
     mnuSlideShowInterval: TMenuItem;
     N3: TMenuItem;
     OpenFolderContainingtheImage1: TMenuItem;
@@ -50,6 +50,7 @@ type
     mnuDelete2: TMenuItem;
     mnuRename2: TMenuItem;
     mnuBackgroundColor: TMenuItem;
+    ips1: TMenuItem;
     procedure mnuSlideShowClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -64,8 +65,8 @@ type
       WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
     procedure About1Click(Sender: TObject);
     procedure mnuEditImageClick(Sender: TObject);
-    procedure mnuRenameImageClick(Sender: TObject);
-    procedure mnuDeleteImageClick(Sender: TObject);
+    procedure mnuRenameClick(Sender: TObject);
+    procedure mnuDeleteClick(Sender: TObject);
     procedure mnuChangeDisplaySizeClick(Sender: TObject);
     procedure StatusBar1DrawPanel(StatusBar: TStatusBar; Panel: TStatusPanel;
       const Rect: TRect);
@@ -84,6 +85,9 @@ type
     procedure mnuEditClick(Sender: TObject);
     procedure mnuBackgroundColorClick(Sender: TObject);
     procedure UpdateBackColors;
+    procedure AppActivate(Sender: TObject);
+    procedure ips1Click(Sender: TObject);
+    procedure PopupMenu1Popup(Sender: TObject);
   private
     isLoading: boolean;
     cancelLoading: boolean;
@@ -168,17 +172,88 @@ resourcestring
   rsRenameFile        = 'Rename File';
   rsCancelLoad        = 'Image loading cancelled.';
   rsStatusbar1        = '%s  (Dimensions: %1.0n x %1.0n; Size: %1.0n KB)';
-  rsStatusbar2        = '%s  (image %1.0n out of %1.0n images)';
+  rsStatusbar2        = '%s  (image %1.0n out of %1.0n)';
   rsOpenFolder        = 'Open Folder';
   rsLoadingFolder     = 'Loading folder ... ';
   rsBackColor         = 'Background Color';
   rsBackColor2        = 'Enter background color in hexidecimal (BBGGRR)';
+
+  rsTips =
+    'Opening a folder will populate '#$1D40F#$1D421#$1D428#$1D42D#$1D428' with thumbnails of all the '+
+    'images  in that folder (*.bmp; *.png; *.jpg and *.gif). Thumbnails have '+
+    '3 sizes: Small (100'#$D7'100) ('#$1D405#$1D7D1'); Medium (150'#$D7'150) ('#$1D405#$1D7D2'); and Large '+
+    '(200'#$D7'200) ('#$1D405#$1D7D3'). By selecting a specific thumbnail ('#$23CE'), images '+
+    'can be viewd individually, either within '+
+    #$1D40F#$1D421#$1D428#$1D42D#$1D428'''s client window ('#$1D405#$1D7D5'), or '+
+    'filling the entire screen ('#$1D405#$1D7D7').'#10#10+
+
+    'While viewing images individually, typing '#$1D7CF' will display the image in its '+
+    'normal unscaled state, '#$1D7D0' will display  the image at twice it''s '+
+    'normal size, etc. Likewise typing Shift+'#$1D7CF' will display the image at '+
+    '1/10 normal size, Shift+'#$1D7D0' will display the image at 2/10 normal '+
+    'size etc. Also while viewing images individually, Ctrl+'#129092' or Ctrl+'+
+    #129094' will display either the previous or next image respectively.'#10#10+
+
+    'Images can also be viewed in a Slide Show ('#$1D405#$1D7D6') where '+
+    #$1D40F#$1D421#$1D428#$1D42D#$1D428' will cycle through all the images '+
+    'in the folder. Via the Edit menu, the speed of the slide show can be '+
+    'adjusted, and also the type of transition that''s used between images.'#10#10+
+
+    'In Slide Show there are 4 transition types:'#10+
+    '1. Fast - transition is immediate.'#10+
+    '2. Simple - the new image is faded in on top of the old image, and '+
+    'the old image is removed once the new image is fully opaque. This effect '+
+    'looks great when images are all the same size and have no transparency.'#10+
+    '3. Concurrent - the new image is faded in while the old image is faded '+
+    'out. This is probably the best option when images have different sizes '+
+    'or images have transparency.'#10+
+    '4. Consecutive - the old image is faded out before the new image is faded '+
+    'in. This effect looks great when the background colour is very dark and '+
+    'the transition appears to ''blink''.';
 
 {$WARN SYMBOL_PLATFORM OFF}
 {$WARN SYMBOL_DEPRECATED OFF}
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions
+//------------------------------------------------------------------------------
+
+type
+ TVSVersionInfo = packed record
+    Length          :WORD;
+    wValueLength    :WORD;
+    wType           :WORD;
+    szKey:array[0..Length('VS_VERSION_INFO')] of WideChar;
+    Padding1        :array[0..0] of Word;
+    FixedInfo       : TVSFixedFileInfo;
+  end;
+
+function GetVersion(showBuild: Boolean = false): string;
+var
+  rs: TResourceStream;
+  w: Word;
+  vi: TVSVersionInfo;
+  ffi: TVSFixedFileInfo;
+begin
+  result := '';
+  rs := TResourceStream.CreateFromID(hInstance, 1, RT_VERSION);
+  try
+    if rs.Size < sizeof(vi) then Exit;
+    rs.read(vi, sizeof(vi));
+    if vi.wValueLength <> sizeof(vi.FixedInfo) then exit;
+    if showBuild then
+      with vi.FixedInfo do
+        result := format('%d.%d.%d (build %d)',
+          [dwFileVersionMS shr 16, dwFileVersionMS and $FFFF,
+          dwFileVersionLS shr 16, dwFileVersionLS and $FFFF])
+    else
+      with vi.FixedInfo do
+        result := format('%d.%d.%d', [dwFileVersionMS shr 16,
+          dwFileVersionMS and $FFFF, dwFileVersionLS shr 16]);
+  finally
+    rs.Free;
+  end;
+end;
 //------------------------------------------------------------------------------
 
 function ShellFileOperation(const fromFileOrFolder,
@@ -220,9 +295,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetDosDateTimeUTC(const searchRec: TSearchRec): LongInt;
+function GetDosDateTimeUTC(const findData: TWin32FindData): LongInt;
 begin
-  if not FileTimeToDosDateTime(searchRec.FindData.ftCreationTime,
+  if not FileTimeToDosDateTime(findData.ftLastWriteTime,
     LongRec(Result).Hi, LongRec(Result).Lo) then Result := -1;
 end;
 //------------------------------------------------------------------------------
@@ -315,6 +390,34 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function DoesContrastWithBackColor(img: TImage32; bgColor: TColor32): Boolean;
+var
+  pc: PARGB;
+  i,minPxls: integer;
+  bgHsl, hsl: THsl;
+begin
+  //Checks if the image has sufficient contrast with bgColor
+  result := true;
+  minPxls := 10;
+  bgHsl := RgbtoHsl(bgColor);
+  pc := PARGB(img.PixelBase);
+  for i := 0 to img.Width * img.Height -1 do
+  begin
+    if pc.A = $FF then
+    begin
+      hsl := RgbtoHsl(pc.Color);
+      if abs(bgHsl.lum - hsl.lum) > 64 then
+      begin
+        dec(minPxls);
+        if minPxls = 0 then Exit;
+      end;
+    end;
+    inc(pc);
+  end;
+  Result := false;
+end;
+//------------------------------------------------------------------------------
+
 function GetControlIndex(ctrl: TControl): integer;
 begin
   if ctrl is TPanel then
@@ -360,6 +463,8 @@ begin
   slideShowTimer.OnTimer := SlideShowOnTimer;
   slideShowTimer.Enabled := false;
 
+  Application.OnActivate := AppActivate;
+
   currentFolder := GetFolderPath(handle, CSIDL_MYPICTURES, SHGFP_TYPE_CURRENT);
   LoadIniSettings;
   UpdateBackColors;
@@ -378,7 +483,20 @@ end;
 
 procedure TMainForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 begin
+  cancelLoading := true;
+  Application.ProcessMessages;
   SaveIniSettings;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.AppActivate(Sender: TObject);
+begin
+  if pnlLargeOnMainForm.Visible then
+    pnlLargeOnMainForm.SetFocus
+  else if (currentIdx >= 0) and (currentIdx < sbMain.ControlCount) then
+    TPanel(sbMain.Controls[currentIdx]).SetFocus
+  else if sbMain.CanFocus then
+    sbMain.SetFocus;
 end;
 //------------------------------------------------------------------------------
 
@@ -541,7 +659,7 @@ begin
       ext := ExtractFileExt(sr.Name);
       if TImage32.IsRegisteredFormat(ext) then
       begin
-        filetime := GetDosDateTimeUTC(sr);
+        filetime := GetDosDateTimeUTC(sr.FindData);
         imageNames.AddObject(slashedPath + sr.Name, Pointer(fileTime));
       end;
       searchRes := FindNext(sr);
@@ -616,7 +734,7 @@ begin
 
 
       filename := ExtractFilename(imageNames[i]);
-      fileTime := FileAge(imageNames[i]);
+      fileTime := LongInt(imageNames.Objects[i]);
 
       img := TImage32.Create;
 
@@ -700,6 +818,7 @@ end;
 procedure TMainForm.AddThumbnail(x,y, thumbSize: integer; img: TImage32);
 var
   pnl: TPanel;
+  c: TColor32;
 begin
   pnl := TPanel.Create(self);
   pnl.Visible := false;
@@ -723,6 +842,12 @@ begin
   pnl.FocusedColor := focusedRectColor;
   pnl.PopupMenu := PopupMenu1;
   pnl.TabStop := true;
+  if not DoesContrastWithBackColor(img, backColor) then
+  begin
+    if GetLuminance(backColor) < $80 then
+      img.SetRGB(clWhite32) else
+      img.SetRGB(clBlack32);
+  end;
   img.CopyToDc(pnl.Bitmap.Canvas.Handle, 0,0, false);
   pnl.Visible := true;
 end;
@@ -790,6 +915,7 @@ begin
   largeImagePanel.Visible:= true;
   largeImageAngle := 0;
 
+  currLargeImg32.Resize(0,0);
   layeredImg.Clear;
   largeImageAngle := 0;
   UpdateLargeView(false);
@@ -872,21 +998,21 @@ begin
       //gently opacify the top layer before deleting the bottom layer
       //slow & smooth transition that looks great, but only with
       //fully opaque images that are the same size.
-      layeredImg[1].Opacity := layeredImg[1].Opacity + 17;
+      layeredImg[1].Opacity := layeredImg[1].Opacity + 15; //17
     end
     else if mnuFadeInWithOut.Checked then
     begin
       //fade in the top layer while fading out the bottom one
       //a seamless transition that looks good with all images
-      layeredImg[0].Opacity := layeredImg[0].Opacity - 51;
-      layeredImg[1].Opacity := layeredImg[1].Opacity + 51;
+      layeredImg[0].Opacity := layeredImg[0].Opacity - 17; //51
+      layeredImg[1].Opacity := layeredImg[1].Opacity + 17; //51
     end else
     begin
       //fades out the bottom layer before fading in the top one
       //a "blink" transition that looks good with all images
       if layeredImg[0].Opacity > 0 then
-        layeredImg[0].Opacity := layeredImg[0].Opacity - 85 else
-        layeredImg[1].Opacity := layeredImg[1].Opacity + 85;
+        layeredImg[0].Opacity := layeredImg[0].Opacity - 51 else //85
+        layeredImg[1].Opacity := layeredImg[1].Opacity + 51;     //85
     end;
 
     if (layeredImg.Count > 1) and (layeredImg[1].Opacity = 255) then
@@ -937,7 +1063,7 @@ begin
 
   //When in a slide show, layeredImg will be the same size as largeImagePanel's
   //InnerClientRect, and each layer scaled to fit. When not in a slide show,
-  //layeredImg will be made the same size as it's solo image and this will be
+  //layeredImg will be made the same size as it's 'large' image and this will be
   //scaled by largeImagePanel so layeredImg fits inside InnerClientRect.
 
   if mnuSlideShow.Checked and
@@ -1064,6 +1190,13 @@ begin
       ////////////////////////////////////
       currLargeImg32.LoadFromFile(filename);
       ////////////////////////////////////
+
+      if not DoesContrastWithBackColor(currLargeImg32, backColor) then
+      begin
+        if GetLuminance(backColor) < $80 then
+          currLargeImg32.SetRGB(clWhite32) else
+          currLargeImg32.SetRGB(clBlack32);
+      end;
       layer.Image.Assign(currLargeImg32);
     end else
       layer.Image.Assign(currLargeImg32);
@@ -1308,15 +1441,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.About1Click(Sender: TObject);
+procedure TMainForm.ips1Click(Sender: TObject);
 var
   msgboxOpts: TMessageBoxOptions;
 begin
   msgboxOpts.Init;
   msgboxOpts.customIcon := Application.Icon;
-  DialogsEx.MessageBox(self, 'Photo', 'Version 1.0'#10+
-    'Author: Angus Johnson'#10+
-    'Copyright © 2020', 'Photo', MB_OK, msgboxOpts);
+  DialogsEx.MessageBox(self, 'Photo Tips', rsTips, 'Photo', MB_OK, msgboxOpts);
 end;
 //------------------------------------------------------------------------------
 
@@ -1363,6 +1494,17 @@ end;
 procedure TMainForm.mnuEditClick(Sender: TObject);
 begin
   mnuEdit2.Enabled := (currentIdx >= 0) and (currentIdx < imageNames.Count);
+  mnuRename2.Enabled := mnuEdit2.Enabled and not isLoading;
+  mnuDelete2.Enabled := mnuRename2.Enabled;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.PopupMenu1Popup(Sender: TObject);
+begin
+  mnuEditClick(nil);
+  mnuEdit.Enabled := mnuEdit2.Enabled;
+  mnuRename.Enabled := mnuRename2.Enabled;
+  mnuDelete.Enabled := mnuDelete2.Enabled;
 end;
 //------------------------------------------------------------------------------
 
@@ -1372,7 +1514,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.mnuRenameImageClick(Sender: TObject);
+procedure TMainForm.mnuRenameClick(Sender: TObject);
 var
   textboxOpts: TTextBoxOptions;
   oldName, newName: string;
@@ -1418,7 +1560,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.mnuDeleteImageClick(Sender: TObject);
+procedure TMainForm.mnuDeleteClick(Sender: TObject);
 var
   msgboxOpts: TMessageBoxOptions;
   filename: string;
@@ -1431,19 +1573,24 @@ begin
     format(rsCheckDelete, [ExtractFilename(filename)]),
     'Photo', MB_YESNO or MB_DEFBUTTON2, msgboxOpts) <> mrYes) then Exit;
 
-  ShellFileOperation(filename, '', FO_DELETE, FOF_ALLOWUNDO);
+  Screen.Cursor := crHourGlass;
+  try
+    ShellFileOperation(filename, '', FO_DELETE, FOF_ALLOWUNDO);
 
-  DeleteZipEntry(AppendSlash(currentFolder) + 'photo.bin', ExtractFileName(filename));
-  sbMain.Controls[currentIdx].Free;
-  thumbnails.Delete(currentIdx);
-  imageNames.Delete(currentIdx);
-  RepositionThumbnails;
-  if currentIdx = imageNames.Count then dec(currentIdx);
-  if currentIdx < 0 then Exit;
+    DeleteZipEntry(AppendSlash(currentFolder) + 'photo.bin', ExtractFileName(filename));
+    sbMain.Controls[currentIdx].Free;
+    thumbnails.Delete(currentIdx);
+    imageNames.Delete(currentIdx);
+    RepositionThumbnails;
+    if currentIdx = imageNames.Count then dec(currentIdx);
+    if currentIdx < 0 then Exit;
 
-  if largeImagePanel.Visible then
-    StartLargeImageView else
-    ActiveControl := TForm(sbMain.Controls[currentIdx]);
+    if largeImagePanel.Visible then
+      StartLargeImageView else
+      ActiveControl := TForm(sbMain.Controls[currentIdx]);
+  finally
+    Screen.Cursor := crDefault;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1489,11 +1636,13 @@ begin
   case Key of
     VK_F8, ORD('P'):                                   //toggle slide show
       mnuSlideShowClick(nil);
-    VK_F9, VK_RETURN, VK_ESCAPE:                       //exit fullscreen
+    VK_F7, VK_F9:
       begin
-        if Key = VK_F9 then TForm(Sender).Tag := 1;    //flag to large view
+        TForm(Sender).Tag := 1;                        //return to large view
         TForm(Sender).ModalResult := mrOK;
       end;
+    VK_RETURN, VK_ESCAPE:                              //return to thumbnails
+      TForm(Sender).ModalResult := mrOK;
     VK_LEFT:
       if (Shift = [ssCtrl]) then
         ShowPrevLargeImage else
@@ -1625,5 +1774,19 @@ begin
   end;
 end;
 //---------------------------------------------------------------------
+
+procedure TMainForm.About1Click(Sender: TObject);
+var
+  msgboxOpts: TMessageBoxOptions;
+begin
+  msgboxOpts.Init;
+  msgboxOpts.customIcon := Application.Icon;
+  DialogsEx.MessageBox(self, 'Photo',
+    'Version ' + GetVersion + #10+
+    'Author: Angus Johnson'#10+
+    'Copyright © 2020',
+    'Photo', MB_OK, msgboxOpts);
+end;
+//------------------------------------------------------------------------------
 
 end.
