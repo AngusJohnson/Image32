@@ -242,14 +242,14 @@ const
 
 var
   //AutoWidthThreshold: When JoinStyle = jsAuto, this is the threshold at
-  //which lines joins will be rounded instead of squared. With wider strokes,
+  //which line joins will be rounded instead of squared. With wider strokes,
   //rounded joins generally look better, but as rounding is more complex it
   //also requries more processing and hence is slower to execute.
   AutoWidthThreshold: double = 5.0;
 
-  //Line stroke widths of less than about 1.3 will produce noticeable
-  //Moire effect when the lines are close to horizontal or close to vertical
-  MinStrokeWidth: double = 0.5; //1.33;
+  //Empirically, line widths of less than about 1.3 will produce noticeable
+  //Moiré Effect when the lines are close to horizontal or close to vertical.
+  MinStrokeWidth: double = 0.5;
 
   //DefaultMiterLimit: Avoids excessive spikes when line offsetting
   DefaultMiterLimit: double = 2.0;

@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 1.42
-Released: 19 February 2020
+Latest version: 1.43
+Released: 26 February 2020
 
 Copyright © 2019-2020 Angus Johnson
 Freeware released under Boost Software License
@@ -12,6 +12,12 @@ download : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
+Version: 1.43
+  Changes in Image32_BMP
+    Fixed compiler bug affecting Delphi XE4 compiler.
+  Changes in BitmapPanels
+    Minor changes to ClientToBitmap and BitmapToClient methods
+    
 Version: 1.42
   Changes in Image32
     Fixed a minor bug in TImage32.CopyToDc method

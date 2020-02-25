@@ -392,23 +392,24 @@ end;
 
 function TPanel.ClientToBitmap(var clientPt: TPoint): Boolean;
 var
-  pt: TPoint;
+  innerMarg: integer;
 begin
-  Result := not fBmp.Empty and PtInRect(InnerClientRect, clientPt);
-  if not Result then Exit;
-  pt.X := Round((clientPt.X -fDstRect.Left + fOffsetX)/fScale);
-  pt.Y := Round((clientPt.Y -fDstRect.Top + fOffsetY)/fScale);
-  Result := (pt.X >= 0) and (pt.X < fBmp.Width) and
-    (pt.Y >= 0) and (pt.Y < fBmp.Height);
-  if Result then clientPt := pt;
+  innerMarg := GetInnerMargin;
+  clientPt.X := Round((clientPt.X - innerMarg + fOffsetX)/fScale);
+  clientPt.Y := Round((clientPt.Y - innerMarg  + fOffsetY)/fScale);
+  Result := (clientPt.X >= 0) and (clientPt.X < fBmp.Width) and
+    (clientPt.Y >= 0) and (clientPt.Y < fBmp.Height);
 end;
 //------------------------------------------------------------------------------
 
 procedure TPanel.BitmapToClient(var pt: TPoint);
+var
+  innerMarg: integer;
 begin
-  if fBmp.Empty then Exit;
-  pt.X := Round(pt.X * fScale +fDstRect.Left - fOffsetX);
-  pt.Y := Round(pt.Y * fScale +fDstRect.Top - fOffsetY);
+  innerMarg := GetInnerMargin;
+  //fDstRect == InnerClientRect
+  pt.X := Round(pt.X * fScale) - fOffsetX + innerMarg;
+  pt.Y := Round(pt.Y * fScale) - fOffsetY + innerMarg;
 end;
 //------------------------------------------------------------------------------
 

@@ -637,6 +637,7 @@ var
   UsesAlpha: Boolean;
   pals: TArrayOfColor32;
   tmp: TImage32;
+  writeValue: TTriColor32;
 begin
   //write everything except a BMP file header because some streams
   //(eg resource streams) don't need a file header
@@ -697,7 +698,8 @@ begin
       begin
         bih.bV4V4Compression := BI_BITFIELDS;
         stream.Write(bih, bih.bV4Size);
-        stream.Write(MakeBitfields, SizeOf(TTriColor32));
+        writeValue := MakeBitfields;
+        stream.Write(writeValue, SizeOf(TTriColor32));
         StreamWrite24BitImage(tmp, stream);
       end
     else

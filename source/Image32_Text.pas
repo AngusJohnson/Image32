@@ -761,15 +761,9 @@ begin
     Exit;
   end;
 
-  //if the background color hasn't been assigned, then use
-  //the color of a pixel in the target image under the text
+  //if the background color hasn't been assigned, then use clWhite32
   if opaqueBkColor = clNone32 then
-  begin
-    xi := Max(0, Min(image.Width -1, Round(x)));
-    yi := Max(0, Min(image.Height -1, Round(y)));
-    opaqueBkColor := image.Pixel[xi,yi];
-    if opaqueBkColor = clNone32 then opaqueBkColor := clWhite32;
-  end;
+    opaqueBkColor := clWhite32;
 
   paths := GetTextOutline(x,y, text, fontInfo, textAlign, result, justifySpc);
   if not assigned(paths) then Exit;
