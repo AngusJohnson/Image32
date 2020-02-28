@@ -236,6 +236,7 @@ type
     fList: TList;
     fIsImageOwner: Boolean;
     function GetImage(index: integer): TImage32;
+    procedure SetImage(index: integer; img: TIMage32);
     function GetLast: TImage32;
   public
     constructor Create;
@@ -246,7 +247,7 @@ type
     procedure Insert(index: integer; image: TImage32);
     procedure Move(currentIndex, newIndex: integer);
     procedure Delete(index: integer);
-    property Image[index: integer]: TImage32 read GetImage; default;
+    property Image[index: integer]: TImage32 read GetImage write SetImage; default;
     property IsImageOwner: Boolean read fIsImageOwner write fIsImageOwner;
     property Last: TImage32 read GetLast;
   end;
@@ -2848,6 +2849,13 @@ end;
 function TImageList32.GetImage(index: integer): TImage32;
 begin
   result := TImage32(fList[index]);
+end;
+//------------------------------------------------------------------------------
+
+procedure TImageList32.SetImage(index: integer; img: TIMage32);
+begin
+  if fIsImageOwner then TImage32(fList[index]).Free;
+  fList[index] := img;
 end;
 //------------------------------------------------------------------------------
 

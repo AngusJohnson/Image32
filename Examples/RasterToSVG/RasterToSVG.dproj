@@ -88,9 +88,9 @@
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
         <VerInfo_Release>1</VerInfo_Release>
         <VerInfo_MinorVer>5</VerInfo_MinorVer>
-        <VerInfo_Build>39</VerInfo_Build>
+        <VerInfo_Build>43</VerInfo_Build>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.5.1.39;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.5.1.43;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <AppEnableRuntimeThemes>true</AppEnableRuntimeThemes>
         <AppEnableHighDPI>true</AppEnableHighDPI>
@@ -102,15 +102,15 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
         <VerInfo_AutoIncVersion>true</VerInfo_AutoIncVersion>
-        <VerInfo_Build>37</VerInfo_Build>
-        <VerInfo_Release>12</VerInfo_Release>
-        <VerInfo_MinorVer>4</VerInfo_MinorVer>
+        <VerInfo_Build>42</VerInfo_Build>
+        <VerInfo_Release>14</VerInfo_Release>
+        <VerInfo_MinorVer>5</VerInfo_MinorVer>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <DCC_IntegerOverflowCheck>true</DCC_IntegerOverflowCheck>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <DCC_RangeChecking>true</DCC_RangeChecking>
         <DCC_DebugDCUs>true</DCC_DebugDCUs>
-        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.4.12.37;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.5.14.42;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <AppEnableRuntimeThemes>true</AppEnableRuntimeThemes>
         <AppEnableHighDPI>true</AppEnableHighDPI>
     </PropertyGroup>
@@ -121,9 +121,9 @@
         <DCCReference Include="Unit1.pas">
             <Form>MainForm</Form>
         </DCCReference>
-        <DCCReference Include="CustomDialogs.pas"/>
         <DCCReference Include="GifImage.pas"/>
         <DCCReference Include="Image32_GIF.pas"/>
+        <DCCReference Include="..\DialogsEx.pas"/>
         <BuildConfiguration Include="Debug">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

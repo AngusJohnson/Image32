@@ -748,7 +748,6 @@ function DrawText_LCD(image: TImage32;
   x,y: double; const text: string; fontInfo: TFontInfo; textAlign: TTextAlign;
   textColor: TColor32; opaqueBkColor: TColor32; justifySpc: double): TPointD;
 var
-  xi,yi: integer;
   paths: TArrayOfArrayOfPointD;
   tmpImg: TImage32;
   rec: TRect;

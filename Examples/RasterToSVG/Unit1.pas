@@ -98,7 +98,7 @@ implementation
 
 uses
   Image32_Draw, Image32_Vector, Image32_Extra, Image32_BMP, Image32_JPG,
-  Image32_PNG, Image32_Clipper, Image32_CQ, Clipper, ClipperCore;
+  Image32_PNG, Image32_GIF, Image32_Clipper, Image32_CQ, Clipper, ClipperCore;
 
 resourcestring
   menuTips =

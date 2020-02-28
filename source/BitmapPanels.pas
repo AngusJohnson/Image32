@@ -336,6 +336,7 @@ begin
   fBmp := TBitmap.Create(self);
   fBmp.Canvas.Brush.Color := Color;
   fFocusedColor := Color;
+  ScaleType := stFit;
   DoubleBuffered := true;
 end;
 //------------------------------------------------------------------------------
@@ -407,7 +408,6 @@ var
   innerMarg: integer;
 begin
   innerMarg := GetInnerMargin;
-  //fDstRect == InnerClientRect
   pt.X := Round(pt.X * fScale) - fOffsetX + innerMarg;
   pt.Y := Round(pt.Y * fScale) - fOffsetY + innerMarg;
 end;

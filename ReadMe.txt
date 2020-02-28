@@ -17,6 +17,8 @@ Version: 1.43
     Fixed compiler bug affecting Delphi XE4 compiler.
   Changes in BitmapPanels
     Minor changes to ClientToBitmap and BitmapToClient methods
+  Examples
+    Added missing DialogsEx.res file
     
 Version: 1.42
   Changes in Image32

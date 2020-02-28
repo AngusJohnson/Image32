@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, Types, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, Menus, ComCtrls, ExtCtrls, Math,
-  ActiveX, ShlObj, ShellApi, Zip, DialogsEx, ZipHelper,
+  ActiveX, ShlObj, ShellApi, ZipEx, DialogsEx,
   BitmapPanels, Image32, Image32_BMP, Image32_PNG, Image32_JPG, Image32_GIF,
   Image32_Layers, Image32_Draw, Image32_Text, Image32_Vector, IniFiles;
 
@@ -223,17 +223,14 @@ type
     Length          :WORD;
     wValueLength    :WORD;
     wType           :WORD;
-    szKey:array[0..Length('VS_VERSION_INFO')] of WideChar;
-    Padding1        :array[0..0] of Word;
+    szKey:array[0..Length('VS_VERSION_INFO'#0)] of WideChar;
     FixedInfo       : TVSFixedFileInfo;
   end;
 
 function GetVersion(showBuild: Boolean = false): string;
 var
   rs: TResourceStream;
-  w: Word;
   vi: TVSVersionInfo;
-  ffi: TVSFixedFileInfo;
 begin
   result := '';
   rs := TResourceStream.CreateFromID(hInstance, 1, RT_VERSION);
@@ -292,13 +289,6 @@ begin
   if Handle = INVALID_HANDLE_VALUE then Exit;
   Windows.FindClose(Handle);
   Result := Int64(FindData.nFileSizeHigh) shl 32 or FindData.nFileSizeLow;
-end;
-//------------------------------------------------------------------------------
-
-function GetDosDateTimeUTC(const findData: TWin32FindData): LongInt;
-begin
-  if not FileTimeToDosDateTime(findData.ftLastWriteTime,
-    LongRec(Result).Hi, LongRec(Result).Lo) then Result := -1;
 end;
 //------------------------------------------------------------------------------
 
@@ -433,7 +423,6 @@ end;
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
   sbMain.Align := alClient;
-
   pnlLargeOnMainForm.Align := alClient;
   pnlLargeOnMainForm.TabStop := true;
   pnlLargeOnMainForm.Left := 0; pnlLargeOnMainForm.Top := 0;
@@ -646,7 +635,10 @@ begin
   thumbnails.Clear;
   imageNames.Clear;
   //and clear thumbnail panels too
+  sbMain.Hide;
   for i := sbMain.ControlCount -1 downto 0 do sbMain.Controls[i].Free;
+  sbMain.Show;
+  Application.ProcessMessages;
 
   isLoading := true;
   Screen.Cursor := crHourGlass;
@@ -659,64 +651,57 @@ begin
       ext := ExtractFileExt(sr.Name);
       if TImage32.IsRegisteredFormat(ext) then
       begin
-        filetime := GetDosDateTimeUTC(sr.FindData);
+        filetime := FileTimeToDosTime(sr.FindData.ftLastWriteTime);
         imageNames.AddObject(slashedPath + sr.Name, Pointer(fileTime));
+        thumbnails.Add(nil);
       end;
       searchRes := FindNext(sr);
     end;
     FindClose(sr);
 
     currentIdx := -1;
-    if (imageNames.Count > 0) then
-    begin
-      /////////////////////////////////
-      LoadThumbnailsFromImageFilenames;
-      /////////////////////////////////
-      if (currentIdx = -1) and (sbMain.ControlCount > 0) then
-        TPanel(sbMain.Controls[0]).SetFocus;
-    end;
+    /////////////////////////////////
+    LoadThumbnailsFromImageFilenames;
+    /////////////////////////////////
+    if (sbMain.ControlCount > 0) and (currentIdx = -1) then
+      TPanel(sbMain.Controls[0]).SetFocus;
     if FileExists(slashedPath + 'photo.bak') then
       DeleteFile(slashedPath + 'photo.bak');
-
   finally
     Screen.Cursor := crDefault;
     isLoading := false;
+    if (sbMain.ControlCount = 0) then StatusBar1.Panels[0].Text := '';
   end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.LoadThumbnailsFromImageFilenames;
 var
-  i,j, w,h,t, x,y, cw, thumbSize: integer;
+  i,j,k,  w,h,t, x,y, cw, thumbSize: integer;
   folder, filename: string;
   img: TImage32;
-  zipIn, zipOut: TZipFile;
-  data: TBytes;
-  fileTime: integer;
+
+  zip: TZipFileEx;
+  data: ZipEx.TArrayOfByte;
+  dosTime: integer;
 begin
+  if imageNames.Count = 0 then Exit;
   folder := AppendSlash(currentFolder);
-  zipIn := TZipFile.Create;
-  zipOut := TZipFile.Create;
+
+  zip := TZipFileEx.Create;
   try
+    zip.LoadFromFile(folder + 'photo.bin');
+
     //Large thumbnail images will be stored in zip files in the same folder
     //as the images as this dramatically speeds up subsequent folder previews.
     //So if we've previewed this folder previously, load thumbnails from the
     //zip file 'photo.bin', adding new images and replacing modified ones.
-    if FileExists(folder + 'photo.bin') and
-      (GetFileSize(folder + 'photo.bin') >
-        SizeOf(TEndOfCentralHeader) + SizeOf(TCentralFileHeader)) then
-    begin
-      RenameFile(folder + 'photo.bin', folder + 'photo.bak');
-      zipIn.Open(folder + 'photo.bak', zmRead);
-    end;
-    zipOut.Open(folder + 'photo.bin', zmWrite);
 
     currentIdx := -1;
     x := 0; y := 0;
     cw := sbMain.ClientWidth; thumbSize := thumbnailSize;
     for i := 0 to imageNames.Count -1 do
     begin
-
       Application.ProcessMessages;
       if cancelLoading then
       begin
@@ -734,14 +719,16 @@ begin
 
 
       filename := ExtractFilename(imageNames[i]);
-      fileTime := LongInt(imageNames.Objects[i]);
+      dosTime := LongInt(imageNames.Objects[i]);
 
       img := TImage32.Create;
 
-      j := ZipIn.IndexOf(filename);
+      j := zip.GetEntryIndex(filename);
       if j >= 0 then //found a thumbnail in zip with matching name
       begin
-        ZipIn.Read(j, data);
+        zip.ExtractEntry(j, data);
+        zip[j].cfh.CRC32 := 1; //reuse CRC32 to flag as in folder
+
         //thumbnails are stored in the following format:
         //width (4); height (4); fileage (4); 32bit thumbnail image
         if length(data) > 12 then
@@ -752,7 +739,7 @@ begin
           //load the zipped thumbnail only if height, width & fileage all match
           if (w <= maxPreviewSize) and (h <= maxPreviewSize) and
             ((w = maxPreviewSize) or (h = maxPreviewSize)) and
-            (t = fileTime) then
+            (t = dosTime) then
           begin
             img.SetSize(w, h);
             Move(data[12], img.PixelBase^, Length(data) - 12);
@@ -769,6 +756,7 @@ begin
           img.LoadFromFile(imageNames[i]);
         except
         end;
+
         if not img.IsEmpty then
         begin
           if img.Width >= img.Height then
@@ -777,18 +765,21 @@ begin
         end;
         //get ready to store the image's height, width, file age and
         //thumbnail image into the zip (photo.bin)
-        j := img.Width * img.Height * sizeOf(TColor32);
-        SetLength(data, j + 12);
+        k := img.Width * img.Height * sizeOf(TColor32);
+        SetLength(data, k + 12);
         Move(img.Width, data[0], 4);
         Move(img.Height, data[4], 4);
-        Move(fileTime, data[8], 4);
-        if j > 0 then
-          Move(img.PixelBase^, data[12], j);
+        Move(dosTime, data[8], 4);
+        if k > 0 then
+          Move(img.PixelBase^, data[12], k);
+        j := zip.AddEntry(filename, data,
+          dupOverwrite, DosTimeToFileTime(dosTime));
+        zip[j].cfh.CRC32 := 1; //reuse CRC32 to flag as in folder
+        data := nil;
       end;
+
       //add the thumbnail image to the 'images' list, and add 'data' to the zip
-      thumbnails.Add(img);
-      zipOut.Add(data, filename);
-      data := nil;
+      thumbnails[i] := img;
 
       //add the thumbnail image to a new TPanel container
       if x + thumbSize >= cw then
@@ -799,11 +790,15 @@ begin
       AddThumbnail(x, y, thumbSize, img);
       inc(x, thumbSize);
     end;
-    zipIn.Close;
-    zipOut.Close;
+
+    //remove files from zip that haven't been flagged as "in folder"
+    //nb: cfh.CRC32 will be updated in SaveZipStructure() below
+    for j := zip.Count -1 downto 0 do
+      if zip[j].cfh.CRC32 <> 1 then zip.DeleteEntry(j);
+
+    zip.SaveToFile(folder + 'photo.bin');
   finally
-    zipIn.Free;
-    zipOut.Free;
+    zip.Free;
   end;
 
   isLoading := false;
@@ -818,7 +813,6 @@ end;
 procedure TMainForm.AddThumbnail(x,y, thumbSize: integer; img: TImage32);
 var
   pnl: TPanel;
-  c: TColor32;
 begin
   pnl := TPanel.Create(self);
   pnl.Visible := false;
@@ -1541,21 +1535,19 @@ end;
 function DeleteZipEntry(const zipFileName, entryName: string): boolean;
 var
   idx: integer;
-  zs: TZipStructure;
-  fs: TFileStream;
+  zip: TZipFileEx;
 begin
   Result := FileExists(zipFileName);
   if not Result then Exit;
-  fs := TFileStream.Create(zipFileName, fmOpenReadWrite);
+  zip := TZipFileEx.Create;
   try
-    zs := GetZipStructure(fs);
-    idx := GetEntryIndex(zs, UTF8String(entryName));
-    Result := DeleteEntry(zs, idx);
-    if not Result then Exit;
-    fs.Size := 0;
-    SaveZipStructure(fs, zs);
+    zip.LoadFromFile(zipFileName);
+    idx := zip.GetEntryIndex(entryName);
+    result := idx >= 0;
+    if result then
+        zip.DeleteEntry(idx);
   finally
-    fs.Free;
+    zip.Free;
   end;
 end;
 //------------------------------------------------------------------------------
