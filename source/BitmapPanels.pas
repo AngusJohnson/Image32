@@ -2,8 +2,8 @@ unit BitmapPanels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.1                                                             *
-* Date      :  19 February 2020                                                *
+* Version   :  3.2                                                             *
+* Date      :  1 March 2020                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Module that allows a TPanel to display an image                 *
@@ -392,24 +392,18 @@ end;
 //------------------------------------------------------------------------------
 
 function TPanel.ClientToBitmap(var clientPt: TPoint): Boolean;
-var
-  innerMarg: integer;
 begin
-  innerMarg := GetInnerMargin;
-  clientPt.X := Round((clientPt.X - innerMarg + fOffsetX)/fScale);
-  clientPt.Y := Round((clientPt.Y - innerMarg  + fOffsetY)/fScale);
+  clientPt.X := Round((clientPt.X - fDstRect.Left + fOffsetX)/fScale);
+  clientPt.Y := Round((clientPt.Y - fDstRect.Top  + fOffsetY)/fScale);
   Result := (clientPt.X >= 0) and (clientPt.X < fBmp.Width) and
     (clientPt.Y >= 0) and (clientPt.Y < fBmp.Height);
 end;
 //------------------------------------------------------------------------------
 
 procedure TPanel.BitmapToClient(var pt: TPoint);
-var
-  innerMarg: integer;
 begin
-  innerMarg := GetInnerMargin;
-  pt.X := Round(pt.X * fScale) - fOffsetX + innerMarg;
-  pt.Y := Round(pt.Y * fScale) - fOffsetY + innerMarg;
+  pt.X := Round(pt.X * fScale) - fOffsetX + fDstRect.Left;
+  pt.Y := Round(pt.Y * fScale) - fOffsetY + fDstRect.Top;
 end;
 //------------------------------------------------------------------------------
 

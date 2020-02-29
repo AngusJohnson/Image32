@@ -2,8 +2,8 @@ unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.37                                                            *
-* Date      :  15 January 2020                                                 *
+* Version   :  1.44                                                            *
+* Date      :  1 March 2020                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -18,12 +18,8 @@ uses
   SysUtils, Classes, Windows, Math, Types,
   Image32, Image32_Draw, Image32_Vector;
 
-type
-  TMatrixD = array [0..2, 0..2] of double;
-
-procedure AffineTransform(img: TImage32;
-  matrix: TMatrixD); overload;
-procedure AffineTransform(img: TImage32;
+procedure AffineTransformImage(img: TImage32; matrix: TMatrixD); overload;
+procedure AffineTransformImage(img: TImage32;
   matrix: TMatrixD; out offset: TPoint); overload;
 
 function ProjectiveTransform(img: TImage32;
@@ -38,152 +34,35 @@ function SplineHorzTransform(img: TImage32; const leftSpline: TArrayOfPointD;
   splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
   out offset: TPoint): Boolean;
 
-//Note: matrix multiplication is not symmetric
-//function MultiplyMatrices(const current, new: TMatrixD): TMatrixD;
-
-const
-  IdentityMatrix: TMatrixD = ((1, 0, 0),(0, 1, 0),(0, 0, 1));
-
 implementation
-
-resourcestring
-  rsInvalidMatrix = 'Invalid matrix.'; //nb: always start with IdentityMatrix
 
 //------------------------------------------------------------------------------
 // Affine Transformation
 //------------------------------------------------------------------------------
 
-function MultiplyMatrices(const current, new: TMatrixD): TMatrixD;
-var
-  i, j: Integer;
-begin
-  if (current[2][2] <> 1) or (new[2][2] <> 1) then
-    Raise Exception.Create(rsInvalidMatrix);
-  for i := 0 to 2 do
-    for j := 0 to 2 do
-      Result[i, j] := (new[0, j] * current[i, 0]) +
-        (new[1, j] * current[i, 1]) + (new[2, j] * current[i, 2]);
-end;
-//------------------------------------------------------------------------------
-
-function Det4(a1, a2, b1, b2: double): double;
-{$IFDEF INLINE} inline; {$ENDIF}
-begin
-  Result := a1 * b2 - a2 * b1;
-end;
-//------------------------------------------------------------------------------
-
-function Det9(a1, a2, a3, b1, b2, b3, c1, c2, c3: double): double;
-{$IFDEF INLINE} inline; {$ENDIF}
-begin
-  Result := a1 * (b2 * c3 - b3 * c2) -
-            b1 * (a2 * c3 - a3 * c2) +
-            c1 * (a2 * b3 - a3 * b2);
-end;
-//------------------------------------------------------------------------------
-
-function Determinant(const matrix: TMatrixD): double;
-{$IFDEF INLINE} inline; {$ENDIF}
-begin
-  Result := Det9(matrix[0,0], matrix[1,0], matrix[2,0],
-                 matrix[0,1], matrix[1,1], matrix[2,1],
-                 matrix[0,2], matrix[1,2], matrix[2,2]);
-end;
-//------------------------------------------------------------------------------
-
-procedure Adjoint(var matrix: TMatrixD);
-var
-  tmp: TMatrixD;
-begin
-  tmp := matrix;
-  matrix[0,0] :=  Det4(tmp[1,1], tmp[1,2], tmp[2,1], tmp[2,2]);
-  matrix[0,1] := -Det4(tmp[0,1], tmp[0,2], tmp[2,1], tmp[2,2]);
-  matrix[0,2] :=  Det4(tmp[0,1], tmp[0,2], tmp[1,1], tmp[1,2]);
-
-  matrix[1,0] := -Det4(tmp[1,0], tmp[1,2], tmp[2,0], tmp[2,2]);
-  matrix[1,1] :=  Det4(tmp[0,0], tmp[0,2], tmp[2,0], tmp[2,2]);
-  matrix[1,2] := -Det4(tmp[0,0], tmp[0,2], tmp[1,0], tmp[1,2]);
-
-  matrix[2,0] :=  Det4(tmp[1,0], tmp[1,1], tmp[2,0], tmp[2,1]);
-  matrix[2,1] := -Det4(tmp[0,0], tmp[0,1], tmp[2,0], tmp[2,1]);
-  matrix[2,2] :=  Det4(tmp[0,0], tmp[0,1], tmp[1,0], tmp[1,1]);
-end;
-//------------------------------------------------------------------------------
-
-procedure ScaleMatrix(var matrix: TMatrixD; val: double);
-var
-  i, j: integer;
-begin
-  for i := 0 to 2 do
-    for j := 0 to 2 do
-      matrix[i, j] := matrix[i, j] * val;
-end;
-//------------------------------------------------------------------------------
-
-procedure InvertMatrix(var matrix: TMatrixD);
-var
-  d: double;
-const
-  tolerance = 1.0E-5;
-begin
-  d := Determinant(matrix);
-  if abs(d) > tolerance then
-  begin
-    Adjoint(matrix);
-    ScaleMatrix(matrix, 1/d);
-  end
-  else matrix := IdentityMatrix;
-end;
-//------------------------------------------------------------------------------
-
-procedure AffineTransformPt(var x, y: double; const matrix: TMatrixD);
-var
-  tmpX: double;
-begin
-  tmpX := x;
-  x := tmpX * matrix[0, 0] + y * matrix[1, 0] + matrix[2, 0];
-  y := tmpX * matrix[0, 1] + y * matrix[1, 1] + matrix[2, 1];
-end;
-//------------------------------------------------------------------------------
-
 function GetTransformBounds(img: TImage32; const matrix: TMatrixD): TRect;
 var
-  i: integer;
-  pts: array[0..3] of TPointD;
-  rec: TRectD;
+  pts: TArrayOfPointD;
 begin
-  pts[0] := PointD(0,0);
-  pts[1] := PointD(img.Width,0);
-  pts[2] := PointD(img.Width,img.Height);
-  pts[3] := PointD(0,img.Height);
-  for i := 0 to 3 do
-    AffineTransformPt(pts[i].X, pts[i].Y, matrix);
-  rec.Left := pts[0].X; rec.Left := rec.Left;
-  rec.Top := pts[0].Y; rec.Bottom := rec.Top;
-  for i := 0 to 3 do
-  begin
-    if pts[i].X < rec.Left then rec.Left := pts[i].X
-    else if pts[i].X > rec.Right then rec.Right := pts[i].X;
-    if pts[i].Y < rec.Top then rec.Top := pts[i].Y
-    else if pts[i].Y > rec.Bottom then rec.Bottom := pts[i].Y;
-  end;
-  Result := Rect(rec);
+  pts := Rectangle(img.Bounds);
+  MatrixApply(matrix, pts);
+  Result := GetBounds(pts);
 end;
 //------------------------------------------------------------------------------
 
-procedure AffineTransform(img: TImage32; matrix: TMatrixD);
+procedure AffineTransformImage(img: TImage32; matrix: TMatrixD);
 var
   dummy: TPoint;
 begin
-  AffineTransform(img, matrix, dummy);
+  AffineTransformImage(img, matrix, dummy);
 end;
 //------------------------------------------------------------------------------
 
-procedure AffineTransform(img: TImage32;
+procedure AffineTransformImage(img: TImage32;
   matrix: TMatrixD; out offset: TPoint); overload;
 var
   i,j, w,h, dx,dy: integer;
-  x, y: double;
+  pt: TPointD;
   pc: PColor32;
   tmp: TArrayOfColor32;
   rec: TRect;
@@ -197,16 +76,16 @@ begin
 
   //starting with the result pixel coords, reverse find
   //the fractional coordinates in the current image
-  InvertMatrix(matrix);
+  MatrixInvert(matrix);
 
   SetLength(tmp, w * h);
   pc := @tmp[0];
   for i := 0 to h -1 do
     for j := 0 to w -1 do
     begin
-      x := j + dx; y := i + dy;
-      AffineTransformPt(x, y, matrix);
-      pc^ := GetWeightedPixel(img, Round(x * 256), Round(y * 256));
+      pt.X := j + dx; pt.Y := i + dy;
+      MatrixApply(matrix, pt);
+      pc^ := GetWeightedPixel(img, Round(pt.X * 256), Round(pt.Y * 256));
       inc(pc);
     end;
   img.SetSize(w, h);
@@ -223,31 +102,7 @@ end;
 // by copyright (C) 2000-2009 under Mozilla Public License.
 // MPL 1.1 or LGPL 2.1 with linking exception (http://www.mozilla.org/MPL/ )
 
-procedure Scale(var M: TMatrixD; Factor: double);
-var
-  i, j: Integer;
-begin
-  for i := 0 to 2 do
-    for j := 0 to 2 do
-      M[i,j] := M[i,j] * Factor;
-end;
-//------------------------------------------------------------------------------
-
-procedure Invert(var M: TMatrixD);
-var
-  Det: double;
-begin
-  Det := Determinant(M);
-  if Abs(Det) < 1E-5 then M := IdentityMatrix
-  else
-  begin
-    Adjoint(M);
-    Scale(M, 1 / Det);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function InvTransformPt(var x, y: double; invMatrix: TMatrixD): Boolean;
+function InvTransform(var x, y: double; invMatrix: TMatrixD): Boolean;
 var
   xx, z: double;
 begin
@@ -270,24 +125,22 @@ function GetProjectiveTransformInvMatrix(const srcRect: TRect;
 var
   dx1, dx2, px, dy1, dy2, py: double;
   g, h, k: double;
-  R: TMatrixD;
+  m: TMatrixD;
 begin
   px := dst[0].X - dst[1].X + dst[2].X - dst[3].X;
   py := dst[0].Y - dst[1].Y + dst[2].Y - dst[3].Y;
 
-  //if (top.dx = bottom.dx) and (top.dy = bottom.dy) then affine transform
   if (px = 0) and (py = 0) then
   begin
-    Result[0, 0] := dst[1].X - dst[0].X;
-    Result[1, 0] := dst[2].X - dst[1].X;
-    Result[2, 0] := dst[0].X;
-
+    //almost certainly rectangular but in theory could be rotated & skewed too
+    Result[0, 0] := (dst[1].X - dst[0].X)/(SrcRect.Right - SrcRect.Left);
     Result[0, 1] := dst[1].Y - dst[0].Y;
-    Result[1, 1] := dst[2].Y - dst[1].Y;
-    Result[2, 1] := dst[0].Y;
-
     Result[0, 2] := 0;
+    Result[1, 0] := dst[2].X - dst[1].X;
+    Result[1, 1] := (dst[2].Y - dst[1].Y)/(SrcRect.Bottom - SrcRect.Top);
     Result[1, 2] := 0;
+    Result[2, 0] := dst[0].X - SrcRect.Left;
+    Result[2, 1] := dst[0].Y - SrcRect.Top;
     Result[2, 2] := 1;
   end else
   begin
@@ -302,35 +155,33 @@ begin
       g := (px * dy2 - py * dx2) * k;
       h := (dx1 * py - dy1 * px) * k;
 
-      Result[0, 0] := dst[1].X - dst[0].X + g * dst[1].X;
-      Result[1, 0] := dst[3].X - dst[0].X + h * dst[3].X;
-      Result[2, 0] := dst[0].X;
+      m[0, 0] := dst[1].X - dst[0].X + g * dst[1].X;
+      m[1, 0] := dst[3].X - dst[0].X + h * dst[3].X;
+      m[2, 0] := dst[0].X;
 
-      Result[0, 1] := dst[1].Y - dst[0].Y + g * dst[1].Y;
-      Result[1, 1] := dst[3].Y - dst[0].Y + h * dst[3].Y;
-      Result[2, 1] := dst[0].Y;
+      m[0, 1] := dst[1].Y - dst[0].Y + g * dst[1].Y;
+      m[1, 1] := dst[3].Y - dst[0].Y + h * dst[3].Y;
+      m[2, 1] := dst[0].Y;
 
-      Result[0, 2] := g;
-      Result[1, 2] := h;
-      Result[2, 2] := 1;
+      m[0, 2] := g;
+      m[1, 2] := h;
+      m[2, 2] := 1;
+
+      Result := IdentityMatrix;
+      Result[0, 0] := 1 / (SrcRect.Right - SrcRect.Left);
+      Result[1, 1] := 1 / (SrcRect.Bottom - SrcRect.Top);
+      Result[0, 2] := -SrcRect.Left;
+      Result[1, 2] := -SrcRect.Top;
+
+      //de-scale and translate before the projective transform!?
+      Result := MatrixMultiply(m, Result);
+
     end else
     begin
       FillChar(Result, SizeOf(Result), 0);
     end;
   end;
-
-  // denormalize texture space (u, v)
-  R := IdentityMatrix;
-  R[0, 0] := 1 / (SrcRect.Right - SrcRect.Left);
-  R[1, 1] := 1 / (SrcRect.Bottom - SrcRect.Top);
-  Result := MultiplyMatrices(R, Result);
-
-  R := IdentityMatrix;
-  R[2, 0] := -SrcRect.Left;
-  R[2, 1] := -SrcRect.Top;
-  Result := MultiplyMatrices(R, Result);
-
-  Invert(Result);
+  MatrixInvert(Result);
 end;
 //------------------------------------------------------------------------------
 
@@ -369,7 +220,7 @@ begin
     for j := 0 to w -1 do
     begin
       x := j + dx; y := i + dy;
-      if not InvTransformPt(x, y, invMatrix) then Exit;
+      if not InvTransform(x, y, invMatrix) then Exit;
       pc^ := GetWeightedPixel(img, Round(x * 256), Round(y * 256));
       inc(pc);
     end;

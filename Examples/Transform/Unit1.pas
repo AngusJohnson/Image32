@@ -216,7 +216,7 @@ begin
             //matrix[0][1] := (fPts[1].Y -fPts[0].Y -Height) / Width;
             //matrix[1][0] := (fPts[1].X - fPts[0].X -Width)/ Height;
           end;
-          AffineTransform(transformLayer.Image, matrix, pt);
+          AffineTransformImage(transformLayer.Image, matrix, pt);
           pt := OffsetPoint(pt, Round(fPts[0].X), Round(fPts[0].Y));
         end;
       ttProjective:
