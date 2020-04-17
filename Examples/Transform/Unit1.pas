@@ -4,14 +4,13 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
-  Types, Menus, ExtCtrls, ComCtrls, Image32, Image32_Layers, BitmapPanels,
+  Types, Menus, ExtCtrls, ComCtrls, Image32, Image32_Layers, ImagePanels,
   Dialogs, ClipBrd;
 
 type
   TTransformType = (ttAfine, ttProjective, ttSpline);
 
   TForm1 = class(TForm)
-    Panel1: TPanel;
     MainMenu1: TMainMenu;
     File1: TMenuItem;
     Exit1: TMenuItem;
@@ -36,11 +35,11 @@ type
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure Panel1MouseDown(Sender: TObject; Button: TMouseButton;
+    procedure pnlMainMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure Panel1MouseMove(Sender: TObject; Shift: TShiftState; X,
+    procedure pnlMainMouseMove(Sender: TObject; Shift: TShiftState; X,
       Y: Integer);
-    procedure Panel1MouseUp(Sender: TObject; Button: TMouseButton;
+    procedure pnlMainMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure mnuOpenClick(Sender: TObject);
     procedure mnuSaveClick(Sender: TObject);
@@ -51,6 +50,7 @@ type
     procedure File1Click(Sender: TObject);
     procedure mnuHideControlsClick(Sender: TObject);
   private
+    pnlMain: TBitmapPanel;
     layeredImage32: TLayeredImage32;
     buttonMovingLayer, hatchedLayer: TLayer32;
     masterLayer, transformLayer: TLayer32;
@@ -88,11 +88,13 @@ procedure TForm1.FormCreate(Sender: TObject);
 begin
   //SETUP THE DISPLAY PANEL
 
-  Panel1.BorderWidth := DPI(16);
-  Panel1.BevelInner := bvLowered;
-  Panel1.TabStop := true; //enables keyboard control
-  Panel1.FocusedColor := clGradientInactiveCaption;
-  Panel1.Scale := 1;
+  pnlMain := TBitmapPanel.Create(self);
+  pnlMain.Parent := self;
+  pnlMain.Align := alClient;
+  pnlMain.OnMouseDown := pnlMainMouseDown;
+  pnlMain.OnMouseUp := pnlMainMouseUp;
+  pnlMain.OnMouseMove := pnlMainMouseMove;
+  pnlMain.PopupMenu := PopupMenu1;
 
   //SETUP THE LAYERED IMAGE
   DefaultButtonSize := DPI(10);
@@ -258,14 +260,14 @@ procedure TForm1.RedrawPanel;
 begin
   //copy the merged layeredImage32 to Panel1
   {$IFDEF SETSIZE}
-  Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
+  pnlMain.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
   {$ELSE}
-  Panel1.Bitmap.Width := layeredImage32.Width;
-  Panel1.Bitmap.Height := layeredImage32.Height;
+  pnlMain.Bitmap.Width := layeredImage32.Width;
+  pnlMain.Bitmap.Height := layeredImage32.Height;
   {$ENDIF}
   layeredImage32.GetMergedImage(mnuHideControls.Checked).CopyToDc(
-    Panel1.Bitmap.Canvas.Handle);
-  Panel1.Refresh;
+    pnlMain.Bitmap.Canvas.Handle);
+  pnlMain.Refresh;
 end;
 //------------------------------------------------------------------------------
 
@@ -301,13 +303,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.Panel1MouseDown(Sender: TObject; Button: TMouseButton;
+procedure TForm1.pnlMainMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
   pt: TPoint;
 begin
   pt := Types.Point(X,Y);
-  if not Panel1.ClientToBitmap(pt) then Exit;
+  pt := pnlMain.ClientToImage(pt);
   fClickPoint := pt;
 
   if (fTransformType = ttSpline) and (ssRight in Shift) then
@@ -321,18 +323,20 @@ begin
   if Assigned(buttonMovingLayer) then
   begin
     //while moving buttons temporarily disable panel zoom and scroll
-    panel1.ZoomAndScrollEnabled := false
+    pnlMain.AllowZoom := false;
+    pnlMain.AllowScroll := false;
   end
   else if PtInRect(transformLayer.Bounds, pt) then
   begin
     fImageIsClicked := true;
     //while moving the image temporarily disable panel zoom and scroll
-    panel1.ZoomAndScrollEnabled := false;
+    pnlMain.AllowZoom := false;
+    pnlMain.AllowScroll := false;
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.Panel1MouseMove(Sender: TObject; Shift: TShiftState; X,
+procedure TForm1.pnlMainMouseMove(Sender: TObject; Shift: TShiftState; X,
   Y: Integer);
 var
   dx, dy, btnBaseIndex, altGroupIdx: integer;
@@ -340,11 +344,11 @@ var
   layer: TLayer32;
 begin
   pt := Types.Point(X,Y);
-  if not Panel1.ClientToBitmap(pt) then Exit;
+  pt := pnlMain.ClientToImage(pt);
 
   if fImageIsClicked then
   begin
-    Panel1.Cursor := crSizeNESW;
+    pnlMain.Cursor := crSizeNESW;
     dx := pt.X - fClickPoint.X;
     dy := pt.Y - fClickPoint.Y;
     fClickPoint := pt;
@@ -358,16 +362,16 @@ begin
   begin
     layer := layeredImage32.GetLayerAt(pt);
     if Assigned(layer) and (layer is TButtonDesignerLayer32) then
-      Panel1.Cursor := crHandPoint
+      pnlMain.Cursor := crHandPoint
     else if PtInRect(transformLayer.Bounds, pt) then
       //nb: the 'designer' layer covers the 'transformed' layer
       //so if layer isn't a 'button' it'll be 'designer'
-      Panel1.Cursor := crSizeAll
+      pnlMain.Cursor := crSizeAll
     else
-      Panel1.Cursor := crDefault;
+      pnlMain.Cursor := crDefault;
   end else
   begin
-    Panel1.Cursor := crHandPoint;
+    pnlMain.Cursor := crHandPoint;
 
     //keep button controls axis aligned for appropriate transforms, otherwise
     //comment out below for an unrestricted skews (and change UpdateImage too)
@@ -394,13 +398,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.Panel1MouseUp(Sender: TObject; Button: TMouseButton;
+procedure TForm1.pnlMainMouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   fImageIsClicked := false;
   buttonMovingLayer := nil;
   //re-enable Panel1 zoom and scroll
-  Panel1.ZoomAndScrollEnabled := true;
+  pnlMain.AllowZoom := true;
 end;
 //------------------------------------------------------------------------------
 

@@ -3,7 +3,7 @@ program Photo;
 uses
   Forms,
   main in 'main.pas' {MainForm},
-  ZipEx in 'ZipEx.pas';
+  ZipEx in '..\ZipEx.pas';
 
 {$R *.res}
 

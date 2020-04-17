@@ -6,10 +6,23 @@ uses
   Windows, Messages, Types, SysUtils, Variants, Classes, Graphics,
   Controls, Forms, Dialogs, Menus, ComCtrls, ExtCtrls, Math,
   ActiveX, ShlObj, ShellApi, ZipEx, DialogsEx,
-  BitmapPanels, Image32, Image32_BMP, Image32_PNG, Image32_JPG, Image32_GIF,
+  ImagePanels, Image32, Image32_BMP, Image32_PNG, Image32_JPG, Image32_GIF,
   Image32_Layers, Image32_Draw, Image32_Text, Image32_Vector, IniFiles;
 
 type
+  TArrayOfArrayOfColor32 = array of TArrayOfColor32;
+
+  TThumbnail = record
+    pixels     : TArrayOfColor32;
+    width      : integer;
+    height     : integer;
+    filename   : string;
+    fileAge    : longInt;
+  end;
+  TThumbnails = array of TThumbnail;
+
+  TLoadState = (lsLoaded, lsLoading, lsLoadingRefresh);
+
   TMainForm = class(TForm)
     MainMenu1: TMainMenu;
     File1: TMenuItem;
@@ -22,23 +35,21 @@ type
     mnuSmallPreview: TMenuItem;
     Panel1: TPanel;
     StatusBar1: TStatusBar;
-    sbMain: TScrollBox;
     OpenDialog1: TOpenDialog;
-    pnlLargeOnMainForm: TPanel;
     Help1: TMenuItem;
-    About1: TMenuItem;
+    mnuAbout: TMenuItem;
     PopupMenu1: TPopupMenu;
-    mnuEditImage: TMenuItem;
+    mnuEdit: TMenuItem;
     mnuDelete: TMenuItem;
     mnuRename: TMenuItem;
     mnuSlideShowInterval: TMenuItem;
     N3: TMenuItem;
-    OpenFolderContainingtheImage1: TMenuItem;
+    mnuOpenImageFolder: TMenuItem;
     mnuFullScreen: TMenuItem;
     mnuLargePreview: TMenuItem;
     mnuLargeImage: TMenuItem;
     N4: TMenuItem;
-    mnuEdit: TMenuItem;
+    mnuMainEdit: TMenuItem;
     mnuTransition: TMenuItem;
     mnuFast: TMenuItem;
     mnuFadeOutThenIn: TMenuItem;
@@ -50,21 +61,16 @@ type
     mnuDelete2: TMenuItem;
     mnuRename2: TMenuItem;
     mnuBackgroundColor: TMenuItem;
-    ips1: TMenuItem;
+    mnuTips: TMenuItem;
+    tmrLoading: TTimer;
+    tmrSlideShow: TTimer;
     procedure mnuSlideShowClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure mnuOpenFolderClick(Sender: TObject);
     procedure mnuEscapeClick(Sender: TObject);
-    procedure ThumbnailKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
-    procedure sbMainMouseMove(Sender: TObject; Shift: TShiftState; X,
-      Y: Integer);
-    procedure sbMainMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
-    procedure sbMainMouseWheel(Sender: TObject; Shift: TShiftState;
-      WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
-    procedure About1Click(Sender: TObject);
-    procedure mnuEditImageClick(Sender: TObject);
+    procedure mnuAboutClick(Sender: TObject);
+    procedure mnuEditClick(Sender: TObject);
     procedure mnuRenameClick(Sender: TObject);
     procedure mnuDeleteClick(Sender: TObject);
     procedure mnuChangeDisplaySizeClick(Sender: TObject);
@@ -72,7 +78,7 @@ type
       const Rect: TRect);
     procedure mnuSlideShowIntervalClick(Sender: TObject);
     procedure FormResize(Sender: TObject);
-    procedure OpenFolderContainingtheImage1Click(Sender: TObject);
+    procedure mnuOpenImageFolderClick(Sender: TObject);
     procedure mnuFullScreenClick(Sender: TObject);
     procedure FullScreenMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
@@ -82,50 +88,45 @@ type
     procedure mnuShowLargeImageInMainformClick(Sender: TObject);
     procedure pnlLargeOnMainFormMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure mnuEditClick(Sender: TObject);
+    procedure mnuMainEditClick(Sender: TObject);
     procedure mnuBackgroundColorClick(Sender: TObject);
     procedure UpdateBackColors;
     procedure AppActivate(Sender: TObject);
-    procedure ips1Click(Sender: TObject);
+    procedure mnuTipsClick(Sender: TObject);
     procedure PopupMenu1Popup(Sender: TObject);
+    procedure tmrLoadingTimer(Sender: TObject);
+    procedure tmrSlideShowTimer(Sender: TObject);
   private
+    pnlThumb: TImagePanel;
+    pnlLarge: TBitmapPanel;
+    largeImg32: TImage32;
+    layeredImg: TLayeredImage32;
+
+    slideShowInterval: integer;
     isLoading: boolean;
     cancelLoading: boolean;
+    deletePrompt: Boolean;
     thumbnailSize: integer;
-    currLargeImg32: TImage32;
     currentIdx: integer;
     currentFolder: string;
-    currentYPos: integer;
-    thumbnails: TImageList32;
-    imageNames: TStringList;
-    layeredImg: TLayeredImage32;
-    slideShowTimer: TTimer;
-
-    deletePrompt: Boolean;
-    largeImagePanel: TPanel;
-    largeImageAngle: double;
-
-    procedure StartLargeImageView(largePanel: TPanel = nil);
+    currentLargePanel: TBitmapPanel; //nb: pointer only
+    currentLargeAngle: double;
+    procedure StartLargeImageView(largePanel: TBitmapPanel = nil);
     procedure EndLargeImageView;
     procedure ShowNextLargeImage;
     procedure ShowPrevLargeImage;
-    procedure LoadThumbnailsFromCurrentFolder;
-    procedure LoadThumbnailsFromImageFilenames;
-    procedure AddThumbnail(x,y, thumbSize: integer; img: TImage32);
-    procedure UpdateCurrentIdx(newIdx: integer = MaxInt);
+    procedure GetFilenamesFromFolder(const folder: string; names: TStringList);
+    procedure LoadThumbnails(const folder: string; names: TStringList);
+    procedure ResetThumbnailRows;
+    function BuildThumbnailRow(rowIdx, columnCount: integer): Boolean;
     procedure UpdateLargeView(fade: Boolean);
-    procedure PanelOnEnter(Sender: TObject);
+    procedure SetThumbnailFocus(idx: integer);
+    procedure ThumbnailKeyDown(Sender: TObject;
+      var Key: Word; Shift: TShiftState);
+    procedure ThumbnailClick(Sender: TObject);
     procedure ThumbnailDblClick(Sender: TObject);
     procedure LargeViewKeyDown(Sender: TObject;
       var Key: Word; Shift: TShiftState);
-    procedure ThumbnailMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
-    procedure ThumbnailMouseMove(Sender: TObject;
-      Shift: TShiftState; X, Y: Integer);
-    procedure VerticalScroll(dy: integer);
-    function CountColumns: integer;
-    function RepositionThumbnails: TSize;
-    procedure SlideShowOnTimer(Sender: TObject);
     procedure SlideShowPauseResume;
     procedure DeleteCheck(Sender: TObject; isChecked: Boolean);
     procedure LoadIniSettings;
@@ -141,25 +142,46 @@ type
     procedure ClearTextFromMenubar;
     procedure ColorChanging(Sender: TObject;
       const S: string; var IsValid: Boolean);
+    function GetColumnCount: integer;
+    procedure DrawThumbnails(Sender: TObject;
+      dstCanvas: TCanvas; const srcRec, dstRec: TRect);
   public
-    { Public declarations }
+    //an individual thumbnailRow is just the pixels for a 'row' image,
+    //that's made from all the thumbnails in that row (duh!).
+    thumbnailRows       : TArrayOfArrayOfColor32;
+    //individual thumbnailRows are only loaded when they're first needed as
+    //this dramatically speeds up the painting of folders with many images
+    thumbnailRowsState  : TArrayOfByte;
+    //Individual thumbnails are used to build thumbnailRows.
+    //These store images using the largest thumbnail resolution.
+    thumbnails          : TThumbnails;
+
+    displayWidth        : integer;
+    displayHeight       : integer;
+    loadState           : TLoadState;
+
+    maxPreviewSize      : integer;
+    midPreviewSize      : integer;
+    minPreviewSize      : integer;
+    backColor           : TColor;
   end;
 
 var
   MainForm            : TMainForm;
-  maxPreviewSize      : integer;
-  midPreviewSize      : integer;
-  minPreviewSize      : integer;
-  slideShowInterval   : cardinal = 5000;
-  backColor           : TColor   = clBtnFace;
 
 const
   focusedRectColor    : TColor   = $0000C0; //lighter maroon
   slideShowFadeInt    : cardinal = 75;
+  space               : integer = 5;
+  margin              : integer = 20;
 
 {$R *.dfm}
 
 implementation
+
+const
+  BUILD_COMPLETE    = 0;
+  BUILD_INCOMPLETE  = 1;
 
 resourcestring
   rsResumeSlideShow   = 'Resuming Slide Show';
@@ -171,9 +193,9 @@ resourcestring
   rsCheckDelete       = 'Are you sure you want to delete %s?';
   rsRenameFile        = 'Rename File';
   rsCancelLoad        = 'Image loading cancelled.';
-  rsStatusbar1        = '%s  (Dimensions: %1.0n x %1.0n; Size: %1.0n KB)';
-  rsStatusbar2        = '%s  (image %1.0n out of %1.0n)';
+  rsThumbProps        = '%s  (%1.0n x %1.0n pixels; file size: %1.0n KB)';
   rsOpenFolder        = 'Open Folder';
+  rsLoadingCnt        = 'Loading file %1.0n of %1.0n';
   rsLoadingFolder     = 'Loading folder ... ';
   rsBackColor         = 'Background Color';
   rsBackColor2        = 'Enter background color in hexidecimal (BBGGRR)';
@@ -185,7 +207,7 @@ resourcestring
     '(200'#$D7'200) ('#$1D405#$1D7D3'). By selecting a specific thumbnail ('#$23CE'), images '+
     'can be viewd individually, either within '+
     #$1D40F#$1D421#$1D428#$1D42D#$1D428'''s client window ('#$1D405#$1D7D5'), or '+
-    'filling the entire screen ('#$1D405#$1D7D7').'#10#10+
+    'filling the entire screen ('#$1D405#$1D7D6').'#10#10+
 
     'While viewing images individually, typing '#$1D7CF' will display the image in its '+
     'normal unscaled state, '#$1D7D0' will display  the image at twice it''s '+
@@ -194,7 +216,7 @@ resourcestring
     'size etc. Also while viewing images individually, Ctrl+'#129092' or Ctrl+'+
     #129094' will display either the previous or next image respectively.'#10#10+
 
-    'Images can also be viewed in a Slide Show ('#$1D405#$1D7D6') where '+
+    'Images can also be viewed in a Slide Show ('#$1D405#$1D7D7') where '+
     #$1D40F#$1D421#$1D428#$1D42D#$1D428' will cycle through all the images '+
     'in the folder. Via the Edit menu, the speed of the slide show can be '+
     'adjusted, and also the type of transition that''s used between images.'#10#10+
@@ -406,55 +428,76 @@ begin
   end;
   Result := false;
 end;
+
 //------------------------------------------------------------------------------
 
-function GetControlIndex(ctrl: TControl): integer;
+
+function PointToStr(const pt: TPointD): string;
 begin
-  if ctrl is TPanel then
-  begin
-    result := 0;
-    while ctrl.Parent.Controls[result] <> ctrl do inc(Result);
-  end else
-    result := -1;
+  if (Round(pt.X * 10) mod 10 <> 0) or (Round(pt.Y * 10) mod 10 <> 0) then
+    result := format('%1.1f,%1.1f',[pt.X, pt.Y]) else
+    result := format('%1.0f,%1.0f',[pt.X, pt.Y]);
+end;
+//------------------------------------------------------------------------------
+
+function PathToStr(const Path: TPathD): string;
+var
+  i: integer;
+begin
+  result := '';
+  for i := 0 to high(Path) do
+    result := result + PointToStr(path[i])+ #13#10;
 end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
-  sbMain.Align := alClient;
-  pnlLargeOnMainForm.Align := alClient;
-  pnlLargeOnMainForm.TabStop := true;
-  pnlLargeOnMainForm.Left := 0; pnlLargeOnMainForm.Top := 0;
-  pnlLargeOnMainForm.BorderWidth := DPI(18);
-  pnlLargeOnMainForm.FocusedColor := backColor;
-  pnlLargeOnMainForm.OnKeyDown := LargeViewKeyDown;
-  pnlLargeOnMainForm.CopyPasteEnabled := true;
-  pnlLargeOnMainForm.Bitmap.PixelFormat := pf24bit;
-  largeImagePanel := pnlLargeOnMainForm;
-
-  StatusBar1.Canvas.Font.Assign(font);
-
+  backColor := clBtnFace;
   maxPreviewSize := DPI(200);
   midPreviewSize := DPI(150);
   minPreviewSize := DPI(100);
   thumbnailSize := midPreviewSize;
   currentIdx := -1;
   deletePrompt := true;
+  loadState := lsLoaded;
 
-  thumbnails := TImageList32.Create;
-  imageNames := TStringList.Create;
+  pnlThumb := TImagePanel.Create(self);
+  pnlThumb.Parent := self;
+  pnlThumb.Color := clBlack;
+  pnlThumb.Align := alClient;
+  pnlThumb.OnDrawImage := DrawThumbnails;
+  pnlThumb.AllowZoom := false;
+  pnlThumb.AutoCenter := false;
+  pnlThumb.OnKeyDown := ThumbnailKeyDown;
+  pnlThumb.OnClick := ThumbnailClick;
+  pnlThumb.OnDblClick := ThumbnailDblClick;
+  pnlThumb.PopupMenu := PopupMenu1;
+
+  pnlLarge := TBitmapPanel.Create(self);
+  pnlLarge.Parent := self;
+  pnlLarge.Visible := false;
+  pnlLarge.BevelOuter := bvNone;
+  pnlLarge.BevelInner := bvNone;
+  pnlLarge.BorderWidth := 0;
+  pnlLarge.Align := alClient;
+  pnlLarge.PopupMenu := PopupMenu1;
+  pnlLarge.OnMouseUp := pnlLargeOnMainFormMouseUp;
+
+  pnlLarge.Left := 0; pnlLarge.Top := 0;
+  pnlLarge.FocusedColor := backColor;
+  pnlLarge.OnKeyDown := LargeViewKeyDown;
+  currentLargePanel := pnlLarge;
+
+  StatusBar1.Canvas.Font.Assign(font);
+
   layeredImg := TLayeredImage32.Create;
-  currLargeImg32 := TImage32.Create;
-
-  slideShowTimer := TTimer.Create(nil);
-  slideShowTimer.Interval := slideShowInterval;
-  slideShowTimer.OnTimer := SlideShowOnTimer;
-  slideShowTimer.Enabled := false;
-
+  largeImg32 := TImage32.Create;
+  slideShowInterval := tmrSlideShow.Interval;
   Application.OnActivate := AppActivate;
 
-  currentFolder := GetFolderPath(handle, CSIDL_MYPICTURES, SHGFP_TYPE_CURRENT);
+  currentFolder :=
+    AppendSlash(GetFolderPath(handle, CSIDL_MYPICTURES, SHGFP_TYPE_CURRENT));
   LoadIniSettings;
   UpdateBackColors;
 end;
@@ -462,10 +505,7 @@ end;
 
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
-  currLargeImg32.Free;
-  slideShowTimer.Free;
-  imageNames.Free;
-  thumbnails.Free;
+  largeImg32.Free;
   layeredImg.Free;
 end;
 //------------------------------------------------------------------------------
@@ -480,12 +520,8 @@ end;
 
 procedure TMainForm.AppActivate(Sender: TObject);
 begin
-  if pnlLargeOnMainForm.Visible then
-    pnlLargeOnMainForm.SetFocus
-  else if (currentIdx >= 0) and (currentIdx < sbMain.ControlCount) then
-    TPanel(sbMain.Controls[currentIdx]).SetFocus
-  else if sbMain.CanFocus then
-    sbMain.SetFocus;
+  if pnlLarge.Visible then pnlLarge.SetFocus
+  else pnlThumb.SetFocus;
 end;
 //------------------------------------------------------------------------------
 
@@ -620,141 +656,124 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.LoadThumbnailsFromCurrentFolder;
+procedure TMainForm.GetFilenamesFromFolder(const folder: string; names: TStringList);
 var
-  i: integer;
   searchRes: integer;
   sr: TSearchRec;
-  slashedPath, ext: string;
+  ext: string;
   fileTime: integer;
 begin
-  slashedPath := AppendSlash(currentFolder);
-  caption := application.Title + ' - ' + currentFolder;
-  StatusBar1.Panels[0].Text := ' ' +rsLoadingFolder;
-  cancelLoading := false;
-  thumbnails.Clear;
-  imageNames.Clear;
-  //and clear thumbnail panels too
-  sbMain.Hide;
-  for i := sbMain.ControlCount -1 downto 0 do sbMain.Controls[i].Free;
-  sbMain.Show;
-  Application.ProcessMessages;
-
   isLoading := true;
   Screen.Cursor := crHourGlass;
   try
     //get the names and lastwrite times of all registered images
     //(bmp, jpg, png & gif) found in the selected folder
-    searchRes := FindFirst(slashedPath + '*.*', faAnyFile, sr);
+    searchRes := FindFirst(folder + '*.*', faAnyFile, sr);
     while searchRes = 0 do
     begin
       ext := ExtractFileExt(sr.Name);
       if TImage32.IsRegisteredFormat(ext) then
       begin
         filetime := FileTimeToDosTime(sr.FindData.ftLastWriteTime);
-        imageNames.AddObject(slashedPath + sr.Name, Pointer(fileTime));
-        thumbnails.Add(nil);
+        names.AddObject(sr.Name, Pointer(fileTime));
       end;
       searchRes := FindNext(sr);
     end;
     FindClose(sr);
 
-    currentIdx := -1;
-    /////////////////////////////////
-    LoadThumbnailsFromImageFilenames;
-    /////////////////////////////////
-    if (sbMain.ControlCount > 0) and (currentIdx = -1) then
-      TPanel(sbMain.Controls[0]).SetFocus;
-    if FileExists(slashedPath + 'photo.bak') then
-      DeleteFile(slashedPath + 'photo.bak');
   finally
     Screen.Cursor := crDefault;
     isLoading := false;
-    if (sbMain.ControlCount = 0) then StatusBar1.Panels[0].Text := '';
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.LoadThumbnailsFromImageFilenames;
+function TMainForm.GetColumnCount: integer;
 var
-  i,j,k,  w,h,t, x,y, cw, thumbSize: integer;
-  folder, filename: string;
-  img: TImage32;
+  thumbSizePlus: Integer;
+begin
+  thumbSizePlus := thumbnailSize + space;
+  result := Max(1, (displayWidth - margin *2) div thumbSizePlus);
+end;
+//------------------------------------------------------------------------------
 
+procedure TMainForm.LoadThumbnails(const folder: string; names: TStringList);
+var
+  i, k, count, imageSize: integer;
+  img: TImage32;
   zip: TZipFileEx;
   data: ZipEx.TArrayOfByte;
   dosTime: integer;
+const
+  FILE_FOUND_IN_FOLDER = 1;
 begin
-  if imageNames.Count = 0 then Exit;
-  folder := AppendSlash(currentFolder);
+  count := names.Count;
+  if count = 0 then Exit;
+  SetLength(thumbnails, names.Count);
 
+  img := TImage32.Create;
   zip := TZipFileEx.Create;
   try
     zip.LoadFromFile(folder + 'photo.bin');
 
-    //Large thumbnail images will be stored in zip files in the same folder
-    //as the images as this dramatically speeds up subsequent folder previews.
-    //So if we've previewed this folder previously, load thumbnails from the
-    //zip file 'photo.bin', adding new images and replacing modified ones.
+    //Large thumbnail images will be stored in 'photo.bin', a zip file
+    //that's saved to any folder that's opened by this application. Storing
+    //thumbnails there dramatically speeds up subsequent folder previews.
+    //So if this folder has a 'photo.bin' file , load any thumbnails that still
+    //match the folder's file age and file size, and replace any updated files
 
-    currentIdx := -1;
-    x := 0; y := 0;
-    cw := sbMain.ClientWidth; thumbSize := thumbnailSize;
-    for i := 0 to imageNames.Count -1 do
+    for i := 0 to count -1 do
     begin
       Application.ProcessMessages;
-      if cancelLoading then
+      if cancelLoading then Exit;
+
+      if (i mod 10 = 0) then
+        StatusBar1.Panels[0].Text := format(rsLoadingCnt, [i/1, count/1]);
+
+      thumbnails[i].pixels := nil;
+      thumbnails[i].filename := names[i];
+      dosTime := LongInt(names.Objects[i]);
+
+      k := zip.GetEntryIndex(names[i]);
+      if k >= 0 then //found a thumbnail in zip with matching name
       begin
-        if sbMain.ControlCount > 0 then
-        begin
-          if currentIdx < 0 then currentIdx := 0;
-          TPanel(sbMain.Controls[currentIdx]).SetFocus;
-        end;
-        Exit;
-      end
-      else if (currentIdx < 0) and (sbMain.ControlCount > 0) then
-        TPanel(sbMain.Controls[0]).SetFocus
-      else if (i mod 20 = 0) then
-        StatusBar1.Panels[0].Text := ' ' +rsLoadingFolder;
-
-
-      filename := ExtractFilename(imageNames[i]);
-      dosTime := LongInt(imageNames.Objects[i]);
-
-      img := TImage32.Create;
-
-      j := zip.GetEntryIndex(filename);
-      if j >= 0 then //found a thumbnail in zip with matching name
-      begin
-        zip.ExtractEntry(j, data);
-        zip[j].cfh.CRC32 := 1; //reuse CRC32 to flag as in folder
-
-        //thumbnails are stored in the following format:
+        //copy the zip entry into 'data'
+        zip.ExtractEntry(k, data);
+        //When TZipFileEx loads files, any useful data in the CENTRAL file
+        //header (CFH) is copied to the LOCAL file header (LFH). After that,
+        //CFH is ignored (and over-written with LFH info when saving).
+        //So it's perfectly safe to use CFH for temporary storage here.
+        zip[k].cfh.CRC32 := FILE_FOUND_IN_FOLDER;
+        //thumbnail 'data' is stored in the following format:
         //width (4); height (4); fileage (4); 32bit thumbnail image
         if length(data) > 12 then
-        begin
-          w := PInteger(@data[0])^;
-          h := PInteger(@data[4])^;
-          t := PInteger(@data[8])^;
-          //load the zipped thumbnail only if height, width & fileage all match
-          if (w <= maxPreviewSize) and (h <= maxPreviewSize) and
-            ((w = maxPreviewSize) or (h = maxPreviewSize)) and
-            (t = dosTime) then
+          with thumbnails[i] do
           begin
-            img.SetSize(w, h);
-            Move(data[12], img.PixelBase^, Length(data) - 12);
+            width := PInteger(@data[0])^;
+            height := PInteger(@data[4])^;
+            fileAge := PInteger(@data[8])^;
+            //only when height, width & fileage match, load the thumbnail
+            if (width <= maxPreviewSize) and (height <= maxPreviewSize) and
+              ((Width = maxPreviewSize) or (height = maxPreviewSize)) and
+              (fileAge = dosTime) then
+            begin
+              SetLength(pixels, width * height);
+              Move(data[12], pixels[0], Length(data) - 12);
+            end;
           end;
-        end;
+          data := nil;
       end;
 
-      if img.IsEmpty then
+      if Length(thumbnails[i].pixels) = 0 then
       begin
-        //no match found ...
-        //either no thumbnail was found in the zip or it needs updating, so
-        //load the full sized image and scale it to the largest preview size
+        //To get here, no match was found in the zip file. Either it didn't
+        //exist or it needs updating. So load and scale the image to largest
+        //thumbnail size and store that in thumbnails[i].pixels and also
+        //update the zip entry with 'data' (ie header info plus pixels).
         try
-          img.LoadFromFile(imageNames[i]);
+          img.LoadFromFile(folder + names[i]);
         except
+          img.SetSize(0,0);
         end;
 
         if not img.IsEmpty then
@@ -762,156 +781,271 @@ begin
           if img.Width >= img.Height then
             img.Scale(maxPreviewSize/img.Width) else
             img.Scale(maxPreviewSize/img.Height);
+          imageSize := img.Width * img.Height * sizeOf(TColor32);
+          //copy the image's height, width, file age and thumbnail
+          //image to 'data' ready to save in the zip file
+          SetLength(data, imageSize + 12);
+          Move(img.PixelBase^, data[12], imageSize);
+          //and copy image to thumbnails array too
+          SetLength(thumbnails[i].pixels, img.Width * img.Height);
+          Move(img.PixelBase^, thumbnails[i].pixels[0], imageSize);
+        end else
+        begin
+          SetLength(data, 12);
         end;
-        //get ready to store the image's height, width, file age and
-        //thumbnail image into the zip (photo.bin)
-        k := img.Width * img.Height * sizeOf(TColor32);
-        SetLength(data, k + 12);
         Move(img.Width, data[0], 4);
         Move(img.Height, data[4], 4);
         Move(dosTime, data[8], 4);
-        if k > 0 then
-          Move(img.PixelBase^, data[12], k);
-        j := zip.AddEntry(filename, data,
+        with thumbnails[i] do
+        begin
+          width := img.Width;
+          height := img.Height;
+          fileAge := dosTime;
+        end;
+        //copy 'data' to a new (or updated) zip entry
+        k := zip.AddEntry(thumbnails[i].filename, data,
           dupOverwrite, DosTimeToFileTime(dosTime));
-        zip[j].cfh.CRC32 := 1; //reuse CRC32 to flag as in folder
+        zip[k].cfh.CRC32 := FILE_FOUND_IN_FOLDER;
         data := nil;
       end;
-
-      //add the thumbnail image to the 'images' list, and add 'data' to the zip
-      thumbnails[i] := img;
-
-      //add the thumbnail image to a new TPanel container
-      if x + thumbSize >= cw then
-      begin
-        x := 0;
-        inc(y, thumbSize);
-      end;
-      AddThumbnail(x, y, thumbSize, img);
-      inc(x, thumbSize);
+      loadState := lsLoadingRefresh; //see tmrLoadingTimer event
     end;
 
     //remove files from zip that haven't been flagged as "in folder"
-    //nb: cfh.CRC32 will be updated in SaveZipStructure() below
-    for j := zip.Count -1 downto 0 do
-      if zip[j].cfh.CRC32 <> 1 then zip.DeleteEntry(j);
+    for k := zip.Count -1 downto 0 do
+      if zip[k].cfh.CRC32 <> FILE_FOUND_IN_FOLDER then
+        zip.DeleteEntry(k);
 
+    //finally save the modified zip file
     zip.SaveToFile(folder + 'photo.bin');
   finally
     zip.Free;
+    img.Free;
   end;
-
-  isLoading := false;
-  if (cw <> sbMain.ClientWidth) or (thumbSize <> thumbnailSize) then
-    RepositionThumbnails;
-
-  if (currentIdx >= 0) and (currentIdx < sbMain.ControlCount) then
-    PanelOnEnter(sbMain.Controls[currentIdx]);
+  pnlThumb.Invalidate;
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.AddThumbnail(x,y, thumbSize: integer; img: TImage32);
+procedure TMainForm.ResetThumbnailRows;
 var
-  pnl: TPanel;
+  i, cnt, colCnt, rowCnt, thumbSizePlus: integer;
 begin
-  pnl := TPanel.Create(self);
-  pnl.Visible := false;
-  pnl.Color := backColor;
-  pnl.ParentBackground := false;
-  pnl.Parent := sbMain;
-  pnl.OnEnter := PanelOnEnter;
-  pnl.OnDblClick := ThumbnailDblClick;
-  pnl.OnMouseDown := ThumbnailMouseDown;
-  pnl.OnMouseMove := ThumbnailMouseMove;
-  pnl.OnKeyDown := ThumbnailKeyDown;
-  pnl.BevelOuter := bvNone;
-  pnl.BorderWidth := 5;
-  pnl.Left := x;
-  pnl.Top := y - sbMain.VertScrollBar.Position;
-  pnl.Width := thumbSize;
-  pnl.Height := thumbSize;
-  pnl.Bitmap.PixelFormat := pf32bit;
-  pnl.Bitmap.SetSize(img.Width, img.Height);
-  pnl.ZoomAndScrollEnabled := false;
-  pnl.FocusedColor := focusedRectColor;
-  pnl.PopupMenu := PopupMenu1;
-  pnl.TabStop := true;
-  if not DoesContrastWithBackColor(img, backColor) then
+  pnlThumb.Invalidate;
+  currentIdx := -1;
+  thumbnailRows := nil; //forces clear
+  thumbnailRowsState := nil;
+  cnt := length(thumbnails);
+  if cnt = 0 then Exit;
+
+  //get thumbnail row and column counts
+  thumbSizePlus := thumbnailSize + space;
+  colCnt := GetColumnCount;
+  rowCnt := cnt div colCnt;
+  if cnt mod colCnt > 0 then inc(rowCnt);
+
+  //define the 'ImageSize' for the  virtual image of all thumbnails
+  pnlThumb.ImageSize := Size(displayWidth,
+    (rowCnt * thumbSizePlus) + margin * 2 - space);
+
+  //initialize thumbnailRows
+  cnt := displayWidth * thumbnailSize;
+  SetLength(thumbnailRows, rowCnt);
+  SetLength(thumbnailRowsState, rowCnt);
+  for i := 0 to rowCnt -1 do
   begin
-    if GetLuminance(backColor) < $80 then
-      img.SetRGB(clWhite32) else
-      img.SetRGB(clBlack32);
+    SetLength(thumbnailRows[i], cnt);
+    thumbnailRowsState[i] := BUILD_INCOMPLETE;
   end;
-  img.CopyToDc(pnl.Bitmap.Canvas.Handle, 0,0, false);
-  pnl.Visible := true;
+end;
+//------------------------------------------------------------------------------
+
+function TMainForm.BuildThumbnailRow(rowIdx, columnCount: integer): Boolean;
+var
+  i, left, x, cnt: integer;
+  startIdx, endIdx: integer;
+  thumbSizePlus, rowImageSize: integer;
+  tmpThumbImg, tmpRowImg: TImage32;
+  rec: TRect;
+begin
+  Result := true;
+  //get thumbnail row and column counts and init thumbnailRows
+  cnt := Length(thumbnails);
+  thumbSizePlus := thumbnailSize + space;
+
+  //create a temp image to display all resized thumb images in a row
+  tmpRowImg := TImage32.Create(displayWidth, thumbnailSize);
+  try
+    rowImageSize := Length(tmpRowImg.Pixels) * SizeOf(TColor32);
+
+    //create a temp thumb image that'll resize to the right size
+    tmpThumbImg := TImage32.Create;
+    try
+      x := 0;
+      //for each thumb image in thumbnails, resize it (if necessary)
+      //and copying the result onto the row image
+      startIdx := rowIdx * columnCount;
+      endIdx := Min(cnt -1, startIdx + columnCount -1);
+      for i := startIdx to endIdx do
+        with thumbnails[i] do
+        begin
+          if pixels = nil then
+          begin
+            Result := false; //ie this thumbnail row must still be loading
+            Break;
+          end;
+
+          //resize and center the thumbnail using tmpThumbImg
+          //and then copy it to tmpRowImg
+
+          left := x * thumbSizePlus + margin;
+          rec := types.Rect(left, 0, left + thumbnailSize, thumbnailSize);
+
+          tmpThumbImg.SetSize(width, height);
+          Move(pixels[0],
+            tmpThumbImg.Pixels[0], Length(pixels) * SizeOf(TColor32));
+
+          if not DoesContrastWithBackColor(tmpThumbImg, backColor) then
+            tmpThumbImg.InvertColors;
+
+          tmpThumbImg.ScaleToFitCentered(thumbnailSize, thumbnailSize);
+          tmpRowImg.Copy(tmpThumbImg, tmpThumbImg.Bounds, rec);
+          inc(x);
+        end;
+
+      //finally copy tmpRowImg.pixels to the current thumbnailRow
+      if x > 0 then
+        Move(tmpRowImg.Pixels[0], thumbnailRows[rowIdx][0], rowImageSize);
+
+      if Result then thumbnailRowsState[rowIdx] := BUILD_COMPLETE;
+    finally
+      tmpThumbImg.Free;
+    end;
+  finally
+    tmpRowImg.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.DrawThumbnails(Sender: TObject;
+  dstCanvas: TCanvas; const srcRec, dstRec: TRect);
+var
+  i, thumbSizePlus, colCnt: integer;
+  dstImg, rowImg: TImage32;
+  rec: TRect;
+  buildComplete: Boolean;
+
+  function ThumbnailPos(idx: integer): TPoint;
+  begin
+    Result.X := (idx mod colCnt) * (thumbnailSize + space) +margin;
+    Result.Y := (idx div colCnt) * (thumbnailSize + space) +margin -srcRec.Top;
+  end;
+
+begin
+  thumbSizePlus := thumbnailSize + space;
+  colCnt := GetColumnCount;
+
+  buildComplete := true;
+  dstCanvas.Brush.Color := clBlack;
+  dstCanvas.FillRect(dstRec);
+  //dstImg - image to finally draw onto the destination canvas
+  dstImg := TImage32.Create(dstRec.Width, dstRec.Height);
+  //rowImg - intermediate image, gets each thumbnailRow and draws it to dstImg
+  rowImg := TImage32.Create(displayWidth, thumbnailSize);
+  try
+    for i := srcRec.Top div thumbSizePlus to High(thumbnailRows) do
+    begin
+      if (i * thumbSizePlus) - srcRec.Top >= dstRec.Bottom then Break;
+      if thumbnailRowsState[i] = BUILD_INCOMPLETE then
+        buildComplete := BuildThumbnailRow(i, colCnt);
+      Move(thumbnailRows[i][0], rowImg.PixelBase^,
+        Length(thumbnailRows[i]) * SizeOf(TColor32));
+      rec := rowImg.Bounds;
+      OffsetRect(rec, 0, (i * thumbSizePlus) - srcRec.Top + margin);
+      dstImg.Copy(rowImg, rowImg.Bounds, rec);
+      if not buildComplete then Break;
+    end;
+    if currentIdx >= 0 then
+    begin
+      rec.TopLeft := ThumbnailPos(currentIdx);
+      rec.BottomRight := Point(rec.Left +thumbnailSize, rec.Top +thumbnailSize);
+      InflateRect(rec, 2, 2);
+      DrawLine(dstImg, Rectangle(rec), 4, clRed32, esClosed);
+    end;
+    //dstImg finally draws to dstCanvas
+    dstImg.CopyToDc(dstCanvas.Handle, dstRec.Left, dstRec.Top);
+  finally
+    dstImg.Free;
+    rowImg.Free;
+  end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuOpenFolderClick(Sender: TObject);
+var
+  names: TStringList;
 begin
-  if not GetFolder(self, rsOpenFolder, false, currentFolder) then
+  if loadState <> lsLoaded then
+  begin
+    cancelLoading := true;
     Exit;
-  cancelLoading := true;
-  Application.ProcessMessages;
-  EndLargeImageView;
-  LoadThumbnailsFromCurrentFolder;
-end;
-//------------------------------------------------------------------------------
-
-function TMainForm.CountColumns: integer;
-var
-  w: integer;
-begin
-  //returns the number of columns that'll fit inside the scrollbox container
-  result := 1;
-  w := thumbnailSize *2;
-  while w < sbMain.ClientWidth do
-  begin
-    inc(result);
-    inc(w, thumbnailSize);
   end;
-end;
-//------------------------------------------------------------------------------
 
-function TMainForm.RepositionThumbnails: TSize;
-var
-  i,w: integer;
-begin
-  Result.cx := 0;
-  Result.cy := 0;
-  if isLoading then Exit;
-  // reposition the thumbnail images inside the scrollbox.
-  sbMain.VertScrollBar.Position := 0;
-  w := sbMain.ClientWidth;
-  for i := 0 to sbMain.ControlCount -1 do
-  begin
-    if Result.cx + sbMain.Controls[i].Width >= w then
-    begin
-      Result.cx := 0;
-      inc(Result.cy, sbMain.Controls[i].Height);
-    end;
-    sbMain.Controls[i].Left := Result.cx;
-    inc(Result.cx, sbMain.Controls[i].Width);
-    sbMain.Controls[i].Top := Result.cy;
+  if not GetFolder(self, rsOpenFolder, false, currentFolder) then Exit;
+
+  if currentLargePanel.Visible then
+    EndLargeImageView;
+  caption := application.Title + ' - ' + currentFolder;
+  currentFolder := AppendSlash(currentFolder);
+  StatusBar1.Panels[0].Text := ' ' +rsLoadingFolder;
+
+  //start current loading
+  thumbnails := nil;
+  pnlThumb.ResetImage;
+  currentIdx := -1;
+
+  cancelLoading := false;
+  names := TStringList.Create;
+  try
+    GetFilenamesFromFolder(currentFolder, names);
+    SetLength(thumbnails, names.Count);
+
+    //ResetThumbnailRows must be done after we set the length
+    //of thumbnails so we can assign pnlThumb's ImageSize.
+    ResetThumbnailRows;
+
+    //when a folder is opened for the first time, the images need to be
+    //converted to large thumbnail size both to store in zip format (which
+    //dramatically speeds up any future folder viewing) and also to store in
+    //the 'thumbnails' array for current viewing. This can take a while,
+    //especially when the images are very large. So we don't have to wait
+    //for this to finish, tmrLoading will check thumbnailRows every second
+    //and refresh pnlThumb when any thumbnailRows have been updated.
+    tmrLoading.Enabled := true;
+    loadState := lsLoading;
+    LoadThumbnails(currentFolder, names);
+  finally
+    loadState := lsLoaded;
+    names.Free;
   end;
+
+  if (Length(thumbnails) > 0) and (currentIdx < 0) then
+    SetThumbnailFocus(0);
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.StartLargeImageView(largePanel: TPanel);
+procedure TMainForm.StartLargeImageView(largePanel: TBitmapPanel);
 begin
   if assigned(largePanel) then
-    largeImagePanel := largePanel;
+    currentLargePanel := largePanel;
 
   if mnuSlideShow.Checked then
-    with largeImagePanel.InnerClientRect do
-      largeImagePanel.Bitmap.SetSize(Width, Height);
-  largeImagePanel.ScaleType := stFit;
-  largeImagePanel.Visible:= true;
-  largeImageAngle := 0;
+    currentLargePanel.Bitmap.SetSize(displayWidth, displayHeight);
+  currentLargePanel.Visible:= true;
+  currentLargeAngle := 0;
 
-  currLargeImg32.Resize(0,0);
+  largeImg32.Resize(0,0);
   layeredImg.Clear;
-  largeImageAngle := 0;
+  currentLargeAngle := 0;
   UpdateLargeView(false);
 end;
 //------------------------------------------------------------------------------
@@ -919,24 +1053,23 @@ end;
 procedure TMainForm.EndLargeImageView;
 begin
   mnuSlideShow.Checked := false;
-  slideShowTimer.Enabled := false;
   ClearTextFromMenubar;
-  pnlLargeOnMainForm.Visible := false;
-  largeImagePanel.Visible := false;
-  largeImagePanel := pnlLargeOnMainForm;
+  pnlLarge.Visible := false;
+  currentLargePanel := pnlLarge;
   layeredImg.Clear;
-  currLargeImg32.SetSize(0,0);
-  if sbMain.CanFocus and (currentIdx >= 0) then
-    TPanel(sbMain.Controls[currentIdx]).SetFocus;
+  largeImg32.SetSize(0,0);
+  if pnlThumb.CanFocus then pnlThumb.SetFocus;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.ShowNextLargeImage;
 begin
-  inc(currentIdx);
-  if currentIdx >= imageNames.Count then currentIdx := 0;
-  largeImageAngle := 0;
-  currLargeImg32.SetSize(0,0);
+
+  if currentIdx >= High(thumbnails) then
+    SetThumbnailFocus(0) else
+    SetThumbnailFocus(currentIdx +1);
+  currentLargeAngle := 0;
+  largeImg32.SetSize(0,0);
   UpdateLargeView(mnuSlideShow.Checked);
 end;
 //------------------------------------------------------------------------------
@@ -944,9 +1077,9 @@ end;
 procedure TMainForm.ShowPrevLargeImage;
 begin
   dec(currentIdx);
-  if currentIdx < 0 then currentIdx := imageNames.Count -1;
-  largeImageAngle := 0;
-  currLargeImg32.SetSize(0,0);
+  if currentIdx < 0 then currentIdx := High(thumbnails);
+  currentLargeAngle := 0;
+  largeImg32.SetSize(0,0);
   UpdateLargeView(mnuSlideShow.Checked);
 end;
 //------------------------------------------------------------------------------
@@ -955,24 +1088,235 @@ procedure TMainForm.FormResize(Sender: TObject);
 var
   rec: TRect;
 begin
-  RepositionThumbnails;
-  StatusBar1.Panels[0].Width := StatusBar1.ClientWidth;
-  if pnlLargeOnMainForm.Visible then
+  if (csDestroying in ComponentState) then Exit;
+
+  with pnlThumb.InnerClientRect do
   begin
-    rec := pnlLargeOnMainForm.InnerClientRect;
+    displayWidth := Right - Left;
+    displayHeight := Bottom - Top;
+  end;
+  pnlThumb.ImageSize := ImagePanels.Size(displayWidth, displayHeight);
+
+  ResetThumbnailRows;
+  StatusBar1.Panels[0].Width := StatusBar1.ClientWidth;
+  if pnlLarge.Visible then
+  begin
+    rec := pnlLarge.InnerClientRect;
     layeredImg.SetSize(rec.Width, rec.Height);
-    pnlLargeOnMainForm.Bitmap.Width := rec.Width;
-    pnlLargeOnMainForm.Bitmap.Height := rec.Height;
+    pnlLarge.Bitmap.Width := rec.Width;
+    pnlLarge.Bitmap.Height := rec.Height;
     UpdateLargeView(false);
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.SlideShowOnTimer(Sender: TObject);
+procedure TMainForm.SlideShowPauseResume;
+var
+  w,h: integer;
+  layer: TLayer32;
+  lf: TLogFont;
+  text: string;
+  pt: TPointD;
+  pp: TArrayOfArrayOfPointD;
 begin
-  if not largeImagePanel.Visible then
+  if layeredImg.Count = 0 then Exit;
+  //if there's already a message layer then delete it!
+  with layeredImg do
+    if TopLayer is TDesignerLayer32 then DeleteLayer(TopLayer.Index);
+
+  with currentLargePanel.InnerClientRect do
   begin
-    slideShowTimer.Enabled := false;
+    w := Width; h := Height;
+  end;
+  currentLargePanel.ScaleToFit;
+
+  if layeredImg.Count > 1 then
+  begin
+    //if pausing during a transition then finish it
+    layeredImg.DeleteLayer(0);
+    layeredImg[0].Opacity := 255;
+  end;
+
+  //When in a slide show, layeredImg will be the same size as largeImagePanel's
+  //InnerClientRect, and each layer scaled to fit. When not in a slide show,
+  //layeredImg will be made the same size as it's 'large' image and this will be
+  //scaled by largeImagePanel so layeredImg fits inside InnerClientRect.
+
+  if mnuSlideShow.Checked and
+    ((layeredImg.Width <> w) or (layeredImg.Height <> h)) then
+  begin
+    layeredImg.SetSize(w, h);
+    layeredImg[0].Image.Assign(largeImg32);
+    layeredImg[0].Image.ScaleToFit(w, h);
+    layeredImg[0].PositionCenteredAt(Point(w div 2, h div 2));
+  end;
+
+  layer := layeredImg.AddLayer(TDesignerLayer32);
+  layer.SetSize(w, h);
+  lf := DefaultLogfont;
+  lf.lfHeight := -DPI(15);
+  if mnuSlideShow.Checked then
+    text := rsResumeSlideShow else
+    text := rsPauseSlideShow;
+  pp := GetTextOutline(layer.Width - 14, -lf.lfHeight +10,
+    text, GetFontInfo(lf), taRight, pt);
+  //fill behind text ...
+  DrawLine(layer.Image, pp, 6, Color32(backColor), esClosed);
+  //draw text ...
+  if GetLuminance(backColor) < $80 then
+    DrawPolygon(layer.Image, pp, frEvenOdd, clWhite32) else
+    DrawPolygon(layer.Image, pp, frEvenOdd, clBlack32);
+
+  tmrSlideShow.Interval := slideShowInterval div 2;
+  tmrSlideShow.Enabled := true;
+
+  currentLargePanel.Bitmap.SetSize(w,h);
+  layeredImg.GetMergedImage.CopyToDc(
+    currentLargePanel.Bitmap.Canvas.Handle, 0,0, false);
+  currentLargePanel.Repaint;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.mnuTransitionClick(Sender: TObject);
+begin
+  TMenuItem(Sender).Checked := true;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.mnuSlideShowClick(Sender: TObject);
+begin
+  mnuSlideShow.Checked := not mnuSlideShow.Checked;
+  ClearTextFromMenubar;
+  tmrSlideShow.Enabled := mnuSlideShow.Checked;
+  if currentLargePanel.Visible then
+    SlideShowPauseResume else
+    StartLargeImageView;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.mnuChangeDisplaySizeClick(Sender: TObject);
+begin
+  if isLoading then begin Beep; Exit; end;
+
+  //either small, medium or large preview, or large image ...
+  TMenuItem(Sender).Checked := true;
+
+  if Sender = mnuLargePreview then
+    thumbnailSize := maxPreviewSize
+  else if Sender = mnuMediumPreview then
+    thumbnailSize := midPreviewSize
+  else
+    thumbnailSize := minPreviewSize;
+
+  ResetThumbnailRows;
+  pnlThumb.Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.mnuShowLargeImageInMainformClick(Sender: TObject);
+begin
+  if (currentIdx < 0) then begin Beep; Exit; end;
+  if mnuFullScreen.Checked then
+    mnuFullScreenClick(nil) else
+    StartLargeImageView(pnlLarge);
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.UpdateLargeView(fade: Boolean);
+var
+  w,h: integer;
+  layer: TLayer32;
+  rec: TRect;
+  filename: string;
+begin
+  if Length(thumbnails) = 0 then Exit;
+  fade := fade and tmrSlideShow.Enabled and not mnuFast.Checked;
+
+  //To manage fading from one image to another, we use a LayeredImage32 object.
+  //When a new image (layer) is added, it's placed on top of the current image.
+  //Initially the new image is fully transparent, and it's made progressively
+  //more opaque until fully opaque at which time the bottom image is removed.
+
+  if fade then
+  begin
+    if (layeredImg.Count = 2) then layeredImg.DeleteLayer(0);
+  end else
+  begin
+    layeredImg.Clear;
+    tmrSlideShow.Interval := SlideShowInterval;
+  end;
+
+  filename := thumbnails[currentIdx].filename;
+  if (currentLargePanel = pnlLarge) then currentLargePanel.SetFocus;
+
+  if mnuSlideShow.Checked then
+    currentLargeAngle := 0 else
+    Screen.Cursor := crHourGlass;
+
+  try
+    layer := layeredImg.AddLayer;
+    if largeImg32.IsEmpty then
+    begin
+      ////////////////////////////////////
+      largeImg32.LoadFromFile(currentFolder + filename);
+      ////////////////////////////////////
+
+      if not DoesContrastWithBackColor(largeImg32, backColor) then
+        largeImg32.InvertColors;
+      layer.Image.Assign(largeImg32);
+    end else
+      layer.Image.Assign(largeImg32);
+
+    if currentLargeAngle <> 0 then
+      layer.Image.Rotate(currentLargeAngle);
+
+    if mnuSlideShow.Checked then
+    begin
+      rec := currentLargePanel.InnerClientRect;
+      OffsetRect(rec, -rec.Left, -rec.Top);
+      w := rec.Width; h := rec.Height;
+      layer.Image.ScaleToFit(w, h);
+      layeredImg.SetSize(w, h);
+      layer.PositionCenteredAt(MidPoint(rec));
+      if fade and (layer.Index > 0) then
+      begin
+        tmrSlideShow.Interval := slideShowFadeInt;
+        tmrSlideShow.Enabled := true;
+        layer.Opacity := 0;
+      end;
+    end else
+    begin
+      w := layer.Image.Width;
+      h := layer.Image.Height;
+      layeredImg.SetSize(w, h);
+      rec := Types.Rect(0,0,w, h);
+      layer.PositionAt(0,0);
+      tmrSlideShow.Enabled := false;
+    end;
+
+    if fade and (layeredImg.Count > 1) then
+    begin
+      tmrSlideShow.Interval := slideShowFadeInt;
+      tmrSlideShow.Enabled := true;
+      layer.Opacity := 0;
+    end;
+
+
+    currentLargePanel.Bitmap.SetSize(w, h);
+    layeredImg.GetMergedImage.CopyToDc(currentLargePanel.Bitmap.Canvas.Handle);
+    currentLargePanel.ScaleToFit;
+    currentLargePanel.Invalidate;
+  finally
+    Screen.Cursor := crDefault;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.tmrSlideShowTimer(Sender: TObject);
+begin
+  if not currentLargePanel.Visible then
+  begin
+    tmrSlideShow.Enabled := false;
     Exit;
   end;
 
@@ -984,8 +1328,8 @@ begin
       layeredImg.DeleteLayer(layeredImg.TopLayer.Index);
       //now either restart or stop the slide show
       if mnuSlideShow.Checked then
-        slideShowTimer.Interval := slideShowInterval div 2 else
-        slideShowTimer.Enabled := false;
+        tmrSlideShow.Interval := slideShowInterval div 2 else
+        tmrSlideShow.Enabled := false;
     end
     else if mnuSimpleFade.Checked then
     begin
@@ -1012,14 +1356,13 @@ begin
     if (layeredImg.Count > 1) and (layeredImg[1].Opacity = 255) then
     begin
       layeredImg.DeleteLayer(0);
-      slideShowTimer.Enabled := mnuSlideShow.Checked;
-      slideShowTimer.Interval := slideShowInterval;
-      StatusBar1.Panels[0].Text := ' ' + ExtractFilename(imageNames[currentIdx]);
+      tmrSlideShow.Enabled := mnuSlideShow.Checked;
+      tmrSlideShow.Interval := slideShowInterval;
     end;
 
     layeredImg.GetMergedImage.CopyToDc(
-      largeImagePanel.Bitmap.Canvas.Handle, 0,0, false);
-    largeImagePanel.Repaint;
+      currentLargePanel.Bitmap.Canvas.Handle, 0,0, false);
+    currentLargePanel.Repaint;
   end else
   begin
     ShowNextLargeImage;
@@ -1027,243 +1370,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.SlideShowPauseResume;
-var
-  w,h: integer;
-  layer: TLayer32;
-  lf: TLogFont;
-  text: string;
-  rec: TRect;
-  pt: TPointD;
-  pp: TArrayOfArrayOfPointD;
+procedure TMainForm.tmrLoadingTimer(Sender: TObject);
 begin
-  if layeredImg.Count = 0 then Exit;
-  //if there's already a message layer then delete it!
-  with layeredImg do
-    if TopLayer is TDesignerLayer32 then DeleteLayer(TopLayer.Index);
-
-  with largeImagePanel.InnerClientRect do
-  begin
-    w := Width; h := Height;
+  case loadState of
+    lsLoading         : Exit; //nothing yet to refresh
+    lsLoaded          : tmrLoading.Enabled := false;
+    lsLoadingRefresh  : loadState := lsLoading;
   end;
-  largeImagePanel.ScaleType := stFit;
-
-  if layeredImg.Count > 1 then
-  begin
-    //if pausing during a transition then finish it
-    layeredImg.DeleteLayer(0);
-    layeredImg[0].Opacity := 255;
-  end;
-
-  //When in a slide show, layeredImg will be the same size as largeImagePanel's
-  //InnerClientRect, and each layer scaled to fit. When not in a slide show,
-  //layeredImg will be made the same size as it's 'large' image and this will be
-  //scaled by largeImagePanel so layeredImg fits inside InnerClientRect.
-
-  if mnuSlideShow.Checked and
-    ((layeredImg.Width <> w) or (layeredImg.Height <> h)) then
-  begin
-    layeredImg.SetSize(w, h);
-    layeredImg[0].Image.Assign(currLargeImg32);
-    rec := Types.Rect(0,0, w, h);
-    layeredImg[0].Image.ScaleToFit(rec);
-    layeredImg[0].PositionCenteredAt(MidPoint(rec));
-  end;
-
-  layer := layeredImg.AddLayer(TDesignerLayer32);
-  layer.SetSize(w, h);
-  lf := DefaultLogfont;
-  lf.lfHeight := -DPI(15);
-  if mnuSlideShow.Checked then
-    text := rsResumeSlideShow else
-    text := rsPauseSlideShow;
-  pp := GetTextOutline(layer.Width - 14, -lf.lfHeight +10,
-    text, GetFontInfo(lf), taRight, pt);
-  DrawLine(layer.Image, pp, 6, Color32(backColor), esClosed);
-  if GetLuminance(backColor) < $80 then
-    DrawPolygon(layer.Image, pp, frEvenOdd, clWhite32) else
-    DrawPolygon(layer.Image, pp, frEvenOdd, clBlack32);
-
-  slideShowTimer.Interval := slideShowInterval div 2;
-  slideShowTimer.Enabled := true;
-
-  largeImagePanel.Bitmap.SetSize(w,h);
-  layeredImg.GetMergedImage.CopyToDc(
-    largeImagePanel.Bitmap.Canvas.Handle, 0,0, false);
-  largeImagePanel.Repaint;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.mnuTransitionClick(Sender: TObject);
-begin
-  TMenuItem(Sender).Checked := true;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.mnuSlideShowClick(Sender: TObject);
-begin
-  mnuSlideShow.Checked := not mnuSlideShow.Checked;
-  ClearTextFromMenubar;
-  slideShowTimer.Enabled := mnuSlideShow.Checked;
-  if largeImagePanel.Visible then
-    SlideShowPauseResume else
-    StartLargeImageView;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.mnuChangeDisplaySizeClick(Sender: TObject);
-var
-  i: integer;
-begin
-  if isLoading then begin Beep; Exit; end;
-
-  //either small, medium or large preview, or large image ...
-  TMenuItem(Sender).Checked := true;
-
-  if Sender = mnuLargePreview then
-    thumbnailSize := maxPreviewSize
-  else if Sender = mnuMediumPreview then
-    thumbnailSize := midPreviewSize
-  else
-    thumbnailSize := minPreviewSize;
-
-  for i := 0 to sbMain.ControlCount -1 do
-  begin
-    sbMain.Controls[i].Width := thumbnailSize;
-    sbMain.Controls[i].Height := thumbnailSize;
-  end;
-  RepositionThumbnails;
-  sbMain.Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.mnuShowLargeImageInMainformClick(Sender: TObject);
-begin
-  if (currentIdx < 0) then begin Beep; Exit; end;
-  if mnuFullScreen.Checked then
-    mnuFullScreenClick(nil) else
-    StartLargeImageView(pnlLargeOnMainForm);
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.UpdateLargeView(fade: Boolean);
-var
-  w,h,s: integer;
-  layer: TLayer32;
-  rec: TRect;
-  filename: string;
-begin
-  if (imageNames.Count = 0) then Exit;
-  fade := fade and slideShowTimer.Enabled and not mnuFast.Checked;
-
-  //To manage fading from one image to another, we use a LayeredImage32 object.
-  //When a new image (layer) is added, it's placed on top of the current image.
-  //Initially the new image is fully transparent, and it's made progressively
-  //more opaque until fully opaque at which time the bottom image is removed.
-
-  if fade then
-  begin
-    if (layeredImg.Count = 2) then layeredImg.DeleteLayer(0);
-  end else
-  begin
-    layeredImg.Clear;
-    slideShowTimer.Interval := SlideShowInterval;
-  end;
-
-  filename := imageNames[currentIdx];
-  if (largeImagePanel = pnlLargeOnMainForm) then largeImagePanel.SetFocus;
-
-  if mnuSlideShow.Checked then
-    largeImageAngle := 0 else
-    Screen.Cursor := crHourGlass;
-
-  try
-    layer := layeredImg.AddLayer;
-    if currLargeImg32.IsEmpty then
-    begin
-      ////////////////////////////////////
-      currLargeImg32.LoadFromFile(filename);
-      ////////////////////////////////////
-
-      if not DoesContrastWithBackColor(currLargeImg32, backColor) then
-      begin
-        if GetLuminance(backColor) < $80 then
-          currLargeImg32.SetRGB(clWhite32) else
-          currLargeImg32.SetRGB(clBlack32);
-      end;
-      layer.Image.Assign(currLargeImg32);
-    end else
-      layer.Image.Assign(currLargeImg32);
-
-    if largeImageAngle <> 0 then
-      layer.Image.Rotate(largeImageAngle);
-    w := layer.Image.Width; h := layer.Image.Height;
-
-    if mnuSlideShow.Checked then
-    begin
-      with largeImagePanel.InnerClientRect do
-        rec := Types.Rect(0,0, Width, Height);
-      layer.Image.ScaleToFit(rec);
-      layeredImg.SetSize(rec.Width, rec.Height);
-      layer.PositionCenteredAt(MidPoint(rec));
-      if fade and (layer.Index > 0) then
-      begin
-        slideShowTimer.Interval := slideShowFadeInt;
-        slideShowTimer.Enabled := true;
-        layer.Opacity := 0;
-      end;
-    end else
-    begin
-      layeredImg.SetSize(w, h);
-      rec := Types.Rect(0,0,w,h);
-      layer.PositionAt(0,0);
-      slideShowTimer.Enabled := false;
-    end;
-
-    if fade and (layeredImg.Count > 1) then
-    begin
-      slideShowTimer.Interval := slideShowFadeInt;
-      slideShowTimer.Enabled := true;
-      layer.Opacity := 0;
-    end;
-
-    largeImagePanel.Bitmap.SetSize(layeredImg.Width, layeredImg.Height);
-    layeredImg.GetMergedImage.CopyToDc(
-      largeImagePanel.Bitmap.Canvas.Handle, 0,0, false);
-
-    largeImagePanel.ScaleType := stFit;
-    largeImagePanel.Invalidate;
-
-    s := GetFileSize(filename);
-    StatusBar1.Panels[0].Text := Format(' '+ rsStatusbar1,
-      [ExtractFilename(filename), w/1.0, h/1.0, s/1024]);
-  finally
-    Screen.Cursor := crDefault;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.PanelOnEnter(Sender: TObject);
-begin
-  currentIdx := GetControlIndex(TPanel(Sender));
-  if currentIdx < 0 then
-    StatusBar1.Panels[0].Text := '' else
-    StatusBar1.Panels[0].Text :=
-      Format(' '+ rsStatusbar2, [ExtractFilename(imageNames[currentIdx]),
-      (currentIdx+1)/1.0, ImageNames.Count/1.0]);
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.ThumbnailDblClick(Sender: TObject);
-begin
-  StartLargeImageView(pnlLargeOnMainForm);
+  pnlThumb.Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuEscapeClick(Sender: TObject);
 begin
   //either ...
-  if largeImagePanel.Visible then       //1. exit a 'large view'
+  if currentLargePanel.Visible then       //1. exit a 'large view'
     EndLargeImageView
   else if isLoading then                //2. cancel folder loading
   begin
@@ -1285,24 +1406,132 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.UpdateCurrentIdx(newIdx: integer);
+procedure TMainForm.ThumbnailClick(Sender: TObject);
+var
+  pt: TPoint;
+  row,col, colCnt: integer;
 begin
-  if imageNames.Count = 0 then Exit
-  else if newIdx = MaxInt then newIdx := currentIdx +1;
-  if newIdx < 0 then newIdx := imageNames.Count -1
-  else if newIdx >= imageNames.Count then newIdx := 0;
-  currentIdx := newIdx;
+  GetCursorPos(pt);
+  pt := pnlThumb.ScreenToClient(pt);
+  pt := pnlThumb.ClientToImage(pt);
+  pt := OffsetPoint(pt, -margin, -margin);
+  if (pt.X < 0) or (pt.Y < 0) then Exit;
+  colCnt := GetColumnCount;
+  col := pt.X div (thumbnailSize + space);
+  if col >= colCnt then Exit;
+  row := pt.Y div (thumbnailSize + space);
+  if row * colCnt + col > High(thumbnails) then Exit;
+  currentIdx := row * colCnt + col;
+  SetThumbnailFocus(currentIdx);
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
 
-  if largeImagePanel.Visible then
+procedure TMainForm.ThumbnailDblClick(Sender: TObject);
+begin
+  if currentIdx >= 0 then
+    StartLargeImageView(pnlLarge);
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.SetThumbnailFocus(idx: integer);
+var
+  fs: Int64;
+begin
+  if Length(thumbnails) = 0 then
   begin
-    largeImageAngle := 0;
-    currLargeImg32.SetSize(0,0);
-    UpdateLargeView(true);
+    currentIdx := -1;
   end else
   begin
-    TPanel(sbMain.Controls[newIdx]).SetFocus;
+    if idx < 0 then currentIdx := 0
+    else if idx >= Length(thumbnails) then
+      currentIdx := High(thumbnails)
+    else
+      currentIdx := idx;
+
+    with thumbnails[currentIdx] do
+    begin
+      fs := GetFileSize(currentFolder + filename);
+      StatusBar1.Panels[0].Text := Format(' '+ rsThumbProps,
+        [ExtractFilename(filename), width/1.0, height/1.0, fs/1024])
+    end;
+  end;
+  pnlThumb.Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.ThumbnailKeyDown(Sender: TObject;
+  var Key: Word; Shift: TShiftState);
+var
+  yPos, colCnt: integer;
+
+  procedure ScrollSelectionIntoView;
+  begin
+    yPos := (currentIdx div colCnt) * (thumbnailSize + space) + margin;
+    if yPos < pnlThumb.Offset.Y then
+      pnlThumb.Offset := Point(pnlThumb.Offset.X, yPos - space)
+    else if yPos + thumbnailSize + space - pnlThumb.Offset.Y >
+      pnlThumb.InnerClientRect.Height then
+        pnlThumb.Offset := Point(pnlThumb.Offset.X,
+          yPos + thumbnailSize + space - pnlThumb.InnerClientRect.Height);
   end;
 
+begin
+
+  if Length(thumbnails) = 0 then Exit;
+  if currentIdx < 0 then
+  begin
+    currentIdx := 0;
+    Invalidate;
+    Exit;
+  end;
+
+  case Key of
+    VK_RETURN:
+      begin
+        StartLargeImageView(pnlLarge);
+        Key := 0;
+      end;
+    VK_UP:
+      begin
+        colCnt := GetColumnCount;
+        Key := 0;
+        SetThumbnailFocus(currentIdx - colCnt);
+        ScrollSelectionIntoView;
+        Invalidate;
+      end;
+    VK_LEFT:
+      begin
+        colCnt := GetColumnCount;
+        Key := 0;
+        if (currentIdx mod colCnt <> 0) then
+        begin
+          SetThumbnailFocus(currentIdx - 1);
+          ScrollSelectionIntoView;
+          Invalidate;
+        end;
+      end;
+    VK_RIGHT:
+      begin
+        colCnt := GetColumnCount;
+        Key := 0;
+        if ((currentIdx + 1) mod colCnt <> 0) then
+        begin
+          SetThumbnailFocus(currentIdx + 1);
+          ScrollSelectionIntoView;
+          Invalidate;
+        end;
+      end;
+    VK_DOWN:
+      begin
+        colCnt := GetColumnCount;
+        Key := 0;
+        SetThumbnailFocus(currentIdx + colCnt);
+        ScrollSelectionIntoView;
+        Invalidate;
+      end;
+    else inherited;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1316,8 +1545,8 @@ begin
       begin
         layeredImg.Clear;
         if Key = Ord('L') then
-          largeImageAngle := largeImageAngle + angle90 else
-          largeImageAngle := largeImageAngle - angle90;
+          currentLargeAngle := currentLargeAngle + angle90 else
+          currentLargeAngle := currentLargeAngle - angle90;
         UpdateLargeView(false);
       end;
     VK_LEFT:
@@ -1334,108 +1563,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-//preview keyboard actions
-procedure TMainForm.ThumbnailKeyDown(Sender: TObject;
-  var Key: Word; Shift: TShiftState);
-var
-  i: integer;
-begin
-  if pnlLargeOnMainForm.Visible then Exit;
-  case Key of
-    VK_RETURN:
-      begin
-        StartLargeImageView(pnlLargeOnMainForm);
-      end;
-    VK_LEFT:
-      begin
-        i := GetControlIndex(TControl(Sender));
-        if (i mod CountColumns > 0) then
-          UpdateCurrentIdx(currentIdx -1);
-      end;
-    VK_RIGHT:
-      begin
-        i := GetControlIndex(TControl(Sender));
-        if (i >= 0) and (i < sbMain.ControlCount -1) and
-          ((i +1) mod CountColumns > 0) then
-            UpdateCurrentIdx(currentIdx +1);
-      end;
-    VK_UP:
-      begin
-        i := GetControlIndex(TControl(Sender)) - CountColumns;
-        if i >= 0 then UpdateCurrentIdx(i);
-      end;
-    VK_DOWN:
-      begin
-        i := GetControlIndex(TControl(Sender));
-        if (i < 0) then Exit;
-        i := i + CountColumns;
-        if i < sbMain.ControlCount then UpdateCurrentIdx(i);
-
-      end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.VerticalScroll(dy: integer);
-begin
-  with sbMain.VertScrollBar do
-    if dy < 0 then
-    begin
-      if Position > 0 then Position := Max(0, Position + dy);
-    end else
-    begin
-      if Position < Range then Position := Min(Range, Position + dy);
-    end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.sbMainMouseDown(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
-begin
-  currentYPos := Y;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.sbMainMouseMove(Sender: TObject; Shift: TShiftState; X,Y: Integer);
-begin
-  if not (ssLeft in Shift) then Exit;
-  VerticalScroll(currentYPos - Y);
-  currentYPos := Y;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.ThumbnailMouseDown(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
-var
-  pt: TPoint;
-begin
-  pt := Types.Point(X,Y);
-  pt := TPanel(Sender).ClientToScreen(pt);
-  pt := ScreenToClient(pt);
-  sbMainMouseDown(Sender, Button, Shift, pt.X, pt.Y);
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.ThumbnailMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
-var
-  pt: TPoint;
-begin
-  pt := Types.Point(X,Y);
-  pt := TPanel(Sender).ClientToScreen(pt);
-  pt := ScreenToClient(pt);
-  sbMainMouseMove(Sender, Shift, pt.X, pt.Y);
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.sbMainMouseWheel(Sender: TObject; Shift: TShiftState;
-  WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
-begin
-  if sbMain.VertScrollBar.Range > 0 then
-    VerticalScroll(-WheelDelta div 2);
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.ips1Click(Sender: TObject);
+procedure TMainForm.mnuTipsClick(Sender: TObject);
 var
   msgboxOpts: TMessageBoxOptions;
 begin
@@ -1471,23 +1599,20 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.UpdateBackColors;
-var
-  i: integer;
 begin
   Self.Color := backColor;
-  sbMain.Color := backColor;
+  pnlThumb.Color := backColor;
   layeredImg.BackgroundColor := Color32(backColor);
   StatusBar1.Invalidate;
-  for i := 0 to sbMain.ControlCount -1 do
-    TPanel(sbMain.Controls[i]).Color := backColor;
-  largeImagePanel.Color := backColor;
-  largeImagePanel.FocusedColor := backColor;
+  currentLargePanel.Color := backColor;
+  currentLargePanel.FocusedColor := backColor;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.mnuEditClick(Sender: TObject);
+procedure TMainForm.mnuMainEditClick(Sender: TObject);
 begin
-  mnuEdit2.Enabled := (currentIdx >= 0) and (currentIdx < imageNames.Count);
+  mnuEdit2.Enabled := (currentIdx >= 0) and (currentIdx < Length(thumbnails));
   mnuRename2.Enabled := mnuEdit2.Enabled and not isLoading;
   mnuDelete2.Enabled := mnuRename2.Enabled;
 end;
@@ -1495,16 +1620,19 @@ end;
 
 procedure TMainForm.PopupMenu1Popup(Sender: TObject);
 begin
-  mnuEditClick(nil);
+  mnuMainEditClick(nil);
   mnuEdit.Enabled := mnuEdit2.Enabled;
   mnuRename.Enabled := mnuRename2.Enabled;
   mnuDelete.Enabled := mnuDelete2.Enabled;
+  mnuOpenImageFolder.Enabled := mnuEdit.Enabled;
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.mnuEditImageClick(Sender: TObject);
+procedure TMainForm.mnuEditClick(Sender: TObject);
 begin
-  ShellExecute(0, Nil, PChar(imageNames[currentIdx]), Nil, Nil, SW_NORMAL);
+  if (currentIdx < 0) or (currentIdx > High(thumbnails)) then Exit;
+  ShellExecute(0, Nil,
+    PChar(currentFolder + thumbnails[currentIdx].filename), Nil, Nil, SW_NORMAL);
 end;
 //------------------------------------------------------------------------------
 
@@ -1513,16 +1641,16 @@ var
   textboxOpts: TTextBoxOptions;
   oldName, newName: string;
 begin
-  oldName := imageNames[currentIdx];
-  newName := ExtractFileName(imageNames[currentIdx]);
+  oldName := thumbnails[currentIdx].filename;
+  newName := oldName;
   textboxOpts.Init;
   textboxOpts.customIcon := Application.Icon;
   if not DialogsEx.TextInputBox(self, rsRenameFile, '', 'Photo', newName,
     textboxOpts) then Exit;
 
-  newName := AppendSlash(currentFolder) + newName;
-  imageNames[currentIdx] := newName;
-  ShellFileOperation(oldName, newName, FO_RENAME, FOF_ALLOWUNDO);
+  thumbnails[currentIdx].filename := newName;
+  ShellFileOperation(currentFolder + oldName,
+    currentFolder + newName, FO_RENAME, FOF_ALLOWUNDO);
 end;
 //------------------------------------------------------------------------------
 
@@ -1556,30 +1684,37 @@ procedure TMainForm.mnuDeleteClick(Sender: TObject);
 var
   msgboxOpts: TMessageBoxOptions;
   filename: string;
+  i, colCnt, rowNum: integer;
 begin
-  filename := imageNames[currentIdx];
+  filename := thumbnails[currentIdx].filename;
   msgboxOpts.Init;
   msgboxOpts.customIcon := Application.Icon;
   msgboxOpts.CheckBoxCallBk := DeleteCheck;
   if deletePrompt and (DialogsEx.MessageBox(self, rsDeleteFile,
-    format(rsCheckDelete, [ExtractFilename(filename)]),
+    format(rsCheckDelete, [filename]),
     'Photo', MB_YESNO or MB_DEFBUTTON2, msgboxOpts) <> mrYes) then Exit;
 
   Screen.Cursor := crHourGlass;
   try
-    ShellFileOperation(filename, '', FO_DELETE, FOF_ALLOWUNDO);
+    //delete the file
+    ShellFileOperation(currentFolder + filename, '', FO_DELETE, FOF_ALLOWUNDO);
+    //delete the zip entry too
+    DeleteZipEntry(currentFolder + 'photo.bin', ExtractFileName(filename));
+    //delete the thumbnail
+    Delete(thumbnails, currentIdx, 1);
 
-    DeleteZipEntry(AppendSlash(currentFolder) + 'photo.bin', ExtractFileName(filename));
-    sbMain.Controls[currentIdx].Free;
-    thumbnails.Delete(currentIdx);
-    imageNames.Delete(currentIdx);
-    RepositionThumbnails;
-    if currentIdx = imageNames.Count then dec(currentIdx);
+    //rebuild the thumbnail display
+    colCnt := GetColumnCount;
+    rowNum := currentIdx div colCnt;
+    for i := rowNum to High(thumbnailRows) do
+      thumbnailRowsState[i] := BUILD_INCOMPLETE;
+    pnlThumb.Invalidate;
+    if currentIdx = Length(thumbnails) then dec(currentIdx);
     if currentIdx < 0 then Exit;
 
-    if largeImagePanel.Visible then
+    if currentLargePanel.Visible then
       StartLargeImageView else
-      ActiveControl := TForm(sbMain.Controls[currentIdx]);
+      ActiveControl := pnlThumb;
   finally
     Screen.Cursor := crDefault;
   end;
@@ -1599,7 +1734,7 @@ begin
   if not NumInputBox(self, rsSlideShowInterval, rsSlideShowSeconds,
     Application.Title, val, numBoxOptions) then Exit;
   slideShowInterval := val * 1000;
-  slideShowTimer.Interval := slideShowInterval;
+  tmrSlideShow.Interval := slideShowInterval;
 end;
 //------------------------------------------------------------------------------
 
@@ -1615,7 +1750,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.OpenFolderContainingtheImage1Click(Sender: TObject);
+procedure TMainForm.mnuOpenImageFolderClick(Sender: TObject);
 begin
   ShellExecute(0, Nil, 'explorer.exe',
     PChar('/e, '+ currentFolder), Nil, SW_NORMAL);
@@ -1626,9 +1761,9 @@ procedure TMainForm.FullScreenKeyDown(Sender: TObject;
   var Key: Word; Shift: TShiftState);
 begin
   case Key of
-    VK_F8, ORD('P'):                                   //toggle slide show
+    VK_F9, ORD('P'):                                   //toggle slide show
       mnuSlideShowClick(nil);
-    VK_F7, VK_F9:
+    VK_F7, VK_F8:
       begin
         TForm(Sender).Tag := 1;                        //return to large view
         TForm(Sender).ModalResult := mrOK;
@@ -1649,8 +1784,8 @@ begin
       begin
         layeredImg.Clear;
         if Key = Ord('L') then
-          largeImageAngle := largeImageAngle + angle90 else
-          largeImageAngle := largeImageAngle - angle90;
+          currentLargeAngle := currentLargeAngle + angle90 else
+          currentLargeAngle := currentLargeAngle - angle90;
         UpdateLargeView(false);
       end else
         inherited;
@@ -1679,10 +1814,10 @@ end;
 procedure TMainForm.mnuFullScreenClick(Sender: TObject);
 var
   frm: TForm;
-  pnl: TPanel;
+  pnl: TBitmapPanel;
 begin
   if currentIdx < 0 then Exit;
-  pnlLargeOnMainForm.Visible := true;
+  pnlLarge.Visible := true;
 
   frm := TForm.Create(nil);
   with frm do
@@ -1692,31 +1827,35 @@ begin
     KeyPreview  := true;
     OnKeyDown   := FullScreenKeyDown;
 
-    pnl := TPanel.Create(frm);
+    pnl := TBitmapPanel.Create(frm);
     pnl.Parent := frm;
     pnl.Align := alClient;
     pnl.Color := backColor;
     pnl.ParentBackground := false;
     pnl.BevelOuter := bvNone;
+    pnl.BevelInner := bvNone;
+    pnl.BorderWidth := 0;
     pnl.Cursor := crNone;
     pnl.OnMouseUp := FullScreenMouseUp;
     pnl.OnDblClick := FullScreenDblClick;
     StartLargeImageView(pnl);
     ShowModal;
+
+    //when tag == 1 (ie when toggling F8), close to the windowed large image
+    if frm.tag = 1 then
+      StartLargeImageView(pnlLarge) else
+      EndLargeImageView;
+
   finally
     Free;
   end;
-
-  //when tag == 1 (ie when toggling F9), close to the windowed large image
-  if frm.tag = 1 then
-    StartLargeImageView(pnlLargeOnMainForm) else
-    EndLargeImageView;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.WMNCPaint(var Message: TWMNCPaint);
 begin
   inherited;
+  //non-client area painting - ie on menubar here
   if mnuSlideShow.Checked then
     PaintTextOnMenubar(rsSlideShow);
 end;
@@ -1767,7 +1906,7 @@ begin
 end;
 //---------------------------------------------------------------------
 
-procedure TMainForm.About1Click(Sender: TObject);
+procedure TMainForm.mnuAboutClick(Sender: TObject);
 var
   msgboxOpts: TMessageBoxOptions;
 begin

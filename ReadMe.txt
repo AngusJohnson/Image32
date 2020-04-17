@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 1.43
-Released: 26 February 2020
+Latest version: 1.45
+Released: 10 March 2020
 
 Copyright © 2019-2020 Angus Johnson
 Freeware released under Boost Software License
@@ -11,6 +11,18 @@ Website  : http://www.angusj.com/delphi/image32/Docs/_Body.htm
 download : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
+
+Version: 1.45
+Changes in Image32_Vector
+  Renamed the SmoothLine function SmoothToBezier
+  
+  
+Version: 1.44
+  Changes in BitmapPanels 
+    Fixed a significant bug introduced in the previous update :(
+  Changes in Image32_Transform and Image32_Vector  
+    Moved most matrix code to Image32_Vector
+    Added a number of new matrix functions
 
 Version: 1.43
   Changes in Image32_BMP

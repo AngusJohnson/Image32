@@ -110,7 +110,7 @@ object Form1: TForm1
       Height = 295
       Align = alRight
       ParentBackground = False
-      TabOrder = 1
+      TabOrder = 0
       OnEnter = pnlSmoothEnter
       OnExit = pnlSmoothExit
       DesignSize = (
@@ -138,18 +138,6 @@ object Form1: TForm1
         TickStyle = tsNone
         OnChange = TrackBar1Change
       end
-    end
-    object DisplayPanel: TPanel
-      Left = 1
-      Top = 1
-      Width = 214
-      Height = 295
-      Align = alClient
-      BevelInner = bvLowered
-      BorderWidth = 16
-      Color = clHighlight
-      TabOrder = 0
-      TabStop = True
     end
   end
   object MainMenu1: TMainMenu

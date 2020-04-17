@@ -1,9 +1,9 @@
 object FrmMain: TFrmMain
   Left = 554
   Top = 394
-  Width = 482
-  Height = 470
   Caption = 'Image32 - Layers & SmoothPaths'
+  ClientHeight = 411
+  ClientWidth = 466
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -17,22 +17,9 @@ object FrmMain: TFrmMain
   OnResize = FormResize
   PixelsPerInch = 96
   TextHeight = 14
-  object pnlMain: TPanel
-    Left = 0
-    Top = 43
-    Width = 466
-    Height = 343
-    Align = alClient
-    PopupMenu = PopupMenu1
-    TabOrder = 0
-    OnDblClick = pnlMainDblClick
-    OnMouseDown = pnlMainMouseDown
-    OnMouseMove = pnlMainMouseMove
-    OnMouseUp = pnlMainMouseUp
-  end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 386
+    Top = 385
     Width = 466
     Height = 26
     Panels = <>
@@ -49,7 +36,7 @@ object FrmMain: TFrmMain
     Width = 466
     Height = 43
     Align = alTop
-    TabOrder = 2
+    TabOrder = 1
     object Label2: TLabel
       Left = 8
       Top = 13

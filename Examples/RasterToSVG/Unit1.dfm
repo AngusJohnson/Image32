@@ -1,7 +1,6 @@
 object MainForm: TMainForm
   Left = 514
   Top = 310
-  ActiveControl = pnlSVG
   Caption = 'RasterToSVG'
   ClientHeight = 432
   ClientWidth = 627
@@ -37,6 +36,7 @@ object MainForm: TMainForm
     Height = 406
     Align = alClient
     TabOrder = 1
+    ExplicitTop = -6
     object pnlTop: TPanel
       Left = 1
       Top = 1
@@ -82,28 +82,6 @@ object MainForm: TMainForm
         TabOrder = 0
         Visible = False
       end
-    end
-    object pnlRaster: TPanel
-      Left = 1
-      Top = 34
-      Width = 311
-      Height = 337
-      Align = alClient
-      BevelInner = bvLowered
-      BorderWidth = 16
-      TabOrder = 2
-      TabStop = True
-    end
-    object pnlSVG: TPanel
-      Left = 312
-      Top = 34
-      Width = 314
-      Height = 337
-      Align = alRight
-      BevelInner = bvLowered
-      BorderWidth = 16
-      TabOrder = 3
-      TabStop = True
     end
   end
   object MainMenu1: TMainMenu

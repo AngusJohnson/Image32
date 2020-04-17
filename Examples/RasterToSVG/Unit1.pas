@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
   Types, Menus, StdCtrls, ExtCtrls, ComCtrls, ShellApi, IniFiles, Dialogs,
-  Image32, BitmapPanels, DialogsEx;
+  Image32, ImagePanels, DialogsEx;
 
 type
   TMainForm = class(TForm)
@@ -31,8 +31,6 @@ type
     N3: TMenuItem;
     mnuTips: TMenuItem;
     pnlOptions: TPanel;
-    pnlRaster: TPanel;
-    pnlSVG: TPanel;
     lblOptions: TLabel;
     ProgressBar: TProgressBar;
     mnuManualPaletteSizes: TMenuItem;
@@ -57,6 +55,8 @@ type
     cancelOp           : boolean;
     rasterImg          : TImage32;
     svgImg             : TImage32;
+    pnlRaster          : TBitmapPanel;
+    pnlSvg             : TBitmapPanel;
     isDrawing          : Boolean;
     maxColors          : integer;
     maximumColors      : integer;
@@ -384,6 +384,17 @@ end;
 
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
+  //setup the SVG BitmapPanel
+  pnlSvg := TBitmapPanel.Create(self);
+  pnlSvg.parent := pnlDisplayParent;
+  pnlSvg.Align := alRight;
+  pnlSvg.Width := pnlDisplayParent.ClientWidth;
+
+  //setup the Raster BitmapPanel
+  pnlRaster := TBitmapPanel.Create(self);
+  pnlRaster.parent := pnlDisplayParent;
+  pnlRaster.Align := alClient;
+
   simpleness := 0;
   smoothness := 2;
   LoadIniSettings;
@@ -400,25 +411,15 @@ begin
   //TabStop := true;             //set in IDE (for keyboard controls)
   pnlRaster.FocusedColor := clGradientInactiveCaption;
   pnlSVG.FocusedColor := clGradientInactiveCaption;
-  pnlRaster.Scale := 1;
-  pnlSVG.Scale := 1;
   //enable image transparency - at least, as far as the panel background ;)
   pnlRaster.Bitmap.PixelFormat := pf32bit;
   pnlSVG.Bitmap.PixelFormat := pf32bit;
-  //and set initial image scale
-  pnlRaster.ScaleType := stFit;
-  pnlSVG.ScaleType := stFit;
   pnlSVG.OnKeyDown := SvgPnlKeydown;
 
   palVectorsList  := TList.Create;
   svgStringStream := TStringStream.Create('');
   rasterImg       := TImage32.Create;
   svgImg         := TImage32.Create;
-
-//  OpenDialog1.FileName := './sample_images/mono_ab.png';
-//  DoOpenFile(OpenDialog1.FileName, false);
-//  WindowState := wsMaximized;
-
   DisplayImages;
 end;
 //------------------------------------------------------------------------------
@@ -516,7 +517,7 @@ begin
   if simpleness > 0 then
     pp := RamerDouglasPeucker(pp, simpleness * scale);
   if smoothness > 0 then
-    pp := SmoothLine(pp, true, smoothness * scale, smoothness);
+    pp := SmoothToBezier(pp, true, smoothness * scale, smoothness);
 
   new(pnc);
   pnc.isFlat := smoothness = 0;
@@ -659,7 +660,7 @@ begin
     if simpleness > 0 then
       shadow := RamerDouglasPeucker(shadow, simpleness * scale);
     if smoothness > 0 then
-      shadow := SmoothLine(shadow, true, smoothness * 0.5, 1);
+      shadow := SmoothToBezier(shadow, true, smoothness * 0.5, 1);
     new(pathsAndColor);
     pathsAndColor.isFlat := smoothness = 0;
     pathsAndColor.paths := shadow;
@@ -692,7 +693,7 @@ begin
       pp := RamerDouglasPeucker(pp, simpleness * scale);
     pp := Image32_Clipper.InflatePolygons(pp, 1.25 * scale, jsRound);
     if smoothness > 0 then
-      pp := SmoothLine(pp, true, scale, 1);
+      pp := SmoothToBezier(pp, true, scale, 1);
 
     new(pathsAndColor);
     pathsAndColor.isFlat := smoothness = 0;
@@ -703,7 +704,7 @@ begin
   if simpleness > 0 then
     black := RamerDouglasPeucker(black, simpleness * scale);
   if smoothness > 0 then
-    black := SmoothLine(black, true, smoothness * scale, 1);
+    black := SmoothToBezier(black, true, smoothness * scale, 1);
 
   new(pathsAndColor);
   pathsAndColor.isFlat := smoothness = 0;
@@ -782,6 +783,7 @@ begin
   pnlSVG.Bitmap.Height := svgImg.Height;
   pnlSVG.ClearBitmap;
   svgImg.CopyToDc(pnlSVG.Bitmap.Canvas.Handle);
+  pnlSVG.ScaleToFit;
 end;
 
 //------------------------------------------------------------------------------
@@ -875,7 +877,7 @@ begin
       pnlRaster.ClearBitmap;
       newRasterImg.CopyToDc(pnlRaster.Bitmap.Canvas.Handle);
 
-      pnlRaster.ScaleType := stFit;
+      pnlRaster.ScaleToFit;
 
       origMaxColors := newRasterImg.ColorCount;
       maxColors := origMaxColors;
@@ -944,7 +946,7 @@ begin
 
     //all done !!
 
-    pnlSVG.ScaleType := stFit;
+    pnlSVG.ScaleToFit;
 
     lblSVG.Caption :=
       format('SVG: %1.0n x %1.0n; file size: %1.0n; colors: %d.',

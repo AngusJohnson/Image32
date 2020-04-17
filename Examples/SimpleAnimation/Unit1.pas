@@ -5,11 +5,10 @@ interface
 uses
   Windows, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls,
-  Image32, BitmapPanels;
+  Image32, ImagePanels;
 
 type
   TForm1 = class(TForm)
-    Panel1: TPanel;
     MainMenu1: TMainMenu;
     File1: TMenuItem;
     Exit1: TMenuItem;
@@ -17,10 +16,11 @@ type
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure Panel1DblClick(Sender: TObject);
+    procedure PnlMainDblClick(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
   private
     timer: TTimer;
+    pnlMain: TBitmapPanel;
     reversing: Boolean;
     imgIndex: integer;
     masterImageList: TImageList32;
@@ -55,22 +55,18 @@ begin
   SpaceAbove := ImageSize *2;
 
   //SETUP THE DISPLAY PANEL
-  Panel1.BorderWidth := DPI(16);
-  Panel1.BevelInner := bvLowered;
-  //set Panel1.Tabstop := true to enable keyboard controls
-  Panel1.TabStop := true;
-  Panel1.FocusedColor := clGradientInactiveCaption;
-  //enable bitmap transparency (ie to the panel background)
-  Panel1.Bitmap.PixelFormat := pf32bit;
-  //since ScaleType defaults to stFit, change to ...
-  Panel1.ScaleType := stScaled; //(scale = 1)
+  pnlMain := TBitmapPanel.Create(self);
+  pnlMain.Parent := self;
+  pnlMain.Align := alClient;
 
-  {$IFDEF SETSIZE}
-  Panel1.Bitmap.SetSize(ImageSize, ImageSize + SpaceAbove);
-  {$ELSE}
-  Panel1.Bitmap.Width := ImageSize;
-  Panel1.Bitmap.Height := ImageSize + SpaceAbove;
-  {$ENDIF}
+  //Panel1.FocusedColor := clGradientInactiveCaption;
+  //enable bitmap transparency (ie to the panel background)
+  pnlMain.Bitmap.PixelFormat := pf32bit;
+  pnlMain.Bitmap.Width := ImageSize;
+  pnlMain.Bitmap.Height := ImageSize + SpaceAbove;
+  pnlMain.AllowZoom := false;
+  pnlMain.AllowScroll := false;
+  pnlMain.OnDblClick := PnlMainDblClick;
 
   rec := Rect(0,0,ImageSize,ImageSize);
   Windows.InflateRect(rec, -15,-15);
@@ -143,8 +139,8 @@ end;
 
 procedure TForm1.Timer1Timer(Sender: TObject);
 begin
-  masterImageList[imgIndex].CopyToDc(Panel1.Bitmap.Canvas.Handle, 0,0, false);
-  Panel1.Repaint;
+  masterImageList[imgIndex].CopyToDc(pnlMain.Bitmap.Canvas.Handle, 0,0, false);
+  pnlMain.Repaint;
   if reversing then
   begin
     dec(imgIndex);
@@ -163,7 +159,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.Panel1DblClick(Sender: TObject);
+procedure TForm1.PnlMainDblClick(Sender: TObject);
 begin
   //halve speed of bouncing ball
   timer.Interval := timer.Interval *2;

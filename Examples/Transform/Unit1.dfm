@@ -16,18 +16,6 @@ object Form1: TForm1
   OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 13
-  object Panel1: TPanel
-    Left = 0
-    Top = 0
-    Width = 370
-    Height = 369
-    Align = alClient
-    PopupMenu = PopupMenu1
-    TabOrder = 0
-    OnMouseDown = Panel1MouseDown
-    OnMouseMove = Panel1MouseMove
-    OnMouseUp = Panel1MouseUp
-  end
   object StatusBar1: TStatusBar
     Left = 0
     Top = 369
@@ -83,24 +71,28 @@ object Form1: TForm1
         Checked = True
         GroupIndex = 11
         RadioItem = True
+        ShortCut = 16433
         OnClick = mnuVerticalSplineClick
       end
       object mnuHorizontalSkew: TMenuItem
         Caption = '&Horizontal Skew'
         GroupIndex = 11
         RadioItem = True
+        ShortCut = 16434
         OnClick = mnuVerticalSplineClick
       end
       object mnuVertProjective: TMenuItem
         Caption = 'Vertical &Projective'
         GroupIndex = 11
         RadioItem = True
+        ShortCut = 16435
         OnClick = mnuVerticalSplineClick
       end
       object mnuVerticalSpline: TMenuItem
         Caption = 'Vertical &Spline'
         GroupIndex = 11
         RadioItem = True
+        ShortCut = 16436
         OnClick = mnuVerticalSplineClick
       end
     end

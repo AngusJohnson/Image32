@@ -6,14 +6,13 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
   Types, Menus, ExtCtrls, ComCtrls, StdCtrls, Dialogs,
-  BitmapPanels, Image32, Image32_Layers, Image32_SmoothPath;
+  ImagePanels, Image32, Image32_Layers, Image32_SmoothPath;
 
 type
   TMoveType = (mtNone, mtAllButtons, mtOneButton,
     mtRotateButton, mtScaleButton, mtLayer);
 
   TFrmMain = class(TForm)
-    pnlMain: TPanel;
     MainMenu1: TMainMenu;
     File1: TMenuItem;
     Exit1: TMenuItem;
@@ -108,6 +107,7 @@ type
     procedure edPenColorChange(Sender: TObject);
     procedure FormResize(Sender: TObject);
   private
+    pnlMain: TBitmapPanel;
     layeredImage32: TLayeredImage32;
     clickPoint    : TPoint;
     rotPoint      : TPoint;
@@ -122,7 +122,8 @@ type
     procedure RefreshButtonPositionsFromPath;
     procedure UpdateButtonGroupFromPath;
     function HitTestButtonPath(const pt: TPoint): Boolean;
-    procedure BeforePanelPaint(Sender: TObject);
+    procedure BeforePanelPaint(Sender: TObject;
+      dstCanvas: TCanvas; const srcRect, dstRect: TRect);
     procedure UpdateLayeredImage;
     procedure StartPolygonArrow;
     function ClearRotateSizeButton: Boolean;
@@ -298,15 +299,17 @@ begin
   dashes[0] := 5; dashes[1] := 5;
   buttonPath := TSmoothPath.Create;
 
-  //SETUP THE DISPLAY PANEL
-  pnlMain.BorderWidth := DPI(16);
-  pnlMain.BevelInner := bvLowered;
-  //set pnlMain.Tabstop -> true to enable keyboard controls
-  pnlMain.TabStop := true;
-  pnlMain.FocusedColor := clGradientInactiveCaption;
-  pnlMain.Scale := 1;
+  //SETUP THE CUSTOM DISPLAY PANEL
+  pnlMain := TBitmapPanel.Create(self);
+  pnlMain.Parent       := self;
+  pnlMain.Align        := alClient;
+  pnlMain.PopupMenu    := PopupMenu1;
+  pnlMain.OnDblClick   := pnlMainDblClick;
+  pnlMain.OnMouseDown  := pnlMainMouseDown;
+  pnlMain.OnMouseMove  := pnlMainMouseMove;
+  pnlMain.OnMouseUp    := pnlMainMouseUp;
   pnlMain.OnBeginPaint := BeforePanelPaint;
-  pnlMain.OnKeyDown := PanelKeyDown;
+  pnlMain.OnKeyDown    := PanelKeyDown;
   pnlMain.Bitmap.PixelFormat := pf32bit; //for alpha transparency
 
   //SETUP LAYEREDIMAGE32
@@ -611,13 +614,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TFrmMain.BeforePanelPaint(Sender: TObject);
-var
-  dc: HDC;
+procedure TFrmMain.BeforePanelPaint(Sender: TObject;
+  dstCanvas: TCanvas; const srcRect, dstRect: TRect);
 begin
   //update the bitmap before repainting the panel
-  dc := pnlMain.Bitmap.Canvas.Handle;
-  layeredImage32.GetMergedImage(not mnuShowDesigner.Checked).CopyToDc(dc);
+  layeredImage32.GetMergedImage(not mnuShowDesigner.Checked).
+    CopyToDc(pnlMain.Bitmap.Canvas.Handle);
 end;
 //------------------------------------------------------------------------------
 
@@ -739,7 +741,7 @@ begin
 
   //convert pnlMain client coordinates to bitmap coordinates
   pt := Types.Point(X,Y);
-  if not pnlMain.ClientToBitmap(pt) then Exit;
+  pt := pnlMain.ClientToImage(pt);
   clickPoint := pt;
 
   //get the layer that was clicked (if any)
@@ -769,7 +771,8 @@ begin
     ClearRotateSizeButton;
 
   //disable pnlMain scrolling if we're about to move a layer
-  pnlMain.ZoomAndScrollEnabled := moveType = mtNone;
+  pnlMain.AllowZoom := moveType = mtNone;
+  pnlMain.AllowScroll := pnlMain.AllowZoom;
 
   UpdateLayeredImage;
   UpdateMenus;
@@ -884,11 +887,12 @@ var
   rec: TRect;
 begin
   pt := Types.Point(X,Y);
-  if not pnlMain.ClientToBitmap(pt) then
+  if not PtInRect(pnlMain.InnerClientRect, pt) then
   begin
     pnlMain.Cursor := crDefault;
     Exit;
   end;
+  pt := pnlMain.ClientToImage(pt);
 
   if moveType = mtNone then
   begin
@@ -957,7 +961,7 @@ procedure TFrmMain.pnlMainMouseUp(Sender: TObject; Button: TMouseButton;
 begin
   moveType := mtNone;
   //re-enable pnlMain zoom and scroll
-  pnlMain.ZoomAndScrollEnabled := true;
+  pnlMain.AllowZoom := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -1226,7 +1230,7 @@ procedure TFrmMain.PopupMenu1Popup(Sender: TObject);
 begin
   GetCursorPos(popupPos);
   popupPos := pnlMain.ScreenToClient(popupPos);
-  pnlMain.ClientToBitmap(popupPos);
+  popupPos := pnlMain.ClientToImage(popupPos);
 end;
 //------------------------------------------------------------------------------
 

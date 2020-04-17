@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.41                                                            *
-* Date      :  14 February 2020                                                *
+* Version   :  1.46                                                            *
+* Date      :  17 April 2020                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -46,6 +46,7 @@ type
 
   PColor32 = ^TColor32;
   TArrayOfColor32 = array of TColor32;
+  TArrayOfArrayOfColor32 = array of TArrayOfColor32;
   TArrayOfInteger = array of Integer;
   TArrayOfByte = array of Byte;
 
@@ -102,7 +103,7 @@ type
     function GetMidPoint: TPointD;
   protected
     function CopyPixels(rec: TRect): TArrayOfColor32;
-    //CopyInternal: Internal routine (has no bounds checking)
+    //CopyInternal: Internal routine (has no scaling or bounds checking)
     procedure CopyInternal(src: TImage32;
       const srcRec, dstRec: TRect; blendFunc: TBlendFunction);
     procedure BeginUpdate;
@@ -123,9 +124,12 @@ type
     //existing image will either be stretched or cropped depending on the
     //stretchImage parameter.
     procedure Resize(newWidth, newHeight: Integer; stretchImage: Boolean = true);
+    //ScaleToFit: The new image will be scaled to fit within 'rec'
+    procedure ScaleToFit(width, height: integer);
+    //ScaleToFitCentered: The new image will be scaled and also centred
+    procedure ScaleToFitCentered(width, height: integer);
     procedure Scale(s: single); overload;
     procedure Scale(sx, sy: single); overload;
-    procedure ScaleToFit(const rec: TRect);
 
     function Copy(src: TImage32; srcRec, dstRec: TRect): Boolean;
     //CopyBlend: Copies part or all of another TImage32 image (src).
@@ -141,7 +145,11 @@ type
     procedure CopyFromDC(srcDc: HDC; const srcRect: TRect);
     //CopyToDc: Copies the image into a Windows device context
     procedure CopyToDc(dstDc: HDC; x: Integer = 0; y: Integer = 0;
-      transparent: Boolean = true; bkColor: TColor32 = 0);
+      transparent: Boolean = true; bkColor: TColor32 = clNone32); overload;
+    procedure CopyToDc(const srcRect: TRect; dstDc: HDC;
+      x: Integer = 0; y: Integer = 0;
+      transparent: Boolean = true;
+      bkColor: TColor32 = clNone32); overload;
     function CopyToClipBoard: Boolean;
     class function CanPasteFromClipBoard: Boolean;
     function PasteFromClipBoard: Boolean;
@@ -1530,8 +1538,8 @@ begin
   if color = 0 then fPixels := nil; //clear image in case old size == new size
   setLength(fPixels, fwidth * fheight);
   fIsPremultiplied := false;
-  //nb: dynamic arrays are zero-initialized with SetLength() unless the array
-  //is returned as a function result. And so SetSize() zero-initializes pixels.
+  //nb: dynamic arrays are zero-initialized with SetLength() UNLESS the array
+  //is returned as a function result. (So SetSize() does zero-initialize)
   if color > 0 then Clear(color);
   Resized;
 end;
@@ -1665,18 +1673,58 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.ScaleToFit(const rec: TRect);
+procedure TImage32.ScaleToFit(width, height: integer);
 var
   sx, sy: double;
 begin
-  if IsEmptyRect(rec) then Exit;
-  sx := RectWidth(rec) / Width;
-  sy := RectHeight(rec) / Height;
+  if IsEmpty or (width <= 0) or (height <= 0) then Exit;
+  sx := width / self.Width;
+  sy := height / self.Height;
   if sx <= sy then
     Scale(sx) else
     Scale(sy);
 end;
 //------------------------------------------------------------------------------
+
+procedure TImage32.ScaleToFitCentered(width, height: integer);
+var
+  sx, sy: double;
+  tmp: TImage32;
+  rec2: TRect;
+begin
+  if IsEmpty or (width <= 0) or (height <= 0) then Exit;
+  sx := width / self.Width;
+  sy := height / self.Height;
+  if sx <= sy then
+  begin
+    Scale(sx);
+    if height = self.Height then Exit;
+    rec2 := Bounds;
+    OffsetRect(rec2, 0, (height - self.Height) div 2);
+    tmp := TImage32.Create(self);
+    try
+      SetSize(width, height);
+      CopyInternal(tmp, tmp.Bounds, rec2, nil);
+    finally
+      tmp.Free;
+    end;
+  end else
+  begin
+    Scale(sy);
+    if width = self.Width then Exit;
+    rec2 := Bounds;
+    OffsetRect(rec2, (width - self.Width) div 2, 0);
+    tmp := TImage32.Create(self);
+    try
+      SetSize(width, height);
+      CopyInternal(tmp, tmp.Bounds, rec2, nil);
+    finally
+      tmp.Free;
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
 
 procedure TImage32.RotateLeft90;
 var
@@ -2127,7 +2175,17 @@ end;
 
 procedure TImage32.CopyToDc(dstDc: HDC;
   x,y: Integer; transparent: Boolean; bkColor: TColor32);
+begin
+  CopyToDc(Bounds, dstDc, x, y, transparent, bkColor);
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.CopyToDc(const srcRect: TRect; dstDc: HDC;
+  x: Integer = 0; y: Integer = 0;
+  transparent: Boolean = true; bkColor: TColor32 = 0);
 var
+  w, h: integer;
+  rec: TRect;
   tmp: TImage32;
   bi: TBitmapInfoHeader;
   bm, oldBm: HBitmap;
@@ -2136,13 +2194,20 @@ var
   hasTransparency: Boolean;
   bf: BLENDFUNCTION;
 begin
-  if IsEmpty then Exit;
-  bi := Get32bitBitmapInfoHeader(Width, Height);
-  tmp := TImage32.create(self);
+  IntersectRect(rec, srcRect, Bounds);
+  if IsEmpty or IsEmptyRect(rec) then Exit;
+  inc(x, rec.Left - srcRect.Left);
+  inc(y, rec.Top - srcRect.Top);
+  tmp := TImage32.create;
   try
+    w := RectWidth(rec);
+    h := RectHeight(rec);
+    tmp.SetSize(w, h);
+    tmp.CopyInternal(self, rec, tmp.Bounds, nil);
+    bi := Get32bitBitmapInfoHeader(w, h);
     tmp.FlipVertical; //DIB sections store pixels Y-inverted
-    hasTransparency :=
-      transparent and (TARGB(bkColor).A < 255) and Self.HasTransparency;
+    hasTransparency := transparent and (TARGB(bkColor).A < 255) and
+      tmp.HasTransparency;
     tmp.Premultiply;  //this is required for DIB sections
     if bkColor <> 0 then
       tmp.SetBackgroundColor(bkColor);
@@ -2152,7 +2217,7 @@ begin
         DIB_RGB_COLORS, dibBits, 0, 0);
       if bm = 0 then Exit;
       try
-        Move(tmp.PixelBase^, dibBits^, Width * Height * SizeOf(TColor32));
+        Move(tmp.PixelBase^, dibBits^, w * h * SizeOf(TColor32));
         oldBm := SelectObject(memDC, bm);
         if HasTransparency then
         begin
@@ -2160,10 +2225,10 @@ begin
           bf.BlendFlags := 0;
           bf.SourceConstantAlpha := 255;
           bf.AlphaFormat := AC_SRC_ALPHA;
-          AlphaBlend(dstDc, x,y, Width,Height, memDC, 0,0,Width,Height, bf);
+          AlphaBlend(dstDc, x,y, w,h, memDC, 0,0, w,h, bf);
         end
         else
-          BitBlt(dstDc, x,y, Width, Height, memDc, 0,0, SRCCOPY);
+          BitBlt(dstDc, x,y, w, h, memDc, 0,0, SRCCOPY);
         SelectObject(memDC, oldBm);
       finally
         DeleteObject(bm);

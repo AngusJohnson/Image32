@@ -44,34 +44,6 @@ object MainForm: TMainForm
     UseSystemFont = False
     OnDrawPanel = StatusBar1DrawPanel
   end
-  object sbMain: TScrollBox
-    Left = 8
-    Top = 80
-    Width = 241
-    Height = 121
-    VertScrollBar.Smooth = True
-    VertScrollBar.Tracking = True
-    Color = clBtnFace
-    ParentColor = False
-    TabOrder = 2
-    OnMouseDown = sbMainMouseDown
-    OnMouseMove = sbMainMouseMove
-    OnMouseWheel = sbMainMouseWheel
-  end
-  object pnlLargeOnMainForm: TPanel
-    Left = 120
-    Top = 143
-    Width = 185
-    Height = 162
-    BevelOuter = bvNone
-    BorderWidth = 18
-    Color = clGray
-    ParentBackground = False
-    PopupMenu = PopupMenu1
-    TabOrder = 3
-    Visible = False
-    OnMouseUp = pnlLargeOnMainFormMouseUp
-  end
   object MainMenu1: TMainMenu
     Left = 16
     Top = 8
@@ -91,14 +63,14 @@ object MainForm: TMainForm
         OnClick = mnuEscapeClick
       end
     end
-    object mnuEdit: TMenuItem
+    object mnuMainEdit: TMenuItem
       Caption = '&Edit'
-      OnClick = mnuEditClick
+      OnClick = mnuMainEditClick
       object mnuEdit2: TMenuItem
         Caption = '&Edit'
         Enabled = False
         ShortCut = 122
-        OnClick = mnuEditImageClick
+        OnClick = mnuEditClick
       end
       object mnuRename2: TMenuItem
         Caption = '&Rename'
@@ -188,33 +160,33 @@ object MainForm: TMainForm
         ShortCut = 118
         OnClick = mnuShowLargeImageInMainformClick
       end
-      object mnuSlideShow: TMenuItem
-        Caption = '&Slide Show'
+      object mnuFullScreen: TMenuItem
+        Caption = 'Full Screen'
         GroupIndex = 2
         ShortCut = 119
-        OnClick = mnuSlideShowClick
+        OnClick = mnuFullScreenClick
       end
       object N2: TMenuItem
         Caption = '-'
         GroupIndex = 2
       end
-      object mnuFullScreen: TMenuItem
-        Caption = 'Full Screen'
+      object mnuSlideShow: TMenuItem
+        Caption = '&Slide Show'
         GroupIndex = 2
         ShortCut = 120
-        OnClick = mnuFullScreenClick
+        OnClick = mnuSlideShowClick
       end
     end
     object Help1: TMenuItem
       Caption = '&Help'
-      object ips1: TMenuItem
+      object mnuTips: TMenuItem
         Caption = '&Tips'
-        OnClick = ips1Click
+        OnClick = mnuTipsClick
       end
-      object About1: TMenuItem
+      object mnuAbout: TMenuItem
         Caption = '&About'
         ShortCut = 112
-        OnClick = About1Click
+        OnClick = mnuAboutClick
       end
     end
   end
@@ -226,10 +198,10 @@ object MainForm: TMainForm
     OnPopup = PopupMenu1Popup
     Left = 73
     Top = 10
-    object mnuEditImage: TMenuItem
+    object mnuEdit: TMenuItem
       Caption = '&Edit'
       ShortCut = 122
-      OnClick = mnuEditImageClick
+      OnClick = mnuEditClick
     end
     object mnuRename: TMenuItem
       Caption = '&Rename'
@@ -244,10 +216,23 @@ object MainForm: TMainForm
     object N3: TMenuItem
       Caption = '-'
     end
-    object OpenFolderContainingtheImage1: TMenuItem
+    object mnuOpenImageFolder: TMenuItem
       Caption = 'Open the &Folder Containing this Image'
       ShortCut = 123
-      OnClick = OpenFolderContainingtheImage1Click
+      OnClick = mnuOpenImageFolderClick
     end
+  end
+  object tmrLoading: TTimer
+    Enabled = False
+    OnTimer = tmrLoadingTimer
+    Left = 208
+    Top = 16
+  end
+  object tmrSlideShow: TTimer
+    Enabled = False
+    Interval = 5000
+    OnTimer = tmrSlideShowTimer
+    Left = 265
+    Top = 16
   end
 end

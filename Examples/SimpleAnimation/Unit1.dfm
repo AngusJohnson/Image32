@@ -17,15 +17,6 @@ object Form1: TForm1
   OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 14
-  object Panel1: TPanel
-    Left = 0
-    Top = 0
-    Width = 261
-    Height = 418
-    Align = alClient
-    TabOrder = 0
-    OnDblClick = Panel1DblClick
-  end
   object StatusBar1: TStatusBar
     Left = 0
     Top = 418

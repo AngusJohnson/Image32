@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
   Types, Menus, ExtCtrls, ComCtrls, StdCtrls,
-  BitmapPanels, Image32, Image32_Layers, Image32_SmoothPath;
+  ImagePanels, Image32, Image32_Layers, Image32_SmoothPath;
 
 const
   UM_REPAINT = WM_USER +1;
@@ -14,7 +14,6 @@ type
   TMoveType = (mtNone, mtAllButtons, mtOneButton, mtRotateButton, mtLayer);
 
   TFrmMain = class(TForm)
-    pnlMain: TPanel;
     MainMenu1: TMainMenu;
     File1: TMenuItem;
     Exit1: TMenuItem;
@@ -72,6 +71,7 @@ type
     procedure edPenColorChange(Sender: TObject);
     procedure FormResize(Sender: TObject);
   private
+    pnlMain       : TBitmapPanel;
     layeredImage32: TLayeredImage32;
     clickPoint    : TPoint;
     rotatePoint   : TPoint;
@@ -87,7 +87,8 @@ type
     function HitTestButtonPath(const pt: TPoint): Boolean;
     function ClearRotateButton: Boolean;
     procedure UpdateImage;
-    procedure BeginPanelPaint(Sender: TObject);
+    procedure BeginPanelPaint(Sender: TObject;
+      dstCanvas: TCanvas; const srcRect, dstRect: TRect);
     procedure PanelKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   public
     { Public declarations }
@@ -206,7 +207,6 @@ end;
 
 procedure TFrmMain.FormCreate(Sender: TObject);
 var
-  layer: TLayer32;
   rec: TRect;
 begin
   lineWidth          := strtoint(edWidth.text);
@@ -218,12 +218,6 @@ begin
   edFillColor.Text  := '$' + inttohex(fillColor, 8);
   edPenColor.Text   := '$' + inttohex(penColor, 8);
 
-  with pnlTop do
-  begin
-    Bitmap.Width := RectWidth(InnerClientRect);
-    Bitmap.Height := RectHeight(InnerClientRect);
-    AutoCenter := false;
-  end;
   edPenColorChange(nil);
 
   setLength(dashes, 2);
@@ -231,13 +225,16 @@ begin
   buttonPath := TSmoothPath.Create;
 
   //SETUP THE DISPLAY PANEL
-  pnlMain.BorderWidth := DPI(16);
-  pnlMain.BevelInner := bvLowered;
-  pnlMain.TabStop := true; //enables keyboard controls
-  pnlMain.FocusedColor := clGradientInactiveCaption;
-  pnlMain.Scale := 1;
-  pnlMain.OnBeginPaint := BeginPanelPaint;
-  pnlMain.OnKeyDown := PanelKeyDown;
+  pnlMain := TBitmapPanel.Create(self);
+  pnlMain.Parent := self;
+  pnlMain.Align  := alClient;
+  pnlMain.OnMouseDown   := pnlMainMouseDown;
+  pnlMain.OnMouseMove   := pnlMainMouseMove;
+  pnlMain.OnMouseUp     := pnlMainMouseUp;
+  pnlMain.OnDblClick    := pnlMainDblClick;
+  pnlMain.PopupMenu     := PopupMenu1;
+  pnlMain.OnBeginPaint  := BeginPanelPaint;
+  pnlMain.OnKeyDown     := PanelKeyDown;
 
   //SETUP LAYEREDIMAGE32
   rec := pnlMain.InnerClientRect;
@@ -470,7 +467,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TFrmMain.BeginPanelPaint(Sender: TObject);
+procedure TFrmMain.BeginPanelPaint(Sender: TObject;
+  dstCanvas: TCanvas; const srcRect, dstRect: TRect);
 var
   dc: HDC;
 begin
@@ -564,7 +562,7 @@ begin
   moveType := mtNone;
   //convert pnlMain client coordinates to bitmap coordinates
   pt := Types.Point(X,Y);
-  if not pnlMain.ClientToBitmap(pt) then Exit;
+  pt := pnlMain.ClientToImage(pt);
   clickPoint := pt;
 
   //get the layer that was clicked (if any)
@@ -589,8 +587,8 @@ begin
     moveType := mtLayer; //ie a completed layer (line or polygon)
 
   //disable pnlMain scrolling if we're about to move a layer
-  pnlMain.ZoomAndScrollEnabled := moveType = mtNone;
-
+  pnlMain.AllowZoom := moveType = mtNone;
+  pnlMain.AllowScroll := pnlMain.AllowZoom;
   UpdateImage;
 end;
 //------------------------------------------------------------------------------
@@ -604,7 +602,7 @@ var
   angle: double;
 begin
   pt := Types.Point(X,Y);
-  if not pnlMain.ClientToBitmap(pt) then Exit;
+  pt := pnlMain.ClientToImage(pt);
 
   if moveType = mtNone then
   begin
@@ -657,7 +655,7 @@ procedure TFrmMain.pnlMainMouseUp(Sender: TObject; Button: TMouseButton;
 begin
   moveType := mtNone;
   //re-enable pnlMain zoom and scroll
-  pnlMain.ZoomAndScrollEnabled := true;
+  pnlMain.AllowZoom := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -780,8 +778,7 @@ end;
 procedure TFrmMain.PanelKeyDown(Sender: TObject; var Key: Word;
   Shift: TShiftState);
 var
-  i, dist, dx, dy: integer;
-  angle: double;
+  i, dist: integer;
   pt: TPointD;
 begin
   //keyboard control of buttons

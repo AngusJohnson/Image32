@@ -1,9 +1,9 @@
 object FrmMain: TFrmMain
   Left = 554
   Top = 394
-  Width = 489
-  Height = 526
   Caption = 'Image, Arrows & Text'
+  ClientHeight = 467
+  ClientWidth = 473
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -17,22 +17,9 @@ object FrmMain: TFrmMain
   OnResize = FormResize
   PixelsPerInch = 96
   TextHeight = 14
-  object pnlMain: TPanel
-    Left = 0
-    Top = 105
-    Width = 473
-    Height = 337
-    Align = alClient
-    PopupMenu = PopupMenu1
-    TabOrder = 1
-    OnDblClick = pnlMainDblClick
-    OnMouseDown = pnlMainMouseDown
-    OnMouseMove = pnlMainMouseMove
-    OnMouseUp = pnlMainMouseUp
-  end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 442
+    Top = 441
     Width = 473
     Height = 26
     Panels = <>
@@ -166,7 +153,6 @@ object FrmMain: TFrmMain
       Width = 80
       Height = 22
       Style = csDropDownList
-      ItemHeight = 14
       ItemIndex = 0
       TabOrder = 5
       Text = 'None'
@@ -185,7 +171,6 @@ object FrmMain: TFrmMain
       Width = 80
       Height = 22
       Style = csDropDownList
-      ItemHeight = 14
       ItemIndex = 1
       TabOrder = 6
       Text = 'Simple'

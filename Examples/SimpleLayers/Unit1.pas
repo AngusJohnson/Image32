@@ -5,11 +5,10 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls, Dialogs,
-  Image32, Image32_Layers, BitmapPanels;
+  Image32, Image32_Layers, ImagePanels;
 
 type
   TForm1 = class(TForm)
-    Panel1: TPanel;
     MainMenu1: TMainMenu;
     File1: TMenuItem;
     Exit1: TMenuItem;
@@ -44,11 +43,11 @@ type
     procedure mnuExitClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure Panel1MouseDown(Sender: TObject; Button: TMouseButton;
+    procedure pnlMainMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure Panel1MouseMove(Sender: TObject; Shift: TShiftState; X,
+    procedure pnlMainMouseMove(Sender: TObject; Shift: TShiftState; X,
       Y: Integer);
-    procedure Panel1MouseUp(Sender: TObject; Button: TMouseButton;
+    procedure pnlMainMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure mnuSaveClick(Sender: TObject);
     procedure mnuCopytoClipboardClick(Sender: TObject);
@@ -62,6 +61,7 @@ type
     procedure mnuPastefromClipboardClick(Sender: TObject);
     procedure mnuAddImageClick(Sender: TObject);
   private
+    pnlMain: TBitmapPanel;
     masterImageList: TImageList32;
     layeredImage32: TLayeredImage32;
     activeLayerMouseDown: Boolean;
@@ -169,24 +169,26 @@ begin
   DefaultButtonSize := DPI(10); //ie the layered image's control buttons
 
   //SETUP THE DISPLAY PANEL
-  Panel1.BorderWidth := DPI(16);
-  Panel1.BevelInner := bvLowered;
-  //set Panel1.Tabstop := true to enable keyboard controls
-  Panel1.TabStop := true;
-  Panel1.FocusedColor := clGradientInactiveCaption;
-  Panel1.Scale := 1;
+  pnlMain := TBitmapPanel.Create(self);
+  pnlMain.Parent := self;
+  pnlMain.Align := alClient;
+  pnlMain.OnMouseDown := pnlMainMouseDown;
+  pnlMain.OnMouseMove := pnlMainMouseMove;
+  pnlMain.OnMouseUp := pnlMainMouseUp;
+  pnlMain.PopupMenu := PopupMenu1;
+
   //enable (image) file drop
-  Panel1.FileDropEnabled := true;
-  Panel1.OnFileDrop := DoDropImage;
+  pnlMain.FileDropEnabled := true;
+  pnlMain.OnFileDrop := DoDropImage;
   //capture key events so ESC will clear ActiveLayer
-  Panel1.OnKeyDown := DoKeyDown;
+  pnlMain.OnKeyDown := DoKeyDown;
 
   //MASTER IMAGE LIST
   masterImageList := TImageList32.Create;
 
   //SETUP LAYEREDIMAGE32
 
-  rec := Panel1.InnerClientRect;
+  rec := pnlMain.InnerClientRect;
   layeredImage32 :=
     TLayeredImage32.Create(RectWidth(rec), RectHeight(rec));
   //we don't need to worry about BackgroundColor here as
@@ -389,8 +391,8 @@ begin
   if not TImage32.IsRegisteredFormat(ExtractFileExt(filename)) then Exit;
 
   GetCursorPos(pt);
-  pt := Panel1.ScreenToClient(pt);
-  Panel1.ClientToBitmap(pt);
+  pt := pnlMain.ScreenToClient(pt);
+  pt := pnlMain.ClientToImage(pt);
 
   masterImage := TImage32.Create;
   masterImageList.Add(masterImage);
@@ -412,11 +414,11 @@ begin
   {$IFDEF SETSIZE}
   Panel1.Bitmap.SetSize(layeredImage32.Width, layeredImage32.Height);
   {$ELSE}
-  Panel1.Bitmap.Width := layeredImage32.Width;
-  Panel1.Bitmap.Height := layeredImage32.Height;
+  pnlMain.Bitmap.Width := layeredImage32.Width;
+  pnlMain.Bitmap.Height := layeredImage32.Height;
   {$ENDIF}
-  layeredImage32.GetMergedImage(false).CopyToDc(Panel1.Bitmap.Canvas.Handle);
-  Panel1.Refresh;
+  layeredImage32.GetMergedImage(false).CopyToDc(pnlMain.Bitmap.Canvas.Handle);
+  pnlMain.Refresh;
 end;
 //------------------------------------------------------------------------------
 
@@ -458,20 +460,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.Panel1MouseDown(Sender: TObject; Button: TMouseButton;
+procedure TForm1.pnlMainMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
   clickedLayer: TLayer32;
 begin
   clickPoint := Types.Point(X,Y);
   //convert clickPoint from Panel coordinates to bitmap coordinates
-  if not Panel1.ClientToBitmap(clickPoint) then Exit;
+  clickPoint := pnlMain.ClientToImage(clickPoint);
 
   //get the clicked layer (if any)
   clickedLayer := layeredImage32.GetLayerAt(clickPoint);
 
   //disable panel1 scrolling if we're about to move an image or a button
-  panel1.ZoomAndScrollEnabled := not Assigned(clickedLayer);
+  pnlMain.AllowZoom := not Assigned(clickedLayer);
+  pnlMain.AllowScroll := pnlMain.AllowZoom;
 
   //if a control button was clicked then get ready to move it
   if Assigned(clickedLayer) and (clickedLayer is TButtonDesignerLayer32) then
@@ -495,7 +498,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.Panel1MouseMove(Sender: TObject; Shift: TShiftState; X,
+procedure TForm1.pnlMainMouseMove(Sender: TObject; Shift: TShiftState; X,
   Y: Integer);
 var
   dx, dy: integer;
@@ -504,7 +507,7 @@ var
   rec: TRect;
 begin
   pt := Types.Point(X,Y);
-  if not Panel1.ClientToBitmap(pt) then Exit;
+  pt := pnlMain.ClientToImage(pt);
 
   dx := pt.X - clickPoint.X;
   dy := pt.Y - clickPoint.Y;
@@ -526,21 +529,21 @@ begin
     //not moving anything so just update the cursor
     layer := layeredImage32.GetLayerAt(pt);
     if Assigned(layer) then
-      Panel1.Cursor := layer.CursorId else
-      Panel1.Cursor := crDefault;
+      pnlMain.Cursor := layer.CursorId else
+      pnlMain.Cursor := crDefault;
     Exit;
   end;
   PaintLayeredImage;
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.Panel1MouseUp(Sender: TObject; Button: TMouseButton;
+procedure TForm1.pnlMainMouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   activeLayerMouseDown := false;
   activeButtonLayer := nil;
   //re-enable Panel1 zoom and scroll
-  Panel1.ZoomAndScrollEnabled := true;
+  pnlMain.AllowZoom := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -618,8 +621,8 @@ begin
   if Sender = PopupMenu1 then
   begin
     GetCursorPos(popupPoint);
-    popupPoint := Panel1.ScreenToClient(popupPoint);
-    Panel1.ClientToBitmap(popupPoint);
+    popupPoint := pnlMain.ScreenToClient(popupPoint);
+    popupPoint := pnlMain.ClientToImage(popupPoint);
   end else
     popupPoint := Point(layeredImage32.MidPoint);
 end;

@@ -16,18 +16,6 @@ object Form1: TForm1
   OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 14
-  object Panel1: TPanel
-    Left = 0
-    Top = 0
-    Width = 403
-    Height = 386
-    Align = alClient
-    PopupMenu = PopupMenu1
-    TabOrder = 0
-    OnMouseDown = Panel1MouseDown
-    OnMouseMove = Panel1MouseMove
-    OnMouseUp = Panel1MouseUp
-  end
   object StatusBar1: TStatusBar
     Left = 0
     Top = 386

@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.44                                                            *
-* Date      :  1 March 2020                                                    *
+* Version   :  1.46                                                            *
+* Date      :  30 March 2020                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -228,12 +228,12 @@ type
   function Grow(const path, normals: TArrayOfPointD; delta: double;
     joinStyle: TJoinStyle; miterLimit: double): TArrayOfPointD;
 
-  //SmoothLine: based on
+  //SmoothToBezier: this function is based on -
   //"An Algorithm for Automatically Fitting Digitized Curves"
   //by Philip J. Schneider in "Graphics Gems", Academic Press, 1990
-  function SmoothLine(const path: TArrayOfPointD; closed: Boolean;
+  function SmoothToBezier(const path: TArrayOfPointD; closed: Boolean;
     tolerance: double; minSegLength: double = 2): TArrayOfPointD; overload;
-  function SmoothLine(const paths: TArrayOfArrayOfPointD; closed: Boolean;
+  function SmoothToBezier(const paths: TArrayOfArrayOfPointD; closed: Boolean;
     tolerance: double; minSegLength: double = 2): TArrayOfArrayOfPointD; overload;
 
 
@@ -2677,7 +2677,7 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// SmoothLine() support structures and functions
+// SmoothToBezier() support structures and functions
 //------------------------------------------------------------------------------
 
 type
@@ -3294,20 +3294,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SmoothLine(const path: TArrayOfPointD; closed: Boolean;
+function SmoothToBezier(const path: TArrayOfPointD; closed: Boolean;
   tolerance: double; minSegLength: double): TArrayOfPointD;
 var
   paths, solution: TArrayOfArrayOfPointD;
 begin
   SetLength(paths, 1);
   paths[0] := path;
-  solution := SmoothLine(paths, closed, tolerance, minSegLength);
+  solution := SmoothToBezier(paths, closed, tolerance, minSegLength);
   if solution <> nil then
     Result := solution[0];
 end;
 //------------------------------------------------------------------------------
 
-function SmoothLine(const paths: TArrayOfArrayOfPointD; closed: Boolean;
+function SmoothToBezier(const paths: TArrayOfArrayOfPointD; closed: Boolean;
   tolerance: double; minSegLength: double): TArrayOfArrayOfPointD;
 var
   i,j, len: integer;

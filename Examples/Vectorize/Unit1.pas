@@ -5,7 +5,7 @@ interface
 uses
   Windows, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls,
-  Image32, BitmapPanels, Dialogs, StdCtrls;
+  Image32, ImagePanels, Dialogs, StdCtrls;
 
 type
   TForm1 = class(TForm)
@@ -28,7 +28,6 @@ type
     Memo1: TMemo;
     pnlDisplayParent: TPanel;
     pnlSmooth: TPanel;
-    DisplayPanel: TPanel;
     TrackBar1: TTrackBar;
     rbBeziers: TRadioButton;
     rbFlat: TRadioButton;
@@ -52,6 +51,7 @@ type
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure TrackBar1Change(Sender: TObject);
   private
+    pnlMain: TBitmapPanel;
     masterImg, workImg: TImage32;
     rawPaths, bezierPaths, flattenedPaths: TArrayOfArrayOfPointD;
     procedure DisplayImage;
@@ -90,10 +90,8 @@ begin
     result := result + PointToStr(path[i]);
   len := Length(Result);
   SetLength(Result, len+2);
-  Result[len-1] := #13;
-  Result[len] := #10;
-  Result[len+1] := #13;
-  Result[len+2] := #10;
+  Result[len-1] := #13; Result[len]   := #10;
+  Result[len+1] := #13; Result[len+2] := #10;
 end;
 //------------------------------------------------------------------------------
 
@@ -109,23 +107,20 @@ end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
-  //SETUP THE BITMAP DISPLAY PANEL
   pnlDisplayParent.Align := alClient;
-  DisplayPanel.BorderWidth := DPI(16);
-  //Panel1.BevelInner := bvLowered;     //set in IDE
-  //Panel1.TabStop := true;             //set in IDE (for keyboard controls)
-  DisplayPanel.FocusedColor := clGradientInactiveCaption;
-  DisplayPanel.Scale := 1;
+
+  //SETUP THE BITMAP DISPLAY PANEL
+  pnlMain := TBitmapPanel.Create(self);
+  pnlMain.Parent := pnlDisplayParent;
+  pnlMain.Align := alClient;
+
   //enable image transparency - at least, as far as the panel background ;)
-  DisplayPanel.Bitmap.PixelFormat := pf32bit;
-  //and set initial image scaling
-  DisplayPanel.ScaleType := stFit;
+  pnlMain.Bitmap.PixelFormat := pf32bit;
 
   masterImg := TImage32.Create;
-  //masterImg.LoadFromResource('sample2', 'PNG');
-  masterImg.LoadFromFile('floorplan.png');
-  workImg := TImage32.Create;
+  masterImg.LoadFromResource('sample2', 'PNG');
 
+  workImg := TImage32.Create;
   DisplayImage;
 end;
 //------------------------------------------------------------------------------
@@ -171,15 +166,15 @@ begin
 
     if mnuShowSmoothedOnly.Checked then
     begin
-      //note: SmoothLine returns poly-bezier paths
-      bezierPaths := SmoothLine(rawPaths, true, TrackBar1.Position, 2);
+      //note: SmoothToBezier returns poly-bezier paths
+      bezierPaths := SmoothToBezier(rawPaths, true, TrackBar1.Position, 2);
       //and finally 'flatten' the poly-bezier paths
       flattenedPaths := FlattenCBezier(bezierPaths);
     end
     else if mnuShowSimplifiedSmoothed.Checked then
     begin
-      //note: SmoothLine returns poly-bezier paths (not flattened paths)
-      bezierPaths := SmoothLine(flattenedPaths, true, TrackBar1.Position, 2);
+      //note: SmoothToBezier returns poly-bezier paths (not flattened paths)
+      bezierPaths := SmoothToBezier(flattenedPaths, true, TrackBar1.Position, 2);
       //and finally 'flatten' the poly-beziers
       flattenedPaths := FlattenCBezier(bezierPaths);
     end;
@@ -201,12 +196,12 @@ begin
   {$IFDEF SETSIZE}
   DisplayPanel.Bitmap.SetSize(displayImg.Width, displayImg.Height);
   {$ELSE}
-  DisplayPanel.Bitmap.Width := workImg.Width;
-  DisplayPanel.Bitmap.Height := workImg.Height;
+  pnlMain.Bitmap.Width := workImg.Width;
+  pnlMain.Bitmap.Height := workImg.Height;
   {$ENDIF}
 
-  DisplayPanel.ClearBitmap; //otherwise images will be blended
-  workImg.CopyToDc(DisplayPanel.Bitmap.Canvas.Handle);
+  pnlMain.ClearBitmap; //otherwise images will be blended
+  workImg.CopyToDc(pnlMain.Bitmap.Canvas.Handle);
 end;
 //------------------------------------------------------------------------------
 
@@ -215,7 +210,7 @@ begin
   if not OpenDialog1.Execute then Exit;
   btnCloseMemoClick(nil);
   masterImg.LoadFromFile(OpenDialog1.FileName);
-  DisplayPanel.ScaleType := stFit;
+  pnlMain.ScaleToFit;
   DisplayImage;
 end;
 //------------------------------------------------------------------------------
@@ -229,7 +224,7 @@ end;
 procedure TForm1.pnlSmoothExit(Sender: TObject);
 begin
   pnlSmooth.Color := clBtnFace;
-  if DisplayPanel.CanFocus then DisplayPanel.SetFocus;
+  if pnlMain.CanFocus then pnlMain.SetFocus;
 end;
 //------------------------------------------------------------------------------
 
@@ -280,7 +275,7 @@ begin
   if not pnlDisplayParent.Visible then
   begin
     pnlDisplayParent.Show;
-    DisplayPanel.SetFocus;
+    pnlMain.SetFocus;
     pnlMemo.Hide;
   end;
 end;
