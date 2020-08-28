@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 1.45
-Released: 10 March 2020
+Latest version: 1.47
+Released: 28 August 2020
 
 Copyright © 2019-2020 Angus Johnson
 Freeware released under Boost Software License
@@ -12,11 +12,24 @@ download : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
+Version: 1.47
+  Added Image32_FMX
+    Provides FMX support (excluding text rendering).
+    This unit uses FMX to load and save stored images
+    (ie instead of using Image32_BMP, Image32_PNG etc).
+  Minor tweaks
+
+Version: 1.46
+  Replaced BitmapPanels unit with ImagePanels unit
+  Changes in Image32 unit
+    ScaleToFit method modified
+    ScaleToFitCentered method added
+    CopyToDc method overloaded
+  
 Version: 1.45
-Changes in Image32_Vector
-  Renamed the SmoothLine function SmoothToBezier
-  
-  
+  Changes in Image32_Vector
+    Renamed the SmoothLine function SmoothToBezier
+
 Version: 1.44
   Changes in BitmapPanels 
     Fixed a significant bug introduced in the previous update :(

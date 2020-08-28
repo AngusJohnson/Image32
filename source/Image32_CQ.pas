@@ -2,8 +2,8 @@ unit Image32_CQ;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.38                                                            *
-* Date      :  20 January 2020                                                 *
+* Version   :  1.47                                                            *
+* Date      :  28 August 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Color reduction for TImage32                                    *

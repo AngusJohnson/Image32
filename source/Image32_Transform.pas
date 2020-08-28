@@ -2,10 +2,10 @@ unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.44                                                            *
-* Date      :  1 March 2020                                                    *
+* Version   :  1.47                                                            *
+* Date      :  28 August 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2020                                         *
+* Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)

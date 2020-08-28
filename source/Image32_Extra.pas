@@ -2,10 +2,10 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.37                                                            *
-* Date      :  15 January 2020                                                 *
+* Version   :  1.47                                                            *
+* Date      :  28 August 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2020                                         *
+* Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
 *           :  belong in other modules.                                        *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
@@ -91,7 +91,8 @@ procedure DrawButton(img: TImage32; const pt: TPointD;
 
 //Vectorize: convert an image into polygon vectors
 function Vectorize(img: TImage32; compareColor: TColor32;
-  compareFunc: TCompareFunction; tolerance: Integer): TArrayOfArrayOfPointD;
+  compareFunc: TCompareFunction; colorTolerance: Integer;
+  roundingTolerance: integer = 2): TArrayOfArrayOfPointD;
 
 function VectorizeMask(const mask: TArrayOfByte;
   maskWidth: integer): TArrayOfArrayOfPointD;
@@ -1612,10 +1613,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Tidy(const poly: TArrayOfPointD): TArrayOfPointD;
+function Tidy(const poly: TArrayOfPointD; tolerance: integer): TArrayOfPointD;
 var
   i,j, highI: integer;
   prev: TPointD;
+  tolSqrd: double;
 begin
   highI := High(poly);
   while  (HighI >= 0) and PointsEqual(poly[highI], poly[0]) do dec(highI);
@@ -1624,7 +1626,7 @@ begin
     Result := nil;
     Exit;
   end;
-
+  tolSqrd := Sqr(Max(2.02, Min(16.1, tolerance + 0.01)));
   SetLength(Result, highI +1);
   prev := poly[highI];
   Result[0] := prev;
@@ -1632,8 +1634,8 @@ begin
   j := 1;
   for i := 1 to highI -1 do
   begin
-    if ((DistanceSqrd(prev, Result[j]) > 2.1) and
-        (DistanceSqrd(Result[j], poly[i]) > 2.1)) or
+    if ((DistanceSqrd(prev, Result[j]) > tolSqrd) and
+        (DistanceSqrd(Result[j], poly[i]) > tolSqrd)) or
       (TurnsRight(prev, result[j], poly[i]) or
         TurnsLeft(result[j], poly[i], poly[i+1])) then
     begin
@@ -1642,8 +1644,8 @@ begin
     end;
     result[j] := poly[i];
   end;
-  if ((DistanceSqrd(prev, Result[j]) > 2.1) and
-    (DistanceSqrd(Result[j], Result[0]) > 2.1)) or
+  if ((DistanceSqrd(prev, Result[j]) > tolSqrd) and
+    (DistanceSqrd(Result[j], Result[0]) > tolSqrd)) or
     TurnsRight(prev, result[j], Result[0]) or
     TurnsLeft(result[j], Result[0], Result[1]) then
       SetLength(Result, j +1) else
@@ -1652,15 +1654,16 @@ end;
 //------------------------------------------------------------------------------
 
 function Vectorize(img: TImage32; compareColor: TColor32;
-  compareFunc: TCompareFunction; tolerance: Integer): TArrayOfArrayOfPointD;
+  compareFunc: TCompareFunction; colorTolerance: Integer;
+  roundingTolerance: integer): TArrayOfArrayOfPointD;
 var
   i: integer;
   mask: TArrayOfByte;
 begin
-  mask := GetBoolMask(img, compareColor, compareFunc, tolerance);
+  mask := GetBoolMask(img, compareColor, compareFunc, colorTolerance);
   Result := VectorizeMask(mask, img.Width);
   for i := 0 to high(Result) do
-    Result[i] := Tidy(Result[i]);
+    Result[i] := Tidy(Result[i], roundingTolerance);
 end;
 //------------------------------------------------------------------------------
 

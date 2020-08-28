@@ -80,6 +80,8 @@ type
     procedure SetOffset(const value: TPoint);
     function GetInnerClientRect: TRect;
     procedure SetScale(scale: double);
+    procedure SetScaleMin(value: double);
+    procedure SetScaleMax(value: double);
     //ScaleAtPoint: zooms in or out keeping 'pt' stationary relative to display
     procedure ScaleAtPoint(scaleDelta: double; const pt: TPoint);
     procedure SetSize(size: TSize);
@@ -127,8 +129,8 @@ type
     property Scale: double read fScale write SetScale;
     //ImageSize: ImageSize affects both scrollings and OnDrawImage bounds
     property ImageSize: TSize read fImageSize write SetSize;
-    property ScaleMin: double read fScaleMin write fScaleMin;
-    property ScaleMax: double read fScaleMax write fScaleMax;
+    property ScaleMin: double read fScaleMin write SetScaleMin;
+    property ScaleMax: double read fScaleMax write SetScaleMax;
     //ShowScrollButtons: defaults to ssbFocused (ie only when Panel has focus)
     property ShowScrollButtons : TShowScrollBtns
       read fShowScrollBtns write SetShowScrollButtons;
@@ -213,8 +215,8 @@ var
   MinBorderWidth: integer = 0; //see initialization
 
 const
-  MinBitmapScale = 0.05;
-  MaxBitmapScale = 20;
+  MinBitmapScale = 0.001;
+  MaxBitmapScale = 1000;
   tolerance = 0.01;
 
 type
@@ -377,8 +379,8 @@ begin
   fFocusedColor := clActiveCaption;
 
   fScale := 1.0;
-  fScaleMin := MinBitmapScale;
-  fScaleMax := MaxBitmapScale;
+  fScaleMin := 0.05;
+  fScaleMax := 20;
   fImageSize := Size(200,200);
 end;
 //------------------------------------------------------------------------------
@@ -510,6 +512,18 @@ begin
   fScale := scale;
   UpdateOffsetDelta(false);
   Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImagePanel.SetScaleMin(value: double);
+begin
+  fScaleMin := Max(MinBitmapScale, Min(fScaleMax, value));
+end;
+//------------------------------------------------------------------------------
+
+procedure TImagePanel.SetScaleMax(value: double);
+begin
+  fScaleMax := Max(fScaleMin, Min(MaxBitmapScale, value));
 end;
 //------------------------------------------------------------------------------
 
@@ -796,11 +810,6 @@ end;
 type TControl = class(Controls.TControl); //access protected Color property
 
 procedure TImagePanel.Paint;
-var
-  marg, btnMin: integer;
-  tmpRec, innerRec, srcRec, dstRec: TRect;
-  backgroundPainted: Boolean;
-  pt: TPoint;
 
   procedure DrawFrame(rec: TRect; tlColor, brColor: TColor; width: integer);
   var
@@ -816,7 +825,7 @@ var
       Canvas.PolyLine([bl, rec.TopLeft, tr]);
       Canvas.Pen.Color := brColor;
       Canvas.PolyLine([tr, rec.BottomRight, bl]);
-      Types.InflateRect(rec, -1, -1);
+      InflateRect(rec, -1, -1);
       dec(width);
     end;
   end;
@@ -833,49 +842,16 @@ var
     Canvas.LineTo(rec.Left, rec.Bottom);
   end;
 
+var
+  marg, btnMin: integer;
+  tmpRec, innerRec, srcRec, dstRec: TRect;
+  backgroundPainted: Boolean;
+  pt: TPoint;
 begin
-  //paint the outer bevel
-  tmpRec := ClientRect;
-  case BevelOuter of
-    bvLowered: DrawFrame(tmpRec, clBtnShadow, clBtnHighlight, BevelWidth);
-    bvRaised:  DrawFrame(tmpRec, clBtnHighlight, clBtnShadow, BevelWidth);
-  end;
-
-  //paint the border
-  InflateRect(tmpRec, -BevelWidth, -BevelWidth);
-  if Focused then
-    DrawFrame(tmpRec, fFocusedColor, fFocusedColor, BorderWidth) else
-    DrawFrame(tmpRec, Color, Color, BorderWidth);
-  InflateRect(tmpRec, -BorderWidth, -BorderWidth);
-
-  //paint the inner bevel
-  case BevelInner of
-    bvLowered: DrawFrame(tmpRec, clBtnShadow, clBtnHighlight, BevelWidth);
-    bvRaised:  DrawFrame(tmpRec, clBtnHighlight, clBtnShadow, BevelWidth);
-  end;
-
+  //calculate un-scaled source rectangle that corresponds with dstRec
   marg := GetInnerMargin;
   innerRec := GetInnerClientRect;
   dstRec := innerRec;
-
-  //paint InnerClientRect
-  backgroundPainted := ParentBackground and
-{$IFDEF STYLESERVICES}
-    StyleServices.Enabled and (seClient in StyleElements) and
-{$ELSE}
-    ThemeServices.ThemesEnabled and
-{$ENDIF}
-    Succeeded(DrawThemeParentBackground(Handle, Canvas.Handle, @dstRec));
-
-  if not backgroundPainted then
-  begin
-    if ParentColor then
-      Canvas.Brush.Color := TControl(parent).Color else
-      Canvas.Brush.Color := self.Color;
-    Canvas.FillRect(dstRec);
-  end;
-
-  //calculate un-scaled source rectangle that corresponds with dstRec
   srcRec := dstRec;
   OffsetRect(srcRec, -marg, -marg);
   ScaleRect(srcRec, 1/fScale);
@@ -897,9 +873,7 @@ begin
     srcRec.Bottom := fImageSize.cy;
   end;
 
-  //clamp offset so we don't scroll outside the draw surface bounds
-  btnMin := GetMinScrollBtnSize;
-
+  //calc offsets
   with fScrollbarHorz do
     if (srcOffset < 0) or (btnSize = 0) then srcOffset := 0;
   with fScrollbarVert do
@@ -907,16 +881,60 @@ begin
 
   if fScrollbarVert.srcOffset > fScrollbarVert.maxSrcOffset then
     fScrollbarVert.srcOffset := Round(fScrollbarVert.maxSrcOffset);
-
   if fScrollbarHorz.srcOffset > fScrollbarHorz.maxSrcOffset then
     fScrollbarHorz.srcOffset := Round(fScrollbarHorz.maxSrcOffset);
-
   OffsetRect(srcRec, fScrollbarHorz.srcOffset, fScrollbarVert.srcOffset);
+
+  //paint innerRec background
+  backgroundPainted := ParentBackground and
+  {$IFDEF STYLESERVICES}
+    StyleServices.Enabled and (seClient in StyleElements) and
+  {$ELSE}
+    ThemeServices.ThemesEnabled and
+  {$ENDIF}
+    Succeeded(DrawThemeParentBackground(Handle, Canvas.Handle, @innerRec));
+  if not backgroundPainted then
+  begin
+    if ParentColor then
+      Canvas.Brush.Color := TControl(parent).Color else
+      Canvas.Brush.Color := self.Color;
+    Canvas.FillRect(innerRec);
+  end;
+
+  //draw the image
+  if Assigned(fOnDrawImage) then
+  begin
+    fOnDrawImage(Self, Canvas, srcRec, dstRec);
+    //prevent recursive paints (in case Invalidate etc called in fOnDrawImage)
+    RedrawWindow(Handle, nil, 0, RDW_NOERASE or RDW_NOINTERNALPAINT or RDW_VALIDATE);
+  end;
+
+  //paint the outer bevel
+  tmpRec := ClientRect;
+  case BevelOuter of
+    bvLowered: DrawFrame(tmpRec, clBtnShadow, clBtnHighlight, BevelWidth);
+    bvRaised:  DrawFrame(tmpRec, clBtnHighlight, clBtnShadow, BevelWidth);
+  end;
+
+  //paint the border
+  InflateRect(tmpRec, -BevelWidth, -BevelWidth);
+  if Focused then
+    DrawFrame(tmpRec, fFocusedColor, fFocusedColor, BorderWidth) else
+    DrawFrame(tmpRec, Color, Color, BorderWidth);
+  InflateRect(tmpRec, -BorderWidth, -BorderWidth);
+
+  //paint the inner bevel
+  case BevelInner of
+    bvLowered: DrawFrame(tmpRec, clBtnShadow, clBtnHighlight, BevelWidth);
+    bvRaised:  DrawFrame(tmpRec, clBtnHighlight, clBtnShadow, BevelWidth);
+  end;
 
   if (BorderWidth >= MinBorderWidth) and
     fAllowScroll and ((fShowScrollBtns = ssAlways) or
     (Focused and (fShowScrollBtns = ssbFocused))) then
   begin
+    btnMin := GetMinScrollBtnSize;
+
     //draw vertical scrollbar
     with fScrollbarVert do
       if (btnSize > 0) then
@@ -944,18 +962,6 @@ begin
         else Canvas.Brush.Color := MakeDarker(Color, 20);
         DrawScrollButton(tmpRec);
       end;
-  end;
-
-  //if dstRec is smaller than InnerClientRect then paint the background
-  Canvas.Brush.Color := Color;
-  if (fScrollbarHorz.BtnSize = 0) or (fScrollbarVert.BtnSize = 0) then
-    Canvas.FillRect(innerRec);
-
-  if Assigned(fOnDrawImage) then
-  begin
-    fOnDrawImage(Self, Canvas, srcRec, dstRec);
-    //prevent recursive paints (in case Invalidate etc called in fOnDrawImage)
-    RedrawWindow(Handle, nil, 0, RDW_NOERASE or RDW_NOINTERNALPAINT or RDW_VALIDATE);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1155,7 +1161,8 @@ begin
   fBmp := TPnlBitmap.Create;
   TPnlBitmap(fBmp).fOwner := self;
   Self.OnDrawImage := DrawImage;
-  fBmp.SetSize(200, 200);
+  fBmp.Width := 200;
+  fBmp.Height := 200;
 end;
 //------------------------------------------------------------------------------
 

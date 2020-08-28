@@ -2,10 +2,10 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.37                                                            *
-* Date      :  15 January 2020                                                 *
+* Version   :  1.47                                                            *
+* Date      :  28 August 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2020                                         *
+* Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -539,10 +539,9 @@ begin
   for i := highI downto 0 do
   begin
     inc(j, psl.count);
-    //nb: 1. GetMem is faster than a dynamic array as it's not initialized
-    //    2. (j + 1) prevents a very rare AV.
+    //nb: GetMem is faster than dynamic arrays because it's not initialized
     if j > 0 then
-      GetMem(psl.fragments, (j +1) * SizeOf(TFragment));
+      GetMem(psl.fragments, j * SizeOf(TFragment));
     psl.count := 0;
     psl.minX := clipRight;
     psl.maxX := 0;

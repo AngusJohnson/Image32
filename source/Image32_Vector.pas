@@ -2,10 +2,10 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.46                                                            *
-* Date      :  30 March 2020                                                   *
+* Version   :  1.47                                                            *
+* Date      :  28 August 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2020                                         *
+* Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -1481,7 +1481,7 @@ procedure MatrixRotate(var matrix: TMatrixD;
   const center: TPointD; angRad: double);
 var
   m: TMatrixD;
-  sn, cs: double;
+  sn, cs: extended; //D7 compatible
   origOffset: Boolean;
 begin
   m := IdentityMatrix;

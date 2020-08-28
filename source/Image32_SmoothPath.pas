@@ -2,10 +2,10 @@ unit Image32_SmoothPath;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.41                                                            *
-* Date      :  14 February 2020                                                *
+* Version   :  1.47                                                            *
+* Date      :  28 August 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2020                                         *
+* Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Supports paths with multiple sub-curves                         *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
