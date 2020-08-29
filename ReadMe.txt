@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 1.47
-Released: 28 August 2020
+Latest version: 1.48
+Released: 29 August 2020
 
 Copyright © 2019-2020 Angus Johnson
 Freeware released under Boost Software License
@@ -11,6 +11,9 @@ Website  : http://www.angusj.com/delphi/image32/Docs/_Body.htm
 download : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
+
+Version: 1.48
+  Bugfixes to FMX framework support
 
 Version: 1.47
   Added Image32_FMX

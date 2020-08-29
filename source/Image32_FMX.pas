@@ -2,8 +2,8 @@ unit Image32_FMX;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.47                                                            *
-* Date      :  28 August 2020                                                  *
+* Version   :  1.48                                                            *
+* Date      :  29 August 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Image file format support for TImage32 and FMX                  *
@@ -119,8 +119,9 @@ var
 begin
   if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, svc) then
   begin
-    Value := svc.GetClipboard;
-    Result := not Value.IsEmpty and Value.IsType<TBitmap>;
+    value := svc.GetClipboard;
+    Result := Value.IsType<TBitmapSurface>;
+    if value.IsObject then value.AsObject.Free;
   end else
     Result := false;
 end;
@@ -133,23 +134,27 @@ var
   value: TValue;
   surf: TBitmapSurface;
 begin
-  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, svc) then
-  begin
-    Value := svc.GetClipboard;
-    Result := assigned(img32) and not Value.IsEmpty and
-      Value.IsType<TBitmapSurface> and
-      (Value.AsType<TBitmapSurface>.PixelFormat = TPixelFormat.BGRA);
-    if not Result then Exit;
+  Result := false;
+  if not assigned(img32) or
+    not TPlatformServices.Current.SupportsPlatformService(
+    IFMXClipboardService, svc) then Exit;
 
-    try
+  value := svc.GetClipboard;
+  if not Value.IsObject then Exit;
+
+  try
+    if Value.IsType<TBitmapSurface> and
+      (Value.AsType<TBitmapSurface>.PixelFormat = TPixelFormat.BGRA) then
+    begin
       surf := Value.AsType<TBitmapSurface>;
       img32.SetSize(surf.Width, surf.Height);
       Move(surf.Scanline[0]^, img32.PixelBase^, surf.Width * surf.Height * 4);
-    finally
-      surf.Free;
+      Result := true;
     end;
-
+  finally
+    value.AsObject.Free;
   end;
+
 end;
 
 //------------------------------------------------------------------------------
@@ -159,7 +164,6 @@ initialization
   TImage32.RegisterImageFormatClass('BMP', TImageFormat_FMX, cpLow);
   TImage32.RegisterImageFormatClass('PNG', TImageFormat_FMX, cpHigh);
   TImage32.RegisterImageFormatClass('JPG', TImageFormat_FMX, cpLow);
-  TImage32.RegisterImageFormatClass('JPEG', TImageFormat_FMX, cpLow);
   TImage32.RegisterImageFormatClass('GIF', TImageFormat_FMX, cpLow);
 
 end.

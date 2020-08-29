@@ -2,8 +2,8 @@ unit Image32_PNG;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.47                                                            *
-* Date      :  28 August 2020                                                  *
+* Version   :  1.48                                                            *
+* Date      :  29 August 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  PNG file format extension for TImage32                          *
@@ -229,10 +229,9 @@ var
   ms: TMemoryStream;
   clipboardNeedsClosing: Boolean;
 begin
-  result := (CF_PNG > 0) or (CF_IMAGEPNG > 0);
+  result := ((CF_PNG > 0) or (CF_IMAGEPNG > 0)) and OpenClipboard(0);
   if not result then Exit;
 
-  clipboardNeedsClosing := OpenClipboard(0);
   ms := TMemoryStream.Create;
   try
     with TImageFormat_PNG.Create do
@@ -265,7 +264,7 @@ begin
 
   finally
     ms.free;
-    if clipboardNeedsClosing then CloseClipboard;
+    CloseClipboard;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -282,13 +281,10 @@ var
   dataHdl: THandle;
   dataPtr: pointer;
   ms: TMemoryStream;
-  clipboardNeedsClosing: Boolean;
 begin
-  result := (CF_PNG > 0) or (CF_IMAGEPNG > 0);
-  if not result then Exit;
+  Result := ((CF_PNG > 0) or (CF_IMAGEPNG > 0)) and OpenClipboard(0);
+  if not Result then Exit;
 
-  //the clipboard may already be open, so ...
-  clipboardNeedsClosing := OpenClipboard(0);
   ms := TMemoryStream.Create;
   try
     dataHdl := 0;
@@ -321,7 +317,7 @@ begin
 
   finally
     ms.free;
-    if clipboardNeedsClosing then CloseClipboard;
+    CloseClipboard;
   end;
 end;
 

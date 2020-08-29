@@ -38,6 +38,9 @@
             {$IF COMPILERVERSION >= 23}
               {$DEFINE UITYPES}          //DelphiXE2   - added UITypes unit
               {$DEFINE STYLESERVICES}    //DelphiXE2   - added StyleServices unit
+              {$IF COMPILERVERSION >= 25}
+                {$LEGACYIFEND ON}        //DelphiXE4   - avoids compiler warning
+              {$IFEND}
             {$IFEND}
           {$IFEND}
         {$IFEND}

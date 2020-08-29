@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.47                                                            *
-* Date      :  28 August 2020                                                  *
+* Version   :  1.48                                                            *
+* Date      :  29 August 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -15,9 +15,11 @@ interface
 {$I Image32.inc}
 
 uses
-  Windows, SysUtils, Classes, {$IFDEF UITYPES} UITypes, {$ENDIF} Math;
+  {$IFDEF MSWINDOWS} Windows, {$ENDIF} Types, SysUtils, Classes,
+  {$IFDEF UITYPES} UITypes, {$ENDIF} Math;
 
 type
+  TRect = Types.TRect;
   TColor32 = type Cardinal;
   TPointD = record X, Y: double; end;
 
@@ -140,6 +142,8 @@ type
     //stretched if necessary to fit into dstRec.
     function CopyBlend(src: TImage32; srcRec, dstRec: TRect;
       blendFunc: TBlendFunction = nil): Boolean;
+
+{$IFDEF MSWINDOWS}
     //CopyFromDC: Copies an image from a Windows device context, erasing
     //any current image in TImage32. (eg copying from TBitmap.canvas.handle)
     procedure CopyFromDC(srcDc: HDC; const srcRect: TRect);
@@ -147,12 +151,12 @@ type
     procedure CopyToDc(dstDc: HDC; x: Integer = 0; y: Integer = 0;
       transparent: Boolean = true; bkColor: TColor32 = clNone32); overload;
     procedure CopyToDc(const srcRect: TRect; dstDc: HDC;
-      x: Integer = 0; y: Integer = 0;
-      transparent: Boolean = true;
+      x: Integer = 0; y: Integer = 0; transparent: Boolean = true;
       bkColor: TColor32 = clNone32); overload;
     procedure CopyToDc(const srcRect, dstRect: TRect; dstDc: HDC;
       transparent: Boolean = true;
       bkColor: TColor32 = clNone32); overload;
+{$ENDIF}
     function CopyToClipBoard: Boolean;
     class function CanPasteFromClipBoard: Boolean;
     function PasteFromClipBoard: Boolean;
@@ -218,7 +222,9 @@ type
     //See TImage32.RegisterImageFormatClass.
     function LoadFromFile(const filename: string): Boolean;
     function LoadFromStream(stream: TStream; const FmtExt: string = ''): Boolean;
+    {$IFDEF MSWINDOWS}
     function LoadFromResource(const resName, resType: string): Boolean;
+    {$ENDIF}
 
     //properties ...
 
@@ -356,8 +362,11 @@ type
   function GetWeightedPixel(img: TImage32; x256, y256: Integer): TColor32;
 
   //Color32: Converts a Graphics.TColor value into a TColor32 value.
+  {$IFDEF MSWINDOWS}
   function Color32(rgbColor: Integer): TColor32; overload;
+  {$ENDIF}
   function Color32(a, r, g, b: Byte): TColor32; overload;
+
   //RGBColor: Converts a TColor32 value into a COLORREF value
   function RGBColor(color: TColor32): Cardinal;
   function InvertColor(color: TColor32): TColor32;
@@ -435,10 +444,10 @@ var
   //DivTable[a,b] = a * 255/b (for a &lt;= b)
   DivTable: array [Byte,Byte] of Byte;
 
-  ScreenPixelsY: Integer;
+  ScreenPixelsY: Integer = 96;
   //DPI: Useful for DPIAware sizing of images and their container controls.<br>
   //Scales values relative to the display's resolution (PixelsPerInch).
-  DpiScale: double;
+  DpiScale: double = 1.0;
 
   //AND BECAUSE OLDER DELPHI COMPILERS (OLDER THAN D2006)
   //DON'T SUPPORT RECORD METHODS
@@ -453,9 +462,6 @@ var
 
 implementation
 
-var
-  ImageFormatClassList: TStringList; //list of supported file extensions
-
 const
   div255 : Double = 1 / 255;
   div6   : Double = 1 / 6;
@@ -465,6 +471,27 @@ type
 
   TByteArray = array[0..MaxInt -1] of Byte;
   PByteArray = ^TByteArray;
+
+  TImgFmtRec = record
+    Fmt: string;
+    Order: TClipboardPriority;
+    Obj: TImageFormatClass;
+  end;
+  PImgFmtRec = ^TImgFmtRec;
+
+var
+  ImageFormatClassList: TList; //list of supported file extensions
+
+
+//------------------------------------------------------------------------------
+
+function ImageFormatClassListSort(item1, item2: Pointer): integer;
+var
+  imgFmtRec1: PImgFmtRec absolute item1;
+  imgFmtRec2: PImgFmtRec absolute item2;
+begin
+  Result := Integer(imgFmtRec1.Order) - Integer(imgFmtRec2.Order);
+end;
 
 //------------------------------------------------------------------------------
 // Blend functions - used by TImage32.CopyBlend()
@@ -580,7 +607,7 @@ var
   curr, mast: THsl;
   val: Integer;
 begin
-  if TARGB(current).A = 0 then
+  if TARGB(current).A < $80 then
   begin
     Result := false;
     Exit;
@@ -662,35 +689,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Color32(rgbColor: Integer): TColor32;
-var
-  res: TARGB absolute Result;
-begin
-  if rgbColor < 0 then
-    result := GetSysColor(rgbColor and $FFFFFF) else
-    result := rgbColor;
-  res.A := res.B; res.B := res.R; res.R := res.A; //byte swap
-  res.A := 255;
-end;
-//------------------------------------------------------------------------------
-
-function Color32(a, r, g, b: Byte): TColor32;
-var
-  res: TARGB absolute Result;
-begin
-  res.A := a; res.R := r; res.G := g; res.B := b;
-end;
-//------------------------------------------------------------------------------
-
-function RGBColor(color: TColor32): Cardinal;
-var
-  c  : TARGB absolute color;
-  res: TARGB absolute Result;
-begin
-  res.R := c.B; res.G := c.G; res.B := c.R; res.A := 0;
-end;
-//------------------------------------------------------------------------------
-
 function InvertColor(color: TColor32): TColor32;
 var
   c: TARGB absolute color;
@@ -727,6 +725,36 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function RGBColor(color: TColor32): Cardinal;
+var
+  c  : TARGB absolute color;
+  res: TARGB absolute Result;
+begin
+  res.R := c.B; res.G := c.G; res.B := c.R; res.A := 0;
+end;
+//------------------------------------------------------------------------------
+
+function Color32(a, r, g, b: Byte): TColor32;
+var
+  res: TARGB absolute Result;
+begin
+  res.A := a; res.R := r; res.G := g; res.B := b;
+end;
+//------------------------------------------------------------------------------
+
+{$IFDEF MSWINDOWS}
+function Color32(rgbColor: Integer): TColor32;
+var
+  res: TARGB absolute Result;
+begin
+  if rgbColor < 0 then
+    result := GetSysColor(rgbColor and $FFFFFF) else
+    result := rgbColor;
+  res.A := res.B; res.B := res.R; res.R := res.A; //byte swap
+  res.A := 255;
+end;
+//------------------------------------------------------------------------------
+
 function GetCompatibleMemDc(wnd: HWnd = 0): HDC;
 var
   dc: HDC;
@@ -752,6 +780,7 @@ begin
   Result.biCompression := BI_RGB;
 end;
 //------------------------------------------------------------------------------
+{$ENDIF}
 
 function RectsEqual(const rec1, rec2: TRect): Boolean;
 begin
@@ -1251,22 +1280,37 @@ end;
 class procedure TImage32.RegisterImageFormatClass(ext: string;
   bm32ExClass: TImageFormatClass; clipPriority: TClipboardPriority);
 var
-  cpChar: Char;
+  i: Integer;
+  imgFmtRec: PImgFmtRec;
 begin
   if (ext = '') or (ext = '.') then Exit
   else if (ext[1] = '.') then Delete(ext, 1,1);
   if not CharInSet(ext[1], ['A'..'Z','a'..'z']) then Exit;
 
+  //avoid duplicates
+  for i := 0 to imageFormatClassList.count -1 do
+  begin
+    imgFmtRec := PImgFmtRec(imageFormatClassList[i]);
+    if SameText(imgFmtRec.Fmt, ext) then Exit;
+  end;
+
   //ImageFormatClassList is sorted with lowest priority first in list
-  cpChar := Char(ord('0') + Ord(clipPriority));
-  ImageFormatClassList.AddObject(cpChar + ext, Pointer(bm32ExClass));
+  new(imgFmtRec);
+  imgFmtRec.Fmt := ext;
+  imgFmtRec.Order := clipPriority;
+  imgFmtRec.Obj := bm32ExClass;
+  ImageFormatClassList.Add(imgFmtRec);
+  //sorting here is arguably inefficient, but there will be so few
+  //entries in the list that this inefficiency will be inconsequential.
+  ImageFormatClassList.Sort(ImageFormatClassListSort);
 end;
 //------------------------------------------------------------------------------
 
 class function TImage32.GetImageFormatClass(const ext: string): TImageFormatClass;
 var
   i: Integer;
-  pattern, matchStr: string;
+  pattern: string;
+  imgFmtRec: PImgFmtRec;
 begin
   Result := nil;
   pattern := ext;
@@ -1276,10 +1320,9 @@ begin
   //try for highest priority first
   for i := imageFormatClassList.count -1 downto 0 do
   begin
-    //nb: ignore the first (priority) char ...
-    matchStr := System.Copy(imageFormatClassList[i], 2, 80);
-    if not SameText(matchStr, pattern) then Continue;
-    Result := TImageFormatClass(ImageFormatClassList.objects[i]);
+    imgFmtRec := PImgFmtRec(imageFormatClassList[i]);
+    if not SameText(imgFmtRec.Fmt, pattern) then Continue;
+    Result := imgFmtRec.Obj;
     break;
   end;
 end;
@@ -1943,32 +1986,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImage32.LoadFromResource(const resName, resType: string): Boolean;
-var
-  resStream: TResourceStream;
-begin
-  if Uppercase(resType) = 'BMP' then
-  begin
-    result := FindResource(hInstance, PChar(resName), RT_BITMAP) <> 0;
-    if not result then Exit;
-    resStream := TResourceStream.Create(hInstance, resName, RT_BITMAP);
-  end else
-  begin
-    result := FindResource(hInstance, PChar(resName), PChar(resType)) <> 0;
-    if not result then Exit;
-    resStream := TResourceStream.Create(hInstance, resName, PChar(resType));
-  end;
-  try
-    BeginUpdate;
-    LoadFromStream(resStream, resType);
-  finally
-    resStream.Free;
-    EndUpdate;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-
 function TImage32.GetPixel(x, y: Integer): TColor32;
 begin
   if (x < 0) or (x >= Width) or (y < 0) or (y >= Height) then
@@ -2138,6 +2155,32 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+{$IFDEF MSWINDOWS}
+function TImage32.LoadFromResource(const resName, resType: string): Boolean;
+var
+  resStream: TResourceStream;
+begin
+  if Uppercase(resType) = 'BMP' then
+  begin
+    result := FindResource(hInstance, PChar(resName), RT_BITMAP) <> 0;
+    if not result then Exit;
+    resStream := TResourceStream.Create(hInstance, resName, RT_BITMAP);
+  end else
+  begin
+    result := FindResource(hInstance, PChar(resName), PChar(resType)) <> 0;
+    if not result then Exit;
+    resStream := TResourceStream.Create(hInstance, resName, PChar(resType));
+  end;
+  try
+    BeginUpdate;
+    LoadFromStream(resStream, resType);
+  finally
+    resStream.Free;
+    EndUpdate;
+  end;
+end;
+//------------------------------------------------------------------------------
+
 procedure TImage32.CopyFromDC(srcDc: HDC; const srcRect: TRect);
 var
   bi: TBitmapInfoHeader;
@@ -2261,6 +2304,7 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
+{$ENDIF}
 
 function TImage32.CopyToClipBoard: Boolean;
 var
@@ -2269,28 +2313,21 @@ var
 begin
   //Sadly with CF_DIB (and even CF_DIBV5) clipboard formats, transparency is
   //usually lost, so we'll copy all available formats including CF_PNG, that
-  //is if it's registerd.
+  //is if it's registered.
   result := not IsEmpty;
   if not result then Exit;
   result := false;
 
-  OpenClipboard(0);
-  try
-    EmptyClipboard;
-    for i := ImageFormatClassList.Count -1 downto 0 do
-    begin
-      formatClass := TImageFormatClass(ImageFormatClassList.objects[i]);
-      if not formatClass.CanCopyToClipboard then Continue; //ie skip JPG
-
-      with formatClass.Create do
-      try
-        if CopyToClipboard(self) then result := true;
-      finally
-        free;
-      end;
+  for i := ImageFormatClassList.Count -1 downto 0 do
+  begin
+    formatClass := PImgFmtRec(ImageFormatClassList[i]).Obj;
+    if not formatClass.CanCopyToClipboard then Continue;
+    with formatClass.Create do
+    try
+      if CopyToClipboard(self) then result := true;
+    finally
+      free;
     end;
-  finally
-    CloseClipboard;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2301,19 +2338,14 @@ var
   formatClass: TImageFormatClass;
 begin
   result := false;
-  OpenClipboard(0);
-  try
-    for i := ImageFormatClassList.Count -1 downto 0 do
+  for i := ImageFormatClassList.Count -1 downto 0 do
+  begin
+    formatClass := PImgFmtRec(ImageFormatClassList[i]).Obj;
+    if formatClass.CanPasteFromClipboard then
     begin
-      formatClass := TImageFormatClass(ImageFormatClassList.objects[i]);
-      if formatClass.CanPasteFromClipboard then
-      begin
-        result := true;
-        Exit;
-      end;
+      result := true;
+      Exit;
     end;
-  finally
-    CloseClipboard;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2326,20 +2358,15 @@ begin
   result := false;
   for i := ImageFormatClassList.Count -1 downto 0 do
   begin
-    formatClass := TImageFormatClass(ImageFormatClassList.objects[i]);
+    formatClass := PImgFmtRec(ImageFormatClassList[i]).Obj;
     if not formatClass.CanPasteFromClipboard then Continue;
 
-    OpenClipboard(0);
+    with formatClass.Create do
     try
-      with formatClass.Create do
-      try
-        result := PasteFromClipboard(self);
-        if not Result then Continue;
-      finally
-        free;
-      end;
+      result := PasteFromClipboard(self);
+      if not Result then Continue;
     finally
-      CloseClipboard;
+      free;
     end;
     Changed;
     Break;
@@ -3088,15 +3115,7 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// Initialization functions
-//------------------------------------------------------------------------------
-
-procedure SetupImageFormatClassList;
-begin
-  ImageFormatClassList := TStringList.Create;
-  ImageFormatClassList.Duplicates := dupIgnore;
-  ImageFormatClassList.Sorted := true;
-end;
+// Initialization and Finalization functions
 //------------------------------------------------------------------------------
 
 procedure MakeBlendTables;
@@ -3118,6 +3137,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+{$IFDEF MSWINDOWS}
 procedure GetDPI;
 var
   dc: HDC;
@@ -3127,15 +3147,25 @@ begin
   DpiScale := ScreenPixelsY / 96;
   ReleaseDC(0, dc);
 end;
+{$ENDIF}
+//------------------------------------------------------------------------------
 
+procedure CleanUpImageFormatClassList;
+var
+  i: integer;
+begin
+  for i := ImageFormatClassList.Count -1 downto 0 do
+    Dispose(PImgFmtRec(ImageFormatClassList[i]));
+  ImageFormatClassList.Free;
+end;
 //------------------------------------------------------------------------------
 
 initialization
-  SetupImageFormatClassList;
+  ImageFormatClassList := TList.Create;
   MakeBlendTables;
-  GetDPI;
+  {$IFDEF MSWINDOWS} GetDPI; {$ENDIF}
 
 finalization
-  ImageFormatClassList.Free;
+  CleanUpImageFormatClassList;
 
 end.
