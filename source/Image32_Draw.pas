@@ -13,6 +13,7 @@ unit Image32_Draw;
 interface
 
 {$I Image32.inc}
+{$DEFINE MemCheck} //adds a negligible cost to performance
 
 uses
   SysUtils, Classes, Windows, Types, Math, Image32, Image32_Vector;
@@ -239,6 +240,11 @@ type
 
 implementation
 
+{$IFDEF MemCheck}
+resourcestring
+  sMemCheckError = 'Image32_Draw: Memory allocation error';
+{$ENDIF}
+
 type
   TArray256Bytes = array[0..255] of byte;
 
@@ -255,7 +261,8 @@ type
   TScanLine = record
     Y: integer;
     minX, maxX: integer;
-    count: integer;
+    fragCnt: integer;
+    {$IFDEF MemCheck} total: integer; {$ENDIF}
     fragments: PFragments;
   end;
   PScanline = ^TScanline;
@@ -511,10 +518,10 @@ begin
         if (y2 >= 0) and (y1 <= clipBottom) then
         begin
           if (y1 > 0) and (y1 <= clipBottom)  then
-            dec(scanlines[y1 -1].count);
+            dec(scanlines[y1 -1].fragCnt);
           if y2 >= clipBottom then
-            inc(scanlines[clipBottom].count) else
-            inc(scanlines[y2].count);
+            inc(scanlines[clipBottom].fragCnt) else
+            inc(scanlines[y2].fragCnt);
         end;
       end else
       begin
@@ -522,10 +529,10 @@ begin
         if (y1 >= 0) and (y2 <= clipBottom) then
         begin
           if (y2 > 0) then
-            dec(scanlines[y2 -1].count);
+            dec(scanlines[y2 -1].fragCnt);
           if y1 >= clipBottom then
-            inc(scanlines[clipBottom].count) else
-            inc(scanlines[y1].count);
+            inc(scanlines[clipBottom].fragCnt) else
+            inc(scanlines[y1].fragCnt);
         end;
       end;
       y1 := y2;
@@ -538,11 +545,12 @@ begin
   psl := @scanlines[highI];
   for i := highI downto 0 do
   begin
-    inc(j, psl.count);
+    inc(j, psl.fragCnt);
     //nb: GetMem is faster than dynamic arrays because it's not initialized
     if j > 0 then
       GetMem(psl.fragments, j * SizeOf(TFragment));
-    psl.count := 0;
+    {$IFDEF MemCheck} psl.total := j; {$ENDIF}
+    psl.fragCnt := 0;
     psl.minX := clipRight;
     psl.maxX := 0;
     psl.Y := i;
@@ -605,9 +613,9 @@ begin
   end;
 
   //TRIM EDGES THAT CROSS CLIPPING BOUNDARIES (EXCEPT THE LEFT BOUNDARY)
-  if bot.X > maxX then
+  if bot.X >= maxX then
   begin
-    if top.X > maxX then
+    if top.X >= maxX then
     begin
       for i := Min(maxY, Round(bot.Y)) downto Max(0, Round(top.Y)) do
         scanlines[i].maxX := maxX;
@@ -652,8 +660,13 @@ begin
 
   psl := @scanlines[scanlineY];
   if not assigned(psl.fragments) then Exit; //a very rare event
-  pFrag := @psl.fragments[psl.count];
-  inc(psl.count);
+  {$IFDEF MemCheck}
+  if psl.fragCnt = psl.total then raise Exception.Create(sMemCheckError);
+  {$ENDIF}
+
+  pFrag := @psl.fragments[psl.fragCnt];
+  inc(psl.fragCnt);
+
   pFrag.botX := bot.X;
   if scanlineY <= top.Y then
   begin
@@ -671,8 +684,11 @@ begin
   dec(psl);
   while psl.Y > top.Y do
   begin
-    pFrag := @psl.fragments[psl.count];
-    inc(psl.count);
+    {$IFDEF MemCheck}
+    if psl.fragCnt = psl.total then raise Exception.Create(sMemCheckError);
+    {$ENDIF}
+    pFrag := @psl.fragments[psl.fragCnt];
+    inc(psl.fragCnt);
     pFrag.botX := x;
     x := x + dxdy;
     pFrag.topX := x;
@@ -681,8 +697,11 @@ begin
     dec(psl);
   end;
   //and finally the top fragment
-  pFrag := @psl.fragments[psl.count];
-  inc(psl.count);
+  {$IFDEF MemCheck}
+  if psl.fragCnt = psl.total then raise Exception.Create(sMemCheckError);
+  {$ENDIF}
+  pFrag := @psl.fragments[psl.fragCnt];
+  inc(psl.fragCnt);
   pFrag.botX := x;
   pFrag.topX := top.X;
   pFrag.dy := psl.Y + 1 - top.Y;
@@ -721,7 +740,7 @@ var
   frag: PFragment;
 begin
   frag := @scanline.fragments[0];
-  for i := 1 to scanline.count do
+  for i := 1 to scanline.fragCnt do
   begin
 
     //if frag.botX > frag.topX then swap. (Simplifies code)
@@ -814,6 +833,7 @@ begin
   rm := SetRoundMode(rmDown); //because this is little faster than Trunc.
   Windows.IntersectRect(clipRec2, clipRec, GetBounds(paths));
   paths2 := OffsetPath(paths, -clipRec2.Left, -clipRec2.Top);
+
   maxW := RectWidth(clipRec2);
   maxH := RectHeight(clipRec2);
   SetLength(scanlines, maxH +1);
@@ -830,7 +850,7 @@ begin
   scanline := @scanlines[0];
   for i := 0 to high(scanlines) do
   begin
-    if scanline.count = 0 then
+    if scanline.fragCnt = 0 then
     begin
       FreeMem(scanline.fragments);
       inc(scanline);
@@ -939,7 +959,9 @@ begin
   dst := GetDstPixel(x1,y);
   for i := x1 to x2 do
   begin
-    //Ord() used here since old compilers require PByte to be defined as PChar
+    //BlendToAlpha is marginally slower than BlendToOpaque but it's used
+    //here because it's universally applicable.
+    //Ord() is used here because very old compilers define PByte as a PChar
     dst^ := BlendToAlpha(dst^, fAlphaTbl[Ord(alpha^)] shl 24 or fColor);
     inc(dst); inc(alpha);
   end;

@@ -222,9 +222,7 @@ type
     //See TImage32.RegisterImageFormatClass.
     function LoadFromFile(const filename: string): Boolean;
     function LoadFromStream(stream: TStream; const FmtExt: string = ''): Boolean;
-    {$IFDEF MSWINDOWS}
-    function LoadFromResource(const resName, resType: string): Boolean;
-    {$ENDIF}
+    function LoadFromResource(const resName: string; resType: PChar): Boolean;
 
     //properties ...
 
@@ -533,7 +531,9 @@ begin
   else
   begin
     //combine alphas ...
-    res.A := not MulTable[not fg.A, not bg.A];
+    //res.A := not MulTable[not fg.A, not bg.A];
+    res.A := ((fg.A xor 255) * (bg.A xor 255) shr 8) xor 255; //marginally faster
+
     fgWeight := DivTable[fg.A, res.A]; //fgWeight = amount foreground color
                                        //contibutes to total (result) color
 
@@ -1333,13 +1333,20 @@ var
   i, pos, len: Integer;
   flag: Cardinal;
   buffer: array [0..79] of Byte;
+const
+  SizeOfBitmapInfoHeader = 40;
+  SizeOfBitmapV4Header = 108;
+  SizeOfBitmapV5Header = 124;
 begin
   result := '';
   pos := stream.position;
   len := stream.size - pos;
   if len <= 4 then Exit;
   stream.read(flag, SizeOf(flag));
-  if (flag and $FFFF) = $4D42 then Result := 'BMP'
+  if ((flag and $FFFF) = $4D42) then Result := 'BMP'
+  else if (flag = SizeOfBitmapInfoHeader) then Result := 'BMP' //resource_2
+  else if (flag = SizeOfBitmapV4Header) then Result := 'BMP'   //resource_2
+  else if (flag = SizeOfBitmapV5Header) then Result := 'BMP'   //resource_2
   else if flag = $38464947 then result := 'GIF'
   else if flag and $FFFF = $D8FF then result := 'JPG'
   else if flag = $474E5089 then result := 'PNG'
@@ -1348,9 +1355,8 @@ begin
   begin
     len := min(len, 80);
     stream.read(buffer[0], len);
-    for i := 0 to len -1 do
-      if (buffer[i] < 9) then Exit;
-    Result := 'TXT'; //eg MIME encoded
+    for i := 0 to len -1 do if (buffer[i] < 9) then Exit;
+    Result := 'TXT'; //possibly MIME encoded
   end;
   stream.position := pos;
 end;
@@ -2155,12 +2161,38 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-{$IFDEF MSWINDOWS}
-function TImage32.LoadFromResource(const resName, resType: string): Boolean;
+function NameToId(Name: PChar): Longint;
+var
+  val, digit: Longint;
+begin
+  Result := -1;
+  if Cardinal(PWord(Name)) < 30 then
+  begin
+    Result := Cardinal(PWord(Name))
+  end
+  else if Name^ = '#' then
+  begin
+    val := 0;
+    inc(Name);
+    while (Ord(Name^) <> 0) do
+    begin
+      digit := Ord(Name^) - Ord('0');
+      if (digit < 0) or (digit > 9) then Exit;
+      val := val * 10 + digit;
+      inc(Name);
+    end;
+    Result := val;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TImage32.LoadFromResource(const resName: string; resType: PChar): Boolean;
 var
   resStream: TResourceStream;
+  resId: integer;
 begin
-  if Uppercase(resType) = 'BMP' then
+  resId := NameToId(resType);
+  if (resId = 2) or ((resId < 0) and (resType = 'BMP')) then
   begin
     result := FindResource(hInstance, PChar(resName), RT_BITMAP) <> 0;
     if not result then Exit;
@@ -2173,7 +2205,7 @@ begin
   end;
   try
     BeginUpdate;
-    LoadFromStream(resStream, resType);
+    LoadFromStream(resStream, '');
   finally
     resStream.Free;
     EndUpdate;
@@ -2181,6 +2213,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+{$IFDEF MSWINDOWS}
 procedure TImage32.CopyFromDC(srcDc: HDC; const srcRect: TRect);
 var
   bi: TBitmapInfoHeader;
