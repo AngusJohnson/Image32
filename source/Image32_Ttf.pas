@@ -2,7 +2,7 @@ unit Image32_Ttf;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  0.9 (initial draft)                                             *
+* Version   :  0.91 (initial draft)                                            *
 * Date      :  15 September 2020                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
@@ -52,7 +52,7 @@ type
   end;
 
   TCmapFormat4 = packed record
-    format        : WORD; //0
+    format        : WORD; //4
     length        : WORD;
     language      : WORD;
     segCountX2    : WORD;
@@ -109,7 +109,7 @@ type
   end;
 
   TTtfTable_Hhea = packed record
-    version        : TFixed;     //always 1
+    version        : TFixed;
     ascent         : Int16;
     descent        : Int16;
     lineGap        : Int16;
@@ -118,7 +118,7 @@ type
     minRSB         : Int16;
     xMaxExtent     : Int16; //max(lsb + (xMax-xMin)) ... see TTtfTable_Head
     caretSlopeRise : Int16;
-    caretSlopeRun  : Int16; //0 for vertical
+    caretSlopeRun  : Int16;
     caretOffset    : Int16;
     reserved       : UInt64;
     metricDataFmt  : Int16;
@@ -152,7 +152,7 @@ type
 
   TTtfFontReader = class
   private
-    stream: TStream;
+    stream: TMemoryStream;
     tableCount: integer;
     pointCount: integer;
     tables: TTtfTableArray;
@@ -226,6 +226,9 @@ const
   WE_HAVE_A_TWO_BY_TWO      = $80;
   WE_HAVE_INSTRUCTIONS      = $100;
   USE_MY_METRICS            = $200;
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 function WordSwap(val: WORD): WORD;
 asm
@@ -322,7 +325,6 @@ begin
   result := GetInt(stream, val);
   value := val / 35536;
 end;
-//------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
 // TTrueTypeReader
@@ -330,12 +332,13 @@ end;
 
 constructor TTtfFontReader.Create;
 begin
-
+  stream := TMemoryStream.Create;
 end;
 //------------------------------------------------------------------------------
 
 destructor TTtfFontReader.Destroy;
 begin
+  Clear;
   stream.Free;
 end;
 //------------------------------------------------------------------------------
@@ -344,20 +347,19 @@ procedure TTtfFontReader.Clear;
 begin
   tableCount := 0;
   pointCount := 0;
-  //rawPaths := nil;
   tables := nil;
   cmapTblRecs := nil;
   format4Offset := 0;
   format4EndCodes := nil;
   tbl_glyf.numContours := 0;
-  FreeAndNil(stream);
+  stream.Clear;
 end;
 //------------------------------------------------------------------------------
 
 function TTtfFontReader.LoadFromStream(astream: TStream): Boolean;
 begin
   Clear;
-  stream := astream;
+  stream.CopyFrom(astream, 0);
   stream.Position := 0;
   result := GetTables;
 end;
@@ -368,7 +370,11 @@ var
   fs: TFileStream;
 begin
   fs := TFileStream.Create(filename, fmOpenRead or fmShareDenyNone);
-  Result := LoadFromStream(fs);
+  try
+    Result := LoadFromStream(fs);
+  finally
+    fs.free;
+  end;
 end;
 //------------------------------------------------------------------------------
 
