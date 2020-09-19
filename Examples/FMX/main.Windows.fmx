@@ -1,0 +1,7 @@
+inherited MainForm_Windows: TMainForm_Windows
+  DesignerMasterStyle = 3
+  inherited ImageViewer1: TImageViewer
+    Viewport.Width = 354.000000000000000000
+    Viewport.Height = 440.000000000000000000
+  end
+end

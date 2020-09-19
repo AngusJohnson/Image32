@@ -1,0 +1,57 @@
+object MainForm: TMainForm
+  Left = 0
+  Top = 0
+  Caption = 'Image32 FMX Demo1'
+  ClientHeight = 444
+  ClientWidth = 358
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  OnShow = FormShow
+  DesignerMasterStyle = 3
+  object ImageViewer1: TImageViewer
+    Touch.InteractiveGestures = [Zoom, Pan]
+    Align = Client
+    Size.Width = 358.000000000000000000
+    Size.Height = 444.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    OnResized = ImageViewer1Resized
+    BitmapScale = 0.839999914169311500
+    ShowScrollBars = False
+    Viewport.Width = 358.000000000000000000
+    Viewport.Height = 444.000000000000000000
+  end
+  object Timer1: TTimer
+    Enabled = False
+    OnTimer = Timer1Timer
+    Left = 56
+    Top = 88
+  end
+  object btnRefresh: TButton
+    Anchors = []
+    Default = True
+    Position.X = 97.000000000000000000
+    Position.Y = 34.000000000000000000
+    Size.Width = 104.000000000000000000
+    Size.Height = 44.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 2
+    Text = '&Refresh'
+    OnClick = btnRefreshClick
+  end
+  object btnClose: TButton
+    Anchors = []
+    Cancel = True
+    Position.X = 209.000000000000000000
+    Position.Y = 34.000000000000000000
+    Size.Width = 104.000000000000000000
+    Size.Height = 44.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 3
+    Text = '&Close'
+    OnClick = btnCloseClick
+  end
+end
