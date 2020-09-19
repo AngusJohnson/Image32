@@ -15,7 +15,7 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Windows, Math, Types, Image32;
+  SysUtils, Classes, Math, Types, Image32;
 
 type
   TArrowStyle = (asNone, asSimple, asFancy, asDiamond, asCircle, asTail);
@@ -160,8 +160,10 @@ type
 
   function ReflectPoint(const pt, pivot: TPointD): TPointD;
 
-  function IntersectRect(const rec1, rec2: TRectD): TRectD;
-  function UnionRect(const rec1, rec2: TRectD): TRectD;
+  function IntersectRect(const rec1, rec2: TRect): TRect; overload;
+  function IntersectRect(const rec1, rec2: TRectD): TRectD; overload;
+  function UnionRect(const rec1, rec2: TRect): TRect; overload;
+  function UnionRect(const rec1, rec2: TRectD): TRectD; overload;
 
   //these 2 functions are only needed to support older versions of Delphi
   function MakeArrayOfInteger(const ints: array of integer): TArrayOfInteger;
@@ -406,12 +408,30 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function IntersectRect(const rec1, rec2: TRect): TRect;
+begin
+  result.Left := Max(rec1.Left, rec2.Left);
+  result.Top := Max(rec1.Top, rec2.Top);
+  result.Right := Min(rec1.Right, rec2.Right);
+  result.Bottom := Min(rec1.Bottom, rec2.Bottom);
+end;
+//------------------------------------------------------------------------------
+
 function IntersectRect(const rec1, rec2: TRectD): TRectD;
 begin
   result.Left := Max(rec1.Left, rec2.Left);
   result.Top := Max(rec1.Top, rec2.Top);
   result.Right := Min(rec1.Right, rec2.Right);
   result.Bottom := Min(rec1.Bottom, rec2.Bottom);
+end;
+//------------------------------------------------------------------------------
+
+function UnionRect(const rec1, rec2: TRect): TRect;
+begin
+  result.Left := Min(rec1.Left, rec2.Left);
+  result.Top := Min(rec1.Top, rec2.Top);
+  result.Right := Max(rec1.Right, rec2.Right);
+  result.Bottom := Max(rec1.Bottom, rec2.Bottom);
 end;
 //------------------------------------------------------------------------------
 
@@ -1159,7 +1179,14 @@ begin
   len2 := length(path2);
   if len1 > 0 then
     Result := Copy(path1, 0, len1);
-  if len2 > 0 then
+  if len2 = 0 then Exit;
+  if (len1 > 0) and PointsEqual(path2[0], path1[len1 -1]) then
+  begin
+    if len2 = 1 then Exit;
+    dec(len2);
+    setLength(Result, len1 + len2);
+    Move(path2[1], Result[len1], len2 * SizeOf(TPointD));
+  end else
   begin
     setLength(Result, len1 + len2);
     Move(path2[0], Result[len1], len2 * SizeOf(TPointD));
@@ -1744,10 +1771,10 @@ end;
 
 function RoundRect(const rec: TRect; radius: integer): TArrayOfPointD;
 var
-  rec2: TRect;
+  rec2: TRectD;
 begin
-  rec2 := rec;
-  Windows.InflateRect(rec2, -radius, -radius);
+  rec2 := RectD(rec);
+  InflateRect(rec2, -radius, -radius);
   if IsEmptyRect(rec2) then
     result := nil else
     result := Grow(Rectangle(rec2), nil, radius, jsRound, 2);

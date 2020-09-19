@@ -48,6 +48,8 @@ type
   public
     constructor Create(const logfont: TLogfont; InitAnsi: boolean = true);
     destructor Destroy; override;
+    //FillMissingChars: note that Windows.GetGlyphOutline() only works for
+    //UCS-2 chars. UCS-4 characters are managed by the OS using font mapping
     procedure FillMissingChars(const s: string);
     function MeasureText(const text: string): TPointD;
     property LogFont: TLogFont read fLogFont;

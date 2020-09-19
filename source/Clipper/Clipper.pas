@@ -3,7 +3,7 @@ unit Clipper;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  10.0                                                            *
-* Date      :  19 October 2019                                                 *
+* Date      :  18 September 2020                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2019                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -17,8 +17,11 @@ unit Clipper;
     //While Inlining has been supported since D2005, both D2005 and D2006
     //have an Inline codegen bug (QC41166) so ignore Inline until D2007.
     {$DEFINE INLINING}
-    {$IF CompilerVersion >= 25.0}     //Delphi XE4+
-      {$LEGACYIFEND ON}
+    {$IF COMPILERVERSION >= 23}         //Delphi XE2+
+      {$DEFINE XPLAT_GENERICS}
+      {$IF CompilerVersion >= 25.0}     //Delphi XE4+
+        {$LEGACYIFEND ON}
+      {$IFEND}
     {$IFEND}
   {$IFEND}
   {$IF CompilerVersion < 14}
@@ -33,7 +36,11 @@ unit Clipper;
 interface
 
 uses
-  Classes, SysUtils, Math, ClipperCore;
+  Classes, SysUtils, Math,
+{$IFDEF XPLAT_GENERICS}
+  Generics.Collections, Generics.Defaults,
+{$ENDIF}
+  ClipperCore;
 
 type
   TVertexFlag = (vfOpenStart, vfOpenEnd, vfLocMax, vfLocMin);
@@ -141,12 +148,19 @@ type
     FCurrentLocMinIdx   : Integer;
     FClipType           : TClipType;
     FFillRule           : TFillRule;
+{$IFDEF XPLAT_GENERICS}
+    FIntersectList      : TList<PIntersectNode>;
+    FOutRecList         : TList<TOutRec>;
+    FLocMinList         : TList<PLocalMinima>;
+    FVertexList         : TList<PVertex>;
+{$ELSE}
     FIntersectList      : TList;
     FOutRecList         : TList;
     FLocMinList         : TList;
+    FVertexList         : TList;
+{$ENDIF}
     FActives            : PActive; //see AEL above
     FSel                : PActive; //see SEL above
-    FVertexList         : TList;
     procedure Reset;
     procedure InsertScanLine(const Y: Int64);
     function PopScanLine(out Y: Int64): Boolean;
@@ -194,7 +208,11 @@ type
       fillRule: TFillRule); virtual;
     function BuildResult(out closedPaths, openPaths: TPaths): Boolean;
     function BuildResultTree(polyTree: TPolyTree; out openPaths: TPaths): Boolean;
+{$IFDEF XPLAT_GENERICS}
+    property OutRecList: TList<TOutRec> read FOutRecList;
+{$ELSE}
     property OutRecList: TList read FOutRecList;
+{$ENDIF}
     property IntersectNode[index: integer]: PIntersectNode
       read GetIntersectNode;
   public
@@ -225,7 +243,11 @@ type
     FParent      : TPolyPath;
     FClass       : TPolyPathClass;
     FPath        : TPath;
+{$IFDEF XPLAT_GENERICS}
+    FChildList   : TList<TPolyPath>;
+{$ELSE}
     FChildList   : TList;
+{$ENDIF}
     function     GetChildCnt: Integer;
     function     GetChild(index: Integer): TPolyPath;
     function     GetIsHole: Boolean;
@@ -915,10 +937,17 @@ end;
 
 constructor TClipper.Create;
 begin
+{$IFDEF XPLAT_GENERICS}
+  FLocMinList := TList<PLocalMinima>.Create;
+  FOutRecList := TList<TOutRec>.Create;
+  FIntersectList := TList<PIntersectNode>.Create;
+  FVertexList := TList<PVertex>.Create;
+{$ELSE}
   FLocMinList := TList.Create;
   FOutRecList := TList.Create;
   FIntersectList := TList.Create;
   FVertexList := TList.Create;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -966,9 +995,24 @@ var
 begin
   if not FLocMinListSorted then
   begin
+
+{$IFDEF XPLAT_GENERICS}
+    FLocMinList.Sort(TComparer<PLocalMinima>.Construct(
+    function (const item1, item2: PLocalMinima): integer
+    var
+      dy: Int64;
+    begin
+      dy := item2.vertex.Pt.Y - item1.vertex.Pt.Y;
+      if dy < 0 then Result := -1
+      else if dy > 0 then Result := 1
+      else Result := 0;
+    end));
+{$ELSE}
     FLocMinList.Sort(LocMinListSort);
+{$ENDIF}
     FLocMinListSorted := true;
   end;
+
   for i := FLocMinList.Count -1 downto 0 do
     InsertScanLine(PLocalMinima(FLocMinList[i]).vertex.Pt.Y);
   FCurrentLocMinIdx := 0;
@@ -1031,7 +1075,8 @@ function TClipper.PopLocalMinima(Y: Int64;
 begin
   Result := false;
   if FCurrentLocMinIdx = FLocMinList.Count then Exit;
-  localMinima := PLocalMinima(FLocMinList[FCurrentLocMinIdx]);
+  //localMinima := PLocalMinima(FLocMinList[FCurrentLocMinIdx]);
+  localMinima := FLocMinList[FCurrentLocMinIdx];
   if (localMinima.vertex.Pt.Y = Y) then
   begin
     inc(FCurrentLocMinIdx);
@@ -1122,7 +1167,7 @@ begin
   while (highI > 0) and PointsEqual(p[highI], p[0]) do dec(highI);
 
   GetMem(va, sizeof(TVertex) * (highI +1));
-  fVertexList.Add(va);
+  fVertexList.Add(@va[0]);
 
   SetVertex(@va[0], nil, p[0]);
   if p[0].Y = p[highI].Y then
@@ -2216,7 +2261,8 @@ end;
 
 function TClipper.GetIntersectNode(index: integer): PIntersectNode;
 begin
-  result := PIntersectNode(FIntersectList[index]);
+  //result := PIntersectNode(FIntersectList[index]);
+  result := FIntersectList[index];
 end;
 //------------------------------------------------------------------------------
 
@@ -2231,7 +2277,17 @@ begin
   //crucial that intersections only occur between adjacent edges.
 
   //First we do a quicksort so intersections proceed in a bottom up order ...
+{$IFDEF XPLAT_GENERICS}
+  FIntersectList.Sort(TComparer<PIntersectNode>.Construct(
+    function (const node1, node2: PIntersectNode): integer
+    begin
+      result := node2.Pt.Y - node1.Pt.Y;
+      if (result = 0) and (node1 <> node2) then
+        result := node1.Pt.X - node2.Pt.X;
+    end));
+{$ELSE}
   FIntersectList.Sort(IntersectListSort);
+{$ENDIF}
 
   //Now as we process these intersections, we must sometimes adjust the order
   //to ensure that intersecting edges are always adjacent ...
@@ -2680,7 +2736,11 @@ end;
 
 constructor TPolyPath.Create;
 begin
+{$IFDEF XPLAT_GENERICS}
+  FChildList := TList<TPolyPath>.Create;
+{$ELSE}
   FChildList := TList.Create;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -2693,11 +2753,9 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TPolyPath.Clear;
-var
-  i: Integer;
 begin
-  for i := 0 to FChildList.Count -1 do
-    TPolyPath(FChildList[i]).Free;
+//  for i := 0 to FChildList.Count -1 do
+//    FChildList[i].Free;
   FChildList.Clear;
 end;
 //------------------------------------------------------------------------------
@@ -2706,7 +2764,7 @@ function  TPolyPath.GetChild(index: Integer): TPolyPath;
 begin
   if (index < 0) or (index >= FChildList.Count) then
     Result := nil else
-    Result := TPolyPath(FChildList[index]);
+    Result := FChildList[index];
 end;
 //------------------------------------------------------------------------------
 

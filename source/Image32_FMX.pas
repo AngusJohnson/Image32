@@ -3,7 +3,7 @@ unit Image32_FMX;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.48                                                            *
-* Date      :  29 August 2020                                                  *
+* Date      :  18 September 2020                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Image file format support for TImage32 and FMX                  *
@@ -15,6 +15,7 @@ interface
 {$I Image32.inc}
 uses
   SysUtils, Classes, Math, Image32, System.Rtti,
+  System.Generics.Collections, System.Generics.Defaults,
   FMX.Platform, FMX.Types, FMX.Surfaces, FMX.Graphics;
 
 type
@@ -22,6 +23,7 @@ type
   TImageFormat_FMX = class(TImageFormat)
   private
     fExt: string;
+    fPixelFormat: FMX.Types.TPixelFormat;
   public
     function LoadFromStream(stream: TStream; img32: TImage32): Boolean; override;
     function SaveToFile(const filename: string; img32: TImage32): Boolean; override;
@@ -31,6 +33,10 @@ type
     class function PasteFromClipboard(img32: TImage32): Boolean; override;
     property Ext: string read fExt write fExt;
   end;
+
+const
+  RT_BITMAP = PChar(2);
+
 
 implementation
 
@@ -49,7 +55,10 @@ begin
   try
     cm.LoadFromStream(stream, surf);
     if (surf.Width = 0) or (surf.Height = 0) then Exit;
-    if (surf.PixelFormat <> TPixelFormat.BGRA) then Exit;
+    if (surf.PixelFormat = TPixelFormat.BGRA) or
+       (surf.PixelFormat = TPixelFormat.RGBA) then
+          fPixelFormat := surf.PixelFormat
+    else Exit;
 
     img32.SetSize(surf.Width, surf.Height);
     Move(surf.Scanline[0]^, img32.PixelBase^, surf.Width * surf.Height * 4);
@@ -82,6 +91,7 @@ begin
   try
     surf.SetSize(img32.Width, img32.Height, TPixelFormat.BGRA);
     Move(img32.PixelBase^, surf.Scanline[0]^, img32.Width * img32.Height * 4);
+
     if Ext = '' then
       cm.SaveToStream(stream, surf, 'PNG') else
       cm.SaveToStream(stream, surf, Ext);
@@ -121,7 +131,6 @@ begin
   begin
     value := svc.GetClipboard;
     Result := Value.IsType<TBitmapSurface>;
-    if value.IsObject then value.AsObject.Free;
   end else
     Result := false;
 end;
@@ -142,19 +151,15 @@ begin
   value := svc.GetClipboard;
   if not Value.IsObject then Exit;
 
-  try
-    if Value.IsType<TBitmapSurface> and
-      (Value.AsType<TBitmapSurface>.PixelFormat = TPixelFormat.BGRA) then
-    begin
-      surf := Value.AsType<TBitmapSurface>;
-      img32.SetSize(surf.Width, surf.Height);
-      Move(surf.Scanline[0]^, img32.PixelBase^, surf.Width * surf.Height * 4);
-      Result := true;
-    end;
-  finally
-    value.AsObject.Free;
+  if Value.IsType<TBitmapSurface> and
+    ((Value.AsType<TBitmapSurface>.PixelFormat = TPixelFormat.RGBA) or
+    (Value.AsType<TBitmapSurface>.PixelFormat = TPixelFormat.BGRA)) then
+  begin
+    surf := Value.AsType<TBitmapSurface>;
+    img32.SetSize(surf.Width, surf.Height);
+    Move(surf.Scanline[0]^, img32.PixelBase^, surf.Width * surf.Height * 4);
+    Result := true;
   end;
-
 end;
 
 //------------------------------------------------------------------------------

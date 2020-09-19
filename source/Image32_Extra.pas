@@ -493,7 +493,7 @@ begin
     pBlur := PARGB(bmpBlur.pixelBase);
     for i := 1 to img.Width * img.Height do
     begin
-      if pColor.A > 0 then
+      if (pColor.A > 0) then
       begin
         pColor.R := ClampByte(pColor.R  + weightAmount[pColor.R - pBlur.R]);
         pColor.G := ClampByte(pColor.G  + weightAmount[pColor.G - pBlur.G]);

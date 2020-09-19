@@ -3,7 +3,7 @@ unit ClipperOffset;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  10.0 (beta)                                                     *
-* Date      :  14 February 2020                                                *
+* Date      :  18 September 2020                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2017                                         *
 * Purpose   :  Offset paths and clipping solutions                             *

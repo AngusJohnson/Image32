@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.47                                                            *
-* Date      :  28 August 2020                                                  *
+* Version   :  1.50                                                            *
+* Date      :  18 September 2020                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -16,7 +16,7 @@ interface
 {$DEFINE MemCheck} //adds a negligible cost to performance
 
 uses
-  SysUtils, Classes, Windows, Types, Math, Image32, Image32_Vector;
+  SysUtils, Classes, Types, Math, Image32, Image32_Vector;
 
 type
   TFillRule = Image32_Vector.TFillRule;
@@ -508,8 +508,8 @@ begin
   begin
     highJ := high(polygons[i]);
     if highJ < 2 then continue;
-    y1 := Round(polygons[i][highJ].Y); //nb: Round is much faster than Floor
-    for j := 0 to highJ do             //    and a little faster than Trunc
+    y1 := Round(polygons[i][highJ].Y);
+    for j := 0 to highJ do
     begin
       y2 := Round(polygons[i][j].Y);
       if y1 < y2 then
@@ -809,7 +809,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-{$IFNDEF TROUNDINGMODE}
+{$IFDEF MSWINDOWS}
 type
   TRoundingMode = Math.TFPURoundingMode;
 {$ENDIF}
@@ -828,22 +828,16 @@ var
   rm: TRoundingMode;
 begin
   //See also https://nothings.org/gamedev/rasterize/
-
   if not assigned(renderer) then Exit;
-  rm := SetRoundMode(rmDown); //because this is little faster than Trunc.
-  Windows.IntersectRect(clipRec2, clipRec, GetBounds(paths));
+  rm := SetRoundMode(rmDown);
+  clipRec2 := Image32_Vector.IntersectRect(clipRec, GetBounds(paths));
   paths2 := OffsetPath(paths, -clipRec2.Left, -clipRec2.Top);
 
   maxW := RectWidth(clipRec2);
   maxH := RectHeight(clipRec2);
   SetLength(scanlines, maxH +1);
   SetLength(windingAccum, maxW +2);
-  try
   AllocateScanlines(paths2, scanlines, maxH, maxW-1);
-    except
-      beep(0,0);
-      Exit;
-    end;
   InitializeScanlines(paths2, scanlines, clipRec2);
   SetLength(byteBuffer, RectWidth(clipRec2));
 

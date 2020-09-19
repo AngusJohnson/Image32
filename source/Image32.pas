@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.48                                                            *
-* Date      :  29 August 2020                                                  *
+* Version   :  1.50                                                            *
+* Date      :  18 September 2020                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -15,8 +15,9 @@ interface
 {$I Image32.inc}
 
 uses
-  {$IFDEF MSWINDOWS} Windows, {$ENDIF} Types, SysUtils, Classes,
-  {$IFDEF UITYPES} UITypes, {$ENDIF} Math;
+  {$IFDEF MSWINDOWS} Windows,{$ENDIF} Types, SysUtils, Classes,
+  {$IFDEF XPLAT_GENERICS} System.Generics.Collections,
+  System.Generics.Defaults, System.Character, {$ENDIF} {$IFDEF UITYPES} UITypes,{$ENDIF} Math;
 
 type
   TRect = Types.TRect;
@@ -42,6 +43,10 @@ const
   clTeal32     = TColor32($FF007F7F);
   clWhite32    = TColor32($FFFFFFFF);
   clYellow32   = TColor32($FFFFFF00);
+
+{$IFDEF ZEROBASEDSTR}
+  {$ZEROBASEDSTRINGS OFF}
+{$ENDIF}
 
 type
   TClipboardPriority = (cpLow, cpMedium, cpHigh);
@@ -248,7 +253,11 @@ type
 
   TImageList32 = class
   private
+{$IFDEF XPLAT_GENERICS}
+    fList: TList<TImage32>;
+{$ELSE}
     fList: TList;
+{$ENDIF}
     fIsImageOwner: Boolean;
     function GetImage(index: integer): TImage32;
     procedure SetImage(index: integer; img: TIMage32);
@@ -455,8 +464,13 @@ var
   function RectHeight(const rec: TRect): Integer;
   {$IFDEF INLINE} inline; {$ENDIF}
 
-  function IsEmptyRect(const rec: TRect): Boolean;
+  function IsEmptyRect(const rec: TRect): Boolean; overload;
   {$IFDEF INLINE} inline; {$ENDIF}
+  function IsEmptyRect(const rec: TRectD): Boolean; overload;
+  {$IFDEF INLINE} inline; {$ENDIF}
+
+  function SwapRedBlue(color: TColor32): TColor32; overload;
+  procedure SwapRedBlue(color: PColor32; count: integer); overload;
 
 implementation
 
@@ -478,9 +492,36 @@ type
   PImgFmtRec = ^TImgFmtRec;
 
 var
-  ImageFormatClassList: TList; //list of supported file extensions
+{$IFDEF XPLAT_GENERICS}
+  ImageFormatClassList: TList<PImgFmtRec>; //list of supported file extensions
+{$ELSE}
+  ImageFormatClassList: TList;
+{$ENDIF}
 
 
+//------------------------------------------------------------------------------
+
+function SwapRedBlue(color: TColor32): TColor32;
+var
+  c: array[0..3] of byte absolute color;
+  r: array[0..3] of byte absolute Result;
+begin
+  result := color;
+  r[0] := c[2];
+  r[2] := c[0];
+end;
+//------------------------------------------------------------------------------
+
+procedure SwapRedBlue(color: PColor32; count: integer);
+var
+  i: integer;
+begin
+  for i := 1 to count do
+  begin
+    color^ := SwapRedBlue(color^);
+    inc(color);
+  end;
+end;
 //------------------------------------------------------------------------------
 
 function ImageFormatClassListSort(item1, item2: Pointer): integer;
@@ -684,6 +725,12 @@ end;
 //------------------------------------------------------------------------------
 
 function IsEmptyRect(const rec: TRect): Boolean;
+begin
+  Result := (rec.Right <= rec.Left) or (rec.Bottom <= rec.Top);
+end;
+//------------------------------------------------------------------------------
+
+function IsEmptyRect(const rec: TRectD): Boolean;
 begin
   Result := (rec.Right <= rec.Left) or (rec.Bottom <= rec.Top);
 end;
@@ -1283,10 +1330,9 @@ var
   i: Integer;
   imgFmtRec: PImgFmtRec;
 begin
-  if (ext = '') or (ext = '.') then Exit
-  else if (ext[1] = '.') then Delete(ext, 1,1);
+  if (ext = '') or (ext = '.') then Exit;
+  if (ext[1] = '.') then Delete(ext, 1,1);
   if not CharInSet(ext[1], ['A'..'Z','a'..'z']) then Exit;
-
   //avoid duplicates
   for i := 0 to imageFormatClassList.count -1 do
   begin
@@ -1302,7 +1348,16 @@ begin
   ImageFormatClassList.Add(imgFmtRec);
   //sorting here is arguably inefficient, but there will be so few
   //entries in the list that this inefficiency will be inconsequential.
+
+{$IFDEF XPLAT_GENERICS}
+  ImageFormatClassList.Sort(TComparer<PImgFmtRec>.Construct(
+    function (const item1, item2: PImgFmtRec): integer
+    begin
+      result := Integer(item1.Order) - Integer(item2.Order);
+    end));
+{$ELSE}
   ImageFormatClassList.Sort(ImageFormatClassListSort);
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -2190,6 +2245,10 @@ function TImage32.LoadFromResource(const resName: string; resType: PChar): Boole
 var
   resStream: TResourceStream;
   resId: integer;
+{$IFNDEF MSWINDOWS}
+const
+  RT_BITMAP = PChar(2);
+{$ENDIF}
 begin
   resId := NameToId(resType);
   if (resId = 2) or ((resId < 0) and (resType = 'BMP')) then
@@ -2961,7 +3020,11 @@ end;
 
 constructor TImageList32.Create;
 begin
+{$IFDEF XPLAT_GENERICS}
+  fList := TList<TImage32>.Create;
+{$ELSE}
   fList := TList.Create;
+{$ENDIF}
   fIsImageOwner := true;
 end;
 //------------------------------------------------------------------------------
@@ -3194,9 +3257,18 @@ end;
 //------------------------------------------------------------------------------
 
 initialization
+
+{$IFDEF XPLAT_GENERICS}
+  ImageFormatClassList := TList<PImgFmtRec>.Create;
+{$ELSE}
   ImageFormatClassList := TList.Create;
+{$ENDIF}
+
   MakeBlendTables;
-  {$IFDEF MSWINDOWS} GetDPI; {$ENDIF}
+
+{$IFDEF MSWINDOWS}
+  GetDPI;
+{$ENDIF}
 
 finalization
   CleanUpImageFormatClassList;
