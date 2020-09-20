@@ -798,23 +798,24 @@ end;
 
 function TMainForm.CheckJpg(const filename: string): Boolean;
 var
-  messageBoxOpts: TMessageBoxOptions;
+  messageBoxOpts: IOptions;
 begin
-  messageBoxOpts.Init;
-  messageBoxOpts.AddCustomButtonCaption('&Continue');
-  messageBoxOpts.AddCustomButtonCaption('&Cancel');
-  messageBoxOpts.CheckBoxCallBk := CheckboxOnJPGMessageDialog;
+  messageBoxOpts := TMessageBoxOptions.Create;
+  messageBoxOpts.AddButtonCaption('&Continue');
+  messageBoxOpts.AddButtonCaption('&Cancel');
+    TMessageBoxOptions(messageBoxOpts.AsObject).CheckBoxCallBk :=
+    CheckboxOnJPGMessageDialog;
 
   Result := DialogsEx.MessageBox(self, 'JPG Images',
     jpgWarning, 'Image32 - JPG files', MB_YESNO or MB_ICONWARNING,
-    messageBoxOpts) = mrYes;
+    TMessageBoxOptions(messageBoxOpts.AsObject)) = mrYes;
 end;
 //------------------------------------------------------------------------------
 
 function TMainForm.GetMaxColors(forceCheck: Boolean): Boolean;
 var
   newMaxColors: integer;
-  numBoxOpts: TNumBoxOptions;
+  numBoxOpts: IOptions;
 begin
   newMaxColors := Max(4, Min(maximumColors, maxColors));
   if not forceCheck and not mnuManualPaletteSizes.Checked then
@@ -823,14 +824,17 @@ begin
     Result := true;
   end else
   begin
-    numBoxOpts.Init;
-    numBoxOpts.CustomIcon := Application.Icon;
-    numBoxOpts.minVal := 4;
-    numBoxOpts.maxVal := 256;
-
+    numBoxOpts := TNumBoxOptions.Create;
+    numBoxOpts.Icon.Assign(Application.Icon);
+    with TNumBoxOptions(numBoxOpts.AsObject) do
+    begin
+      minVal := 4;
+      maxVal := 256;
+    end;
     result := DialogsEx.NumInputBox(self, 'Maximum Color Count',
       format(colorCountMessage,[maxColors/1.0]),
-      'Image32 - Image Color Count', newMaxColors, numBoxOpts);
+      'Image32 - Image Color Count', newMaxColors,
+      TNumBoxOptions(numBoxOpts.AsObject));
     if Result then maxColors := newMaxColors;
   end;
 end;
@@ -1032,12 +1036,12 @@ end;
 
 procedure TMainForm.mnuTipsClick(Sender: TObject);
 var
-  messageBoxOpts: TMessageBoxOptions;
+  messageBoxOpts: IOptions;
 begin
-  messageBoxOpts.Init;
-  messageBoxOpts.CustomIcon := Application.Icon;
+  messageBoxOpts := TMessageBoxOptions.Create;
+  messageBoxOpts.Icon.Assign(Application.Icon);
   DialogsEx.MessageBox(self, 'RasterToSVG Tips', menuTips,
-    'RasterToSVG', MB_OK, messageBoxOpts);
+    'RasterToSVG', MB_OK, TMessageBoxOptions(messageBoxOpts.AsObject));
 end;
 //------------------------------------------------------------------------------
 
@@ -1075,23 +1079,27 @@ end;
 
 procedure TMainForm.mnuChangeSmoothnessClick(Sender: TObject);
 var
-  comboboxOpts: TComboboxOptions;
+  comboboxOpts: IOptions;
   num: integer;
 begin
-  comboboxOpts.Init;
-  comboboxOpts.CustomIcon := Application.Icon;
-  comboboxOpts.AddComboboxItem('4 - Very High');
-  comboboxOpts.AddComboboxItem('3 - High');
-  comboboxOpts.AddComboboxItem('2 - Medium');
-  comboboxOpts.AddComboboxItem('1 - Low');
-  comboboxOpts.AddComboboxItem('0 - None');
+  comboboxOpts := TComboboxOptions.Create;
+  comboboxOpts.Icon.Assign(Application.Icon);
+  with TComboboxOptions(comboboxOpts.AsObject) do
+  begin
+    AddComboboxItem('4 - Very High');
+    AddComboboxItem('3 - High');
+    AddComboboxItem('2 - Medium');
+    AddComboboxItem('1 - Low');
+    AddComboboxItem('0 - None');
+  end;
   num := 4 -smoothness;
 
   if not DialogsEx.ComboInputBox(Self, 'Drawing Smoothness',
     'A small amount of ''Smoothness'' usually improves the drawing and '+
     'can significantly reduce file size.'#10'But you can have too much '+
     'of a good thing too :).', 'RasterToSVG',
-    num, comboboxOpts) or (4 - num = smoothness) then Exit;
+    num, TComboboxOptions(comboboxOpts.AsObject)) or (4 - num = smoothness) 
+    then Exit;
 
   smoothness := 4 - num;
   if OpenDialog1.FileName <> '' then
@@ -1103,17 +1111,22 @@ end;
 procedure TMainForm.ChangeSimpleness1Click(Sender: TObject);
 var
   val: integer;
-  numOpts: TNumBoxOptions;
+  numOpts: IOptions;
 begin
-  numOpts.Init;
-  numOpts.minVal := 0;
-  numOpts.maxVal := 2;
-  numOpts.CustomIcon := Application.Icon;
+  numOpts := TNumBoxOptions.Create;
+  with TNumBoxOptions(numOpts.AsObject) do
+  begin
+    minVal := 0;
+    maxVal := 2;
+    Icon.Assign(Application.Icon);
+  end;
   val := simpleness;
   if not DialogsEx.NumInputBox(Self, 'Simplify Drawing',
     'Increasing ''Simplify'' will reduce the file size, but it can also '+
     'significantly degrade the drawing. Try it and see.',
-    'RasterToSVG', val, numOpts) or (val = simpleness) then Exit;
+    'RasterToSVG', val, TNumBoxOptions(numOpts.AsObject)) or (val = simpleness) 
+    then Exit;
+
   simpleness := val;
   if OpenDialog1.FileName <> '' then
     DoOpenFile(false) else
@@ -1151,10 +1164,10 @@ end;
 
 procedure TMainForm.About1Click(Sender: TObject);
 var
-  messageBoxOpts: TMessageBoxOptions;
+  messageBoxOpts: IOptions;
 begin
-  messageBoxOpts.Init;
-  messageBoxOpts.customIcon := Application.Icon;
+  messageBoxOpts := TMessageBoxOptions.Create;
+  messageBoxOpts.Icon.Assign(Application.Icon);
 
   DialogsEx.MessageBox(self, 'RasterToSVG',
     'Version 1.6'#10+
@@ -1162,7 +1175,7 @@ begin
     'Open source freeware.'#10+
     'Copyright © 2019 - 2020'#10+
     'Boost Software License 1.0',
-    'RasterToSVG', MB_OK, messageBoxOpts);
+    'RasterToSVG', MB_OK, TMessageBoxOptions(messageBoxOpts.AsObject));
 end;
 //------------------------------------------------------------------------------
 

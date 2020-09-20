@@ -5,8 +5,6 @@ program RasterToSVG;
 uses
   Forms,
   Unit1 in 'Unit1.pas' {MainForm},
-  GifImage in 'GifImage.pas',
-  Image32_GIF in 'Image32_GIF.pas',
   DialogsEx in '..\DialogsEx.pas';
 
 {$R *.res}

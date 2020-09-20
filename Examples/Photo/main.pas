@@ -945,8 +945,9 @@ begin
   colCnt := GetColumnCount;
 
   buildComplete := true;
-  dstCanvas.Brush.Color := clBlack;
+  dstCanvas.Brush.Color := pnlThumb.color;
   dstCanvas.FillRect(dstRec);
+
   //dstImg - image to finally draw onto the destination canvas
   dstImg := TImage32.Create(dstRec.Width, dstRec.Height);
   //rowImg - intermediate image, gets each thumbnailRow and draws it to dstImg
@@ -1167,7 +1168,7 @@ begin
     DrawPolygon(layer.Image, pp, frEvenOdd, clWhite32) else
     DrawPolygon(layer.Image, pp, frEvenOdd, clBlack32);
 
-  tmrSlideShow.Interval := slideShowInterval div 2;
+  tmrSlideShow.Interval := slideShowInterval div 3;
   tmrSlideShow.Enabled := true;
 
   currentLargePanel.Bitmap.SetSize(w,h);
@@ -1328,7 +1329,7 @@ begin
       layeredImg.DeleteLayer(layeredImg.TopLayer.Index);
       //now either restart or stop the slide show
       if mnuSlideShow.Checked then
-        tmrSlideShow.Interval := slideShowInterval div 2 else
+        tmrSlideShow.Interval := slideShowInterval div 3 else
         tmrSlideShow.Enabled := false;
     end
     else if mnuSimpleFade.Checked then
@@ -1565,26 +1566,30 @@ end;
 
 procedure TMainForm.mnuTipsClick(Sender: TObject);
 var
-  msgboxOpts: TMessageBoxOptions;
+  msgboxOpts: IOptions;
 begin
-  msgboxOpts.Init;
-  msgboxOpts.customIcon := Application.Icon;
-  DialogsEx.MessageBox(self, 'Photo Tips', rsTips, 'Photo', MB_OK, msgboxOpts);
+  msgboxOpts := TMessageBoxOptions.Create;
+  msgboxOpts.Icon.Assign(Application.Icon);
+  DialogsEx.MessageBox(self, 'Photo Tips', rsTips,
+    'Photo', MB_OK, msgboxOpts as TMessageBoxOptions);
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuBackgroundColorClick(Sender: TObject);
 var
-  hexboxOpts: THexBoxOptions;
+  hexboxOpts: IOptions;
   hex: string;
 begin
-  hexboxOpts.Init;
-  hexboxOpts.customIcon := Application.Icon;
-  hexboxOpts.editChangeCallBk := ColorChanging;
-  hexboxOpts.maxLen := 6;
+  hexboxOpts := THexBoxOptions.Create;
+  hexboxOpts.Icon.Assign(Application.Icon);
+  with (hexboxOpts as THexBoxOptions) do
+  begin
+    editChangeCallBk := ColorChanging;
+    maxLen := 6;
+  end;
   hex := IntToHex(ColorToRGB(backColor), 6);
   DialogsEx.HexInputBox(self, rsBackColor,
-    rsBackColor2, 'Photo', hex, hexboxOpts);
+    rsBackColor2, 'Photo', hex, hexboxOpts as THexBoxOptions);
   backColor := StrToInt('$'+hex);
   UpdateBackColors;
 end;
@@ -1602,6 +1607,7 @@ procedure TMainForm.UpdateBackColors;
 begin
   Self.Color := backColor;
   pnlThumb.Color := backColor;
+  pnlThumb.Refresh;
   layeredImg.BackgroundColor := Color32(backColor);
   StatusBar1.Invalidate;
   currentLargePanel.Color := backColor;
@@ -1638,15 +1644,15 @@ end;
 
 procedure TMainForm.mnuRenameClick(Sender: TObject);
 var
-  textboxOpts: TTextBoxOptions;
+  textboxOpts: IOptions;
   oldName, newName: string;
 begin
   oldName := thumbnails[currentIdx].filename;
   newName := oldName;
-  textboxOpts.Init;
-  textboxOpts.customIcon := Application.Icon;
-  if not DialogsEx.TextInputBox(self, rsRenameFile, '', 'Photo', newName,
-    textboxOpts) then Exit;
+  textboxOpts := TTextBoxOptions.Create;
+  textboxOpts.Icon.Assign(Application.Icon);
+  if not DialogsEx.TextInputBox(self, rsRenameFile, '',
+    'Photo', newName, textboxOpts as TTextBoxOptions) then Exit;
 
   thumbnails[currentIdx].filename := newName;
   ShellFileOperation(currentFolder + oldName,
@@ -1682,17 +1688,17 @@ end;
 
 procedure TMainForm.mnuDeleteClick(Sender: TObject);
 var
-  msgboxOpts: TMessageBoxOptions;
+  msgboxOpts: IOptions;
   filename: string;
   i, colCnt, rowNum: integer;
 begin
   filename := thumbnails[currentIdx].filename;
-  msgboxOpts.Init;
-  msgboxOpts.customIcon := Application.Icon;
-  msgboxOpts.CheckBoxCallBk := DeleteCheck;
+  msgboxOpts := TMessageBoxOptions.Create;
+  msgboxOpts.Icon.Assign(Application.Icon);
+  (msgboxOpts as TMessageBoxOptions).CheckBoxCallBk := DeleteCheck;
   if deletePrompt and (DialogsEx.MessageBox(self, rsDeleteFile,
-    format(rsCheckDelete, [filename]),
-    'Photo', MB_YESNO or MB_DEFBUTTON2, msgboxOpts) <> mrYes) then Exit;
+    format(rsCheckDelete, [filename]), 'Photo', MB_YESNO or MB_DEFBUTTON2,
+    msgboxOpts as TMessageBoxOptions) <> mrYes) then Exit;
 
   Screen.Cursor := crHourGlass;
   try
@@ -1723,16 +1729,19 @@ end;
 
 procedure TMainForm.mnuSlideShowIntervalClick(Sender: TObject);
 var
-  numBoxOptions: TNumBoxOptions;
+  numBoxOptions: IOptions;
   val: integer;
 begin
-  numBoxOptions.Init;
-  numBoxOptions.customIcon := Application.Icon;
-  numBoxOptions.minVal := 2;
-  numBoxOptions.maxVal := 300;
+  numBoxOptions := TNumBoxOptions.Create;
+  numBoxOptions.Icon.Assign(Application.Icon);
+  with (numBoxOptions as TNumBoxOptions) do
+  begin
+    minVal := 2;
+    maxVal := 300;
+  end;
   val := Round(slideShowInterval / 1000);
   if not NumInputBox(self, rsSlideShowInterval, rsSlideShowSeconds,
-    Application.Title, val, numBoxOptions) then Exit;
+    Application.Title, val, numBoxOptions as TNumBoxOptions) then Exit;
   slideShowInterval := val * 1000;
   tmrSlideShow.Interval := slideShowInterval;
 end;
@@ -1908,15 +1917,15 @@ end;
 
 procedure TMainForm.mnuAboutClick(Sender: TObject);
 var
-  msgboxOpts: TMessageBoxOptions;
+  msgboxOpts: IOptions;
 begin
-  msgboxOpts.Init;
-  msgboxOpts.customIcon := Application.Icon;
+  msgboxOpts := TMessageBoxOptions.Create;
+  msgboxOpts.Icon.Assign(Application.Icon);
   DialogsEx.MessageBox(self, 'Photo',
     'Version ' + GetVersion + #10+
     'Author: Angus Johnson'#10+
     'Copyright © 2020',
-    'Photo', MB_OK, msgboxOpts);
+    'Photo', MB_OK, msgboxOpts as TMessageBoxOptions);
 end;
 //------------------------------------------------------------------------------
 

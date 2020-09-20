@@ -33,73 +33,74 @@ type
     dpOwnerFormCenter, dpScreenCenter, dpDesktopCenter, dpMainFormCenter,
     dpRecTopLeft, dpRecTopRight, dpRecBottomLeft, dpRecBottomRight);
 
-  PBaseOptions = ^TBaseOptions;
-  TBaseOptions = object
-  private
-    magic          : integer; //see Init in descendant classes
-    buttonCaptions : TStringDynArray;
-  public
-    customIcon     : TIcon;
+
+  IOptions = interface(IInterface)
+    function AsObject: TInterfacedObject;
+    function Icon: TIcon;
+    procedure SetIcon(ico: TIcon);
+    function ButtonCaps: TStringDynArray;
+    procedure AddButtonCaption(const caption: string);
   end;
 
-  PMessageBoxOptions = ^TMessageBoxOptions;
-  TMessageBoxOptions = object (TBaseOptions)
+  TOptions = class(TInterfacedObject, IOptions)
+  protected
+    ico : TIcon;
+    btnCaps : TStringDynArray;
+  public
+    constructor Create; virtual;
+    destructor Destroy; override;
+    function AsObject: TInterfacedObject;
+    function Icon: TIcon;
+    procedure SetIcon(ico: TIcon);
+    function ButtonCaps: TStringDynArray;
+    procedure AddButtonCaption(const caption: string);
+  end;
+
+  TMessageBoxOptions = class(TOptions)
   public
     CheckBoxCallBk : TNotifyCheckboxChangedFunc;
-    procedure Init;
-    procedure AddCustomButtonCaption(const caption: string);
   end;
 
-  TTextBoxOptions = object (TBaseOptions)
+  TTextBoxOptions = class(TOptions)
   public
     charCase         : TEditCharCase;
     allowEmptyString : Boolean;
     allowOnlyOptions : TAllowOnlyOptions;
     editChangeCallBk : TNotifyEditChangedFunc;
-    procedure Init;
-    procedure AddCustomButtonCaption(const caption: string);
   end;
 
-  TComboboxOptions = object (TBaseOptions)
+  TComboboxOptions = class(TOptions)
   private
     comboItems       : TStringDynArray;
   public
     editChangeCallBk : TNotifyEditChangedFunc;
-    procedure Init;
-    procedure AddCustomButtonCaption(const caption: string);
     procedure AddComboboxItem(const item: string);
   end;
 
-  TNumBoxOptions = object (TBaseOptions)
+  TNumBoxOptions = class(TOptions)
   public
     minVal           : integer;
     maxVal           : integer;
     allowEmptyString : Boolean;
     allowOnlyOptions : TAllowOnlyOptions;
     editChangeCallBk : TNotifyEditChangedFunc;
-    procedure Init;
-    procedure AddCustomButtonCaption(const caption: string);
   end;
 
-  THexBoxOptions = object (TBaseOptions)
+  THexBoxOptions = class(TOptions)
   public
     maxLen           : integer;
     allowEmptyString : Boolean;
     allowOnlyOptions : TAllowOnlyOptions;
     editChangeCallBk : TNotifyEditChangedFunc;
-    procedure Init;
-    procedure AddCustomButtonCaption(const caption: string);
   end;
 
-  TFloatBoxOptions = object (TBaseOptions)
+  TFloatBoxOptions = class(TOptions)
   public
     minVal           : Double;
     maxVal           : Double;
     allowEmptyString : Boolean;
     allowOnlyOptions : TAllowOnlyOptions;
     editChangeCallBk : TNotifyEditChangedFunc;
-    procedure Init;
-    procedure AddCustomButtonCaption(const caption: string);
   end;
 
   //MessageBox:
@@ -139,6 +140,7 @@ type
   function FloatInputBox(AOwner: TCustomForm;
     const ABigText, ASmallText, ATitle: string; var Value: double;
     const options: TFloatBoxOptions): boolean; overload;
+
 var
   SoundBeepOnStop : Boolean = true;
   smallFontSize   : integer = 10;
@@ -157,9 +159,9 @@ const
   mrButton3 = 14;
   mrButton4 = 15;
 
-implementation
-
 {$R *.res}
+
+implementation
 
 uses Math, Messages;
 
@@ -180,66 +182,52 @@ resourcestring
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-procedure CheckInit(opts: PBaseOptions);
+constructor TOptions.Create;
 begin
-  if (opts.magic <> $BADA55) then
-      raise Exception.Create(rsInitFail)
-  else if Length(opts.buttonCaptions) > 4 then
-    raise Exception.Create(rsExcessCaps);
+  ico := TIcon.Create;
 end;
 //------------------------------------------------------------------------------
 
-procedure AddCustomBtnCaption(opts: PBaseOptions; const caption: string);
+destructor TOptions.Destroy;
+begin
+  ico.Free;
+end;
+//------------------------------------------------------------------------------
+
+function TOptions.AsObject: TInterfacedObject;
+begin
+  result := self;
+end;
+//------------------------------------------------------------------------------
+
+function TOptions.Icon: TIcon;
+begin
+  result := ico;
+end;
+//------------------------------------------------------------------------------
+
+procedure TOptions.SetIcon(ico: TIcon);
+begin
+  self.ico := ico;
+end;
+//------------------------------------------------------------------------------
+
+function TOptions.ButtonCaps: TStringDynArray;
+begin
+  result := btnCaps;
+end;
+//------------------------------------------------------------------------------
+
+procedure TOptions.AddButtonCaption(const caption: string);
 var
   i: integer;
 begin
-  CheckInit(opts);
-  i := Length(opts.buttonCaptions);
-  SetLength(opts.buttonCaptions, i+1);
-  opts.buttonCaptions[i] := caption;
+  i := Length(btnCaps);
+  if i > 3 then Exit;
+  SetLength(btnCaps, i+1);
+  btnCaps[i] := caption;
 end;
 //------------------------------------------------------------------------------
-
-procedure TMessageboxOptions.Init;
-begin
-  if magic = $BADA55 then Finalize(self);
-  FillChar(self, SizeOf(self), 0);
-  Self.magic := $BADA55;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMessageboxOptions.AddCustomButtonCaption(const caption: string);
-begin
-  AddCustomBtnCaption(@Self, caption);
-end;
-//------------------------------------------------------------------------------
-
-procedure TTextBoxOptions.Init;
-begin
-  if  magic = $BADA55 then Finalize(self);
-  FillChar(self, SizeOf(self), 0);
-  Self.magic := $BADA55;
-end;
-//------------------------------------------------------------------------------
-
-procedure TTextBoxOptions.AddCustomButtonCaption(const caption: string);
-begin
-  AddCustomBtnCaption(@Self, caption);
-end;
-//------------------------------------------------------------------------------
-
-procedure TComboboxOptions.Init;
-begin
-  if  magic = $BADA55 then Finalize(self);
-  FillChar(self, SizeOf(self), 0);
-  Self.magic := $BADA55;
-end;
-//------------------------------------------------------------------------------
-
-procedure TComboboxOptions.AddCustomButtonCaption(const caption: string);
-begin
-  AddCustomBtnCaption(@Self, caption);
-end;
 //------------------------------------------------------------------------------
 
 procedure TComboboxOptions.AddComboboxItem(const item: string);
@@ -249,48 +237,6 @@ begin
   i := length(comboItems);
   SetLength(comboItems, i +1);
   comboItems[i] := item;
-end;
-//------------------------------------------------------------------------------
-
-procedure TNumBoxOptions.Init;
-begin
-  if  magic = $BADA55 then Finalize(self);
-  FillChar(self, SizeOf(self), 0);
-  Self.magic := $BADA55;
-end;
-//------------------------------------------------------------------------------
-
-procedure TNumBoxOptions.AddCustomButtonCaption(const caption: string);
-begin
-  AddCustomBtnCaption(@Self, caption);
-end;
-//------------------------------------------------------------------------------
-
-procedure THexBoxOptions.Init;
-begin
-  if  magic = $BADA55 then Finalize(self);
-  FillChar(self, SizeOf(self), 0);
-  Self.magic := $BADA55;
-end;
-//------------------------------------------------------------------------------
-
-procedure THexBoxOptions.AddCustomButtonCaption(const caption: string);
-begin
-  AddCustomBtnCaption(@Self, caption);
-end;
-//------------------------------------------------------------------------------
-
-procedure TFloatBoxOptions.Init;
-begin
-  if  magic = $BADA55 then Finalize(self);
-  FillChar(self, SizeOf(self), 0);
-  Self.magic := $BADA55;
-end;
-//------------------------------------------------------------------------------
-
-procedure TFloatBoxOptions.AddCustomButtonCaption(const caption: string);
-begin
-  AddCustomBtnCaption(@Self, caption);
 end;
 //------------------------------------------------------------------------------
 
@@ -319,7 +265,7 @@ type
     procedure Paint(Sender: TObject);
     procedure FormActivate(Sender: TObject);
     procedure SetupDialog(style: cardinal;
-      dialogType: TDialogType; const options: TBaseOptions);
+      dialogType: TDialogType; options: IOptions; cbVisible : Boolean);
     procedure ValidateIntInput(Sender: TObject);
     procedure ValidateHexInput(Sender: TObject);
     procedure ValidateRealInput(Sender: TObject);
@@ -404,7 +350,7 @@ type
   TArrayOfInteger = array of integer;
 
 procedure TCustomDialog.SetupDialog(style: cardinal;
-  dialogType: TDialogType; const options: TBaseOptions);
+  dialogType: TDialogType; options: IOptions; cbVisible : Boolean);
 var
   i, j, len, iconSize, padding, clientWidth, tmpClientWidth: integer;
   visibleBtns, customBtnCaptionCnt: integer;
@@ -438,7 +384,7 @@ begin
 
   iconSize := 0;
   padding := dpi11;
-  showIcon := Assigned(options.CustomIcon) or (style and ICONMASK <> 0);
+  showIcon := Assigned(options.Icon) or (style and ICONMASK <> 0);
 
   // Icons //////////////////////////////////////////////
   if showIcon then
@@ -453,8 +399,8 @@ begin
     fIconImage.Top := dpi11;
 
     //CustomDialog.res contains Windows 10 style icons
-    if assigned(options.CustomIcon) then
-      fIconImage.Picture.Icon.Assign(options.CustomIcon)
+    if assigned(options.Icon) then
+      fIconImage.Picture.Icon.Assign(options.Icon)
     else if style and ICONMASK = MB_ICONINFORMATION then //aka MB_ICONASTERISK
       //fIconImage.Picture.Icon.Handle := LoadIcon(0, IDI_INFORMATION)
       fIconImage.Picture.Icon.Handle := LoadImage(hInstance,
@@ -576,9 +522,8 @@ begin
 
   fCheckbox := TCheckBox.Create(fForm);
   fCheckbox.Parent := fForm;
-  fCheckbox.Visible :=
-    (dialogType = dtMessage) and
-      assigned(PMessageBoxOptions(@options).CheckBoxCallBk);
+  fCheckbox.Visible := (dialogType = dtMessage) and cbVisible;
+
   if fCheckbox.Visible then
   begin
     fCheckbox.Top := fSmallTextRect.Bottom + dpi11;
@@ -601,7 +546,7 @@ begin
   fButtons[0].Cancel := true;
   fButtons[0].Visible := true;
 
-  customBtnCaptionCnt := Length(options.buttonCaptions);
+  customBtnCaptionCnt := Length(options.ButtonCaps);
   if (dialogType <> dtMessage) and (customBtnCaptionCnt > 2) then
   begin
     if customBtnCaptionCnt = 3 then
@@ -710,7 +655,7 @@ begin
   for i := 0 to j do
   begin
     button := fButtons[j-i];
-    button.Caption := options.buttonCaptions[i];
+    button.Caption := options.ButtonCaps[i];
     button.Width := Max(dpi75, fForm.Canvas.TextWidth(button.caption) +dpi20);
   end;
 
@@ -770,7 +715,7 @@ begin
 
   fForm := TForm.Create(AOwner);
   try
-    SetupDialog(MB_OKCANCEL, dtEdit, PBaseOptions(@options)^);
+    SetupDialog(MB_OKCANCEL, dtEdit, options, false);
     fEdit.Text := Value;
     fEdit.CharCase := options.charCase;
     fEdit.OnChange := ValidateStrInput;
@@ -796,7 +741,7 @@ begin
 
   fForm := TForm.Create(AOwner);
   try
-    SetupDialog(MB_OKCANCEL, dtCombo, PBaseOptions(@options)^);
+    SetupDialog(MB_OKCANCEL, dtCombo, options, false);
     for i := 0 to high(options.comboItems) do
       fCombo.Items.Add(options.comboItems[i]);
     fCombo.ItemIndex := index;
@@ -877,15 +822,18 @@ end;
 function TCustomDialog.MessageBox(AOwner: TCustomForm;
   const ABigText, ASmallText, ATitle: string; style: Cardinal;
   const options: TMessageBoxOptions): Cardinal;
+var
+  cbVisible: Boolean;
 begin
   fTitle := ATitle;
   fBigText := ABigText;
   fSmallText := ASmallText;
+  cbVisible := Assigned(options.CheckBoxCallBk);
   fForm := TForm.Create(AOwner);
   try
-    SetupDialog(style, dtMessage, PBaseOptions(@options)^);
+    SetupDialog(style, dtMessage, options, cbVisible);
     result := fForm.ShowModal;
-    if Assigned(options.CheckBoxCallBk) then
+    if cbVisible then
       options.CheckBoxCallBk(self, fCheckbox.Checked);
   finally
     fForm.Free;
@@ -950,7 +898,7 @@ begin
 
   fForm := TForm.Create(AOwner);
   try
-    SetupDialog(MB_OKCANCEL, dtEdit, PBaseOptions(@options)^);
+    SetupDialog(MB_OKCANCEL, dtEdit, options, false);
     fEdit.Text := Value;
     fEdit.CharCase := options.CharCase;
     fEdit.OnChange := ValidateStrInput;
@@ -977,8 +925,8 @@ begin
 
   fForm := TForm.Create(AOwner);
   try
-    SetupDialog(MB_OKCANCEL, dtEdit, PBaseOptions(@options)^);
-   fEdit.Text := FloatToStr(Value);
+    SetupDialog(MB_OKCANCEL, dtEdit, options, false);
+    fEdit.Text := FloatToStr(Value);
     fEdit.OnChange := ValidateRealInput;
     ValidateRealInput(nil);
     result := fForm.ShowModal = mrOK;
@@ -1018,7 +966,7 @@ begin
 
   fForm := TForm.Create(AOwner);
   try
-    SetupDialog(MB_OKCANCEL, dtEdit, PBaseOptions(@options)^);
+    SetupDialog(MB_OKCANCEL, dtEdit, options, false);
     ICCX.dwSize := sizeof(ICCX);
     ICCX.dwICC := ICC_UPDOWN_CLASS;
     InitCommonControlsEx(ICCX);
@@ -1059,7 +1007,7 @@ begin
 
   fForm := TForm.Create(AOwner);
   try
-    SetupDialog(MB_OKCANCEL, dtEdit, PBaseOptions(@options)^);
+    SetupDialog(MB_OKCANCEL, dtEdit, options, false);
     fEdit.Text := hex;
     fEdit.OnChange := ValidateHexInput;
     ValidateHexInput(nil);
@@ -1076,10 +1024,11 @@ end;
 function MessageBox(AOwner: TCustomForm; const ABigText, ASmallText,
   ATitle: string; style: Cardinal): TModalResult;
 var
-  options: TMessageBoxOptions;
+  options: IOptions;
 begin
-  options.Init;
-  Result := MessageBox(AOwner, ABigText, ASmallText, ATitle, style, options);
+  options := TMessageBoxOptions.Create;
+  Result := MessageBox(AOwner, ABigText, ASmallText, ATitle, style,
+    TMessageBoxOptions(options.AsObject));
 end;
 //------------------------------------------------------------------------------
 
@@ -1087,7 +1036,6 @@ function MessageBox(AOwner: TCustomForm;
   const ABigText, ASmallText, ATitle: string; style: Cardinal;
   const options: TMessageBoxOptions): TModalResult;
 begin
-  CheckInit(PBaseOptions(@options));
   with TCustomDialog.Create do
   try
     Result := MessageBox(AOwner, ABigText, ASmallText, ATitle, style, options);
@@ -1100,10 +1048,11 @@ end;
 function TextInputBox(AOwner: TCustomForm; const ABigText, ASmallText,
   ATitle: string; var Value: string): boolean;
 var
-  options: TTextBoxOptions;
+  options: IOptions;
 begin
-  options.Init;
-  Result := TextInputBox(AOwner, ABigText, ASmallText, ATitle, Value, options);
+  options := TTextBoxOptions.Create;
+  Result := TextInputBox(AOwner, ABigText, ASmallText, ATitle, Value,
+    TTextBoxOptions(options.AsObject));
 end;
 //------------------------------------------------------------------------------
 
@@ -1111,7 +1060,6 @@ function TextInputBox(AOwner: TCustomForm;
   const ABigText, ASmallText, ATitle: string; var Value: string;
   const options: TTextBoxOptions): boolean;
 begin
-  CheckInit(PBaseOptions(@options));
   with TCustomDialog.Create do
   try
     Result := TextInputBox(AOwner, ABigText, ASmallText, ATitle, Value, options);
@@ -1125,7 +1073,6 @@ function ComboInputBox(AOwner: TCustomForm;
   const ABigText, ASmallText, ATitle: string; var index: integer;
   const options: TComboBoxOptions): boolean;
 begin
-  CheckInit(PBaseOptions(@options));
   with TCustomDialog.Create do
   try
     Result := ComboInputBox(AOwner, ABigText, ASmallText,
@@ -1139,10 +1086,11 @@ end;
 function NumInputBox(AOwner: TCustomForm; const ABigText, ASmallText,
   ATitle: string; var Value: integer): boolean;
 var
-  options: TNumBoxOptions;
+  options: IOptions;
 begin
-  options.Init;
-  result := NumInputBox(AOwner, ABigText, ASmallText, ATitle, Value, options);
+  options := TNumBoxOptions.Create;
+  result := NumInputBox(AOwner, ABigText, ASmallText, ATitle, Value,
+    TNumBoxOptions(options.AsObject));
 end;
 //------------------------------------------------------------------------------
 
@@ -1150,7 +1098,6 @@ function NumInputBox(AOwner: TCustomForm;
   const ABigText, ASmallText, ATitle: string; var Value: integer;
   const options: TNumBoxOptions): boolean;
 begin
-  CheckInit(PBaseOptions(@options));
   with TCustomDialog.Create do
   try
     result := NumInputBox(AOwner, ABigText, ASmallText, ATitle, Value, options);
@@ -1164,7 +1111,6 @@ function HexInputBox(AOwner: TCustomForm;
   const ABigText, ASmallText, ATitle: string; var hex: string;
   const options: THexBoxOptions): boolean;
 begin
-  CheckInit(PBaseOptions(@options));
   with TCustomDialog.Create do
   try
     result := HexInputBox(AOwner, ABigText, ASmallText, ATitle, hex, options);
@@ -1174,14 +1120,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
 function FloatInputBox(AOwner: TCustomForm; const ABigText, ASmallText,
   ATitle: string; var Value: double): boolean;
 var
-  options: TFloatBoxOptions;
+  options: IOptions;
 begin
-  options.Init;
-  result := FloatInputBox(AOwner, ABigText, ASmallText, ATitle, Value, options);
+  options := TFloatBoxOptions.Create;
+  result := FloatInputBox(AOwner, ABigText, ASmallText, ATitle, Value,
+    TFloatBoxOptions(options.AsObject));
 end;
 //------------------------------------------------------------------------------
 
@@ -1189,11 +1135,9 @@ function FloatInputBox(AOwner: TCustomForm;
   const ABigText, ASmallText, ATitle: string; var Value: double;
   const options: TFloatBoxOptions): boolean;
 begin
-  CheckInit(PBaseOptions(@options));
   with TCustomDialog.Create do
   try
-    result := FloatInputBox(AOwner, ABigText, ASmallText, ATitle,
-      Value, options);
+    result := FloatInputBox(AOwner, ABigText, ASmallText, ATitle, Value, options);
   finally
     free;
   end;

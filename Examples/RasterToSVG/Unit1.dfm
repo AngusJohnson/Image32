@@ -1,9 +1,9 @@
 object MainForm: TMainForm
   Left = 514
   Top = 310
+  Width = 643
+  Height = 487
   Caption = 'RasterToSVG'
-  ClientHeight = 432
-  ClientWidth = 627
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -21,7 +21,7 @@ object MainForm: TMainForm
   TextHeight = 17
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 406
+    Top = 403
     Width = 627
     Height = 26
     Panels = <>
@@ -33,10 +33,9 @@ object MainForm: TMainForm
     Left = 0
     Top = 0
     Width = 627
-    Height = 406
+    Height = 403
     Align = alClient
     TabOrder = 1
-    ExplicitTop = -6
     object pnlTop: TPanel
       Left = 1
       Top = 1
@@ -61,7 +60,7 @@ object MainForm: TMainForm
     end
     object pnlOptions: TPanel
       Left = 1
-      Top = 371
+      Top = 368
       Width = 625
       Height = 34
       Align = alBottom

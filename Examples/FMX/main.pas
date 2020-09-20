@@ -38,7 +38,6 @@ var
   bkColor, penColor, txtColor: TColor32;
 const
   margin: integer = 20;
-  fontHeight: double = 70;
 
 implementation
 
@@ -56,15 +55,23 @@ procedure TMainForm.FormCreate(Sender: TObject);
 var
   i: integer;
   resourceImg: TImage32;
-  paths, tmp: TPathsD;
+  tmp: TPathD;
+  paths: TPathsD;
   textRec, imageRec: TRect;
   rec1, rec2: TRect;
 
   delta: TPoint;
-  nextX: double;
+  screenScale, fontHeight, nextX: double;
   glyphManager: TGlyphManager;
   fontReader : TTtfFontReader;
+
+  ScreenService: IFMXScreenService;
 begin
+  if TPlatformServices.Current.SupportsPlatformService (
+    IFMXScreenService, IInterface(ScreenService)) then
+      screenScale := ScreenService.GetScreenScale else
+      screenScale := 1.0;
+
   displayImg := TImage32.Create();
 
   bkColor  := $FFF8F8BB; //yellow
@@ -77,6 +84,7 @@ begin
 {$ENDIF}
 
   //get outline for some text from the font resource
+  fontHeight := 35 * screenScale;
   glyphManager := TGlyphManager.Create(fontHeight);
   fontReader := TTtfFontReader.Create;
   try
@@ -104,9 +112,8 @@ begin
 
     //fill the display image and give it a border too
     displayImg.FillRect(displayImg.Bounds, bkColor);
-    SetLength(tmp, 1);
-    tmp[0] := Image32_Vector.Rectangle(displayImg.Bounds);
-    DrawLine(displayImg, tmp[0], 2, penColor, esClosed);
+    tmp := Image32_Vector.Rectangle(displayImg.Bounds);
+    DrawLine(displayImg, tmp, 2, penColor, esClosed);
 
     //offset the resource image so it's centered in the display image
     //and copy the resource image onto the display image ...

@@ -33,6 +33,7 @@ object MainForm: TMainForm
   object btnRefresh: TButton
     Anchors = []
     Default = True
+    StyledSettings = [Family, Style, FontColor]
     Position.X = 97.000000000000000000
     Position.Y = 34.000000000000000000
     Size.Width = 104.000000000000000000
@@ -40,11 +41,13 @@ object MainForm: TMainForm
     Size.PlatformDefault = False
     TabOrder = 2
     Text = '&Refresh'
+    TextSettings.Font.Size = 16.000000000000000000
     OnClick = btnRefreshClick
   end
   object btnClose: TButton
     Anchors = []
     Cancel = True
+    StyledSettings = [Family, Style, FontColor]
     Position.X = 209.000000000000000000
     Position.Y = 34.000000000000000000
     Size.Width = 104.000000000000000000
@@ -52,6 +55,7 @@ object MainForm: TMainForm
     Size.PlatformDefault = False
     TabOrder = 3
     Text = '&Close'
+    TextSettings.Font.Size = 16.000000000000000000
     OnClick = btnCloseClick
   end
 end

@@ -225,14 +225,14 @@ object MainForm: TMainForm
   object tmrLoading: TTimer
     Enabled = False
     OnTimer = tmrLoadingTimer
-    Left = 208
-    Top = 16
+    Left = 120
+    Top = 88
   end
   object tmrSlideShow: TTimer
     Enabled = False
     Interval = 5000
     OnTimer = tmrSlideShowTimer
-    Left = 265
-    Top = 16
+    Left = 177
+    Top = 88
   end
 end

@@ -1075,8 +1075,7 @@ function TClipper.PopLocalMinima(Y: Int64;
 begin
   Result := false;
   if FCurrentLocMinIdx = FLocMinList.Count then Exit;
-  //localMinima := PLocalMinima(FLocMinList[FCurrentLocMinIdx]);
-  localMinima := FLocMinList[FCurrentLocMinIdx];
+  localMinima := PLocalMinima(FLocMinList[FCurrentLocMinIdx]);
   if (localMinima.vertex.Pt.Y = Y) then
   begin
     inc(FCurrentLocMinIdx);
@@ -2261,8 +2260,7 @@ end;
 
 function TClipper.GetIntersectNode(index: integer): PIntersectNode;
 begin
-  //result := PIntersectNode(FIntersectList[index]);
-  result := FIntersectList[index];
+  result := PIntersectNode(FIntersectList[index]);
 end;
 //------------------------------------------------------------------------------
 
@@ -2753,9 +2751,11 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TPolyPath.Clear;
+var
+  i: integer;
 begin
-//  for i := 0 to FChildList.Count -1 do
-//    FChildList[i].Free;
+  for i := 0 to FChildList.Count -1 do
+    TPolyPath(FChildList[i]).Free;
   FChildList.Clear;
 end;
 //------------------------------------------------------------------------------

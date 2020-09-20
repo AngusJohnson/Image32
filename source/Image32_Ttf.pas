@@ -259,8 +259,6 @@ type
     function LoadFromFile(const filename: string): Boolean;
     function GetGlyph(unicode: Word; out paths: TPathsD;
       out nextX: integer; out glyphMetrics: TGlyphMetrics): Boolean;
-    function GetGlyphs(const text: string; out paths: TPathsD;
-      out nextX: integer): Boolean;
     property FontInfo: TTtfFontInfo read GetFontInfo;
   end;
 
@@ -299,8 +297,10 @@ type
     procedure Clear;
     function GetChar(c: Char; fontReader: TTtfFontReader;
     out paths: TPathsD; out glyphMetrics: TGlyphMetrics): Boolean;
-    function GetString(s: string; fontReader: TTtfFontReader;
-      out paths: TPathsD; out nextX: double): Boolean;
+    function GetString(const s: string; fontReader: TTtfFontReader;
+      out paths: TPathsD; out nextX: double): Boolean; overload;
+    function GetString(x,y: double; const s: string; fontReader: TTtfFontReader;
+      out paths: TPathsD; out nextX: double): Boolean; overload;
   end;
 
 implementation
@@ -1298,30 +1298,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetGlyphs(const text: string;
-  out paths: TPathsD; out nextX: integer): Boolean;
-var
-  i, currX, len: integer;
-  tmpPaths: TPathsD;
-  glyphMetrics: TGlyphMetrics;
-begin
-  paths := nil;
-  Result := IsValidFontFormat;
-  nextX := 0;
-  len := Length(text);
-  if not Result or (len = 0) then Exit;
-  for i := 1 to len do
-  begin
-    result := GetGlyph(Ord(text[i]), tmpPaths, currX, glyphMetrics);
-    if not result then Exit;
-    if nextX > 0 then
-      tmpPaths := OffsetPath(tmpPaths, nextX, 0);
-    inc(nextX, currX);
-    AppendPath(paths, tmpPaths);
-  end;
-end;
-//------------------------------------------------------------------------------
-
 function TTtfFontReader.GetFontInfo: TTtfFontInfo;
 begin
   if not IsValidFontFormat then
@@ -1509,7 +1485,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TGlyphManager.GetString(s: string; fontReader: TTtfFontReader;
+function TGlyphManager.GetString(const s: string; fontReader: TTtfFontReader;
+  out paths: TPathsD; out nextX: double): Boolean;
+begin
+  Result := GetString(0,0, s, fontReader, paths, nextX);
+end;
+//------------------------------------------------------------------------------
+
+function TGlyphManager.GetString(x,y: double; const s: string; fontReader: TTtfFontReader;
   out paths: TPathsD; out nextX: double): Boolean;
 var
   i: integer;
@@ -1519,13 +1502,13 @@ var
 begin
   Result := true;
   FillMissingChars(s, fontReader);
-  nextX := 0;
+  nextX := x;
   for i := 1 to Length(s) do
   begin
     Result := GetChar(s[i], nil, tmpPaths, metrics);
     if not result then Break;
-    if i > 0 then
-      tmpPaths := OffsetPath(tmpPaths, nextX, 0);
+    if (nextX <> 0) or (y <> 0) then
+      tmpPaths := OffsetPath(tmpPaths, nextX, y);
     if fFontHeight > 0 then
       dx := metrics.hmtx.advanceWidth * fFontHeight / metrics.upm else
       dx := metrics.hmtx.advanceWidth;
