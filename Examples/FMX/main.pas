@@ -5,7 +5,7 @@ interface
 uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   System.Rtti, Math, FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics,
-  Image32, Image32_Vector, Image32_Draw, Image32_FMX,
+  Image32, Image32_Vector, Image32_Draw, Image32_Extra, Image32_FMX,
   Image32_Ttf, Image32_Clipper,
   FMX.Dialogs, FMX.Layouts, FMX.ExtCtrls, FMX.Platform, FMX.Surfaces,
   FMX.StdCtrls, FMX.Controls.Presentation;
@@ -24,11 +24,10 @@ type
     procedure FormDestroy(Sender: TObject);
     procedure btnRefreshClick(Sender: TObject);
   private
-    zoomCount: cardinal;
-    displayImg: TImage32;
-    zoomText: array[0..19] of TPathsD;
+    zoomIdx: cardinal;
+    zoomImages: array[0..20] of TImage32;
     outlineText: TPathsD;
-    procedure UpdateImageViewer(img: TImage32);
+    procedure UpdateImageViewer;
   public
   end;
 
@@ -53,18 +52,17 @@ implementation
 
 procedure TMainForm.FormCreate(Sender: TObject);
 var
-  i: integer;
-  resourceImg: TImage32;
+  i, zoomCnt: integer;
+  baseImg, imgBooks: TImage32;
   tmp: TPathD;
-  paths: TPathsD;
-  textRec, imageRec: TRect;
-  rec1, rec2: TRect;
-
+  mainTxtPaths, copyTxtPaths: TPathsD;
+  textRec, textRec2, imageRec: TRect;
+  matrix: TMatrixD;
   delta: TPoint;
   screenScale, fontHeight, nextX: double;
-  glyphManager: TGlyphManager;
-  fontReader : TTtfFontReader;
 
+  glyphCache: TGlyphCache;
+  fontReader : TTtfFontReader;
   ScreenService: IFMXScreenService;
 begin
   if TPlatformServices.Current.SupportsPlatformService (
@@ -72,7 +70,7 @@ begin
       screenScale := ScreenService.GetScreenScale else
       screenScale := 1.0;
 
-  displayImg := TImage32.Create();
+  fontHeight := 35 * screenScale;
 
   bkColor  := $FFF8F8BB; //yellow
   penColor := clMaroon32;
@@ -83,92 +81,138 @@ begin
   txtColor := SwapRedBlue(txtColor);
 {$ENDIF}
 
-  //get outline for some text from the font resource
-  fontHeight := 35 * screenScale;
-  glyphManager := TGlyphManager.Create(fontHeight);
+
+  baseImg := TImage32.Create();
+  //get ready for some simple text animation
+  zoomCnt := Length(zoomImages);
+  zoomIdx := zoomCnt -1;
+  zoomImages[zoomIdx] := baseImg;
+
+  //create a fontReader to access truetype font files (*.ttf) that
+  //have been stored as font resources and create a glyph cache too
   fontReader := TTtfFontReader.Create;
+  glyphCache := TGlyphCache.Create(fontReader, fontHeight);
   try
-    //fontReader.LoadFromFile('c:\windows\fonts\arial.ttf');
-    fontReader.LoadFromResource('FONT', RT_RCDATA);
+    //connect fontReader to a specific font
+    fontReader.LoadFromResource('FONT_2', RT_RCDATA);
     if not fontReader.IsValidFontFormat then Exit;
 
-    glyphManager.GetString('Image32  rocks!', fontReader, paths, nextX);
+
+    //and get the outline for some text ...
+    glyphCache.GetString('Image32  rocks!', mainTxtPaths, nextX);
+
+    //Normally we'd create different fontReaders for different fonts and
+    //also use different glyphManagers for different font heights.
+    //But here, I'm showing it's possible to reuse these objects ...
+
+    fontReader.LoadFromResource('FONT_1', RT_RCDATA);
+    if not fontReader.IsValidFontFormat then Exit;
+    //nb: fontReader changing fonts will automatically clear glyphCache
+    //cache, though changing glyphCache fontHeight will also do the same...
+    glyphCache.FontHeight := fontHeight / 4;
+
+    //and now get the copyright text outline
+    glyphCache.GetString('© 2020 Angus Johnson', copyTxtPaths, nextX);
   finally
+    glyphCache.Free;
     fontReader.free;
-    glyphManager.Free;
   end;
 
-  resourceImg := TImage32.Create;
+  //and some affine transformations of mainTxtPaths, just for fun :)
+  matrix := IdentityMatrix;
+  //stretch it vertically ...
+  MatrixScale(matrix, 1, 1.75);
+  //and skew (yes, we could've used an italicized font instead) ...
+  MatrixSkew(matrix, -0.25, 0);
+  MatrixApply(matrix, mainTxtPaths);
+
+  imgBooks := TImage32.Create;
   try
-    //load the background image ...
-    resourceImg.LoadFromResource('PNGIMAGE_1', RT_RCDATA);
+    //load a colourful background image (some books) ...
+    imgBooks.LoadFromResource('PNGIMAGE_1', RT_RCDATA);
 
-    //set the size of the display image so that it fits
-    //both the resource image and the text ...
-    textRec := Image32_Vector.GetBounds(paths);
-    displayImg.SetSize(
-      max(resourceImg.Width, textRec.Width) + margin *4,
-      max(resourceImg.Height, textRec.Height) + margin *4);
+    //set the size of the base image so that it contains
+    //both 'imgBooks' and the text with a decent margin ...
+    textRec := Image32_Vector.GetBounds(mainTxtPaths);
+    baseImg.SetSize(
+      max(imgBooks.Width, textRec.Width) + (margin * 4),
+      max(imgBooks.Height, textRec.Height) + (margin * 4));
 
-    //fill the display image and give it a border too
-    displayImg.FillRect(displayImg.Bounds, bkColor);
-    tmp := Image32_Vector.Rectangle(displayImg.Bounds);
-    DrawLine(displayImg, tmp, 2, penColor, esClosed);
+    //color fill the base image and give it a border ...
+    baseImg.FillRect(baseImg.Bounds, bkColor);
+    tmp := Image32_Vector.Rectangle(baseImg.Bounds);
+    DrawLine(baseImg, tmp, 2, penColor, esClosed);
 
-    //offset the resource image so it's centered in the display image
-    //and copy the resource image onto the display image ...
-    delta := Point((displayImg.Width - resourceImg.Width) div 2,
-      (displayImg.Height - resourceImg.Height) div 2);
-    imageRec := resourceImg.Bounds;
+    //offset 'imgBooks' so it's centered in the base image
+    //and copy it onto the base image ...
+    imageRec := imgBooks.Bounds;
+    delta := Point((baseImg.Width - imgBooks.Width) div 2,
+      (baseImg.Height - imgBooks.Height) div 2);
     OffsetRect(imageRec, delta.X, delta.Y);
-    displayImg.CopyBlend(resourceImg, resourceImg.Bounds, imageRec, BlendToOpaque);
-
-    //center the text too ...
-    delta := Point((displayImg.Width - textRec.Width) div 2 - textRec.Left,
-      (displayImg.Height - textRec.Height) div 2 - textRec.Top);
-    zoomText[0] := OffsetPath(paths, delta.X, delta.Y);
-    outlineText := InflatePolygons(zoomText[0], 1.5);
-
-    //get an array of zoomed test paths
-    zoomCount := Length(zoomText);
-    for i := 1 to zoomCount -1 do
-    begin
-      rec1 := Image32_Vector.GetBounds(zoomText[i-1]);
-      zoomText[i] := OffsetPath(zoomText[i-1], -rec1.Left, -rec1.Top);
-      zoomText[i] := ScalePath(zoomText[i], 0.9, 0.9);
-      rec2 := Image32_Vector.GetBounds(zoomText[i]);
-      zoomText[i] := OffsetPath(zoomText[i],
-        rec1.Left + (rec1.Width - rec2.Width) div 2,
-        rec1.Top + (rec1.Height - rec2.Height) div 2);
-    end;
-
-    UpdateImageViewer(displayImg);
-    ImageViewer1Resized(nil);
-    btnRefresh.Enabled := false;
+    baseImg.CopyBlend(imgBooks, imgBooks.Bounds, imageRec, BlendToOpaque);
 
   finally
-    resourceImg.Free;
+    imgBooks.Free;
   end;
+
+  //draw a simple copyright notice using a normal font (font_1)
+  //and locate it in the bottom right corner of the display image
+  with GetBoundsD(copyTxtPaths) do
+    copyTxtPaths := OffsetPath(copyTxtPaths,
+      baseImg.Width - Width -10, baseImg.Height - 10);
+  DrawPolygon(baseImg, copyTxtPaths, frNonZero, clBlack32);
+
+  //center mainTxtPaths inside displayImg ...
+  delta.X := (baseImg.Width - textRec.Width) div 2 - textRec.Left;
+  delta.Y := (baseImg.Height - textRec.Height) div 2 - textRec.Top;
+  outlineText := OffsetPath(mainTxtPaths, delta.X, delta.Y);
+
+  //fill an array of images copying the base image and overlaying
+  //some scaled text in preparation for some text 'zoom' animation
+  zoomImages[0] := TImage32.Create(baseImg);
+  DrawPolygon(zoomImages[0], outlineText, frNonZero, clBlack32);
+  outlineText := InflatePolygons(outlineText, -1.0);
+  DrawPolygon(zoomImages[0], outlineText, frNonZero, txtColor);
+  Draw3D(zoomImages[0], outlineText, frNonZero, 6, 3);
+
+  for i := 1 to zoomCnt -2 do
+  begin
+    textRec := Image32_Vector.GetBounds(outlineText);
+    outlineText := ScalePath(outlineText, 0.9, 0.9);
+    textRec2 := Image32_Vector.GetBounds(outlineText);
+    outlineText := OffsetPath(outlineText,
+      (textRec.Left-textRec2.Left) + (textRec.Width-textRec2.Width)/2,
+      (textRec.Top-textRec2.Top) + (textRec.Height-textRec2.Height)/2);
+    zoomImages[i] := TImage32.Create(baseImg);
+    DrawPolygon(zoomImages[i], outlineText, frNonZero, clGray32);
+  end;
+
+  UpdateImageViewer;
+  ImageViewer1Resized(nil);
+  btnRefresh.Enabled := false;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormDestroy(Sender: TObject);
+var
+  i: integer;
 begin
-  displayImg.Free;
+  for i := High(zoomImages) downto 0 do
+    zoomImages[i].Free;
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.UpdateImageViewer(img: TImage32);
+procedure TMainForm.UpdateImageViewer;
 var
   surf: TBitmapSurface;
+  img: TImage32;
 begin
+  img := zoomImages[zoomIdx];
   surf := TBitmapSurface.Create;
   try
     surf.SetSize(img.Width, img.Height, TPixelFormat.BGRA);
     Move(img.PixelBase^, surf.Scanline[0]^, img.Width * img.Height *4);
     ImageViewer1.Bitmap.Assign(surf);
-
-    ImageViewer1.RealignContent;
   finally
     surf.Free;
   end;
@@ -187,45 +231,27 @@ begin
   btnClose.Position.X := ClientWidth - btnClose.Width - btnClose.Height / 2;
   btnClose.Position.Y := ClientHeight - btnClose.Height * 3 / 2;
 
-  btnRefresh.Position.X :=
-    btnClose.Position.X - btnRefresh.Width - btnClose.Height /2;
-  btnRefresh.Position.Y := btnClose.Position.Y;
+  btnRefresh.Position.X := btnClose.Position.X;
+  btnRefresh.Position.Y := btnClose.Position.Y - btnRefresh.Height * 4/3;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormShow(Sender: TObject);
 begin
+  if zoomImages[0] = nil then Exit; //something went wrong while loading
   Timer1.Enabled := true;
 end;
 //------------------------------------------------------------------------------
 
-
 procedure TMainForm.Timer1Timer(Sender: TObject);
-var
-  img: TImage32;
-  zoomTotal, alpha: cardinal;
 begin
   Timer1.Interval := 25;
-  dec(zoomCount);
-
-  img := TImage32.Create(displayImg);
-  try
-    if zoomCount = 0 then
-    begin
-      Timer1.Enabled := false;
-      btnRefresh.Enabled := true;
-      DrawPolygon(img, outlineText, frNonZero, clBlack32);
-      DrawPolygon(img, zoomText[zoomCount], frNonZero, txtColor);
-    end else
-    begin
-      zoomTotal := High(zoomText);
-      alpha :=  ((zoomTotal - zoomCount) *255 div zoomTotal) shl 24;
-      DrawPolygon(img, zoomText[zoomCount], frNonZero, alpha);
-    end;
-
-    UpdateImageViewer(img);
-  finally
-    img.Free;
+  dec(zoomIdx);
+  UpdateImageViewer;
+  if zoomIdx = 0 then
+  begin
+    Timer1.Enabled := false;
+    btnRefresh.Enabled := true;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -233,8 +259,8 @@ end;
 procedure TMainForm.btnRefreshClick(Sender: TObject);
 begin
   btnRefresh.Enabled := false;
-  UpdateImageViewer(displayImg);
-  zoomCount := Length(zoomText);
+  zoomIdx := High(zoomImages);
+  UpdateImageViewer;
   Timer1.Interval := 1000;
   Timer1.Enabled := true;
 end;

@@ -2,7 +2,7 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'Image32 FMX Demo1'
-  ClientHeight = 444
+  ClientHeight = 522
   ClientWidth = 358
   FormFactor.Width = 320
   FormFactor.Height = 480
@@ -15,14 +15,14 @@ object MainForm: TMainForm
     Touch.InteractiveGestures = [Zoom, Pan]
     Align = Client
     Size.Width = 358.000000000000000000
-    Size.Height = 444.000000000000000000
+    Size.Height = 522.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 1
     OnResized = ImageViewer1Resized
     BitmapScale = 0.839999914169311500
     ShowScrollBars = False
     Viewport.Width = 358.000000000000000000
-    Viewport.Height = 444.000000000000000000
+    Viewport.Height = 522.000000000000000000
   end
   object Timer1: TTimer
     Enabled = False
@@ -35,7 +35,7 @@ object MainForm: TMainForm
     Default = True
     StyledSettings = [Family, Style, FontColor]
     Position.X = 97.000000000000000000
-    Position.Y = 34.000000000000000000
+    Position.Y = 43.837837219238280000
     Size.Width = 104.000000000000000000
     Size.Height = 44.000000000000000000
     Size.PlatformDefault = False
@@ -49,7 +49,7 @@ object MainForm: TMainForm
     Cancel = True
     StyledSettings = [Family, Style, FontColor]
     Position.X = 209.000000000000000000
-    Position.Y = 34.000000000000000000
+    Position.Y = 43.837837219238280000
     Size.Width = 104.000000000000000000
     Size.Height = 44.000000000000000000
     Size.PlatformDefault = False

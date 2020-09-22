@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 1.50
-Released: 20 September 2020
+Latest version: 1.51
+Released: 22 September 2020
 
 Copyright © 2019-2020 Angus Johnson
 Freeware released under Boost Software License
@@ -11,6 +11,17 @@ Website  : http://www.angusj.com/delphi/image32/Docs/_Body.htm
 download : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
+
+Version: 1.51
+  Modified Image32_Ttf
+    Significant updates to TTtfFontReader and also to
+    TGlyphManager which has been renamed TGlyphCache
+  Minor updates to other units
+  Updated FMX demo
+
+Version: 1.50a
+  Modified Image32_Ttf
+    Added kerning support (enabled by default)
 
 Version: 1.50
   Added Image32_Ttf

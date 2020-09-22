@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.47                                                            *
-* Date      :  28 August 2020                                                  *
+* Version   :  1.50c                                                           *
+* Date      :  21 September 2020                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -414,6 +414,8 @@ begin
   result.Top := Max(rec1.Top, rec2.Top);
   result.Right := Min(rec1.Right, rec2.Right);
   result.Bottom := Min(rec1.Bottom, rec2.Bottom);
+  if (Result.Left > Result.Right) or
+    (Result.Top > Result.Bottom) then Result := NullRect;
 end;
 //------------------------------------------------------------------------------
 

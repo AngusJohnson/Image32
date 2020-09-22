@@ -3,7 +3,7 @@ unit Image32_Ttf;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.1                                                             *
-* Date      :  18 September 2020                                               *
+* Date      :  22 September 2020                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2020                                              *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependency)        *
@@ -240,9 +240,35 @@ type
   TTableName = (tblName, tblHead, tblHhea,
     tblCmap, tblMaxp, tblLoca, tblGlyf, tblHmtx, tblKern);
 
+  //Because TGlyphCache is dependant on an external TTtfFontReader, and
+  //given it's simplest for TGlyphCache to get a pointer to a TTtfFontReader
+  //during construction, we need a mechanism such that TTtfFontReader will
+  //notify TGlyphCache if its font is changed or if it's being destroyed.
+  //And we need to accommodate several TGlyphCache objects being attached
+  //to a single TTtfFontReader object (eg to cache multiple font heights).
+
+  TNotifyFlag = (nfChanging, nfDestroying);
+
+  TNotifyRecipient = class;
+
+  TNotifySender = class
+  protected
+    fRecipientList: array of TNotifyRecipient;
+    procedure Register(Recipient: TNotifyRecipient);
+    procedure UnRegister(Recipient: TNotifyRecipient);
+  public
+    destructor Destroy; override;
+    procedure NotifyRecipients(notifyFlag: TNotifyFlag);
+  end;
+
+  TNotifyRecipient = class
+  protected
+    procedure SenderIsNotifying(notifyFlag: TNotifyFlag); virtual;
+  end;
+
 {$ZEROBASEDSTRINGS OFF}
 
-  TTtfFontReader = class
+  TTtfFontReader = class(TNotifySender)
   private
     fStream            : TMemoryStream;
     fFontInfo          : TTtfFontInfo;
@@ -305,46 +331,102 @@ type
     metrics        : TGlyphMetrics;
   end;
 
-  //TGlyphManager: speeds up text rendering by parsing font files only once for
+  //TGlyphCache: speeds up text rendering by parsing font files only once for
   //each accessed character. It can also scale glyphs to a specified font
   //height and invert them too (which is necessary on Windows PCs).
-  TGlyphManager = class
+  TGlyphCache = class(TNotifyRecipient)
   private
 {$IFDEF XPLAT_GENERICS}
     fGlyphInfoList     : TList<PGlyphInfo>;
 {$ELSE}
     fGlyphInfoList     : TList;
 {$ENDIF}
+    fFontReader        : TTtfFontReader;
     fSorted            : Boolean;
     fUseKerning        : Boolean;
     fVerticalFlip      : Boolean;
     fFontHeight        : double;
+    fFlipVert          : Boolean;
     function FoundInList(c: Char): Boolean;
-    procedure AddGlyph(unicode: Word; fontReader: TTtfFontReader;
+    procedure AddGlyph(unicode: Word;
       out paths: TPathsD; out glyphMetrics: TGlyphMetrics);
     procedure VerticalFlip(var paths: TPathsD);
+    procedure SetFlipVert(value: Boolean);
+    procedure SetFontHeight(newHeight: double);
+    procedure SetFontReader(newFontReader: TTtfFontReader);
     procedure Sort;
     function ListMissingChars(const charList: string): string;
-    procedure FillMissingChars(const charList: string;
-      fontReader: TTtfFontReader);
+    procedure FillMissingChars(const charList: string);
+  protected
+    procedure SenderIsNotifying(notifyFlag: TNotifyFlag); override;
   public
-    constructor Create(fontHeight: double = 0.0;
-      verticalFlip: Boolean = true; useKerning: Boolean = true);
+    constructor Create(fontReader: TTtfFontReader; fontHeight: double);
     destructor Destroy; override;
     procedure Clear;
-    function GetChar(c: Char; fontReader: TTtfFontReader;
-    out paths: TPathsD; out glyphMetrics: TGlyphMetrics): Boolean;
-    function GetString(const s: string; fontReader: TTtfFontReader;
+    function GetChar(c: Char;
+      out paths: TPathsD; out glyphMetrics: TGlyphMetrics): Boolean;
+    function GetString(const s: string;
       out paths: TPathsD; out nextX: double): Boolean; overload;
-    function GetString(x,y: double; const s: string; fontReader: TTtfFontReader;
+    function GetString(x,y: double; const s: string;
       out paths: TPathsD; out nextX: double): Boolean; overload;
-    property UseKerning: boolean read fUseKerning write fUseKerning;
+    property InvertY: boolean read fFlipVert write SetFlipVert;
+    property FontHeight: double read fFontHeight write SetFontHeight;
+    property FontReader: TTtfFontReader read
+      fFontReader write SetFontReader;
+    property Kerning: boolean read fUseKerning write fUseKerning;
   end;
 
   procedure GetMeaningfulDateTime(const secsSince1904: Uint64;
     out yy,mo,dd, hh,mi,ss: cardinal);
 
 implementation
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+procedure TNotifySender.Register(Recipient: TNotifyRecipient);
+var
+  len: integer;
+begin
+  len := Length(fRecipientList);
+  SetLength(fRecipientList, len+1);
+  fRecipientList[len] := Recipient;
+end;
+//------------------------------------------------------------------------------
+
+procedure TNotifySender.UnRegister(Recipient: TNotifyRecipient);
+var
+  i: integer;
+begin
+  i := High(fRecipientList);
+  while fRecipientList[i] <> Recipient do dec(i);
+  if i < 0 then Exit;
+  Delete(fRecipientList, i, 1);
+end;
+//------------------------------------------------------------------------------
+
+destructor TNotifySender.Destroy;
+begin
+  NotifyRecipients(nfDestroying);
+  inherited;
+end;
+//------------------------------------------------------------------------------
+
+procedure TNotifySender.NotifyRecipients(notifyFlag: TNotifyFlag);
+var
+  i: integer;
+begin
+  for i := High(fRecipientList) downto 0 do
+    fRecipientList[i].SenderIsNotifying(notifyFlag);
+end;
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+procedure TNotifyRecipient.SenderIsNotifying(notifyFlag: TNotifyFlag);
+begin
+  //overridden by descendant classes
+end;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -525,6 +607,7 @@ destructor TTtfFontReader.Destroy;
 begin
   Clear;
   fStream.Free;
+  inherited;
 end;
 //------------------------------------------------------------------------------
 
@@ -538,6 +621,7 @@ begin
   fTbl_glyf.numContours := 0;
   fFontInfo.fontFormat  := ffInvalid;
   fStream.Clear;
+  NotifyRecipients(nfChanging);
 end;
 //------------------------------------------------------------------------------
 
@@ -1504,32 +1588,43 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TGlyphManager
+// TGlyphCache
 //------------------------------------------------------------------------------
 
-constructor TGlyphManager.Create(fontHeight: double = 0;
-  verticalFlip: Boolean = true; useKerning: Boolean = true);
+constructor TGlyphCache.Create(fontReader: TTtfFontReader; fontHeight: double);
 begin
 {$IFDEF XPLAT_GENERICS}
   fGlyphInfoList := TList<PGlyphInfo>.Create;
 {$ELSE}
   fGlyphInfoList := TList.Create;
 {$ENDIF}
+  if assigned(fontReader) then fontReader.Register(self);
+  fFontReader := fontReader;
+
   fSorted := false;
-  fUseKerning := useKerning;
-  fVerticalFlip := verticalFlip;
+  fUseKerning := true;
+  fVerticalFlip := true;
   fFontHeight := fontHeight;
 end;
 //------------------------------------------------------------------------------
 
-destructor TGlyphManager.Destroy;
+destructor TGlyphCache.Destroy;
 begin
+  if assigned(fFontReader) then fFontReader.UnRegister(self);
   Clear;
   fGlyphInfoList.Free;
+  inherited;
 end;
 //------------------------------------------------------------------------------
 
-procedure TGlyphManager.Clear;
+procedure TGlyphCache.SenderIsNotifying(notifyFlag: TNotifyFlag);
+begin
+  if notifyFlag = nfDestroying then fFontReader := nil;
+  Clear;
+end;
+//------------------------------------------------------------------------------
+
+procedure TGlyphCache.Clear;
 var
   i: integer;
 begin
@@ -1568,14 +1663,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TGlyphManager.FoundInList(c: Char): Boolean;
+function TGlyphCache.FoundInList(c: Char): Boolean;
 begin
   if not fSorted then Sort;
   result := FindInSortedList(c, fGlyphInfoList) >= 0;
 end;
 //------------------------------------------------------------------------------
 
-function TGlyphManager.ListMissingChars(const charList: string): string;
+function TGlyphCache.ListMissingChars(const charList: string): string;
 var
   i,j,r, len: integer;
   chars: string;
@@ -1603,23 +1698,22 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TGlyphManager.FillMissingChars(const charList: string;
-  fontReader: TTtfFontReader);
+procedure TGlyphCache.FillMissingChars(const charList: string);
 var
   i: integer;
   paths: TPathsD;
   missing: string;
   dummy: TGlyphMetrics;
 begin
-  if not assigned(fontReader) or
-    not fontReader.IsValidFontFormat then Exit;
+  if not assigned(fFontReader) or
+    not fFontReader.IsValidFontFormat then Exit;
   missing := ListMissingChars(charList);
   for i := 1 to Length(missing) do
-    AddGlyph(Ord(missing[i]), fontReader, paths, dummy);
+    AddGlyph(Ord(missing[i]), paths, dummy);
 end;
 //------------------------------------------------------------------------------
 
-procedure TGlyphManager.VerticalFlip(var paths: TPathsD);
+procedure TGlyphCache.VerticalFlip(var paths: TPathsD);
 var
   i,j: integer;
 begin
@@ -1629,7 +1723,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TGlyphManager.GetChar(c: Char; fontReader: TTtfFontReader;
+function TGlyphCache.GetChar(c: Char;
   out paths: TPathsD; out glyphMetrics: TGlyphMetrics): Boolean;
 var
   listIdx: integer;
@@ -1639,9 +1733,9 @@ begin
   Result := listIdx >= 0;
   if not Result then
   begin
-    if not Assigned(fontReader) or
-      not fontReader.IsValidFontFormat then Exit;
-    AddGlyph(Ord(c), fontReader, paths, glyphMetrics);
+    if not Assigned(fFontReader) or
+      not fFontReader.IsValidFontFormat then Exit;
+    AddGlyph(Ord(c), paths, glyphMetrics);
   end else
   begin
     with PGlyphInfo(fGlyphInfoList[listIdx])^ do
@@ -1653,10 +1747,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TGlyphManager.GetString(const s: string; fontReader: TTtfFontReader;
+function TGlyphCache.GetString(const s: string;
   out paths: TPathsD; out nextX: double): Boolean;
 begin
-  Result := GetString(0,0, s, fontReader, paths, nextX);
+  Result := GetString(0,0, s, paths, nextX);
 end;
 //------------------------------------------------------------------------------
 
@@ -1683,7 +1777,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TGlyphManager.GetString(x,y: double; const s: string; fontReader: TTtfFontReader;
+function TGlyphCache.GetString(x,y: double; const s: string;
   out paths: TPathsD; out nextX: double): Boolean;
 var
   i,j: integer;
@@ -1693,12 +1787,12 @@ var
   prevGlyphKernList: TArrayOfTKern;
 begin
   Result := true;
-  FillMissingChars(s, fontReader);
+  FillMissingChars(s);
   nextX := x;
   prevGlyphKernList := nil;
   for i := 1 to Length(s) do
   begin
-    Result := GetChar(s[i], nil, tmpPaths, metrics);
+    Result := GetChar(s[i], tmpPaths, metrics);
     if not result then Break;
     if fUseKerning and assigned(prevGlyphKernList) then
     begin
@@ -1729,7 +1823,54 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TGlyphManager.Sort;
+procedure TGlyphCache.SetFontReader(newFontReader: TTtfFontReader);
+begin
+  if newFontReader = fFontReader then Exit;
+  if Assigned(fFontReader) then
+  begin
+    fFontReader.UnRegister(self);
+    Clear;
+  end;
+  fFontReader := newFontReader;
+  if Assigned(fFontReader) then
+    fFontReader.Register(self);
+end;
+//------------------------------------------------------------------------------
+
+procedure TGlyphCache.SetFontHeight(newHeight: double);
+begin
+  if fFontHeight = newHeight then Exit;
+  Clear;
+  fFontHeight := Max(0, newHeight);
+end;
+//------------------------------------------------------------------------------
+
+procedure FlipVert(var paths: TPathsD);
+var
+  i,j: integer;
+begin
+  for i := 0 to High(paths) do
+    for j := 0 to High(paths[i]) do
+      paths[i][j].Y := -paths[i][j].Y;
+end;
+//------------------------------------------------------------------------------
+
+procedure TGlyphCache.SetFlipVert(value: Boolean);
+var
+  i: integer;
+  glyphInfo: PGlyphInfo;
+begin
+  if fFlipVert = value then Exit;
+  for i := 0 to fGlyphInfoList.Count -1 do
+  begin
+     glyphInfo := PGlyphInfo(fGlyphInfoList[i]);
+     FlipVert(glyphInfo.contours);
+  end;
+  fFlipVert := value;
+end;
+//------------------------------------------------------------------------------
+
+procedure TGlyphCache.Sort;
 begin
 {$IFDEF XPLAT_GENERICS}
   fGlyphInfoList.Sort(TComparer<PGlyphInfo>.Construct(
@@ -1744,13 +1885,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TGlyphManager.AddGlyph(unicode: Word; fontReader: TTtfFontReader;
+procedure TGlyphCache.AddGlyph(unicode: Word;
   out paths: TPathsD; out glyphMetrics: TGlyphMetrics);
 var
   glyph: PGlyphInfo;
   dummy: integer;
 begin
-  fontReader.GetGlyph(unicode, paths, dummy, glyphMetrics);
+  fFontReader.GetGlyph(unicode, paths, dummy, glyphMetrics);
 
   New(glyph);
   glyph.unicode := unicode;
@@ -1758,7 +1899,7 @@ begin
 
   if fFontHeight > 0 then
     glyph.contours := ScalePath(paths,
-      fFontHeight/fontReader.FontInfo.unitsPerEm)
+      fFontHeight / fFontReader.FontInfo.unitsPerEm)
   else
     glyph.contours := paths; //unscaled
 
