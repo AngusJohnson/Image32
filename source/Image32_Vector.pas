@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.50c                                                           *
-* Date      :  21 September 2020                                               *
+* Version   :  1.51                                                           *
+* Date      :  23 September 2020                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -27,6 +27,7 @@ type
 
   TMatrixD = array [0..2, 0..2] of double;
 
+  function InflateRect(const rec: TRect; dx, dy: integer): TRect; overload;
   function InflateRect(const rec: TRectD; dx, dy: double): TRectD; overload;
 
   function Rectangle(const rec: TRect): TArrayOfPointD; overload;
@@ -1759,6 +1760,15 @@ begin
   result[1] := PointD(r, t);
   result[2] := PointD(r, b);
   result[3] := PointD(l, b);
+end;
+//------------------------------------------------------------------------------
+
+function InflateRect(const rec: TRect; dx, dy: integer): TRect;
+begin
+  result.Left := rec.Left - dx;
+  result.Top := rec.Top - dy;
+  result.Right := rec.Right + dx;
+  result.Bottom := rec.Bottom + dy;
 end;
 //------------------------------------------------------------------------------
 

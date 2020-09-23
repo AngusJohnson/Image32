@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.50                                                            *
-* Date      :  18 September 2020                                               *
+* Version   :  1.51                                                            *
+* Date      :  23 September 2020                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -13,7 +13,7 @@ unit Image32_Draw;
 interface
 
 {$I Image32.inc}
-{$DEFINE MemCheck} //adds a negligible cost to performance
+{.$DEFINE MemCheck} //adds a negligible cost to performance
 
 uses
   SysUtils, Classes, Types, Math, Image32, Image32_Vector;
@@ -278,6 +278,27 @@ var
 // Miscellaneous functions
 //------------------------------------------------------------------------------
 
+//__Round: a very efficient RoundTowardZero algorithm
+function __Round(val: double): integer; {$IFDEF INLINE} inline; {$ENDIF}
+var
+  exp: integer;
+  i64: UInt64 absolute val;
+begin
+  //https://en.wikipedia.org/wiki/Double-precision_floating-point_format
+  if i64 <> 0 then
+  begin
+    exp := ((i64 shr 52) and $7FF) - 1023;
+    if exp >= 0 then
+    begin
+      Result := ((i64 and $1FFFFFFFFFFFFF) shr (52-exp)) or (1 shl exp);
+      if val < 0 then Result := -Result;
+    end else
+      Result := 0;
+  end else
+    Result := 0;
+end;
+//------------------------------------------------------------------------------
+
 function GetPixel(current: PARGB; delta: integer): PARGB;
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
@@ -508,10 +529,10 @@ begin
   begin
     highJ := high(polygons[i]);
     if highJ < 2 then continue;
-    y1 := Round(polygons[i][highJ].Y);
+    y1 := __Round(polygons[i][highJ].Y);
     for j := 0 to highJ do
     begin
-      y2 := Round(polygons[i][j].Y);
+      y2 := __Round(polygons[i][j].Y);
       if y1 < y2 then
       begin
         //descending
@@ -599,7 +620,7 @@ begin
     //but still update maxX for each scanline the edge passes
     if bot.X > maxX then
     begin
-      for i := Min(maxY, Round(bot.Y)) downto Max(0, Round(top.Y)) do
+      for i := Min(maxY, __Round(bot.Y)) downto Max(0, __Round(top.Y)) do
         scanlines[i].maxX := maxX;
       Exit;
     end;
@@ -617,13 +638,13 @@ begin
   begin
     if top.X >= maxX then
     begin
-      for i := Min(maxY, Round(bot.Y)) downto Max(0, Round(top.Y)) do
+      for i := Min(maxY, __Round(bot.Y)) downto Max(0, __Round(top.Y)) do
         scanlines[i].maxX := maxX;
       Exit;
     end;
     //here the edge must be oriented bottom-right to top-left
     y := bot.Y - (bot.X - maxX) * Abs(dydx);
-    for i := Min(maxY, Round(bot.Y)) downto Max(0, Round(y)) do
+    for i := Min(maxY, __Round(bot.Y)) downto Max(0, __Round(y)) do
       scanlines[i].maxX := maxX;
     bot.Y := y;
     if bot.Y <= 0 then Exit;
@@ -633,7 +654,7 @@ begin
   begin
     //here the edge must be oriented bottom-left to top-right
     y := top.Y + (top.X - maxX) * Abs(dydx);
-    for i := Min(maxY, Round(y)) downto Max(0, Round(top.Y)) do
+    for i := Min(maxY, __Round(y)) downto Max(0, __Round(top.Y)) do
       scanlines[i].maxX := maxX;
     top.Y := y;
     if top.Y >= maxY then Exit;
@@ -653,7 +674,7 @@ begin
   end;
 
   //SPLIT THE EDGE INTO MULTIPLE SCANLINE FRAGMENTS
-  scanlineY := Round(bot.Y);
+  scanlineY := __Round(bot.Y);
   if bot.Y = scanlineY then dec(scanlineY);
   //at the lower-most extent of the edge 'split' the first fragment
   if scanlineY < 0 then Exit;
@@ -751,8 +772,8 @@ begin
       frag.topX  := q;
     end;
 
-    leftXi := Max(0, Round(frag.botX));
-    rightXi := Max(0, Round(frag.topX));
+    leftXi := Max(0, __Round(frag.botX));
+    rightXi := Max(0, __Round(frag.topX));
 
     //winding direction is stored as the sign of dydx.
     if frag.dydx < 0 then windDir := -1 else windDir := 1;
@@ -809,11 +830,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-{$IFDEF MSWINDOWS}
-type
-  TRoundingMode = Math.TFPURoundingMode;
-{$ENDIF}
-
 procedure Rasterize(const paths: TArrayOfArrayOfPointD;
   const clipRec: TRect; fillRule: TFillRule; renderer: TCustomRenderer);
 var
@@ -825,11 +841,9 @@ var
   byteBuffer: TArrayOfByte;
   scanlines: TArrayOfScanline;
   scanline: PScanline;
-  rm: TRoundingMode;
 begin
   //See also https://nothings.org/gamedev/rasterize/
   if not assigned(renderer) then Exit;
-  rm := SetRoundMode(rmDown);
   clipRec2 := Image32_Vector.IntersectRect(clipRec, GetBounds(paths));
   paths2 := OffsetPath(paths, -clipRec2.Left, -clipRec2.Top);
 
@@ -865,23 +879,23 @@ begin
       case fillRule of
         frEvenOdd:
           begin
-            aa := Round(Abs(accum) * 255) and $1FF;
+            aa := __Round(Abs(accum) * 255) and $1FF;
             if aa >= $100 then aa := aa xor $1ff;
             byteBuffer[j] := aa;
           end;
         frNonZero:
           begin
-            byteBuffer[j] := Min($FF, Round(Abs(accum) * 255));
+            byteBuffer[j] := Min($FF, __Round(Abs(accum) * 255));
           end;
         frPositive:
           begin
             if accum > 0.002 then
-              byteBuffer[j] := Min($FF, Round(accum * 255));
+              byteBuffer[j] := Min($FF, __Round(accum * 255));
           end;
         frNegative:
           begin
             if accum < -0.002 then
-              byteBuffer[j] := Min($FF, Round(-accum * 255));
+              byteBuffer[j] := Min($FF, __Round(-accum * 255));
           end;
       end;
     end;
@@ -893,7 +907,6 @@ begin
     FreeMem(scanline.fragments);
     inc(scanline);
   end;
-  SetRoundMode(rm);
 end;
 
 //------------------------------------------------------------------------------

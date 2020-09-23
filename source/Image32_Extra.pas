@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.50c                                                           *
-* Date      :  21 September 2020                                               *
+* Version   :  1.51                                                           *
+* Date      :  23 September 2020                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -278,7 +278,7 @@ begin
   y := depth * y;
   blurSize := Max(1,Round(depth / 4));
   if depth <= 2 then rpt :=1 else rpt := 2;
-  InflateRect(rec, Ceil(depth*2), Ceil(depth*2));
+  Image32_Vector.InflateRect(rec, Ceil(depth*2), Ceil(depth*2));
   polys := OffsetPath(polygons, -rec.Left, -rec.Top);
   shadowPolys := OffsetPath(polys, x, y);
   shadowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
@@ -315,7 +315,7 @@ begin
   rec := GetBounds(polygons);
   glowPolys := OffsetPath(polygons,
     blurRadius -rec.Left +1, blurRadius -rec.Top +1);
-  InflateRect(rec, blurRadius +1, blurRadius +1);
+  Image32_Vector.InflateRect(rec, blurRadius +1, blurRadius +1);
   glowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
   try
     DrawPolygon(glowImg, glowPolys, fillRule, color);
@@ -598,7 +598,7 @@ var
   wc: TWeightedColor;
   buffer: TArrayOfColor32;
 begin
-  IntersectRect(rect, img.Bounds, rect);
+  rect := Image32_Vector.IntersectRect(img.Bounds, rect);
   if IsEmptyRect(rect) or (radius < 1) then Exit;
   widthLess1 := RectWidth(rect) -1;
   radius := ClampRange(radius, 1, Min(widthLess1, MaxBlur));
@@ -718,7 +718,7 @@ var
   row: PColor32Array;
   wcRow: PWeightedColorArray;
 begin
-  IntersectRect(rec, img.Bounds, rec);
+  rec := Image32_Vector.IntersectRect(rec, img.Bounds);
   if IsEmptyRect(rec) or (radius < 1) then Exit
   else if radius > MaxBlur then radius := MaxBlur;
 
@@ -873,7 +873,7 @@ begin
   else if k < 230 then k := 3
   else k := 4;
   cutoutRec := rect;
-  InflateRect(cutoutRec, k, k);
+  Image32_Vector.InflateRect(cutoutRec, k, k);
 
   cutout  := TImage32.Create(img, cutoutRec);
   mask    := TImage32.Create(cutout.Width, cutout.Height);
@@ -882,7 +882,7 @@ begin
     //fill behind the cutout with black also
     //blurring the fill to soften its edges
     rect3 := cutout.Bounds;
-    InflateRect(rect3, -k, -k);
+    Image32_Vector.InflateRect(rect3, -k, -k);
     path := Ellipse(rect3);
     DrawPolygon(mask, path, frNonZero, clBlack32);
     //given the very small area and small radius of the blur, the
