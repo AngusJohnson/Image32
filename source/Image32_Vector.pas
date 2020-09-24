@@ -145,6 +145,7 @@ type
 
   function Area(const path: TPathD): Double;
   function RectsEqual(const rec1, rec2: TRect): Boolean;
+  procedure OffsetRect(var rec: TRect; dx, dy: integer); overload;
   procedure OffsetRect(var rec: TRectD; dx, dy: double); overload;
 
   function Point(X,Y: Integer): TPoint; overload;
@@ -369,6 +370,15 @@ begin
     j := i;
   end;
   Result := -Result * 0.5;
+end;
+//------------------------------------------------------------------------------
+
+procedure OffsetRect(var rec: TRect; dx, dy: integer);
+begin
+  rec.Left := rec.Left + dx;
+  rec.Top := rec.Top + dy;
+  rec.Right := rec.Right + dx;
+  rec.Bottom := rec.Bottom + dy;
 end;
 //------------------------------------------------------------------------------
 

@@ -378,12 +378,12 @@ type
       out paths: TPathsD; out nextX: double): Boolean; overload;
     function GetString(x,y: double; const s: string;
       out paths: TPathsD; out nextX: double): Boolean; overload;
-    //GetCharOffsets: the length of this array will always by 1 more than the
-    //length of 's'. The returned array lists the X offset of each character in
-    //'s', with the final value being the offset of the character that may
-    //follow 's'. Note that these offsets will be influenced by the Kerning
-    //property. And note too that the first offset will always be 0, and while
-    //the 's' parameter is 1 based, the returned array is 0 based.
+    //GetCharOffsets: Returns an array of X offsets for each character in 's',
+    //with an additional value for the offset of the character that may
+    //follow 's'. Hence the returned array's length will always by 1 more than
+    //that of 's'. These values will be influenced by the Kerning property.
+    //Note too that while the 's' parameter is 1 based, the returned array is
+    //0 based though the first value always being 0.
     function GetCharOffsets(const s: string): TArrayOfDouble;
 
     //Ascent: the distance the text's baseline is from its top
@@ -1753,25 +1753,25 @@ end;
 
 function TGlyphCache.GetAscent: double;
 begin
-  Result := 0;
-  if not IsValidFont then Exit;
-  Result := fFontReader.FontInfo.ascent * fScale;
+  if not IsValidFont then
+    Result := 0 else
+    Result := fFontReader.FontInfo.ascent * fScale;
 end;
 //------------------------------------------------------------------------------
 
 function TGlyphCache.GetDescent: double;
 begin
-  Result := 0;
-  if not IsValidFont then Exit;
-  Result := fFontReader.FontInfo.descent * fScale;
+  if not IsValidFont then
+    Result := 0 else
+    Result := fFontReader.FontInfo.descent * fScale;
 end;
 //------------------------------------------------------------------------------
 
 function TGlyphCache.GetLineGap: double;
 begin
-  Result := 0;
-  if not IsValidFont then Exit;
-  Result := fFontReader.FontInfo.lineGap * fScale;
+  if not IsValidFont then
+    Result := 0 else
+    Result := fFontReader.FontInfo.lineGap * fScale;
 end;
 //------------------------------------------------------------------------------
 
@@ -1929,7 +1929,7 @@ end;
 procedure TGlyphCache.SetFontHeight(newHeight: double);
 begin
   if fFontHeight = newHeight then Exit;
-  fFontHeight := Max(0, newHeight);
+  fFontHeight := abs(newHeight);
   UpdateScale;
   Clear;
 end;

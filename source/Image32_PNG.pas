@@ -13,11 +13,12 @@ unit Image32_PNG;
 interface
 
 {$I Image32.inc}
+{$IFDEF DELPHI_PNG}
 
 uses
-  SysUtils, Classes, Windows, Math, Image32 {$IFDEF DELPHI_PNG}, PngImage{$ENDIF};
+  SysUtils, Classes, Windows,
+  {$IFDEF FPC} Graphics {$ELSE} Math, PngImage {$ENDIF}, Image32;
 
-{$IFDEF DELPHI_PNG}
 type
 
   TImageFormat_PNG = class(TImageFormat)
@@ -45,6 +46,27 @@ resourcestring
 //------------------------------------------------------------------------------
 // Loading (reading) PNG images from file ...
 //------------------------------------------------------------------------------
+
+{$IFDEF FPC}
+function TImageFormat_PNG.LoadFromStream(stream: TStream; img32: TImage32): Boolean;
+var
+  png: TPortableNetworkGraphic;
+begin
+  png := TPortableNetworkGraphic.Create;
+  try
+    png.LoadFromStream(stream);
+    result := (png.Width * png.Height > 0) and
+      (png.RawImage.Description.BitsPerPixel = 32);
+    if not Result then Exit;
+    img32.SetSize(png.Width, png.Height);
+    Move(png.ScanLine[0]^, img32.PixelBase^, png.Width * png.Height *4);
+  finally
+    png.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+{$ELSE}
 
 function TImageFormat_PNG.LoadFromStream(stream: TStream; img32: TImage32): Boolean;
 var
@@ -171,11 +193,30 @@ begin
     png.Free;
   end;
 end;
+{$ENDIF}
 
 //------------------------------------------------------------------------------
 // Saving (writing) PNG images to file ...
 //------------------------------------------------------------------------------
 
+{$IFDEF FPC}
+procedure TImageFormat_PNG.SaveToStream(stream: TStream; img32: TImage32);
+var
+  png: TPortableNetworkGraphic;
+begin
+  if (img32.Width * img32.Height = 0) then Exit;
+  png := TPortableNetworkGraphic.Create;
+  try
+    png.SetSize(img32.Width, img32.Height);
+    png.PixelFormat := pf32bit;
+    Move(img32.PixelBase^, png.ScanLine[0]^, img32.Width * img32.Height *4);
+    png.SaveToStream(stream);
+  finally
+    png.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+{$ELSE}
 procedure TImageFormat_PNG.SaveToStream(stream: TStream; img32: TImage32);
 var
   i,j: integer;
@@ -215,6 +256,7 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
+{$ENDIF}
 
 class function TImageFormat_PNG.CanCopyToClipboard: Boolean;
 begin
@@ -227,7 +269,6 @@ var
   dataHdl: THandle;
   dataPtr: pointer;
   ms: TMemoryStream;
-  clipboardNeedsClosing: Boolean;
 begin
   result := ((CF_PNG > 0) or (CF_IMAGEPNG > 0)) and OpenClipboard(0);
   if not result then Exit;

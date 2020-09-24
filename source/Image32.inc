@@ -9,6 +9,8 @@
   {$IFNDEF DEBUG}
     {$DEFINE INLINE}
   {$ENDIF}
+  {$DEFINE DELPHI_PNG}
+  {$UNDEF CPUX86}
 {$ELSE}
   {$IF COMPILERVERSION < 15}
     Your version of Delphi is not supported (Image32 requires Delphi version 7 or above)
@@ -41,6 +43,7 @@
               {$DEFINE STYLESERVICES}    //DelphiXE2   - added StyleServices unit
               {$IF COMPILERVERSION >= 25}
                 {$LEGACYIFEND ON}        //DelphiXE4   - avoids compiler warning
+                {$DEFINE ZEROBASEDSTR}
               {$IFEND}
             {$IFEND}
           {$IFEND}
