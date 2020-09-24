@@ -12,6 +12,7 @@ unit Clipper;
 
 {$IFDEF FPC}
   {$DEFINE INLINING}
+  {$MODE DELPHI}
 {$ELSE}
   {$IF CompilerVersion >= 18}         //Delphi 2007
     //While Inlining has been supported since D2005, both D2005 and D2006

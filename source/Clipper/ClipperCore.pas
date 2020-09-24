@@ -141,7 +141,7 @@ function OffsetPath(const path: TPathD; dx, dy: double): TPathD; overload;
 function OffsetPaths(const paths: TPaths; dx, dy: Int64): TPaths; overload;
 function OffsetPaths(const paths: TPathsD; dx, dy: double): TPathsD; overload;
 
-function Paths(const paths: TPathsD): TPaths;
+function Paths(const pathsD: TPathsD): TPaths;
 function PathsD(const paths: TPaths): TPathsD;
 
 procedure StripDuplicates(var path: TPath); overload;
@@ -441,20 +441,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Paths(const paths: TPathsD): TPaths;
+function Paths(const pathsD: TPathsD): TPaths;
 var
   i,j,len,len2: integer;
 begin
-  len := Length(paths);
+  len := Length(pathsD);
   setLength(Result, len);
   for i := 0 to len -1 do
   begin
-    len2 := Length(paths[i]);
+    len2 := Length(pathsD[i]);
     setLength(Result[i], len2);
     for j := 0 to len2 -1 do
     begin
-      Result[i][j].X := Round(paths[i][j].X);
-      Result[i][j].Y := Round(paths[i][j].Y);
+      Result[i][j].X := Round(pathsD[i][j].X);
+      Result[i][j].Y := Round(pathsD[i][j].Y);
     end;
   end;
 end;
