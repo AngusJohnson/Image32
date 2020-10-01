@@ -1,13 +1,14 @@
 object MainForm: TMainForm
-  Left = 866
+  Left = 867
   Height = 705
-  Top = 302
+  Top = 303
   Width = 729
   Caption = 'Image32 Lazarus Demo'
   ClientHeight = 705
   ClientWidth = 729
   DesignTimePPI = 192
   OnCreate = FormCreate
+  OnDestroy = FormDestroy
   OnShow = FormShow
   Position = poDesktopCenter
   LCLVersion = '2.0.10.0'

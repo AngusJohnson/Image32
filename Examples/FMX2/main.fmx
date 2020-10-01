@@ -1,0 +1,91 @@
+object MainForm: TMainForm
+  Left = 0
+  Top = 0
+  Caption = 'Image32 FMX Demo2'
+  ClientHeight = 612
+  ClientWidth = 390
+  Position = Designed
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  OnKeyDown = FormKeyDown
+  OnResize = FormResize
+  DesignerMasterStyle = 0
+  object TabControl1: TTabControl
+    Align = Client
+    Size.Width = 390.000000000000000000
+    Size.Height = 612.000000000000000000
+    Size.PlatformDefault = False
+    TabHeight = 30.000000000000000000
+    TabIndex = 0
+    TabOrder = 1
+    TabPosition = Bottom
+    OnChange = TabControl1Change
+    Sizes = (
+      390s
+      582s
+      390s
+      582s
+      390s
+      582s)
+    object TabItem1: TTabItem
+      CustomIcon = <
+        item
+        end>
+      IsSelected = True
+      Size.Width = 41.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = ''
+      TabOrder = 0
+      Text = '&Text'
+      ExplicitSize.cx = 179.000000000000000000
+      ExplicitSize.cy = 30.000000000000000000
+    end
+    object TabItem2: TTabItem
+      CustomIcon = <
+        item
+        end>
+      TextSettings.Font.Family = 'Arial'
+      IsSelected = False
+      Size.Width = 49.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = ''
+      TabOrder = 0
+      Text = '&Clock'
+      ExplicitSize.cx = 179.000000000000000000
+      ExplicitSize.cy = 30.000000000000000000
+    end
+    object TabItem3: TTabItem
+      CustomIcon = <
+        item
+        end>
+      IsSelected = False
+      Size.Width = 49.000000000000000000
+      Size.Height = 30.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = ''
+      TabOrder = 0
+      Text = '&Close'
+      ExplicitSize.cx = 179.000000000000000000
+      ExplicitSize.cy = 30.000000000000000000
+    end
+  end
+  object Timer1: TTimer
+    Enabled = False
+    OnTimer = Timer1Timer
+    Left = 48
+    Top = 32
+  end
+  object Layout1: TLayout
+    Align = Client
+    Size.Width = 390.000000000000000000
+    Size.Height = 612.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    OnPaint = Layout1Paint
+  end
+end

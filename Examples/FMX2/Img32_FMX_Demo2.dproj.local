@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2020/09/29 16:17:05.000.303,=C:\Users\awj19\Documents\Dev\D10.3\Files\Unit1.pas</Transaction>
+    <Transaction>2020/09/29 16:17:31.000.108,C:\Users\awj19\Documents\Dev\D10.3\Files\Image32\Examples\FMX2\main.fmx=C:\Users\awj19\Documents\Dev\D10.3\Files\Unit1.fmx</Transaction>
+    <Transaction>2020/09/29 16:17:31.000.108,C:\Users\awj19\Documents\Dev\D10.3\Files\Image32\Examples\FMX2\main.pas=C:\Users\awj19\Documents\Dev\D10.3\Files\Unit1.pas</Transaction>
+    <Transaction>2020/09/29 16:17:45.000.640,C:\Users\awj19\Documents\Dev\D10.3\Files\Image32\Examples\FMX2\Img32_FMX.dproj=C:\Users\awj19\Documents\Dev\D10.3\Files\Project1.dproj</Transaction>
+    <Transaction>2020/09/29 16:18:01.000.459,C:\Users\awj19\Documents\Dev\D10.3\Files\Image32\Examples\FMX2\Img32_FMX_Demo1.dproj=C:\Users\awj19\Documents\Dev\D10.3\Files\Image32\Examples\FMX2\Img32_FMX.dproj</Transaction>
+    <Transaction>2020/09/29 17:10:54.000.584,=C:\Users\awj19\Documents\Dev\D10.3\Files\Image32\Examples\FMX2\essay.txt</Transaction>
+    <Transaction>2020/09/29 17:10:54.000.569,=C:\Users\awj19\Documents\Dev\D10.3\Files\Image32\Examples\FMX2\books.png</Transaction>
+    <Transaction>2020/09/30 22:08:46.000.710,C:\Users\awj19\Documents\Dev\D10.3\Files\Image32\Examples\FMX2\books.png=C:\Users\awj19\Documents\Dev\D10.3\Files\Image32\Examples\FMX2\darcy.png</Transaction>
+    <Transaction>2020/10/01 11:34:45.000.413,C:\Users\awj19\Documents\Dev\D10.3\Files\Image32\Examples\FMX2\Img32_FMX_Demo1.dproj=C:\Users\awj19\Documents\Dev\D10.3\Files\Image32\Examples\FMX2\Img32_FMX_Demo2.dproj</Transaction>
+  </Transactions>
+	<ActiveMobileDevice>
+		<NoProfile Android="787eb74d" Android64="787eb74d"/>
+	</ActiveMobileDevice>
+</BorlandProject>

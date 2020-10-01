@@ -2,7 +2,7 @@ object FrmMain: TFrmMain
   Left = 554
   Top = 394
   Caption = 'Image32 - Layers & SmoothPaths'
-  ClientHeight = 411
+  ClientHeight = 408
   ClientWidth = 466
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -19,7 +19,7 @@ object FrmMain: TFrmMain
   TextHeight = 14
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 385
+    Top = 382
     Width = 466
     Height = 26
     Panels = <>

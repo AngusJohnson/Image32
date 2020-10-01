@@ -51,7 +51,7 @@ var
   path, path2: TArrayOfPointD;
   rec: TRect;
 begin
-  ImageSize := DPI(100);
+  ImageSize := DPIAware(100);
   SpaceAbove := ImageSize *2;
 
   //SETUP THE DISPLAY PANEL

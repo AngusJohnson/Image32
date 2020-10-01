@@ -2,7 +2,7 @@ object Form1: TForm1
   Left = 618
   Top = 336
   Caption = 'Image32 - Transform'
-  ClientHeight = 388
+  ClientHeight = 385
   ClientWidth = 370
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -18,7 +18,7 @@ object Form1: TForm1
   TextHeight = 13
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 369
+    Top = 366
     Width = 370
     Height = 19
     Panels = <>

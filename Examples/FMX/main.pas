@@ -99,7 +99,7 @@ begin
 
 
     //and get the outline for some text ...
-    glyphCache.GetString('Image32  rocks!', mainTxtPaths, nextX);
+    glyphCache.GetTextGlyphs(0,0,'Image32  rocks!', mainTxtPaths, nextX);
 
     //Normally we'd create different fontReaders for different fonts and
     //also use different glyphManagers for different font heights.
@@ -112,7 +112,8 @@ begin
     glyphCache.FontHeight := fontHeight / 4;
 
     //and now get the copyright text outline
-    glyphCache.GetString('© 2020 Angus Johnson', copyTxtPaths, nextX);
+    glyphCache.GetTextGlyphs(0,0,
+      '© 2020 Angus Johnson', copyTxtPaths, nextX);
   finally
     glyphCache.Free;
     fontReader.free;
@@ -148,7 +149,7 @@ begin
     imageRec := imgBooks.Bounds;
     delta := Point((baseImg.Width - imgBooks.Width) div 2,
       (baseImg.Height - imgBooks.Height) div 2);
-    OffsetRect(imageRec, delta.X, delta.Y);
+    Image32_Vector.OffsetRect(imageRec, delta.X, delta.Y);
     baseImg.CopyBlend(imgBooks, imgBooks.Bounds, imageRec, BlendToOpaque);
 
   finally

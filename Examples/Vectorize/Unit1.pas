@@ -53,7 +53,7 @@ type
   private
     pnlMain: TBitmapPanel;
     masterImg, workImg: TImage32;
-    rawPaths, bezierPaths, flattenedPaths: TArrayOfArrayOfPointD;
+    rawPaths, bezierPaths, flattenedPaths: TPathsD;
     procedure DisplayImage;
   public
     { Public declarations }
@@ -95,7 +95,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function PathsToStr(const paths: TArrayOfArrayOfPointD): string;
+function PathsToStr(const paths: TPathsD): string;
 var
   i: integer;
 begin

@@ -2,7 +2,7 @@ object Form1: TForm1
   Left = 594
   Top = 418
   Caption = 'Image32 - Layers example'
-  ClientHeight = 412
+  ClientHeight = 409
   ClientWidth = 403
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -18,7 +18,7 @@ object Form1: TForm1
   TextHeight = 14
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 386
+    Top = 383
     Width = 403
     Height = 26
     Panels = <>

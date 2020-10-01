@@ -454,9 +454,9 @@ end;
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
   backColor := clBtnFace;
-  maxPreviewSize := DPI(200);
-  midPreviewSize := DPI(150);
-  minPreviewSize := DPI(100);
+  maxPreviewSize := DPIAware(200);
+  midPreviewSize := DPIAware(150);
+  minPreviewSize := DPIAware(100);
   thumbnailSize := midPreviewSize;
   currentIdx := -1;
   deletePrompt := true;
@@ -961,7 +961,7 @@ begin
       Move(thumbnailRows[i][0], rowImg.PixelBase^,
         Length(thumbnailRows[i]) * SizeOf(TColor32));
       rec := rowImg.Bounds;
-      OffsetRect(rec, 0, (i * thumbSizePlus) - srcRec.Top + margin);
+      Image32_Vector.OffsetRect(rec, 0, (i * thumbSizePlus) - srcRec.Top + margin);
       dstImg.Copy(rowImg, rowImg.Bounds, rec);
       if not buildComplete then Break;
     end;
@@ -969,7 +969,7 @@ begin
     begin
       rec.TopLeft := ThumbnailPos(currentIdx);
       rec.BottomRight := Point(rec.Left +thumbnailSize, rec.Top +thumbnailSize);
-      InflateRect(rec, 2, 2);
+      Image32_Vector.InflateRect(rec, 2, 2);
       DrawLine(dstImg, Rectangle(rec), 4, clRed32, esClosed);
     end;
     //dstImg finally draws to dstCanvas
@@ -1118,7 +1118,7 @@ var
   lf: TLogFont;
   text: string;
   pt: TPointD;
-  pp: TArrayOfArrayOfPointD;
+  pp: TPathsD;
 begin
   if layeredImg.Count = 0 then Exit;
   //if there's already a message layer then delete it!
@@ -1155,7 +1155,7 @@ begin
   layer := layeredImg.AddLayer(TDesignerLayer32);
   layer.SetSize(w, h);
   lf := DefaultLogfont;
-  lf.lfHeight := -DPI(15);
+  lf.lfHeight := -DPIAware(15);
   if mnuSlideShow.Checked then
     text := rsResumeSlideShow else
     text := rsPauseSlideShow;
@@ -1274,7 +1274,7 @@ begin
     if mnuSlideShow.Checked then
     begin
       rec := currentLargePanel.InnerClientRect;
-      OffsetRect(rec, -rec.Left, -rec.Top);
+      Image32_Vector.OffsetRect(rec, -rec.Left, -rec.Top);
       w := rec.Width; h := rec.Height;
       layer.Image.ScaleToFit(w, h);
       layeredImg.SetSize(w, h);
@@ -1900,7 +1900,8 @@ begin
   MenubarInfo.cbSize := SizeOf(MenubarInfo);
   GetMenuBarInfo(Handle, Integer(OBJID_MENU), 0, MenubarInfo);
   GetWindowRect(Handle, rec);
-  with rec do OffsetRect(MenubarInfo.rcBar, -Left, -Top);
+  with rec do
+    Image32_Vector.OffsetRect(MenubarInfo.rcBar, -Left, -Top);
   dc := GetWindowDC(Handle);
   try
     SetBkMode(dc, TRANSPARENT);

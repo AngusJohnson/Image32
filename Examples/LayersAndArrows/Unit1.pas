@@ -116,7 +116,7 @@ type
     designLayer   : TLayer32;
     buttonPath    : TSmoothPath;
     dist          : double;
-    btnPathRegion : TArrayOfArrayOfPointD;
+    btnPathRegion : TPathsD;
     dashes        : TArrayOfInteger;
     disableTypeChangeClick : Boolean;
     procedure RefreshButtonPositionsFromPath;
@@ -130,7 +130,7 @@ type
     procedure UpdateMenus;
     procedure DisplayFont;
     function ShortenPathAndReturnArrowHeads(var path: TArrayOfPointD):
-      TArrayOfArrayOfPointD;
+      TPathsD;
     procedure AdjustArrow(index: integer; newPt: TPointD);
     procedure PanelKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   public
@@ -195,7 +195,7 @@ procedure TLineLayer32.SetSmoothPathAndDraw(const smoothPath: TSmoothPath);
 var
   rec: TRect;
   flatPath: TArrayOfPointD;
-  paths: TArrayOfArrayOfPointD;
+  paths: TPathsD;
 begin
   self.SmoothPath.Assign(smoothPath);
   CursorId := crMove;
@@ -283,13 +283,13 @@ var
   layer: TLayer32;
   rec: TRect;
 begin
-  lineWidth          := DPI(5);
+  lineWidth          := DPIAware(5);
   LineWidthUpDown.Position := lineWidth;
-  hitTestWidth       := DPI(5);
-  buttonSize         := DPI(9);
+  hitTestWidth       := DPIAware(5);
+  buttonSize         := DPIAware(9);
   popupPos           := Types.Point(0,0);
 
-  Shape1.Pen.Width := DPI(3);
+  Shape1.Pen.Width := DPIAware(3);
   fillColor          := defaultFillClr;
   penColor           := defaultPenClr;
   edFillColor.Text   := '$' + inttoHex(fillColor, 8);
@@ -476,7 +476,7 @@ end;
 //------------------------------------------------------------------------------
 
 function TFrmMain.ShortenPathAndReturnArrowHeads(var path: TArrayOfPointD):
-  TArrayOfArrayOfPointD;
+  TPathsD;
 var
   pt1, pt2: TPointD;
   pathEnd: TPathEnd;
@@ -517,7 +517,7 @@ var
   i, d: integer;
   rec: TRect;
   flatPath: TArrayOfPointD;
-  htPaths, arrowHeads: TArrayOfArrayOfPointD;
+  htPaths, arrowHeads: TPathsD;
   dl: TDesignerLayer32;
 const
   fillC: TColor32 = $40AAAAAA;
@@ -697,14 +697,14 @@ begin
   if (Sender = mnuRotateButtons) or (Sender = mnuRotateButtons2) then
   begin
     layer := StartButtonGroup(layeredImage32, Point(pt), clRed32,
-      DPI(9), [], TButtonDesignerLayer32);
+      DPIAware(9), [], TButtonDesignerLayer32);
     layer.CursorId := crRotate;
     layer.Name := 'Rotate';
   end else
   begin
     dist := i;
     layer := StartButtonGroup(layeredImage32, Point(pt), clLime32,
-      DPI(9), [], TButtonDesignerLayer32);
+      DPIAware(9), [], TButtonDesignerLayer32);
     layer.CursorId := crSizeNS;
     layer.Name := 'Scale';
   end;

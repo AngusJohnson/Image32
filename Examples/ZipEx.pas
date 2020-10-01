@@ -2,8 +2,8 @@ unit ZipEx;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.0                                                             *
-* Date      :  28 February 2020                                                *
+* Version   :  2.1                                                             *
+* Date      :  29 February 2020                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  This unit is an alternative to Delphi's System.Zip unit.        *
@@ -14,7 +14,6 @@ interface
 
 uses
   Windows, Messages, Types, SysUtils, Classes, Math, ZLib;
-
 
 type
   TArrayOfByte = array of Byte;
@@ -71,15 +70,16 @@ type
   //TEntryInfo: a custom record that's used by TZipStructure below
   PEntryInfo = ^TEntryInfo;
   TEntryInfo = record
-    cfh          : TCentralFileHeader;  //modified internally
-    lfh          : TLocalFileHeader;    //may be modified directly
-    isEncrypted  : Boolean;             //modified internally
-    password     : AnsiString;          //modified internally
-    filename     : UTF8String;          //may be modified directly
-    comments     : UTF8String;          //may be modified directly
-    centralExtra : TArrayOfByte;        //may be modified directly
-    localExtra   : TArrayOfByte;        //may be modified directly
-    localData    : TArrayOfByte;        //see note1 below
+    cfh            : TCentralFileHeader;  //modified internally
+    lfh            : TLocalFileHeader;    //may be modified directly
+    isEncrypted    : Boolean;             //modified internally
+    password       : AnsiString;          //modified internally
+    filename       : UTF8String;          //may be modified directly
+    fileTime       : Windows.TFileTime;   //may be modified directly
+    comments       : UTF8String;          //may be modified directly
+    centralExtra   : TArrayOfByte;        //may be modified directly
+    localExtra     : TArrayOfByte;        //may be modified directly
+    compressedData : TArrayOfByte;        //see note1 below
   end;
   TEntryInfos = array of TEntryInfo;
 
@@ -132,6 +132,8 @@ type
     //EncryptEntry: Encrypts an existing entry using PKWARE encryption. While
     //this encryption is weak, custom encryptions could be implemented here too.
     function EncryptEntry(index: integer; const password: AnsiString = ''): Boolean;
+    //DecryptEntry: This simplifies ExtractEntry the EditEntry into one op
+    function DecryptEntry(index: integer; const password: AnsiString = ''): Boolean;
 
     property Count: integer read GetCount;
     property Entries[index: integer]: PEntryInfo read GetEntryInfo; default;
@@ -428,16 +430,22 @@ begin
     (ei.lfh.HeaderSig = LOCAL_HEADERSIG);
   if isValid then
   begin
-    if ei.lfh.CRC32 = 0 then ei.lfh.CRC32 := ei.cfh.CRC32;
     stream.Position := stream.Position + ei.lfh.FileNameLen;
     SetLength(ei.localExtra, ei.lfh.ExtraLen);
     if ei.lfh.ExtraLen > 0 then
       stream.Read(ei.localExtra[0], ei.lfh.ExtraLen);
-    SetLength(ei.localData, ei.lfh.ComprSize);
+    if ei.lfh.ComprSize = 0 then
+      ei.lfh.ComprSize := ei.cfh.CompressedSize;
+    SetLength(ei.compressedData, ei.lfh.ComprSize);
     if ei.lfh.ComprSize > 0 then
-      stream.Read(ei.localData[0], ei.lfh.ComprSize);
+      stream.Read(ei.compressedData[0], ei.lfh.ComprSize);
     if ei.lfh.FileDate = 0 then
       PInteger(@ei.lfh.FileTime)^ := ei.cfh.FileDate;
+    DosDateTimeToFileTime(ei.lfh.FileDate, ei.lfh.FileTime, ei.fileTime);
+
+    if ei.lfh.CRC32 = 0 then ei.lfh.CRC32 := ei.cfh.CRC32;
+    if ei.lfh.UnComprSize = 0 then
+      ei.lfh.UnComprSize := ei.cfh.UncompressedSize;
     ei.isEncrypted := Odd(ei.lfh.Flag);
   end;
   stream.Position := SavedPos;
@@ -543,18 +551,19 @@ begin
     if lenFn = 0 then Continue;
     pei := @zs.eis[i];
     LenX := Length(pei.localExtra);
-    lenD := Length(pei.localData);
+    lenD := Length(pei.compressedData);
 
     FillChar(pei.cfh, SizeOf(TCentralFileHeader), 0);
     pei.cfh.HeaderSig := CENTRAL_HEADERSIG;
     pei.cfh.RelOffLocalHdr := outStream.Position - delta;
-
     pei.lfh.VersionNeed := 20;
     pei.cfh.Version := pei.lfh.VersionNeed;
     pei.cfh.MadeByVersion := 0;  //MS-DOS (0)
     pei.cfh.HostVersionNo := 20; //version 2 (20/10);
     pei.cfh.Flag := pei.lfh.Flag;
-    pei.cfh.FileDate := PInteger(@pei.lfh.FileTime)^;
+
+    pei.cfh.FileDate := FileTimeToDosTime(pei.fileTime);
+    PInteger(@pei.lfh.FileTime)^ := pei.cfh.FileDate;
 
     if lenD < pei.lfh.UnComprSize then
     begin
@@ -578,7 +587,7 @@ begin
     outStream.Write(pei.lfh, SizeOf(TLocalFileHeader));
     outStream.Write(pei.filename[1], lenFn);
     if LenX > 0 then outStream.Write(pei.localExtra[0], LenX);
-    if LenD > 0 then outStream.Write(pei.localData[0], LenD);
+    if LenD > 0 then outStream.Write(pei.compressedData[0], LenD);
   end;
 
   zs.eoc.CentralOffset := outStream.Position - delta;
@@ -701,7 +710,7 @@ var
 begin
   Result := false;
   pei := @zs.eis[index];
-  len := Length(pei.localData);
+  len := Length(pei.compressedData);
   if pei.isEncrypted or (len = 0) then
     Exit
   else if (password <> '') then
@@ -713,8 +722,8 @@ begin
   end;
 
   //expand and move localData to accommodate the 12 byte header
-  SetLength(pei.localData, len + 12);
-  Move(pei.localData[0], pei.localData[12], len);
+  SetLength(pei.compressedData, len + 12);
+  Move(pei.compressedData[0], pei.compressedData[12], len);
   inc(len, 12);
 
   //initialize keys
@@ -723,12 +732,12 @@ begin
 
   //generate header
   Randomize;
-  for i := 0 to 10 do pei.localData[i] := Random(256);
-  pei.localData[11] := (pei.lfh.CRC32 shr 24);
+  for i := 0 to 10 do pei.compressedData[i] := Random(256);
+  pei.compressedData[11] := (pei.lfh.CRC32 shr 24);
 
   //encrypt the data
   for i := 0 to len -1 do
-    pei.localData[i] := EncryptByte(keys, pei.localData[i]);
+    pei.compressedData[i] := EncryptByte(keys, pei.compressedData[i]);
 
   pei.lfh.Flag := pei.lfh.Flag or $1; //set lfh encryption flag
   pei.isEncrypted := true;
@@ -750,7 +759,7 @@ begin
   //      entry, the entry will have to be edited (see EditZipEntry).
   Result := false;
   pei := @zs.eis[index];
-  len := Length(pei.localData);
+  len := Length(pei.compressedData);
 
   if not pei.isEncrypted or (len <= 12) then exit //not encrypted
   else if (password <> '') then pw := password
@@ -766,7 +775,7 @@ begin
 
   //copy the 12 byte header and check that it's valid
   SetLength(header, 12);
-  Move(pei.localData[0], header[0], 12);
+  Move(pei.compressedData[0], header[0], 12);
   for i := 0 to 11 do
     DecryptByte(keys, header[i]);
 
@@ -776,7 +785,7 @@ begin
   //decrypt the data
   dec(len, 12);
   SetLength(data, len);
-  Move(pei.localData[12], data[0], len);
+  Move(pei.compressedData[12], data[0], len);
   for i := 0 to len -1 do
     DecryptByte(keys, data[i]);
   Result := true;
@@ -887,7 +896,7 @@ begin
   end else
     pei.lfh.ComprMethod := 8; //deflate
 
-  pei.localData := compressedData;
+  pei.compressedData := compressedData;
   pei.lfh.UnComprSize := len;
   dosTime := FileTimeToDosTime(fileTime);
   PInteger(@pei.lfh.FileTime)^ := dosTime;
@@ -905,14 +914,14 @@ begin
   //note: there's no range checking here and I'd recommend
   //testing this result with the stored CRC value.
   result := nil;
-  len := Length(zs.eis[index].localData);
+  len := Length(zs.eis[index].compressedData);
   if len = 0 then Exit
   else if zs.eis[index].cfh.CompressionMethod = 0 then
   begin
     SetLength(Result, len);
-    Move(zs.eis[index].localData[0], Result[0], len);
+    Move(zs.eis[index].compressedData[0], Result[0], len);
   end else
-    Result := DecompressData(zs.eis[index].localData);
+    Result := DecompressData(zs.eis[index].compressedData);
  end;
 //------------------------------------------------------------------------------
 
@@ -921,7 +930,6 @@ procedure EditZipEntry(var zs: TZipStructure; index: integer;
   const comment: string);
 var
   len: integer;
-  dosTime: longint;
   compressedData: TArrayOfByte;
   pei: PEntryInfo;
 begin
@@ -929,6 +937,7 @@ begin
   pei.comments := UTF8Encode(comment);
   //remove any trace of prior encryption
   pei.isEncrypted := false;
+  pei.fileTime := fileTime;
   pei.lfh.Flag := pei.lfh.Flag and not $1;
 
   len := Length(uncompressedData);
@@ -946,11 +955,9 @@ begin
   //    will automatically 'store' rather than 'deflate' then entry.
   if len <= Length(compressedData) then
     compressedData := uncompressedData;
-  pei.localData := compressedData;
+  pei.compressedData := compressedData;
 
   pei.lfh.CRC32 := CalcCRC32(@uncompressedData[0], len);
-  dosTime := FileTimeToDosTime(fileTime);
-  PInteger(@pei.lfh.FileTime)^ := dosTime;
 end;
 //------------------------------------------------------------------------------
 
@@ -1030,7 +1037,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
 function TZipFileEx.GetEntryIndex(const entryName: string): integer;
 begin
   Result := GetZipEntryIndex(zipStructure, entryName);
@@ -1097,12 +1103,15 @@ begin
   if not Result then Exit;
   if zipStructure.eis[index].isEncrypted then
   begin
-    result := PKWareDecryptEntry(zipStructure, index, password, buffer);
-    if result then buffer := DecompressData(buffer);
+    if PKWareDecryptEntry(zipStructure, index, password, buffer) then
+      buffer := DecompressData(buffer);
   end else
     buffer := ExtractZipEntry(zipStructure, index);
+
   len := Length(buffer);
-  result := outStream.Write(buffer, len) = len;
+  result := (len > 0) and
+    (CalcCRC32(@buffer[0], len) = zipStructure.eis[index].lfh.CRC32) and
+    (outStream.Write(buffer, len) = len);
 end;
 //------------------------------------------------------------------------------
 
@@ -1118,6 +1127,17 @@ function TZipFileEx.EncryptEntry(index: integer; const password: AnsiString = ''
 begin
   Result := (index >= 0) and (index < Length(zipStructure.eis)) and
     PKWareEncryptEntry(zipStructure, index, password);
+end;
+//------------------------------------------------------------------------------
+
+function TZipFileEx.DecryptEntry(index: integer; const password: AnsiString = ''): Boolean;
+var
+  buffer: TArrayOfByte;
+  pei: PEntryInfo;
+begin
+  pei := GetEntryInfo(index);
+  Result := assigned(pei) and ExtractEntry(index, buffer, password) and
+    EditEntry(index, buffer, pei.fileTime, string(pei.comments));
 end;
 //------------------------------------------------------------------------------
 

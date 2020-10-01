@@ -20,11 +20,15 @@ type
     procedure btnCloseClick(Sender: TObject);
     procedure btnRefreshClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
   private
+    bkColor, penColor, txtColor: TColor32;
     zoomIdx: integer;
     zoomImages: array[0..16] of TImage32;
+    procedure PrepareBaseImage;
+    procedure PrepareZoomImages(var zoomGlyphs: TPathsD; const offset: TPoint);
     procedure UpdateImageViewer;
   public
 
@@ -32,7 +36,6 @@ type
 
 var
   MainForm: TMainForm;
-  bkColor, penColor, txtColor: TColor32;
 const
   margin = 20;
 
@@ -45,27 +48,21 @@ implementation
 {$R *.lfm}
 {$R font.res}
 
-{ TMainForm }
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+function ToUnicode(const s: string): UnicodeString;
+begin
+  Result := UnicodeString(s);
+end;
+
+//------------------------------------------------------------------------------
+// TMainForm
+//------------------------------------------------------------------------------
 
 procedure TMainForm.FormCreate(Sender: TObject);
-var
-  i,zoomCnt: integer;
-  baseImg, imgBooks: TImage32;
-  tmp: TPathD;
-  outlineText, mainTxtPaths, copyTxtPaths: TPathsD;
-  textRec, textRec2, imageRec: TRect;
-  matrix: TMatrixD;
-  delta: TPoint;
-  screenScale, fontHeight, nextX: double;
-
-  glyphCache: TGlyphCache;
-  fontReader : TTtfFontReader;
 begin
-  screenScale := 2.0;
-
-  fontHeight := 35 * screenScale;
-
-  bkColor  := $FFF8F8BB; //yellow
+  bkColor  := $FFF8F8E0; //pale yellow
   penColor := clMaroon32;
   txtColor := $FF00BB00; //green
 {$IFNDEF MSWINDOWS}
@@ -73,38 +70,67 @@ begin
   penColor := SwapRedBlue(penColor);
   txtColor := SwapRedBlue(txtColor);
 {$ENDIF}
+  PrepareBaseImage;
+end;
+//------------------------------------------------------------------------------
 
+procedure TMainForm.FormDestroy(Sender: TObject);
+var
+  i: integer;
+begin
+  for i := 0 to High(zoomImages) do
+    zoomImages[i].Free;
+end;
+//------------------------------------------------------------------------------
 
-  baseImg := TImage32.Create();
+procedure TMainForm.PrepareBaseImage;
+var
+  i: integer;
+  imgBooks: TImage32;
+  tmpPath: TPathD;
+  mainTxtPaths, copyTxtPaths: TPathsD;
+  textRec, textRec2, imageRec: TRect;
+  matrix: TMatrixD;
+  delta: TPoint;
+  nextX: double;
+  copyright, sillyText: UnicodeString;
+
+  glyphCache: TGlyphCache;
+  fontReader : TTtfFontReader;
+begin
+  //workaround a Lazarus quirk ...
+  //it doesn't seem to dynamically convert static text ...
+  copyright := ToUnicode('© 2020 Angus Johnson');
+  sillyText := ToUnicode('Image32  Rocks!');
+
   //get ready for some simple text animation
-  zoomCnt := Length(zoomImages);
-  zoomIdx := zoomCnt -1;
-  zoomImages[zoomIdx] := baseImg;
+  zoomIdx := 0;
+  zoomImages[0] := TImage32.Create();
 
-  //create a fontReader to access truetype font files (*.ttf) that
-  //have been stored as font resources and create a glyph cache too
+  //create a TFontReader to access a couple of truetype font files (*.ttf)
+  //that have been stored as font resources and create a TGlyphCache too
   fontReader := TTtfFontReader.Create;
-  glyphCache := TGlyphCache.Create(fontReader, fontHeight);
+  glyphCache := TGlyphCache.Create(fontReader, DpiAware(36));
   try
     //connect fontReader to a specific font
     fontReader.LoadFromResource('FONT_2', RT_RCDATA);
     if not fontReader.IsValidFontFormat then Exit;
 
     //and get the outline for some text ...
-    glyphCache.GetString('Image32  Rocks!', mainTxtPaths, nextX);
+    glyphCache.GetTextGlyphs(0,0, sillyText, mainTxtPaths, nextX);
 
     //Normally we'd create different fontReaders for different fonts and
-    //also use different glyphManagers for different font heights.
-    //But here, I'm showing it's possible to reuse these objects ...
+    //also use different glyphManagers for different font heights,
+    //but it's also possible to reuse these objects ...
 
-    fontReader.LoadFromResource('FONT_1', RT_RCDATA);
+    fontReader.LoadFromResource('FONT_3', RT_RCDATA);
     if not fontReader.IsValidFontFormat then Exit;
     //nb: fontReader changing fonts will automatically clear glyphCache
     //cache, though changing glyphCache fontHeight will also do the same...
-    glyphCache.FontHeight := fontHeight / 4;
+    glyphCache.FontHeight := DPIAware(10);
 
     //and now get the copyright text outline
-    glyphCache.GetString('© 2020 Angus Johnson', copyTxtPaths, nextX);
+    glyphCache.GetTextGlyphs(0,0, copyright, copyTxtPaths, nextX);
   finally
     glyphCache.Free;
     fontReader.free;
@@ -118,6 +144,8 @@ begin
   MatrixSkew(matrix, -0.25, 0);
   MatrixApply(matrix, mainTxtPaths);
 
+  //this seems necessary because Lazarus appears to bypass the initialization
+  //section in Image32_PNG unless some code from that unit is used explicitly.
   TImage32.RegisterImageFormatClass('PNG', TImageFormat_PNG, cpHigh);
 
   imgBooks := TImage32.Create;
@@ -128,22 +156,26 @@ begin
     //set the size of the base image so that it contains
     //both 'imgBooks' and the text with a decent margin ...
     textRec := Image32_Vector.GetBounds(mainTxtPaths);
-    baseImg.SetSize(
+    zoomImages[0].SetSize(
       max(imgBooks.Width, textRec.Width) + (margin * 4),
       max(imgBooks.Height, textRec.Height) + (margin * 4));
 
     //color fill the base image and give it a border ...
-    baseImg.FillRect(baseImg.Bounds, bkColor);
-    tmp := Image32_Vector.Rectangle(baseImg.Bounds);
-    DrawLine(baseImg, tmp, 2, penColor, esClosed);
+    with zoomImages[0] do
+    begin
+       FillRect(Bounds, bkColor);
+       tmpPath := Image32_Vector.Rectangle(Bounds);
+    end;
+    DrawLine(zoomImages[0], tmpPath, 2, penColor, esClosed);
 
     //offset 'imgBooks' so it's centered in the base image
     //and copy it onto the base image ...
     imageRec := imgBooks.Bounds;
-    delta := Point((baseImg.Width - imgBooks.Width) div 2,
-      (baseImg.Height - imgBooks.Height) div 2);
+    delta := Point((zoomImages[0].Width - imgBooks.Width) div 2,
+      (zoomImages[0].Height - imgBooks.Height) div 2);
     OffsetRect(imageRec, delta.X, delta.Y);
-    baseImg.CopyBlend(imgBooks, imgBooks.Bounds, imageRec, @BlendToOpaque);
+    zoomImages[0].CopyBlend(imgBooks, imgBooks.Bounds,
+      imageRec, @BlendToOpaque);
 
   finally
     imgBooks.Free;
@@ -153,55 +185,57 @@ begin
   //and locate it in the bottom right corner of the display image
   with GetBoundsD(copyTxtPaths) do
     copyTxtPaths := OffsetPath(copyTxtPaths,
-      baseImg.Width - Width -10, baseImg.Height - 10);
-  DrawPolygon(baseImg, copyTxtPaths, frNonZero, clBlack32);
+      zoomImages[0].Width - Width -10, zoomImages[0].Height - 10);
+  DrawPolygon(zoomImages[0], copyTxtPaths, frNonZero, clBlack32);
 
   //center mainTxtPaths inside displayImg ...
-  delta.X := (baseImg.Width - textRec.Width) div 2 - textRec.Left;
-  delta.Y := (baseImg.Height - textRec.Height) div 2 - textRec.Top;
-  outlineText := OffsetPath(mainTxtPaths, delta.X, delta.Y);
+  delta.X := (zoomImages[0].Width - textRec.Width) div 2 - textRec.Left;
+  delta.Y := (zoomImages[0].Height - textRec.Height) div 2 - textRec.Top;
 
-  //fill an array of images copying the base image and overlaying
-  //some scaled text in preparation for some text 'zoom' animation
-  zoomImages[0] := TImage32.Create(baseImg);
+  PrepareZoomImages(mainTxtPaths, delta);
 
-
-  //a lot of fiddling to embelish final text appearance:
-
-  //use zoomImages[1] as a temporary drawing surface
-  zoomImages[1] := TImage32.Create(baseImg.Width, baseImg.Height);
-  //to aid contrasting the text from the background image, create a
-  //white text background image and blur it for a faint white halo
-  DrawPolygon(zoomImages[1], outlineText, frNonZero, clWhite32);
-  BoxBlur(zoomImages[1] , zoomImages[1].Bounds, 2, 1);
-  //and make the halo standout a little more
-  zoomImages[1].ScaleAlpha(1.5);
-  //draw a drop shadow
-  DrawShadow(zoomImages[1], outlineText, frNonZero, 4, -angle45);
-  //draw text background (green)
-  DrawPolygon(zoomImages[1], outlineText, frNonZero, txtColor);
-  //draw the text edges (black) and add a 3D effect
-  DrawLine(zoomImages[1], outlineText, 1.5, clBlack32, esClosed);
-  Draw3D(zoomImages[1], outlineText, frNonZero, 6, 3);
-  //copy merge the text onto imgBase.
-  zoomImages[0].CopyBlend(zoomImages[1],
-    zoomImages[1].Bounds,zoomImages[0].Bounds, @BlendToAlpha);
-  zoomImages[1].Free;
-
-  for i := 1 to zoomCnt -2 do
-  begin
-    textRec := Image32_Vector.GetBounds(outlineText);
-    outlineText := ScalePath(outlineText, 0.9, 0.9);
-    textRec2 := Image32_Vector.GetBounds(outlineText);
-    outlineText := OffsetPath(outlineText,
-      (textRec.Left-textRec2.Left) + (textRec.Width-textRec2.Width)/2,
-      (textRec.Top-textRec2.Top) + (textRec.Height-textRec2.Height)/2);
-    zoomImages[i] := TImage32.Create(baseImg);
-    DrawPolygon(zoomImages[i], outlineText, frNonZero, clGray32);
-  end;
   btnRefresh.Enabled := false;
   UpdateImageViewer;
 end;
+//------------------------------------------------------------------------------
+
+
+procedure TMainForm.PrepareZoomImages(var zoomGlyphs: TPathsD;
+  const offset: TPoint);
+var
+  i,highI: integer;
+  textRec, textRec2: TRect;
+begin
+
+  zoomGlyphs := OffsetPath(zoomGlyphs, offset.X, offset.Y);
+
+  //fill an array of images copying the base image and overlaying
+  //some scaled text in preparation for some text 'zoom' animation
+  highI := High(zoomImages);
+  for i := 1 to highI do
+    zoomImages[i] := TImage32.Create(zoomImages[0]);
+
+  //draw a drop shadow
+  DrawShadow(zoomImages[highI], zoomGlyphs, frNonZero, 4, -angle45);
+  //draw text background (green)
+  DrawPolygon(zoomImages[highI], zoomGlyphs, frNonZero, txtColor);
+  //draw the text edges (black) and add a 3D effect
+  DrawLine(zoomImages[highI], zoomGlyphs, 1.5, clBlack32, esClosed);
+  Draw3D(zoomImages[highI], zoomGlyphs, frNonZero, 6, 3);
+
+  for i := highI-1 downto 1 do
+  begin
+    textRec := Image32_Vector.GetBounds(zoomGlyphs);
+    zoomGlyphs := ScalePath(zoomGlyphs, 0.9, 0.9);
+    textRec2 := Image32_Vector.GetBounds(zoomGlyphs);
+    zoomGlyphs := OffsetPath(zoomGlyphs,
+      (textRec.Left-textRec2.Left) + (textRec.Width-textRec2.Width)/2,
+      (textRec.Top-textRec2.Top) + (textRec.Height-textRec2.Height)/2);
+    zoomImages[i] := TImage32.Create(zoomImages[zoomIdx]);
+    DrawPolygon(zoomImages[i], zoomGlyphs, frNonZero, clGray32);
+  end;
+end;
+//------------------------------------------------------------------------------
 
 procedure TMainForm.UpdateImageViewer;
 begin
@@ -210,38 +244,42 @@ begin
   zoomImages[zoomIdx].CopyToDc(Image1.Picture.Bitmap.Canvas.Handle);
   Image1.Repaint;
 end;
+//------------------------------------------------------------------------------
 
 procedure TMainForm.FormShow(Sender: TObject);
 begin
-  if zoomImages[0] = nil then Exit; //something went wrong while loading
   Timer1.Enabled := true;
 end;
+//------------------------------------------------------------------------------
 
 procedure TMainForm.btnRefreshClick(Sender: TObject);
 begin
   btnRefresh.Enabled := false;
-  zoomIdx := High(zoomImages);
+  zoomIdx := 0;
   UpdateImageViewer;
   Timer1.Interval := 1000;
   Timer1.Enabled := true;
 end;
+//------------------------------------------------------------------------------
 
 procedure TMainForm.btnCloseClick(Sender: TObject);
 begin
   Close;
 end;
+//------------------------------------------------------------------------------
 
 procedure TMainForm.Timer1Timer(Sender: TObject);
 begin
   Timer1.Interval := 25;
-  dec(zoomIdx);
+  inc(zoomIdx);
   UpdateImageViewer;
-  if zoomIdx = 0 then
+  if zoomIdx = High(zoomImages) then
   begin
     Timer1.Enabled := false;
     btnRefresh.Enabled := true;
   end;
 end;
+//------------------------------------------------------------------------------
 
 end.
 

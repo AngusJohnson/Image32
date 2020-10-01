@@ -166,7 +166,7 @@ var
   rec: TRect;
 begin
   Randomize;
-  DefaultButtonSize := DPI(10); //ie the layered image's control buttons
+  DefaultButtonSize := DPIAware(10); //ie the layered image's control buttons
 
   //SETUP THE DISPLAY PANEL
   pnlMain := TBitmapPanel.Create(self);
@@ -252,7 +252,7 @@ function TForm1.AddText(const pt: TPoint): TLayer32;
 var
   lf: TLogfont;
   rec: TRect;
-  paths: TArrayOfArrayOfPointD;
+  paths: TPathsD;
   endPt: TPointD;
 const
   RandText: array [0..5] of string =
@@ -300,7 +300,7 @@ end;
 
 procedure TForm1.SizeAndDrawLayer(layer: TLayer32; newWidth, newHeight: integer);
 var
-  paths: TArrayOfArrayOfPointD;
+  paths: TPathsD;
   img: TImage32;
   rec: TRect;
   brushColor, penColor: TColor;

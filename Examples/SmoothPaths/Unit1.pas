@@ -79,7 +79,7 @@ type
     clickedLayer  : TLayer32;
     designLayer   : TDesignerLayer32;
     buttonPath    : TSmoothPath;
-    btnPathRegion : TArrayOfArrayOfPointD;
+    btnPathRegion : TPathsD;
     dashes        : TArrayOfInteger;
     disableTypeChange: Boolean;
     procedure RefreshButtonGroupFromPath;
@@ -210,9 +210,9 @@ var
   rec: TRect;
 begin
   lineWidth          := strtoint(edWidth.text);
-  hitTestWidth       := DPI(5);
-  buttonSizes[false] := DPI(9);
-  buttonSizes[true]  := DPI(8);
+  hitTestWidth       := DPIAware(5);
+  buttonSizes[false] := DPIAware(9);
+  buttonSizes[true]  := DPIAware(8);
   fillColor := $88FFFF66;
   penColor := clNavy32;
   edFillColor.Text  := '$' + inttohex(fillColor, 8);
@@ -394,7 +394,7 @@ var
   i, d: integer;
   rec: TRect;
   path: TArrayOfPointD;
-  paths: TArrayOfArrayOfPointD;
+  paths: TPathsD;
 begin
   if not Active then Exit; //just avoids several calls in FormCreate
 
@@ -538,7 +538,7 @@ begin
   i := (RectWidth(rec) + RectHeight(rec)) div 4;
   pt := PointD(rotatePoint.X,rotatePoint.Y - i);
   layer := StartButtonGroup(layeredImage32, Point(pt), clRed32,
-    DPI(9), [], TButtonDesignerLayer32);
+    DPIAware(9), [], TButtonDesignerLayer32);
   layer.CursorId := crRotate;
   UpdateImage;
 end;

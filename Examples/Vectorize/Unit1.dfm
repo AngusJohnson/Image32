@@ -1,9 +1,9 @@
 object Form1: TForm1
   Left = 514
   Top = 310
+  Width = 585
+  Height = 497
   Caption = 'Image32: Vectorize'
-  ClientHeight = 439
-  ClientWidth = 552
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -22,7 +22,7 @@ object Form1: TForm1
   object StatusBar1: TStatusBar
     Left = 0
     Top = 413
-    Width = 552
+    Width = 569
     Height = 26
     Panels = <>
     ParentFont = True
@@ -32,7 +32,7 @@ object Form1: TForm1
   object pnlMemo: TPanel
     Left = 0
     Top = 0
-    Width = 552
+    Width = 569
     Height = 413
     Align = alClient
     TabOrder = 1
@@ -40,7 +40,7 @@ object Form1: TForm1
     object Panel3: TPanel
       Left = 1
       Top = 1
-      Width = 550
+      Width = 567
       Height = 41
       Align = alTop
       TabOrder = 0
@@ -88,7 +88,7 @@ object Form1: TForm1
     object Memo1: TMemo
       Left = 1
       Top = 42
-      Width = 550
+      Width = 567
       Height = 370
       Align = alClient
       HideSelection = False
@@ -133,7 +133,6 @@ object Form1: TForm1
         Orientation = trVertical
         PageSize = 0
         Position = 3
-        ShowSelRange = False
         TabOrder = 0
         TickStyle = tsNone
         OnChange = TrackBar1Change

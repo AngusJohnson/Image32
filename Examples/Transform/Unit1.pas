@@ -97,8 +97,8 @@ begin
   pnlMain.PopupMenu := PopupMenu1;
 
   //SETUP THE LAYERED IMAGE
-  DefaultButtonSize := DPI(10);
-  fMargin := DPI(50);
+  DefaultButtonSize := DPIAware(10);
+  fMargin := DPIAware(50);
 
   layeredImage32 := TLayeredImage32.Create;
   //width & height will be set in UpdateLayeredImage method below

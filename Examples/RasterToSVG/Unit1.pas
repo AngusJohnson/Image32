@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
   Types, Menus, StdCtrls, ExtCtrls, ComCtrls, ShellApi, IniFiles, Dialogs,
-  Image32, ImagePanels, DialogsEx;
+  Clipper, ClipperCore, Image32, ImagePanels, DialogsEx;
 
 type
   TMainForm = class(TForm)
@@ -98,7 +98,7 @@ implementation
 
 uses
   Image32_Draw, Image32_Vector, Image32_Extra, Image32_BMP, Image32_JPG,
-  Image32_PNG, Image32_GIF, Image32_Clipper, Image32_CQ, Clipper, ClipperCore;
+  Image32_PNG, Image32_GIF, Image32_Clipper, Image32_CQ;
 
 resourcestring
   menuTips =
@@ -162,7 +162,7 @@ end;
 //------------------------------------------------------------------------------
 
 procedure WriteCBezierPathToSvgStringStream(ss: TStringStream;
-  const path: TArrayOfArrayOfPointD; index: integer);
+  const path: TPathsD; index: integer);
 var
   i,j,k, highI,highJ: integer;
   prevOp: Char;
@@ -199,7 +199,7 @@ end;
 //------------------------------------------------------------------------------
 
 procedure WriteFlattenedPathToSvgStringStream(ss: TStringStream;
-  const path: TArrayOfArrayOfPointD; index: integer);
+  const path: TPathsD; index: integer);
 var
   i,j,highI,highJ: integer;
   prevOp: Char;
@@ -302,7 +302,7 @@ end;
 procedure EraseBackgroundIncludeHolesInside(img: TImage32; tolerance: integer);
 var
   mask: TArrayOfByte;
-  pp: TArrayOfArrayOfPointD;
+  pp: TPathsD;
   bkgndClr: TColor32;
   i: integer;
   p: PColor32;
@@ -333,7 +333,7 @@ var
   procedure EraseBackGndInternal(x,y: integer);
   var
     mask: TArrayOfByte;
-    pp: TArrayOfArrayOfPointD;
+    pp: TPathsD;
   begin
     mask := GetFloodFillMask(img, x , y, CompareRGB, tolerance);
     pp := VectorizeMask(mask, img.Width);
@@ -399,14 +399,14 @@ begin
   smoothness := 2;
   LoadIniSettings;
   DragAcceptFiles(Handle, True);
-  lblRaster.Left := DPI(16);
+  lblRaster.Left := DPIAware(16);
   UpdateOptions(true);
 
   paletteImages := TImageList32.Create;
   paletteColors := TList.Create;
   //SETUP THE 2 DISPLAY PANELS
-  pnlRaster.BorderWidth := DPI(16);
-  pnlSVG.BorderWidth := DPI(16);
+  pnlRaster.BorderWidth := DPIAware(16);
+  pnlSVG.BorderWidth := DPIAware(16);
   //BevelInner := bvLowered;     //set in IDE
   //TabStop := true;             //set in IDE (for keyboard controls)
   pnlRaster.FocusedColor := clGradientInactiveCaption;
@@ -485,7 +485,7 @@ type
   PPathsNColor = ^TPathsNColor;
   TPathsNColor = record
     isFlat : Boolean;
-    paths  : TArrayOfArrayOfPointD;
+    paths  : TPathsD;
     color  : TColor32;
   end;
 
@@ -503,7 +503,7 @@ end;
 
 procedure TMainForm.BuildVectorListFromMonochromeImage(tmpMasterImg: TImage32; scale: double);
 var
-  pp: TArrayOfArrayOfPointD;
+  pp: TPathsD;
   pnc: PPathsNColor;
 begin
   svgStringStream.Size := 0;
@@ -529,8 +529,8 @@ end;
 
 //DeletePath: is needed because Delete(polyPath, index, 1)
 //isn't supported in older versions of Delphi
-function DeletePath(const pp: TArrayOfArrayOfPointD;
-  index: integer): TArrayOfArrayOfPointD;
+function DeletePath(const pp: TPathsD;
+  index: integer): TPathsD;
 var
   i, highI: integer;
 begin
@@ -549,7 +549,7 @@ var
   img: TImage32;
   pal: TArrayOfColor32;
   palFrequencies: TArrayOfInteger;
-  opaque: TArrayOfArrayOfPointD;
+  opaque: TPathsD;
 begin
   paletteImages.Clear;
   paletteColors.Clear;
@@ -636,7 +636,7 @@ procedure TMainForm.BuildVectorListFromColorDrawing(scale: double);
 var
   i,j: integer;
   pathsAndColor: PPathsNColor;
-  pp, shadow, black, opaque: TArrayOfArrayOfPointD;
+  pp, shadow, black, opaque: TPathsD;
   filename: string;
 begin
   //convert palette entres into vectors and store them in palVectorsList.
@@ -718,7 +718,7 @@ procedure TMainForm.BuildSvgFromVectorList(
   newWidth, newHeight: integer; scaling: double);
 var
   i: integer;
-  pp: TArrayOfArrayOfPointD;
+  pp: TPathsD;
   svgSize: TSize;
 begin
   if palVectorsList.Count = 0 then Exit;
@@ -901,8 +901,8 @@ begin
         lblOptions.Caption := 'Building Image:' else
         lblOptions.Caption := 'Building with ' +s +': ';
 
-    ProgressBar.Left := lblOptions.Left + lblOptions.Width  + DPI(16);
-    ProgressBar.Width := pnlOptions.ClientWidth - DPI(16) - ProgressBar.Left;
+    ProgressBar.Left := lblOptions.Left + lblOptions.Width  + DPIAware(16);
+    ProgressBar.Width := pnlOptions.ClientWidth - DPIAware(16) - ProgressBar.Left;
     ProgressBar.Visible := true;
     ProgressBar.Position := 0;
 
@@ -1028,8 +1028,8 @@ end;
 procedure TMainForm.FormResize(Sender: TObject);
 begin
   pnlSVG.Width := ClientWidth div 2;
-  lblSVG.Left := pnlSVG.Left + DPI(16);
-  lblRaster.Left := DPI(16);
+  lblSVG.Left := pnlSVG.Left + DPIAware(16);
+  lblRaster.Left := DPIAware(16);
   lblOptions.Left := lblRaster.Left;
 end;
 //------------------------------------------------------------------------------

@@ -28,6 +28,7 @@ type
 {$IFNDEF UNICODE}
   UnicodeString = WideString;
 {$ENDIF}
+{$ZEROBASEDSTRINGS OFF}
 
   //TGlyphInfo: Object that's used internally be TFontInfo
   //Note - glyph outlines always use the NON-ZERO fill rule
@@ -44,23 +45,24 @@ type
   //handled by FontManager.
   TFontInfo = class
   private
-    fAccessTime: TDatetime;
-    fHandle  : HFont;
-    fLogFont : TLogFont;
-    fSorted  : Boolean;
+    fAccessTime   : TDatetime;
+    fHandle       : HFont;
+    fLogFont      : TLogFont;
+    fFontSortStr  : UnicodeString;
+    fGlyphsSorted : Boolean;
     {$IFDEF XPLAT_GENERICS}
-    fGlyphs  : TList<TGlyphInfo>;
+    fGlyphs       : TList<TGlyphInfo>;
     {$ELSE}
-    fGlyphs  : TList;
+    fGlyphs       : TList;
     {$ENDIF}
-    procedure Sort;
+    procedure SortGlyphs;
     function GetUnderLined: Boolean;
     procedure SetUnderlined(value: Boolean);
     function GetStrikeThrough: Boolean;
     procedure SetStrikeThrough(value: Boolean);
     function GetFontName: string;
     function GetGlyphInfo(wc: WideChar): TGlyphInfo;
-    //CreateGlyph: note that Windows.GetGlyphOutline() only works for
+    //AddGlyph: note that Windows.GetGlyphOutline() only works for
     //UCS-2 chars. UCS-4 characters are managed by the OS using font mapping
     procedure AddGlyph(wc: WideChar; memDc: HDC);
     function GetMissingChars(const s: UnicodeString): UnicodeString;
@@ -83,14 +85,20 @@ type
   TFontManager = class
   private
     fCapacity  : integer;
-    fFontInfos : TStringList;
+    fSorted    : Boolean;
+    {$IFDEF XPLAT_GENERICS}
+    fFontInfos : TList<TFontInfo>;
+    {$ELSE}
+    fFontInfos : TList;
+    {$ENDIF}
     fInstalledFonts: TStringList;
     function GetInstalledFonts: TStringList;
     procedure SetCapacity(capacity: integer);
+    procedure Sort;
     function IndexOfOldest: integer;
-    function LogFontToSearchStr(lf: TLogfont): string;
+    function AddFontInternal(const logFont: TLogFont; InitAnsi: boolean): TFontInfo;
   protected
-    function AddFont(logFont: TLogFont; InitAnsi: boolean = true): TFontInfo;
+    function AddFont(const logFont: TLogFont; InitAnsi: boolean = true): TFontInfo;
   public
     constructor Create(capacity: integer = 50);
     destructor Destroy; override;
@@ -101,13 +109,13 @@ type
     //GetFontInfo: Returns a TFontInfo object that matches the supplied
     //logFont.<br> If AutoAdd is true and no match is found in the current
     //list of TFontInfo objects, then the fontManager will create a new
-    //TFontInfo object to match the supplied logFont. Otherwise when no match
+      //TFontInfo object to match the supplied logFont. Otherwise when no match
     //is found, the function will return nil.<br>
     //Also, it's much more efficient the derive path info for ranges of
     //characters, rather than deriving this info for individual characters.
     //So when InitAnsi is true, the FontManager will get path infor for all
     //characters in the range 32 .. 126;
-    function GetFontInfo(logFont: TLogFont; AutoAdd: Boolean = true;
+    function GetFontInfo(const logFont: TLogFont; AutoAdd: Boolean = true;
       InitAnsi: boolean = true): TFontInfo; overload;
     function GetFontInfo(font: hFont; AutoAdd: Boolean = true;
       InitAnsi: boolean = true): TFontInfo; overload;
@@ -884,6 +892,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function LogFontToSearchStr(const lf: TLogfont): UniCodeString;
+var
+  i,len: integer;
+begin
+  result := '';
+  i := 1;
+  while (i < 32) and (lf.lfFaceName[i] <> #0) do inc(i);
+  len := 28 + i*2;
+  SetLength(result, len div 2);
+  Move(lf, Result[1], len);
+end;
+//------------------------------------------------------------------------------
+
 function EnumFontsProc(var LogFont: TLogFont; var TextMetric: TTextMetric;
   FontType: Integer; Data: Pointer): Integer; stdcall;
 var
@@ -997,9 +1018,9 @@ end;
 //------------------------------------------------------------------------------
 
 {$IFDEF XPLAT_GENERICS}
-function FindInSortedList(wc: WideChar; glyphList: TList<TGlyphInfo>): integer;
+function FindGlyph(wc: WideChar; glyphList: TList<TGlyphInfo>): integer;
 {$ELSE}
-function FindInSortedList(wc: WideChar; glyphList: TList): integer;
+function FindGlyph(wc: WideChar; glyphList: TList): integer;
 {$ENDIF}
 var
   i,l,r: integer;
@@ -1030,9 +1051,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TFontInfo.Sort;
+procedure TFontInfo.SortGlyphs;
 begin
-  if fSorted then Exit;
+  if fGlyphsSorted then Exit;
   {$IFDEF XPLAT_GENERICS}
     fGlyphs.Sort(TComparer<TGlyphInfo>.Construct(
       function (const glyph1, glyph2: TGlyphInfo): integer
@@ -1042,7 +1063,7 @@ begin
   {$ELSE}
     fGlyphs.Sort(GlyphSorter);
   {$ENDIF}
-  fSorted := true;
+  fGlyphsSorted := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -1054,12 +1075,12 @@ begin
   result := ''; r := 0;
   if (fHandle = 0) then Exit;
 
-  if not fSorted then Sort;
+  if not fGlyphsSorted then SortGlyphs;
   Result := Copy(s, 1, len);
   for i := 1 to length(Result) do
   begin
     if Result[i] = #0 then Continue
-    else if FindInSortedList(Result[i], fGlyphs) < 0 then
+    else if FindGlyph(Result[i], fGlyphs) < 0 then
     begin
       inc(r);
       Result[r] := Result[i];
@@ -1087,13 +1108,13 @@ begin
   oldFont := SelectObject(memDC, fHandle);
   try
     for i := 1 to Length(missing) do
-      if FindInSortedList(missing[i], fGlyphs) < 0 then
+      if FindGlyph(missing[i], fGlyphs) < 0 then
         AddGlyph(missing[i], memDc);
   finally
     SelectObject(memDC, oldFont);
     DeleteDC(memDC);
   end;
-  Sort;
+  SortGlyphs;
 end;
 //------------------------------------------------------------------------------
 
@@ -1113,12 +1134,12 @@ var
 begin
   Result := nil;
   if wc < #32 then Exit;
-  if not fSorted then Sort;
-  i := FindInSortedList(wc, fGlyphs);
+  if not fGlyphsSorted then SortGlyphs;
+  i := FindGlyph(wc, fGlyphs);
   if i < 0 then
   begin
     FillMissingChars(wc);
-    i := FindInSortedList(wc, fGlyphs);
+    i := FindGlyph(wc, fGlyphs);
     if i >= 0 then Result := TGlyphInfo(fGlyphs[i])
   end
   else
@@ -1196,8 +1217,12 @@ begin
   fInstalledFonts.Duplicates := dupIgnore;
   fInstalledFonts.CaseSensitive := false;
 
-  fFontInfos := TStringList.Create;
-  fFontInfos.Sorted := true;
+  {$IFDEF XPLAT_GENERICS}
+  fFontInfos := TList<TFontInfo>.Create;
+  {$ELSE}
+  fFontInfos := TList.Create;
+  {$ENDIF}
+  //fFontInfos.Sorted := true;
 
   fCapacity := Max(1, capacity);
 end;
@@ -1251,7 +1276,7 @@ var
   i: integer;
 begin
   for i := 0 to fFontInfos.Count -1 do
-    fFontInfos.Objects[i].Free;
+    TFontInfo(fFontInfos[i]).Free;
   fFontInfos.Clear;
 end;
 //------------------------------------------------------------------------------
@@ -1266,19 +1291,6 @@ begin
 end;
 //---------------------------------------------------------------------
 
-function TFontManager.LogFontToSearchStr(lf: TLogfont): string;
-var
-  i,len: integer;
-begin
-  result := '';
-  i := 1;
-  while (i < 32) and (lf.lfFaceName[i] <> #0) do inc(i);
-  len := 28 + i*2;
-  SetLength(result, len div 2);
-  Move(lf, Result[1], len);
-end;
-//------------------------------------------------------------------------------
-
 function TFontManager.IndexOfOldest: integer;
 var
   i: integer;
@@ -1287,10 +1299,10 @@ begin
   Result := -1;
   if fFontInfos.Count = 0 then Exit;
   result := 0;
-  time := TFontInfo(fFontInfos.Objects[0]).LastAccessed;
+  time := TFontInfo(fFontInfos[0]).LastAccessed;
   for i := 1 to fFontInfos.Count -1 do
   begin
-    time2 := TFontInfo(fFontInfos.Objects[i]).LastAccessed;
+    time2 := TFontInfo(fFontInfos[i]).LastAccessed;
     if time2 >= time then Continue;
     time := time2;
     result := i;
@@ -1306,42 +1318,106 @@ begin
   while fFontInfos.Count >= fCapacity do
   begin
     oldestIdx := IndexOfOldest;
-    fFontInfos.Objects[oldestIdx].Free;
+    TFontInfo(fFontInfos[oldestIdx]).Free;
     fFontInfos.Delete(oldestIdx);
   end;
 end;
 //------------------------------------------------------------------------------
 
-function TFontManager.AddFont(logFont: TLogFont; InitAnsi: boolean): TFontInfo;
+{$IFDEF XPLAT_GENERICS}
+function FindFontInfo(const lf: TLogFont; fontList: TList<TFontInfo>): integer;
+{$ELSE}
+function FindFontInfo(const lf: TLogFont; fontList: TList): integer;
+{$ENDIF}
+var
+  i,l,r: integer;
+  lfSearchStr: UnicodeString;
+begin
+  lfSearchStr := LogFontToSearchStr(lf);
+  //binary search the sorted list ...
+  l := 0;
+  r := fontList.Count -1;
+  while l <= r do
+  begin
+    Result := (l + r) shr 1;
+    i := CompareStr(TFontInfo(fontList[Result]).fFontSortStr, lfSearchStr);
+    if i < 0 then
+    begin
+      l := Result +1
+    end else
+    begin
+      if i = 0 then Exit;
+      r := Result -1;
+    end;
+  end;
+  Result := -1;
+end;
+//------------------------------------------------------------------------------
+
+function FontInfoSorter(fontInfo1, fontInfo2: pointer): integer;
+begin
+  Result := CompareStr(TFontInfo(fontInfo1).fFontSortStr,
+    TFontInfo(fontInfo2).fFontSortStr);
+end;
+//------------------------------------------------------------------------------
+
+procedure TFontManager.Sort;
+begin
+  if fSorted then Exit;
+  {$IFDEF XPLAT_GENERICS}
+    fFontInfos.Sort(TComparer<TFontInfo>.Construct(
+      function (const fontInfo1, fontInfo2: TFontInfo): integer
+      begin
+        Result := CompareStr(fontInfo1.fFontSortStr, fontInfo2.fFontSortStr);
+      end));
+  {$ELSE}
+    fFontInfos.Sort(FontInfoSorter);
+  {$ENDIF}
+  fSorted := true;
+end;
+//------------------------------------------------------------------------------
+
+function TFontManager.AddFontInternal(const logFont: TLogFont;
+  InitAnsi: boolean): TFontInfo;
+begin
+  Result := TFontInfo.Create(logFont, InitAnsi);
+  Result.fFontSortStr := LogFontToSearchStr(logFont);
+  Result.LastAccessed := now;
+  fFontInfos.Add(Result);
+  fSorted := false;
+end;
+//------------------------------------------------------------------------------
+
+function TFontManager.AddFont(const logFont: TLogFont; InitAnsi: boolean): TFontInfo;
 var
   idx, oldestIdx: integer;
 begin
   while fFontInfos.Count >= fCapacity do
   begin
     oldestIdx := IndexOfOldest;
-    fFontInfos.Objects[oldestIdx].Free;
+    TFontInfo(fFontInfos[oldestIdx]).Free;
     fFontInfos.Delete(oldestIdx);
   end;
-  result := TFontInfo.Create(logFont, InitAnsi);
-  if not assigned(result) then Exit;
-  fFontInfos.AddObject(LogFontToSearchStr(logFont), Result);
-  Result.LastAccessed := now;
+  Result := AddFontInternal(logFont, InitAnsi);
 end;
 //------------------------------------------------------------------------------
 
-function TFontManager.GetFontInfo(logFont: TLogFont;
+function TFontManager.GetFontInfo(const logFont: TLogFont;
   AutoAdd: Boolean; InitAnsi: boolean): TFontInfo;
 var
   i: integer;
 begin
-  if fFontInfos.Find(LogFontToSearchStr(logFont), i) then
+  if not fSorted then Sort;
+  i := FindFontInfo(logFont, fFontInfos);
+  if i >= 0 then
   begin
-    result := TFontInfo(fFontInfos.Objects[i]);
+    result := TFontInfo(fFontInfos[i]);
     Result.LastAccessed := now;
   end
   else if AutoAdd then
-    Result := AddFont(logFont, InitAnsi)
-  else
+  begin
+    Result := AddFontInternal(logFont, InitAnsi);
+  end else
     Result := nil;
 end;
 //------------------------------------------------------------------------------
