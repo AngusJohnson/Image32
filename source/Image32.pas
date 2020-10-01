@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.50                                                            *
-* Date      :  18 September 2020                                               *
+* Version   :  1.52                                                            *
+* Date      :  1 October 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -16,8 +16,8 @@ interface
 
 uses
   {$IFDEF MSWINDOWS} Windows,{$ENDIF} Types, SysUtils, Classes,
-  {$IFDEF XPLAT_GENERICS} System.Generics.Collections,
-  System.Generics.Defaults, System.Character, {$ENDIF} {$IFDEF UITYPES} UITypes,{$ENDIF} Math;
+  {$IFDEF XPLAT_GENERICS} Generics.Collections,
+  Generics.Defaults, Character, {$ENDIF} {$IFDEF UITYPES} UITypes,{$ENDIF} Math;
 
 type
   TRect = Types.TRect;
@@ -55,6 +55,7 @@ type
   TArrayOfColor32 = array of TColor32;
   TArrayOfArrayOfColor32 = array of TArrayOfColor32;
   TArrayOfInteger = array of Integer;
+  TArrayOfWord = array of WORD;
   TArrayOfByte = array of Byte;
 
   TImage32 = class;
@@ -295,11 +296,9 @@ type
   TArrayofHSL = array of THsl;
 
   PPointD = ^TPointD;
-  TArrayOfPointD = array of TPointD;
-  TPathD = TArrayOfPointD;         //may cause ambiguity with Clipper.pas
-  TArrayOfArrayOfPointD = array of TArrayOfPointD;
-  TPathsD = TArrayOfArrayOfPointD; //may cause ambiguity with Clipper.pas
-  TArrayOfArrayOfArrayOfPointD = array of TArrayOfArrayOfPointD;
+  TPathD = array of TPointD;       //nb: watch for ambiguity with Clipper.pas
+  TPathsD = array of TPathD;       //nb: watch for ambiguity with Clipper.pas
+  TArrayOfPathsD = array of TPathsD;
 
   TArrayOfDouble = array of double;
 
@@ -342,9 +341,9 @@ type
   //BlendToAlpha: Blends two semi-transparent images (slower than BlendToOpaque)
   function BlendToAlpha(bgColor, fgColor: TColor32): TColor32;
   //BlendMask: Whereever the mask is, preserves the background
-  function BlendMask(bgColor, mask: TColor32): TColor32;
+  function BlendMask(bgColor, alphaMask: TColor32): TColor32;
   {$IFDEF INLINE} inline; {$ENDIF}
-  function BlendInvertedMask(bgColor, mask: TColor32): TColor32;
+  function BlendInvertedMask(bgColor, alphaMask: TColor32): TColor32;
   {$IFDEF INLINE} inline; {$ENDIF}
 
   //COMPARE COLOR FUNCTIONS (ConvertToBoolMask, FloodFill, Vectorize etc.)
@@ -368,8 +367,8 @@ type
   //GetWeightedPixel: coordinates x256, y256 are scaled up by 256.
   function GetWeightedPixel(img: TImage32; x256, y256: Integer): TColor32;
 
-  //Color32: Converts a Graphics.TColor value into a TColor32 value.
   {$IFDEF MSWINDOWS}
+  //Color32: Converts a Graphics.TColor value into a TColor32 value.
   function Color32(rgbColor: Integer): TColor32; overload;
   {$ENDIF}
   function Color32(a, r, g, b: Byte): TColor32; overload;
@@ -403,13 +402,11 @@ type
   function ClampRange(val, min, max: single): single; overload;
   function IncPColor32(pc: Pointer; cnt: Integer): PColor32;
 
-  //DPI: Useful for DPIAware sizing of images and their container controls.<br>
+  //DPIAware: Useful for DPIAware sizing of images and their container controls.<br>
   //Scales values relative to the display's resolution (PixelsPerInch).<br>
-  //See https://docs.microsoft.com/en-us/windows/desktop/hidpi/high-dpi-desktop-application-development-on-windows
-  function DPI(val: Integer): Integer; overload;
-  {$IFDEF INLINE} inline; {$ENDIF}
-  function DPI(val: double): double; overload;
-  {$IFDEF INLINE} inline; {$ENDIF}
+  //See https://docs.microsoft.com/en-us/windows/desktop/hidpi/high-DPIAware-desktop-application-development-on-windows
+  function DPIAware(val: Integer): Integer; overload; {$IFDEF INLINE} inline; {$ENDIF}
+  function DPIAware(val: double): double; overload; {$IFDEF INLINE} inline; {$ENDIF}
 
   {$IFDEF FPC}
   function AlphaBlend(DC: HDC; p2, p3, p4, p5: Integer;
@@ -451,10 +448,8 @@ var
   //DivTable[a,b] = a * 255/b (for a &lt;= b)
   DivTable: array [Byte,Byte] of Byte;
 
-  ScreenPixelsY: Integer = 96;
-  //DPI: Useful for DPIAware sizing of images and their container controls.<br>
-  //Scales values relative to the display's resolution (PixelsPerInch).
-  DpiScale: double = 1.0;
+  //ScreenScale: Useful for DPIAware sizing of images and controls.
+  ScreenScale: double = 1.0;
 
   //AND BECAUSE OLDER DELPHI COMPILERS (OLDER THAN D2006)
   //DON'T SUPPORT RECORD METHODS
@@ -476,11 +471,7 @@ implementation
 
 const
   div255 : Double = 1 / 255;
-  div6   : Double = 1 / 6;
 type
-  PColor32Array = ^TColor32Array;
-  TColor32Array = array [0.. maxint div SizeOf(TColor32) -1] of TColor32;
-
   TByteArray = array[0..MaxInt -1] of Byte;
   PByteArray = ^TByteArray;
 
@@ -587,11 +578,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function BlendMask(bgColor, mask: TColor32): TColor32;
+function BlendMask(bgColor, alphaMask: TColor32): TColor32;
 var
   res: TARGB absolute Result;
   bg: TARGB absolute bgColor;
-  fg: TARGB absolute mask;
+  fg: TARGB absolute alphaMask;
 begin
   Result := bgColor;
   res.A := MulTable[bg.A, fg.A];
@@ -599,11 +590,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function BlendInvertedMask(bgColor, mask: TColor32): TColor32;
+function BlendInvertedMask(bgColor, alphaMask: TColor32): TColor32;
 var
   res: TARGB absolute Result;
   bg: TARGB absolute bgColor;
-  fg: TARGB absolute mask;
+  fg: TARGB absolute alphaMask;
 begin
   Result := bgColor;
   res.A := MulTable[bg.A, 255 - fg.A];
@@ -836,15 +827,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DPI(val: Integer): Integer;
+function DPIAware(val: Integer): Integer;
 begin
-  result := Round( val * DpiScale);
+  result := Round( val * ScreenScale);
 end;
 //------------------------------------------------------------------------------
 
-function DPI(val: double): double;
+function DPIAware(val: double): double;
 begin
-  result := val * DpiScale;
+  result := val * ScreenScale;
 end;
 //------------------------------------------------------------------------------
 
@@ -1351,10 +1342,10 @@ begin
 
 {$IFDEF XPLAT_GENERICS}
   ImageFormatClassList.Sort(TComparer<PImgFmtRec>.Construct(
-    function (const item1, item2: PImgFmtRec): integer
-    begin
-      result := Integer(item1.Order) - Integer(item2.Order);
-    end));
+      function(const imgFmtRec1, imgFmtRec2: PImgFmtRec): Integer
+      begin
+        Result := Integer(imgFmtRec1.Order) - Integer(imgFmtRec2.Order);
+      end));
 {$ELSE}
   ImageFormatClassList.Sort(ImageFormatClassListSort);
 {$ENDIF}
@@ -2250,12 +2241,15 @@ const
   RT_BITMAP = PChar(2);
 {$ENDIF}
 begin
+  resStream := nil;
   resId := NameToId(resType);
   if (resId = 2) or ((resId < 0) and (resType = 'BMP')) then
   begin
-    result := FindResource(hInstance, PChar(resName), RT_BITMAP) <> 0;
-    if not result then Exit;
-    resStream := TResourceStream.Create(hInstance, resName, RT_BITMAP);
+    if FindResource(hInstance, PChar(resName), RT_BITMAP) <> 0 then
+      resStream := TResourceStream.Create(hInstance, resName, RT_BITMAP)
+    else if FindResource(hInstance, PChar(resName), 'BMP') <> 0 then
+      resStream := TResourceStream.Create(hInstance, resName, 'BMP');
+    Result := Assigned(resStream);
   end else
   begin
     result := FindResource(hInstance, PChar(resName), PChar(resType)) <> 0;
@@ -3234,14 +3228,18 @@ end;
 //------------------------------------------------------------------------------
 
 {$IFDEF MSWINDOWS}
-procedure GetDPI;
+procedure GetScreenScale;
 var
   dc: HDC;
+  ScreenPixelsY: integer;
 begin
   dc := GetDC(0);
-  ScreenPixelsY := GetDeviceCaps(dc, LOGPIXELSY);
-  DpiScale := ScreenPixelsY / 96;
-  ReleaseDC(0, dc);
+  try
+    ScreenPixelsY := GetDeviceCaps(dc, LOGPIXELSY);
+    ScreenScale := ScreenPixelsY / 96;
+  finally
+    ReleaseDC(0, dc);
+  end;
 end;
 {$ENDIF}
 //------------------------------------------------------------------------------
@@ -3267,7 +3265,7 @@ initialization
   MakeBlendTables;
 
 {$IFDEF MSWINDOWS}
-  GetDPI;
+  GetScreenScale;
 {$ENDIF}
 
 finalization

@@ -2,8 +2,8 @@ unit Image32_SmoothPath;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.47                                                            *
-* Date      :  28 August 2020                                                  *
+* Version   :  1.52                                                            *
+* Date      :  1 October 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Supports paths with multiple sub-curves                         *
@@ -32,16 +32,16 @@ type
     fCapacity       : integer;
     fCount          : integer;
     fCtrlPoints     : array of TSmoothPoint;
-    fFlattened      : TArrayOfPointD;
+    fFlattened      : TPathD;
     fAutoAdjust     : Boolean;
-    function GetCtrlPoints: TArrayOfPointD;
+    function GetCtrlPoints: TPathD;
     function GetPoint(index: integer): TPointD;
     procedure SetPoint(index: integer; const pt: TPointD);
     function GetPointType(index: integer): TSmoothType;
     procedure SetPointType(index: integer; const newType: TSmoothType);
     function GetLastType: TSmoothType;
 
-    function GetFlattenedPath: TArrayOfPointD;
+    function GetFlattenedPath: TPathD;
     procedure AddInternal(const pt: TPointD; pointType: TSmoothType);
     procedure MovePoint(index: integer; const newPt: TPointD);
   public
@@ -64,9 +64,9 @@ type
       read GetPoint write SetPoint; Default;
     property PointTypes[index: integer]: TSmoothType
       read GetPointType write SetPointType;
-    property CtrlPoints: TArrayOfPointD read GetCtrlPoints;
+    property CtrlPoints: TPathD read GetCtrlPoints;
     property Count: integer read fCount;
-    property FlattenedPath: TArrayOfPointD read GetFlattenedPath;
+    property FlattenedPath: TPathD read GetFlattenedPath;
   end;
 
   //Anticipating that TSmoothPath will mostly be used inside a TLayeredImage32
@@ -130,7 +130,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSmoothPath.GetCtrlPoints: TArrayOfPointD;
+function TSmoothPath.GetCtrlPoints: TPathD;
 var
   i, cnt: integer;
 begin
@@ -272,10 +272,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSmoothPath.GetFlattenedPath: TArrayOfPointD;
+function TSmoothPath.GetFlattenedPath: TPathD;
 var
   i,j,k, cnt: integer;
-  tmp: TArrayOfPointD;
+  tmp: TPathD;
 begin
   Result := nil;
   if not assigned(fCtrlPoints) or (Count < 4) then Exit;
@@ -549,7 +549,7 @@ procedure DrawSmoothPathCtrlLinesOnDesigner(const smoothPath: TSmoothPath;
   designerLayer: TDesignerLayer32);
 var
   i, highI: integer;
-  pts: TArrayOfPointD;
+  pts: TPathD;
 begin
   SetLength(pts, 2);
   highI := smoothPath.Count -1;

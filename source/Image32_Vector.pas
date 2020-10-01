@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.51                                                           *
-* Date      :  23 September 2020                                               *
+* Version   :  1.52                                                            *
+* Date      :  1 October 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -30,95 +30,100 @@ type
   function InflateRect(const rec: TRect; dx, dy: integer): TRect; overload;
   function InflateRect(const rec: TRectD; dx, dy: double): TRectD; overload;
 
-  function Rectangle(const rec: TRect): TArrayOfPointD; overload;
-  function Rectangle(const rec: TRectD): TArrayOfPointD; overload;
-  function Rectangle(l, t, r, b: double): TArrayOfPointD; overload;
+  function Rectangle(const rec: TRect): TPathD; overload;
+  function Rectangle(const rec: TRectD): TPathD; overload;
+  function Rectangle(l, t, r, b: double): TPathD; overload;
 
-  function RoundRect(const rec: TRect; radius: integer): TArrayOfPointD; overload;
-  function RoundRect(const rec: TRectD; radius: double): TArrayOfPointD; overload;
+  function RoundRect(const rec: TRect; radius: integer): TPathD; overload;
+  function RoundRect(const rec: TRectD; radius: double): TPathD; overload;
 
-  function Ellipse(const rec: TRect; steps: integer = 0): TArrayOfPointD; overload;
-  function Ellipse(const rec: TRectD; steps: integer = 0): TArrayOfPointD; overload;
+  function Ellipse(const rec: TRect; steps: integer = 0): TPathD; overload;
+  function Ellipse(const rec: TRectD; steps: integer = 0): TPathD; overload;
 
   function Star(const focalPt: TPointD;
-    innerRadius, outerRadius: double; points: integer): TArrayOfPointD;
+    innerRadius, outerRadius: double; points: integer): TPathD;
 
-  function Arc(const rec: TRect; startAngle, endAngle: double): TArrayOfPointD;
-  function Pie(const rec: TRect; StartAngle, EndAngle: double): TArrayOfPointD;
+  function Arc(const rec: TRect; startAngle, endAngle: double): TPathD;
+  function Pie(const rec: TRect; StartAngle, EndAngle: double): TPathD;
 
-  function FlattenQBezier(const pt1, pt2, pt3: TPointD): TArrayOfPointD; overload;
-  function FlattenQBezier(const pts: TArrayOfPointD): TArrayOfPointD; overload;
-  function FlattenQBezier(const pts: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD; overload;
+  function FlattenQBezier(const pt1, pt2, pt3: TPointD): TPathD; overload;
+  function FlattenQBezier(const pts: TPathD): TPathD; overload;
+  function FlattenQBezier(const pts: TPathsD): TPathsD; overload;
 
-  function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD): TArrayOfPointD; overload;
-  function FlattenCBezier(const pts: TArrayOfPointD): TArrayOfPointD; overload;
-  function FlattenCBezier(const pts: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD; overload;
+  function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD): TPathD; overload;
+  function FlattenCBezier(const pts: TPathD): TPathD; overload;
+  function FlattenCBezier(const pts: TPathsD): TPathsD; overload;
 
   //FlattenCSpline: Approximates the 'S' command inside the 'd' property of an
   //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
-  function FlattenCSpline(const pts: TArrayOfPointD): TArrayOfPointD;
+  function FlattenCSpline(const pts: TPathD): TPathD;
 
   //FlattenQSpline: Approximates the 'T' command inside the 'd' property of an
   //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
-  function FlattenQSpline(const pts: TArrayOfPointD): TArrayOfPointD;
+  function FlattenQSpline(const pts: TPathD): TPathD;
 
   //ArrowHead: The ctrlPt's only function is to control the angle of the arrow.
   function ArrowHead(const arrowTip, ctrlPt: TPointD; size: double;
-    arrowStyle: TArrowStyle): TArrayOfPointD;
+    arrowStyle: TArrowStyle): TPathD;
 
   function GetDefaultArrowHeadSize(lineWidth: double): double;
 
-  function ShortenPath(const path: TArrayOfPointD;
-    pathEnd: TPathEnd; amount: double): TArrayOfPointD;
+  function ShortenPath(const path: TPathD;
+    pathEnd: TPathEnd; amount: double): TPathD;
 
   //RamerDouglasPeucker: simplifies paths, recursively removing vertices where
   //they deviate no more than 'epsilon' from their adjacent vertices.
-  function RamerDouglasPeucker(const path: TArrayOfPointD;
-    epsilon: double): TArrayOfPointD; overload;
-  function RamerDouglasPeucker(const paths: TArrayOfArrayOfPointD;
-    epsilon: double): TArrayOfArrayOfPointD; overload;
+  function RamerDouglasPeucker(const path: TPathD;
+    epsilon: double): TPathD; overload;
+  function RamerDouglasPeucker(const paths: TPathsD;
+    epsilon: double): TPathsD; overload;
 
   //GetDashPath: Returns a polyline (not polygons)
-  function GetDashedPath(const path: TArrayOfPointD;
+  function GetDashedPath(const path: TPathD;
     closed: Boolean; const pattern: TArrayOfInteger;
-    patternOffset: PDouble): TArrayOfArrayOfPointD;
+    patternOffset: PDouble): TPathsD;
 
-  function GetDashedOutLine(const path: TArrayOfPointD;
+  function GetDashedOutLine(const path: TPathD;
     closed: Boolean; const pattern: TArrayOfInteger;
     patternOffset: PDouble; lineWidth: double;
-    joinStyle: TJoinStyle; endStyle: TEndStyle): TArrayOfArrayOfPointD;
+    joinStyle: TJoinStyle; endStyle: TEndStyle): TPathsD;
 
   //CopyPaths: Because only dynamic string arrays are copy-on-write
-  //function CopyPaths(const paths: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD;
+  //function CopyPaths(const paths: TPathsD): TPathsD;
 
   function OffsetPoint(const pt: TPoint; dx, dy: integer): TPoint; overload;
   function OffsetPoint(const pt: TPointD; dx, dy: double): TPointD; overload;
 
-  function OffsetPath(const path: TArrayOfPointD;
-    dx, dy: double): TArrayOfPointD; overload;
-  function OffsetPath(const paths: TArrayOfArrayOfPointD;
-    dx, dy: double): TArrayOfArrayOfPointD; overload;
-  function ScalePath(const path: TArrayOfPointD;
-    sx, sy: double): TArrayOfPointD; overload;
-  function ScalePath(const path: TArrayOfPointD;
-    scale: double): TArrayOfPointD; overload;
-  function ScalePath(const paths: TArrayOfArrayOfPointD;
-    sx, sy: double): TArrayOfArrayOfPointD; overload;
-  function ScalePath(const paths: TArrayOfArrayOfPointD;
-    scale: double): TArrayOfArrayOfPointD; overload;
+  function OffsetPath(const path: TPathD;
+    dx, dy: double): TPathD; overload;
+  function OffsetPath(const paths: TPathsD;
+    dx, dy: double): TPathsD; overload;
+  function OffsetPath(const paths: TArrayOfPathsD;
+    dx, dy: double): TArrayOfPathsD; overload;
 
-  function ReversePath(const path: TArrayOfPointD): TArrayOfPointD; overload;
-  function ReversePath(const paths: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD; overload;
+  function ScalePath(const path: TPathD;
+    sx, sy: double): TPathD; overload;
+  function ScalePath(const path: TPathD;
+    scale: double): TPathD; overload;
+  function ScalePath(const paths: TPathsD;
+    sx, sy: double): TPathsD; overload;
+  function ScalePath(const paths: TPathsD;
+    scale: double): TPathsD; overload;
 
-  function OpenPathToFlatPolygon(const path: TArrayOfPointD): TArrayOfPointD;
-  function JoinPaths(const path1, path2: TArrayOfPointD):TArrayOfPointD;
-  procedure AppendPoint(var path: TArrayOfPointD; const extra: TPointD);
-  procedure AppendPath(var paths: TArrayOfArrayOfPointD;
-    const extra: TArrayOfPointD);
+  function ReversePath(const path: TPathD): TPathD; overload;
+  function ReversePath(const paths: TPathsD): TPathsD; overload;
+
+  function OpenPathToFlatPolygon(const path: TPathD): TPathD;
+  function JoinPaths(const path1, path2: TPathD):TPathD;
+  procedure AppendPoint(var path: TPathD; const extra: TPointD);
+  procedure AppendPath(var paths: TPathsD;
+    const extra: TPathD);
     {$IFDEF INLINE} inline; {$ENDIF} overload;
-  procedure AppendPath(var paths: TArrayOfArrayOfPointD;
-    const extra: TArrayOfArrayOfPointD);
+  procedure AppendPath(var paths: TPathsD;
+    const extra: TPathsD);
     {$IFDEF INLINE} inline; {$ENDIF} overload;
+  procedure AppendPath(var arrayOfPathsD: TArrayOfPathsD;
+    const extra: TPathsD); overload;
 
   function GetAngle(const origin, pt: TPoint): double; overload;
   function GetAngle(const origin, pt: TPointD): double; overload;
@@ -127,18 +132,18 @@ type
 
   procedure RotatePoint(var pt: TPointD;
     const focalPoint: TPointD; sinA, cosA: double);
-  function RotatePath(const path: TArrayOfPointD;
-    const focalPoint: TPointD; angleRads: double): TArrayOfPointD; overload;
-  function RotatePath(const paths: TArrayOfArrayOfPointD;
-    const focalPoint: TPointD; angleRads: double): TArrayOfArrayOfPointD; overload;
+  function RotatePath(const path: TPathD;
+    const focalPoint: TPointD; angleRads: double): TPathD; overload;
+  function RotatePath(const paths: TPathsD;
+    const focalPoint: TPointD; angleRads: double): TPathsD; overload;
 
-  function MakePathI(const pts: array of integer): TArrayOfPointD; overload;
-  function MakePathD(const pts: array of double): TArrayOfPointD; overload;
+  function MakePathI(const pts: array of integer): TPathD; overload;
+  function MakePathD(const pts: array of double): TPathD; overload;
 
-  function GetBounds(const path: TArrayOfPointD): TRect; overload;
-  function GetBounds(const paths: TArrayOfArrayOfPointD): TRect; overload;
-  function GetBoundsD(const path: TArrayOfPointD): TRectD; overload;
-  function GetBoundsD(const paths: TArrayOfArrayOfPointD): TRectD; overload;
+  function GetBounds(const path: TPathD): TRect; overload;
+  function GetBounds(const paths: TPathsD): TRect; overload;
+  function GetBoundsD(const path: TPathD): TRectD; overload;
+  function GetBoundsD(const paths: TPathsD): TRectD; overload;
 
   function Rect(const recD: TRectD): TRect; overload;
   function Rect(const l,t,r,b: integer): TRect; overload;
@@ -177,7 +182,7 @@ type
   {$IFDEF INLINING} inline; {$ENDIF}
   function TurnsRight(const pt1, pt2, pt3: TPointD): boolean;
   {$IFDEF INLINING} inline; {$ENDIF}
-  function IsPathConvex(const path: TArrayOfPointD): Boolean;
+  function IsPathConvex(const path: TPathD): Boolean;
 
   //GetUnitVector: Used internally
   function GetUnitVector(const pt1, pt2: TPointD): TPointD;
@@ -186,9 +191,9 @@ type
   function GetUnitNormal(const pt1, pt2: TPointD): TPointD;
   {$IFDEF INLINE} inline; {$ENDIF}
   //GetVectors: Used internally
-  function GetVectors(const path: TArrayOfPointD): TArrayOfPointD;
+  function GetVectors(const path: TPathD): TPathD;
   //GetNormals: Used internally
-  function GetNormals(const path: TArrayOfPointD): TArrayOfPointD;
+  function GetNormals(const path: TPathD): TPathD;
   //DistanceSqrd: Used internally
   function DistanceSqrd(const pt1, pt2: TPoint): double; overload;
   {$IFDEF INLINE} inline; {$ENDIF}
@@ -201,9 +206,9 @@ type
   {$IFDEF INLINE} inline; {$ENDIF}
 
   function PointInPolygon(const pt: TPointD;
-    const polygon: TArrayOfPointD; fillRule: TFillRule): Boolean;
+    const polygon: TPathD; fillRule: TFillRule): Boolean;
   function PointInPolygons(const pt: TPointD;
-    const polygons: TArrayOfArrayOfPointD; fillRule: TFillRule): Boolean;
+    const polygons: TPathsD; fillRule: TFillRule): Boolean;
 
   function PerpendicularDist(const pt, line1, line2: TPointD): double;
   function ClosestPointOnLine(const pt, linePt1, linePt2: TPointD): TPointD;
@@ -218,27 +223,27 @@ type
   function GetLineEllipseIntersects(const ellipseRect: TRect;
     var linePt1, linePt2: TPointD): Boolean;
 
-  function Outline(const line: TArrayOfPointD; lineWidth: double;
+  function Outline(const line: TPathD; lineWidth: double;
     joinStyle: TJoinStyle; endStyle: TEndStyle;
-    miterLimit: double = 0): TArrayOfArrayOfPointD; overload;
-  function Outline(const lines: TArrayOfArrayOfPointD; lineWidth: double;
+    miterLimit: double = 0): TPathsD; overload;
+  function Outline(const lines: TPathsD; lineWidth: double;
     joinStyle: TJoinStyle; endStyle: TEndStyle;
-    miterLimit: double = 0): TArrayOfArrayOfPointD; overload;
+    miterLimit: double = 0): TPathsD; overload;
 
    //Grow: Offsets a closed path by 'delta' amount toward the left of the path.
    //Hence clockwise paths expand and counter-clockwise paths contract.<br>
    //No consideration is given to overlapping joins as these only very rarely
    //cause artifacts when paths are rendered.
-  function Grow(const path, normals: TArrayOfPointD; delta: double;
-    joinStyle: TJoinStyle; miterLimit: double): TArrayOfPointD;
+  function Grow(const path, normals: TPathD; delta: double;
+    joinStyle: TJoinStyle; miterLimit: double): TPathD;
 
   //SmoothToBezier: this function is based on -
   //"An Algorithm for Automatically Fitting Digitized Curves"
   //by Philip J. Schneider in "Graphics Gems", Academic Press, 1990
-  function SmoothToBezier(const path: TArrayOfPointD; closed: Boolean;
-    tolerance: double; minSegLength: double = 2): TArrayOfPointD; overload;
-  function SmoothToBezier(const paths: TArrayOfArrayOfPointD; closed: Boolean;
-    tolerance: double; minSegLength: double = 2): TArrayOfArrayOfPointD; overload;
+  function SmoothToBezier(const path: TPathD; closed: Boolean;
+    tolerance: double; minSegLength: double = 2): TPathD; overload;
+  function SmoothToBezier(const paths: TPathsD; closed: Boolean;
+    tolerance: double; minSegLength: double = 2): TPathsD; overload;
 
 
   //Matrix functions
@@ -249,9 +254,9 @@ type
   procedure MatrixApply(const matrix: TMatrixD;
     var pt: TPointD); overload;
   procedure MatrixApply(const matrix: TMatrixD;
-    var path: TArrayOfPointD); overload;
+    var path: TPathD); overload;
   procedure MatrixApply(const matrix: TMatrixD;
-    var paths: TArrayOfArrayOfPointD); overload;
+    var paths: TPathsD); overload;
   procedure MatrixInvert(var matrix: TMatrixD);
 
   //MatrixSkew: dx represents the delta offset of an X coordinate as a
@@ -513,7 +518,7 @@ begin
 end;
 //---------------------------------------------------------------------------
 
-function IsPathConvex(const path: TArrayOfPointD): Boolean;
+function IsPathConvex(const path: TPathD): Boolean;
 var
   i, pathLen: integer;
   dir: boolean;
@@ -573,7 +578,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function CopyPaths(const paths: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD;
+function CopyPaths(const paths: TPathsD): TPathsD;
 var
   i, len1: integer;
 begin
@@ -598,7 +603,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function OffsetPath(const path: TArrayOfPointD; dx, dy: double): TArrayOfPointD;
+function OffsetPath(const path: TPathD; dx, dy: double): TPathD;
 var
   i, len: integer;
 begin
@@ -612,8 +617,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function OffsetPath(const paths: TArrayOfArrayOfPointD;
-  dx, dy: double): TArrayOfArrayOfPointD;
+function OffsetPath(const paths: TPathsD;
+  dx, dy: double): TPathsD;
 var
   i,len: integer;
 begin
@@ -624,7 +629,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ScalePath(const path: TArrayOfPointD; sx, sy: double): TArrayOfPointD;
+function OffsetPath(const paths: TArrayOfPathsD;
+  dx, dy: double): TArrayOfPathsD;
+var
+  i,len: integer;
+begin
+  len := length(paths);
+  setLength(result, len);
+  for i := 0 to len -1 do
+    result[i] := OffsetPath(paths[i], dx, dy);
+end;
+//------------------------------------------------------------------------------
+
+function ScalePath(const path: TPathD; sx, sy: double): TPathD;
 var
   i, len: integer;
 begin
@@ -640,15 +657,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ScalePath(const path: TArrayOfPointD;
-  scale: double): TArrayOfPointD;
+function ScalePath(const path: TPathD;
+  scale: double): TPathD;
 begin
   result := ScalePath(path, scale, scale);
 end;
 //------------------------------------------------------------------------------
 
-function ScalePath(const paths: TArrayOfArrayOfPointD;
-  sx, sy: double): TArrayOfArrayOfPointD;
+function ScalePath(const paths: TPathsD;
+  sx, sy: double): TPathsD;
 var
   i,len: integer;
 begin
@@ -659,14 +676,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ScalePath(const paths: TArrayOfArrayOfPointD;
-  scale: double): TArrayOfArrayOfPointD;
+function ScalePath(const paths: TPathsD;
+  scale: double): TPathsD;
 begin
   result := ScalePath(paths, scale, scale);
 end;
 //------------------------------------------------------------------------------
 
-function ReversePath(const path: TArrayOfPointD): TArrayOfPointD;
+function ReversePath(const path: TPathD): TPathD;
 var
   i, highI: integer;
 begin
@@ -677,7 +694,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ReversePath(const paths: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD;
+function ReversePath(const paths: TPathsD): TPathsD;
 var
   i, len: integer;
 begin
@@ -688,7 +705,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function OpenPathToFlatPolygon(const path: TArrayOfPointD): TArrayOfPointD;
+function OpenPathToFlatPolygon(const path: TPathD): TPathD;
 var
   i, len, len2: integer;
 begin
@@ -703,7 +720,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetVectors(const path: TArrayOfPointD): TArrayOfPointD;
+function GetVectors(const path: TPathD): TPathD;
 var
   i,j, len: cardinal;
   pt: TPointD;
@@ -741,7 +758,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetNormals(const path: TArrayOfPointD): TArrayOfPointD;
+function GetNormals(const path: TPathD): TPathD;
 var
   i,j, len: cardinal;
   pt: TPointD;
@@ -804,7 +821,7 @@ end;
 //------------------------------------------------------------------------------
 
 function PointInPolyWindingCount(const pt: TPointD;
-  const path: TArrayOfPointD; out PointOnEdgeDir: integer): integer;
+  const path: TPathD; out PointOnEdgeDir: integer): integer;
 var
   i, len: integer;
   prevPt: TPointD;
@@ -855,7 +872,7 @@ end;
 //------------------------------------------------------------------------------
 
 function PointInPolygon(const pt: TPointD;
-  const polygon: TArrayOfPointD; fillRule: TFillRule): Boolean;
+  const polygon: TPathD; fillRule: TFillRule): Boolean;
 var
   wc: integer;
   PointOnEdgeDir: integer;
@@ -871,10 +888,10 @@ end;
 //------------------------------------------------------------------------------
 
 function PointInPolysWindingCount(const pt: TPointD;
-  const paths: TArrayOfArrayOfPointD; out PointOnEdgeDir: integer): integer;
+  const paths: TPathsD; out PointOnEdgeDir: integer): integer;
 var
   i,j, len: integer;
-  p: TArrayOfPointD;
+  p: TPathD;
   prevPt: TPointD;
   isAbove: Boolean;
   crossProd: double;
@@ -919,7 +936,7 @@ end;
 //------------------------------------------------------------------------------
 
 function PointInPolygons(const pt: TPointD;
-  const polygons: TArrayOfArrayOfPointD; fillRule: TFillRule): Boolean;
+  const polygons: TPathsD; fillRule: TFillRule): Boolean;
 var
   wc: integer;
   PointOnEdgeDir: integer;
@@ -1065,15 +1082,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Grow(const path, normals: TArrayOfPointD; delta: double;
-  joinStyle: TJoinStyle; miterLimit: double): TArrayOfPointD;
+function Grow(const path, normals: TPathD; delta: double;
+  joinStyle: TJoinStyle; miterLimit: double): TPathD;
 var
   i,prevI, highI: cardinal;
   buffLen, resultLen: cardinal;
   steps360, stepsPerRad: double;
   stepSin, stepCos, cosA: extended;
   P: TPointD;
-  norms: TArrayOfPointD;
+  norms: TPathD;
   normalA, normalB: TPointD;
 
   procedure AddPoint(const pt: TPointD);
@@ -1184,7 +1201,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function JoinPaths(const path1, path2: TArrayOfPointD):TArrayOfPointD;
+function JoinPaths(const path1, path2: TPathD):TPathD;
 var
   len1, len2: integer;
 begin
@@ -1207,7 +1224,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure AppendPoint(var path: TArrayOfPointD; const extra: TPointD);
+procedure AppendPoint(var path: TPathD; const extra: TPointD);
 var
   len: integer;
 begin
@@ -1217,8 +1234,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure AppendPath(var paths: TArrayOfArrayOfPointD;
-  const extra: TArrayOfPointD);
+procedure AppendPath(var paths: TPathsD;
+  const extra: TPathD);
 var
   len1, len2: integer;
 begin
@@ -1230,8 +1247,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure AppendPath(var paths: TArrayOfArrayOfPointD;
-  const extra: TArrayOfArrayOfPointD);
+procedure AppendPath(var paths: TPathsD;
+  const extra: TPathsD);
 var
   i, len1, len2: integer;
 begin
@@ -1241,6 +1258,19 @@ begin
   setLength(paths, len1 + len2);
   for i := 0 to len2 -1 do
     paths[len1+i] := Copy(extra[i], 0, length(extra[i]));
+end;
+//------------------------------------------------------------------------------
+
+procedure AppendPath(var arrayOfPathsD: TArrayOfPathsD;
+  const extra: TPathsD);
+var
+  len: integer;
+begin
+  len := length(arrayOfPathsD);
+  setLength(arrayOfPathsD, len + 1);
+  if Assigned(extra) then
+    AppendPath(arrayOfPathsD[len], extra) else
+    arrayOfPathsD[len] := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -1256,8 +1286,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RotatePathInternal(const path: TArrayOfPointD;
-  const focalPoint: TPointD; sinA, cosA: extended): TArrayOfPointD;
+function RotatePathInternal(const path: TPathD;
+  const focalPoint: TPointD; sinA, cosA: extended): TPathD;
 var
   i: integer;
   x,y: double;
@@ -1273,8 +1303,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RotatePath(const path: TArrayOfPointD;
-  const focalPoint: TPointD; angleRads: double): TArrayOfPointD;
+function RotatePath(const path: TPathD;
+  const focalPoint: TPointD; angleRads: double): TPathD;
 var
   sinA, cosA: extended;
 begin
@@ -1283,8 +1313,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RotatePath(const paths: TArrayOfArrayOfPointD;
-  const focalPoint: TPointD; angleRads: double): TArrayOfArrayOfPointD;
+function RotatePath(const paths: TPathsD;
+  const focalPoint: TPointD; angleRads: double): TPathsD;
 var
   i: integer;
   sinA, cosA: extended;
@@ -1381,7 +1411,6 @@ begin
   result := alpha2 / 2;
   if (dotProd < 0) then result := pi - result;
   if (ab.x * bc.y - ab.y * bc.x) < 0 then result := -result;
-  //if Result < 0 then Result := -Result; //todo - recheck!!
 end;
 
 //------------------------------------------------------------------------------
@@ -1442,7 +1471,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure MatrixApply(const matrix: TMatrixD; var path: TArrayOfPointD);
+procedure MatrixApply(const matrix: TMatrixD; var path: TPathD);
 var
   i, len: integer;
   tmpX: double;
@@ -1461,7 +1490,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure MatrixApply(const matrix: TMatrixD; var paths: TArrayOfArrayOfPointD);
+procedure MatrixApply(const matrix: TMatrixD; var paths: TPathsD);
 var
   i,j,len: integer;
   tmpX: double;
@@ -1584,13 +1613,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GrowOpenLine(const line: TArrayOfPointD; width: double;
+function GrowOpenLine(const line: TPathD; width: double;
   joinStyle: TJoinStyle; endStyle: TEndStyle;
-  miterLimit: double): TArrayOfArrayOfPointD;
+  miterLimit: double): TPathsD;
 var
   len, x,y, wDiv2: integer;
   wd2: double;
-  line1, line2: TArrayOfPointD;
+  line1, line2: TPathD;
   vec1, vec2: TPointD;
 begin
   Result := nil;
@@ -1641,7 +1670,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ReverseNormals(const norms: TArrayOfPointD): TArrayOfPointD;
+function ReverseNormals(const norms: TPathD): TPathD;
 var
   i, highI: integer;
 begin
@@ -1657,11 +1686,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GrowClosedLine(const line: TArrayOfPointD; width: double;
-  joinStyle: TJoinStyle; miterLimit: double): TArrayOfArrayOfPointD;
+function GrowClosedLine(const line: TPathD; width: double;
+  joinStyle: TJoinStyle; miterLimit: double): TPathsD;
 var
   len: integer;
-  line2, norms: TArrayOfPointD;
+  line2, norms: TPathD;
 begin
   len := length(line);
   if len < 3 then
@@ -1687,9 +1716,9 @@ end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-function Outline(const line: TArrayOfPointD; lineWidth: double;
+function Outline(const line: TPathD; lineWidth: double;
   joinStyle: TJoinStyle; endStyle: TEndStyle;
-  miterLimit: double): TArrayOfArrayOfPointD;
+  miterLimit: double): TPathsD;
 begin
   if not assigned(line) then
     Result := nil
@@ -1700,13 +1729,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Outline(const lines: TArrayOfArrayOfPointD; lineWidth: double;
+function Outline(const lines: TPathsD; lineWidth: double;
   joinStyle: TJoinStyle; endStyle: TEndStyle;
-  miterLimit: double): TArrayOfArrayOfPointD;
+  miterLimit: double): TPathsD;
 var
   i: integer;
 
-  procedure AddPaths(const paths: TArrayOfArrayOfPointD);
+  procedure AddPaths(const paths: TPathsD);
   var
     i, len, len2: integer;
   begin
@@ -1737,7 +1766,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Rectangle(const rec: TRect): TArrayOfPointD;
+function Rectangle(const rec: TRect): TPathD;
 begin
   setLength(Result, 4);
   with rec do
@@ -1750,7 +1779,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Rectangle(const rec: TRectD): TArrayOfPointD;
+function Rectangle(const rec: TRectD): TPathD;
 begin
   setLength(Result, 4);
   with rec do
@@ -1763,7 +1792,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Rectangle(l, t, r, b: double): TArrayOfPointD;
+function Rectangle(l, t, r, b: double): TPathD;
 begin
   setLength(Result, 4);
   result[0] := PointD(l, t);
@@ -1791,7 +1820,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RoundRect(const rec: TRect; radius: integer): TArrayOfPointD;
+function RoundRect(const rec: TRect; radius: integer): TPathD;
 var
   rec2: TRectD;
 begin
@@ -1803,7 +1832,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RoundRect(const rec: TRectD; radius: double): TArrayOfPointD;
+function RoundRect(const rec: TRectD; radius: double): TPathD;
 var
   rec2: TRectD;
 begin
@@ -1814,13 +1843,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Ellipse(const rec: TRect; steps: integer = 0): TArrayOfPointD;
+function Ellipse(const rec: TRect; steps: integer = 0): TPathD;
 begin
   Result := Ellipse(RectD(rec), steps);
 end;
 //------------------------------------------------------------------------------
 
-function Ellipse(const rec: TRectD; steps: integer): TArrayOfPointD;
+function Ellipse(const rec: TRectD; steps: integer): TPathD;
 var
   i: Integer;
   f: double;
@@ -1853,7 +1882,7 @@ end;
 //------------------------------------------------------------------------------
 
 function Star(const focalPt: TPointD;
-  innerRadius, outerRadius: double; points: integer): TArrayOfPointD;
+  innerRadius, outerRadius: double; points: integer): TPathD;
 var
   i: Integer;
   sinA, cosA: extended;
@@ -1881,7 +1910,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Arc(const rec: TRect; startAngle, endAngle: double): TArrayOfPointD;
+function Arc(const rec: TRect; startAngle, endAngle: double): TPathD;
 var
   i, steps: Integer;
   angle, radiusMax: double;
@@ -1917,7 +1946,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Pie(const rec: TRect; StartAngle, EndAngle: double): TArrayOfPointD;
+function Pie(const rec: TRect; StartAngle, EndAngle: double): TPathD;
 var
   len: integer;
 begin
@@ -1929,7 +1958,7 @@ end;
 //------------------------------------------------------------------------------
 
 function ArrowHead(const arrowTip, ctrlPt: TPointD; size: double;
-  arrowStyle: TArrowStyle): TArrayOfPointD;
+  arrowStyle: TArrowStyle): TPathD;
 var
   unitVec, basePt: TPointD;
   sDiv40, sDiv50, sDiv60, sDiv120: double;
@@ -1999,8 +2028,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ShortenPath(const path: TArrayOfPointD;
-  pathEnd: TPathEnd; amount: double): TArrayOfPointD;
+function ShortenPath(const path: TPathD;
+  pathEnd: TPathEnd; amount: double): TPathD;
 var
   len, amount2: double;
   vec: TPointD;
@@ -2071,7 +2100,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure RDP(const path: TArrayOfPointD; startIdx, endIdx: integer;
+procedure RDP(const path: TPathD; startIdx, endIdx: integer;
   epsilonSqrd: double; const flags: TArrayOfInteger);
 var
   i, idx: integer;
@@ -2094,8 +2123,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RamerDouglasPeucker(const path: TArrayOfPointD;
-  epsilon: double): TArrayOfPointD;
+function RamerDouglasPeucker(const path: TPathD;
+  epsilon: double): TPathD;
 var
   i,j, len: integer;
   buffer: TArrayOfInteger;
@@ -2123,8 +2152,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RamerDouglasPeucker(const paths: TArrayOfArrayOfPointD;
-  epsilon: double): TArrayOfArrayOfPointD;
+function RamerDouglasPeucker(const paths: TPathsD;
+  epsilon: double): TPathsD;
 var
   i,j, len: integer;
 begin
@@ -2140,12 +2169,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetDashedPath(const path: TArrayOfPointD;
+function GetDashedPath(const path: TPathD;
   closed: Boolean; const pattern: TArrayOfInteger;
-  patternOffset: PDouble): TArrayOfArrayOfPointD;
+  patternOffset: PDouble): TPathsD;
 var
   i, highI, paIdx: integer;
-  vecs, path2, dash: TArrayOfPointD;
+  vecs, path2, dash: TPathD;
   patCnt, patLen: integer;
   dashCapacity, dashCnt, ptsCapacity, ptsCnt: integer;
   segLen, residualPat, patOff: double;
@@ -2262,13 +2291,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetDashedOutLine(const path: TArrayOfPointD;
+function GetDashedOutLine(const path: TPathD;
   closed: Boolean; const pattern: TArrayOfInteger;
   patternOffset: PDouble; lineWidth: double;
-  joinStyle: TJoinStyle; endStyle: TEndStyle): TArrayOfArrayOfPointD;
+  joinStyle: TJoinStyle; endStyle: TEndStyle): TPathsD;
 var
   i: integer;
-  tmp: TArrayOfArrayOfPointD;
+  tmp: TPathsD;
 begin
   Result := nil;
   tmp := GetDashedPath(path, closed, pattern, patternOffset);
@@ -2278,7 +2307,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetBoundsD(const paths: TArrayOfArrayOfPointD): TRectD;
+function GetBoundsD(const paths: TPathsD): TRectD;
 var
   i,j: integer;
   l,t,r,b: double;
@@ -2305,7 +2334,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetBoundsD(const path: TArrayOfPointD): TRectD;
+function GetBoundsD(const path: TPathD): TRectD;
 var
   i,highI: integer;
   l,t,r,b: double;
@@ -2332,7 +2361,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetBounds(const path: TArrayOfPointD): TRect;
+function GetBounds(const path: TPathD): TRect;
 var
   recD: TRectD;
 begin
@@ -2341,7 +2370,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetBounds(const paths: TArrayOfArrayOfPointD): TRect;
+function GetBounds(const paths: TPathsD): TRect;
 var
   recD: TRectD;
 begin
@@ -2350,7 +2379,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenQBezier(const pts: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD;
+function FlattenQBezier(const pts: TPathsD): TPathsD;
 var
   i, len: integer;
 begin
@@ -2361,10 +2390,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenQBezier(const pts: TArrayOfPointD): TArrayOfPointD;
+function FlattenQBezier(const pts: TPathD): TPathD;
 var
   i, highI: integer;
-  p: TArrayOfPointD;
+  p: TPathD;
 begin
   Result := nil;
   highI := high(pts);
@@ -2389,7 +2418,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenQBezier(const pt1, pt2, pt3: TPointD): TArrayOfPointD;
+function FlattenQBezier(const pt1, pt2, pt3: TPointD): TPathD;
 var
   resultCnt, resultLen: integer;
 
@@ -2439,7 +2468,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenCBezier(const pts: TArrayOfArrayOfPointD): TArrayOfArrayOfPointD;
+function FlattenCBezier(const pts: TPathsD): TPathsD;
 var
   i, len: integer;
 begin
@@ -2450,10 +2479,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenCBezier(const pts: TArrayOfPointD): TArrayOfPointD;
+function FlattenCBezier(const pts: TPathD): TPathD;
 var
   i, len: integer;
-  p: TArrayOfPointD;
+  p: TPathD;
 begin
   Result := nil;
   len := Length(pts) -1;
@@ -2478,7 +2507,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD): TArrayOfPointD;
+function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD): TPathD;
 var
   resultCnt, resultLen: integer;
 
@@ -2545,7 +2574,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenCSpline(const pts: TArrayOfPointD): TArrayOfPointD;
+function FlattenCSpline(const pts: TPathD): TPathD;
 var
   resultCnt, resultLen: integer;
 
@@ -2617,7 +2646,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenQSpline(const pts: TArrayOfPointD): TArrayOfPointD;
+function FlattenQSpline(const pts: TPathD): TPathD;
 var
   resultCnt, resultLen: integer;
 
@@ -2677,7 +2706,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function MakePathI(const pts: array of integer): TArrayOfPointD; overload;
+function MakePathI(const pts: array of integer): TPathD; overload;
 var
   i,j, x,y, len: Integer;
 begin
@@ -2701,7 +2730,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function MakePathD(const pts: array of double): TArrayOfPointD;
+function MakePathD(const pts: array of double): TPathD;
 var
   i, j, len: Integer;
   x,y: double;
@@ -2742,7 +2771,7 @@ type
   TFitCurveContainer = class
   private
     ppts      : PPt;
-    solution  : TArrayOfPointD;
+    solution  : TPathD;
     tolSqrd   : double;
     function Count(first, last: PPt): integer;
     function AddPt(const pt: TPointD): PPt;
@@ -2753,20 +2782,20 @@ type
     function ChordLengthParameterize(
       first, last: PPt; count: integer): TArrayOfDouble;
     function GenerateBezier(first, last: PPt; count: integer;
-      const u: TArrayOfDouble; const firstTan, lastTan: TPointD): TArrayOfPointD;
+      const u: TArrayOfDouble; const firstTan, lastTan: TPointD): TPathD;
     function Reparameterize(first, last: PPt; count: integer;
-      const u: TArrayOfDouble; const bezier: TArrayOfPointD): TArrayOfDouble;
-    function NewtonRaphsonRootFind(const q: TArrayOfPointD;
+      const u: TArrayOfDouble; const bezier: TPathD): TArrayOfDouble;
+    function NewtonRaphsonRootFind(const q: TPathD;
       const pt: TPointD; u: double): double;
     function ComputeMaxErrorSqrd(first, last: PPt;
-      const bezier: TArrayOfPointD; const u: TArrayOfDouble;
+      const bezier: TPathD; const u: TArrayOfDouble;
       out SplitPoint: PPt): double;
     function FitCubic(first, last: PPt;
       firstTan, lastTan: TPointD): Boolean;
-    procedure AppendSolution(const bezier: TArrayOfPointD);
+    procedure AppendSolution(const bezier: TPathD);
   public
-    function FitCurve(const path: TArrayOfPointD; closed: Boolean;
-      tolerance: double; minSegLength: double): TArrayOfPointD;
+    function FitCurve(const path: TPathD; closed: Boolean;
+      tolerance: double; minSegLength: double): TPathD;
   end;
 
 //------------------------------------------------------------------------------
@@ -2966,13 +2995,13 @@ end;
 //------------------------------------------------------------------------------
 
 function TFitCurveContainer.GenerateBezier(first, last: PPt; count: integer;
-  const u: TArrayOfDouble; const firstTan, lastTan: TPointD): TArrayOfPointD;
+  const u: TArrayOfDouble; const firstTan, lastTan: TPointD): TPathD;
 var
   i: integer;
   p: PPt;
   dist, epsilon: double;
   v1,v2, tmp: TPointD;
-  a0, a1: TArrayOfPointD;
+  a0, a1: TPathD;
   c: array [0..1, 0..1] of double;
   x: array [0..1] of double;
   det_c0_c1, det_c0_x, det_x_c1, alphaL, alphaR: double;
@@ -3045,7 +3074,7 @@ end;
 //------------------------------------------------------------------------------
 
 function TFitCurveContainer.Reparameterize(first, last: PPt; count: integer;
-  const u: TArrayOfDouble; const bezier: TArrayOfPointD): TArrayOfDouble;
+  const u: TArrayOfDouble; const bezier: TPathD): TArrayOfDouble;
 var
   i: integer;
 begin
@@ -3075,7 +3104,7 @@ end;
 //------------------------------------------------------------------------------
 
 function TFitCurveContainer.ComputeMaxErrorSqrd(first, last: PPt;
-	const bezier: TArrayOfPointD; const u: TArrayOfDouble;
+	const bezier: TPathD; const u: TArrayOfDouble;
   out SplitPoint: PPt): double;
 var
   i: integer;
@@ -3102,7 +3131,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFitCurveContainer.NewtonRaphsonRootFind(const q: TArrayOfPointD;
+function TFitCurveContainer.NewtonRaphsonRootFind(const q: TPathD;
   const pt: TPointD; u: double): double;
 var
   numerator, denominator: double;
@@ -3143,7 +3172,7 @@ var
   i, cnt: integer;
   splitPoint: PPt;
   centerTan: TPointD;
-  bezier: TArrayOfPointD;
+  bezier: TPathD;
   clps, uPrime: TArrayOfDouble;
   maxErrorSqrd: double;
 const
@@ -3258,8 +3287,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFitCurveContainer.FitCurve(const path: TArrayOfPointD;
-  closed: Boolean; tolerance: double; minSegLength: double): TArrayOfPointD;
+function TFitCurveContainer.FitCurve(const path: TPathD;
+  closed: Boolean; tolerance: double; minSegLength: double): TPathD;
 var
   i, highI: integer;
   d: double;
@@ -3328,7 +3357,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TFitCurveContainer.AppendSolution(const bezier: TArrayOfPointD);
+procedure TFitCurveContainer.AppendSolution(const bezier: TPathD);
 var
   i, len: integer;
 begin
@@ -3343,10 +3372,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SmoothToBezier(const path: TArrayOfPointD; closed: Boolean;
-  tolerance: double; minSegLength: double): TArrayOfPointD;
+function SmoothToBezier(const path: TPathD; closed: Boolean;
+  tolerance: double; minSegLength: double): TPathD;
 var
-  paths, solution: TArrayOfArrayOfPointD;
+  paths, solution: TPathsD;
 begin
   SetLength(paths, 1);
   paths[0] := path;
@@ -3356,8 +3385,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SmoothToBezier(const paths: TArrayOfArrayOfPointD; closed: Boolean;
-  tolerance: double; minSegLength: double): TArrayOfArrayOfPointD;
+function SmoothToBezier(const paths: TPathsD; closed: Boolean;
+  tolerance: double; minSegLength: double): TPathsD;
 var
   i,j, len: integer;
 begin

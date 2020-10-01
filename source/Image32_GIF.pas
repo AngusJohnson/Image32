@@ -2,8 +2,8 @@ unit Image32_GIF;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.47                                                            *
-* Date      :  28 August 2020                                                  *
+* Version   :  1.52                                                            *
+* Date      :  1 October 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  GIF file format extension for TImage32                          *
@@ -15,7 +15,7 @@ interface
 {$I Image32.inc}
 uses
   SysUtils, Classes, Windows, Math, Image32, Graphics,
-  {$IFDEF DELPHI_GIF} GifImg {$ELSE} GifImage{$ENDIF};
+  {$IFDEF DELPHI_GIF} GifImg {$ELSE} GifImage {$ENDIF};
 
 type
 

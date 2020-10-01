@@ -238,7 +238,7 @@ type
 
 function DPI(value: integer): integer;
 begin
-  result := Round(value * Screen.PixelsPerInch div 96);
+  result := MulDiv(value, Screen.PixelsPerInch, 96);
 end;
 //------------------------------------------------------------------------------
 

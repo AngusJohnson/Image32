@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.51                                                            *
-* Date      :  23 September 2020                                               *
+* Version   :  1.52                                                            *
+* Date      :  1 October 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -157,73 +157,82 @@ type
     radius: double; color: TColor32); overload;
   procedure DrawPoint(img: TImage32; const pt: TPointD;
     radius: double; renderer: TCustomRenderer); overload;
-  procedure DrawPoint(img: TImage32; const points: TArrayOfPointD;
+  procedure DrawPoint(img: TImage32; const points: TPathD;
     radius: double; color: TColor32); overload;
-  procedure DrawPoint(img: TImage32; const paths: TArrayOfArrayOfPointD;
+  procedure DrawPoint(img: TImage32; const paths: TPathsD;
     radius: double; color: TColor32); overload;
 
   procedure DrawLine(img: TImage32;
-    const line: TArrayOfPointD; lineWidth: double; color: TColor32;
+    const line: TPathD; lineWidth: double; color: TColor32;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
   procedure DrawLine(img: TImage32;
-    const line: TArrayOfPointD; lineWidth: double; renderer: TCustomRenderer;
+    const line: TPathD; lineWidth: double; renderer: TCustomRenderer;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
-  procedure DrawLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
+  procedure DrawLine(img: TImage32; const lines: TPathsD;
     lineWidth: double; color: TColor32;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
-  procedure DrawLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
+  procedure DrawLine(img: TImage32; const lines: TPathsD;
     lineWidth: double; renderer: TCustomRenderer;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
 
    procedure DrawInvertedLine(img: TImage32;
-     const line: TArrayOfPointD; lineWidth: double;
+     const line: TPathD; lineWidth: double;
      endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
    procedure DrawInvertedLine(img: TImage32;
-     const lines: TArrayOfArrayOfPointD; lineWidth: double;
+     const lines: TPathsD; lineWidth: double;
      endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
 
-  procedure DrawDashedLine(img: TImage32; const line: TArrayOfPointD;
+  procedure DrawDashedLine(img: TImage32; const line: TPathD;
     dashPattern: TArrayOfInteger; patternOffset: PDouble;
     lineWidth: double; color: TColor32;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
-  procedure DrawDashedLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
+  procedure DrawDashedLine(img: TImage32; const lines: TPathsD;
     dashPattern: TArrayOfInteger; patternOffset: PDouble;
     lineWidth: double; color: TColor32; endStyle: TEndStyle;
     joinStyle: TJoinStyle = jsAuto); overload;
-  procedure DrawDashedLine(img: TImage32; const line: TArrayOfPointD;
+  procedure DrawDashedLine(img: TImage32; const line: TPathD;
     dashPattern: TArrayOfInteger; patternOffset: PDouble;
     lineWidth: double; renderer: TCustomRenderer; endStyle: TEndStyle;
     joinStyle: TJoinStyle = jsAuto); overload;
-  procedure DrawDashedLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
+  procedure DrawDashedLine(img: TImage32; const lines: TPathsD;
     dashPattern: TArrayOfInteger; patternOffset: PDouble;
     lineWidth: double; renderer: TCustomRenderer;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
 
   procedure DrawInvertedDashedLine(img: TImage32;
-    const line: TArrayOfPointD; dashPattern: TArrayOfInteger;
+    const line: TPathD; dashPattern: TArrayOfInteger;
     patternOffset: PDouble; lineWidth: double; endStyle: TEndStyle;
     joinStyle: TJoinStyle = jsAuto); overload;
   procedure DrawInvertedDashedLine(img: TImage32;
-    const lines: TArrayOfArrayOfPointD; dashPattern: TArrayOfInteger;
+    const lines: TPathsD; dashPattern: TArrayOfInteger;
     patternOffset: PDouble; lineWidth: double;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
 
-  procedure DrawPolygon(img: TImage32; const polygon: TArrayOfPointD;
+  procedure DrawPolygon(img: TImage32; const polygon: TPathD;
     fillRule: TFillRule; color: TColor32); overload;
-  procedure DrawPolygon(img: TImage32; const polygon: TArrayOfPointD;
+  procedure DrawPolygon(img: TImage32; const polygon: TPathD;
     fillRule: TFillRule; renderer: TCustomRenderer); overload;
-  procedure DrawPolygon(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+  procedure DrawPolygon(img: TImage32; const polygons: TPathsD;
     fillRule: TFillRule; color: TColor32); overload;
-  procedure DrawPolygon(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+  procedure DrawPolygon(img: TImage32; const polygons: TPathsD;
     fillRule: TFillRule; renderer: TCustomRenderer); overload;
+
+  // 'Clear Type' text rendering is quite useful for low resolution
+  // displays (96 ppi). However it's of little to no benefit on higher
+  // resolution displays and becomes unnecessary overhead. See also:
+  // https://en.wikipedia.org/wiki/Subpixel_rendering
+  // https://www.grc.com/ctwhat.htm
+  // https://www.grc.com/cttech.htm
+  procedure DrawPolygon_ClearType(img: TImage32; const polygons: TPathsD;
+    fillRule: TFillRule; color: TColor32; backColor: TColor32 = clWhite32);
 
   ///////////////////////////////////////////////////////////////////////////
   // MISCELLANEOUS FUNCTIONS
   ///////////////////////////////////////////////////////////////////////////
 
-  procedure ErasePolygon(img: TImage32; const polygon: TArrayOfPointD;
+  procedure ErasePolygon(img: TImage32; const polygon: TPathD;
     fillRule: TFillRule); overload;
-  procedure ErasePolygon(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+  procedure ErasePolygon(img: TImage32; const polygons: TPathsD;
     fillRule: TFillRule); overload;
 
   //Both DrawBoolMask and DrawAlphaMask require
@@ -235,7 +244,7 @@ type
 
   procedure SetGamma(gamma: double);
 
-  procedure Rasterize(const paths: TArrayOfArrayOfPointD;
+  procedure Rasterize(const paths: TPathsD;
     const clipRec: TRect; fillRule: TFillRule; renderer: TCustomRenderer);
 
 implementation
@@ -268,26 +277,115 @@ type
   PScanline = ^TScanline;
   TArrayOfScanline = array of TScanline;
 
-  TDoubletArray = array[0 .. (Maxint div SizeOf(Double)) -1] of Double;
-  PDoubleArray = ^TDoubletArray;
-
 var
   gammaTable: TArray256Bytes;
 
 //------------------------------------------------------------------------------
-// Miscellaneous functions
+// ApplyClearType (see DrawPolygon_ClearType below)
 //------------------------------------------------------------------------------
 
-//__Round: a very efficient RoundTowardZero algorithm
-function __Round(val: double): integer; {$IFDEF INLINE} inline; {$ENDIF}
+type
+  PArgbs = ^TArgbs;
+  TArgbs = array [0.. (Maxint div SizeOf(TARGB)) -1] of TARGB;
+
+procedure ApplyClearType(img: TImage32;
+  textColor: TColor32 = clBlack32; bkColor: TColor32 = clWhite32);
+const
+  centerWeighting = 5; //0 <= centerWeighting <= 25
+var
+  h, w: integer;
+  src, dst: PARGB;
+  srcArr: PArgbs;
+  fgColor: TARGB absolute textColor;
+  bgColor: TARGB absolute bkColor;
+  diff_R, diff_G, diff_B: integer;
+  bg8_R, bg8_G, bg8_B: integer;
+  rowBuffer: TArrayOfARGB;
+  primeTbl, nearTbl, FarTbl: PByteArray;
+begin
+  // Precondition: the background to text drawn onto 'img' must be transparent
+
+  // multiplication tables (see Image32.pas)
+  // 85 + (2 * 57) + (2 * 28) == 255
+  primeTbl := @MulTable[85 + centerWeighting *2];
+  nearTbl  := @MulTable[57];
+  farTbl   := @MulTable[28 - centerWeighting];
+
+  SetLength(rowBuffer, img.Width+4);
+  FillChar(rowBuffer[0], Length(rowBuffer) *  SizeOf(TColor32), 0);
+
+  for h := 0 to img.Height -1 do
+  begin
+    dst := PARGB(@img.Pixels[h * img.Width]);
+    //each row of the image is copied into a temporary buffer ...
+    src := PARGB(@rowBuffer[2]);
+    Move(dst^, src^, img.Width * SizeOf(TColor32));
+    srcArr := PArgbs(rowBuffer);
+
+    //using this buffer update the image ...
+    w := 2;
+    while w < img.Width do
+    begin
+      dst.R := primeTbl[srcArr[w].A] +
+        nearTbl[srcArr[w-1].A] + farTbl[srcArr[w-2].A] +
+        nearTbl[srcArr[w+1].A] + farTbl[srcArr[w+2].A];
+      inc(w);
+      dst.G := primeTbl[srcArr[w].A] +
+        nearTbl[srcArr[w-1].A] + farTbl[srcArr[w-2].A] +
+        nearTbl[srcArr[w+1].A] + farTbl[srcArr[w+2].A];
+      inc(w);
+      dst.B := primeTbl[srcArr[w].A] +
+        nearTbl[srcArr[w-1].A] + farTbl[srcArr[w-2].A] +
+        nearTbl[srcArr[w+1].A] + farTbl[srcArr[w+2].A];
+      inc(w);
+      dst.A := 255;
+      inc(dst);
+    end;
+  end;
+
+  //The right 2/3 of the image can now be removed ...
+   img.Crop(Types.Rect(0,0, img.Width div 3, img.Height));
+
+  //currently text is white and the background is black
+  //so blend in the text and background colors ...
+  diff_R := fgColor.R - bgColor.R;
+  diff_G := fgColor.G - bgColor.G;
+  diff_B := fgColor.B - bgColor.B;
+  bg8_R := bgColor.R shl 8;
+  bg8_G := bgColor.G shl 8;
+  bg8_B := bgColor.B shl 8;
+  dst := PARGB(img.PixelBase);
+  for h := 0 to img.Width * img.Height -1 do
+  begin
+    if dst.R > 0 then
+    begin
+      //blend font and background colors ...
+      dst.R := (bg8_R + diff_R * dst.R) shr 8;
+      dst.G := (bg8_G + diff_G * dst.G) shr 8;
+      dst.B := (bg8_B + diff_B * dst.B) shr 8;
+    end
+    else dst.Color := 0;
+    inc(dst);
+  end;
+end;
+
+//------------------------------------------------------------------------------
+// Other miscellaneous functions
+//------------------------------------------------------------------------------
+
+
+//__Trunc: A very efficient Trunc() algorithm (ie rounds toward zero)
+function __Trunc(val: double): integer; {$IFDEF INLINE} inline; {$ENDIF}
 var
   exp: integer;
-  i64: UInt64 absolute val;
+  i64: UInt64 absolute val; //nb: this cast circumvents potential endian issues
 begin
   //https://en.wikipedia.org/wiki/Double-precision_floating-point_format
   if i64 <> 0 then
   begin
-    exp := ((i64 shr 52) and $7FF) - 1023;
+    exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;
+    //if exp = 1024 then //INF & NAN values
+    //  Result := MaxInt else
     if exp >= 0 then
     begin
       Result := ((i64 and $1FFFFFFFFFFFFF) shr (52-exp)) or (1 shl exp);
@@ -517,7 +615,7 @@ end;
 // Rasterize() support functions
 //------------------------------------------------------------------------------
 
-procedure AllocateScanlines(const polygons: TArrayOfArrayOfPointD;
+procedure AllocateScanlines(const polygons: TPathsD;
   var scanlines: TArrayOfScanline; clipBottom, clipRight: integer);
 var
   i,j, highI, highJ: integer;
@@ -529,10 +627,10 @@ begin
   begin
     highJ := high(polygons[i]);
     if highJ < 2 then continue;
-    y1 := __Round(polygons[i][highJ].Y);
+    y1 := __Trunc(polygons[i][highJ].Y);
     for j := 0 to highJ do
     begin
-      y2 := __Round(polygons[i][j].Y);
+      y2 := __Trunc(polygons[i][j].Y);
       if y1 < y2 then
       begin
         //descending
@@ -620,7 +718,7 @@ begin
     //but still update maxX for each scanline the edge passes
     if bot.X > maxX then
     begin
-      for i := Min(maxY, __Round(bot.Y)) downto Max(0, __Round(top.Y)) do
+      for i := Min(maxY, __Trunc(bot.Y)) downto Max(0, __Trunc(top.Y)) do
         scanlines[i].maxX := maxX;
       Exit;
     end;
@@ -638,13 +736,13 @@ begin
   begin
     if top.X >= maxX then
     begin
-      for i := Min(maxY, __Round(bot.Y)) downto Max(0, __Round(top.Y)) do
+      for i := Min(maxY, __Trunc(bot.Y)) downto Max(0, __Trunc(top.Y)) do
         scanlines[i].maxX := maxX;
       Exit;
     end;
     //here the edge must be oriented bottom-right to top-left
     y := bot.Y - (bot.X - maxX) * Abs(dydx);
-    for i := Min(maxY, __Round(bot.Y)) downto Max(0, __Round(y)) do
+    for i := Min(maxY, __Trunc(bot.Y)) downto Max(0, __Trunc(y)) do
       scanlines[i].maxX := maxX;
     bot.Y := y;
     if bot.Y <= 0 then Exit;
@@ -654,7 +752,7 @@ begin
   begin
     //here the edge must be oriented bottom-left to top-right
     y := top.Y + (top.X - maxX) * Abs(dydx);
-    for i := Min(maxY, __Round(y)) downto Max(0, __Round(top.Y)) do
+    for i := Min(maxY, __Trunc(y)) downto Max(0, __Trunc(top.Y)) do
       scanlines[i].maxX := maxX;
     top.Y := y;
     if top.Y >= maxY then Exit;
@@ -674,7 +772,7 @@ begin
   end;
 
   //SPLIT THE EDGE INTO MULTIPLE SCANLINE FRAGMENTS
-  scanlineY := __Round(bot.Y);
+  scanlineY := __Trunc(bot.Y);
   if bot.Y = scanlineY then dec(scanlineY);
   //at the lower-most extent of the edge 'split' the first fragment
   if scanlineY < 0 then Exit;
@@ -730,7 +828,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure InitializeScanlines(var polygons: TArrayOfArrayOfPointD;
+procedure InitializeScanlines(var polygons: TPathsD;
   const scanlines: TArrayOfScanline; const clipRec: TRect);
 var
   i,j, highJ: integer;
@@ -772,8 +870,8 @@ begin
       frag.topX  := q;
     end;
 
-    leftXi := Max(0, __Round(frag.botX));
-    rightXi := Max(0, __Round(frag.topX));
+    leftXi := Max(0, __Trunc(frag.botX));
+    rightXi := Max(0, __Trunc(frag.topX));
 
     //winding direction is stored as the sign of dydx.
     if frag.dydx < 0 then windDir := -1 else windDir := 1;
@@ -830,12 +928,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Rasterize(const paths: TArrayOfArrayOfPointD;
+procedure Rasterize(const paths: TPathsD;
   const clipRec: TRect; fillRule: TFillRule; renderer: TCustomRenderer);
 var
   i,j, xli, xri, maxW, maxH, aa: integer;
   clipRec2: TRect;
-  paths2: TArrayOfArrayOfPointD;
+  paths2: TPathsD;
   accum: double;
   windingAccum: TArrayOfDouble;
   byteBuffer: TArrayOfByte;
@@ -879,23 +977,23 @@ begin
       case fillRule of
         frEvenOdd:
           begin
-            aa := __Round(Abs(accum) * 255) and $1FF;
+            aa := __Trunc(Abs(accum) * 255) and $1FF;
             if aa >= $100 then aa := aa xor $1ff;
             byteBuffer[j] := aa;
           end;
         frNonZero:
           begin
-            byteBuffer[j] := Min($FF, __Round(Abs(accum) * 255));
+            byteBuffer[j] := Min($FF, __Trunc(Abs(accum) * 255));
           end;
         frPositive:
           begin
             if accum > 0.002 then
-              byteBuffer[j] := Min($FF, __Round(accum * 255));
+              byteBuffer[j] := Min($FF, __Trunc(accum * 255));
           end;
         frNegative:
           begin
             if accum < -0.002 then
-              byteBuffer[j] := Min($FF, __Round(-accum * 255));
+              byteBuffer[j] := Min($FF, __Trunc(-accum * 255));
           end;
       end;
     end;
@@ -1431,7 +1529,7 @@ end;
 procedure DrawPoint(img: TImage32;
   const pt: TPointD; radius: double; color: TColor32);
 var
-  path: TArrayOfPointD;
+  path: TPathD;
 begin
   if radius <= 1 then
     path := Rectangle(pt.X-radius, pt.Y-radius, pt.X+radius, pt.Y+radius) else
@@ -1443,14 +1541,14 @@ end;
 procedure DrawPoint(img: TImage32; const pt: TPointD;
   radius: double; renderer: TCustomRenderer);
 var
-  path: TArrayOfPointD;
+  path: TPathD;
 begin
   path := Ellipse(RectD(pt.X -radius, pt.Y -radius, pt.X +radius, pt.Y +radius));
   DrawPolygon(img, path, frEvenOdd, renderer);
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawPoint(img: TImage32; const points: TArrayOfPointD;
+procedure DrawPoint(img: TImage32; const points: TPathD;
   radius: double; color: TColor32);
 var
   i: integer;
@@ -1460,7 +1558,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawPoint(img: TImage32; const paths: TArrayOfArrayOfPointD;
+procedure DrawPoint(img: TImage32; const paths: TPathsD;
   radius: double; color: TColor32);
 var
   i: integer;
@@ -1470,10 +1568,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawLine(img: TImage32; const line: TArrayOfPointD; lineWidth: double;
+procedure DrawLine(img: TImage32; const line: TPathD; lineWidth: double;
   color: TColor32; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
-  lines: TArrayOfArrayOfPointD;
+  lines: TPathsD;
 begin
   setLength(lines, 1);
   lines[0] := line;
@@ -1481,10 +1579,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawLine(img: TImage32; const line: TArrayOfPointD; lineWidth: double;
+procedure DrawLine(img: TImage32; const line: TPathD; lineWidth: double;
   renderer: TCustomRenderer; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
-  lines: TArrayOfArrayOfPointD;
+  lines: TPathsD;
 begin
   setLength(lines, 1);
   lines[0] := line;
@@ -1493,10 +1591,10 @@ end;
 //------------------------------------------------------------------------------
 
 procedure DrawInvertedLine(img: TImage32;
-  const line: TArrayOfPointD; lineWidth: double;
+  const line: TPathD; lineWidth: double;
   endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto);
 var
-  lines: TArrayOfArrayOfPointD;
+  lines: TPathsD;
 begin
   setLength(lines, 1);
   lines[0] := line;
@@ -1504,11 +1602,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
+procedure DrawLine(img: TImage32; const lines: TPathsD;
   lineWidth: double; color: TColor32;
   endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
-  lines2: TArrayOfArrayOfPointD;
+  lines2: TPathsD;
   cr: TColorRenderer;
 begin
   if not assigned(lines) then exit;
@@ -1524,11 +1622,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
+procedure DrawLine(img: TImage32; const lines: TPathsD;
   lineWidth: double; renderer: TCustomRenderer;
   endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
-  lines2: TArrayOfArrayOfPointD;
+  lines2: TPathsD;
 begin
   if (not assigned(lines)) or (not assigned(renderer)) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
@@ -1539,10 +1637,10 @@ end;
 //------------------------------------------------------------------------------
 
 procedure DrawInvertedLine(img: TImage32;
-  const lines: TArrayOfArrayOfPointD; lineWidth: double;
+  const lines: TPathsD; lineWidth: double;
   endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto);
 var
-  lines2: TArrayOfArrayOfPointD;
+  lines2: TPathsD;
   ir: TInverseRenderer;
 begin
   if not assigned(lines) then exit;
@@ -1558,11 +1656,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawDashedLine(img: TImage32; const line: TArrayOfPointD;
+procedure DrawDashedLine(img: TImage32; const line: TPathD;
   dashPattern: TArrayOfInteger; patternOffset: PDouble; lineWidth: double;
   color: TColor32; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
-  lines: TArrayOfArrayOfPointD;
+  lines: TPathsD;
   cr: TColorRenderer;
 begin
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
@@ -1580,7 +1678,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawDashedLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
+procedure DrawDashedLine(img: TImage32; const lines: TPathsD;
   dashPattern: TArrayOfInteger; patternOffset: PDouble; lineWidth: double;
   color: TColor32; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
@@ -1593,11 +1691,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawDashedLine(img: TImage32; const line: TArrayOfPointD;
+procedure DrawDashedLine(img: TImage32; const line: TPathD;
   dashPattern: TArrayOfInteger; patternOffset: PDouble; lineWidth: double;
   renderer: TCustomRenderer; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
-  lines: TArrayOfArrayOfPointD;
+  lines: TPathsD;
 begin
   if (not assigned(line)) or (not assigned(renderer)) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
@@ -1609,7 +1707,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawDashedLine(img: TImage32; const lines: TArrayOfArrayOfPointD;
+procedure DrawDashedLine(img: TImage32; const lines: TPathsD;
   dashPattern: TArrayOfInteger; patternOffset: PDouble; lineWidth: double;
   renderer: TCustomRenderer; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
@@ -1623,11 +1721,11 @@ end;
 //------------------------------------------------------------------------------
 
 procedure DrawInvertedDashedLine(img: TImage32;
-  const line: TArrayOfPointD; dashPattern: TArrayOfInteger;
+  const line: TPathD; dashPattern: TArrayOfInteger;
   patternOffset: PDouble; lineWidth: double; endStyle: TEndStyle;
   joinStyle: TJoinStyle = jsAuto);
 var
-  lines: TArrayOfArrayOfPointD;
+  lines: TPathsD;
   renderer: TInverseRenderer;
 begin
   if not assigned(line) then exit;
@@ -1646,7 +1744,7 @@ end;
 //------------------------------------------------------------------------------
 
 procedure DrawInvertedDashedLine(img: TImage32;
-  const lines: TArrayOfArrayOfPointD; dashPattern: TArrayOfInteger;
+  const lines: TPathsD; dashPattern: TArrayOfInteger;
   patternOffset: PDouble; lineWidth: double;
   endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto);
 var
@@ -1659,10 +1757,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawPolygon(img: TImage32; const polygon: TArrayOfPointD;
+procedure DrawPolygon(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; color: TColor32);
 var
-  polygons: TArrayOfArrayOfPointD;
+  polygons: TPathsD;
 begin
   if not assigned(polygon) then exit;
   setLength(polygons, 1);
@@ -1671,10 +1769,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawPolygon(img: TImage32; const polygon: TArrayOfPointD;
+procedure DrawPolygon(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; renderer: TCustomRenderer);
 var
-  polygons: TArrayOfArrayOfPointD;
+  polygons: TPathsD;
 begin
   if (not assigned(polygon)) or (not assigned(renderer)) then exit;
   setLength(polygons, 1);
@@ -1684,7 +1782,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawPolygon(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+procedure DrawPolygon(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; color: TColor32);
 var
   cr: TColorRenderer;
@@ -1700,7 +1798,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawPolygon(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+procedure DrawPolygon(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; renderer: TCustomRenderer);
 begin
   if (not assigned(polygons)) or (not assigned(renderer)) then exit;
@@ -1709,10 +1807,40 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure ErasePolygon(img: TImage32; const polygon: TArrayOfPointD;
+procedure DrawPolygon_ClearType(img: TImage32; const polygons: TPathsD;
+  fillRule: TFillRule; color: TColor32; backColor: TColor32);
+var
+  tmpImg: TImage32;
+  rec: TRect;
+  tmpPolygons: TPathsD;
+  cr: TColorRenderer;
+begin
+  if not assigned(polygons) then exit;
+
+  rec := GetBounds(polygons);
+  tmpImg := TImage32.Create(RectWidth(rec) *3, RectHeight(rec));
+  try
+    tmpPolygons := OffsetPath(polygons, -rec.Left, -rec.Top);
+    tmpPolygons := ScalePath(tmpPolygons, 3, 1);
+    cr := TColorRenderer.Create(clBlack32);
+    try
+      if cr.Initialize(tmpImg) then
+        Rasterize(tmpPolygons, tmpImg.bounds, fillRule, cr);
+    finally
+      cr.Free;
+    end;
+    ApplyClearType(tmpImg, color, backColor);
+    img.CopyBlend(tmpImg, tmpImg.Bounds, rec, BlendToAlpha);
+  finally
+    tmpImg.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure ErasePolygon(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule);
 var
-  polygons: TArrayOfArrayOfPointD;
+  polygons: TPathsD;
 begin
   if not assigned(polygon) then exit;
   setLength(polygons, 1);
@@ -1721,7 +1849,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure ErasePolygon(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+procedure ErasePolygon(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule);
 var
   er: TEraseRenderer;

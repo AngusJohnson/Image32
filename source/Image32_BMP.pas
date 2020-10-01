@@ -2,8 +2,8 @@ unit Image32_BMP;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.48                                                            *
-* Date      :  29 August 2020                                                  *
+* Version   :  1.52                                                            *
+* Date      :  1 October 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  BMP file format extension for TImage32                          *
@@ -26,7 +26,8 @@ type
 
   TImageFormat_BMP = class(TImageFormat)
   private
-    useClipboardFormat: Boolean;
+    fUseClipboardFormat: Boolean;
+    fIncludeFileHeaderInSaveStream: Boolean;
   public
     function LoadFromStream(stream: TStream; img32: TImage32): Boolean; override;
     function SaveToFile(const filename: string; img32: TImage32): Boolean; override;
@@ -35,6 +36,8 @@ type
     class function CopyToClipboard(img32: TImage32): Boolean; override;
     class function CanPasteFromClipboard: Boolean; override;
     class function PasteFromClipboard(img32: TImage32): Boolean; override;
+    property IncludeFileHeaderInSaveStream: Boolean read
+      fIncludeFileHeaderInSaveStream write fIncludeFileHeaderInSaveStream;
   end;
 
   function LoadFromHBITMAP(img32: TImage32; bm: HBITMAP; pal: HPALETTE = 0): Boolean;
@@ -446,7 +449,7 @@ end;
 // Saving (writing) BMP images to file ...
 //------------------------------------------------------------------------------
 
-function GetFileHeader(stream: TStream;
+function GetFileHeaderFromInfoHeader(stream: TStream;
   BitmapInfoHeaderOffset: integer): TBitmapFileHeader;
 var
   bih: TBitmapInfoHeader;
@@ -632,8 +635,9 @@ end;
 
 procedure TImageFormat_BMP.SaveToStream(stream: TStream; img32: TImage32);
 var
+  bfh: TBitmapFileHeader;
   bih: TBitmapV4Header;
-  palCnt, BitCount, rowSize: integer;
+  palCnt, BitCount, rowSize, infoHeaderOffset: integer;
   UsesAlpha: Boolean;
   pals: TArrayOfColor32;
   tmp: TImage32;
@@ -642,11 +646,11 @@ begin
   //write everything except a BMP file header because some streams
   //(eg resource streams) don't need a file header
 
-  if useClipboardFormat then
+  if fUseClipboardFormat then
     UsesAlpha := false else
     UsesAlpha := img32.HasTransparency;
 
-  if useClipboardFormat or UsesAlpha then
+  if fUseClipboardFormat or UsesAlpha then
   begin
     BitCount := 32;
     palCnt := 0;
@@ -659,6 +663,14 @@ begin
     else if palCnt > 2 then BitCount := 4
     else BitCount := 1;
   end;
+
+  if fIncludeFileHeaderInSaveStream then
+  begin
+    //Write empty BitmapFileHeader ...
+    FillChar(bfh, sizeof(bfh), #0);
+    stream.Write(bfh, sizeOf(bfh));
+  end;
+  infoHeaderOffset := stream.Position;
 
   FillChar(bih, sizeof(bih), #0);
   rowSize := GetRowSize(BitCount, img32.Width);
@@ -711,31 +723,35 @@ begin
   finally
     tmp.Free;
   end;
+
+  if fIncludeFileHeaderInSaveStream then
+  begin
+    //finally update BitmapFileHeader ...
+    bfh := GetFileHeaderFromInfoHeader(stream, infoHeaderOffset);
+    stream.Position := infoHeaderOffset - sizeOf(bfh);
+    stream.Write(bfh, sizeOf(bfh));
+  end;
+
 end;
 //------------------------------------------------------------------------------
 
 function TImageFormat_BMP.SaveToFile(const filename: string;
   img32: TImage32): Boolean;
 var
+  SaveStateIncludeFileHeader: Boolean;
   stream: TFilestream;
-  bfh: TBitmapFileHeader;
 begin
   result := not img32.IsEmpty;
   if not result then Exit;
+  SaveStateIncludeFileHeader := fIncludeFileHeaderInSaveStream;
   stream := TFileStream.Create(filename, fmCreate);
   try
-    //Write an incomplete BitmapFileHeader ...
-    FillChar(bfh, sizeof(bfh), #0);
-    stream.Write(bfh, sizeOf(bfh));
-    //Write main body of the BMP file ...
-    useClipboardFormat := false;
+    fIncludeFileHeaderInSaveStream := true;
+    fUseClipboardFormat := false;
     SaveToStream(stream, img32);
-    //update BitmapFileHeader ...
-    bfh := GetFileHeader(stream, sizeof(bfh));
-    stream.Position := 0;
-    stream.Write(bfh, sizeOf(bfh));
   finally
     stream.Free;
+    fIncludeFileHeaderInSaveStream := SaveStateIncludeFileHeader;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -751,7 +767,6 @@ var
   dataHdl: THandle;
   dataPtr: pointer;
   ms: TMemoryStream;
-  clipboardNeedsClosing: Boolean;
 begin
   result := OpenClipboard(0);
   if not Result then Exit;
@@ -759,7 +774,7 @@ begin
   try
     with TImageFormat_BMP.Create do
     try
-      useClipboardFormat := true;
+      fUseClipboardFormat := true;
       SaveToStream(ms, img32);
     finally
       free;

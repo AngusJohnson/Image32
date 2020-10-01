@@ -2,8 +2,8 @@ unit Image32_Text;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.47                                                            *
-* Date      :  28 August 2020                                                  *
+* Version   :  1.52                                                            *
+* Date      :  1 October 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Module to support text in the Image32 library                   *
@@ -15,17 +15,27 @@ interface
 {$I Image32.inc}
 
 uses
-  Windows, Types, SysUtils, Classes, Math, Image32, Image32_Draw;
+  Windows, Types, SysUtils, Classes, Math,
+{$IFDEF XPLAT_GENERICS}
+  Generics.Collections, Generics.Defaults,
+{$ENDIF}
+  Image32, Image32_Draw;
 
 const
   DEFAULT = -1;
 type
+
+{$IFNDEF UNICODE}
+  UnicodeString = WideString;
+{$ENDIF}
+
   //TGlyphInfo: Object that's used internally be TFontInfo
   //Note - glyph outlines always use the NON-ZERO fill rule
   //https://docs.microsoft.com/en-us/typography/opentype/spec/glyf
   TGlyphInfo = class
+    wc: WideChar;
     gm: TGlyphMetrics;
-    paths: TArrayOfArrayOfPointD;
+    paths: TPathsD;
     bounds: TRectD;
   end;
 
@@ -37,25 +47,32 @@ type
     fAccessTime: TDatetime;
     fHandle  : HFont;
     fLogFont : TLogFont;
-    fGlyphs  : TStringList;
+    fSorted  : Boolean;
+    {$IFDEF XPLAT_GENERICS}
+    fGlyphs  : TList<TGlyphInfo>;
+    {$ELSE}
+    fGlyphs  : TList;
+    {$ENDIF}
+    procedure Sort;
     function GetUnderLined: Boolean;
     procedure SetUnderlined(value: Boolean);
     function GetStrikeThrough: Boolean;
     procedure SetStrikeThrough(value: Boolean);
     function GetFontName: string;
-    function GetGlyphInfo(c: Char): TGlyphInfo;
-    function CreateGlyph(c: Char; memDc: HDC): TGlyphInfo;
+    function GetGlyphInfo(wc: WideChar): TGlyphInfo;
+    //CreateGlyph: note that Windows.GetGlyphOutline() only works for
+    //UCS-2 chars. UCS-4 characters are managed by the OS using font mapping
+    procedure AddGlyph(wc: WideChar; memDc: HDC);
+    function GetMissingChars(const s: UnicodeString): UnicodeString;
+    procedure FillMissingChars(const ws: UnicodeString);
   public
     constructor Create(const logfont: TLogfont; InitAnsi: boolean = true);
     destructor Destroy; override;
-    //FillMissingChars: note that Windows.GetGlyphOutline() only works for
-    //UCS-2 chars. UCS-4 characters are managed by the OS using font mapping
-    procedure FillMissingChars(const s: string);
-    function MeasureText(const text: string): TPointD;
+    function MeasureText(const text: UnicodeString): TPointD;
     property LogFont: TLogFont read fLogFont;
     property Handle: HFont read fHandle;
     property Fontname: string read GetFontName;
-    property GlyphInfo[c: Char]: TGlyphInfo read GetGlyphInfo;
+    property GlyphInfo[wc: WideChar]: TGlyphInfo read GetGlyphInfo;
     property LastAccessed: TDatetime read fAccessTime write fAccessTime;
     property UnderLined: Boolean read GetUnderLined write SetUnderLined;
     property StrikeThrough: Boolean read GetStrikeThrough write SetStrikeThrough;
@@ -109,36 +126,37 @@ type
   TTextAlign = (taLeft, taRight, taCenter, taJustify);
   TTextVAlign = (tvaTop, tvaMiddle, tvaBottom);
 
-  function GetTextOutline(x, y: double; const text: string;
+  function GetTextOutline(x, y: double; const text: UnicodeString;
     fontInfo: TFontInfo; textAlign: TTextAlign; out textEndPos: TPointD;
-    justifySpc: double = 0): TArrayOfArrayOfPointD;
+    justifySpc: double = 0): TPathsD;
 
-  function DrawText(image: TImage32; x,y: double; const text: string;
+  function DrawText(image: TImage32; x,y: double; const text: UnicodeString;
     fontInfo: TFontInfo = nil; textAlign: TTextAlign = taLeft;
     textColor: TColor32 = clBlack32; justifySpc: double = 0): TPointD; overload;
 
-  function DrawText(image: TImage32; x,y: double; const text: string;
+  function DrawText(image: TImage32; x,y: double; const text: UnicodeString;
     fontInfo: TFontInfo; textAlign: TTextAlign; renderer: TCustomRenderer;
     justifySpc: double = 0): TPointD; overload;
 
-  function DrawText_LCD(image: TImage32; x,y: double; const text: string;
-    fontInfo: TFontInfo = nil; textAlign: TTextAlign = taLeft; textColor:
-    TColor32 = clBlack32; opaqueBkColor: TColor32 = clNone32;
+  function DrawText_ClearType(image: TImage32; x,y: double;
+    const text: UnicodeString; fontInfo: TFontInfo = nil;
+    textAlign: TTextAlign = taLeft; textColor:
+    TColor32 = clBlack32; opaqueBkColor: TColor32 = clWhite32;
     justifySpc: double = 0): TPointD;
 
   function GetTextAlongPathOutine(image: TImage32;
-    const text: string; const path: TArrayOfPointD; fontInfo: TFontInfo;
+    const text: UnicodeString; const path: TPathD; fontInfo: TFontInfo;
     textAlign: TTextAlign; vertOffset: integer = 0;
-    charSpacing: double = 0): TArrayOfArrayOfPointD;
+    charSpacing: double = 0): TPathsD;
 
   function DrawWrappedText(image: TImage32; const rec: TRect;
-    const text: string; fontInfo: TFontInfo;
+    const text: UnicodeString; fontInfo: TFontInfo;
     textAlign: TTextAlign = taJustify; textAlignV: TTextVAlign = tvaTop;
     textColor: TColor32 = clBlack32;
     lineSpacing: double = DEFAULT; paraSpacing: double = DEFAULT): TPointD;
 
   function DrawWrappedText_LCD(image: TImage32; const rec: TRect;
-    const text: string; fontInfo: TFontInfo;
+    const text: UnicodeString; fontInfo: TFontInfo;
     textAlign: TTextAlign = taJustify; textAlignV: TTextVAlign = tvaTop;
     textColor: TColor32 = clBlack32;
     lineSpacing: double = DEFAULT; paraSpacing: double = DEFAULT): TPointD;
@@ -147,17 +165,17 @@ type
   //MeasureText also returns via 'charOffsets' the offset for the start
   //of each character PLUS the offset of the next anticipated character.<br>
   //Hence Length(charPos) = Length(text) +1;
-  procedure MeasureText(const text: string;
+  procedure MeasureText(const text: UnicodeString;
     fontInfo: TFontInfo; out bounds: TRectD); overload;
-  procedure MeasureText(const text: string; fontInfo: TFontInfo;
-    out bounds: TRectD; out charOffsets: TArrayOfPointD); overload;
+  procedure MeasureText(const text: UnicodeString; fontInfo: TFontInfo;
+    out bounds: TRectD; out charOffsets: TPathD); overload;
 
   //GetFontSize: Returns the font's 'point size' (DPI independant)
   function GetFontSize(logFont: TLogFont): integer;
   //GetFontHeight: Returns the font's height in (positive) 'logical units'
   function GetFontHeight(logFont: TLogFont): integer;
   //CheckFontHeight: Converts logFont.lfHeight from 'point size' into
-  //'logical units' (ie when logFont.lfHeight > 0).
+  //'logical units' (ie returned logFont.lfHeight will always be negative).
   procedure CheckFontHeight(var logFont: TLogFont);
   //GetLogFontFromHFont: Returns a LogFont matching the supplied font handle.
   function GetLogFontFromHFont(font: HFont): TLogFont;
@@ -195,23 +213,29 @@ const
 //------------------------------------------------------------------------------
 
 function GetFontSize(logFont: TLogFont): integer;
+const
+  _72Div96 = 72/96;
 begin
   if logFont.lfHeight > 0 then result := logFont.lfHeight
-  else result := MulDiv(-logFont.lfHeight, 72, ScreenPixelsY);
+  else result := Round(DpiAware(-logFont.lfHeight * _72Div96));
 end;
 //------------------------------------------------------------------------------
 
 function GetFontHeight(logFont: TLogFont): integer;
+const
+  _96Div72 = 96/72;
 begin
   if logFont.lfHeight < 0 then result := -logFont.lfHeight
-  else result := MulDiv(logFont.lfHeight, ScreenPixelsY, 72);
+  else result := Round(DpiAware(logFont.lfHeight * _96Div72));
 end;
 //------------------------------------------------------------------------------
 
 procedure CheckFontHeight(var logFont: TLogFont);
+const
+  _96Div72 = 96/72;
 begin
   if logFont.lfHeight > 0 then
-  logFont.lfHeight := -MulDiv(logFont.lfHeight, ScreenPixelsY, 72);
+    logFont.lfHeight := -Round(DpiAware(logFont.lfHeight * _96Div72));
 end;
 //------------------------------------------------------------------------------
 
@@ -228,10 +252,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ParseFontCharInfo(info: PByte; infoSize: cardinal): TArrayOfArrayOfPointD;
+function ParseFontCharInfo(info: PByte; infoSize: cardinal): TPathsD;
 var
   i, cnt: integer;
-  buff: TArrayOfPointD;
+  buff: TPathD;
   buffCnt, buffLen: integer;
   endInfo, endContour:  PByte;
   p1,p2,p3,hp: TPointD;
@@ -343,12 +367,13 @@ end;
 //------------------------------------------------------------------------------
 
 function GetPathsForChar(memDC: HDC;
-  c: Char; out metrics: TGlyphMetrics): TArrayOfArrayOfPointD;
+  wc: WideChar; out metrics: TGlyphMetrics): TPathsD;
 var
   size: DWord;
   info:  PByte;
 begin
-  size := GetGlyphOutline(memDC, cardinal(c),
+  FillChar(metrics, SizeOf(metrics), 0);
+  size := GetGlyphOutline(memDC, cardinal(wc),
     GGO_NATIVE or GGO_UNHINTED, metrics, 0, nil, vert_flip_mat2);
   if (size = GDI_ERROR) or (size = 0) then
   begin
@@ -360,7 +385,7 @@ begin
 
   GetMem(info, size);
   try
-    if GetGlyphOutline(memDC, cardinal(c), GGO_NATIVE or GGO_UNHINTED,
+    if GetGlyphOutline(memDC, cardinal(wc), GGO_NATIVE or GGO_UNHINTED,
       metrics, size, info, vert_flip_mat2) <> GDI_ERROR then
         Result := ParseFontCharInfo(info, size);
   finally
@@ -369,107 +394,22 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-type
-  PArgbArray = ^TArgbArray;
-  TArgbArray = array [0.. (Maxint div SizeOf(TARGB)) -1] of TARGB;
-
-procedure ApplyLcd(image: TImage32; fontColor, bkColor: TColor32);
-const
-  centerWeighting = 0; //0 <= centerWeighting <= 25
-var
-  h, w: integer;
-  src, dst: PARGB;
-  srcArr: PArgbArray;
-  fgColor: TARGB absolute fontColor;
-  bgColor: TARGB absolute bkColor;
-  diff_R, diff_G, diff_B: integer;
-  bg8_R, bg8_G, bg8_B: integer;
-  rowBuffer: TArrayOfARGB;
-  primeTbl, nearTbl, FarTbl: PByteArray;
-begin
-  // see https://en.wikipedia.org/wiki/Subpixel_rendering
-  //     https://www.grc.com/ctwhat.htm
-  //     https://www.grc.com/cttech.htm
-
-  //lookup multiplication tables (see Image32.pas)
-  //85 + (2 * 57) + (2 * 28) == 255
-  primeTbl := @MulTable[85 + centerWeighting *2];
-  nearTbl  := @MulTable[57];
-  farTbl   := @MulTable[28 - centerWeighting];
-
-  SetLength(rowBuffer, image.Width+4);
-  FillChar(rowBuffer[0], Length(rowBuffer) *  SizeOf(TColor32), 0);
-
-  for h := 0 to image.Height -1 do
-  begin
-    dst := PARGB(@image.Pixels[h * image.Width]);
-    //each row of the image is copied into a temporary buffer ...
-    src := PARGB(@rowBuffer[2]);
-    Move(dst^, src^, image.Width * SizeOf(TColor32));
-    srcArr := PArgbArray(rowBuffer);
-    //using this buffer update the image ...
-    w := 2;
-    while w < image.Width do
-    begin
-      dst.R := primeTbl[srcArr[w].A] +
-        nearTbl[srcArr[w-1].A] + farTbl[srcArr[w-2].A] +
-        nearTbl[srcArr[w+1].A] + farTbl[srcArr[w+2].A];
-      inc(w);
-      dst.G := primeTbl[srcArr[w].A] +
-        nearTbl[srcArr[w-1].A] + farTbl[srcArr[w-2].A] +
-        nearTbl[srcArr[w+1].A] + farTbl[srcArr[w+2].A];
-      inc(w);
-      dst.B := primeTbl[srcArr[w].A] +
-        nearTbl[srcArr[w-1].A] + farTbl[srcArr[w-2].A] +
-        nearTbl[srcArr[w+1].A] + farTbl[srcArr[w+2].A];
-      inc(w);
-      dst.A := 255;
-      inc(dst);
-    end;
-  end;
-
-  //The right 2/3 of the image can now be removed ...
-   image.Crop(Types.Rect(0,0, image.Width div 3, image.Height));
-
-  //currently text is white and the background is black
-  //so blend in the text and background colors ...
-  diff_R := fgColor.R - bgColor.R;
-  diff_G := fgColor.G - bgColor.G;
-  diff_B := fgColor.B - bgColor.B;
-  bg8_R := bgColor.R shl 8;
-  bg8_G := bgColor.G shl 8;
-  bg8_B := bgColor.B shl 8;
-  dst := PARGB(image.PixelBase);
-  for h := 0 to image.Width * image.Height -1 do
-  begin
-    if dst.R > 0 then
-    begin
-      //blend font and background colors ...
-      dst.R := (bg8_R + diff_R * dst.R) shr 8;
-      dst.G := (bg8_G + diff_G * dst.G) shr 8;
-      dst.B := (bg8_B + diff_B * dst.B) shr 8;
-    end
-    else dst.Color := 0;
-    inc(dst);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function GetTextOutline(x, y: double; const text: string;
+function GetTextOutline(x, y: double; const text: UnicodeString;
   fontInfo: TFontInfo; textAlign: TTextAlign;
-  out textEndPos: TPointD; justifySpc: double): TArrayOfArrayOfPointD;
+  out textEndPos: TPointD; justifySpc: double): TPathsD;
 var
   i, len: integer;
   dx, lineWidth: double;
-  underline, strikethrough: TArrayOfPointD;
-  paths2: TArrayOfArrayOfPointD;
+  underline, strikethrough: TPathD;
+  paths2: TPathsD;
   glyphInfo: TGlyphInfo;
   bounds: TRectD;
-  charPos, norms: TArrayOfPointD;
+  charPos, norms: TPathD;
   startPos: TPointD;
   ulOffset: double;
 begin
   Result := nil;
+
   len := length(text);
   if (len = 0) then Exit;
   if fontInfo = nil then
@@ -564,7 +504,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function CountSpaces(const text: string): integer;
+function CountSpaces(const text: UnicodeString): integer;
   {$IFDEF INLINE} inline; {$ENDIF}
 var
   i: integer;
@@ -575,10 +515,10 @@ end;
 //------------------------------------------------------------------------------
 
 function DrawText(image: TImage32;
-  x,y: double; const text: string; fontInfo: TFontInfo;
+  x,y: double; const text: UnicodeString; fontInfo: TFontInfo;
   textAlign: TTextAlign; textColor: TColor32; justifySpc: double): TPointD;
 var
-  paths: TArrayOfArrayOfPointD;
+  paths: TPathsD;
 begin
   if (text = '') or (textColor shr 24 = 0) or image.IsEmpty then Exit;
   paths := GetTextOutline(x,y, text, fontInfo, textAlign, result, justifySpc);
@@ -586,11 +526,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DrawText(image: TImage32; x,y: double; const text: string;
+function DrawText(image: TImage32; x,y: double; const text: UnicodeString;
   fontInfo: TFontInfo; textAlign: TTextAlign;
   renderer: TCustomRenderer; justifySpc: double = 0): TPointD;
 var
-  paths: TArrayOfArrayOfPointD;
+  paths: TPathsD;
 begin
   if (text = '') or image.IsEmpty or not assigned(renderer) then
   begin
@@ -603,12 +543,12 @@ end;
 //------------------------------------------------------------------------------
 
 function DrawWrappedTextInternal(image: TImage32; const rec: TRect;
-  const text: string; fontInfo: TFontInfo; lcd: Boolean;
+  const text: UnicodeString; fontInfo: TFontInfo; lcd: Boolean;
   textAlign: TTextAlign; textAlignV: TTextVAlign;
   textColor: TColor32; lineSpacing: double; paraSpacing: double): TPointD;
 var
   bounds: TRectD;
-  charPos: TArrayOfPointD;
+  charPos: TPathD;
   fontHeight, x,y, dy: double;
   len: integer;
 
@@ -638,7 +578,7 @@ var
   function WrapText(measureOnly, lcd: Boolean): TPointD;
   var
     i, curr, spacesCnt: integer;
-    textLine: string;
+    textLine: UnicodeString;
     textWidth, justifySpace: double;
   begin
     curr := 1;
@@ -664,8 +604,9 @@ var
       if not measureOnly then
       begin
         if lcd then
-          Result := DrawText_LCD(image, x, y,
-            textLine, fontInfo, textAlign, textColor, 0, justifySpace) else
+          Result := DrawText_ClearType(image, x, y, textLine,
+            fontInfo, textAlign, textColor, clWhite32, justifySpace)
+        else
           Result := DrawText(image, x, y,
             textLine, fontInfo, textAlign, textColor, justifySpace);
       end;
@@ -727,7 +668,7 @@ end;
 //------------------------------------------------------------------------------
 
 function DrawWrappedText(image: TImage32; const rec: TRect;
-  const text: string; fontInfo: TFontInfo;
+  const text: UnicodeString; fontInfo: TFontInfo;
   textAlign: TTextAlign; textAlignV: TTextVAlign;
   textColor: TColor32; lineSpacing: double; paraSpacing: double): TPointD;
 begin
@@ -737,7 +678,7 @@ end;
 //------------------------------------------------------------------------------
 
 function DrawWrappedText_LCD(image: TImage32; const rec: TRect;
-  const text: string; fontInfo: TFontInfo;
+  const text: UnicodeString; fontInfo: TFontInfo;
   textAlign: TTextAlign; textAlignV: TTextVAlign; textColor: TColor32;
   lineSpacing: double; paraSpacing: double): TPointD;
 begin
@@ -746,39 +687,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DrawText_LCD(image: TImage32;
-  x,y: double; const text: string; fontInfo: TFontInfo; textAlign: TTextAlign;
+function DrawText_ClearType(image: TImage32; x,y: double;
+  const text: UnicodeString; fontInfo: TFontInfo; textAlign: TTextAlign;
   textColor: TColor32; opaqueBkColor: TColor32; justifySpc: double): TPointD;
 var
-  paths: TArrayOfArrayOfPointD;
-  tmpImg: TImage32;
-  rec: TRect;
-  alpha: byte;
+  paths: TPathsD;
 begin
-  alpha := textColor shr 24;
-  if (text = '') or (alpha = 0) or image.IsEmpty then
-  begin
-    Result := PointD(x,y);
-    Exit;
-  end;
-
-  //if the background color hasn't been assigned, then use clWhite32
-  if opaqueBkColor = clNone32 then
-    opaqueBkColor := clWhite32;
+  Result := PointD(x,y);
+  if (text = '') or image.IsEmpty then Exit;
 
   paths := GetTextOutline(x,y, text, fontInfo, textAlign, result, justifySpc);
   if not assigned(paths) then Exit;
-  rec := GetBounds(paths);
-  paths := OffsetPath(paths, -rec.Left, -rec.Top);
-  paths := ScalePath(paths, 3, 1);
-  tmpImg := TImage32.Create(RectWidth(rec) * 3, RectHeight(rec));
-  try
-    DrawPolygon(tmpImg, paths, frNonZero, alpha shl 24);
-    ApplyLcd(tmpImg, textColor, opaqueBkColor);
-    image.CopyBlend(tmpImg, tmpImg.Bounds, rec, BlendToOpaque);
-  finally
-    tmpImg.Free;
-  end;
+  DrawPolygon_ClearType(image, paths, frNonZero, textColor, opaqueBkColor);
 end;
 //------------------------------------------------------------------------------
 
@@ -792,9 +712,9 @@ type
   TPathInfos = array of TPathInfo;
 
 function GetTextAlongPathOutine(image: TImage32;
-  const text: string; const path: TArrayOfPointD; fontInfo: TFontInfo;
+  const text: UnicodeString; const path: TPathD; fontInfo: TFontInfo;
   textAlign: TTextAlign; vertOffset: integer = 0;
-  charSpacing: double = 0): TArrayOfArrayOfPointD;
+  charSpacing: double = 0): TPathsD;
 var
   i, textLen, pathLen: integer;
   left, center, center2, dist, dx: double;
@@ -802,7 +722,7 @@ var
   pathInfo: TPathInfo;
   pathInfos: TPathInfos;
   pt, rotatePt: TPointD;
-  tmpPaths: TArrayOfArrayOfPointD;
+  tmpPaths: TPathsD;
 const
   TwoPi = Pi * 2;
 
@@ -876,31 +796,33 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure MeasureText(const text: string; fontInfo: TFontInfo; out bounds: TRectD);
+procedure MeasureText(const text: UnicodeString; fontInfo: TFontInfo; out bounds: TRectD);
 var
-  charOffsets: TArrayOfPointD;
+  charOffsets: TPathD;
 begin
   MeasureText(text, fontInfo, bounds, charOffsets);
 end;
 //------------------------------------------------------------------------------
 
-procedure MeasureText(const text: string; fontInfo: TFontInfo;
-  out bounds: TRectD; out charOffsets: TArrayOfPointD);
+procedure MeasureText(const text: UnicodeString; fontInfo: TFontInfo;
+  out bounds: TRectD; out charOffsets: TPathD);
 var
   i, len: integer;
   delta, x,y: double;
   glyphInfo: TGlyphInfo;
   rec: TRectD;
   mtp: TMeasureTextPrefer;
+  ws: UnicodeString;
 begin
-  len := Length(text);
+  ws := UnicodeString(text);
+  len := Length(ws);
   setLength(charOffsets, len+1);
   bounds := RectD(0, 0, 0, 0);
   if len = 0 then EXit;
   charOffsets[0] := PointD(0,0);
   if fontInfo = nil then
     fontInfo := FontManager.GetFontInfo(DefaultLogfont);
-  fontInfo.FillMissingChars(text);
+  fontInfo.FillMissingChars(ws);
 
   //Positioning angled text is tricky since it requires working around the
   //integer values gmCellIncX and gmCellIncY which create cummulative
@@ -918,7 +840,7 @@ begin
   x := 0; y := 0;
   for i := 1 to len do
   begin
-    glyphInfo := fontInfo.GlyphInfo[text[i]];
+    glyphInfo := fontInfo.GlyphInfo[ws[i]];
     if not assigned(glyphInfo) then
     begin
       charOffsets[i] := charOffsets[i-1];
@@ -1013,7 +935,7 @@ procedure InitDefaultLogfont;
 var
   facename: string;
 begin
-  facename := FontManager.GetPreferredFaceName('Microsoft Sans Serif, Arial');
+  facename := FontManager.GetPreferredFaceName('Arial, Noto Sans, Liberation Sans');
   FillChar(DefaultLogfont, sizeof(DefaultLogfont), 0);
   with DefaultLogfont do
   begin
@@ -1074,75 +996,150 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TFontInfo.FillMissingChars(const s: string);
+{$IFDEF XPLAT_GENERICS}
+function FindInSortedList(wc: WideChar; glyphList: TList<TGlyphInfo>): integer;
+{$ELSE}
+function FindInSortedList(wc: WideChar; glyphList: TList): integer;
+{$ENDIF}
 var
-  i,j, len: integer;
+  i,l,r: integer;
+begin
+  //binary search the sorted list ...
+  l := 0;
+  r := glyphList.Count -1;
+  while l <= r do
+  begin
+    Result := (l + r) shr 1;
+    i := Ord(TGlyphInfo(glyphList[Result]).wc) - Ord(wc);
+    if i < 0 then
+    begin
+      l := Result +1
+    end else
+    begin
+      if i = 0 then Exit;
+      r := Result -1;
+    end;
+  end;
+  Result := -1;
+end;
+//------------------------------------------------------------------------------
+
+function GlyphSorter(glyph1, glyph2: pointer): integer;
+begin
+  Result := Ord(TGlyphInfo(glyph1).wc) - Ord(TGlyphInfo(glyph2).wc);
+end;
+//------------------------------------------------------------------------------
+
+procedure TFontInfo.Sort;
+begin
+  if fSorted then Exit;
+  {$IFDEF XPLAT_GENERICS}
+    fGlyphs.Sort(TComparer<TGlyphInfo>.Construct(
+      function (const glyph1, glyph2: TGlyphInfo): integer
+      begin
+        Result := Ord(glyph1.wc) - Ord(glyph2.wc);
+      end));
+  {$ELSE}
+    fGlyphs.Sort(GlyphSorter);
+  {$ENDIF}
+  fSorted := true;
+end;
+//------------------------------------------------------------------------------
+
+function TFontInfo.GetMissingChars(const s: UnicodeString): UnicodeString;
+var
+  i,j,r,len: integer;
+begin
+  len := Length(s);
+  result := ''; r := 0;
+  if (fHandle = 0) then Exit;
+
+  if not fSorted then Sort;
+  Result := Copy(s, 1, len);
+  for i := 1 to length(Result) do
+  begin
+    if Result[i] = #0 then Continue
+    else if FindInSortedList(Result[i], fGlyphs) < 0 then
+    begin
+      inc(r);
+      Result[r] := Result[i];
+      for j := i +1 to len do
+          if Result[j] = Result[i] then Result[j] := #0;
+    end;
+  end;
+  SetLength(Result, r);
+end;
+//------------------------------------------------------------------------------
+
+procedure TFontInfo.FillMissingChars(const ws: UnicodeString);
+var
+  i,j: integer;
   memDC: HDC;
   oldFont: HFont;
+  ordinals: TArrayOfWord;
+  missing: UnicodeString;
+  ordinal: Word;
 begin
-  if fHandle = 0 then Exit;
-  len := length(s);
-  i := 1;
-  while (i <= len) and fGlyphs.Find(s[i], j) do inc(i);
-  if (i > len) then Exit;
+  missing := GetMissingChars(ws);
+  if (missing = '') or (fHandle = 0) then Exit;
 
   memDC := CreateCompatibleDC(0);
   oldFont := SelectObject(memDC, fHandle);
   try
-    while i <= len do
-    begin
-      CreateGlyph(s[i], memDc);
-      inc(i);
-      while (i <= len) and fGlyphs.Find(s[i], j) do inc(i);
-    end;
+    for i := 1 to Length(missing) do
+      if FindInSortedList(missing[i], fGlyphs) < 0 then
+        AddGlyph(missing[i], memDc);
   finally
     SelectObject(memDC, oldFont);
     DeleteDC(memDC);
   end;
+  Sort;
 end;
 //------------------------------------------------------------------------------
 
-function TFontInfo.MeasureText(const text: string): TPointD;
+function TFontInfo.MeasureText(const text: UnicodeString): TPointD;
 var
   bounds: TRectD;
-  dummy: TArrayOfPointD;
+  dummy: TPathD;
 begin
   Image32_Text.MeasureText(text, self, bounds, dummy);
   Result := PointD(bounds.Width, bounds.Height);
 end;
 //------------------------------------------------------------------------------
 
-function TFontInfo.GetGlyphInfo(c: Char): TGlyphInfo;
+function TFontInfo.GetGlyphInfo(wc: WideChar): TGlyphInfo;
 var
   i: integer;
 begin
   Result := nil;
-  if ord(c) < 32 then Exit;
-  if fGlyphs.Find(c, i) then
-    Result := TGlyphInfo(fGlyphs.Objects[i])
-  else
+  if wc < #32 then Exit;
+  if not fSorted then Sort;
+  i := FindInSortedList(wc, fGlyphs);
+  if i < 0 then
   begin
-    FillMissingChars(c);
-    if fGlyphs.Find(c, i) then
-      Result := TGlyphInfo(fGlyphs.Objects[i]);
-  end;
+    FillMissingChars(wc);
+    i := FindInSortedList(wc, fGlyphs);
+    if i >= 0 then Result := TGlyphInfo(fGlyphs[i])
+  end
+  else
+    Result := TGlyphInfo(fGlyphs[i]);
 end;
 //------------------------------------------------------------------------------
 
-function TFontInfo.CreateGlyph(c: Char; memDc: HDC): TGlyphInfo;
+procedure TFontInfo.AddGlyph(wc: WideChar; memDc: HDC);
 var
-  paths: TArrayOfArrayOfPointD;
+  gi: TGlyphInfo;
+  paths: TPathsD;
   gm: TGlyphMetrics;
 begin
-  result := nil;
-  paths := GetPathsForChar(memDC, c, gm);
+  paths := GetPathsForChar(memDC, wc, gm);
   if (gm.gmCellIncX = 0) and (gm.gmCellIncY = 0) then Exit;
-  result := TGlyphInfo.Create;
-  result.gm := gm;
-  result.paths := paths;
-  result.bounds := GetBoundsD(paths);
-  result.bounds.Right := result.bounds.Right;
-  fGlyphs.AddObject(c, result);
+  gi := TGlyphInfo.Create;
+  gi.wc := wc;
+  gi.gm := gm;
+  gi.paths := paths;
+  gi.bounds := GetBoundsD(paths);
+  fGlyphs.Add(gi);
 end;
 //------------------------------------------------------------------------------
 
@@ -1156,8 +1153,11 @@ begin
   CheckFontHeight(fLogFont); //nb: needed before calling CreateFontIndirect
   fLogFont.lfOrientation := fLogFont.lfEscapement;
 
-  fGlyphs := TStringList.Create;
-  fGlyphs.CaseSensitive := true;
+  {$IFDEF XPLAT_GENERICS}
+  fGlyphs:= TList<TGlyphInfo>.Create;
+  {$ELSE}
+  fGlyphs := TList.Create;
+  {$ENDIF}
   fHandle := CreateFontIndirect(fLogFont);
   if (fHandle > 0) and InitAnsi then
   begin
@@ -1165,13 +1165,12 @@ begin
     oldFont := SelectObject(memDC, fHandle);
     try
       for i := 32 to 126 do
-        CreateGlyph(char(i), memDc);
+         AddGlyph(WideChar(i), memDc);
     finally
       SelectObject(memDC, oldFont);
       DeleteDC(memDC);
     end;
   end;
-  fGlyphs.Sorted := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -1181,8 +1180,9 @@ var
 begin
   DeleteObject(fHandle);
   for i := 0 to fGlyphs.Count -1 do
-    fGlyphs.Objects[i].Free;
+    TGlyphInfo(fGlyphs[i]).Free;
   fGlyphs.Free;
+  inherited;
 end;
 
 //------------------------------------------------------------------------------
@@ -1207,7 +1207,9 @@ destructor TFontManager.Destroy;
 begin
   Clear;
   fFontInfos.Free;
+  fInstalledFonts.Clear;
   fInstalledFonts.Free;
+  inherited;
 end;
 //------------------------------------------------------------------------------
 
@@ -1266,20 +1268,14 @@ end;
 
 function TFontManager.LogFontToSearchStr(lf: TLogfont): string;
 var
-  i, len: integer;
-  p: PByte;
-  pc: PChar;
+  i,len: integer;
 begin
-  result := lf.lfFaceName;
-  len := length(result);
-  setLength(result, LF_FACESIZE + 52);
-  for i := len+1 to LF_FACESIZE do result[i] := ' ';
-  p := @lf; pc := @result[LF_FACESIZE+1];
-  for i := 1 to 26 do
-  begin
-    BytetoChrs(p, pc);
-    inc(p); inc(pc, 2);
-  end;
+  result := '';
+  i := 1;
+  while (i < 32) and (lf.lfFaceName[i] <> #0) do inc(i);
+  len := 28 + i*2;
+  SetLength(result, len div 2);
+  Move(lf, Result[1], len);
 end;
 //------------------------------------------------------------------------------
 
@@ -1318,7 +1314,7 @@ end;
 
 function TFontManager.AddFont(logFont: TLogFont; InitAnsi: boolean): TFontInfo;
 var
-  oldestIdx: integer;
+  idx, oldestIdx: integer;
 begin
   while fFontInfos.Count >= fCapacity do
   begin

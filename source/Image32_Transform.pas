@@ -2,8 +2,8 @@ unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.47                                                            *
-* Date      :  28 August 2020                                                  *
+* Version   :  1.52                                                            *
+* Date      :  1 October 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -15,22 +15,21 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Windows, Math, Types,
-  Image32, Image32_Draw, Image32_Vector;
+  SysUtils, Classes, Math, Types, Image32, Image32_Draw, Image32_Vector;
 
 procedure AffineTransformImage(img: TImage32; matrix: TMatrixD); overload;
 procedure AffineTransformImage(img: TImage32;
   matrix: TMatrixD; out offset: TPoint); overload;
 
 function ProjectiveTransform(img: TImage32;
-  const dstPts: TArrayOfPointD): Boolean; overload;
+  const dstPts: TPathD): Boolean; overload;
 function ProjectiveTransform(img: TImage32;
-  const dstPts: TArrayOfPointD; out offset: TPoint): Boolean; overload;
+  const dstPts: TPathD; out offset: TPoint): Boolean; overload;
 
-function SplineVertTransform(img: TImage32; const topSpline: TArrayOfPointD;
+function SplineVertTransform(img: TImage32; const topSpline: TPathD;
   splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
   out offset: TPoint): Boolean;
-function SplineHorzTransform(img: TImage32; const leftSpline: TArrayOfPointD;
+function SplineHorzTransform(img: TImage32; const leftSpline: TPathD;
   splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
   out offset: TPoint): Boolean;
 
@@ -42,7 +41,7 @@ implementation
 
 function GetTransformBounds(img: TImage32; const matrix: TMatrixD): TRect;
 var
-  pts: TArrayOfPointD;
+  pts: TPathD;
 begin
   pts := Rectangle(img.Bounds);
   MatrixApply(matrix, pts);
@@ -121,7 +120,7 @@ end;
 //------------------------------------------------------------------------------
 
 function GetProjectiveTransformInvMatrix(const srcRect: TRect;
-  dst: TArrayOfPointD): TMatrixD;
+  dst: TPathD): TMatrixD;
 var
   dx1, dx2, px, dy1, dy2, py: double;
   g, h, k: double;
@@ -177,15 +176,13 @@ begin
       Result := MatrixMultiply(m, Result);
 
     end else
-    begin
-      FillChar(Result, SizeOf(Result), 0);
-    end;
+      Result := IdentityMatrix;
   end;
   MatrixInvert(Result);
 end;
 //------------------------------------------------------------------------------
 
-function ProjectiveTransform(img: TImage32; const dstPts: TArrayOfPointD): Boolean;
+function ProjectiveTransform(img: TImage32; const dstPts: TPathD): Boolean;
 var
   dummy: TPoint;
 begin
@@ -194,7 +191,7 @@ end;
 //------------------------------------------------------------------------------
 
 function ProjectiveTransform(img: TImage32;
-  const dstPts: TArrayOfPointD; out offset: TPoint): Boolean;
+  const dstPts: TPathD; out offset: TPoint): Boolean;
 var
   w,h,i,j, dx,dy: integer;
   x,y: double;
@@ -252,7 +249,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function InterpolateSegment(const pt1, pt2: TPointD): TArrayOfPointD;
+function InterpolateSegment(const pt1, pt2: TPointD): TPathD;
 var
   i, len: integer;
   x,y,dx,dy: double;
@@ -270,10 +267,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function InterpolatePath(const path: TArrayOfPointD): TArrayOfPointD;
+function InterpolatePath(const path: TPathD): TPathD;
 var
   i,len,len2: integer;
-  tmp: TArrayOfPointD;
+  tmp: TPathD;
 begin
   //returns a coordinate array for every value of X and y along the path based
   //on 2D distance. (This is a sadly only a poor approximation to perspective
@@ -291,14 +288,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SplineVertTransform(img: TImage32; const topSpline: TArrayOfPointD;
+function SplineVertTransform(img: TImage32; const topSpline: TPathD;
   splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
   out offset: TPoint): Boolean;
 var
   t,u,v, i,j, x,len, w,h: integer;
   prevX: integer;
   dx, dy, y, sy: double;
-  topPath, botPath: TArrayOfPointD;
+  topPath, botPath: TPathD;
   rec: TRect;
   scaleY: TArrayOfDouble;
   pc: PColor32;
@@ -324,7 +321,7 @@ begin
   //is roughly proportionally spaced even when the spline causes overlap.
   topPath := InterpolatePath(topPath);
   botPath := OffsetPath(topPath, 0, img.Height);
-  Windows.OffsetRect(rec, -rec.Left, -rec.Top);
+  Image32_Vector.OffsetRect(rec, -rec.Left, -rec.Top);
   rec := Rect(UnionRect(RectD(rec), GetBoundsD(botPath)));
   w := RectWidth(rec); h := RectHeight(rec);
   len  := Length(topPath);
@@ -400,13 +397,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SplineHorzTransform(img: TImage32; const leftSpline: TArrayOfPointD;
+function SplineHorzTransform(img: TImage32; const leftSpline: TPathD;
   splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
   out offset: TPoint): Boolean;
 var
   t,u,v, i,j, y,prevY, len, w,h: integer;
   x, dx,dy,sx: double;
-  leftPath, rightPath: TArrayOfPointD;
+  leftPath, rightPath: TPathD;
   rec: TRect;
   scaleX: TArrayOfDouble;
   pc: PColor32;
@@ -432,7 +429,7 @@ begin
   //is roughly proportionally spaced even when the spline causes overlap.
   leftPath := InterpolatePath(leftPath);
   rightPath := OffsetPath(leftPath, img.Width, 0);
-  Windows.OffsetRect(rec, -rec.Left, -rec.Top);
+  Image32_Vector.OffsetRect(rec, -rec.Left, -rec.Top);
   rec := Rect(UnionRect(RectD(rec), GetBoundsD(rightPath)));
   w := RectWidth(rec); h := RectHeight(rec);
   len  := Length(leftPath);

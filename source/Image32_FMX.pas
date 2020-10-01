@@ -2,8 +2,8 @@ unit Image32_FMX;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.48                                                            *
-* Date      :  18 September 2020                                               *
+* Version   :  1.52                                                            *
+* Date      :  1 October 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Image file format support for TImage32 and FMX                  *
@@ -165,11 +165,23 @@ end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
+procedure CheckScreenScale;
+var
+  ScreenService: IFMXScreenService;
+begin
+  if TPlatformServices.Current.SupportsPlatformService (
+    IFMXScreenService, IInterface(ScreenService)) then
+      ScreenScale := ScreenService.GetScreenScale
+end;
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
 initialization
   TImage32.RegisterImageFormatClass('BMP', TImageFormat_FMX, cpLow);
   TImage32.RegisterImageFormatClass('PNG', TImageFormat_FMX, cpHigh);
   TImage32.RegisterImageFormatClass('JPG', TImageFormat_FMX, cpLow);
   TImage32.RegisterImageFormatClass('GIF', TImageFormat_FMX, cpLow);
+  CheckScreenScale;
 
 end.
 

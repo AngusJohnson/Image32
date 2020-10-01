@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.47                                                            *
-* Date      :  28 August 2020                                                  *
+* Version   :  1.52                                                            *
+* Date      :  1 October 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -15,7 +15,7 @@ interface
 {$I Image32.inc}
 
 uses
-  Windows, SysUtils, Classes, Math, Types, Image32, Image32_Extra;
+  SysUtils, Classes, Math, Types, Image32, Image32_Extra;
 
 type
   TSizingStyle = (ssCorners, ssEdges, ssEdgesAndCorners, ssCustom);
@@ -39,7 +39,7 @@ type
     fName        : string;
     fGroupId     : integer;
     fCursorId    : integer;
-    fHitTestRegions: TArrayOfArrayOfPointD;
+    fHitTestRegions: TPathsD;
     function GetBounds: TRect;
     function GetMidPoint: TPointD;
     function GetClientMidPoint: TPointD;
@@ -72,7 +72,7 @@ type
     property CursorId: integer read fCursorId write fCursorId;
     property GroupId: integer read fGroupId;
     property Height: integer read GetHeight;
-    property HitTestRegions: TArrayOfArrayOfPointD
+    property HitTestRegions: TPathsD
       read fHitTestRegions write fHitTestRegions;
     property Image: TImage32 read fImage;
     property Index: integer read fIndex;
@@ -103,20 +103,20 @@ type
     fPenColor: TColor32;
     fButtonSize: double;
   protected
-    procedure DrawDashedLine(const ctrlPts: TArrayOfPointD; closed: Boolean);
+    procedure DrawDashedLine(const ctrlPts: TPathD; closed: Boolean);
     procedure DrawGridLine(const pt1, pt2: TPointD;
       width: double; color: TColor32); virtual;
     function HitTest(const pt: TPoint): Boolean; override;
   public
     constructor Create(owner: TLayeredImage32); override;
     procedure DrawGrid(majorInterval, minorInterval: integer);
-    procedure DrawLine(const path: TArrayOfPointD);
+    procedure DrawLine(const path: TPathD);
     procedure DrawRectangle(const rec: TRect);
     procedure DrawEllipse(const rec: TRect);
     procedure DrawCSplineDesign(
-      const ctrlPts: TArrayOfPointD; isStartOfPath: Boolean = true);
+      const ctrlPts: TPathD; isStartOfPath: Boolean = true);
     procedure DrawQSplineDesign(
-      const ctrlPts: TArrayOfPointD; isStartOfPath: Boolean = true);
+      const ctrlPts: TPathD; isStartOfPath: Boolean = true);
     property ButtonSize: double read fButtonSize write fButtonSize;
     property PenColor: TColor32 read fPenColor write fPenColor;
     property PenWidth: double read fPenWidth write fPenWidth;
@@ -189,7 +189,7 @@ type
     buttonLayerClass: TButtonDesignerLayer32Class = nil): integer;
   function UpdateButtonSizingGroup(movedBtnLayer: TButtonDesignerLayer32): TRect;
   function CreateButtonGroup(layeredImage32: TLayeredImage32;
-    const buttonPts: TArrayOfPointD; buttonColor: TColor32;
+    const buttonPts: TPathD; buttonColor: TColor32;
     buttonSize: integer; buttonOptions: TButtonOptions;
     buttonLayerClass: TButtonDesignerLayer32Class = nil): integer;
   function StartButtonGroup(layeredImage32: TLayeredImage32;
@@ -231,13 +231,13 @@ resourcestring
 // Miscellaneous functions
 //------------------------------------------------------------------------------
 
-function GetRectCorners(const rec: TRect): TArrayOfPointD;
+function GetRectCorners(const rec: TRect): TPathD;
 begin
   Result := Rectangle(rec);
 end;
 //------------------------------------------------------------------------------
 
-function GetRectEdgeMidPoints(const rec: TRect): TArrayOfPointD;
+function GetRectEdgeMidPoints(const rec: TRect): TPathD;
 var
   mp: TPointD;
 begin
@@ -278,7 +278,7 @@ begin
   Result := PtInRect(Bounds, pt);
   if Result and assigned(fHitTestRegions) then
     Result := PointInPolygons(
-      OffsetPoint(PointD(pt),-left,-top),fHitTestRegions,frEvenOdd)
+      OffsetPoint(PointD(pt),-left,-top), fHitTestRegions, frEvenOdd)
 end;
 //------------------------------------------------------------------------------
 
@@ -470,7 +470,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TDesignerLayer32.DrawDashedLine(const ctrlPts: TArrayOfPointD;
+procedure TDesignerLayer32.DrawDashedLine(const ctrlPts: TPathD;
   closed: Boolean);
 const
   endstyle: array[Boolean] of TEndStyle = (esSquare, esClosed);
@@ -486,7 +486,7 @@ end;
 procedure TDesignerLayer32.DrawGridLine(const pt1, pt2: TPointD;
   width: double; color: TColor32);
 var
-  path: TArrayOfPointD;
+  path: TPathD;
 begin
   SetLength(path, 2);
   path[0] := pt1; path[1] := pt2;
@@ -531,11 +531,11 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TDesignerLayer32.DrawQSplineDesign(
-  const ctrlPts: TArrayOfPointD; isStartOfPath: Boolean);
+  const ctrlPts: TPathD; isStartOfPath: Boolean);
 var
   i,j, len: integer;
   pt, pt2: TPointD;
-  path: TArrayOfPointD;
+  path: TPathD;
 begin
   len := length(ctrlPts);
   if len < 3 then Exit;
@@ -565,11 +565,11 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TDesignerLayer32.DrawCSplineDesign(
-  const ctrlPts: TArrayOfPointD; isStartOfPath: Boolean = true);
+  const ctrlPts: TPathD; isStartOfPath: Boolean = true);
 var
   i,len: integer;
   pt: TPointD;
-  path: TArrayOfPointD;
+  path: TPathD;
 begin
   len := length(ctrlPts);
   if Odd(len) then dec(len);
@@ -599,7 +599,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TDesignerLayer32.DrawLine(const path: TArrayOfPointD);
+procedure TDesignerLayer32.DrawLine(const path: TPathD);
 begin
   DrawDashedLine(path, false);
 end;
@@ -607,7 +607,7 @@ end;
 
 procedure TDesignerLayer32.DrawRectangle(const rec: TRect);
 var
-  path: TArrayOfPointD;
+  path: TPathD;
 begin
   path := Rectangle(rec);
   DrawDashedLine(path, true);
@@ -616,7 +616,7 @@ end;
 
 procedure TDesignerLayer32.DrawEllipse(const rec: TRect);
 var
-  path: TArrayOfPointD;
+  path: TPathD;
 begin
   path := Ellipse(rec);
   DrawDashedLine(path, true);
@@ -1122,7 +1122,7 @@ function CreateSizingBtnsGroup(targetLayer: TLayer32;
 var
   i, idxFirstBtn: integer;
   rec: TRect;
-  corners, edges: TArrayOfPointD;
+  corners, edges: TPathD;
   layer: TLayer32;
   lim: TLayeredImage32;
 const
@@ -1189,7 +1189,7 @@ var
   i, btnIdx, cnt, fig: integer;
   lim: TLayeredImage32;
   btnMP: TPoint;
-  corners, edgeMps: TArrayOfPointD;
+  corners, edgeMps: TPathD;
   style: TSizingStyle;
 begin
   lim := movedBtnLayer.Owner;
@@ -1273,7 +1273,7 @@ end;
 //------------------------------------------------------------------------------
 
 function CreateButtonGroup(layeredImage32: TLayeredImage32;
-  const buttonPts: TArrayOfPointD; buttonColor: TColor32;
+  const buttonPts: TPathD; buttonColor: TColor32;
   buttonSize: integer; buttonOptions: TButtonOptions;
   buttonLayerClass: TButtonDesignerLayer32Class = nil): integer;
 var
@@ -1347,6 +1347,6 @@ end;
 //------------------------------------------------------------------------------
 
 initialization
-  DefaultButtonSize := DPI(10);
+  DefaultButtonSize := DPIAware(10);
 
 end.

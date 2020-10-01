@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.51                                                           *
-* Date      :  23 September 2020                                               *
+* Version   :  1.52                                                            *
+* Date      :  1 October 2020                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -23,16 +23,16 @@ type
   TButtonOption = (boSquare, boDiamond, boPressed, boDropShadow);
   TButtonOptions = set of TButtonOption;
 
-procedure DrawShadow(img: TImage32; const polygon: TArrayOfPointD;
+procedure DrawShadow(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; depth: double; angleRads: double = angle225;
   color: TColor32 = $80000000; cutoutInsideShadow: Boolean = false); overload;
-procedure DrawShadow(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+procedure DrawShadow(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; depth: double; angleRads: double = angle225;
   color: TColor32 = $80000000; cutoutInsideShadow: Boolean = false); overload;
 
-procedure DrawGlow(img: TImage32; const polygon: TArrayOfPointD;
+procedure DrawGlow(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; color: TColor32; blurRadius: integer); overload;
-procedure DrawGlow(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+procedure DrawGlow(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; color: TColor32; blurRadius: integer); overload;
 
 //FloodFill: If no CompareFunc is provided, FloodFill will fill whereever
@@ -71,16 +71,16 @@ procedure RedEyeRemove(img: TImage32; const rect: TRect);
 procedure PencilEffect(img: TImage32; intensity: integer = 0);
 procedure TraceContours(img: TImage32; intensity: integer);
 
-procedure Erase(img: TImage32; const polygon: TArrayOfPointD;
+procedure Erase(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; inverted: Boolean = false); overload;
-procedure Erase(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+procedure Erase(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; inverted: Boolean = false); overload;
 
-procedure Draw3D(img: TImage32; const polygon: TArrayOfPointD;
+procedure Draw3D(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; height, blurRadius: double;
   colorLt: TColor32 = $DDFFFFFF; colorDk: TColor32 = $80000000;
   angleRads: double = angle45); overload;
-procedure Draw3D(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+procedure Draw3D(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; height, blurRadius: double;
   colorLt: TColor32 = $DDFFFFFF; colorDk: TColor32 = $80000000;
   angleRads: double = angle45); overload;
@@ -92,19 +92,15 @@ procedure DrawButton(img: TImage32; const pt: TPointD;
 //Vectorize: convert an image into polygon vectors
 function Vectorize(img: TImage32; compareColor: TColor32;
   compareFunc: TCompareFunction; colorTolerance: Integer;
-  roundingTolerance: integer = 2): TArrayOfArrayOfPointD;
+  roundingTolerance: integer = 2): TPathsD;
 
 function VectorizeMask(const mask: TArrayOfByte;
-  maskWidth: integer): TArrayOfArrayOfPointD;
+  maskWidth: integer): TPathsD;
 
 function GetFloodFillMask(img: TImage32; x, y: Integer;
   compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
 
 implementation
-
-resourcestring
-  rsDraw3DNeedsNonZeroFill =
-    'Draw3D Error: Procedure requires non-zero filling rule.';
 
 const
   FloodFillDefaultRGBTolerance: byte = 20;
@@ -248,11 +244,11 @@ end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-procedure DrawShadow(img: TImage32; const polygon: TArrayOfPointD;
+procedure DrawShadow(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; depth: double; angleRads: double;
   color: TColor32; cutoutInsideShadow: Boolean);
 var
-  polygons: TArrayOfArrayOfPointD;
+  polygons: TPathsD;
 begin
   setlength(polygons, 1);
   polygons[0] := polygon;
@@ -261,14 +257,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawShadow(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+procedure DrawShadow(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; depth: double; angleRads: double;
   color: TColor32; cutoutInsideShadow: Boolean);
 var
   x,y: extended; //D7 compatible
   blurSize, rpt: integer;
   rec: TRect;
-  polys, shadowPolys: TArrayOfArrayOfPointD;
+  polys, shadowPolys: TPathsD;
   shadowImg: TImage32;
 begin
   rec := GetBounds(polygons);
@@ -278,7 +274,7 @@ begin
   y := depth * y;
   blurSize := Max(1,Round(depth / 4));
   if depth <= 2 then rpt :=1 else rpt := 2;
-  Image32_Vector.InflateRect(rec, Ceil(depth*2), Ceil(depth*2));
+  rec := Image32_Vector.InflateRect(rec, Ceil(depth*2), Ceil(depth*2));
   polys := OffsetPath(polygons, -rec.Left, -rec.Top);
   shadowPolys := OffsetPath(polys, x, y);
   shadowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
@@ -294,10 +290,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawGlow(img: TImage32; const polygon: TArrayOfPointD;
+procedure DrawGlow(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; color: TColor32; blurRadius: integer);
 var
-  polygons: TArrayOfArrayOfPointD;
+  polygons: TPathsD;
 begin
   setlength(polygons, 1);
   polygons[0] := polygon;
@@ -305,17 +301,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawGlow(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+procedure DrawGlow(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; color: TColor32; blurRadius: integer);
 var
   rec: TRect;
-  glowPolys: TArrayOfArrayOfPointD;
+  glowPolys: TPathsD;
   glowImg: TImage32;
 begin
   rec := GetBounds(polygons);
   glowPolys := OffsetPath(polygons,
     blurRadius -rec.Left +1, blurRadius -rec.Top +1);
-  Image32_Vector.InflateRect(rec, blurRadius +1, blurRadius +1);
+  rec := Image32_Vector.InflateRect(rec, blurRadius +1, blurRadius +1);
   glowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
   try
     DrawPolygon(glowImg, glowPolys, fillRule, color);
@@ -864,7 +860,7 @@ procedure RedEyeRemove(img: TImage32; const rect: TRect);
 var
   k: integer;
   cutout, mask: TImage32;
-  path: TArrayOfPointD;
+  path: TPathD;
   cutoutRec, rect3: TRect;
   radGrad: TRadialGradientRenderer;
 begin
@@ -907,7 +903,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Erase(img: TImage32; const polygon: TArrayOfPointD;
+procedure Erase(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; inverted: Boolean);
 var
   mask: TImage32;
@@ -927,7 +923,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Erase(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+procedure Erase(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; inverted: Boolean);
 var
   mask: TImage32;
@@ -947,11 +943,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Draw3D(img: TImage32; const polygon: TArrayOfPointD;
+procedure Draw3D(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; height, blurRadius: double;
   colorLt: TColor32; colorDk: TColor32; angleRads: double);
 var
-  polygons: TArrayOfArrayOfPointD;
+  polygons: TPathsD;
 begin
   setLength(polygons, 1);
   polygons[0] := polygon;
@@ -959,14 +955,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Draw3D(img: TImage32; const polygons: TArrayOfArrayOfPointD;
+procedure Draw3D(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; height, blurRadius: double;
   colorLt: TColor32; colorDk: TColor32; angleRads: double);
 var
   tmp: TImage32;
   recI: TRect;
   recD: TRectD;
-  paths, paths2: TArrayOfArrayOfPointD;
+  paths, paths2: TPathsD;
   x,y: extended;
 begin
   Math.SinCos(angleRads, y, x);
@@ -1005,7 +1001,7 @@ procedure DrawButton(img: TImage32; const pt: TPointD;
   size: double; color: TColor32; buttonOptions: TButtonOptions);
 var
   i: integer;
-  path: TArrayOfPointD;
+  path: TPathD;
   rec: TRectD;
   shadowSize, shadowAngle: double;
 begin
@@ -1167,15 +1163,15 @@ type
     destructor Destroy; override;
     procedure Update(x, y: double);
     function GetCount: integer;
-    function GetPoints: TArrayOfPointD;
+    function GetPoints: TPathD;
     property IsAscending: Boolean read isStart;
   end;
 
   TPt2Container = class
     prevRight: integer;
     leftMostPt, rightMost: TPt2;
-    solution: TArrayOfArrayOfPointD;
-    procedure AddToSolution(const path: TArrayOfPointD);
+    solution: TPathsD;
+    procedure AddToSolution(const path: TPathD);
     function StartNewPath(insertBefore: TPt2;
       xLeft, xRight, y: integer; isHole: Boolean): TPt2;
     procedure AddRange(var current: TPt2; xLeft, xRight, y: integer);
@@ -1311,7 +1307,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TPt2.GetPoints: TArrayOfPointD;
+function TPt2.GetPoints: TPathD;
 var
   i, count: integer;
   pt2: TPt2;
@@ -1330,7 +1326,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPt2Container.AddToSolution(const path: TArrayOfPointD);
+procedure TPt2Container.AddToSolution(const path: TPathD);
 var
   len: integer;
 begin
@@ -1462,7 +1458,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function IsHeadingLeft(current: TPt2; l, r: integer): Boolean;
+function IsHeadingLeft(current: TPt2; r: integer): Boolean;
   {$IFDEF INLINE} inline; {$ENDIF}
 begin
   Result := r <= current.pt.X;
@@ -1519,7 +1515,7 @@ begin
   end else
   begin
     //'range' must somewhat overlap one or more paths above
-    if IsHeadingLeft(current, xLeft, xRight) then
+    if IsHeadingLeft(current, xRight) then
     begin
       if current.isHole then
       begin
@@ -1544,7 +1540,7 @@ end;
 //------------------------------------------------------------------------------
 
 function VectorizeMask(const mask: TArrayOfByte;
-  maskWidth: integer): TArrayOfArrayOfPointD;
+  maskWidth: integer): TPathsD;
 var
   i,j, len, height, blockStart: integer;
   current: TPt2;
@@ -1613,7 +1609,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Tidy(const poly: TArrayOfPointD; tolerance: integer): TArrayOfPointD;
+function Tidy(const poly: TPathD; tolerance: integer): TPathD;
 var
   i,j, highI: integer;
   prev: TPointD;
@@ -1655,7 +1651,7 @@ end;
 
 function Vectorize(img: TImage32; compareColor: TColor32;
   compareFunc: TCompareFunction; colorTolerance: Integer;
-  roundingTolerance: integer): TArrayOfArrayOfPointD;
+  roundingTolerance: integer): TPathsD;
 var
   i: integer;
   mask: TArrayOfByte;
