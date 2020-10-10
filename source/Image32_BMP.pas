@@ -2,8 +2,8 @@ unit Image32_BMP;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.52                                                            *
-* Date      :  1 October 2020                                                  *
+* Version   :  1.53                                                            *
+* Date      :  10 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  BMP file format extension for TImage32                          *
@@ -15,7 +15,7 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Windows, Math, Image32;
+  {$IFDEF MSWINDOWS} Windows,{$ENDIF} SysUtils, Classes, Math, Image32;
 
 type
 
@@ -32,15 +32,19 @@ type
     function LoadFromStream(stream: TStream; img32: TImage32): Boolean; override;
     function SaveToFile(const filename: string; img32: TImage32): Boolean; override;
     procedure SaveToStream(stream: TStream; img32: TImage32); override;
+{$IFDEF MSWINDOWS}
     class function CanCopyToClipboard: Boolean; override;
     class function CopyToClipboard(img32: TImage32): Boolean; override;
     class function CanPasteFromClipboard: Boolean; override;
     class function PasteFromClipboard(img32: TImage32): Boolean; override;
+{$ENDIF}
     property IncludeFileHeaderInSaveStream: Boolean read
       fIncludeFileHeaderInSaveStream write fIncludeFileHeaderInSaveStream;
   end;
 
+{$IFDEF MSWINDOWS}
   function LoadFromHBITMAP(img32: TImage32; bm: HBITMAP; pal: HPALETTE = 0): Boolean;
+{$ENDIF}
 
 implementation
 
@@ -51,6 +55,79 @@ type
   PTriColor32 = ^TTriColor32;
   TTriColor32 = array [0..2] of TColor32;
   TArrayOfByte = array of Byte;
+
+  TBitmapFileHeader = packed record
+    bfType: Word;
+    bfSize: Cardinal;
+    bfReserved1: Word;
+    bfReserved2: Word;
+    bfOffBits: Cardinal;
+  end;
+
+  TBitmapInfoHeader = packed record
+    biSize: Cardinal;
+    biWidth: Longint;
+    biHeight: Longint;
+    biPlanes: Word;
+    biBitCount: Word;
+    biCompression: Cardinal;
+    biSizeImage: Cardinal;
+    biXPelsPerMeter: Longint;
+    biYPelsPerMeter: Longint;
+    biClrUsed: Cardinal;
+    biClrImportant: Cardinal;
+  end;
+
+  PBitmapCoreHeader = ^TBitmapCoreHeader;
+  TBitmapCoreHeader = packed record
+    bcSize: Cardinal;
+    bcWidth: Word;
+    bcHeight: Word;
+    bcPlanes: Word;
+    bcBitCount: Word;
+  end;
+
+  TCIEXYZ = record
+    ciexyzX: Longint;
+    ciexyzY: Longint;
+    ciexyzZ: Longint;
+  end;
+
+  TCIEXYZTriple = record
+    ciexyzRed: TCIEXYZ;
+    ciexyzGreen: TCIEXYZ;
+    ciexyzBlue: TCIEXYZ;
+  end;
+
+  TBitmapV4Header = packed record
+    bV4Size: Cardinal;
+    bV4Width: Longint;
+    bV4Height: Longint;
+    bV4Planes: Word;
+    bV4BitCount: Word;
+    bV4V4Compression: Cardinal;
+    bV4SizeImage: Cardinal;
+    bV4XPelsPerMeter: Longint;
+    bV4YPelsPerMeter: Longint;
+    bV4ClrUsed: Cardinal;
+    bV4ClrImportant: Cardinal;
+    bV4RedMask: Cardinal;
+    bV4GreenMask: Cardinal;
+    bV4BlueMask: Cardinal;
+    bV4AlphaMask: Cardinal;
+    bV4CSType: Cardinal;
+    bV4Endpoints: TCIEXYZTriple;
+    bV4GammaRed: Cardinal;
+    bV4GammaGreen: Cardinal;
+    bV4GammaBlue: Cardinal;
+  end;
+
+const
+  BI_RGB = 0;
+  BI_RLE24 = 4;
+  BI_RLE8 = 1;
+  BI_RLE4 = 2;
+  BI_BITFIELDS = 3;
 
 //------------------------------------------------------------------------------
 // Loading (reading) BMP images from file ...
@@ -75,11 +152,12 @@ function StreamReadImageWithBitfields(stream: TStream; width, height,
   bpp: integer; bitfields: TTriColor32): TArrayOfColor32;
 var
   i,j,bytesPerRow, bytesPerPix: integer;
-  shift, size: TTriColor32;
+  shift, size: array[0..2] of byte;
   buffer: PByte;
   dstPixel: PARGB;
   b: PCardinal;
 begin
+  Result := nil;
 
   //from the 3 bitfields, get each bit mask offset (shift) and bit mask size
   for i := 0 to 2 do
@@ -102,7 +180,11 @@ begin
   //colorXBit.R = (buffer^ and bitfields[0]) shr shift[0]
   //and the largest possible value for colorXBit.R = (1 shl size[i]) - 1
   //so convert size[x] to the maximum possible value for colorXBit.R ...
-  for i := 0 to 2 do size[i] := (1 shl size[i]) - 1;
+  for i := 0 to 2 do
+  begin
+    if size[i] > 8 then Exit; //bitfields bigger than 8 are not supported
+    size[i] := (1 shl size[i]) - 1;
+  end;
 
   bytesPerPix := bpp div 8;
   bytesPerRow := ((31 + bpp * width) div 32) * 4;
@@ -168,7 +250,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetByte(var ptr: PByte): Byte; overload;
+function GetByte(var ptr: PByte): Byte;
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
   result := Byte(ptr^);
@@ -176,38 +258,35 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetByte(var ptr: PByte; is4Bit, isSecond: Boolean): Byte; overload;
+function GetNibble(var ptr: PByte; var bitsOffset: integer): Byte;
 begin
-  if not is4Bit then
-  begin
-    result := Byte(ptr^);
-    inc(ptr);
-  end
-  else if isSecond then
+  if bitsOffset = 4 then
   begin
     result := Ord(ptr^) and $F;
+    bitsOffset := 0;
     inc(ptr);
   end else
+  begin
     result := Ord(ptr^) shr 4;
+    bitsOffset := 4;
+  end;
 end;
 //------------------------------------------------------------------------------
 
-function StreamReadImageWithRLECompression(stream: TStream;
+function ReadRLE4orRLE8Compression(stream: TStream;
   width, height, bpp: integer;
   const palette: TArrayOfColor32): TArrayOfColor32;
 var
   i,j,k, cnt, idx: integer;
-  buffLen, w, delta: integer;
+  buffLen, w, delta, bitOffset: integer;
   dst: PColor32;
   byte1, byte2: byte;
   buffer: Pointer;
   b: PByte;
-  is4Bit: boolean;
 const
   COMMAND_BYTE = 0;
   DELTA_MODE = 2;
 begin
-  is4Bit := bpp = 4;
   setLength(Result, width * height);
   buffLen := stream.Size - stream.Position;
   getMem(buffer, buffLen);
@@ -240,22 +319,25 @@ begin
           else                            //'absolute mode'
           begin
             cnt := byte2;
+            bitOffset := 0;
             for k := 1 to cnt do
             begin
-              idx := GetByte(b, is4Bit, not Odd(k));
+              if bpp = 4 then
+                idx := GetNibble(b, bitOffset) else
+                idx := GetByte(b);
               dst^ := palette[idx];
               inc(w);
               if w = width then break;
               inc(dst);
             end;
-            if is4Bit and Odd(cnt) then inc(b);
+            if bitOffset > 0 then inc(b);
             if Cardinal(b) mod 2 = 1 then
               inc(b);                     //ie must be WORD aligned
           end;
         end else                          //'encoded mode'
         begin
           cnt := byte1;
-          if is4Bit then
+          if bpp = 4 then
           begin
             for j := 1 to cnt do
             begin
@@ -338,6 +420,7 @@ var
   tmp, pal: TArrayOfColor32;
   bitfields: TTriColor32;
   isTopDown, hasValidBitFields: boolean;
+  pb: PByteArray;
 begin
   result := false;
   with stream do
@@ -358,8 +441,15 @@ begin
 
     Read(bih, sizeof(bih));
 
+    if bih.biSize < sizeof(bih) then //accommodate dodgy TBitmapInfoHeader's
+    begin
+      if bih.biSize <sizeof(TBitmapCoreHeader) then Exit;
+      pb := @bih.biSize;
+      FillChar(pb[bih.biSize], sizeof(bih) - bih.biSize, 0);
+    end;
+
     palEntrySize := 4;
-    if bih.biSize = sizeof(BITMAPCOREHEADER) then
+    if bih.biSize = sizeof(TBitmapCoreHeader) then
     begin
       bih.biBitCount     := PBitmapCoreHeader(@bih).bcBitCount;
       bih.biHeight       := PBitmapCoreHeader(@bih).bcHeight;
@@ -370,9 +460,10 @@ begin
       palEntrySize       := 3;
     end;
 
-    //make sure this is a valid BMP stream ...
-    if (bih.biBitCount > 32) or (bih.biPlanes <> 1) or
-      (bih.biSize < sizeof(BITMAPCOREHEADER)) or
+    //make sure this is a valid BMP stream
+    //(nb: embedded JPEG and PNG formats not supported)
+    if (bih.biBitCount > 32) or
+      (bih.biWidth > $3FFF) or (bih.biHeight > $3FFF) or //16,383
       (bih.biCompression > BI_BITFIELDS) then Exit;
 
     isTopDown := bih.biHeight < 0;
@@ -409,8 +500,11 @@ begin
       end;
     end;
 
+    if bih.biClrUsed > 256 then bih.biClrUsed := 0;
+
     if (bih.biClrUsed = 0) and (bih.biBitCount < 16) then
       bih.biClrUsed := Trunc(Power(2, bih.biBitCount));
+
     if bih.biClrUsed > 0 then
       pal := StreamReadPalette(stream, bih.biClrUsed, palEntrySize);
 
@@ -432,7 +526,7 @@ begin
     end
 
     else if (bih.biCompression = BI_RLE8) or (bih.biCompression = BI_RLE4) then
-      tmp := StreamReadImageWithRLECompression(
+      tmp := ReadRLE4orRLE8Compression(
         stream, img32.Width, img32.Height, bih.biBitCount, pal)
 
     else tmp := StreamReadImageWithPalette(
@@ -756,6 +850,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+{$IFDEF MSWINDOWS}
+
 class function TImageFormat_BMP.CanCopyToClipboard: Boolean;
 begin
   Result := true;
@@ -911,6 +1007,7 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
+{$ENDIF}
 
 initialization
   TImage32.RegisterImageFormatClass('BMP', TImageFormat_BMP, cpLow);

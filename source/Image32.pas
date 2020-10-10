@@ -328,7 +328,7 @@ type
     procedure Reset;
     procedure Add(c: TColor32; weight: Integer);
     procedure Subtract(c: TColor32; weight: Integer);
-    procedure AddWeight(weight: Integer);
+    procedure AddWeight(weight: Integer); //ie add clNone32
     property AddCount: Integer read fAddCount;
     property Color: TColor32 read GetColor;
   end;

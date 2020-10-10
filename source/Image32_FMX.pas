@@ -169,9 +169,10 @@ procedure CheckScreenScale;
 var
   ScreenService: IFMXScreenService;
 begin
-  if TPlatformServices.Current.SupportsPlatformService (
+  if (Image32.ScreenScale = 1) and
+    TPlatformServices.Current.SupportsPlatformService (
     IFMXScreenService, IInterface(ScreenService)) then
-      ScreenScale := ScreenService.GetScreenScale
+      Image32.ScreenScale := ScreenService.GetScreenScale
 end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------

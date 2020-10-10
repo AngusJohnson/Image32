@@ -15,7 +15,9 @@ interface
 
 {$I Image32.inc}
 
-uses Windows, SysUtils, Classes, Math, Image32;
+uses
+  {$IFDEF MSWINDOWS} Windows,{$ENDIF}
+  SysUtils, Classes, Math, Image32, Image32_Vector;
 
 function MakePalette(image: TImage32;
   MaxColors: integer): TArrayOfColor32; overload;
@@ -42,7 +44,9 @@ function TrimPalette(const palette: TArrayOfColor32;
   const colorFrequency: TArrayOfInteger;
   fraction: double): TArrayOfColor32; overload;
 
+{$IFDEF MSWINDOWS}
 function CreateLogPalette(const palColors: TArrayOfColor32): TMaxLogPalette;
+{$ENDIF}
 
 //GetNearestPaletteColor: This function is relatively slow so be
 //careful how you use it :).
@@ -916,6 +920,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+{$IFDEF MSWINDOWS}
 function CreateLogPalette(const palColors: TArrayOfColor32): TMaxLogPalette;
 var
   i, len: integer;
@@ -931,6 +936,7 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
+{$ENDIF}
 
 procedure DrawPalette(image: TImage32; const palette: TArrayOfColor32);
 var
@@ -941,7 +947,7 @@ begin
   if len < 16 then w := len else w := 16;
   h := (len +15) div 16;
   image.SetSize(w * 16, h * 16);
-  rec := Rect(0,0,16,16);
+  rec := Image32_Vector.Rect(0,0,16,16);
   for i := 0 to len -1 do
   begin
     image.FillRect(rec, palette[i] or $FF000000);

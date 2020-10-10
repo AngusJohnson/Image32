@@ -1,16 +1,39 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 1.51
-Released: 22 September 2020
+Latest version: 1.52
+Released: 2 October 2020
 
 Copyright © 2019-2020 Angus Johnson
 Freeware released under Boost Software License
 https://www.boost.org/LICENSE_1_0.txt
 
-Website  : http://www.angusj.com/delphi/image32/Docs/_Body.htm
-download : https://sourceforge.net/projects/image32/files/
+Documentation : http://www.angusj.com/delphi/image32/Docs/
+Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
+
+Version 1.52
+  Changes in Image32
+    type TArrayOfPointD deleted (replaced by its former alias TPathD)
+    type TArrayOfArrayOfPointD deleted (replaced by its former alias TPathsD)
+    DPI function renamed DPIAware
+    ScreenPixelsY variable removed
+    DpiScale renamed ScreenScale
+  Changes in Image32_Draw
+    DrawPolygon_ClearType function added
+  Changes in Image32_Text
+    Most parameters of string type changed to UnicodeString type
+    Similarly, parameters of Char type changed to WideChar type
+    DrawText_LCD function renamed to DrawText_ClearType
+  Changes in Image32_Ttf
+    TTtfFontInfo.GetGlyph renamed TTtfFontInfo.GetGlyphInfo
+    TGlyphCache.GetChar renamed TGlyphCache.GetCharInfo
+    TGlyphCache.GetString renamed TGlyphCache.GetTextGlyphs
+    Overloaded TGlyphCache.GetTextGlyphs method now manages
+      line wrapping, justification, horizontal and vertical 
+      alignments within a specified TRect.
+    Added TGlyphCache.GetCharOffsets method
+    TGlyphCache.LineGap property replaced with LineHeight property
 
 Version: 1.51
   Modified Image32_Ttf
