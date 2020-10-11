@@ -1791,13 +1791,17 @@ begin
   glyph := Image32_Vector.ScalePath(glyph,
     imgSize/rec.Width, imgSize/rec.Height);
   img := TImage32.Create(imgSize,imgSize);
-  DrawPolygon(img, glyph, frEvenOdd, clBlack32);
-  accum := 0;
-  p := PARGB(img.PixelBase);
-  for i := 0 to imgSize * imgSize do
-  begin
-    inc(accum, p.A);
-    inc(p);
+  try
+    DrawPolygon(img, glyph, frEvenOdd, clBlack32);
+    accum := 0;
+    p := PARGB(img.PixelBase);
+    for i := 0 to imgSize * imgSize do
+    begin
+      inc(accum, p.A);
+      inc(p);
+    end;
+  finally
+    img.Free;
   end;
   fFontWeight := Max(100, Min(900,
     Round(k * accum / (imgSize * imgSize * 100)) * 100));
