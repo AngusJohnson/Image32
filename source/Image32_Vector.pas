@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.52                                                            *
-* Date      :  1 October 2020                                                  *
+* Version   :  1.53                                                            *
+* Date      :  11 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -286,7 +286,7 @@ var
   AutoWidthThreshold: double = 5.0;
 
   //Empirically, line widths of less than about 1.3 will produce noticeable
-  //Moiré Effect when the lines are close to horizontal or close to vertical.
+  //Moire Effect when the lines are close to horizontal or close to vertical.
   MinStrokeWidth: double = 0.5;
 
   //DefaultMiterLimit: Avoids excessive spikes when line offsetting
@@ -446,19 +446,33 @@ end;
 
 function UnionRect(const rec1, rec2: TRect): TRect;
 begin
-  result.Left := Min(rec1.Left, rec2.Left);
-  result.Top := Min(rec1.Top, rec2.Top);
-  result.Right := Max(rec1.Right, rec2.Right);
-  result.Bottom := Max(rec1.Bottom, rec2.Bottom);
+  if IsEmptyRect(rec1) then
+    Result := rec2
+  else if IsEmptyRect(rec2) then
+    Result := rec1
+  else
+  begin
+    result.Left := Min(rec1.Left, rec2.Left);
+    result.Top := Min(rec1.Top, rec2.Top);
+    result.Right := Max(rec1.Right, rec2.Right);
+    result.Bottom := Max(rec1.Bottom, rec2.Bottom);
+  end;
 end;
 //------------------------------------------------------------------------------
 
 function UnionRect(const rec1, rec2: TRectD): TRectD;
 begin
-  result.Left := Min(rec1.Left, rec2.Left);
-  result.Top := Min(rec1.Top, rec2.Top);
-  result.Right := Max(rec1.Right, rec2.Right);
-  result.Bottom := Max(rec1.Bottom, rec2.Bottom);
+  if IsEmptyRect(rec1) then
+    Result := rec2
+  else if IsEmptyRect(rec2) then
+    Result := rec1
+  else
+  begin
+    result.Left := Min(rec1.Left, rec2.Left);
+    result.Top := Min(rec1.Top, rec2.Top);
+    result.Right := Max(rec1.Right, rec2.Right);
+    result.Bottom := Max(rec1.Bottom, rec2.Bottom);
+  end;
 end;
 //------------------------------------------------------------------------------
 

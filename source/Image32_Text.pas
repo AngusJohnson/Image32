@@ -2,8 +2,8 @@ unit Image32_Text;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.52                                                            *
-* Date      :  1 October 2020                                                  *
+* Version   :  1.53                                                            *
+* Date      :  11 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Module to support text in the Image32 library                   *
@@ -204,7 +204,6 @@ resourcestring
 
 type
   TMeasureTextPrefer = (mtPreferNone, mtPreferX, mtPreferY);
-  TArrayOfString = array of string;
 
 const
   GGO_BEZIER        = $3;

@@ -3,7 +3,7 @@ unit Image32_Ttf;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.53                                                            *
-* Date      :  10 October 2020                                                 *
+* Date      :  11 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2020                                              *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -13,11 +13,11 @@ unit Image32_Ttf;
 interface
 
 {$I Image32.inc}
+
 uses
+  {$IFDEF MSWINDOWS}Windows, ShlObj,{$ENDIF}
   Types, SysUtils, Classes, Math,
-{$IFDEF XPLAT_GENERICS}
-  Generics.Collections, Generics.Defaults,
-{$ENDIF}
+  {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults,{$ENDIF}
   Image32, Image32_Draw;
 
 type
@@ -277,6 +277,7 @@ type
   TTtfFontReader = class(TNotifySender)
   private
     fStream            : TMemoryStream;
+    fFontWeight        : integer;
     fFontInfo          : TTtfFontInfo;
     fTables            : TTtfTableArray;
     fTblIdxes          : array[TTableName] of integer;
@@ -317,6 +318,7 @@ type
     function GetFontInfo: TTtfFontInfo;
     function GetGlyphKernList(glyphIdx: integer): TArrayOfTKern;
     function GetGlyphMetrics(glyphIdx: integer): TGlyphMetrics;
+    function GetWeight: integer;
   public
     constructor Create;
     destructor Destroy; override;
@@ -328,6 +330,7 @@ type
     function GetGlyphInfo(unicode: Word; out paths: TPathsD;
       out nextX: integer; out glyphMetrics: TGlyphMetrics): Boolean;
     property FontInfo: TTtfFontInfo read GetFontInfo;
+    property Weight: integer read GetWeight; //range 100-900
   end;
 
   PGlyphInfo = ^TGlyphInfo;
@@ -427,6 +430,26 @@ type
 
   function PointHeightToPixelHeight(pt: double): double;
 
+  {$IFDEF MSWINDOWS}
+  function GetFontFolder: string;
+  function GetInstalledTtfFilenames: TArrayOfString;
+  {$ENDIF}
+  function GetFacenameAndStyle(const filename: string;
+    out facename: string; out style: string): Boolean; overload;
+  function GetFacenameAndStyle(const stream: TStream;
+    out facename: string; out style: string): Boolean; overload;
+  function FilterOnFacename(const fontnames: TArrayOfString;
+    const facename: string; exactMatch: Boolean): TArrayOfString;
+  function FilterOnStyles(const fontnames: TArrayOfString;
+    const mustIncludeStyle, mustExcludeStyle: array of string): TArrayOfString;
+
+  (* Example of the above functions:
+  //find the Arial font that's neither Bold or Italic
+  fonts := GetInstalledTtfFilenames;
+  fonts := FilterOnFacename(fonts, 'arial', true);
+  fonts := FilterOnStyles(fonts, [], ['bold','italic']);
+  *)
+
 implementation
 
 uses
@@ -494,16 +517,28 @@ var
   isLeapYr: Boolean;
 begin
   ss := (secsSince1904 div 126230400);      //126230400 secs per 4 years
+  if (ss > 49) or (ss = 0) then             //fix for invalid dates
+  begin
+    yy := 1904; mo := 1; dd := 1;
+    hh := 0; mi := 0; ss := 0;
+    Exit;
+  end;
   yy := 1904 + (ss * 4);
+
   ss := secsSince1904 mod 126230400;        //remaining secs since last leap yr
   yy := yy + ss div 31536000;               //31536000 secs per common year
+
   ss := ss mod 31536000;                    //remaining seconds in final year
   dd := ss div 86400;                       //days remaining in final year
+
   mo := 1;
   isLeapYr := (yy mod 4) = 0;
   while dim[isLeapYr, mo] < dd do inc(mo);
+
   ss := ss - (dim[isLeapYr, mo-1] * 86400); //remaining secs in month
   dd := ss div 86400;                       //86400 secs per day
+  if dd = 0 then
+    dd := 1;                   //fix for secsSince1904 == 0
 
   ss := ss mod 86400;                       //remaining secs in day
   hh := ss div 3600;
@@ -715,19 +750,31 @@ begin
   for i := 1 to length do
   begin
     GetWord(stream, w); //nb: reverses byte order
+    if w = 0 then
+    begin
+      SetLength(Result, i -1);
+      break;
+    end;
     result[i] := WideChar(w);
-  end;
+   end;
 end;
 //------------------------------------------------------------------------------
 
-function GetAnsiString(stream: TStream; length: integer): string;
+function GetAnsiString(stream: TStream; len: integer): string;
 var
+  i: integer;
   ansi: UTF8String;
 begin
-  setLength(ansi, length +1);
-  ansi[length] := #0;
-  stream.Read(ansi[1], length);
+  setLength(ansi, len+1);
+  ansi[len+1] := #0;
+  stream.Read(ansi[1], len);
   result := string(ansi);
+  for i := 1 to length(Result) do
+    if Result[i] = #0 then
+    begin
+      SetLength(Result, i -1);
+      break;
+    end;
 end;
 
 //------------------------------------------------------------------------------
@@ -757,6 +804,7 @@ begin
   fKernTable            := nil;
   fTbl_glyf.numContours := 0;
   fFontInfo.fontFormat  := ffInvalid;
+  fFontWeight           := 0;
   fStream.Clear;
   NotifyRecipients(nfChanging);
 end;
@@ -800,11 +848,15 @@ function TTtfFontReader.LoadFromFile(const filename: string): Boolean;
 var
   fs: TFileStream;
 begin
-  fs := TFileStream.Create(filename, fmOpenRead or fmShareDenyNone);
   try
-    Result := LoadFromStream(fs);
-  finally
-    fs.free;
+    fs := TFileStream.Create(filename, fmOpenRead or fmShareDenyNone);
+    try
+      Result := LoadFromStream(fs);
+    finally
+      fs.free;
+    end;
+  except
+    Result := False;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1034,23 +1086,25 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetTable_name: Boolean;
-
-  function GetStringGlyphs(const nameRec: TNameRec): UnicodeString;
-  var
-    sPos: integer;
-  begin
-    sPos := fStream.Position;
-    fStream.Position := fTables[fTblIdxes[tblName]].offset +
-      fTbl_name.stringOffset + nameRec.offset;
-    if IsUnicode(nameRec.platformID) then
-      Result := GetWideString(fStream, nameRec.length) else
-      Result := UnicodeString(GetAnsiString(fStream, nameRec.length));
-    fStream.Position := sPos;
-  end;
-
+function GetString(stream: TStream;
+  const nameRec: TNameRec; offset: integer): UnicodeString;
 var
-  i: integer;
+  sPos, len: integer;
+begin
+  sPos := stream.Position;
+  stream.Position := offset + nameRec.offset;
+  if IsUnicode(nameRec.platformID) then
+    Result := GetWideString(stream, nameRec.length) else
+    Result := UnicodeString(GetAnsiString(stream, nameRec.length));
+  len := Length(Result);
+  if (len > 0) and (Result[len] = #0) then SetLength(Result, len -1);
+  stream.Position := sPos;
+end;
+//------------------------------------------------------------------------------
+
+function TTtfFontReader.GetTable_name: Boolean;
+var
+  i, offset: integer;
   nameRec: TNameRec;
   nameTbl: TTtfTable;
 begin
@@ -1064,6 +1118,7 @@ begin
   GetWord(fStream, fTbl_name.format);
   GetWord(fStream, fTbl_name.count);
   GetWord(fStream, fTbl_name.stringOffset);
+  offset := nameTbl.offset + fTbl_name.stringOffset;
   for i := 1 to fTbl_name.count do
   begin
     GetWord(fStream, nameRec.platformID);
@@ -1073,11 +1128,11 @@ begin
     GetWord(fStream, nameRec.length);
     GetWord(fStream, nameRec.offset);
     case nameRec.nameID of
-      0: fFontInfo.copyright    := GetStringGlyphs(nameRec);
-      1: fFontInfo.faceName     := GetStringGlyphs(nameRec);
-      2: fFontInfo.style        := GetStringGlyphs(nameRec);
+      0: fFontInfo.copyright    := GetString(fStream, nameRec, offset);
+      1: fFontInfo.faceName     := GetString(fStream, nameRec, offset);
+      2: fFontInfo.style        := GetString(fStream, nameRec, offset);
       3..7: continue;
-      8: fFontInfo.manufacturer := GetStringGlyphs(nameRec);
+      8: fFontInfo.manufacturer := GetString(fStream, nameRec, offset);
       else break;
     end;
   end;
@@ -1707,6 +1762,48 @@ begin
   end else
     FillChar(result, sizeOf(Result), 0)
 end;
+//------------------------------------------------------------------------------
+
+function TTtfFontReader.GetWeight: integer;
+var
+  glyph: TPathsD;
+  i, dummy: integer;
+  accum: Cardinal;
+  gm: TGlyphMetrics;
+  rec: TRectD;
+  img: TImage32;
+  p: PARGB;
+const
+  imgSize = 16;
+  k = 5; //empirical constant
+begin
+  //get an empirical weight based on the character 'G'
+  result := 0;
+  if not IsValidFontFormat then Exit;
+  if fFontWeight > 0 then
+  begin
+    Result := fFontWeight;
+    Exit;
+  end;
+  GetGlyphInfo(Ord('G'),glyph, dummy, gm);
+  rec := GetBoundsD(glyph);
+  glyph := Image32_Vector.OffsetPath(glyph, -rec.Left, -rec.Top);
+  glyph := Image32_Vector.ScalePath(glyph,
+    imgSize/rec.Width, imgSize/rec.Height);
+  img := TImage32.Create(imgSize,imgSize);
+  DrawPolygon(img, glyph, frEvenOdd, clBlack32);
+  accum := 0;
+  p := PARGB(img.PixelBase);
+  for i := 0 to imgSize * imgSize do
+  begin
+    inc(accum, p.A);
+    inc(p);
+  end;
+  fFontWeight := Max(100, Min(900,
+    Round(k * accum / (imgSize * imgSize * 100)) * 100));
+  Result := fFontWeight;
+end;
+//------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
 // TGlyphCache
@@ -2248,6 +2345,201 @@ begin
 
   if fVerticalFlip then VerticalFlip(Result.contours);
   fSorted := false;
+end;
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+function AppendSlash(const foldername: string): string;
+begin
+  Result := foldername;
+  if (Result = '') or (Result[Length(Result)] = '\') then Exit;
+  Result := Result + '\';
+end;
+//------------------------------------------------------------------------------
+
+{$IFDEF MSWINDOWS}
+function GetFontFolder: string;
+var
+  pidl: PItemIDList;
+  path: array[0..MAX_PATH] of char;
+begin
+  SHGetSpecialFolderLocation(0, CSIDL_FONTS, pidl);
+  SHGetPathFromIDList(pidl, path);
+  result := path;
+end;
+//------------------------------------------------------------------------------
+
+function GetInstalledTtfFilenames: TArrayOfString;
+var
+  cnt, buffLen: integer;
+  fontFolder, filterUpcase: string;
+  sr: TSearchRec;
+  res: integer;
+begin
+  cnt := 0; buffLen := 1024;
+  SetLength(Result, buffLen);
+  fontFolder := AppendSlash(GetFontFolder);
+  res := FindFirst(fontFolder + '*.ttf', faAnyFile, sr);
+  while res = 0 do
+  begin
+    if cnt = buffLen then
+    begin
+      inc(buffLen, 128);
+      SetLength(Result, buffLen);
+    end;
+    Result[cnt] := fontFolder + sr.Name;
+    inc(cnt);
+    res := FindNext(sr);
+  end;
+  FindClose(sr);
+  SetLength(Result, cnt);
+end;
+//------------------------------------------------------------------------------
+{$ENDIF}
+
+function GetFacenameAndStyle(const filename: string;
+  out facename: string; out style: string): Boolean;
+var
+  fs: TFileStream;
+begin
+  try
+    fs := TFileStream.Create(filename, fmOpenRead or fmShareDenyNone);
+    try
+      Result := GetFacenameAndStyle(fs, facename, style);
+    finally
+      fs.free;
+    end;
+  except
+    Result := False;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function GetFacenameAndStyle(const stream: TStream;
+  out facename: string; out style: string): Boolean;
+var
+  i,j, offset: integer;
+  dummy: Cardinal;
+  cnt, strOffset: Word;
+  table: TTtfTable;
+  nameRec: TNameRec;
+begin
+  result := false;
+  facename := ''; style := '';
+  //stream.Position := 0;
+  if stream.Position >= stream.Size - SizeOf(TTtfOffsetTable) then Exit;
+  GetCardinal(stream, dummy);
+  GetWord(stream, cnt);
+  stream.Position := stream.Position +6;
+  if stream.Position >= stream.Size - SizeOf(TTtfTable) * cnt then Exit;
+  for i := 0 to cnt -1 do
+  begin
+    GetCardinal(stream, table.tag);
+    GetCardinal(stream, table.checkSum);
+    GetCardinal(stream, table.offset);
+    GetCardinal(stream, table.length);
+    if table.tag = $6E616D65 then //'name' table
+    begin
+      if (stream.Size < table.offset + table.length) then Exit;
+      stream.Position := table.offset;
+      GetWord(stream, cnt); //ie format ignored
+      GetWord(stream, cnt);
+      GetWord(stream, strOffset);
+      offset := table.offset + strOffset;
+      for j := 1 to cnt do
+      begin
+        GetWord(stream, nameRec.platformID);
+        GetWord(stream, nameRec.encodingID);
+        GetWord(stream, nameRec.languageID);
+        GetWord(stream, nameRec.nameID);
+        GetWord(stream, nameRec.length);
+        GetWord(stream, nameRec.offset);
+        case nameRec.nameID of
+          0: continue;
+          1: faceName     := GetString(stream, nameRec, offset);
+          2: style        := GetString(stream, nameRec, offset);
+          else break;
+        end;
+      end;
+      Result := facename <> '';
+      break;
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function FilterOnFacename(const fontnames: TArrayOfString;
+  const facename: string; exactMatch: Boolean): TArrayOfString;
+var
+  i, cnt, len: integer;
+  upName, name, s: string;
+begin
+  upName := UpperCase(facename);
+  len := Length(fontnames);
+  cnt := 0;
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+  begin
+    if not GetFacenameAndStyle(fontnames[i], name, s) then Continue;
+    if (exactMatch and (CompareStr(upName, Uppercase(name)) <> 0)) or
+      (not exactMatch and (Pos(upName, Uppercase(name)) = 0)) then Continue;
+    Result[cnt] := fontnames[i];
+    inc(cnt);
+  end;
+  SetLength(Result, cnt);
+end;
+//------------------------------------------------------------------------------
+
+function FilterOnStyles(const fontnames: TArrayOfString;
+  const mustIncludeStyle, mustExcludeStyle: array of string): TArrayOfString;
+var
+  i,j,k, len,cnt: integer;
+  n,s: string;
+  incl, excl: array of string;
+  isMatch: Boolean;
+begin
+  cnt := 0;
+  len := Length(fontnames);
+  SetLength(Result, len);
+
+  i := Length(mustIncludeStyle);
+  setLength(incl, i);
+  for j := 0 to i -1 do
+    incl[j] := UpperCase(mustIncludeStyle[j]);
+  i := Length(mustExcludeStyle);
+  setLength(excl, i);
+  for j := 0 to i -1 do
+    excl[j] := UpperCase(mustExcludeStyle[j]);
+
+  for i := 0 to len -1 do
+  begin
+    if GetFacenameAndStyle(fontnames[i], n, s) then
+    begin
+      isMatch := true;
+      for j := 0 to High(incl) do
+        if (Pos(incl[j], Uppercase(s)) = 0) then
+        begin
+          isMatch := false;
+          break;
+        end;
+
+      if isMatch then
+        for j := 0 to High(excl) do
+          if (Pos(excl[j], Uppercase(s)) > 0) then
+          begin
+            isMatch := false;
+            break;
+          end;
+
+      if isMatch then
+      begin
+        Result[cnt] := fontnames[i];
+        inc(cnt);
+      end;
+    end;
+  end;
+  SetLength(Result, cnt);
 end;
 
 //------------------------------------------------------------------------------

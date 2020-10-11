@@ -359,11 +359,11 @@ end;
 constructor TImagePanel.Create(AOwner: TComponent);
 begin
   inherited;
-  Height :=200;
-  Width := 200;
+  Height := 200;
+  Width  := 200;
 
   BevelWidth := 1;
-  BorderWidth := DPI(16);
+  BorderWidth := 16;
   BevelInner := bvLowered;
   DoubleBuffered := true;
   TabStop := true;

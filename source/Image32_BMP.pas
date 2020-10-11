@@ -3,7 +3,7 @@ unit Image32_BMP;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.53                                                            *
-* Date      :  10 October 2020                                                 *
+* Date      :  11 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  BMP file format extension for TImage32                          *
@@ -177,12 +177,13 @@ begin
       end;
   end;
 
-  //colorXBit.R = (buffer^ and bitfields[0]) shr shift[0]
-  //and the largest possible value for colorXBit.R = (1 shl size[i]) - 1
-  //so convert size[x] to the maximum possible value for colorXBit.R ...
   for i := 0 to 2 do
   begin
-    if size[i] > 8 then Exit; //bitfields bigger than 8 are not supported
+    //bitfields larger than 8 aren't supported
+    if size[i] > 8 then Exit;
+    //colorXBit.R = (buffer^ and bitfields[0]) shr shift[0]
+    //and the largest possible value for colorXBit.R = (1 shl size[i]) - 1
+    //so convert size[x] to the maximum possible value for colorXBit.R ...
     size[i] := (1 shl size[i]) - 1;
   end;
 

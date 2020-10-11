@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.52                                                            *
-* Date      :  1 October 2020                                                  *
+* Version   :  1.53                                                            *
+* Date      :  11 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -301,6 +301,7 @@ type
   TArrayOfPathsD = array of TPathsD;
 
   TArrayOfDouble = array of double;
+  TArrayOfString = array of string;
 
   TRectD = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
     Left, Top, Right, Bottom: double;
@@ -1489,7 +1490,8 @@ begin
     pc := PixelBase;
     for i := 0 to Width * Height -1 do
     begin
-      pc^ := color; inc(pc);
+      pc^ := color;
+      inc(pc);
     end;
   end;
   Changed;
