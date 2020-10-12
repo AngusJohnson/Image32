@@ -32,8 +32,10 @@ function InflateOpenPaths(const paths: TPathsD;
   delta: Double; joinStyle: TJoinStyle = jsAuto; endStyle: TEndStyle = esSquare;
   miterLimit: double = 2.0): TPathsD;
 
+//UnionPolygon: removes self-intersections
 function UnionPolygon(const polygon: TPathD;
   fillRule: TFillRule): TPathsD;
+
 function UnionPolygons(const polygons: TPathsD;
   fillRule: TFillRule): TPathsD; overload;
 function UnionPolygons(const polygon1, polygon2: TPathD;
@@ -120,8 +122,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function UnionPolygon(const polygon: TPathD;
-  fillRule: TFillRule): TPathsD;
+function UnionPolygon(const polygon: TPathD; fillRule: TFillRule): TPathsD;
 begin
   with TClipperD.Create do
   try

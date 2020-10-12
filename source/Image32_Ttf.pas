@@ -537,9 +537,6 @@ begin
 
   ss := ss - (dim[isLeapYr, mo-1] * 86400); //remaining secs in month
   dd := ss div 86400;                       //86400 secs per day
-  if dd = 0 then
-    dd := 1;                   //fix for secsSince1904 == 0
-
   ss := ss mod 86400;                       //remaining secs in day
   hh := ss div 3600;
   ss := ss mod 3600;                        //remaining secs in hour
@@ -1086,8 +1083,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetString(stream: TStream;
-  const nameRec: TNameRec; offset: integer): UnicodeString;
+function GetNameRecString(stream: TStream;
+  const nameRec: TNameRec; offset: cardinal): UnicodeString;
 var
   sPos, len: integer;
 begin
@@ -1104,7 +1101,8 @@ end;
 
 function TTtfFontReader.GetTable_name: Boolean;
 var
-  i, offset: integer;
+  i: integer;
+  offset: cardinal;
   nameRec: TNameRec;
   nameTbl: TTtfTable;
 begin
@@ -1128,11 +1126,11 @@ begin
     GetWord(fStream, nameRec.length);
     GetWord(fStream, nameRec.offset);
     case nameRec.nameID of
-      0: fFontInfo.copyright    := GetString(fStream, nameRec, offset);
-      1: fFontInfo.faceName     := GetString(fStream, nameRec, offset);
-      2: fFontInfo.style        := GetString(fStream, nameRec, offset);
+      0: fFontInfo.copyright    := GetNameRecString(fStream, nameRec, offset);
+      1: fFontInfo.faceName     := GetNameRecString(fStream, nameRec, offset);
+      2: fFontInfo.style        := GetNameRecString(fStream, nameRec, offset);
       3..7: continue;
-      8: fFontInfo.manufacturer := GetString(fStream, nameRec, offset);
+      8: fFontInfo.manufacturer := GetNameRecString(fStream, nameRec, offset);
       else break;
     end;
   end;
@@ -2370,6 +2368,7 @@ var
 begin
   SHGetSpecialFolderLocation(0, CSIDL_FONTS, pidl);
   SHGetPathFromIDList(pidl, path);
+  SHFree(pidl);
   result := path;
 end;
 //------------------------------------------------------------------------------
@@ -2377,7 +2376,7 @@ end;
 function GetInstalledTtfFilenames: TArrayOfString;
 var
   cnt, buffLen: integer;
-  fontFolder, filterUpcase: string;
+  fontFolder: string;
   sr: TSearchRec;
   res: integer;
 begin
@@ -2461,8 +2460,8 @@ begin
         GetWord(stream, nameRec.offset);
         case nameRec.nameID of
           0: continue;
-          1: faceName     := GetString(stream, nameRec, offset);
-          2: style        := GetString(stream, nameRec, offset);
+          1: faceName     := GetNameRecString(stream, nameRec, offset);
+          2: style        := GetNameRecString(stream, nameRec, offset);
           else break;
         end;
       end;
@@ -2498,7 +2497,7 @@ end;
 function FilterOnStyles(const fontnames: TArrayOfString;
   const mustIncludeStyle, mustExcludeStyle: array of string): TArrayOfString;
 var
-  i,j,k, len,cnt: integer;
+  i,j, len,cnt: integer;
   n,s: string;
   incl, excl: array of string;
   isMatch: Boolean;

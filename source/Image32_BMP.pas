@@ -3,7 +3,7 @@ unit Image32_BMP;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.53                                                            *
-* Date      :  11 October 2020                                                 *
+* Date      :  12 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  BMP file format extension for TImage32                          *
@@ -251,24 +251,24 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetByte(var ptr: PByte): Byte;
+function GetByte(stream: TStream): Byte;
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
-  result := Byte(ptr^);
-  inc(ptr);
+  stream.Read(Result, 1);
 end;
 //------------------------------------------------------------------------------
 
-function GetNibble(var ptr: PByte; var bitsOffset: integer): Byte;
+function GetNibble(stream: TStream; var bitsOffset: integer): Byte;
 begin
+  stream.Read(Result, 1);
   if bitsOffset = 4 then
   begin
-    result := Ord(ptr^) and $F;
+    result := result and $F;
     bitsOffset := 0;
-    inc(ptr);
   end else
   begin
-    result := Ord(ptr^) shr 4;
+    Stream.Position := Stream.Position -1;
+    result := result shr 4;
     bitsOffset := 4;
   end;
 end;
@@ -279,95 +279,85 @@ function ReadRLE4orRLE8Compression(stream: TStream;
   const palette: TArrayOfColor32): TArrayOfColor32;
 var
   i,j,k, cnt, idx: integer;
-  buffLen, w, delta, bitOffset: integer;
+  w, delta, bitOffset: integer;
   dst: PColor32;
   byte1, byte2: byte;
-  buffer: Pointer;
-  b: PByte;
 const
   COMMAND_BYTE = 0;
   DELTA_MODE = 2;
 begin
   setLength(Result, width * height);
-  buffLen := stream.Size - stream.Position;
-  getMem(buffer, buffLen);
-  try
-    stream.Read(buffer^, buffLen);
-    b := buffer;
-    for i := 0 to height -1 do
+  for i := 0 to height -1 do
+  begin
+    dst := @result[i * width];
+    w := 0; idx := 0;
+    while w < width do
     begin
-      dst := @result[i * width];
-      w := 0; idx := 0;
-      while w < width do
+      byte1 := GetByte(stream);
+      byte2 := GetByte(stream);
+      if byte1 = COMMAND_BYTE then
       begin
-        byte1 := GetByte(b);
-        byte2 := GetByte(b);
-        if byte1 = COMMAND_BYTE then
+        if byte2 < 2 then Exit          //error
+        else if byte2 = DELTA_MODE then
         begin
-          if byte2 < 2 then Exit          //error
-          else if byte2 = DELTA_MODE then
+          cnt := GetByte(stream);
+          delta := GetByte(stream);
+          if delta > 0 then Exit;       //Y-delta never seen & not supported
+          for k := 1 to cnt do
           begin
-            cnt := GetByte(b);
-            delta := GetByte(b);
-            if delta > 0 then Exit;       //Y-delta never seen & not supported
-            for k := 1 to cnt do
-            begin
-              dst^ := palette[idx];
-              inc(w);
-              inc(dst);
-            end;
-          end
-          else                            //'absolute mode'
-          begin
-            cnt := byte2;
-            bitOffset := 0;
-            for k := 1 to cnt do
-            begin
-              if bpp = 4 then
-                idx := GetNibble(b, bitOffset) else
-                idx := GetByte(b);
-              dst^ := palette[idx];
-              inc(w);
-              if w = width then break;
-              inc(dst);
-            end;
-            if bitOffset > 0 then inc(b);
-            if Cardinal(b) mod 2 = 1 then
-              inc(b);                     //ie must be WORD aligned
+            dst^ := palette[idx];
+            inc(w);
+            inc(dst);
           end;
-        end else                          //'encoded mode'
+        end
+        else                            //'absolute mode'
         begin
-          cnt := byte1;
-          if bpp = 4 then
+          cnt := byte2;
+          bitOffset := 0;
+          for k := 1 to cnt do
           begin
-            for j := 1 to cnt do
-            begin
-              if Odd(j) then
-                idx := byte2 shr 4 else
-                idx := byte2 and $F;
-              dst^ := palette[idx];
-              inc(w);
-              if w = width then break;
-              inc(dst);
-            end;
-          end else
+            if bpp = 4 then
+              idx := GetNibble(stream, bitOffset) else
+              idx := GetByte(stream);
+            dst^ := palette[idx];
+            inc(w);
+            if w = width then break;
+            inc(dst);
+          end;
+          if bitOffset > 0 then GetByte(stream);
+          if Odd(stream.Position) then
+            GetByte(stream);            //ie must be WORD aligned
+        end;
+      end else                          //'encoded mode'
+      begin
+        cnt := byte1;
+        if bpp = 4 then
+        begin
+          for j := 1 to cnt do
           begin
-            idx := byte2;
-            for j := 1 to cnt do
-            begin
-              dst^ := palette[idx];
-              inc(w);
-              inc(dst);
-            end;
+            if Odd(j) then
+              idx := byte2 shr 4 else
+              idx := byte2 and $F;
+            dst^ := palette[idx];
+            inc(w);
+            if w = width then break;
+            inc(dst);
+          end;
+        end else
+        begin
+          idx := byte2;
+          for j := 1 to cnt do
+          begin
+            dst^ := palette[idx];
+            inc(w);
+            inc(dst);
           end;
         end;
       end;
-      byte1 := GetByte(b);
-      byte2 := GetByte(b);
-      if (byte1 <> 0) or (byte2 <> 0) then Exit;
     end;
-  finally
-    FreeMem(buffer);
+    byte1 := GetByte(stream);
+    byte2 := GetByte(stream);
+    if (byte1 <> 0) or (byte2 <> 0) then Exit;
   end;
 end;
 //------------------------------------------------------------------------------
