@@ -48,7 +48,7 @@ var
   i, ImageSize, SpaceAbove, sqSize: integer;
   j,k: double;
   img, img2: TImage32;
-  path, path2: TArrayOfPointD;
+  path, path2: TPathD;
   rec: TRect;
 begin
   ImageSize := DPIAware(100);

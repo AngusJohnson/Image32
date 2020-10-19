@@ -541,8 +541,8 @@ begin
   begin
     //assuming bg.A = 255, use just fg.A for color weighting
     res.A := 255;
-    fw := @MulTable[fg.A];         //ie weight of foreground
-    bw := @MulTable[not fg.A];     //ie weight of foreground
+    fw := PByteArray(@MulTable[fg.A]);     //ie weight of foreground
+    bw := PByteArray(@MulTable[not fg.A]); //ie weight of foreground
     res.R := fw[fg.R] + bw[bg.R];
     res.G := fw[fg.G] + bw[bg.G];
     res.B := fw[fg.B] + bw[bg.B];
@@ -570,8 +570,8 @@ begin
     fgWeight := DivTable[fg.A, res.A]; //fgWeight = amount foreground color
                                        //contibutes to total (result) color
 
-    R     := @MulTable[fgWeight];      //ie weight of foreground
-    InvR  := @MulTable[not fgWeight];  //ie weight of foreground
+    R     := PByteArray(@MulTable[fgWeight]);      //ie weight of foreground
+    InvR  := PByteArray(@MulTable[not fgWeight]);  //ie weight of foreground
     res.R := R[fg.R] + InvR[bg.R];
     res.G := R[fg.G] + InvR[bg.G];
     res.B := R[fg.B] + InvR[bg.B];

@@ -28,7 +28,10 @@ type
 {$IFNDEF UNICODE}
   UnicodeString = WideString;
 {$ENDIF}
-{$ZEROBASEDSTRINGS OFF}
+
+{$IFDEF ZEROBASEDSTR}
+  {$ZEROBASEDSTRINGS OFF}
+{$ENDIF}
 
   //TGlyphInfo: Object that's used internally be TFontInfo
   //Note - glyph outlines always use the NON-ZERO fill rule

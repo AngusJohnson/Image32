@@ -155,7 +155,7 @@ end;
 procedure TLineLayer32.SetSmoothPath(const smoothPath: TSmoothPath);
 var
   rec: TRect;
-  flatPath: TArrayOfPointD;
+  flatPath: TPathD;
 begin
   flatPath := smoothPath.FlattenedPath;
   //calculate and assign hit test regions
@@ -180,7 +180,7 @@ end;
 procedure TPolygonLayer32.SetSmoothPath(const smoothPath: TSmoothPath);
 var
   rec: TRect;
-  flattened: TArrayOfPointD;
+  flattened: TPathD;
 begin
   //calculate and assign hit test regions
   flattened := smoothPath.FlattenedPath;
@@ -393,7 +393,7 @@ procedure TFrmMain.UpdateImage;
 var
   i, d: integer;
   rec: TRect;
-  path: TArrayOfPointD;
+  path: TPathD;
   paths: TPathsD;
 begin
   if not Active then Exit; //just avoids several calls in FormCreate

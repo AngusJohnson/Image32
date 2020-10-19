@@ -307,9 +307,9 @@ begin
 
   // multiplication tables (see Image32.pas)
   // 85 + (2 * 57) + (2 * 28) == 255
-  primeTbl := @MulTable[85 + centerWeighting *2];
-  nearTbl  := @MulTable[57];
-  farTbl   := @MulTable[28 - centerWeighting];
+  primeTbl := PByteArray(@MulTable[85 + centerWeighting *2]);
+  nearTbl  := PByteArray(@MulTable[57]);
+  farTbl   := PByteArray(@MulTable[28 - centerWeighting]);
 
   SetLength(rowBuffer, img.Width+4);
   FillChar(rowBuffer[0], Length(rowBuffer) *  SizeOf(TColor32), 0);
@@ -373,27 +373,20 @@ end;
 // Other miscellaneous functions
 //------------------------------------------------------------------------------
 
-
 //__Trunc: A very efficient Trunc() algorithm (ie rounds toward zero)
 function __Trunc(val: double): integer; {$IFDEF INLINE} inline; {$ENDIF}
 var
   exp: integer;
-  i64: UInt64 absolute val; //nb: this cast circumvents potential endian issues
+  i64: UInt64 absolute val;
 begin
   //https://en.wikipedia.org/wiki/Double-precision_floating-point_format
-  if i64 <> 0 then
-  begin
-    exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;
-    //if exp = 1024 then //INF & NAN values
-    //  Result := MaxInt else
-    if exp >= 0 then
-    begin
-      Result := ((i64 and $1FFFFFFFFFFFFF) shr (52-exp)) or (1 shl exp);
-      if val < 0 then Result := -Result;
-    end else
-      Result := 0;
-  end else
-    Result := 0;
+  Result := 0;
+  if i64 = 0 then Exit;
+  exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;
+  //nb: when exp == 1024 then val == INF or NAN
+  if exp <= 0 then Exit;
+  Result := ((i64 and $1FFFFFFFFFFFFF) shr (52-exp)) or (1 shl exp);
+  if val < 0 then Result := -Result;
 end;
 //------------------------------------------------------------------------------
 
@@ -538,8 +531,8 @@ begin
     Result := fgColor
   else
   begin
-    R    := @MulTable[mask];
-    InvR := @MulTable[not mask];
+    R    := PByteArray(@MulTable[mask]);
+    InvR := PByteArray(@MulTable[not mask]);
     res.A := R[fg.A] + InvR[bg.A];
     res.R := R[fg.R] + InvR[bg.R];
     res.G := R[fg.G] + InvR[bg.G];
@@ -1052,7 +1045,7 @@ end;
 procedure TColorRenderer.SetColor(value: TColor32);
 begin
   fColor := value and $FFFFFF;
-  fAlphaTbl := @MulTable[value shr 24];
+  fAlphaTbl := PByteArray(@MulTable[value shr 24]);
 end;
 //------------------------------------------------------------------------------
 

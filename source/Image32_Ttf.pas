@@ -30,7 +30,7 @@ type
 
   //nb: Avoid "packed" records as these cause problems with Android
 
-  TTtfOffsetTable = record
+  TFontHeaderTable = record
     sfntVersion   : Cardinal;  // $10000 or 'OTTO'
     numTables     : WORD;
     searchRange   : WORD;
@@ -38,42 +38,17 @@ type
     rangeShift    : WORD;
   end;
 
-  TTtfTable = record
+  TFontTable = record
     tag           : Cardinal;
     checkSum      : Cardinal;
     offset        : Cardinal;
     length        : Cardinal;
   end;
 
-  TTtfTable_Cmap = record
+  TFontTable_Cmap = record
     version       : WORD;
     numTables     : WORD;
   end;
-
-  TTtfTable_Kern = record
-    version       : WORD;
-    numTables     : WORD;
-  end;
-
-  TKernSubTbl = record
-    version       : WORD;
-    length        : WORD;
-    coverage      : WORD;
-  end;
-
-  TFormat0KernHdr = record
-    nPairs        : WORD;
-    searchRange   : WORD;
-    entrySelector : WORD;
-    rangeShift    : WORD;
-  end;
-
-  TFormat0KernRec = record
-    left          : WORD;
-    right         : WORD;
-    value         : int16;
-  end;
-  TArrayOfKernRecs = array of TFormat0KernRec;
 
   TCmapTblRec = record
     platformID    : WORD; //Unicode = 0; Windows = 3 (obsolete);
@@ -108,7 +83,32 @@ type
     entryCount    : WORD;
   end;
 
-  TTtfTable_Name = record
+  TFontTable_Kern = record
+    version       : WORD;
+    numTables     : WORD;
+  end;
+
+  TKernSubTbl = record
+    version       : WORD;
+    length        : WORD;
+    coverage      : WORD;
+  end;
+
+  TFormat0KernHdr = record
+    nPairs        : WORD;
+    searchRange   : WORD;
+    entrySelector : WORD;
+    rangeShift    : WORD;
+  end;
+
+  TFormat0KernRec = record
+    left          : WORD;
+    right         : WORD;
+    value         : int16;
+  end;
+  TArrayOfKernRecs = array of TFormat0KernRec;
+
+  TFontTable_Name = record
     format        : WORD;
     count         : WORD;
     stringOffset  : WORD;
@@ -124,7 +124,7 @@ type
     offset            : WORD;
   end;
 
-  TTtfTable_Head = record
+  TFontTable_Head = record
     majorVersion   : Word;
     minorVersion   : Word;
     fontRevision   : TFixed;
@@ -145,14 +145,14 @@ type
     glyphDataFmt   : Int16;
   end;
 
-  TTtfTable_Maxp = record
+  TFontTable_Maxp = record
     version        : TFixed;
     numGlyphs      : WORD;
     maxPoints      : WORD;
     maxContours    : WORD;
   end;
 
-  TTtfTable_Glyf = record
+  TFontTable_Glyf = record
     numContours    : Int16;
     xMin           : Int16;
     yMin           : Int16;
@@ -160,7 +160,7 @@ type
     yMax           : Int16;
   end;
 
-  TTtfTable_Hhea = record
+  TFontTable_Hhea = record
     version        : TFixed;
     ascent         : Int16;
     descent        : Int16;
@@ -177,20 +177,12 @@ type
     numLongHorMets : WORD;
   end;
 
-  TTtfTable_Hmtx = record
+  TFontTable_Hmtx = record
     advanceWidth    : WORD;
     leftSideBearing : Int16;
   end;
 
-  TTtfTable_Loca = record
-    //offset   : Word or Cardinal array(see below);
-    //offsets should be 32bit aligned and are relative to the 'glyf' table
-    //offset[0] is the offset of the 'missing' character glyph
-    //offset = WORD array when head.indexToLocFmt == 0 else it's Cardinals
-  end;
-
-  //TTtfFontInfo: custom record
-  TTtfFontInfo = record
+  TFontInfo = record                  //a custom summary record
     fontFormat     : TFontFormat;
     faceName       : UnicodeString;
     style          : UnicodeString;
@@ -219,16 +211,15 @@ type
   end;
   TArrayOfTKern = array of TKern;
 
-  TGlyphMetrics = record
+  TGlyphMetrics = record              //a custom metrics record
     glyphIdx   : integer;
     unitsPerEm : integer;
-    glyf       : TTtfTable_Glyf;
-    hmtx       : TTtfTable_Hmtx;
+    glyf       : TFontTable_Glyf;
+    hmtx       : TFontTable_Hmtx;
     kernList   : TArrayOfTKern;
   end;
 
-  TTtfTableArray = array of TTtfTable;
-  TArrayOfByte = array of Byte;
+  TFontTableArray = array of TFontTable;
   TArrayOfWord = array of WORD;
   TArrayOfCardinal = array of Cardinal;
   TArrayOfCmapTblRec = array of TCmapTblRec;
@@ -243,28 +234,26 @@ type
   TTableName = (tblName, tblHead, tblHhea,
     tblCmap, tblMaxp, tblLoca, tblGlyf, tblHmtx, tblKern);
 
-  //TGlyphCache is dependant on an external TTtfFontReader, and it makes sense
-  //to save this TTtfFontReader as a property. So we need a mechanism where
-  //TTtfFontReader will notify TGlyphCache when its font is changing and when
-  //it's being destroyed. And we need to accommodate several TGlyphCache
-  //objects being attached to a single TTtfFontReader object (ie when caching
-  //glyphs for several heights of a given font).
+  //The TNotifySender and TNotifyRecipient classes below provide a mechanism
+  //for an object to notify others of changes. This mechanism is necessary for
+  //TGlyphCache which is dependent on an external TFontReader object, and
+  //would need to flush its cache if its associated TFontReader changes or
+  //is destroyed.
 
   TNotifyFlag = (nfChanging, nfDestroying);
-
   TNotifyRecipient = class;
 
   TNotifySender = class
-  protected
+  private
     fUpdateCount: integer;
     fRecipientList: array of TNotifyRecipient;
+  public
+    destructor Destroy; override;
+    procedure NotifyRecipients(notifyFlag: TNotifyFlag);
     procedure Register(Recipient: TNotifyRecipient);
     procedure UnRegister(Recipient: TNotifyRecipient);
     procedure BeginUpdate;
     procedure EndUpdate;
-  public
-    destructor Destroy; override;
-    procedure NotifyRecipients(notifyFlag: TNotifyFlag);
   end;
 
   TNotifyRecipient = class
@@ -272,22 +261,24 @@ type
     procedure SenderIsNotifying(notifyFlag: TNotifyFlag); virtual; abstract;
   end;
 
-{$ZEROBASEDSTRINGS OFF}
+{$IFDEF ZEROBASEDSTR}
+  {$ZEROBASEDSTRINGS OFF}
+{$ENDIF}
 
-  TTtfFontReader = class(TNotifySender)
+  TFontReader = class(TNotifySender)
   private
     fStream            : TMemoryStream;
     fFontWeight        : integer;
-    fFontInfo          : TTtfFontInfo;
-    fTables            : TTtfTableArray;
+    fFontInfo          : TFontInfo;
+    fTables            : TFontTableArray;
     fTblIdxes          : array[TTableName] of integer;
-    fTbl_name          : TTtfTable_Name;
-    fTbl_head          : TTtfTable_Head;
-    fTbl_hhea          : TTtfTable_Hhea;
-    fTbl_cmap          : TTtfTable_Cmap;
-    fTbl_maxp          : TTtfTable_Maxp;
-    fTbl_glyf          : TTtfTable_Glyf;
-    fTbl_hmtx          : TTtfTable_Hmtx;
+    fTbl_name          : TFontTable_Name;
+    fTbl_head          : TFontTable_Head;
+    fTbl_hhea          : TFontTable_Hhea;
+    fTbl_cmap          : TFontTable_Cmap;
+    fTbl_maxp          : TFontTable_Maxp;
+    fTbl_glyf          : TFontTable_Glyf;
+    fTbl_hmtx          : TFontTable_Hmtx;
     fTbl_loca2         : TArrayOfWord;
     fTbl_loca4         : TArrayOfCardinal;
     fCmapTblRecs       : TArrayOfCmapTblRec;
@@ -315,7 +306,7 @@ type
     function ConvertSplinesToBeziers(const pathsEx: TPathsEx): TPathsEx;
     procedure GetPathCoords(var paths: TPathsEx);
     function GetGlyphHorzMetrics(glyphIdx: integer): Boolean;
-    function GetFontInfo: TTtfFontInfo;
+    function GetFontInfo: TFontInfo;
     function GetGlyphKernList(glyphIdx: integer): TArrayOfTKern;
     function GetGlyphMetrics(glyphIdx: integer): TGlyphMetrics;
     function GetWeight: integer;
@@ -329,7 +320,7 @@ type
     function LoadFromFile(const filename: string): Boolean;
     function GetGlyphInfo(unicode: Word; out paths: TPathsD;
       out nextX: integer; out glyphMetrics: TGlyphMetrics): Boolean;
-    property FontInfo: TTtfFontInfo read GetFontInfo;
+    property FontInfo: TFontInfo read GetFontInfo;
     property Weight: integer read GetWeight; //range 100-900
   end;
 
@@ -340,9 +331,9 @@ type
     metrics        : TGlyphMetrics;
   end;
 
-  //TGlyphCache: speeds up text rendering by parsing font files only once for
-  //each accessed character. It can also scale glyphs to a specified font
-  //height and invert them too (which is necessary on Windows PCs).
+  //TGlyphCache: speeds up text rendering by parsing font files only once
+  //for each accessed character. It can also scale glyphs to a specified
+  //font height and invert them too (which is necessary on Windows PCs).
   TGlyphCache = class(TNotifyRecipient)
   private
 {$IFDEF XPLAT_GENERICS}
@@ -350,11 +341,10 @@ type
 {$ELSE}
     fGlyphInfoList     : TList;
 {$ENDIF}
-    fFontReader        : TTtfFontReader;
+    fFontReader        : TFontReader;
     fSorted            : Boolean;
     fScale             : double;
     fUseKerning        : Boolean;
-    fVerticalFlip      : Boolean;
     fFontHeight        : double;
     fFlipVert          : Boolean;
     function FoundInList(charOrdinal: WORD): Boolean;
@@ -362,7 +352,7 @@ type
     procedure VerticalFlip(var paths: TPathsD);
     procedure SetFlipVert(value: Boolean);
     procedure SetFontHeight(newHeight: double);
-    procedure SetFontReader(newFontReader: TTtfFontReader);
+    procedure SetFontReader(newFontReader: TFontReader);
     procedure UpdateScale;
     procedure Sort;
     procedure GetMissingGlyphs(const ordinals: TArrayOfWord);
@@ -377,7 +367,7 @@ type
   protected
     procedure SenderIsNotifying(notifyFlag: TNotifyFlag); override;
   public
-    constructor Create(fontReader: TTtfFontReader; fontHeight: double);
+    constructor Create(fontReader: TFontReader; fontHeight: double);
     destructor Destroy; override;
     procedure Clear;
     function GetCharInfo(charOrdinal: WORD): PGlyphInfo;
@@ -392,7 +382,7 @@ type
     property Ascent: double read GetAscent;
     property Descent: double read GetDescent;
     property FontHeight: double read fFontHeight write SetFontHeight;
-    property FontReader: TTtfFontReader read
+    property FontReader: TFontReader read
       fFontReader write SetFontReader;
     property InvertY: boolean read fFlipVert write SetFlipVert;
     property Kerning: boolean read fUseKerning write fUseKerning;
@@ -778,13 +768,13 @@ end;
 // TTrueTypeReader
 //------------------------------------------------------------------------------
 
-constructor TTtfFontReader.Create;
+constructor TFontReader.Create;
 begin
   fStream := TMemoryStream.Create;
 end;
 //------------------------------------------------------------------------------
 
-destructor TTtfFontReader.Destroy;
+destructor TFontReader.Destroy;
 begin
   Clear;
   fStream.Free;
@@ -792,7 +782,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TTtfFontReader.Clear;
+procedure TFontReader.Clear;
 begin
   fTables               := nil;
   fCmapTblRecs          := nil;
@@ -807,13 +797,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.IsValidFontFormat: Boolean;
+function TFontReader.IsValidFontFormat: Boolean;
 begin
   result := fFontInfo.fontFormat = ffTrueType;
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.LoadFromStream(stream: TStream): Boolean;
+function TFontReader.LoadFromStream(stream: TStream): Boolean;
 begin
   BeginUpdate;
   try
@@ -828,7 +818,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.LoadFromResource(const resName: string; resType: PChar): Boolean;
+function TFontReader.LoadFromResource(const resName: string; resType: PChar): Boolean;
 var
   rs: TResourceStream;
 begin
@@ -841,7 +831,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.LoadFromFile(const filename: string): Boolean;
+function TFontReader.LoadFromFile(const filename: string): Boolean;
 var
   fs: TFileStream;
 begin
@@ -858,28 +848,29 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetOffsetTable(stream: TStream; out offTable: TTtfOffsetTable): Boolean;
+function GetHeaderTable(stream: TStream;
+  out headerTable: TFontHeaderTable): Boolean;
 begin
-  result := stream.Position < stream.Size - SizeOf(TTtfOffsetTable);
+  result := stream.Position < stream.Size - SizeOf(TFontHeaderTable);
   if not result then Exit;
-  GetCardinal(stream, offTable.sfntVersion);
-  GetWord(stream, offTable.numTables);
-  GetWord(stream, offTable.searchRange);
-  GetWord(stream, offTable.entrySelector);
-  GetWord(stream, offTable.rangeShift);
+  GetCardinal(stream, headerTable.sfntVersion);
+  GetWord(stream, headerTable.numTables);
+  GetWord(stream, headerTable.searchRange);
+  GetWord(stream, headerTable.entrySelector);
+  GetWord(stream, headerTable.rangeShift);
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetTables: Boolean;
+function TFontReader.GetTables: Boolean;
 var
   i, tblCount: integer;
   tbl: TTableName;
-  offTable: TTtfOffsetTable;
+  headerTable: TFontHeaderTable;
 begin
   result := false;
-  if not GetOffsetTable(fStream, offTable) then Exit;
-  tblCount := offTable.numTables;
-  result := fStream.Position < fStream.Size - SizeOf(TTtfTable) * tblCount;
+  if not GetHeaderTable(fStream, headerTable) then Exit;
+  tblCount := headerTable.numTables;
+  result := fStream.Position < fStream.Size - SizeOf(TFontTable) * tblCount;
   if not result then Exit;
 
   for tbl := low(TTableName) to High(TTableName) do fTblIdxes[tbl] := -1;
@@ -923,13 +914,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetTable_cmap: Boolean;
+function TFontReader.GetTable_cmap: Boolean;
 var
   i, segCount: integer;
   reserved: WORD;
   cmapRec: TCmapTblRec;
   format4Rec: TCmapFormat4;
-  cmapTbl: TTtfTable;
+  cmapTbl: TFontTable;
 begin
   Result := false;
   cmapTbl := fTables[fTblIdxes[tblCmap]];
@@ -998,7 +989,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetGlyphIdxFromCmapIdx(idx: Word): integer;
+function TFontReader.GetGlyphIdxFromCmapIdx(idx: Word): integer;
 var
   i: integer;
   w: WORD;
@@ -1031,9 +1022,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetTable_maxp: Boolean;
+function TFontReader.GetTable_maxp: Boolean;
 var
-  maxpTbl: TTtfTable;
+  maxpTbl: TFontTable;
 begin
   maxpTbl := fTables[fTblIdxes[tblMaxp]];
   Result := (fStream.Size >= maxpTbl.offset + maxpTbl.length) and
@@ -1052,10 +1043,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetTable_loca: Boolean;
+function TFontReader.GetTable_loca: Boolean;
 var
   i: integer;
-  locaTbl: TTtfTable;
+  locaTbl: TFontTable;
 begin
   locaTbl := fTables[fTblIdxes[tblLoca]];
   Result := fStream.Size >= locaTbl.offset + locaTbl.length;
@@ -1099,18 +1090,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetTable_name: Boolean;
+function TFontReader.GetTable_name: Boolean;
 var
   i: integer;
   offset: cardinal;
   nameRec: TNameRec;
-  nameTbl: TTtfTable;
+  nameTbl: TFontTable;
 begin
   fFontInfo.faceName := '';
   fFontInfo.style   := '';
   nameTbl := fTables[fTblIdxes[tblName]];
   Result := (fStream.Size >= nameTbl.offset + nameTbl.length) and
-    (nameTbl.length >= SizeOf(TTtfTable_Name));
+    (nameTbl.length >= SizeOf(TFontTable_Name));
   if not Result then Exit;
   fStream.Position := nameTbl.offset;
   GetWord(fStream, fTbl_name.format);
@@ -1137,9 +1128,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetTable_head: Boolean;
+function TFontReader.GetTable_head: Boolean;
 var
-  headTbl: TTtfTable;
+  headTbl: TFontTable;
   yy,mo,dd,hh,mi,ss: cardinal;
 begin
   headTbl := fTables[fTblIdxes[tblHead]];
@@ -1176,9 +1167,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetTable_hhea: Boolean;
+function TFontReader.GetTable_hhea: Boolean;
 var
-  hheaTbl: TTtfTable;
+  hheaTbl: TFontTable;
 begin
   hheaTbl := fTables[fTblIdxes[tblHhea]];
   Result := (fStream.Size >= hheaTbl.offset + hheaTbl.length) and
@@ -1203,9 +1194,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetGlyphHorzMetrics(glyphIdx: integer): Boolean;
+function TFontReader.GetGlyphHorzMetrics(glyphIdx: integer): Boolean;
 var
-  tbl            : TTtfTable;
+  tbl            : TFontTable;
 begin
   tbl := fTables[fTblIdxes[tblHmtx]];
   Result := (fStream.Size >= tbl.offset + tbl.length);
@@ -1228,11 +1219,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TTtfFontReader.GetTable_kern;
+procedure TFontReader.GetTable_kern;
 var
   i              : integer;
-  tbl            : TTtfTable;
-  tbl_kern       : TTtfTable_Kern;
+  tbl            : TFontTable;
+  tbl_kern       : TFontTable_Kern;
   kernSub        : TKernSubTbl;
   format0KernHdr : TFormat0KernHdr;
 begin
@@ -1297,7 +1288,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetGlyphKernList(glyphIdx: integer): TArrayOfTKern;
+function TFontReader.GetGlyphKernList(glyphIdx: integer): TArrayOfTKern;
 var
   i,j,len: integer;
 begin
@@ -1317,10 +1308,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetGlyphPaths(glyphIdx: integer): TPathsEx;
+function TFontReader.GetGlyphPaths(glyphIdx: integer): TPathsEx;
 var
   offset: cardinal;
-  glyfTbl: TTtfTable;
+  glyfTbl: TFontTable;
 begin
   result := nil;
   if fTbl_head.indexToLocFmt = 0 then
@@ -1359,7 +1350,7 @@ const
   Y_DELTA                   = $20;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetSimpleGlyph: TPathsEx;
+function TFontReader.GetSimpleGlyph: TPathsEx;
 var
   i,j: integer;
   instructLen: WORD;
@@ -1398,7 +1389,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TTtfFontReader.GetPathCoords(var paths: TPathsEx);
+procedure TFontReader.GetPathCoords(var paths: TPathsEx);
 var
   i,j: integer;
   xi,yi: Int16;
@@ -1474,7 +1465,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.ConvertSplinesToBeziers(const pathsEx: TPathsEx): TPathsEx;
+function TFontReader.ConvertSplinesToBeziers(const pathsEx: TPathsEx): TPathsEx;
 var
   i,j,k: integer;
   pt: TPointEx;
@@ -1559,7 +1550,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetCompositeGlyph: TPathsEx;
+function TFontReader.GetCompositeGlyph: TPathsEx;
 var
   streamPos: integer;
   flag, glyphIndex: WORD;
@@ -1569,7 +1560,7 @@ var
   a,b,c,d,e,f: double;
 //  compoundIdx, componentIdx: integer;
   componentPaths: TPathsEx;
-  tbl_glyf_old: TTtfTable_Glyf;
+  tbl_glyf_old: TFontTable_Glyf;
 const
   //glyf flags - composite
   ARG_1_AND_2_ARE_WORDS     = $1;
@@ -1670,7 +1661,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetGlyphInfo(unicode: Word; out paths: TPathsD;
+function TFontReader.GetGlyphInfo(unicode: Word; out paths: TPathsD;
   out nextX: integer; out glyphMetrics: TGlyphMetrics): Boolean;
 var
   i,j, glyphIdx: integer;
@@ -1716,7 +1707,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetFontInfo: TTtfFontInfo;
+function TFontReader.GetFontInfo: TFontInfo;
 begin
   if not IsValidFontFormat then
   begin
@@ -1748,7 +1739,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetGlyphMetrics(glyphIdx: integer): TGlyphMetrics;
+function TFontReader.GetGlyphMetrics(glyphIdx: integer): TGlyphMetrics;
 begin
   if IsValidFontFormat then
   begin
@@ -1762,7 +1753,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TTtfFontReader.GetWeight: integer;
+function TFontReader.GetWeight: integer;
 var
   glyph: TPathsD;
   i, dummy: integer;
@@ -1811,7 +1802,7 @@ end;
 // TGlyphCache
 //------------------------------------------------------------------------------
 
-constructor TGlyphCache.Create(fontReader: TTtfFontReader; fontHeight: double);
+constructor TGlyphCache.Create(fontReader: TFontReader; fontHeight: double);
 begin
 {$IFDEF XPLAT_GENERICS}
   fGlyphInfoList := TList<PGlyphInfo>.Create;
@@ -1820,7 +1811,7 @@ begin
 {$ENDIF}
   fSorted := false;
   fUseKerning := true;
-  fVerticalFlip := true;
+  fFlipVert := true;
   fFontHeight := fontHeight;
   SetFontReader(fontReader);
 end;
@@ -2248,7 +2239,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TGlyphCache.SetFontReader(newFontReader: TTtfFontReader);
+procedure TGlyphCache.SetFontReader(newFontReader: TFontReader);
 begin
   if newFontReader = fFontReader then Exit;
   if Assigned(fFontReader) then
@@ -2345,7 +2336,7 @@ begin
     Result.contours := CleanPath(ScalePath(Result.contours, fScale));
   end;
 
-  if fVerticalFlip then VerticalFlip(Result.contours);
+  if fFlipVert then VerticalFlip(Result.contours);
   fSorted := false;
 end;
 
@@ -2425,17 +2416,17 @@ var
   i,j, offset: integer;
   dummy: Cardinal;
   cnt, strOffset: Word;
-  table: TTtfTable;
+  table: TFontTable;
   nameRec: TNameRec;
 begin
   result := false;
   facename := ''; style := '';
   //stream.Position := 0;
-  if stream.Position >= stream.Size - SizeOf(TTtfOffsetTable) then Exit;
+  if stream.Position >= stream.Size - SizeOf(TFontHeaderTable) then Exit;
   GetCardinal(stream, dummy);
   GetWord(stream, cnt);
   stream.Position := stream.Position +6;
-  if stream.Position >= stream.Size - SizeOf(TTtfTable) * cnt then Exit;
+  if stream.Position >= stream.Size - SizeOf(TFontTable) * cnt then Exit;
   for i := 0 to cnt -1 do
   begin
     GetCardinal(stream, table.tag);

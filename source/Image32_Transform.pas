@@ -122,62 +122,48 @@ end;
 function GetProjectiveTransformInvMatrix(const srcRect: TRect;
   dst: TPathD): TMatrixD;
 var
-  dx1, dx2, px, dy1, dy2, py: double;
+  dx0, dy0, dx1, dy1, dx2, dy2, dx3, dy3, px, py: double;
   g, h, k: double;
   m: TMatrixD;
 begin
-  px := dst[0].X - dst[1].X + dst[2].X - dst[3].X;
-  py := dst[0].Y - dst[1].Y + dst[2].Y - dst[3].Y;
+  dx0 := dst[1].X - dst[0].X;
+  dy0 := dst[1].Y - dst[0].Y;
+  dx1 := dst[2].X - dst[1].X;
+  dy1 := dst[2].Y - dst[1].Y;
+  dx2 := dst[3].X - dst[2].X;
+  dy2 := dst[3].Y - dst[2].Y;
+  dx3 := dst[0].X - dst[3].X;
+  dy3 := dst[0].Y - dst[3].Y;
 
-  if (px = 0) and (py = 0) then
+  px := dx0 + dx2;
+  py := dy0 + dy2;
+
+  k :=  dx2 * dy1 - dx1 * dy2;     //cross-product
+  if k <> 0 then
   begin
-    //almost certainly rectangular but in theory could be rotated & skewed too
-    Result[0, 0] := (dst[1].X - dst[0].X)/(SrcRect.Right - SrcRect.Left);
-    Result[0, 1] := dst[1].Y - dst[0].Y;
-    Result[0, 2] := 0;
-    Result[1, 0] := dst[2].X - dst[1].X;
-    Result[1, 1] := (dst[2].Y - dst[1].Y)/(SrcRect.Bottom - SrcRect.Top);
-    Result[1, 2] := 0;
-    Result[2, 0] := dst[0].X - SrcRect.Left;
-    Result[2, 1] := dst[0].Y - SrcRect.Top;
-    Result[2, 2] := 1;
+    k := 1 / k;
+    g := (py * dx2 - px * dy2) * k;
+    h := (dx1 * py - dy1 * px) * k;
+
+    m[0, 0] := dx0 + g * dst[1].X;
+    m[1, 0] := h * dst[3].X - dx3;
+    m[2, 0] := dst[0].X;
+    m[0, 1] := dy0 + g * dst[1].Y;
+    m[1, 1] := h * dst[3].Y - dy3;
+    m[2, 1] := dst[0].Y;
+    m[0, 2] := g;
+    m[1, 2] := h;
+    m[2, 2] := 1;
+
+    Result := IdentityMatrix;
+    Result[0, 0] := 1 / (SrcRect.Right - SrcRect.Left);
+    Result[1, 1] := 1 / (SrcRect.Bottom - SrcRect.Top);
+    Result[0, 2] := -SrcRect.Left;
+    Result[1, 2] := -SrcRect.Top;
+
+    Result := MatrixMultiply(m, Result);
   end else
-  begin
-    dx1 := dst[1].X - dst[2].X;
-    dx2 := dst[3].X - dst[2].X;
-    dy1 := dst[1].Y - dst[2].Y;
-    dy2 := dst[3].Y - dst[2].Y;
-    k := dx1 * dy2 - dx2 * dy1;
-    if k <> 0 then
-    begin
-      k := 1 / k;
-      g := (px * dy2 - py * dx2) * k;
-      h := (dx1 * py - dy1 * px) * k;
-
-      m[0, 0] := dst[1].X - dst[0].X + g * dst[1].X;
-      m[1, 0] := dst[3].X - dst[0].X + h * dst[3].X;
-      m[2, 0] := dst[0].X;
-
-      m[0, 1] := dst[1].Y - dst[0].Y + g * dst[1].Y;
-      m[1, 1] := dst[3].Y - dst[0].Y + h * dst[3].Y;
-      m[2, 1] := dst[0].Y;
-
-      m[0, 2] := g;
-      m[1, 2] := h;
-      m[2, 2] := 1;
-
-      Result := IdentityMatrix;
-      Result[0, 0] := 1 / (SrcRect.Right - SrcRect.Left);
-      Result[1, 1] := 1 / (SrcRect.Bottom - SrcRect.Top);
-      Result[0, 2] := -SrcRect.Left;
-      Result[1, 2] := -SrcRect.Top;
-
-      //de-scale and translate before the projective transform!?
-      Result := MatrixMultiply(m, Result);
-
-    end else
-      Result := IdentityMatrix;
-  end;
+    Result := IdentityMatrix; //3 vertices are colinear :(
   MatrixInvert(Result);
 end;
 //------------------------------------------------------------------------------

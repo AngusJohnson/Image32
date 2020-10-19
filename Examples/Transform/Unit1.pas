@@ -57,7 +57,7 @@ type
     designLayer: TDesignerLayer32;
     fClickPoint: TPoint;
     fImageIsClicked: Boolean;
-    fPts: TArrayOfPointD;
+    fPts: TPathD;
     fMargin: integer;
     fButtonGroupId: integer;
     fTransformType: TTransformType;

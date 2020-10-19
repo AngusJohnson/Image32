@@ -80,7 +80,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function PathToStr(const path: TArrayOfPointD): string;
+function PathToStr(const path: TPathD): string;
 var
   i, len: integer;
 begin

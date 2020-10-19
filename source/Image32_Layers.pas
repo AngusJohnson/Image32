@@ -699,7 +699,7 @@ var
   alphaTbl: PByteArray;
 begin
   pb := PARGB(image.PixelBase);
-  alphaTbl := @MulTable[opacity];
+  alphaTbl := PByteArray(@MulTable[opacity]);
   for i := 0 to image.Width * image.Height - 1 do
   begin
     pb.A := alphaTbl[pb.A];

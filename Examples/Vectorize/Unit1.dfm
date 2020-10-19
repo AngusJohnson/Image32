@@ -1,9 +1,9 @@
 object Form1: TForm1
   Left = 514
   Top = 310
-  Width = 585
-  Height = 497
   Caption = 'Image32: Vectorize'
+  ClientHeight = 436
+  ClientWidth = 569
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -21,7 +21,7 @@ object Form1: TForm1
   TextHeight = 16
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 413
+    Top = 410
     Width = 569
     Height = 26
     Panels = <>
@@ -33,7 +33,7 @@ object Form1: TForm1
     Left = 0
     Top = 0
     Width = 569
-    Height = 413
+    Height = 410
     Align = alClient
     TabOrder = 1
     Visible = False
@@ -89,7 +89,7 @@ object Form1: TForm1
       Left = 1
       Top = 42
       Width = 567
-      Height = 370
+      Height = 367
       Align = alClient
       HideSelection = False
       ReadOnly = True

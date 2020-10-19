@@ -129,7 +129,7 @@ type
     function ClearRotateSizeButton: Boolean;
     procedure UpdateMenus;
     procedure DisplayFont;
-    function ShortenPathAndReturnArrowHeads(var path: TArrayOfPointD):
+    function ShortenPathAndReturnArrowHeads(var path: TPathD):
       TPathsD;
     procedure AdjustArrow(index: integer; newPt: TPointD);
     procedure PanelKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
@@ -194,7 +194,7 @@ type
 procedure TLineLayer32.SetSmoothPathAndDraw(const smoothPath: TSmoothPath);
 var
   rec: TRect;
-  flatPath: TArrayOfPointD;
+  flatPath: TPathD;
   paths: TPathsD;
 begin
   self.SmoothPath.Assign(smoothPath);
@@ -233,7 +233,7 @@ end;
 procedure TPolygonLayer32.SetSmoothPathAndDraw(const smoothPath: TSmoothPath);
 var
   rec: TRect;
-  flattened: TArrayOfPointD;
+  flattened: TPathD;
 begin
   //calculate and assign hit test regions
   flattened := smoothPath.FlattenedPath;
@@ -262,7 +262,7 @@ procedure TTextLayer32.PositionTextAndDraw(const pt: TPoint);
 var
   rec: TRectD;
   rec2: TRect;
-  charOffsets: TArrayOfPointD;
+  charOffsets: TPathD;
   htwDiv2: integer;
 begin
   MeasureText(name, nil, rec, charOffsets);
@@ -475,8 +475,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFrmMain.ShortenPathAndReturnArrowHeads(var path: TArrayOfPointD):
-  TPathsD;
+function TFrmMain.ShortenPathAndReturnArrowHeads(var path: TPathD): TPathsD;
 var
   pt1, pt2: TPointD;
   pathEnd: TPathEnd;
@@ -516,7 +515,7 @@ procedure TFrmMain.UpdateLayeredImage;
 var
   i, d: integer;
   rec: TRect;
-  flatPath: TArrayOfPointD;
+  flatPath: TPathD;
   htPaths, arrowHeads: TPathsD;
   dl: TDesignerLayer32;
 const
@@ -1213,7 +1212,7 @@ end;
 procedure TFrmMain.StartPolygonArrow;
 var
   i: integer;
-  defaultArrowPts: TArrayOfPointD;
+  defaultArrowPts: TPathD;
 begin
   defaultArrowPts :=
     MakePathI([200,200, 300,100, 300,150,

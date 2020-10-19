@@ -1431,8 +1431,7 @@ end;
 // Matrix functions
 //------------------------------------------------------------------------------
 
-function Det4(a1, a2, b1, b2: double): double;
-{$IFDEF INLINE} inline; {$ENDIF}
+function Det4(a1, a2, b1, b2: double): double; {$IFDEF INLINE} inline; {$ENDIF}
 begin
   Result := a1 * b2 - a2 * b1;
 end;
@@ -1441,9 +1440,9 @@ end;
 function Det9(a1, a2, a3, b1, b2, b3, c1, c2, c3: double): double;
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
-  Result := a1 * (b2 * c3 - b3 * c2) -
-            b1 * (a2 * c3 - a3 * c2) +
-            c1 * (a2 * b3 - a3 * b2);
+  Result := a1 * Det4(b2, b3, c2, c3) -
+            b1 * Det4(a2, a3, c2, c3) +
+            c1 * Det4(a2, a3, b2, b3);
 end;
 //------------------------------------------------------------------------------
 

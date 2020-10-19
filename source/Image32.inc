@@ -2,7 +2,6 @@
   {$MODE DELPHI}
   {$DEFINE ABSTRACT_CLASSES}
   {$DEFINE RECORD_METHODS}
-  //{$modeSwitch advancedRecords}
   {$DEFINE PBYTE}
   {$DEFINE UITYPES}
   {$DEFINE NESTED_TYPES}      
@@ -10,11 +9,13 @@
     {$DEFINE INLINE}
   {$ENDIF}
   {$DEFINE DELPHI_PNG}
-  {$UNDEF CPUX86}
 {$ELSE}
   {$IF COMPILERVERSION < 15}
     Your version of Delphi is not supported (Image32 requires Delphi version 7 or above)
-  {$IFEND}
+  {$IFEND}  
+  {$IFDEF CPUX86}
+      {$DEFINE ASM_X86}                  //nb: do not define in FPC 
+  {$ENDIF}  
   {$IF COMPILERVERSION >= 17}
     {$IFNDEF DEBUG}
       {$DEFINE INLINE}                   //Delphi 2005 - added inlining
@@ -41,9 +42,11 @@
               {$DEFINE UITYPES}          //DelphiXE2   - added UITypes unit
               {$DEFINE XPLAT_GENERICS}   //DelphiXE2   - reasonable cross-platform & generics support
               {$DEFINE STYLESERVICES}    //DelphiXE2   - added StyleServices unit
-              {$IF COMPILERVERSION >= 25}
-                {$LEGACYIFEND ON}        //DelphiXE4   - avoids compiler warning
-                {$DEFINE ZEROBASEDSTR}
+              {$IF COMPILERVERSION >= 24}
+                {$DEFINE ZEROBASEDSTR}   //DelphiXE3
+                {$IF COMPILERVERSION >= 25}
+                  {$LEGACYIFEND ON}      //DelphiXE4   - avoids compiler warning
+                {$IFEND}
               {$IFEND}
             {$IFEND}
           {$IFEND}
@@ -52,4 +55,3 @@
     {$IFEND}
   {$IFEND}
 {$ENDIF}
-
