@@ -248,7 +248,7 @@ type
 
   //Matrix functions
   function MatrixDeterminant(const matrix: TMatrixD): double;
-  procedure MatrixAdjoint(var matrix: TMatrixD);
+  procedure MatrixAdjugate(var matrix: TMatrixD);
   function MatrixMultiply(const modifier, matrix: TMatrixD): TMatrixD;
 
   procedure MatrixApply(const matrix: TMatrixD;
@@ -1455,10 +1455,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure MatrixAdjoint(var matrix: TMatrixD);
+procedure MatrixAdjugate(var matrix: TMatrixD);
 var
   tmp: TMatrixD;
 begin
+  //https://en.wikipedia.org/wiki/Adjugate_matrix
   tmp := matrix;
   matrix[0,0] :=  Det4(tmp[1,1], tmp[1,2], tmp[2,1], tmp[2,2]);
   matrix[0,1] := -Det4(tmp[0,1], tmp[0,2], tmp[2,1], tmp[2,2]);
@@ -1608,7 +1609,7 @@ begin
   d := MatrixDeterminant(matrix);
   if abs(d) > tolerance then
   begin
-    MatrixAdjoint(matrix);
+    MatrixAdjugate(matrix);
     ScaleInternal(matrix, 1/d);
   end
   else matrix := IdentityMatrix;

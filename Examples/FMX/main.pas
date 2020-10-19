@@ -62,7 +62,7 @@ var
   screenScale, fontHeight, nextX: double;
 
   glyphCache: TGlyphCache;
-  fontReader : TTtfFontReader;
+  fontReader : TFontReader;
   ScreenService: IFMXScreenService;
 begin
   if TPlatformServices.Current.SupportsPlatformService (
@@ -90,14 +90,12 @@ begin
 
   //create a fontReader to access truetype font files (*.ttf) that
   //have been stored as font resources and create a glyph cache too
-  fontReader := TTtfFontReader.Create;
+  fontReader := TFontReader.Create;
   glyphCache := TGlyphCache.Create(fontReader, fontHeight);
   try
-    //connect fontReader to a specific font
+    //connect fontReader to a styled sans serif font
     fontReader.LoadFromResource('FONT_2', RT_RCDATA);
     if not fontReader.IsValidFontFormat then Exit;
-
-
     //and get the outline for some text ...
     glyphCache.GetTextGlyphs(0,0,'Image32  rocks!', mainTxtPaths, nextX);
 
@@ -105,25 +103,27 @@ begin
     //also use different glyphManagers for different font heights.
     //But here, I'm showing it's possible to reuse these objects ...
 
+    //connect fontReader to a plain sans serif font
     fontReader.LoadFromResource('FONT_1', RT_RCDATA);
     if not fontReader.IsValidFontFormat then Exit;
-    //nb: fontReader changing fonts will automatically clear glyphCache
-    //cache, though changing glyphCache fontHeight will also do the same...
+    //nb: fontReader changing fonts will automatically clear glyphCache,
+    //though changing glyphCache's fontHeight will also do the same...
     glyphCache.FontHeight := fontHeight / 4;
 
     //and now get the copyright text outline
     glyphCache.GetTextGlyphs(0,0,
-      '© 2020 Angus Johnson', copyTxtPaths, nextX);
+      #$00A9' 2020 Angus Johnson', copyTxtPaths, nextX);
   finally
     glyphCache.Free;
     fontReader.free;
   end;
 
-  //and some affine transformations of mainTxtPaths, just for fun :)
+  //now do some affine transformations of mainTxtPaths, just for fun :)
+  //(though this can be commented out without causing any problems)
   matrix := IdentityMatrix;
   //stretch it vertically ...
   MatrixScale(matrix, 1, 1.75);
-  //and skew (yes, we could've used an italicized font instead) ...
+  //and horizontal skew (yes, we could've used an italicized font instead) ...
   MatrixSkew(matrix, -0.25, 0);
   MatrixApply(matrix, mainTxtPaths);
 

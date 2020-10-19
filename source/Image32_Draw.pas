@@ -384,7 +384,7 @@ begin
   if i64 = 0 then Exit;
   exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;
   //nb: when exp == 1024 then val == INF or NAN
-  if exp <= 0 then Exit;
+  if exp < 0 then Exit;
   Result := ((i64 and $1FFFFFFFFFFFFF) shr (52-exp)) or (1 shl exp);
   if val < 0 then Result := -Result;
 end;

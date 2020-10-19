@@ -2,12 +2,13 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'Image32 FMX Demo2'
-  ClientHeight = 612
-  ClientWidth = 390
-  Position = Designed
+  ClientHeight = 480
+  ClientWidth = 320
+  Position = DesktopCenter
   FormFactor.Width = 320
   FormFactor.Height = 480
   FormFactor.Devices = [Desktop]
+  OnActivate = FormActivate
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnKeyDown = FormKeyDown
@@ -15,8 +16,8 @@ object MainForm: TMainForm
   DesignerMasterStyle = 0
   object TabControl1: TTabControl
     Align = Client
-    Size.Width = 390.000000000000000000
-    Size.Height = 612.000000000000000000
+    Size.Width = 320.000000000000000000
+    Size.Height = 480.000000000000000000
     Size.PlatformDefault = False
     TabHeight = 30.000000000000000000
     TabIndex = 0
@@ -24,12 +25,12 @@ object MainForm: TMainForm
     TabPosition = Bottom
     OnChange = TabControl1Change
     Sizes = (
-      390s
-      582s
-      390s
-      582s
-      390s
-      582s)
+      320s
+      450s
+      320s
+      450s
+      320s
+      450s)
     object TabItem1: TTabItem
       CustomIcon = <
         item
@@ -82,8 +83,8 @@ object MainForm: TMainForm
   end
   object Layout1: TLayout
     Align = Client
-    Size.Width = 390.000000000000000000
-    Size.Height = 612.000000000000000000
+    Size.Width = 320.000000000000000000
+    Size.Height = 480.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
     OnPaint = Layout1Paint

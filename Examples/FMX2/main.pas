@@ -27,6 +27,7 @@ type
       Shift: TShiftState);
     procedure Timer1Timer(Sender: TObject);
     procedure FormResize(Sender: TObject);
+    procedure FormActivate(Sender: TObject);
   private
     margin: integer;
     fontHeight: double;
@@ -109,7 +110,6 @@ begin
   imgMain      := TImage32.Create();
   imgClockface := TImage32.Create();
 
-  ScreenScale := 2;
   margin := DPIAware(20);
 
   rs := TResourceStream.Create(hInstance, 'ESSAY', RT_RCDATA);
@@ -123,17 +123,8 @@ begin
   end;
   essay := StringReplace(essay, '\n', #10, [rfReplaceAll]);
 
-  fontHeight := DPIAware( PointHeightToPixelHeight(12) );
-  UpdateImage1;
-
-{$IFNDEF ANDROID}
-  //center on desktop (Form.Position seems borked in FMX!?)
-  with Screen.DesktopRect do
-  begin
-    self.Left := (Width - DPIAware(self.Width)) div 2;
-    self.Top := (Height - DPIAware(self.Height)) div 2;
-  end;
-{$ENDIF}
+  Layout1.Scale.Point := PointF(1/ScreenScale,1/ScreenScale);
+  fontHeight := DPIAware( PointHeightToPixelHeight(9));
 end;
 //------------------------------------------------------------------------------
 
@@ -154,13 +145,13 @@ var
   tmpStr: string;
 
   imgBooks: TImage32;
-  glyphCache: TGlyphCache;
-  fontReader : TTtfFontReader;
+  noto14Cache: TGlyphCache;
+  notoSansReg : TFontReader;
+  subPxlAdj: Boolean;
 begin
   Timer1.Enabled := false;
   //IMPORTANT: we need to undo any screen scaling
   //as it causes unacceptible blurring (especially of text) ...
-  Layout1.Scale.Point := PointF(1/ScreenScale,1/ScreenScale);
 
   innermargin := margin div 2;
   outerRec := Image32_Vector.Rect(0, 0,
@@ -171,13 +162,15 @@ begin
   //color fill the base image and give it a border ...
   imgMain.Clear(clWhite32);
 
+  subPxlAdj := fontHeight < 14;
+
   //create a fontReader to access truetype font files (*.ttf) that
   //have been stored as font resources and create a glyph cache too
-  fontReader := TTtfFontReader.Create;
-  glyphCache := TGlyphCache.Create(fontReader, fontHeight);
+  notoSansReg := TFontReader.Create;
+  noto14Cache := TGlyphCache.Create(notoSansReg, fontHeight);
   try
-    fontReader.LoadFromResource('FONT_1', RT_RCDATA); // see font.res
-    if not fontReader.IsValidFontFormat then Exit;
+    notoSansReg.LoadFromResource('FONT_1', RT_RCDATA); // see font.res
+    if not notoSansReg.IsValidFontFormat then Exit;
 
     //load an image and scale it to a useful size ...
     imgBooks := TImage32.Create();
@@ -206,10 +199,12 @@ begin
     tmpRec := innerRec;
     tmpRec.Width := tmpRec.Width div 2 - innermargin;
     tmpRec.Bottom := innermargin div 2 +
-      Min(imageRec.Bottom + Round(glyphCache.Ascent), innerRec.Bottom);
-    glyphCache.GetTextGlyphs(tmpRec, essay,
+      Min(imageRec.Bottom + Round(noto14Cache.Ascent), innerRec.Bottom);
+    noto14Cache.GetTextGlyphs(tmpRec, essay,
       taJustify, tvaTop, txtPaths, nextCharIdx, nextCharPt);
-    DrawPolygon(imgMain, txtPaths, frNonZero, clBlack32);
+    if subPxlAdj then
+      DrawPolygon_ClearType(imgMain, txtPaths, frNonZero, clBlack32) else
+      DrawPolygon(imgMain, txtPaths, frNonZero, clBlack32);
 
     //now draw text that didn't fit on the left of the image
     if (nextCharIdx <> 0) then
@@ -217,14 +212,17 @@ begin
       tmpStr := Copy(essay, nextCharIdx, Length(essay));
       if (tmpStr[1] <= #32) then Delete(tmpStr,1,1);
       innerRec.Top := Round(nextCharPt.Y);
-      glyphCache.GetTextGlyphs(innerRec, tmpStr,
+      noto14Cache.GetTextGlyphs(innerRec, tmpStr,
         taJustify, tvaTop, txtPaths, nextCharIdx, nextCharPt);
-      DrawPolygon(imgMain, txtPaths, frNonZero, clBlack32);
+
+      if subPxlAdj then
+        DrawPolygon_ClearType(imgMain, txtPaths, frNonZero, clBlack32) else
+        DrawPolygon(imgMain, txtPaths, frNonZero, clBlack32);
     end;
 
   finally
-    glyphCache.Free;
-    fontReader.free;
+    noto14Cache.Free;
+    notoSansReg.free;
   end;
   Layout1.Repaint;
 end;
@@ -242,7 +240,7 @@ var
   nextCharPt: TPointD;
   ir: TImageRenderer;
   lgr: TLinearGradientRenderer;
-  fontReader: TTtfFontReader;
+  fontReader: TFontReader;
   glyphCache: TGlyphCache;
 begin
   imgClockface.SetSize(
@@ -330,7 +328,7 @@ begin
   //draw the "maker's mark"
   rec := Image32_Vector.Rect(recD);
   Image32_Vector.OffsetRect(rec, 0, Round(-clockRadius *2/5));
-  fontReader := TTtfFontReader.Create;
+  fontReader := TFontReader.Create;
   glyphCache := TGlyphCache.Create(fontReader, clockRadius / 12);
   try
     fontReader.LoadFromResource('FONT_1', RT_RCDATA);
@@ -456,6 +454,13 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormResize(Sender: TObject);
+begin
+  if Visible then
+    TabControl1Change(nil);
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.FormActivate(Sender: TObject);
 begin
   TabControl1Change(nil);
 end;
