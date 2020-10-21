@@ -247,8 +247,9 @@ type
 
 
   //Matrix functions
+  function Matrix(const m00, m01, m02, m10, m11, m12, m20, m21, m22: double): TMatrixD;
   function MatrixDeterminant(const matrix: TMatrixD): double;
-  procedure MatrixAdjugate(var matrix: TMatrixD);
+  function MatrixAdjugate(const matrix: TMatrixD): TMatrixD;
   function MatrixMultiply(const modifier, matrix: TMatrixD): TMatrixD;
 
   procedure MatrixApply(const matrix: TMatrixD;
@@ -1431,6 +1432,14 @@ end;
 // Matrix functions
 //------------------------------------------------------------------------------
 
+function Matrix(const m00, m01, m02, m10, m11, m12, m20, m21, m22: double): TMatrixD;
+begin
+  Result[0,0] := m00; Result[0,1] := m01; Result[0,2] := m02;
+  Result[1,0] := m10; Result[1,1] := m11; Result[1,2] := m12;
+  Result[2,0] := m20; Result[2,1] := m21; Result[2,2] := m22;
+end;
+//------------------------------------------------------------------------------
+
 function Det4(a1, a2, b1, b2: double): double; {$IFDEF INLINE} inline; {$ENDIF}
 begin
   Result := a1 * b2 - a2 * b1;
@@ -1455,23 +1464,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure MatrixAdjugate(var matrix: TMatrixD);
-var
-  tmp: TMatrixD;
+function MatrixAdjugate(const matrix: TMatrixD): TMatrixD;
 begin
   //https://en.wikipedia.org/wiki/Adjugate_matrix
-  tmp := matrix;
-  matrix[0,0] :=  Det4(tmp[1,1], tmp[1,2], tmp[2,1], tmp[2,2]);
-  matrix[0,1] := -Det4(tmp[0,1], tmp[0,2], tmp[2,1], tmp[2,2]);
-  matrix[0,2] :=  Det4(tmp[0,1], tmp[0,2], tmp[1,1], tmp[1,2]);
+  Result[0,0] :=  Det4(matrix[1,1], matrix[1,2], matrix[2,1], matrix[2,2]);
+  Result[0,1] := -Det4(matrix[0,1], matrix[0,2], matrix[2,1], matrix[2,2]);
+  Result[0,2] :=  Det4(matrix[0,1], matrix[0,2], matrix[1,1], matrix[1,2]);
 
-  matrix[1,0] := -Det4(tmp[1,0], tmp[1,2], tmp[2,0], tmp[2,2]);
-  matrix[1,1] :=  Det4(tmp[0,0], tmp[0,2], tmp[2,0], tmp[2,2]);
-  matrix[1,2] := -Det4(tmp[0,0], tmp[0,2], tmp[1,0], tmp[1,2]);
+  Result[1,0] := -Det4(matrix[1,0], matrix[1,2], matrix[2,0], matrix[2,2]);
+  Result[1,1] :=  Det4(matrix[0,0], matrix[0,2], matrix[2,0], matrix[2,2]);
+  Result[1,2] := -Det4(matrix[0,0], matrix[0,2], matrix[1,0], matrix[1,2]);
 
-  matrix[2,0] :=  Det4(tmp[1,0], tmp[1,1], tmp[2,0], tmp[2,1]);
-  matrix[2,1] := -Det4(tmp[0,0], tmp[0,1], tmp[2,0], tmp[2,1]);
-  matrix[2,2] :=  Det4(tmp[0,0], tmp[0,1], tmp[1,0], tmp[1,1]);
+  Result[2,0] :=  Det4(matrix[1,0], matrix[1,1], matrix[2,0], matrix[2,1]);
+  Result[2,1] := -Det4(matrix[0,0], matrix[0,1], matrix[2,0], matrix[2,1]);
+  Result[2,2] :=  Det4(matrix[0,0], matrix[0,1], matrix[1,0], matrix[1,1]);
 end;
 //------------------------------------------------------------------------------
 
@@ -1530,8 +1536,8 @@ function MatrixMultiply(const modifier, matrix: TMatrixD): TMatrixD;
 var
   i, j: Integer;
 begin
-  if (modifier[2][2] <> 1) or (matrix[2][2] <> 1) then
-    raise Exception.Create(rsInvalidMatrix);
+//  if (modifier[2][2] <> 1) or (matrix[2][2] <> 1) then
+//    raise Exception.Create(rsInvalidMatrix);
   for i := 0 to 2 do
     for j := 0 to 2 do
       Result[i, j] :=
@@ -1609,7 +1615,7 @@ begin
   d := MatrixDeterminant(matrix);
   if abs(d) > tolerance then
   begin
-    MatrixAdjugate(matrix);
+    matrix := MatrixAdjugate(matrix);
     ScaleInternal(matrix, 1/d);
   end
   else matrix := IdentityMatrix;
