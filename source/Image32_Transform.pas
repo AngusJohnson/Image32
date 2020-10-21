@@ -2,8 +2,8 @@ unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.52                                                            *
-* Date      :  1 October 2020                                                  *
+* Version   :  1.53                                                            *
+* Date      :  21 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -21,10 +21,12 @@ procedure AffineTransformImage(img: TImage32; matrix: TMatrixD); overload;
 procedure AffineTransformImage(img: TImage32;
   matrix: TMatrixD; out offset: TPoint); overload;
 
+//ProjectiveTransform:
+//  srcPts, dstPts => each path must contain 4 points
+//  margins => the margins around dstPts (in the dest. projective).
+//  Margins are only meaningful when srcPts are inside the image.
 function ProjectiveTransform(img: TImage32;
-  const dstPts: TPathD): Boolean; overload;
-function ProjectiveTransform(img: TImage32;
-  const dstPts: TPathD; out offset: TPoint): Boolean; overload;
+  const srcPts, dstPts: TPathD; const margins: TRect): Boolean;
 
 function SplineVertTransform(img: TImage32; const topSpline: TPathD;
   splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
@@ -95,119 +97,116 @@ end;
 // Projective Transformation
 //------------------------------------------------------------------------------
 
-// The code below is based on code from GR32_Transforms.pas in
-// Graphics32 - https://sourceforge.net/projects/graphics32/
-// Portions created by the initial developer, Alex A. Denisov, are protected
-// by copyright (C) 2000-2009 under Mozilla Public License.
-// MPL 1.1 or LGPL 2.1 with linking exception (http://www.mozilla.org/MPL/ )
-
-function InvTransform(var x, y: double; invMatrix: TMatrixD): Boolean;
+procedure MatrixMulCoord(const matrix: TMatrixD; var x,y,z: double);
+{$IFDEF INLINE} inline; {$ENDIF}
 var
-  xx, z: double;
+  xx, yy: double;
 begin
-  z := invMatrix[0, 2] * x + invMatrix[1, 2] * y + invMatrix[2, 2];
-  Result := z <> 0;
-  if not Result then Exit;
-
-  xx := x;
-  x := invMatrix[0, 0] *xx + invMatrix[1, 0] *y + invMatrix[2, 0];
-  y := invMatrix[0, 1] *xx + invMatrix[1, 1] *y + invMatrix[2, 1];
-
-  if z = 1 then Exit;
-  z := 1 / z; x := x * z; y := y * z;
-  Result := (abs(x) < $7FFFFF) and (abs(y) < $7FFFFF); //avoids range error
+  xx := x; yy := y;
+  x := matrix[0,0] *xx + matrix[0,1] *yy + matrix[0,2] *z;
+  y := matrix[1,0] *xx + matrix[1,1] *yy + matrix[1,2] *z;
+  z := matrix[2,0] *xx + matrix[2,1] *yy + matrix[2,2] *z;
 end;
 //------------------------------------------------------------------------------
 
-function GetProjectiveTransformInvMatrix(const srcRect: TRect;
-  dst: TPathD): TMatrixD;
+function BasisToPoints(x1, y1, x2, y2, x3, y3, x4, y4: double): TMatrixD;
 var
-  dx0, dy0, dx1, dy1, dx2, dy2, dx3, dy3, px, py: double;
-  g, h, k: double;
-  m: TMatrixD;
+  m, m2: TMatrixD;
+  z4: double;
 begin
-  dx0 := dst[1].X - dst[0].X;
-  dy0 := dst[1].Y - dst[0].Y;
-  dx1 := dst[2].X - dst[1].X;
-  dy1 := dst[2].Y - dst[1].Y;
-  dx2 := dst[3].X - dst[2].X;
-  dy2 := dst[3].Y - dst[2].Y;
-  dx3 := dst[0].X - dst[3].X;
-  dy3 := dst[0].Y - dst[3].Y;
+  m := Matrix(x1, x2, x3, y1, y2, y3, 1,  1,  1);
+  m2 := MatrixAdjugate(m);
+  z4 := 1;
+  MatrixMulCoord(m2, x4, y4, z4);
+  m2 := Matrix(x4, 0, 0, 0, y4, 0, 0, 0, z4);
+  Result := MatrixMultiply(m2, m);
+end;
+//------------------------------------------------------------------------------
 
-  px := dx0 + dx2;
-  py := dy0 + dy2;
+procedure GetSrcCoords256(const matrix: TMatrixD; var x, y: integer);
+{$IFDEF INLINE} inline; {$ENDIF}
+var
+  xx,yy,zz: double;
+const
+  Q: integer = MaxInt div 256;
+begin
+  xx := x; yy := y; zz := 1;
+  MatrixMulCoord(matrix, xx, yy, zz);
 
-  k :=  dx2 * dy1 - dx1 * dy2;     //cross-product
-  if k <> 0 then
+  if zz = 0 then
   begin
-    k := 1 / k;
-    g := (py * dx2 - px * dy2) * k;
-    h := (dx1 * py - dy1 * px) * k;
-
-    m[0, 0] := dx0 + g * dst[1].X;
-    m[1, 0] := h * dst[3].X - dx3;
-    m[2, 0] := dst[0].X;
-    m[0, 1] := dy0 + g * dst[1].Y;
-    m[1, 1] := h * dst[3].Y - dy3;
-    m[2, 1] := dst[0].Y;
-    m[0, 2] := g;
-    m[1, 2] := h;
-    m[2, 2] := 1;
-
-    Result := IdentityMatrix;
-    Result[0, 0] := 1 / (SrcRect.Right - SrcRect.Left);
-    Result[1, 1] := 1 / (SrcRect.Bottom - SrcRect.Top);
-    Result[0, 2] := -SrcRect.Left;
-    Result[1, 2] := -SrcRect.Top;
-
-    Result := MatrixMultiply(m, Result);
+    if xx >= 0 then x := Q else x := -Q;
+    if yy >= 0 then y := Q else y := -Q;
   end else
-    Result := IdentityMatrix; //3 vertices are colinear :(
-  MatrixInvert(Result);
+  begin
+    xx := xx/zz;
+    if xx > Q then x := MaxInt
+    else if xx < -Q then x := -MaxInt
+    else x := Round(xx *256);
+
+    yy := yy/zz;
+    if yy > Q then y := MaxInt
+    else if yy < -Q then y := -MaxInt
+    else y := Round(yy *256);
+  end;
 end;
 //------------------------------------------------------------------------------
 
-function ProjectiveTransform(img: TImage32; const dstPts: TPathD): Boolean;
+function GetProjectionMatrix(const srcPts, dstPts: TPathD): TMatrixD;
 var
-  dummy: TPoint;
+  i: integer;
+  srcMat, dstMat: TMatrixD;
 begin
-  Result := ProjectiveTransform(img, dstPts, dummy);
+  if (length(srcPts) <> 4) or (length(dstPts) <> 4) then
+  begin
+    Result := IdentityMatrix;
+    Exit;
+  end;
+  srcMat := BasisToPoints(srcPts[0].X, srcPts[0].Y,
+    srcPts[1].X, srcPts[1].Y, srcPts[2].X, srcPts[2].Y, srcPts[3].X, srcPts[3].Y);
+  dstMat := BasisToPoints(dstPts[0].X, dstPts[0].Y,
+    dstPts[1].X, dstPts[1].Y, dstPts[2].X, dstPts[2].Y, dstPts[3].X, dstPts[3].Y);
+  Result := MatrixMultiply(MatrixAdjugate(dstMat), srcMat);
 end;
 //------------------------------------------------------------------------------
 
 function ProjectiveTransform(img: TImage32;
-  const dstPts: TPathD; out offset: TPoint): Boolean;
+  const srcPts, dstPts: TPathD; const margins: TRect): Boolean;
 var
-  w,h,i,j, dx,dy: integer;
-  x,y: double;
+  w,h,i,j: integer;
+  x,y: integer;
   rec: TRect;
-  invMatrix: TMatrixD;
+  dstPts2: TPathD;
+  mat: TMatrixD;
   tmp: TArrayOfColor32;
   pc: PColor32;
 begin
-  result := false;
-  if img.IsEmpty or (Length(dstPts) <> 4) or
-    not IsPathConvex(dstPts) then Exit;
+  //https://math.stackexchange.com/a/339033/384709
 
-  invMatrix := GetProjectiveTransformInvMatrix(img.Bounds, dstPts);
+  Result := not img.IsEmpty and
+    (Length(dstPts) = 4) and IsPathConvex(dstPts);
+  if not Result then Exit;
+
   rec := GetBounds(dstPts);
-  offset := rec.TopLeft;
+  dec(rec.Left, margins.Left);
+  dec(rec.Top, margins.Top);
+  inc(rec.Right, margins.Right);
+  inc(rec.Bottom, margins.Bottom);
+  dstPts2 := OffsetPath(dstPts, -rec.Left, -rec.Top);
 
-  w := RectWidth(rec); h := RectHeight(rec);
-  dx := rec.Left;
-  dy := rec.Top;
+  mat := GetProjectionMatrix(srcPts, dstPts2);
+  w := RectWidth(rec);
+  h := RectHeight(rec);
   SetLength(tmp, w * h);
   pc := @tmp[0];
-  for i := 0 to h -1 do
+  for i :=  0 to h -1 do
     for j := 0 to w -1 do
     begin
-      x := j + dx; y := i + dy;
-      if not InvTransform(x, y, invMatrix) then Exit;
-      pc^ := GetWeightedPixel(img, Round(x * 256), Round(y * 256));
+      x := j; y := i;
+      GetSrcCoords256(mat, x, y);
+      pc^ := GetWeightedPixel(img, x, y);
       inc(pc);
     end;
-  Result := true;
   img.SetSize(w, h);
   Move(tmp[0], img.Pixels[0], w * h * sizeOf(TColor32));
 end;
