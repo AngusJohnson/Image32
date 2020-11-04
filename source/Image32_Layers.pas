@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.52                                                            *
-* Date      :  1 October 2020                                                  *
+* Version   :  1.53                                                            *
+* Date      :  22 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -473,7 +473,7 @@ end;
 procedure TDesignerLayer32.DrawDashedLine(const ctrlPts: TPathD;
   closed: Boolean);
 const
-  endstyle: array[Boolean] of TEndStyle = (esSquare, esClosed);
+  endstyle: array[Boolean] of TEndStyle = (esSquare, esPolygon);
 var
   step: integer;
 begin

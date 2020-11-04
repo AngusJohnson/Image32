@@ -1038,7 +1038,7 @@ begin
 
   Draw3D(img, path, frNonZero, shadowSize*2,
     Ceil(shadowSize), $AA000000, $CCFFFFFF, shadowAngle);
-  DrawLine(img, path, 1, clBlack32, esClosed);
+  DrawLine(img, path, 1, clBlack32, esPolygon);
 
   if not (boSquare in buttonOptions) then Exit;
   path := Rectangle(rec);

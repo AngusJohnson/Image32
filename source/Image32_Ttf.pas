@@ -2,8 +2,8 @@ unit Image32_Ttf;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.53                                                            *
-* Date      :  11 October 2020                                                 *
+* Version   :  1.54                                                            *
+* Date      :  4 November 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2020                                              *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -15,7 +15,7 @@ interface
 {$I Image32.inc}
 
 uses
-  {$IFDEF MSWINDOWS}Windows, ShlObj,{$ENDIF}
+  {$IFDEF MSWINDOWS}Windows, ShlObj, {$ENDIF}
   Types, SysUtils, Classes, Math,
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults,{$ENDIF}
   Image32, Image32_Draw;
@@ -318,6 +318,10 @@ type
     function LoadFromStream(stream: TStream): Boolean;
     function LoadFromResource(const resName: string; resType: PChar): Boolean;
     function LoadFromFile(const filename: string): Boolean;
+{$IFDEF MSWINDOWS}
+    function LoadFromLogfont(logfont: TLogFont): Boolean;
+    function LoadFromFontHdl(hdl: HFont): Boolean;
+{$ENDIF}
     function GetGlyphInfo(unicode: Word; out paths: TPathsD;
       out nextX: integer; out glyphMetrics: TGlyphMetrics): Boolean;
     property FontInfo: TFontInfo read GetFontInfo;
@@ -377,8 +381,13 @@ type
       textAlign: TTextAlign; textAlignV: TTextVAlign;
       out glyphs: TPathsD; out nextIdx: integer;
       out nextPt: TPointD): Boolean; overload;
+    function GetAngledTextGlyphs(x, y: double; const text: UnicodeString;
+      angleRadians: double; const rotatePt: TPointD;
+      out glyphs: TPathsD; out nextPt: TPointD): Boolean;
 
     function GetCharOffsets(const text: UnicodeString): TArrayOfDouble;
+    function GetTextWidth(const text: UnicodeString): double;
+
     property Ascent: double read GetAscent;
     property Descent: double read GetDescent;
     property FontHeight: double read fFontHeight write SetFontHeight;
@@ -389,9 +398,6 @@ type
     property LineHeight: double read GetLineHeight;
     property Scale : double read fScale;
   end;
-
-  function TextWidth(image: TImage32;
-    const text: UnicodeString; glyphCache: TGlyphCache): double;
 
   function DrawText(image: TImage32;
     x, y: double;
@@ -412,8 +418,15 @@ type
     glyphCache: TGlyphCache;
     textColor: TColor32 = clBlack32): TPointD; overload;
 
+  function DrawAngledText(image: TImage32;
+    x, y, interCharSpace: double;
+    const text: UnicodeString;
+    glyphCache: TGlyphCache;
+    angleRadians: double;
+    textColor: TColor32 = clBlack32): TPointD;
+
   function DrawVerticalText(image: TImage32;
-    x, y, space: double;
+    x, y, interCharSpace: double;
     const text: UnicodeString;
     glyphCache: TGlyphCache;
     textColor: TColor32 = clBlack32): double;
@@ -424,21 +437,6 @@ type
   function GetFontFolder: string;
   function GetInstalledTtfFilenames: TArrayOfString;
   {$ENDIF}
-  function GetFacenameAndStyle(const filename: string;
-    out facename: string; out style: string): Boolean; overload;
-  function GetFacenameAndStyle(const stream: TStream;
-    out facename: string; out style: string): Boolean; overload;
-  function FilterOnFacename(const fontnames: TArrayOfString;
-    const facename: string; exactMatch: Boolean): TArrayOfString;
-  function FilterOnStyles(const fontnames: TArrayOfString;
-    const mustIncludeStyle, mustExcludeStyle: array of string): TArrayOfString;
-
-  (* Example of the above functions:
-  //find the Arial font that's neither Bold or Italic
-  fonts := GetInstalledTtfFilenames;
-  fonts := FilterOnFacename(fonts, 'arial', true);
-  fonts := FilterOnStyles(fonts, [], ['bold','italic']);
-  *)
 
 implementation
 
@@ -847,6 +845,64 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
+
+{$IFDEF MSWINDOWS}
+function GetFontMemStreamFromFontHdl(hdl: HFont;
+  memStream: TMemoryStream): Boolean;
+var
+  dc, memDc: HDC;
+  cnt: DWORD;
+begin
+  result := false;
+  if not Assigned(memStream) or (hdl = 0) then Exit;
+
+  dc := GetDC(0);
+  memDc := CreateCompatibleDC(dc);
+  try
+    SelectObject(memDc, hdl);
+    //get the required size of the font data (file)
+    cnt := Windows.GetFontData(memDc, 0, 0, nil, 0);
+    result := cnt <> $FFFFFFFF;
+    if not Result then Exit;
+    //copy the font data into the memory stream
+    memStream.SetSize(cnt);
+    Windows.GetFontData(memDc, 0, 0, memStream.Memory, cnt);
+  finally
+    DeleteDC(memDc);
+    ReleaseDC(0, dc);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TFontReader.LoadFromFontHdl(hdl: HFont): Boolean;
+var
+  ms: TMemoryStream;
+begin
+  ms := TMemoryStream.Create;
+  try
+    Result := GetFontMemStreamFromFontHdl(hdl, ms) and
+      LoadFromStream(ms);
+  finally
+    ms.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TFontReader.LoadFromLogfont(logfont: TLogFont): Boolean;
+var
+  hdl: HFont;
+begin
+  Result := false;
+  hdl := CreateFontIndirect(logfont);
+  if hdl = 0 then Exit;
+  try
+    Result := LoadFromFontHdl(hdl);
+  finally
+    DeleteObject(hdl);
+  end;
+end;
+
+{$ENDIF}
 
 function GetHeaderTable(stream: TStream;
   out headerTable: TFontHeaderTable): Boolean;
@@ -1923,7 +1979,7 @@ begin
   if not IsValidFont then
     Result := 0
   else with fFontReader.FontInfo do
-    Result := Max(descent, yMin) * fScale;
+    Result := Max(descent, -yMin) * fScale;
 end;
 //------------------------------------------------------------------------------
 
@@ -2020,6 +2076,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TGlyphCache.GetTextWidth(const text: UnicodeString): double;
+var
+  offsets: TArrayOfDouble;
+begin
+  Result := 0;
+  if not IsValidFont then Exit;
+  offsets := GetCharOffsets(text);
+  Result := offsets[high(offsets)];
+end;
+//------------------------------------------------------------------------------
+
 function TGlyphCache.GetTextGlyphs(x, y: double; const text: UnicodeString;
   out glyphs: TPathsD; out nextX: double): Boolean;
 var
@@ -2083,39 +2150,55 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function GetBoundsD(const pa: TArrayOfPathsD): TRectD; overload;
+var
+  i, len: integer;
+  pp: TPathsD;
+begin
+  len := Length(pa);
+  SetLength(pp, len);
+  for i := 0 to len -1 do
+    pp[i] := Rectangle(GetBoundsD(pa[i]));
+  Result := GetBoundsD(pp);
+end;
+//------------------------------------------------------------------------------
+
 function TGlyphCache.GetTextGlyphs(const rec: TRect;
   const text: UnicodeString; textAlign: TTextAlign; textAlignV: TTextVAlign;
   out glyphs: TPathsD; out nextIdx: integer; out nextPt: TPointD): Boolean;
 var
   i,j,k, lenCurr, lenRem, spcCount: integer;
-  lh, ascent, currLineWidthPxls, spcDx, q, dx: double;
+  lh, currLineWidthPxls, spcDx, dx, dy: double;
   currentLine, remainingText: UnicodeString;
   offsets: TArrayOfDouble;
   hardCR: Boolean;
-  delta: TPointD;
   currLineGlyphs: TArrayOfPathsD;
 begin
-  //precondition: #10 chars are fine but NOT #13
+  //precondition: 'text' may contain '#10 chars but not #13 chars
+
   nextIdx := 1;
   glyphs := nil;
   nextPt := PointD(rec.left, rec.Top);
   Result := IsValidFont;
   if not Result then Exit;
 
-  lh := Round(lineHeight);
+  lh := LineHeight;
+  if (nextPt.Y +lh > rec.Bottom) then Exit;
 
-  delta := PointD(0,0);
   currentLine := '';
-  ascent := Self.Ascent;
+  currLineWidthPxls := 0;
+
   remainingText := text;
-  while remainingText <> '' do
+  while (remainingText <> '') do
   begin
+
     //get text up to the next line-break char
     i := 1; j := 1;
     lenRem := Length(remainingText);
     while (j <= lenRem) and (remainingText[j] <> #10) do inc(j);
 
-    if j > i then //we have a non-blank line
+    //if we have a non-blank line
+    if j > i then
     begin
       currLineGlyphs := nil;
       currentLine := copy(remainingText, i, j - i);
@@ -2147,54 +2230,44 @@ begin
         lenCurr := j;
       end;
 
-      //get the glyphs for the currentline ...
-      nextPt.X := rec.Left;
-      if not GetTextGlyphsInternal(nextPt.X, nextPt.Y + ascent,
-        currentLine, currLineGlyphs, nextPt.X) then Break;
       inc(nextIdx, lenCurr);
       currLineWidthPxls := offsets[lenCurr];
 
-      //align horizontally
       case textAlign of
         taRight:
-          begin
-            delta.X := (rec.Right - nextPt.X);
-            currLineGlyphs :=
-              Image32_Vector.OffsetPath(currLineGlyphs, delta.X, 0);
-            nextPt.X := rec.Right - currLineWidthPxls;
-          end;
+          nextPt.X := rec.Right - currLineWidthPxls;
         taCenter:
+          nextPt.X := (rec.Right - rec.Left - currLineWidthPxls) * 0.5;
+        else
+          nextPt.X := rec.Left;
+      end;
+
+      //get the glyphs for the currentline ...
+      if not GetTextGlyphsInternal(nextPt.X, nextPt.Y + ascent,
+        currentLine, currLineGlyphs, dx) then Break;
+
+      if textAlign = taJustify then
+      begin
+        hardCR := (remainingText = '') or (remainingText[1] < #32);
+        if not hardCR then
+        begin
+          spcCount := CountSpaces(currentLine);
+          if (spcCount > 0) and (currLineWidthPxls < rec.Width) then
           begin
-            delta.X := (rec.Right - nextPt.X) * 0.5;
-            currLineGlyphs :=
-              Image32_Vector.OffsetPath(currLineGlyphs, delta.X, 0);
-            nextPt.X := nextPt.X + delta.X;
-          end;
-        taJustify:
-          begin
-            hardCR := (remainingText = '') or (remainingText[1] < #32);
-            if not hardCR then
+            spcDx := (rec.Width - currLineWidthPxls)/spcCount;
+            j := lenCurr;
+            while spcCount > 0 do
             begin
-              spcCount := CountSpaces(currentLine);
-              if (spcCount > 0) and (currLineWidthPxls < rec.Width) then
-              begin
-                spcDx := (rec.Width - currLineWidthPxls)/spcCount;
-                j := lenCurr;
-                q := 0;
-                while spcCount > 0 do
-                begin
-                  i := j;
-                  dx := spcDx * spcCount;
-                  while (i > 0) and (currentLine[i] <> #32) do dec(i);
-                  for k := i to j -1 do
-                    currLineGlyphs[k] := OffsetPath(currLineGlyphs[k], dx, 0);
-                  Dec(spcCount);
-                  j := i -1;
-                end;
-                nextPt.X := rec.Right;
-              end;
+              i := j;
+              dx := spcDx * spcCount;
+              while (i > 0) and (currentLine[i] <> #32) do dec(i);
+              for k := i to j -1 do
+                currLineGlyphs[k] := OffsetPath(currLineGlyphs[k], dx, 0);
+              Dec(spcCount);
+              j := i -1;
             end;
           end;
+        end;
       end;
 
       for i := 0 to High(currLineGlyphs) do
@@ -2212,30 +2285,46 @@ begin
     end;
   end;
 
-  if nextIdx > Length(text) then nextIdx := 0; //ie all chars processed :)
+  if textAlign <> taRight then
+    nextPt.X := nextPt.X + currLineWidthPxls;
+
+  if nextIdx > Length(text) then
+    nextIdx := 0; //flags all chars have been processed :)
 
   //finally do vertical alignment
   case textAlignV of
     tvaMiddle:
       begin
-        delta.Y := (rec.Bottom - nextPt.Y) / 2;
-        if delta.Y > 0 then
+        dy := (rec.Bottom - rec.Top - nextPt.Y - descent) / 2;
+        if dy > 0 then
         begin
-          glyphs := Image32_Vector.OffsetPath(glyphs, 0, delta.Y);
-          nextPt.Y := nextPt.Y + delta.Y;
+          glyphs := Image32_Vector.OffsetPath(glyphs, 0, dy);
+          nextPt.Y := nextPt.Y + dy;
         end;
       end;
     tvaBottom:
       begin
-        delta.Y := rec.Bottom - nextPt.Y;
-        if delta.Y > 0 then
+        dy := rec.Bottom - nextPt.Y;
+        if dy > 0 then
         begin
-          glyphs := Image32_Vector.OffsetPath(glyphs, 0, delta.Y);
-          nextPt.Y := nextPt.Y + delta.Y;
+          glyphs := Image32_Vector.OffsetPath(glyphs, 0, dy);
+          nextPt.Y := nextPt.Y + dy;
         end;
         nextPt.Y := rec.Bottom;
       end;
   end;
+end;
+//------------------------------------------------------------------------------
+
+function TGlyphCache.GetAngledTextGlyphs(x, y: double;
+  const text: UnicodeString; angleRadians: double; const rotatePt: TPointD;
+  out glyphs: TPathsD; out nextPt: TPointD): Boolean;
+begin
+  nextPt.Y := y;
+  Result := GetTextGlyphs(x,y, text, glyphs, nextPt.X);
+  if not Result then Exit;
+  glyphs := RotatePath(glyphs, rotatePt, angleRadians);
+  RotatePoint(nextPt, PointD(x,y), angleRadians);
 end;
 //------------------------------------------------------------------------------
 
@@ -2389,166 +2478,9 @@ begin
   FindClose(sr);
   SetLength(Result, cnt);
 end;
-//------------------------------------------------------------------------------
 {$ENDIF}
 
-function GetFacenameAndStyle(const filename: string;
-  out facename: string; out style: string): Boolean;
-var
-  fs: TFileStream;
-begin
-  try
-    fs := TFileStream.Create(filename, fmOpenRead or fmShareDenyNone);
-    try
-      Result := GetFacenameAndStyle(fs, facename, style);
-    finally
-      fs.free;
-    end;
-  except
-    Result := False;
-  end;
-end;
 //------------------------------------------------------------------------------
-
-function GetFacenameAndStyle(const stream: TStream;
-  out facename: string; out style: string): Boolean;
-var
-  i,j, offset: integer;
-  dummy: Cardinal;
-  cnt, strOffset: Word;
-  table: TFontTable;
-  nameRec: TNameRec;
-begin
-  result := false;
-  facename := ''; style := '';
-  //stream.Position := 0;
-  if stream.Position >= stream.Size - SizeOf(TFontHeaderTable) then Exit;
-  GetCardinal(stream, dummy);
-  GetWord(stream, cnt);
-  stream.Position := stream.Position +6;
-  if stream.Position >= stream.Size - SizeOf(TFontTable) * cnt then Exit;
-  for i := 0 to cnt -1 do
-  begin
-    GetCardinal(stream, table.tag);
-    GetCardinal(stream, table.checkSum);
-    GetCardinal(stream, table.offset);
-    GetCardinal(stream, table.length);
-    if table.tag = $6E616D65 then //'name' table
-    begin
-      if (stream.Size < table.offset + table.length) then Exit;
-      stream.Position := table.offset;
-      GetWord(stream, cnt); //ie format ignored
-      GetWord(stream, cnt);
-      GetWord(stream, strOffset);
-      offset := table.offset + strOffset;
-      for j := 1 to cnt do
-      begin
-        GetWord(stream, nameRec.platformID);
-        GetWord(stream, nameRec.encodingID);
-        GetWord(stream, nameRec.languageID);
-        GetWord(stream, nameRec.nameID);
-        GetWord(stream, nameRec.length);
-        GetWord(stream, nameRec.offset);
-        case nameRec.nameID of
-          0: continue;
-          1: faceName     := GetNameRecString(stream, nameRec, offset);
-          2: style        := GetNameRecString(stream, nameRec, offset);
-          else break;
-        end;
-      end;
-      Result := facename <> '';
-      break;
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function FilterOnFacename(const fontnames: TArrayOfString;
-  const facename: string; exactMatch: Boolean): TArrayOfString;
-var
-  i, cnt, len: integer;
-  upName, name, s: string;
-begin
-  upName := UpperCase(facename);
-  len := Length(fontnames);
-  cnt := 0;
-  SetLength(Result, len);
-  for i := 0 to len -1 do
-  begin
-    if not GetFacenameAndStyle(fontnames[i], name, s) then Continue;
-    if (exactMatch and (CompareStr(upName, Uppercase(name)) <> 0)) or
-      (not exactMatch and (Pos(upName, Uppercase(name)) = 0)) then Continue;
-    Result[cnt] := fontnames[i];
-    inc(cnt);
-  end;
-  SetLength(Result, cnt);
-end;
-//------------------------------------------------------------------------------
-
-function FilterOnStyles(const fontnames: TArrayOfString;
-  const mustIncludeStyle, mustExcludeStyle: array of string): TArrayOfString;
-var
-  i,j, len,cnt: integer;
-  n,s: string;
-  incl, excl: array of string;
-  isMatch: Boolean;
-begin
-  cnt := 0;
-  len := Length(fontnames);
-  SetLength(Result, len);
-
-  i := Length(mustIncludeStyle);
-  setLength(incl, i);
-  for j := 0 to i -1 do
-    incl[j] := UpperCase(mustIncludeStyle[j]);
-  i := Length(mustExcludeStyle);
-  setLength(excl, i);
-  for j := 0 to i -1 do
-    excl[j] := UpperCase(mustExcludeStyle[j]);
-
-  for i := 0 to len -1 do
-  begin
-    if GetFacenameAndStyle(fontnames[i], n, s) then
-    begin
-      isMatch := true;
-      for j := 0 to High(incl) do
-        if (Pos(incl[j], Uppercase(s)) = 0) then
-        begin
-          isMatch := false;
-          break;
-        end;
-
-      if isMatch then
-        for j := 0 to High(excl) do
-          if (Pos(excl[j], Uppercase(s)) > 0) then
-          begin
-            isMatch := false;
-            break;
-          end;
-
-      if isMatch then
-      begin
-        Result[cnt] := fontnames[i];
-        inc(cnt);
-      end;
-    end;
-  end;
-  SetLength(Result, cnt);
-end;
-
-//------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-
-function TextWidth(image: TImage32;
-  const text: UnicodeString; glyphCache: TGlyphCache): double;
-var
-  offsets: TArrayOfDouble;
-begin
-  Result := 0;
-  if not assigned(glyphCache) or not glyphCache.IsValidFont then Exit;
-  offsets := glyphCache.GetCharOffsets(text);
-  Result := offsets[high(offsets)];
-end;
 //------------------------------------------------------------------------------
 
 function DrawText(image: TImage32; x, y: double; const text: UnicodeString;
@@ -2590,27 +2522,52 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DrawVerticalText(image: TImage32; x, y, space: double;
-  const text: UnicodeString; glyphCache: TGlyphCache;
-  textColor: TColor32 = clBlack32): double;
+function DrawAngledText(image: TImage32;
+  x, y, interCharSpace: double;
+  const text: UnicodeString;
+  glyphCache: TGlyphCache;
+  angleRadians: double;
+  textColor: TColor32 = clBlack32): TPointD;
 var
   i: integer;
   glyphs: TPathsD;
   glyphInfo: PGlyphInfo;
-  xxMax,dx, dy, scale: double;
+  sinA, cosA, dx, dy, z, scale: double;
 begin
-  Result := 0;
+  Result := PointD(x,y);
+  if not assigned(glyphCache) or not glyphCache.IsValidFont or
+    not glyphCache.GetAngledTextGlyphs(x, y, text, angleRadians,
+      Result, glyphs, Result) then Exit;
+  DrawPolygon(image, glyphs, frNonZero, textColor);
+end;
+//------------------------------------------------------------------------------
+
+function DrawVerticalText(image: TImage32; x, y, interCharSpace: double;
+  const text: UnicodeString; glyphCache: TGlyphCache;
+  textColor: TColor32 = clBlack32): double;
+var
+  i, xxMax: integer;
+  glyphs: TPathsD;
+  glyphInfo: PGlyphInfo;
+  dx, dy, scale: double;
+begin
+  Result := y;
   if not assigned(glyphCache) or not glyphCache.IsValidFont then Exit;
 
-  scale := glyphCache.Scale;
-  with glyphCache.FontReader.FontInfo do
-    xxMax := (xMax - xMin);
-
+  xxMax := 0;
   for i := 1 to Length(text) do
   begin
     glyphInfo := glyphCache.GetCharInfo(ord(text[i]));
     if not assigned(glyphInfo) then Exit;
+    with glyphInfo.metrics.glyf do
+      if xMax > xxMax then
+         xxMax := xMax;
+  end;
 
+  scale := glyphCache.Scale;
+  for i := 1 to Length(text) do
+  begin
+    glyphInfo := glyphCache.GetCharInfo(ord(text[i]));
     with glyphInfo.metrics.glyf do
     begin
       dx :=  (xxMax - xMax) * 0.5 * scale;
@@ -2620,9 +2577,10 @@ begin
     glyphs := Image32_Vector.OffsetPath( glyphInfo.contours, x + dx, y);
     DrawPolygon(image, glyphs, frNonZero, textColor);
     if text[i] = #32 then
-      y := y + dy - space else
-      y := y + dy + space;
+      y := y + dy - interCharSpace else
+      y := y + dy + interCharSpace;
   end;
+  Result := y;
 end;
 //------------------------------------------------------------------------------
 

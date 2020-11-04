@@ -1,9 +1,9 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 1.52
-Released: 2 October 2020
+Latest version: 1.53
+Released: 22 October 2020
 
-Copyright © 2019-2020 Angus Johnson
+Copyright Â© 2019-2020 Angus Johnson
 Freeware released under Boost Software License
 https://www.boost.org/LICENSE_1_0.txt
 
@@ -11,6 +11,36 @@ Documentation : http://www.angusj.com/delphi/image32/Docs/
 Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
+
+Version 1.53
+  Image32_Ttf
+    Renamed TTtfFontReader class to TFontReader class
+    Similarly renamed several related records
+    Added TFontReader.Weight property
+    Fixed bug in TFontReader.FontInfo record where the
+      'facename' and 'style' fields could contain misplaced #0's
+    Added GetFontFolder & GetInstalledTtfFilenames functions
+    Added GetFacenameAndStyle function
+    Added FilterOnFacename function
+    Added FilterOnStyles function
+    Fixed bug in GetMeaningfulDateTime with invalid dates        
+    Added TGlyphCache.GetTextWidth method
+    Added DrawText functions
+    Added DrawTextVertical function    
+  Image32_Text
+    Move TArrayOfString type definition to Image32 unit
+  Image32_Transform
+    Updated ProjectiveTransform
+  Image32_Vector
+    Added Matrix function
+    Renamed MatrixAdjoint to MatrixAdjugate and modified it.
+    Fixed but in UnionRect function  
+  Image32_Bmp:
+    Various minor improvements
+  Examples
+    Updated FMX and FMX2 examples to accommodate the recent
+    renaming of TTtfFontReader.
+    Fixed several broken examples
 
 Version 1.52
   Changes in Image32
@@ -117,62 +147,3 @@ Version: 1.41
   Changes in Examples
     Added "Photo" application, an image viewer
 
-Version: 1.40
-  Changes in Image32_Extra
-    Improved Vectorize function
-  Changes in BitmapPanels
-    Updated
-  Changes in Examples
-    Updated RasterToSVG and Vectorize samples
-    
-Version: 1.39
-  Changes in Image32_Layers
-    Fixed minor bug introduced in previous update
-    
-Version: 1.38
-  Changes in Image32
-    Added TImage32.Copy method 
-      (it's the same as CopyBlend with nil blend)
-  Changes in Image32_Layers
-    TLayeredImage32.Group method now returns the GroupId
-    CreateButtonGroup and CreateSizingBtnsGroup functions now 
-      return the newly created group's GroupId
-    Replace UpdateSizingGroup function with UpdateButtonSizingGroup 
-      function (and significantly changed its functionality).
-    TLayer.HitTestRegions coordinates are now relative to 
-      the layer itself (not the TLayeredImage32 control).
-  Changes in Image32_CQ
-    Removed TrimPaletteByFraction and overloaded TrimPalette
-  Changes in Examples
-    Significantly updated SimpleLayers example
-    
-Version: 1.37
-  Changes in Image32
-    TImage32.CanPasteFromClipboard is now a class function
-  Changes in Image32_Draw      
-    Added DrawInvertedLine, DrawInvertedDashedLine
-  Changes in Image32_Vector      
-    Fixed minor bug in GetDashedPath function
-  Changes to Image32_Transform
-    Renamed SplineTransformVert to SplineVertTransform
-    Renamed SplineTransformHorz to SplineHorzTransform
-  Changes in Examples
-    Major update to LayersAndTransform; also renamed to Transform
-    LayersAndTransform2 removed
-      
-Version: 1.36
-  Changes in Image32
-    Renamed TImage32.SetMonochromeColor to TImage32.SetRGB
-    Renamed TImage32.ConvertToMask to TImage32.ConvertToBoolMask
-    Added TImage32.ConvertToAlphaMask
-    Renamed GetMask function to GetBoolMask
-    Added GetByteMask function
-    Added CompareRgbEx & CompareAlphaEx functions    
-  Changes in Image32_CQ
-    Renamed CreatePalette to MakePalette because CreateXXXX 
-      tends to imply the returned structure will need freeing
-    Added MakeAndApplyPalette which is *much* faster than
-      MakePalette followed by ApplyPalette
-    Added TrimPalette and TrimPaletteByFraction functions
-  Changes in Examples
-    Updated RasterToSVG utility

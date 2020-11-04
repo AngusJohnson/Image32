@@ -16,21 +16,15 @@ uses
   ClipperCore, Clipper, ClipperOffset,
   Image32, Image32_Draw, Image32_Vector;
 
-//nb: InflatePolygons assumes that there's consistent winding where
+//nb: InflatePath assumes that there's consistent winding where
 //outer paths wind in one direction and inner paths in the other
-function InflatePolygon(const polygon: TPathD;
-  delta: Double; joinStyle: TJoinStyle = jsAuto;
-  miterLimit: double = 2.0): TPathsD;
-function InflatePolygons(const polygons: TPathsD;
-  delta: Double; joinStyle: TJoinStyle = jsAuto;
-  miterLimit: double = 2.0): TPathsD;
 
-function InflateOpenPath(const path: TPathD;
+function InflatePath(const path: TPathD;
   delta: Double; joinStyle: TJoinStyle = jsAuto; endStyle: TEndStyle = esSquare;
   miterLimit: double = 2.0): TPathsD;
-function InflateOpenPaths(const paths: TPathsD;
+function InflatePaths(const paths: TPathsD;
   delta: Double; joinStyle: TJoinStyle = jsAuto; endStyle: TEndStyle = esSquare;
-  miterLimit: double = 2.0): TPathsD;
+  miterLimit: double = 2.0; arcTolerance: double = 0.0): TPathsD;
 
 //UnionPolygon: removes self-intersections
 function UnionPolygon(const polygon: TPathD;
@@ -54,39 +48,7 @@ implementation
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-function InflatePolygon(const polygon: TPathD;
-  delta: Double; joinStyle: TJoinStyle;
-  miterLimit: double): TPathsD;
-var
-  polygons: TPathsD;
-begin
-  setLength(polygons, 1);
-  polygons[0] := polygon;
-  Result := InflatePolygons(polygons, delta, joinStyle, miterLimit);
-end;
-//------------------------------------------------------------------------------
-
-function InflatePolygons(const polygons: TPathsD;
-  delta: Double; joinStyle: TJoinStyle;
-  miterLimit: double): TPathsD;
-var
-  jt: ClipperOffset.TJoinType;
-begin
-  case joinStyle of
-    jsSquare: jt := jtSquare;
-    jsMiter: jt :=  jtMiter;
-    jsRound: jt := jtRound;
-
-    else if abs(delta) <= 2 then
-      jt := jtSquare else
-      jt := jtRound;
-  end;
-  Result := TPathsD(ClipperOffsetPaths(
-    ClipperCore.TPathsD(polygons), delta, jt, etPolygon, miterLimit));
-end;
-//------------------------------------------------------------------------------
-
-function InflateOpenPath(const path: TPathD;
+function InflatePath(const path: TPathD;
   delta: Double; joinStyle: TJoinStyle; endStyle: TEndStyle;
   miterLimit: double): TPathsD;
 var
@@ -94,13 +56,13 @@ var
 begin
   setLength(paths, 1);
   paths[0] := path;
-  Result := InflateOpenPaths(paths, delta, joinStyle, endStyle, miterLimit);
+  Result := InflatePaths(paths, delta, joinStyle, endStyle, miterLimit);
 end;
 //------------------------------------------------------------------------------
 
-function InflateOpenPaths(const paths: TPathsD;
+function InflatePaths(const paths: TPathsD;
   delta: Double; joinStyle: TJoinStyle; endStyle: TEndStyle;
-  miterLimit: double): TPathsD;
+  miterLimit: double; arcTolerance: double): TPathsD;
 var
   jt: ClipperOffset.TJoinType;
   et: TEndType;
@@ -115,10 +77,12 @@ begin
   case endStyle of
     esButt: et := etOpenButt;
     esSquare: et := etOpenSquare;
-    else et := etOpenRound;
+    esRound: et := etOpenRound;
+    esJoined: et := etOpenJoined;
+    else et := etPolygon;
   end;
-  Result := TPathsD(ClipperOffsetPaths(
-    ClipperCore.TPathsD(paths), delta, jt, et, miterLimit));
+  Result := TPathsD(ClipperOffsetPaths( ClipperCore.TPathsD(paths),
+    delta, jt, et, miterLimit, arcTolerance));
 end;
 //------------------------------------------------------------------------------
 

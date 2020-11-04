@@ -3,7 +3,7 @@ unit Image32_Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.53                                                            *
-* Date      :  21 October 2020                                                 *
+* Date      :  22 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -130,13 +130,16 @@ var
 const
   Q: integer = MaxInt div 256;
 begin
+  //returns coords multiplied by 256 in anticipation of the following
+  //GetWeightedPixel function call which in turn expects the lower 8bits
+  //of the integer coord value to represent a fraction.
   xx := x; yy := y; zz := 1;
   MatrixMulCoord(matrix, xx, yy, zz);
 
   if zz = 0 then
   begin
-    if xx >= 0 then x := Q else x := -Q;
-    if yy >= 0 then y := Q else y := -Q;
+    if xx >= 0 then x := Q else x := -MaxInt;
+    if yy >= 0 then y := Q else y := -MaxInt;
   end else
   begin
     xx := xx/zz;

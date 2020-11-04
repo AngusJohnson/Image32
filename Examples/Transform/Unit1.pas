@@ -213,7 +213,7 @@ begin
             if mnuVertSkew.Checked then
               matrix[0][1] := (fPts[1].Y -fPts[0].Y -Height) / Width else
               matrix[1][0] := (fPts[1].X - fPts[0].X -Width)/ Height;
-            //otherwise for unrestricted skews do the code below instead
+            //for unrestricted skews uncomment the code below
             //(and make changes in Panel1MouseMove too) ...
             //matrix[0][1] := (fPts[1].Y -fPts[0].Y -Height) / Width;
             //matrix[1][0] := (fPts[1].X - fPts[0].X -Width)/ Height;
@@ -222,8 +222,13 @@ begin
           pt := OffsetPoint(pt, Round(fPts[0].X), Round(fPts[0].Y));
         end;
       ttProjective:
-        //ProjectiveTransform ...
-        if not ProjectiveTransform(transformLayer.image, fPts, pt) then Exit;
+        begin
+          //ProjectiveTransform ...
+          with transformLayer do
+            if not ProjectiveTransform(image,
+              Rectangle(image.Bounds), fPts, NullRect) then Exit;
+          pt := GetBounds(fPts).TopLeft;
+        end;
       ttSpline:
         //SplineTransformVert ...
         if not SplineVertTransform(transformLayer.image,

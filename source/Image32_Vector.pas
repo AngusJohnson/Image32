@@ -3,7 +3,7 @@ unit Image32_Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.53                                                            *
-* Date      :  11 October 2020                                                 *
+* Date      :  22 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -20,7 +20,7 @@ uses
 type
   TArrowStyle = (asNone, asSimple, asFancy, asDiamond, asCircle, asTail);
   TJoinStyle  = (jsAuto, jsSquare, jsMiter, jsRound);
-  TEndStyle   = (esClosed, esButt, esSquare, esRound);
+  TEndStyle   = (esPolygon, esButt, esSquare, esRound, esJoined);
   TPathEnd    = (peStart, peEnd, peBothEnds);
   TSplineType = (stQuadratic, stCubic);
   TFillRule = (frEvenOdd, frNonZero, frPositive, frNegative);
@@ -131,7 +131,9 @@ type
   function GetAngle(const a, b, c: TPointD): double; overload;
 
   procedure RotatePoint(var pt: TPointD;
-    const focalPoint: TPointD; sinA, cosA: double);
+    const focalPoint: TPointD; angleRad: double); overload;
+  procedure RotatePoint(var pt: TPointD;
+    const focalPoint: TPointD; sinA, cosA: double); overload;
   function RotatePath(const path: TPathD;
     const focalPoint: TPointD; angleRads: double): TPathD; overload;
   function RotatePath(const paths: TPathsD;
@@ -244,7 +246,6 @@ type
     tolerance: double; minSegLength: double = 2): TPathD; overload;
   function SmoothToBezier(const paths: TPathsD; closed: Boolean;
     tolerance: double; minSegLength: double = 2): TPathsD; overload;
-
 
   //Matrix functions
   function Matrix(const m00, m01, m02, m10, m11, m12, m20, m21, m22: double): TMatrixD;
@@ -1290,6 +1291,16 @@ end;
 //------------------------------------------------------------------------------
 
 procedure RotatePoint(var pt: TPointD;
+  const focalPoint: TPointD; angleRad: double);
+var
+  sinA, cosA: double;
+begin
+  SinCos(angleRad, sinA, cosA);
+  RotatePoint(pt, focalPoint, sinA, cosA);
+end;
+//------------------------------------------------------------------------------
+
+procedure RotatePoint(var pt: TPointD;
   const focalPoint: TPointD; sinA, cosA: double);
 var
   tmpX, tmpY: double;
@@ -1715,7 +1726,7 @@ begin
   len := length(line);
   if len < 3 then
   begin
-    result := GrowOpenLine(line, width, joinStyle, esClosed, miterLimit);
+    result := GrowOpenLine(line, width, joinStyle, esPolygon, miterLimit);
     Exit;
   end;
 
@@ -1742,7 +1753,7 @@ function Outline(const line: TPathD; lineWidth: double;
 begin
   if not assigned(line) then
     Result := nil
-  else if endStyle = esClosed then
+  else if endStyle = esPolygon then
     result := GrowClosedLine(line, lineWidth, joinStyle, miterLimit)
   else
     result := GrowOpenLine(line, lineWidth, joinStyle, endStyle, miterLimit);
@@ -1771,11 +1782,11 @@ begin
   if not assigned(lines) then exit;
   if joinStyle = jsAuto then
   begin
-    if endStyle in [esClosed, esRound] then
+    if endStyle in [esPolygon, esRound] then
       joinStyle := jsRound else
       joinStyle := jsSquare;
   end;
-  if endStyle = esClosed then
+  if endStyle = esPolygon then
     for i := 0 to high(lines) do
       AddPaths(GrowClosedLine(lines[i],
         lineWidth, joinStyle, miterLimit))

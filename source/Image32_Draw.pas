@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.52                                                            *
-* Date      :  1 October 2020                                                  *
+* Version   :  1.53                                                            *
+* Date      :  22 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -1658,7 +1658,7 @@ var
 begin
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
   if not assigned(line) then exit;
-  lines := GetDashedPath(line, endStyle = esClosed, dashPattern, patternOffset);
+  lines := GetDashedPath(line, endStyle = esPolygon, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
   lines := Outline(lines, lineWidth, joinStyle, endStyle);
   cr := TColorRenderer.Create(color);
@@ -1692,7 +1692,7 @@ var
 begin
   if (not assigned(line)) or (not assigned(renderer)) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
-  lines := GetDashedPath(line, endStyle = esClosed, dashPattern, patternOffset);
+  lines := GetDashedPath(line, endStyle = esPolygon, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
   lines := Outline(lines, lineWidth, joinStyle, endStyle);
   if renderer.Initialize(img) then
@@ -1723,7 +1723,7 @@ var
 begin
   if not assigned(line) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
-  lines := GetDashedPath(line, endStyle = esClosed, dashPattern, patternOffset);
+  lines := GetDashedPath(line, endStyle = esPolygon, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
   lines := Outline(lines, lineWidth, joinStyle, endStyle);
   renderer := TInverseRenderer.Create;

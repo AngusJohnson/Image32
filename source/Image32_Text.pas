@@ -3,7 +3,7 @@ unit Image32_Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.53                                                            *
-* Date      :  11 October 2020                                                 *
+* Date      :  22 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  Module to support text in the Image32 library                   *

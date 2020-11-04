@@ -3,7 +3,7 @@ unit Image32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.53                                                            *
-* Date      :  11 October 2020                                                 *
+* Date      :  22 October 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -379,8 +379,8 @@ type
   function InvertColor(color: TColor32): TColor32;
   procedure Monochrome(var color: TColor32);
 
-  //RgbtoHsl: See https://en.wikipedia.org/wiki/HSL_and_HSV
-  function RgbtoHsl(color: TColor32): THsl;
+  //RgbToHsl: See https://en.wikipedia.org/wiki/HSL_and_HSV
+  function RgbToHsl(color: TColor32): THsl;
   //HslToRgb: See https://en.wikipedia.org/wiki/HSL_and_HSV
   function HslToRgb(hslColor: THsl): TColor32;
   function AdjustHue(color: TColor32; percent: Integer): TColor32;
@@ -403,8 +403,8 @@ type
   function ClampRange(val, min, max: single): single; overload;
   function IncPColor32(pc: Pointer; cnt: Integer): PColor32;
 
-  //DPIAware: Useful for DPIAware sizing of images and their container controls.<br>
-  //Scales values relative to the display's resolution (PixelsPerInch).<br>
+  //DPIAware: Useful for DPIAware sizing of images and their container controls.
+  //It scales values relative to the display's resolution (PixelsPerInch).
   //See https://docs.microsoft.com/en-us/windows/desktop/hidpi/high-DPIAware-desktop-application-development-on-windows
   function DPIAware(val: Integer): Integer; overload; {$IFDEF INLINE} inline; {$ENDIF}
   function DPIAware(val: double): double; overload; {$IFDEF INLINE} inline; {$ENDIF}
@@ -645,8 +645,8 @@ begin
     Result := false;
     Exit;
   end;
-  curr := RGBtoHsl(current);
-  mast := RGBtoHsl(master);
+  curr := RgbToHsl(current);
+  mast := RgbToHsl(master);
   if curr.hue > mast.hue then
   begin
     val := curr.hue - mast.hue;
@@ -1109,7 +1109,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RgbtoHsl(color: TColor32): THsl;
+function RgbToHsl(color: TColor32): THsl;
 var
   rgba: TARGB absolute color;
   hsl: THsl absolute result;
@@ -1186,7 +1186,7 @@ var
 begin
   percent := percent mod 100;
   if percent < 0 then inc(percent, 100);
-  hsl := RgbtoHsl(color);
+  hsl := RgbToHsl(color);
   hsl.hue := (hsl.hue + Round(percent*255/100)) mod 256;
   result := HslToRgb(hsl);
 end;
@@ -1199,7 +1199,7 @@ begin
   len := length(clr32Arr);
   setLength(result, len);
   for i := 0 to len -1 do
-    result[i] := RgbtoHsl(clr32Arr[i]);
+    result[i] := RgbToHsl(clr32Arr[i]);
 end;
 //------------------------------------------------------------------------------
 
