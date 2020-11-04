@@ -97,7 +97,8 @@ type
   EClipperLibException = class(Exception);
 
 //Area: returns type double to avoid potential integer overflows
-function Area(const path: TPath): Double;
+function Area(const path: TPath): Double; overload;
+function Area(const path: TPathD): Double; overload;
 function Orientation(const path: TPath): Boolean;
 function PointInPolygon(const pt: TPoint64;
   const path: TPath): TPointInPolygonResult;
@@ -151,6 +152,9 @@ function ReversePath(const path: TPath): TPath; overload;
 function ReversePath(const path: TPathD): TPathD; overload;
 function ReversePaths(const paths: TPaths): TPaths; overload;
 function ReversePaths(const paths: TPathsD): TPathsD; overload;
+
+procedure AppendPoint(var path: TPath; const pt: TPoint64); overload;
+procedure AppendPoint(var path: TPathD; const pt: TPointD); overload;
 
 procedure AppendPath(var paths: TPaths; const extra: TPath); overload;
 procedure AppendPath(var paths: TPathsD; const extra: TPathD); overload;
@@ -533,6 +537,26 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure AppendPoint(var path: TPath; const pt: TPoint64);
+var
+  len: Integer;
+begin
+  len := length(path);
+  SetLength(path, len +1);
+  path[len] := pt;
+end;
+//------------------------------------------------------------------------------
+
+procedure AppendPoint(var path: TPathD; const pt: TPointD);
+var
+  len: Integer;
+begin
+  len := length(path);
+  SetLength(path, len +1);
+  path[len] := pt;
+end;
+//------------------------------------------------------------------------------
+
 procedure AppendPath(var paths: TPaths; const extra: TPath);
 var
   len: Integer;
@@ -841,6 +865,25 @@ end;
 //------------------------------------------------------------------------------
 
 function Area(const path: TPath): Double;
+var
+  i, j, highI: Integer;
+  d: Double;
+begin
+  Result := 0.0;
+  highI := High(path);
+  if (highI < 2) then Exit;
+  j := highI;
+  for i := 0 to highI do
+  begin
+    d := (path[j].X + path[i].X);
+    Result := Result + d * (path[j].Y - path[i].Y);
+    j := i;
+  end;
+  Result := -Result * 0.5;
+end;
+//------------------------------------------------------------------------------
+
+function Area(const path: TPathD): Double;
 var
   i, j, highI: Integer;
   d: Double;
