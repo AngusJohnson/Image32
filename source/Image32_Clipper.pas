@@ -20,10 +20,10 @@ uses
 //outer paths wind in one direction and inner paths in the other
 
 function InflatePath(const path: TPathD;
-  delta: Double; joinStyle: TJoinStyle = jsAuto; endStyle: TEndStyle = esSquare;
+  delta: Double; joinStyle: TJoinStyle; endStyle: TEndStyle;
   miterLimit: double = 2.0): TPathsD;
 function InflatePaths(const paths: TPathsD;
-  delta: Double; joinStyle: TJoinStyle = jsAuto; endStyle: TEndStyle = esSquare;
+  delta: Double; joinStyle: TJoinStyle; endStyle: TEndStyle;
   miterLimit: double = 2.0; arcTolerance: double = 0.0): TPathsD;
 
 //UnionPolygon: removes self-intersections

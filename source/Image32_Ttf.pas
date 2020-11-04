@@ -3,7 +3,7 @@ unit Image32_Ttf;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.54                                                            *
-* Date      :  4 November 2020                                                 *
+* Date      :  5 November 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2020                                              *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -2237,7 +2237,8 @@ begin
         taRight:
           nextPt.X := rec.Right - currLineWidthPxls;
         taCenter:
-          nextPt.X := (rec.Right - rec.Left - currLineWidthPxls) * 0.5;
+          nextPt.X := rec.Left +
+            (rec.Right - rec.Left - currLineWidthPxls) * 0.5;
         else
           nextPt.X := rec.Left;
       end;
@@ -2295,7 +2296,7 @@ begin
   case textAlignV of
     tvaMiddle:
       begin
-        dy := (rec.Bottom - rec.Top - nextPt.Y - descent) / 2;
+        dy := (rec.Bottom - nextPt.Y - descent) / 2;
         if dy > 0 then
         begin
           glyphs := Image32_Vector.OffsetPath(glyphs, 0, dy);
