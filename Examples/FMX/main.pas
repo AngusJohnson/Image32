@@ -5,10 +5,10 @@ interface
 uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   System.Rtti, Math, FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics,
-  Image32, Image32_Vector, Image32_Draw, Image32_Extra, Image32_FMX,
-  Image32_Ttf, Image32_Clipper,
   FMX.Dialogs, FMX.Layouts, FMX.ExtCtrls, FMX.Platform, FMX.Surfaces,
-  FMX.StdCtrls, FMX.Controls.Presentation;
+  FMX.StdCtrls, FMX.Controls.Presentation,
+  Image32;
+
 
 type
   TMainForm = class(TForm)
@@ -33,8 +33,8 @@ type
 
 var
   MainForm: TMainForm;
-
   bkColor, penColor, txtColor: TColor32;
+
 const
   margin: integer = 20;
 
@@ -47,21 +47,26 @@ implementation
 
 {$R font.res}
 
+uses
+  Image32_Vector, Image32_Draw, Image32_Extra, Image32_FMX,
+    Image32_Ttf, Image32_Clipper;
+
 //------------------------------------------------------------------------------
+// TMainForm methods
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormCreate(Sender: TObject);
 var
   i, zoomCnt: integer;
   baseImg, imgBooks: TImage32;
-  tmp: TPathD;
-  mainTxtPaths, copyTxtPaths: TPathsD;
-  textRec, textRec2, imageRec: TRect;
+  bigTextGlyphs, copyrightGlyphs: TPathsD;
+  tmpPath: TPathD;
+  textRec, textRec2, imgRec, tmpRec: TRect;
   matrix: TMatrixD;
   delta: TPoint;
   screenScale, fontHeight, nextX: double;
 
-  glyphCache: TGlyphCache;
+  fontCache: TGlyphCache;
   fontReader : TFontReader;
   ScreenService: IFMXScreenService;
 begin
@@ -69,7 +74,6 @@ begin
     IFMXScreenService, IInterface(ScreenService)) then
       screenScale := ScreenService.GetScreenScale else
       screenScale := 1.0;
-
   fontHeight := 35 * screenScale;
 
   bkColor  := $FFF8F8BB; //yellow
@@ -81,98 +85,97 @@ begin
   txtColor := SwapRedBlue(txtColor);
 {$ENDIF}
 
-
-  baseImg := TImage32.Create();
-  //get ready for some simple text animation
-  zoomCnt := Length(zoomImages);
-  zoomIdx := zoomCnt -1;
-  zoomImages[zoomIdx] := baseImg;
+  baseImg := TImage32.Create;
 
   //create a fontReader to access truetype font files (*.ttf) that
   //have been stored as font resources and create a glyph cache too
   fontReader := TFontReader.Create;
-  glyphCache := TGlyphCache.Create(fontReader, fontHeight);
+  fontCache := TGlyphCache.Create(fontReader, fontHeight);
   try
-    //connect fontReader to a styled sans serif font
+    //connect fontReader to a fancy ttf font stored as a resource
     fontReader.LoadFromResource('FONT_2', RT_RCDATA);
     if not fontReader.IsValidFontFormat then Exit;
     //and get the outline for some text ...
-    glyphCache.GetTextGlyphs(0,0,'Image32  rocks!', mainTxtPaths, nextX);
+    fontCache.GetTextGlyphs(0,0,'Image32  rocks!', bigTextGlyphs, nextX);
 
-    //Normally we'd create different fontReaders for different fonts and
-    //also use different glyphManagers for different font heights.
-    //But here, I'm showing it's possible to reuse these objects ...
-
-    //connect fontReader to a plain sans serif font
+    //Now that we've gotten 'bigTextGlyphs' we need
+    //a different font for the copyright text
     fontReader.LoadFromResource('FONT_1', RT_RCDATA);
     if not fontReader.IsValidFontFormat then Exit;
-    //nb: fontReader changing fonts will automatically clear glyphCache,
-    //though changing glyphCache's fontHeight will also do the same...
-    glyphCache.FontHeight := fontHeight / 4;
+    fontCache.FontHeight := fontHeight / 4;
 
-    //and now get the copyright text outline
-    glyphCache.GetTextGlyphs(0,0,
-      #$00A9' 2020 Angus Johnson', copyTxtPaths, nextX);
+    fontCache.GetTextGlyphs(0,0,#$00A9' 2020 Angus Johnson',
+      copyrightGlyphs, nextX);
   finally
-    glyphCache.Free;
+    fontCache.Free;
     fontReader.free;
   end;
 
-  //now do some affine transformations of mainTxtPaths, just for fun :)
-  //(though this can be commented out without causing any problems)
-  matrix := IdentityMatrix;
-  //stretch it vertically ...
-  MatrixScale(matrix, 1, 1.75);
-  //and horizontal skew (yes, we could've used an italicized font instead) ...
-  MatrixSkew(matrix, -0.25, 0);
-  MatrixApply(matrix, mainTxtPaths);
-
+  //also load a colourful background image (some books) ...
   imgBooks := TImage32.Create;
   try
-    //load a colourful background image (some books) ...
     imgBooks.LoadFromResource('PNGIMAGE_1', RT_RCDATA);
 
-    //set the size of the base image so that it contains
-    //both 'imgBooks' and the text with a decent margin ...
-    textRec := Image32_Vector.GetBounds(mainTxtPaths);
+    //size the base image
     baseImg.SetSize(
-      max(imgBooks.Width, textRec.Width) + (margin * 4),
-      max(imgBooks.Height, textRec.Height) + (margin * 4));
+      Image32_Vector.GetBounds(bigTextGlyphs).Width + margin *2,
+      imgBooks.Height);
 
-    //color fill the base image and give it a border ...
-    baseImg.FillRect(baseImg.Bounds, bkColor);
-    tmp := Image32_Vector.Rectangle(baseImg.Bounds);
-    DrawLine(baseImg, tmp, 2, penColor, esClosed);
+    //offset 'imgBooks' so it'll be centered in the base image
+    imgRec := imgBooks.Bounds;
+    delta.X := (baseImg.Width - imgBooks.Width)   div 2;
+    delta.Y := (baseImg.Height - imgBooks.Height) div 2;
+    Image32_Vector.OffsetRect(imgRec, delta.X, delta.Y);
 
-    //offset 'imgBooks' so it's centered in the base image
-    //and copy it onto the base image ...
-    imageRec := imgBooks.Bounds;
-    delta := Point((baseImg.Width - imgBooks.Width) div 2,
-      (baseImg.Height - imgBooks.Height) div 2);
-    Image32_Vector.OffsetRect(imageRec, delta.X, delta.Y);
-    baseImg.CopyBlend(imgBooks, imgBooks.Bounds, imageRec, BlendToOpaque);
+    //draw the background color and imgBooks onto baseImg
+    baseImg.Clear(bkColor);
+    baseImg.CopyBlend(imgBooks, imgBooks.Bounds, imgRec, BlendToOpaque);
 
   finally
     imgBooks.Free;
   end;
 
-  //draw a simple copyright notice using a normal font (font_1)
-  //and locate it in the bottom right corner of the display image
-  with GetBoundsD(copyTxtPaths) do
-    copyTxtPaths := OffsetPath(copyTxtPaths,
-      baseImg.Width - Width -10, baseImg.Height - 10);
-  DrawPolygon(baseImg, copyTxtPaths, frNonZero, clBlack32);
+  //now give baseImg a border
+  imgRec := baseImg.Bounds;
+  imgRec := Image32_Vector.InflateRect(imgRec, -1, -1);
+  tmpPath := Rectangle(imgRec);
+  DrawLine(baseImg, tmpPath, 2, penColor, esPolygon);
+
+  //draw the copyright text in the bottom right corner
+  tmpRec := Image32_Vector.GetBounds(copyrightGlyphs);
+  copyrightGlyphs :=
+    Image32_Vector.OffsetPath(copyrightGlyphs,
+    imgRec.Right - margin - tmpRec.Width,
+    imgRec.Bottom - margin);
+  DrawPolygon(baseImg, copyrightGlyphs, frNonZero, clBlack32);
+
+  //get ready for some simple text animation
+  zoomCnt := Length(zoomImages);
+  zoomIdx := zoomCnt -1;
+  zoomImages[zoomIdx] := baseImg;
+
+  //make the 'bigTextGlyphs' text a little bolder ...
+  bigTextGlyphs := InflatePaths(bigTextGlyphs, 1.5, jsAuto, esPolygon);
+
+  //and perform an affine transformation to
+  //stretch the text glyphs vertically and italicize too
+  matrix := IdentityMatrix;
+  MatrixScale(matrix, 1, 1.75);
+  MatrixSkew(matrix, -0.25, 0);
+  MatrixApply(matrix, bigTextGlyphs);
 
   //center mainTxtPaths inside displayImg ...
+  textRec := Image32_Vector.GetBounds(bigTextGlyphs);
   delta.X := (baseImg.Width - textRec.Width) div 2 - textRec.Left;
   delta.Y := (baseImg.Height - textRec.Height) div 2 - textRec.Top;
-  outlineText := OffsetPath(mainTxtPaths, delta.X, delta.Y);
+  outlineText := OffsetPath(bigTextGlyphs, delta.X, delta.Y);
 
   //fill an array of images copying the base image and overlaying
   //some scaled text in preparation for some text 'zoom' animation
   zoomImages[0] := TImage32.Create(baseImg);
+
   DrawPolygon(zoomImages[0], outlineText, frNonZero, clBlack32);
-  outlineText := InflatePolygons(outlineText, -1.0);
+  //outlineText := InflatePaths(outlineText, -1.0, jsAuto, esPolygon);
   DrawPolygon(zoomImages[0], outlineText, frNonZero, txtColor);
   Draw3D(zoomImages[0], outlineText, frNonZero, 6, 3);
 

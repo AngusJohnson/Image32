@@ -970,7 +970,7 @@ begin
       rec.TopLeft := ThumbnailPos(currentIdx);
       rec.BottomRight := Point(rec.Left +thumbnailSize, rec.Top +thumbnailSize);
       Image32_Vector.InflateRect(rec, 2, 2);
-      DrawLine(dstImg, Rectangle(rec), 4, clRed32, esClosed);
+      DrawLine(dstImg, Rectangle(rec), 4, clRed32, esPolygon);
     end;
     //dstImg finally draws to dstCanvas
     dstImg.CopyToDc(dstCanvas.Handle, dstRec.Left, dstRec.Top);
@@ -1162,7 +1162,7 @@ begin
   pp := GetTextOutline(layer.Width - 14, -lf.lfHeight +10,
     text, GetFontInfo(lf), taRight, pt);
   //fill behind text ...
-  DrawLine(layer.Image, pp, 6, Color32(backColor), esClosed);
+  DrawLine(layer.Image, pp, 6, Color32(backColor), esPolygon);
   //draw text ...
   if GetLuminance(backColor) < $80 then
     DrawPolygon(layer.Image, pp, frEvenOdd, clWhite32) else

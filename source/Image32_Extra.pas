@@ -85,6 +85,10 @@ procedure Draw3D(img: TImage32; const polygons: TPathsD;
   colorLt: TColor32 = $DDFFFFFF; colorDk: TColor32 = $80000000;
   angleRads: double = angle45); overload;
 
+function GradientColor(color1, color2: TColor32; frac: single): TColor32;
+function MakeDarker(color: TColor32; percent: cardinal): TColor32;
+function MakeLighter(color: TColor32; percent: cardinal): TColor32;
+
 procedure DrawButton(img: TImage32; const pt: TPointD;
   size: double; color: TColor32 = clNone32;
   buttonOptions: TButtonOptions = []);
@@ -994,6 +998,38 @@ begin
   finally
     tmp.Free;
   end;
+end;
+//------------------------------------------------------------------------------
+
+function GradientColor(color1, color2: TColor32; frac: single): TColor32;
+var
+  c1: TARGB absolute color1;
+  c2: TARGB absolute color2;
+  r:  TARGB absolute Result;
+begin
+  if frac >= 1 then
+    result := color2
+  else if frac <= 0 then
+    result := color1
+  else
+  begin
+    r.B := trunc(c1.B*(1-frac) + c2.B*frac);
+    r.G := trunc(c1.G*(1-frac) + c2.G*frac);
+    r.R := trunc(c1.R*(1-frac) + c2.R*frac);
+    r.A := trunc(c1.A*(1-frac) + c2.A*frac);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function MakeDarker(color: TColor32; percent: cardinal): TColor32;
+begin
+  result := GradientColor(color, $FF000000, percent/100);
+end;
+//------------------------------------------------------------------------------
+
+function MakeLighter(color: TColor32; percent: cardinal): TColor32;
+begin
+  result := GradientColor(color, $FFFFFFFF, percent/100);
 end;
 //------------------------------------------------------------------------------
 

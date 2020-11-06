@@ -206,7 +206,7 @@ begin
   //now combine an outline of the shortened path with the arrow head polygons
   AppendPath(paths, OpenPathToFlatPolygon(flatPath));
   HitTestRegions :=
-    InflatePolygons(paths, (lineWidth + hitTestWidth) * 0.5, jsAuto);
+    InflatePaths(paths, (lineWidth + hitTestWidth) * 0.5, jsAuto, esPolygon);
   rec := GetBounds(HitTestRegions);
   self.SetBounds(rec);
   HitTestRegions := OffsetPath(HitTestRegions, -Left, -Top);
@@ -221,7 +221,7 @@ begin
   Image.Clear;
   DrawPolygon(Image, paths, frEvenOdd, fillColor);
   DrawLine(Image, flatPath, lineWidth, penColor, esRound);
-  DrawLine(Image, paths, lineWidth, penColor, esClosed);
+  DrawLine(Image, paths, lineWidth, penColor, esPolygon);
 end;
 
 //------------------------------------------------------------------------------
@@ -240,7 +240,7 @@ begin
   //nb: UnionPolygon fixes up any self-intersections
   self.HitTestRegions := UnionPolygon(flattened, frEvenOdd);
   HitTestRegions :=
-    InflatePolygons(HitTestRegions, (lineWidth + hitTestWidth) *0.5);
+    InflatePaths(HitTestRegions, (lineWidth + hitTestWidth) *0.5);
   rec := GetBounds(HitTestRegions);
   SetBounds(rec);
   HitTestRegions := OffsetPath(HitTestRegions, -Left, -Top);
@@ -251,7 +251,7 @@ begin
   flattened := OffsetPath(flattened, -Left, -Top);
   Image.Clear;
   DrawPolygon(Image, flattened, frNonZero, fillColor);
-  DrawLine(Image, flattened, lineWidth, penColor, esClosed);
+  DrawLine(Image, flattened, lineWidth, penColor, esPolygon);
 end;
 
 //------------------------------------------------------------------------------
@@ -366,11 +366,11 @@ begin
   if buttonPath.Count < 2 then
     btnPathRegion := nil
   else if rbPolygonArrow.Checked then
-    btnPathRegion := InflatePolygon(buttonPath.FlattenedPath,
-      (lineWidth + hitTestWidth) * 0.5, jsRound)
+    btnPathRegion := InflatePath(buttonPath.FlattenedPath,
+      (lineWidth + hitTestWidth) * 0.5, jsRound, esPolygon)
   else
-    btnPathRegion := InflateOpenPath(OpenPathToFlatPolygon(
-      buttonPath.FlattenedPath), lineWidth + hitTestWidth, jsRound);
+    btnPathRegion := InflatePath(OpenPathToFlatPolygon(
+      buttonPath.FlattenedPath), lineWidth + hitTestWidth, jsRound, esPolygon);
 end;
 //------------------------------------------------------------------------------
 
@@ -437,10 +437,10 @@ begin
   if buttonPath.Count < 2 then
     btnPathRegion := nil
   else if rbPolygonArrow.Checked then
-    btnPathRegion := InflatePolygon(buttonPath.FlattenedPath,
+    btnPathRegion := InflatePath(buttonPath.FlattenedPath,
       (lineWidth + hitTestWidth) * 0.5, jsRound)
   else
-    btnPathRegion := InflateOpenPath(OpenPathToFlatPolygon(
+    btnPathRegion := InflatePath(OpenPathToFlatPolygon(
       buttonPath.FlattenedPath), lineWidth + hitTestWidth, jsRound);
   UpdateMenus;
   UpdateLayeredImage;
@@ -537,12 +537,12 @@ begin
     if rbPolygonArrow.Checked then
     begin
       DrawPolygon(dl.Image, flatPath, frEvenOdd, fillColor);
-      DrawLine(dl.Image, flatPath, lineWidth, penColor, esClosed);
+      DrawLine(dl.Image, flatPath, lineWidth, penColor, esPolygon);
     end else
     begin
       arrowHeads := ShortenPathAndReturnArrowHeads(flatPath);
       DrawPolygon(dl.Image, arrowHeads, frEvenOdd, fillColor);
-      DrawLine(dl.Image, arrowHeads, lineWidth, penColor, esClosed);
+      DrawLine(dl.Image, arrowHeads, lineWidth, penColor, esPolygon);
       DrawLine(dl.Image, flatPath, lineWidth, penColor, esRound);
     end;
     //display control lines
@@ -557,7 +557,7 @@ begin
     i := Max(DefaultButtonSize, linewidth) div 2 + hitTestWidth;
     Windows.InflateRect(rec, i, i);
     DrawPolygon(dl.Image, Ellipse(rec), frEvenOdd, fillC);
-    DrawLine(dl.Image, Ellipse(rec), 1, penC, esClosed);
+    DrawLine(dl.Image, Ellipse(rec), 1, penC, esPolygon);
   end;
 
   //scaling or rotation (always group 2)
@@ -578,11 +578,11 @@ begin
       //convert HitTestRegions from layer to layeredImage32 coordinates
       with clickedLayer do
         htPaths := OffsetPath(HitTestRegions, Left, Top);
-      DrawDashedLine(dl.Image, htPaths, dashes, nil, 1, clRed32, esClosed)
+      DrawDashedLine(dl.Image, htPaths, dashes, nil, 1, clRed32, esPolygon)
     end
     else if (clickedLayer is TTextLayer32) then
       DrawDashedLine(dl.Image, Rectangle(clickedLayer.Bounds),
-        dashes, nil, 1, clRed32, esClosed)
+        dashes, nil, 1, clRed32, esPolygon)
   end;
 
   //and update the statusbar too

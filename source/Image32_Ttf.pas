@@ -376,6 +376,8 @@ type
     procedure Clear;
     function GetCharInfo(charOrdinal: WORD): PGlyphInfo;
     function GetTextGlyphs(x, y: double; const text: UnicodeString;
+      out glyphs: TPathsD): Boolean; overload;
+    function GetTextGlyphs(x, y: double; const text: UnicodeString;
       out glyphs: TPathsD; out nextX: double): Boolean; overload;
     function GetTextGlyphs(const rec: TRect; const text: UnicodeString;
       textAlign: TTextAlign; textAlignV: TTextVAlign;
@@ -819,8 +821,12 @@ end;
 function TFontReader.LoadFromResource(const resName: string; resType: PChar): Boolean;
 var
   rs: TResourceStream;
+  id: integer;
 begin
-  rs := TResourceStream.Create(hInstance, resName, resType);
+  id := StrToIntDef(resName, 0);
+  if id > 0  then
+    rs := TResourceStream.CreateFromID(hInstance, id, resType) else
+    rs := TResourceStream.Create(hInstance, resName, resType);
   try
     Result := LoadFromStream(rs);
   finally
@@ -2088,6 +2094,15 @@ end;
 //------------------------------------------------------------------------------
 
 function TGlyphCache.GetTextGlyphs(x, y: double; const text: UnicodeString;
+  out glyphs: TPathsD): Boolean;
+var
+  dummy: double;
+begin
+  Result := GetTextGlyphs(x, y, text, glyphs, dummy);
+end;
+//------------------------------------------------------------------------------
+
+function TGlyphCache.GetTextGlyphs(x, y: double; const text: UnicodeString;
   out glyphs: TPathsD; out nextX: double): Boolean;
 var
   i: integer;
@@ -2530,10 +2545,7 @@ function DrawAngledText(image: TImage32;
   angleRadians: double;
   textColor: TColor32 = clBlack32): TPointD;
 var
-  i: integer;
   glyphs: TPathsD;
-  glyphInfo: PGlyphInfo;
-  sinA, cosA, dx, dy, z, scale: double;
 begin
   Result := PointD(x,y);
   if not assigned(glyphCache) or not glyphCache.IsValidFont or

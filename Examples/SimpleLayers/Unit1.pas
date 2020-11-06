@@ -334,7 +334,7 @@ begin
     SetLength(paths, 1);
     paths[0] := Rectangle(rec);
     DrawPolygon(img, paths, frNonZero, brushColor);
-    DrawLine(img, paths, 6, penColor, esClosed);
+    DrawLine(img, paths, 6, penColor, esPolygon);
   end
   else if layer.Name = 'ellipse' then
   begin
@@ -343,7 +343,7 @@ begin
     SetLength(paths, 1);
     paths[0] := Ellipse(rec);
     DrawPolygon(img, paths, frNonZero, brushColor);
-    DrawLine(img, paths, 6, penColor, esClosed);
+    DrawLine(img, paths, 6, penColor, esPolygon);
   end else
   begin
     //layer contains text
@@ -356,7 +356,7 @@ begin
     DrawShadow(img, paths, frNonZero, 3);
     DrawPolygon(img, paths, frNonZero, brushColor);
     Draw3D(img, paths, frNonZero, 3,4);
-    DrawLine(img, paths, 2, clBlack32, esClosed);
+    DrawLine(img, paths, 2, clBlack32, esPolygon);
   end;
   if layer.Name <> '' then
     layer.HitTestRegions := paths;

@@ -159,8 +159,9 @@ var
 begin
   flatPath := smoothPath.FlattenedPath;
   //calculate and assign hit test regions
-  self.HitTestRegions := InflateOpenPath(OpenPathToFlatPolygon(flatPath),
-    lineWidth + hitTestWidth, jsAuto, esRound);
+  self.HitTestRegions := InflatePath(flatPath,
+    lineWidth + hitTestWidth, jsRound, esRound);
+
   rec := GetBounds(HitTestRegions);
   self.SetBounds(rec);
   HitTestRegions := OffsetPath(HitTestRegions, -Left, -Top);
@@ -187,7 +188,7 @@ begin
   //nb: UnionPolygon fixes up any self-intersections
   HitTestRegions := UnionPolygon(flattened, frEvenOdd);
   HitTestRegions :=
-    InflatePolygons(HitTestRegions, (lineWidth + hitTestWidth) *0.5);
+    InflatePaths(HitTestRegions, (lineWidth + hitTestWidth) *0.5);
   rec := GetBounds(HitTestRegions);
   self.SetBounds(rec);
   HitTestRegions := OffsetPath(HitTestRegions, -Left, -Top);
@@ -197,7 +198,7 @@ begin
   flattened := OffsetPath(flattened, -Left, -Top);
   Image.Clear;
   DrawPolygon(Image, flattened, frNonZero, GetFillColor);
-  DrawLine(Image, flattened, lineWidth, GetPenColor, esClosed);
+  DrawLine(Image, flattened, lineWidth, GetPenColor, esPolygon);
   CursorId := crSizeAll;
 end;
 
@@ -289,8 +290,8 @@ begin
 
   //update hittest region too
   if buttonPath.Count > 1 then
-    btnPathRegion := InflateOpenPath(OpenPathToFlatPolygon(
-      buttonPath.FlattenedPath), lineWidth + hitTestWidth, jsRound)
+    btnPathRegion := InflatePath(buttonPath.FlattenedPath,
+      lineWidth + hitTestWidth, jsRound, esRound)
   else
     btnPathRegion := nil;
 
@@ -353,8 +354,8 @@ begin
 
   //update hittest region too
   if buttonPath.Count > 1 then
-    btnPathRegion := InflateOpenPath(OpenPathToFlatPolygon(
-      buttonPath.FlattenedPath), Max(lineWidth, hitTestWidth), jsRound)
+    btnPathRegion := InflatePath(buttonPath.FlattenedPath,
+      Max(lineWidth, hitTestWidth), jsRound, esRound)
   else
     btnPathRegion := nil;
 
@@ -417,7 +418,7 @@ begin
     i := Max(DefaultButtonSize, linewidth) div 2 + hitTestWidth;
     Windows.InflateRect(rec, i, i);
     DrawPolygon(designLayer.Image, Ellipse(rec), frEvenOdd, $40AAAAAA);
-    DrawLine(designLayer.Image, Ellipse(rec), 1, $AAFF0000, esClosed);
+    DrawLine(designLayer.Image, Ellipse(rec), 1, $AAFF0000, esPolygon);
   end;
 
   //rotation (always group 2)
@@ -436,7 +437,7 @@ begin
   begin
     with TSmoothPathLayer32(clickedLayer) do
       paths := OffsetPath(HitTestRegions, Left, Top);
-    DrawDashedLine(designLayer.Image, paths, dashes, nil, 1, clRed32, esClosed);
+    DrawDashedLine(designLayer.Image, paths, dashes, nil, 1, clRed32, esPolygon);
   end;
 
   //and update Statusbar too

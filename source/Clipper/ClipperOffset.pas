@@ -3,33 +3,23 @@ unit ClipperOffset;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  10.0 (beta)                                                     *
-* Date      :  24 October 2020                                                 *
+* Date      :  6 November 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2017                                         *
+* Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Offset paths and clipping solutions                             *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
-{$IFDEF FPC}
-  {$DEFINE INLINING}
-{$ELSE}
-  {$IF CompilerVersion < 14}
-    Requires Delphi version 6 or above.
-  {$IFEND}
-  {$IF CompilerVersion >= 18}         //Delphi 2007
-    //While Inlining has been supported since D2005, both D2005 and D2006
-    //have an Inline codegen bug (QC41166) so ignore Inline until D2007.
-    {$DEFINE INLINING}
-    {$IF CompilerVersion >= 25.0}     //Delphi XE4+
-      {$LEGACYIFEND ON}
-    {$IFEND}
-  {$IFEND}
-{$ENDIF}
+{$I Clipper.inc}
 
 interface
 
 uses
-  SysUtils, Classes, Math, ClipperCore, Clipper;
+  SysUtils, Classes, Math,
+{$IFDEF XPLAT_GENERICS}
+  Generics.Collections, Generics.Defaults,
+{$ENDIF}
+  ClipperCore, Clipper;
 
 type
 
@@ -40,7 +30,7 @@ type
 	  paths     : TPathsD;
 	  joinType  : TJoinType;
 	  endType   : TEndType;
-    constructor Create(const paths: TPathsD; jt: TJoinType; et: TEndType);
+    constructor Create(jt: TJoinType; et: TEndType);
   end;
 
   TClipperOffset = class
@@ -52,7 +42,11 @@ type
     fArcTolerance: Double;
     fStepsPerRad : Double;
     fNorms       : TPathD;
+{$IFDEF XPLAT_GENERICS}
+    fInGroups    : TList<TPathGroup>;
+{$ELSE}
     fInGroups    : TList;
+{$ENDIF}
     fInPath      : TPathD;
     fOutPath     : TPathD;
     fOutPaths    : TPathsD;
@@ -180,9 +174,8 @@ end;
 // TPathGroup methods
 //------------------------------------------------------------------------------
 
-constructor TPathGroup.Create(const paths: TPathsD; jt: TJoinType; et: TEndType);
+constructor TPathGroup.Create(jt: TJoinType; et: TEndType);
 begin
-  Self.paths := CopyPaths(paths);
   Self.joinType := jt;
   Self.endType := et;
 end;
@@ -196,7 +189,12 @@ begin
   inherited Create;
   fMiterLimit := MiterLimit;
   fArcTolerance := ArcTolerance;
+
+{$IFDEF XPLAT_GENERICS}
+  fInGroups     := TList<TPathGroup>.Create;
+{$ELSE}
   fInGroups     := TList.Create;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -234,11 +232,12 @@ end;
 procedure TClipperOffset.AddPaths(const paths: TPathsD;
   joinType: TJoinType; endType: TEndType);
 var
-  node: TPathGroup;
+  group: TPathGroup;
 begin
   if Length(paths) = 0 then Exit;
-  node := TPathGroup.Create(paths, joinType, endType);
-  fInGroups.Add(node);
+  group := TPathGroup.Create(joinType, endType);
+  AppendPaths(group.paths, paths);
+  fInGroups.Add(group);
 end;
 //------------------------------------------------------------------------------
 
@@ -408,8 +407,6 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TClipperOffset.OffsetOpenJoined;
-var
-  i,j: integer;
 begin
   OffsetPolygon;
   SetLength(fOutPath, fOutPathLen);
@@ -484,6 +481,7 @@ end;
 function TClipperOffset.Execute(delta: Double): TPathsD;
 var
   i: integer;
+  group: TPathGroup;
 begin
   fSolution := nil;
   Result := nil;
@@ -499,8 +497,10 @@ begin
   begin
 	  //nb: delta will depend on whether paths are polygons or open
     for i := 0 to fInGroups.Count -1 do
-      with TPathGroup(fInGroups[i]) do
-        DoOffset(paths, delta, jointype, endtype);
+    begin
+      group := TPathGroup(fInGroups[i]);
+      DoOffset(group.paths, delta, group.jointype, group.endtype);
+    end;
     Result := fSolution;
   end;
 end;

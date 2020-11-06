@@ -3,33 +3,15 @@ unit ClipperCore;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  10.0 (beta)                                                     *
-* Date      :  9 March 2019                                                    *
+* Date      :  6 November 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2019                                         *
+* Copyright :  Angus Johnson 2010-2020                                         *
 * Purpose   :  Core Clipper Library module                                     *
 *              Contains structures and functions used throughout the library   *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
-{$IFDEF FPC}
-  {$DEFINE INLINING}
-{$ELSE}
-  {$IF CompilerVersion < 14}
-    Requires Delphi version 6 or above.
-  {$IFEND}
-  {$IF CompilerVersion >= 18}         //Delphi 2007
-    //While Inlining has been supported since D2005, both D2005 and D2006
-    //have an Inline codegen bug (QC41166) so ignore Inline until D2007.
-    {$DEFINE INLINING}
-    {$IF CompilerVersion >= 25.0}     //Delphi XE4+
-      {$LEGACYIFEND ON}
-    {$IFEND}
-  {$IFEND}
-{$ENDIF}
-
-{$IFDEF DEBUG}
-  {$UNDEF INLINING}
-{$ENDIF}
+{$I Clipper.inc}
 
 interface
 

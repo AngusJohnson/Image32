@@ -337,7 +337,7 @@ var
   begin
     mask := GetFloodFillMask(img, x , y, CompareRGB, tolerance);
     pp := VectorizeMask(mask, img.Width);
-    pp := InflatePolygons(pp, 0.5);
+    pp := InflatePaths(pp, 0.5);
     Erase(img, pp, Image32_Vector.frEvenOdd);
   end;
 
@@ -610,7 +610,7 @@ begin
 
   if assigned(opaque) then
   begin
-    opaque := Image32_Clipper.InflatePolygons(opaque, 2 * scale);
+    opaque := InflatePaths(opaque, 2 * scale);
     ErasePolygon(tmpMasterImg, opaque, Image32_Vector.frEvenOdd);
   end;
 
@@ -691,7 +691,7 @@ begin
 
     if simpleness > 0 then
       pp := RamerDouglasPeucker(pp, simpleness * scale);
-    pp := Image32_Clipper.InflatePolygons(pp, 1.25 * scale, jsRound);
+    pp := InflatePaths(pp, 1.25 * scale, jsRound);
     if smoothness > 0 then
       pp := SmoothToBezier(pp, true, scale, 1);
 

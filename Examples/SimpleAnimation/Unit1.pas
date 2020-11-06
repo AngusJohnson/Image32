@@ -83,7 +83,7 @@ begin
   img := TImage32.Create(ImageSize, ImageSize);
   DrawPolygon(img, path, frNonZero, clLime32);
   Draw3D(img, path, frNonZero, 8, 8);
-  DrawLine(img, path, 3, clGreen32, esClosed);
+  DrawLine(img, path, 3, clGreen32, esPolygon);
 
   //acceleration phase
   k := power(SpaceAbove, 1/25); //k^25 = SpaceAbove
