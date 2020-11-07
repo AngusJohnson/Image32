@@ -20,7 +20,7 @@ uses
 type
   TArrowStyle = (asNone, asSimple, asFancy, asDiamond, asCircle, asTail);
   TJoinStyle  = (jsAuto, jsSquare, jsMiter, jsRound);
-  TEndStyle   = (esPolygon, esButt, esSquare, esRound, esJoined);
+  TEndStyle   = (esPolygon, esButt, esSquare, esRound, esClosed);
   TPathEnd    = (peStart, peEnd, peBothEnds);
   TSplineType = (stQuadratic, stCubic);
   TFillRule = (frEvenOdd, frNonZero, frPositive, frNegative);
@@ -1786,7 +1786,7 @@ begin
       joinStyle := jsRound else
       joinStyle := jsSquare;
   end;
-  if endStyle = esPolygon then
+  if endStyle in [esPolygon, esClosed] then
     for i := 0 to high(lines) do
       AddPaths(GrowClosedLine(lines[i],
         lineWidth, joinStyle, miterLimit))

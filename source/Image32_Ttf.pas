@@ -311,7 +311,10 @@ type
     function GetGlyphMetrics(glyphIdx: integer): TGlyphMetrics;
     function GetWeight: integer;
   public
-    constructor Create;
+    constructor Create; overload;
+{$IFDEF MSWINDOWS}
+    constructor Create(const fontname: string); overload;
+{$ENDIF}
     destructor Destroy; override;
     procedure Clear;
     function IsValidFontFormat: Boolean;
@@ -319,8 +322,8 @@ type
     function LoadFromResource(const resName: string; resType: PChar): Boolean;
     function LoadFromFile(const filename: string): Boolean;
 {$IFDEF MSWINDOWS}
-    function LoadFromLogfont(logfont: TLogFont): Boolean;
-    function LoadFromFontHdl(hdl: HFont): Boolean;
+    function Load(const fontname: string): Boolean;
+    function LoadUsingFontHdl(hdl: HFont): Boolean;
 {$ENDIF}
     function GetGlyphInfo(unicode: Word; out paths: TPathsD;
       out nextX: integer; out glyphMetrics: TGlyphMetrics): Boolean;
@@ -329,10 +332,11 @@ type
   end;
 
   PGlyphInfo = ^TGlyphInfo;
-  TGlyphInfo = record
-    unicode        : Word;
-    contours       : TPathsD;
-    metrics        : TGlyphMetrics;
+  TGlyphInfo = {$IFDEF RECORD_METHODS}record{$ELSE}object{$ENDIF}
+    unicode  : Word;
+    contours : TPathsD;
+    metrics  : TGlyphMetrics;
+    function GetBounds: TRectD;
   end;
 
   //TGlyphCache: speeds up text rendering by parsing font files only once
@@ -432,6 +436,10 @@ type
     const text: UnicodeString;
     glyphCache: TGlyphCache;
     textColor: TColor32 = clBlack32): double;
+
+  function GetTextGlyphsOnPath(const text: UnicodeString;
+    const path: TPathD; glyphCache: TGlyphCache; textAlign: TTextAlign;
+    perpendicOffset: integer = 0; charSpacing: double = 0): TPathsD;
 
   function PointHeightToPixelHeight(pt: double): double;
 
@@ -774,6 +782,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+{$IFDEF MSWINDOWS}
+constructor TFontReader.Create(const fontname: string);
+begin
+  Create;
+  Load(fontname);
+end;
+//------------------------------------------------------------------------------
+{$ENDIF}
+
 destructor TFontReader.Destroy;
 begin
   Clear;
@@ -880,7 +897,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFontReader.LoadFromFontHdl(hdl: HFont): Boolean;
+function TFontReader.LoadUsingFontHdl(hdl: HFont): Boolean;
 var
   ms: TMemoryStream;
 begin
@@ -894,20 +911,23 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFontReader.LoadFromLogfont(logfont: TLogFont): Boolean;
+function TFontReader.Load(const fontname: string): Boolean;
 var
+  logfont: TLogFont;
   hdl: HFont;
 begin
   Result := false;
+  FillChar(logfont, SizeOf(logfont), 0);
+  StrPCopy(@logfont.lfFaceName[0], fontname);
   hdl := CreateFontIndirect(logfont);
   if hdl = 0 then Exit;
   try
-    Result := LoadFromFontHdl(hdl);
+    Result := LoadUsingFontHdl(hdl);
   finally
     DeleteObject(hdl);
   end;
 end;
-
+//------------------------------------------------------------------------------
 {$ENDIF}
 
 function GetHeaderTable(stream: TStream;
@@ -1861,6 +1881,24 @@ end;
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
+// TGlyphInfo
+//------------------------------------------------------------------------------
+
+function TGlyphInfo.GetBounds: TRectD;
+var
+  ppmFrac: double;
+begin
+  ppmFrac := 1/metrics.unitsPerEm;
+  with metrics.glyf do
+  begin
+    Result.Left   := xMin * ppmFrac;
+    Result.Top    := yMin * ppmFrac;
+    Result.Right  := xMax * ppmFrac;
+    Result.Bottom := yMax * ppmFrac;
+  end;
+end;
+
+//------------------------------------------------------------------------------
 // TGlyphCache
 //------------------------------------------------------------------------------
 
@@ -2594,6 +2632,92 @@ begin
       y := y + dy + interCharSpace;
   end;
   Result := y;
+end;
+//------------------------------------------------------------------------------
+
+type
+  TPathInfo = record
+    pt     : TPointD;
+    vector : TPointD;
+    angle  : Double;
+    dist   : double;
+  end;
+  TPathInfos = array of TPathInfo;
+
+function GetTextGlyphsOnPath(const text: UnicodeString;
+    const path: TPathD; glyphCache: TGlyphCache; textAlign: TTextAlign;
+    perpendicOffset: integer = 0; charSpacing: double = 0): TPathsD;
+var
+  i, textLen, pathLen, pathInfoIdx: integer;
+  textWidth, left, center, center2, scale, dist, dx: double;
+  glyph: PGlyphInfo;
+  offsets: TArrayOfDouble;
+  pathInfo: TPathInfo;
+  pathInfos: TPathInfos;
+  pt, rotatePt: TPointD;
+  tmpPaths: TPathsD;
+
+  function GetPathInfo(var startIdx: integer; offset: double): TPathInfo;
+  begin
+    while startIdx < pathLen do
+    begin
+      if pathInfos[startIdx].dist > offset then break;
+      inc(startIdx);
+    end;
+    Result := pathInfos[startIdx -1];
+    if Result.angle >= 0 then Exit; //ie already initialized
+    Result.angle  := -GetAngle(path[startIdx-1], path[startIdx]);
+    Result.vector := GetUnitVector(path[startIdx-1], path[startIdx]);
+    Result.pt     := path[startIdx -1];
+  end;
+
+begin
+  Result := nil;
+  pathLen := Length(path) +1;
+  textLen := Length(text);
+
+  offsets := glyphCache.GetCharOffsets(text);
+  textWidth := offsets[textLen] + charSpacing * (textLen -1);
+
+  setLength(pathInfos, pathLen);
+  if (pathLen < 3) or (textLen = 0) then Exit;
+
+  dist := 0;
+  pathInfos[0].angle := -1;
+  pathInfos[0].dist := 0;
+  for i:= 1 to pathLen -2 do
+  begin
+    pathInfos[i].angle := -1; //flag uninitialized
+    dist := dist + Distance(path[i-1], path[i]);
+    pathInfos[i].dist := dist;
+  end;
+
+  case textAlign of
+    taCenter: Left := (dist - textWidth) * 0.5;
+    taRight : Left := dist - textWidth;
+    else      Left := 0;
+  end;
+
+  scale := glyphCache.Scale;
+  Result := nil;
+  pathInfoIdx := 1;
+  for i := 1 to textLen do
+  begin
+    glyph :=  glyphCache.GetCharInfo(Ord(text[i]));
+    with glyph.metrics do
+      center := (glyf.xMax - glyf.xMin) * scale * 0.5;
+    center2 := left + center;
+    pathInfo := GetPathInfo(pathInfoIdx, center2);
+    rotatePt := PointD(center, -perpendicOffset);
+    tmpPaths := RotatePath(glyph.contours, rotatePt, pathInfo.angle);
+    dx := center2 - pathInfo.dist;
+    pt.X := pathInfo.pt.X + pathInfo.vector.X * dx - rotatePt.X;
+    pt.Y := pathInfo.pt.Y + pathInfo.vector.Y * dx - rotatePt.Y;
+
+    tmpPaths := OffsetPath(tmpPaths, pt.X, pt.Y);
+    AppendPath(Result, tmpPaths);
+    left := left + glyph.metrics.hmtx.advanceWidth * scale + charSpacing;
+  end;
 end;
 //------------------------------------------------------------------------------
 

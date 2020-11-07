@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 1.53
-Released: 22 October 2020
+Latest version: 1.54
+Released: 7 November 2020
 
 Copyright © 2019-2020 Angus Johnson
 Freeware released under Boost Software License
@@ -11,6 +11,27 @@ Documentation : http://www.angusj.com/delphi/image32/Docs/
 Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
+
+Version 1.54
+  changes in Image32_Ttf
+	added 3 methods to TFontreader (Window's platform only):
+	  Create(string), Load(string) and  LoadUsingFontHdl methods
+	added TGlyphCache.GetAngledTextGlyphs functions
+	added DrawAngledText function
+	added GetTextGlyphsOnPath function
+	removed 3 functions:  GetFacenameAndStyle(), 
+	  FilterOnFacename() and FilterOnStyles()    	
+  changes in Image32_Text
+	renamed GetTextAlongPathOutine() to GetTextGlyphsOnPath()
+  changes in Image32_Clipper
+	Deleted InflatePolygons and InflateOpenPath functions
+	  and replaced with InflatePath and InflatePaths functions
+  changes in Image32_Vector
+	added esPolygon to TEndStyle enumeration
+	('Closed' paths are handled differently polygons.)
+  changes in Image32_Extra
+	Added GradientColor, MakeDarker and MakeLighter functions
+  updated Examples to accommodate recent changes
 
 Version 1.53
   Image32_Ttf

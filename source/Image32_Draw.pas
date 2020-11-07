@@ -164,16 +164,20 @@ type
 
   procedure DrawLine(img: TImage32;
     const line: TPathD; lineWidth: double; color: TColor32;
-    endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
+    endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto;
+    miterLimit: double = 2); overload;
   procedure DrawLine(img: TImage32;
     const line: TPathD; lineWidth: double; renderer: TCustomRenderer;
-    endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
+    endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto;
+    miterLimit: double = 2); overload;
   procedure DrawLine(img: TImage32; const lines: TPathsD;
     lineWidth: double; color: TColor32;
-    endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
+    endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto;
+    miterLimit: double = 2); overload;
   procedure DrawLine(img: TImage32; const lines: TPathsD;
     lineWidth: double; renderer: TCustomRenderer;
-    endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
+    endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto;
+    miterLimit: double = 2); overload;
 
    procedure DrawInvertedLine(img: TImage32;
      const line: TPathD; lineWidth: double;
@@ -1562,30 +1566,31 @@ end;
 //------------------------------------------------------------------------------
 
 procedure DrawLine(img: TImage32; const line: TPathD; lineWidth: double;
-  color: TColor32; endStyle: TEndStyle; joinStyle: TJoinStyle);
+  color: TColor32; endStyle: TEndStyle; joinStyle: TJoinStyle;
+  miterLimit: double);
 var
   lines: TPathsD;
 begin
   setLength(lines, 1);
   lines[0] := line;
-  DrawLine(img, lines, lineWidth, color, endStyle, joinStyle);
+  DrawLine(img, lines, lineWidth, color, endStyle, joinStyle, miterLimit);
 end;
 //------------------------------------------------------------------------------
 
 procedure DrawLine(img: TImage32; const line: TPathD; lineWidth: double;
-  renderer: TCustomRenderer; endStyle: TEndStyle; joinStyle: TJoinStyle);
+  renderer: TCustomRenderer; endStyle: TEndStyle; joinStyle: TJoinStyle;
+  miterLimit: double);
 var
   lines: TPathsD;
 begin
   setLength(lines, 1);
   lines[0] := line;
-  DrawLine(img, lines, lineWidth, renderer, endStyle, joinStyle);
+  DrawLine(img, lines, lineWidth, renderer, endStyle, joinStyle, miterLimit);
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawInvertedLine(img: TImage32;
-  const line: TPathD; lineWidth: double;
-  endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto);
+procedure DrawInvertedLine(img: TImage32; const line: TPathD;
+lineWidth: double; endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto);
 var
   lines: TPathsD;
 begin
@@ -1597,14 +1602,15 @@ end;
 
 procedure DrawLine(img: TImage32; const lines: TPathsD;
   lineWidth: double; color: TColor32;
-  endStyle: TEndStyle; joinStyle: TJoinStyle);
+  endStyle: TEndStyle; joinStyle: TJoinStyle;
+  miterLimit: double);
 var
   lines2: TPathsD;
   cr: TColorRenderer;
 begin
   if not assigned(lines) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
-  lines2 := Outline(lines, lineWidth, joinStyle, endStyle, 2);
+  lines2 := Outline(lines, lineWidth, joinStyle, endStyle, miterLimit);
   cr := TColorRenderer.Create(color);
   try
     if cr.Initialize(img) then
@@ -1617,7 +1623,8 @@ end;
 
 procedure DrawLine(img: TImage32; const lines: TPathsD;
   lineWidth: double; renderer: TCustomRenderer;
-  endStyle: TEndStyle; joinStyle: TJoinStyle);
+  endStyle: TEndStyle; joinStyle: TJoinStyle;
+  miterLimit: double);
 var
   lines2: TPathsD;
 begin

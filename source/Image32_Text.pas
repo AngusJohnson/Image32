@@ -155,18 +155,12 @@ type
     TColor32 = clBlack32; opaqueBkColor: TColor32 = clWhite32;
     justifySpc: double = 0): TPointD;
 
-  function GetTextAlongPathOutine(image: TImage32;
-    const text: UnicodeString; const path: TPathD; fontInfo: TFontInfo;
+  function GetTextGlyphsOnPath(const text: UnicodeString;
+    const path: TPathD; fontInfo: TFontInfo;
     textAlign: TTextAlign; vertOffset: integer = 0;
     charSpacing: double = 0): TPathsD;
 
   function DrawWrappedText(image: TImage32; const rec: TRect;
-    const text: UnicodeString; fontInfo: TFontInfo;
-    textAlign: TTextAlign = taJustify; textAlignV: TTextVAlign = tvaTop;
-    textColor: TColor32 = clBlack32;
-    lineSpacing: double = DEFAULT; paraSpacing: double = DEFAULT): TPointD;
-
-  function DrawWrappedText_LCD(image: TImage32; const rec: TRect;
     const text: UnicodeString; fontInfo: TFontInfo;
     textAlign: TTextAlign = taJustify; textAlignV: TTextVAlign = tvaTop;
     textColor: TColor32 = clBlack32;
@@ -687,16 +681,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DrawWrappedText_LCD(image: TImage32; const rec: TRect;
-  const text: UnicodeString; fontInfo: TFontInfo;
-  textAlign: TTextAlign; textAlignV: TTextVAlign; textColor: TColor32;
-  lineSpacing: double; paraSpacing: double): TPointD;
-begin
-  Result := DrawWrappedTextInternal(image, rec, text, fontInfo,
-    true, textAlign, textAlignV, textColor, lineSpacing, paraSpacing);
-end;
-//------------------------------------------------------------------------------
-
 function DrawText_ClearType(image: TImage32; x,y: double;
   const text: UnicodeString; fontInfo: TFontInfo; textAlign: TTextAlign;
   textColor: TColor32; opaqueBkColor: TColor32; justifySpc: double): TPointD;
@@ -721,8 +705,8 @@ type
   end;
   TPathInfos = array of TPathInfo;
 
-function GetTextAlongPathOutine(image: TImage32;
-  const text: UnicodeString; const path: TPathD; fontInfo: TFontInfo;
+function GetTextGlyphsOnPath(const text: UnicodeString;
+  const path: TPathD; fontInfo: TFontInfo;
   textAlign: TTextAlign; vertOffset: integer = 0;
   charSpacing: double = 0): TPathsD;
 var

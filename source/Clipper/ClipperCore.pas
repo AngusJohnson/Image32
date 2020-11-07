@@ -37,7 +37,7 @@ type
   TPathsD = array of TPathD;
   TArrayOfPathsD = array of TPathsD;
 
-  TRect64 = {$IFDEF UNICODE}record{$ELSE}object{$ENDIF}
+  TRect64 = {$IFDEF RECORD_METHODS}record{$ELSE}object{$ENDIF}
   private
     function GetWidth: Int64; {$IFDEF INLINING} inline; {$ENDIF}
     function GetHeight: Int64; {$IFDEF INLINING} inline; {$ENDIF}
@@ -52,7 +52,7 @@ type
     property IsEmpty: Boolean read GetIsEmpty;
   end;
 
-  TRectD = {$ifdef UNICODE}record{$else}object{$endif}
+  TRectD = {$ifdef RECORD_METHODS}record{$else}object{$endif}
   private
     function GetWidth: double; {$IFDEF INLINING} inline; {$ENDIF}
     function GetHeight: double; {$IFDEF INLINING} inline; {$ENDIF}

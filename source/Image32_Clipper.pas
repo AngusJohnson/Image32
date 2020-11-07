@@ -78,7 +78,7 @@ begin
     esButt: et := etOpenButt;
     esSquare: et := etOpenSquare;
     esRound: et := etOpenRound;
-    esJoined: et := etOpenJoined;
+    esClosed: et := etOpenJoined;
     else et := etPolygon;
   end;
   Result := TPathsD(ClipperOffsetPaths( ClipperCore.TPathsD(paths),
