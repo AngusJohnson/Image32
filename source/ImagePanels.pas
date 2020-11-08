@@ -231,12 +231,12 @@ type
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-//DPI: the 'standard' screen resoluton is 96dpi;
+//DpiAware: the 'standard' screen resoluton is 96dpi;
 //newer monitors however typically have higher resoulutions (eg 120, 144dpi).
 //Without DPI scaling, application forms and controls would get progressively
 //smaller as DPI resoulutons increase.
 
-function DPI(value: integer): integer;
+function DpiAware(value: integer): integer;
 begin
   result := MulDiv(value, Screen.PixelsPerInch, 96);
 end;
@@ -296,6 +296,13 @@ procedure SetRectHeight(var rec: TRect; height: integer);
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
   rec.Bottom := rec.Top + height;
+end;
+//------------------------------------------------------------------------------
+
+function IsEmptyRect(const rec: TRect): Boolean;
+{$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result := (rec.Right <= rec.Left) or (rec.Bottom <= rec.Top);
 end;
 //------------------------------------------------------------------------------
 
@@ -556,7 +563,7 @@ end;
 
 function TImagePanel.GetMinScrollBtnSize: integer;
 begin
-  Result := Max(1, GetInnerMargin - DPI(5));
+  Result := Max(1, GetInnerMargin - DpiAware(5));
 end;
 //------------------------------------------------------------------------------
 
@@ -579,7 +586,8 @@ begin
   with fScrollbarVert do
   begin
     if resetOrigin then srcOffset := 0;
-    if scaledY < innerHeight + tolerance then //no scroll button needed
+    if (scaledY = 0) or
+      (scaledY < innerHeight + tolerance) then //no scroll button needed
     begin
       btnSize := 0; btnDelta := 0; maxSrcOffset := 0;
     end else
@@ -593,7 +601,7 @@ begin
   with fScrollbarHorz do
   begin
     if resetOrigin then srcOffset := 0;
-    if scaledX < innerWidth + tolerance then  //no scroll button needed
+    if (scaledX = 0) or (scaledX < innerWidth + tolerance) then  //no scroll button needed
     begin
       btnSize := 0; btnDelta := 0; maxSrcOffset := 0;
     end else
@@ -941,7 +949,7 @@ begin
       begin
         tmpRec.Top := marg + Round(srcOffset * btnDelta);
         tmpRec.Bottom := tmpRec.Top + btnSize;
-        tmpRec.Right := ClientWidth - DPI(3);
+        tmpRec.Right := ClientWidth - DpiAware(3);
         tmpRec.Left := tmpRec.Right - btnMin;
         if MouseOver or MouseDown then Canvas.Brush.Color := clHotLight
         else if Focused then Canvas.Brush.Color := MakeDarker(fFocusedColor, 20)
@@ -955,7 +963,7 @@ begin
       begin
         tmpRec.Left := marg + Round(srcOffset * btnDelta);
         tmpRec.Right := tmpRec.Left + btnSize;
-        tmpRec.Bottom := ClientHeight - DPI(3);
+        tmpRec.Bottom := ClientHeight - DpiAware(3);
         tmpRec.Top := tmpRec.Bottom - btnMin;
         if MouseOver or MouseDown then Canvas.Brush.Color := clHotLight
         else if Focused then Canvas.Brush.Color := MakeDarker(fFocusedColor, 20)
@@ -1196,6 +1204,8 @@ var
   bf: BLENDFUNCTION;
   tmpBmp: TBitmap;
 begin
+  if IsEmptyRect(srcRect) or IsEmptyRect(dstRect) then Exit;
+
   if Assigned(fOnBeginPaint) then
   begin
     fOnBeginPaint(Self, dstCanvas, srcRect, dstRect);
@@ -1361,6 +1371,6 @@ end;
 //------------------------------------------------------------------------------
 
 initialization
-  MinBorderWidth := DPI(10);
+  MinBorderWidth := DpiAware(10);
 
 end.

@@ -332,11 +332,10 @@ type
   end;
 
   PGlyphInfo = ^TGlyphInfo;
-  TGlyphInfo = {$IFDEF RECORD_METHODS}record{$ELSE}object{$ENDIF}
+  TGlyphInfo = record
     unicode  : Word;
     contours : TPathsD;
     metrics  : TGlyphMetrics;
-    function GetBounds: TRectD;
   end;
 
   //TGlyphCache: speeds up text rendering by parsing font files only once
@@ -425,11 +424,9 @@ type
     textColor: TColor32 = clBlack32): TPointD; overload;
 
   function DrawAngledText(image: TImage32;
-    x, y, interCharSpace: double;
-    const text: UnicodeString;
-    glyphCache: TGlyphCache;
-    angleRadians: double;
-    textColor: TColor32 = clBlack32): TPointD;
+  x, y: double; angleRadians: double;
+  const text: UnicodeString; glyphCache: TGlyphCache;
+  textColor: TColor32 = clBlack32): TPointD;
 
   function DrawVerticalText(image: TImage32;
     x, y, interCharSpace: double;
@@ -1878,25 +1875,6 @@ begin
     Round(k * accum / (imgSize * imgSize * 100)) * 100));
   Result := fFontWeight;
 end;
-//------------------------------------------------------------------------------
-
-//------------------------------------------------------------------------------
-// TGlyphInfo
-//------------------------------------------------------------------------------
-
-function TGlyphInfo.GetBounds: TRectD;
-var
-  ppmFrac: double;
-begin
-  ppmFrac := 1/metrics.unitsPerEm;
-  with metrics.glyf do
-  begin
-    Result.Left   := xMin * ppmFrac;
-    Result.Top    := yMin * ppmFrac;
-    Result.Right  := xMax * ppmFrac;
-    Result.Bottom := yMax * ppmFrac;
-  end;
-end;
 
 //------------------------------------------------------------------------------
 // TGlyphCache
@@ -2371,7 +2349,8 @@ end;
 //------------------------------------------------------------------------------
 
 function TGlyphCache.GetAngledTextGlyphs(x, y: double;
-  const text: UnicodeString; angleRadians: double; const rotatePt: TPointD;
+  const text: UnicodeString;
+  angleRadians: double; const rotatePt: TPointD;
   out glyphs: TPathsD; out nextPt: TPointD): Boolean;
 begin
   nextPt.Y := y;
@@ -2577,18 +2556,17 @@ end;
 //------------------------------------------------------------------------------
 
 function DrawAngledText(image: TImage32;
-  x, y, interCharSpace: double;
-  const text: UnicodeString;
-  glyphCache: TGlyphCache;
-  angleRadians: double;
+  x, y: double; angleRadians: double;
+  const text: UnicodeString; glyphCache: TGlyphCache;
   textColor: TColor32 = clBlack32): TPointD;
 var
   glyphs: TPathsD;
+  rotatePt: TPointD;
 begin
-  Result := PointD(x,y);
+  rotatePt := PointD(x,y);
   if not assigned(glyphCache) or not glyphCache.IsValidFont or
-    not glyphCache.GetAngledTextGlyphs(x, y, text, angleRadians,
-      Result, glyphs, Result) then Exit;
+    not glyphCache.GetAngledTextGlyphs(x, y, text,
+      angleRadians, rotatePt, glyphs, Result) then Exit;
   DrawPolygon(image, glyphs, frNonZero, textColor);
 end;
 //------------------------------------------------------------------------------
