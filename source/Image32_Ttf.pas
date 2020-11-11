@@ -2,8 +2,8 @@ unit Image32_Ttf;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.54                                                            *
-* Date      :  5 November 2020                                                 *
+* Version   :  1.56                                                            *
+* Date      :  11 November 2020                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2020                                              *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -312,6 +312,7 @@ type
     function GetWeight: integer;
   public
     constructor Create; overload;
+    constructor CreateFromResource(const resName: string; resType: PChar);
 {$IFDEF MSWINDOWS}
     constructor Create(const fontname: string); overload;
 {$ENDIF}
@@ -354,6 +355,8 @@ type
     fUseKerning        : Boolean;
     fFontHeight        : double;
     fFlipVert          : Boolean;
+    fUnderlined        : Boolean;
+    fStrikeOut         : Boolean;
     function FoundInList(charOrdinal: WORD): Boolean;
     function AddGlyph(unicode: Word): PGlyphInfo;
     procedure VerticalFlip(var paths: TPathsD);
@@ -402,6 +405,8 @@ type
     property Kerning: boolean read fUseKerning write fUseKerning;
     property LineHeight: double read GetLineHeight;
     property Scale : double read fScale;
+    property Underlined: Boolean read fUnderlined write fUnderlined;
+    property StrikeOut: Boolean read fStrikeOut write fStrikeOut;
   end;
 
   function DrawText(image: TImage32;
@@ -438,9 +443,8 @@ type
     const path: TPathD; glyphCache: TGlyphCache; textAlign: TTextAlign;
     perpendicOffset: integer = 0; charSpacing: double = 0): TPathsD;
 
-  function PointHeightToPixelHeight(pt: double): double;
-
   {$IFDEF MSWINDOWS}
+  function PointHeightToPixelHeight(pt: double): double;
   function GetFontFolder: string;
   function GetInstalledTtfFilenames: TArrayOfString;
   {$ENDIF}
@@ -450,16 +454,11 @@ implementation
 uses
   Image32_Vector;
 
+const
+  lineFrac = 0.05;
+
 //------------------------------------------------------------------------------
 // Miscellaneous functions
-//------------------------------------------------------------------------------
-
-function PointHeightToPixelHeight(pt: double): double;
-const
-  _96Div72 = 96/72;
-begin
-  Result := Abs(pt) * _96Div72;
-end;
 //------------------------------------------------------------------------------
 
 function CleanPath(const path: TPathD): TPathD; overload;
@@ -601,6 +600,7 @@ asm
   rol ax,8;
 end;
 {$ELSE}
+{$IFDEF INLINE} inline; {$ENDIF}
 var
   v: array[0..1] of byte absolute val;
   r: array[0..1] of byte absolute result;
@@ -617,6 +617,7 @@ asm
   rol ax,8;
 end;
 {$ELSE}
+{$IFDEF INLINE} inline; {$ENDIF}
 var
   v: array[0..1] of byte absolute val;
   r: array[0..1] of byte absolute result;
@@ -633,6 +634,7 @@ asm
   bswap eax
 end;
 {$ELSE}
+{$IFDEF INLINE} inline; {$ENDIF}
 var
   i: integer;
   v: array[0..3] of byte absolute val;
@@ -652,6 +654,7 @@ asm
   BSWAP   EAX
 end;
 {$ELSE}
+{$IFDEF INLINE} inline; {$ENDIF}
 var
   i: integer;
   v: array[0..7] of byte absolute val;
@@ -779,6 +782,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+constructor TFontReader.CreateFromResource(const resName: string;
+  resType: PChar);
+begin
+  Create;
+  LoadFromResource(resName, resType);
+end;
+//------------------------------------------------------------------------------
+
+
 {$IFDEF MSWINDOWS}
 constructor TFontReader.Create(const fontname: string);
 begin
@@ -835,14 +847,10 @@ end;
 function TFontReader.LoadFromResource(const resName: string; resType: PChar): Boolean;
 var
   rs: TResourceStream;
-  id: integer;
 begin
-  id := StrToIntDef(resName, 0);
-  if id > 0  then
-    rs := TResourceStream.CreateFromID(hInstance, id, resType) else
-    rs := TResourceStream.Create(hInstance, resName, resType);
+  rs := CreateResourceStream(resName, resType);
   try
-    Result := LoadFromStream(rs);
+    Result := assigned(rs) and LoadFromStream(rs);
   finally
     rs.free;
   end;
@@ -1637,11 +1645,9 @@ var
   arg1i, arg2i: Int16;
   tmp: single;
   a,b,c,d,e,f: double;
-//  compoundIdx, componentIdx: integer;
   componentPaths: TPathsEx;
   tbl_glyf_old: TFontTable_Glyf;
 const
-  //glyf flags - composite
   ARG_1_AND_2_ARE_WORDS     = $1;
   ARGS_ARE_XY_VALUES        = $2;
   ROUND_XY_TO_GRID          = $4;
@@ -1659,7 +1665,6 @@ begin
   begin
     glyphIndex := 0;
     a := 0; b := 0; c := 0; d := 0; e := 0; f := 0;
-//    compoundIdx := 0; componentIdx := 0;
 
     GetWord(fStream, flag);
     GetWord(fStream, glyphIndex);
@@ -1672,10 +1677,6 @@ begin
       begin
         e := arg1i;
         f := arg2i;
-      end else
-      begin
-//        compoundIdx  := arg1i;
-//        componentIdx := arg2i;
       end;
     end else
     begin
@@ -1685,10 +1686,6 @@ begin
       begin
         e := arg1b;
         f := arg2b;
-      end else
-      begin
-//        compoundIdx  := Byte(arg1b);
-//        componentIdx := Byte(arg2b);
       end;
     end;
 
@@ -2122,13 +2119,32 @@ function TGlyphCache.GetTextGlyphs(x, y: double; const text: UnicodeString;
   out glyphs: TPathsD; out nextX: double): Boolean;
 var
   i: integer;
+  w, y2: double;
+  p: TPathD;
   arrayOfGlyphs: TArrayOfPathsD;
 begin
   glyphs := nil;
   Result := GetTextGlyphsInternal(x, y, text, arrayOfGlyphs, nextX);
   if not Result then Exit;
+
+  if fUnderlined then
+  begin
+    w := LineHeight * lineFrac;
+    y2 := y + w;
+    p := Rectangle(x, y2, nextX, y2 + w);
+    AppendPath(glyphs, p);
+  end;
+
   for i := 0 to high(arrayOfGlyphs) do
     AppendPath(glyphs, arrayOfGlyphs[i]);
+
+  if fStrikeOut then
+  begin
+    w := LineHeight * lineFrac;
+    y := y - LineHeight/4;
+    p := Rectangle(x, y , nextX, y + w);
+    AppendPath(glyphs, p);
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -2164,7 +2180,6 @@ begin
 
     currGlyph := OffsetPath(glyphInfo.contours, nextX, y);
     AppendPath(glyphs, currGlyph);
-
     nextX := nextX + glyphInfo.metrics.hmtx.advanceWidth * fScale;
     prevGlyphKernList := glyphInfo.metrics.kernList;
   end;
@@ -2199,10 +2214,11 @@ function TGlyphCache.GetTextGlyphs(const rec: TRect;
   out glyphs: TPathsD; out nextIdx: integer; out nextPt: TPointD): Boolean;
 var
   i,j,k, lenCurr, lenRem, spcCount: integer;
-  lh, currLineWidthPxls, spcDx, dx, dy: double;
+  lh, currLineWidthPxls, spcDx, dx, dy, y2, w: double;
   currentLine, remainingText: UnicodeString;
   offsets: TArrayOfDouble;
   hardCR: Boolean;
+  underline, strikeOut: TPathD;
   currLineGlyphs: TArrayOfPathsD;
 begin
   //precondition: 'text' may contain '#10 chars but not #13 chars
@@ -2298,12 +2314,36 @@ begin
               Dec(spcCount);
               j := i -1;
             end;
+            currLineWidthPxls := rec.Width; //needed for underlining
           end;
         end;
       end;
 
+      underline := nil;
+      if fUnderlined then
+      begin
+        w := LineHeight * lineFrac;
+        y2 := nextPt.Y + ascent + w;
+        underline := Rectangle(nextPt.X, y2,
+          nextPt.X + currLineWidthPxls, y2 + w);
+        AppendPath(glyphs, underline);
+      end;
+
       for i := 0 to High(currLineGlyphs) do
         AppendPath(glyphs, currLineGlyphs[i]);
+
+      strikeOut := nil;
+      if fStrikeOut then
+      begin
+        w := LineHeight * lineFrac;
+        y2 := nextPt.Y + ascent - LineHeight/4;
+        strikeOut := Rectangle(nextPt.X, y2,
+          nextPt.X + currLineWidthPxls, y2 + w);
+        AppendPath(glyphs, strikeOut);
+      end;
+
+
+
     end;
 
     nextPt.Y := nextPt.Y + lh;
@@ -2474,6 +2514,14 @@ end;
 //------------------------------------------------------------------------------
 
 {$IFDEF MSWINDOWS}
+function PointHeightToPixelHeight(pt: double): double;
+const
+  _96Div72 = 96/72;
+begin
+  Result := Abs(pt) * _96Div72;
+end;
+//------------------------------------------------------------------------------
+
 function GetFontFolder: string;
 var
   pidl: PItemIDList;

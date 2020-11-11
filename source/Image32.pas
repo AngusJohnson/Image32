@@ -415,6 +415,10 @@ type
     stdcall; external 'msimg32.dll' name 'AlphaBlend';
   {$ENDIF}
 
+  //CreateResourceStream: handles both numeric and string names and types
+  function CreateResourceStream(const resName: string;
+    resType: PChar): TResourceStream;
+
 const
   angle180 = Pi;
   angle0  = 0;
@@ -478,7 +482,7 @@ type
 
   TImgFmtRec = record
     Fmt: string;
-    Order: TClipboardPriority;
+    SortOrder: TClipboardPriority;
     Obj: TImageFormatClass;
   end;
   PImgFmtRec = ^TImgFmtRec;
@@ -521,7 +525,7 @@ var
   imgFmtRec1: PImgFmtRec absolute item1;
   imgFmtRec2: PImgFmtRec absolute item2;
 begin
-  Result := Integer(imgFmtRec1.Order) - Integer(imgFmtRec2.Order);
+  Result := Integer(imgFmtRec1.SortOrder) - Integer(imgFmtRec2.SortOrder);
 end;
 
 //------------------------------------------------------------------------------
@@ -1212,6 +1216,47 @@ begin
   for i := 0 to len -1 do
     result[i] := HslToRgb(hslArr[i]);
 end;
+//------------------------------------------------------------------------------
+
+function NameToId(Name: PChar): Longint;
+begin
+  if Cardinal(PWord(Name)) < 30 then
+  begin
+    Result := Cardinal(PWord(Name))
+  end else
+  begin
+    if Name^ = '#' then inc(Name);
+    Result := StrToIntDef(Name, 0);
+    if Result > 65535 then Result := 0;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function CreateResourceStream(const resName: string;
+  resType: PChar): TResourceStream;
+var
+  nameId, typeId: Cardinal;
+{$IFNDEF MSWINDOWS}
+const
+  RT_BITMAP = PChar(2);
+{$ENDIF}
+begin
+  Result := nil;
+  typeId := NameToId(resType);
+  if (typeId > 0) then resType := PChar(typeId)
+  else if (resType = 'BMP') then resType := RT_BITMAP;
+
+  nameId := NameToId(PChar(resName));
+  if nameId > 0 then
+  begin
+    if FindResource(hInstance, PChar(nameId), resType) <> 0 then
+      Result := TResourceStream.CreateFromID(hInstance, nameId, resType);
+  end else
+  begin
+    if FindResource(hInstance, PChar(resName), resType) <> 0 then
+      Result := TResourceStream.Create(hInstance, PChar(resName), resType);
+  end;
+end;
 
 //------------------------------------------------------------------------------
 // TRectD methods
@@ -1335,7 +1380,7 @@ begin
   //ImageFormatClassList is sorted with lowest priority first in list
   new(imgFmtRec);
   imgFmtRec.Fmt := ext;
-  imgFmtRec.Order := clipPriority;
+  imgFmtRec.SortOrder := clipPriority;
   imgFmtRec.Obj := bm32ExClass;
   ImageFormatClassList.Add(imgFmtRec);
   //sorting here is arguably inefficient, but there will be so few
@@ -1345,7 +1390,7 @@ begin
   ImageFormatClassList.Sort(TComparer<PImgFmtRec>.Construct(
       function(const imgFmtRec1, imgFmtRec2: PImgFmtRec): Integer
       begin
-        Result := Integer(imgFmtRec1.Order) - Integer(imgFmtRec2.Order);
+        Result := Integer(imgFmtRec1.SortOrder) - Integer(imgFmtRec2.SortOrder);
       end));
 {$ELSE}
   ImageFormatClassList.Sort(ImageFormatClassListSort);
@@ -2209,58 +2254,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function NameToId(Name: PChar): Longint;
-var
-  val, digit: Longint;
-begin
-  Result := -1;
-  if Cardinal(PWord(Name)) < 30 then
-  begin
-    Result := Cardinal(PWord(Name))
-  end
-  else if Name^ = '#' then
-  begin
-    val := 0;
-    inc(Name);
-    while (Ord(Name^) <> 0) do
-    begin
-      digit := Ord(Name^) - Ord('0');
-      if (digit < 0) or (digit > 9) then Exit;
-      val := val * 10 + digit;
-      inc(Name);
-    end;
-    Result := val;
-  end;
-end;
-//------------------------------------------------------------------------------
-
 function TImage32.LoadFromResource(const resName: string; resType: PChar): Boolean;
 var
   resStream: TResourceStream;
-  resId: integer;
-{$IFNDEF MSWINDOWS}
-const
-  RT_BITMAP = PChar(2);
-{$ENDIF}
 begin
-  resStream := nil;
-  resId := NameToId(resType);
-  if (resId = 2) or ((resId < 0) and (resType = 'BMP')) then
-  begin
-    if FindResource(hInstance, PChar(resName), RT_BITMAP) <> 0 then
-      resStream := TResourceStream.Create(hInstance, resName, RT_BITMAP)
-    else if FindResource(hInstance, PChar(resName), 'BMP') <> 0 then
-      resStream := TResourceStream.Create(hInstance, resName, 'BMP');
-    Result := Assigned(resStream);
-  end else
-  begin
-    result := FindResource(hInstance, PChar(resName), PChar(resType)) <> 0;
-    if not result then Exit;
-    resStream := TResourceStream.Create(hInstance, resName, PChar(resType));
-  end;
+  resStream := CreateResourceStream(resName, resType);
   try
     BeginUpdate;
-    LoadFromStream(resStream, '');
+    Result := assigned(resStream) and
+      LoadFromStream(resStream, '');
   finally
     resStream.Free;
     EndUpdate;

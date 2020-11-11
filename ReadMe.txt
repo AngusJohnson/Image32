@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 1.54
-Released: 7 November 2020
+Latest version: 1.55
+Released: 8 November 2020
 
 Copyright © 2019-2020 Angus Johnson
 Freeware released under Boost Software License
@@ -11,6 +11,13 @@ Documentation : http://www.angusj.com/delphi/image32/Docs/
 Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
+
+Version 1.55
+  changes in Image32_Ttf
+	bugfix DrawAngledText function
+  changes in ImagePanels
+    minor bugfix
+  Image32_Text now deprecated in favour of Image32_Ttf
 
 Version 1.54
   changes in Image32_Ttf
