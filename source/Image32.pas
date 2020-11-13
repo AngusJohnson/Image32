@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.53                                                            *
-* Date      :  22 October 2020                                                 *
+* Version   :  1.56                                                            *
+* Date      :  14 November 2020                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2020                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -795,19 +795,6 @@ begin
     result := rgbColor;
   res.A := res.B; res.B := res.R; res.R := res.A; //byte swap
   res.A := 255;
-end;
-//------------------------------------------------------------------------------
-
-function GetCompatibleMemDc(wnd: HWnd = 0): HDC;
-var
-  dc: HDC;
-begin
-  dc := Windows.GetDC(wnd);
-  try
-    Result := CreateCompatibleDC(dc);
-  finally
-    Windows.ReleaseDC(wnd, dc);
-  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -2275,7 +2262,7 @@ procedure TImage32.CopyFromDC(srcDc: HDC; const srcRect: TRect);
 var
   bi: TBitmapInfoHeader;
   bm, oldBm: HBitmap;
-  memDc: HDC;
+  dc, memDc: HDC;
   pixels: Pointer;
   w,h: integer;
 begin
@@ -2285,9 +2272,10 @@ begin
     h := RectHeight(srcRect);
     SetSize(w, h);
     bi := Get32bitBitmapInfoHeader(w, h);
-    memDc := GetCompatibleMemDc;
+    dc := GetDC(0);
+    memDc := CreateCompatibleDC(dc);
     try
-      bm := CreateDIBSection(memDc,
+      bm := CreateDIBSection(dc,
         PBITMAPINFO(@bi)^, DIB_RGB_COLORS, pixels, 0, 0);
       if bm = 0 then Exit;
       try
@@ -2300,6 +2288,7 @@ begin
       end;
     finally
       DeleteDc(memDc);
+      ReleaseDc(0, dc);
     end;
     SetAlpha(255);
     FlipVertical;
@@ -2361,7 +2350,7 @@ begin
     tmp.Premultiply;  //this is required for DIB sections
     if bkColor <> 0 then
       tmp.SetBackgroundColor(bkColor);
-    memDc := GetCompatibleMemDc;
+    memDc := CreateCompatibleDC(0);
     try
       bm := CreateDIBSection(memDc, PBITMAPINFO(@bi)^,
         DIB_RGB_COLORS, dibBits, 0, 0);

@@ -85,6 +85,8 @@ type
     //ScaleAtPoint: zooms in or out keeping 'pt' stationary relative to display
     procedure ScaleAtPoint(scaleDelta: double; const pt: TPoint);
     procedure SetSize(size: TSize);
+    function  GetColor: TColor;
+    procedure SetColor(acolor: TColor);
     procedure SetAutoCenter(value: Boolean);
     procedure SetAllowZoom(value: Boolean);
     procedure SetShowScrollButtons(value: TShowScrollBtns);
@@ -109,6 +111,8 @@ type
     procedure WMKeyUp(var Message: TWMKey); message WM_KEYUP;
     procedure CMMouseLeave(var Message: TMessage); message CM_MOUSELEAVE;
     procedure CMFocusChanged(var Message: TMessage); message CM_FOCUSCHANGED;
+    procedure DrawImage(Sender: TObject; dstCanvas: TCanvas;
+      const srcRect, dstRect: TRect); virtual;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -123,6 +127,7 @@ type
   published
     //AutoCenter: centers the image when its size is less than the display size
     property AutoCenter: Boolean read fAutoCenter write SetAutoCenter;
+    property Color: TColor read GetColor write SetColor;
     //FocusedColor: colour of the border when the panel is focused
     property FocusedColor: TColor read fFocusedColor write fFocusedColor;
     //Scale: image scale (between ScaleMin and ScaleMax) if AllowZoom is enabled
@@ -157,14 +162,14 @@ type
     fCopyPasteEnabled  : Boolean;
     fOnBeginPaint      : TDrawImageEvent;
     fOnEndPaint        : TDrawImageEvent;
-    procedure DrawImage(Sender: TObject; dstCanvas: TCanvas;
-      const srcRect, dstRect: TRect);
     procedure SetFileDropEnabled(value: Boolean);
     procedure WMKeyDown(var Message: TWMKey); message WM_KEYDOWN;
   protected
     procedure CreateWnd; override;
     procedure DestroyWnd; override;
     procedure WMDropFiles(var Msg: TMessage); message WM_DROPFILES;
+    procedure DrawImage(Sender: TObject; dstCanvas: TCanvas;
+      const srcRect, dstRect: TRect); override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -545,6 +550,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function  TImagePanel.GetColor: TColor;
+begin
+  Result := inherited Color;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImagePanel.SetColor(acolor: TColor);
+begin
+  if inherited Color = acolor then Exit;
+  ParentBackground := false;
+  ParentColor := false;
+  inherited Color := acolor
+end;
+//------------------------------------------------------------------------------
+
 procedure TImagePanel.SetAutoCenter(value: Boolean);
 begin
   if value = fAutoCenter then Exit;
@@ -815,6 +835,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TImagePanel.DrawImage(Sender: TObject; dstCanvas: TCanvas;
+  const srcRect, dstRect: TRect);
+begin
+end;
+//------------------------------------------------------------------------------
+
 type TControl = class(Controls.TControl); //access protected Color property
 
 procedure TImagePanel.Paint;
@@ -911,11 +937,10 @@ begin
 
   //draw the image
   if Assigned(fOnDrawImage) then
-  begin
-    fOnDrawImage(Self, Canvas, srcRec, dstRec);
-    //prevent recursive paints (in case Invalidate etc called in fOnDrawImage)
-    RedrawWindow(Handle, nil, 0, RDW_NOERASE or RDW_NOINTERNALPAINT or RDW_VALIDATE);
-  end;
+    fOnDrawImage(Self, Canvas, srcRec, dstRec) else
+    DrawImage(Self, Canvas, srcRec, dstRec);
+  //prevent recursive paints (in case Invalidate etc called in fOnDrawImage)
+  RedrawWindow(Handle, nil, 0, RDW_NOERASE or RDW_NOINTERNALPAINT or RDW_VALIDATE);
 
   //paint the outer bevel
   tmpRec := ClientRect;
@@ -1168,7 +1193,6 @@ begin
   inherited;
   fBmp := TPnlBitmap.Create;
   TPnlBitmap(fBmp).fOwner := self;
-  Self.OnDrawImage := DrawImage;
   fBmp.Width := 200;
   fBmp.Height := 200;
 end;

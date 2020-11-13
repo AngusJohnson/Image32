@@ -3,7 +3,7 @@ unit Image32_Ttf;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  1.56                                                            *
-* Date      :  11 November 2020                                                *
+* Date      :  14 November 2020                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2020                                              *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -24,6 +24,10 @@ type
   TFixed = type single;
   Int16 = type SmallInt;
   TFontFormat = (ffInvalid, ffTrueType, ffCompact);
+
+  TMacStyle = (msBold, msItalic, msUnderline, msOutline,
+    msShadow, msCondensed, msExtended);
+  TMacStyles = set of TMacStyle;
 
   TTextAlign = (taLeft, taRight, taCenter, taJustify);
   TTextVAlign = (tvaTop, tvaMiddle, tvaBottom);
@@ -190,6 +194,7 @@ type
     manufacturer   : UnicodeString;
     dateCreated    : TDatetime;
     dateModified   : TDatetime;
+    macStyles      : TMacStyles;
     glyphCount     : integer;
     unitsPerEm     : integer;
     xMin           : integer;
@@ -455,7 +460,7 @@ uses
   Image32_Vector;
 
 const
-  lineFrac = 0.05;
+  lineFrac = 0.04;
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions
@@ -509,9 +514,23 @@ const
     (0,31,60,91,121,152,182,213,244,274,305,335,366));
 var
   isLeapYr: Boolean;
+const
+  maxValidYear  = 2100;
+  secsPerHour   = 3600;
+  secsPerDay    = 86400;
+  secsPerNormYr = 31536000;
+  secsPerLeapYr = secsPerNormYr + secsPerDay;
+  secsPer4Years = secsPerNormYr * 3 + secsPerLeapYr; //126230400;
 begin
-  ss := (secsSince1904 div 126230400);      //126230400 secs per 4 years
-  if (ss > 49) or (ss = 0) then             //fix for invalid dates
+  //nb: Centuries are not leap years unless they are multiples of 400.
+  //    2000 WAS a leap year, but 2100 won't be.
+  //    Validate function at http://www.mathcats.com/explore/elapsedtime.html
+
+  ss := (secsSince1904 div secsPer4Years);       //count '4years' since 1904
+
+  //manage invalid dates
+  if (secsSince1904 = 0) or
+    (ss > (maxValidYear-1904) div 4) then
   begin
     yy := 1904; mo := 1; dd := 1;
     hh := 0; mi := 0; ss := 0;
@@ -519,21 +538,22 @@ begin
   end;
   yy := 1904 + (ss * 4);
 
-  ss := secsSince1904 mod 126230400;        //remaining secs since last leap yr
-  yy := yy + ss div 31536000;               //31536000 secs per common year
-
-  ss := ss mod 31536000;                    //remaining seconds in final year
-  dd := ss div 86400;                       //days remaining in final year
-
+  ss := secsSince1904 mod secsPer4Years;         //secs since START last leap yr
+  isLeapYr := ss < secsPerLeapYr;
+  if not isLeapYr then
+  begin
+    dec(ss, secsPerLeapYr);
+    yy := yy + (ss div secsPerNormYr) + 1;
+    ss := ss mod secsPerNormYr;                  //remaining secs in final year
+  end;
+  dd := 1 + ss div secsPerDay;                   //day number in final year
   mo := 1;
-  isLeapYr := (yy mod 4) = 0;
   while dim[isLeapYr, mo] < dd do inc(mo);
-
-  ss := ss - (dim[isLeapYr, mo-1] * 86400); //remaining secs in month
-  dd := ss div 86400;                       //86400 secs per day
-  ss := ss mod 86400;                       //remaining secs in day
-  hh := ss div 3600;
-  ss := ss mod 3600;                        //remaining secs in hour
+  ss := ss - (dim[isLeapYr, mo-1] * secsPerDay); //remaining secs in month
+  dd := 1 + (ss div secsPerDay);
+  ss := ss mod secsPerDay;
+  hh := ss div secsPerHour;
+  ss := ss mod secsPerHour;
   mi := ss div 60;
   ss := ss mod 60;
 end;
@@ -878,14 +898,13 @@ end;
 function GetFontMemStreamFromFontHdl(hdl: HFont;
   memStream: TMemoryStream): Boolean;
 var
-  dc, memDc: HDC;
+  memDc: HDC;
   cnt: DWORD;
 begin
   result := false;
   if not Assigned(memStream) or (hdl = 0) then Exit;
 
-  dc := GetDC(0);
-  memDc := CreateCompatibleDC(dc);
+  memDc := CreateCompatibleDC(0);
   try
     SelectObject(memDc, hdl);
     //get the required size of the font data (file)
@@ -897,7 +916,6 @@ begin
     Windows.GetFontData(memDc, 0, 0, memStream.Memory, cnt);
   finally
     DeleteDC(memDc);
-    ReleaseDC(0, dc);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1246,6 +1264,7 @@ begin
   GetInt16(fStream, fTbl_head.xMax);
   GetInt16(fStream, fTbl_head.yMax);
   GetWord(fStream, fTbl_head.macStyle);
+  fFontInfo.macStyles := TMacStyles(Byte(fTbl_head.macStyle));
   GetWord(fStream, fTbl_head.lowestRecPPEM);
   GetInt16(fStream, fTbl_head.fontDirHint);
   GetInt16(fStream, fTbl_head.indexToLocFmt);
@@ -2130,7 +2149,7 @@ begin
   if fUnderlined then
   begin
     w := LineHeight * lineFrac;
-    y2 := y + w;
+    y2 := y + 1.5 *(1+w);
     p := Rectangle(x, y2, nextX, y2 + w);
     AppendPath(glyphs, p);
   end;
@@ -2323,7 +2342,7 @@ begin
       if fUnderlined then
       begin
         w := LineHeight * lineFrac;
-        y2 := nextPt.Y + ascent + w;
+        y2 := nextPt.Y + ascent + 1.5 *(1+w);
         underline := Rectangle(nextPt.X, y2,
           nextPt.X + currLineWidthPxls, y2 + w);
         AppendPath(glyphs, underline);

@@ -957,14 +957,12 @@ end;
 function LoadFromHBITMAP(img32: TImage32; bm: HBITMAP; pal: HPALETTE): Boolean;
 var
   w, h: integer;
-  dc, memDc: HDC;
+  memDc: HDC;
   oldBitmap, oldPalette: HGDIOBJ;
   bi: BITMAPINFO;
 begin
   result := false;
-
-  dc := GetDC(0);
-  memDC := CreateCompatibleDC(dc);
+  memDC := CreateCompatibleDC(0);
   try
     oldBitmap := SelectObject(memDC, bm);
     if (pal > 0) then
@@ -994,7 +992,6 @@ begin
     Result := true;
   finally
     DeleteDC(memDC);
-    ReleaseDC(0, dc);
   end;
 end;
 //------------------------------------------------------------------------------
