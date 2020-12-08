@@ -466,45 +466,6 @@ const
 // Miscellaneous functions
 //------------------------------------------------------------------------------
 
-function CleanPath(const path: TPathD): TPathD; overload;
-var
-  i,j, highI: integer;
-  pt: TPointD;
-const
-  //This value has been derived empirically.
-  //While ten times this value does very marginally improve
-  //performance it significantly degrades glyph quality
-  tolerance = 0.25;
-begin
-  highI := High(path);
-  setLength(result, highI +1);
-  if highI < 0 then Exit;
-  j := 0;
-  pt := path[highI];
-  for i := 0 to highI do
-  begin
-    if Sqr(path[i].X - pt.X) + Sqr(path[i].Y - pt.Y) > tolerance then
-    begin
-      result[j] := path[i];
-      pt := path[i];
-      inc(j);
-    end;
-  end;
-  setLength(result, j);
-end;
-//------------------------------------------------------------------------------
-
-function CleanPath(const paths: TPathsD): TPathsD; overload;
-var
-  i, len: integer;
-begin
-  len := Length(paths);
-  setLength(result, len);
-  for i := 0 to len -1 do
-    result[i] := CleanPath(paths[i]);
-end;
-//------------------------------------------------------------------------------
-
 //GetMeaningfulDateTime: returns UTC date & time
 procedure GetMeaningfulDateTime(const secsSince1904: Uint64;
   out yy,mo,dd, hh,mi,ss: cardinal);
@@ -2502,6 +2463,8 @@ end;
 function TGlyphCache.AddGlyph(unicode: Word): PGlyphInfo;
 var
   dummy: integer;
+const
+  minLength = 0.25;
 begin
 
   New(Result);
@@ -2512,9 +2475,10 @@ begin
 
   if fFontHeight > 0 then
   begin
-    //removing excessive detail from scaled down glyphs significantly
-    //improves text rendering performance (~2 times faster)
-    Result.contours := CleanPath(ScalePath(Result.contours, fScale));
+    Result.contours := ScalePath(Result.contours, fScale);
+    //text rendering is about twice as fast when excess detail is removed
+    Result.contours :=
+      StripNearDuplicates(Result.contours, minLength, true);
   end;
 
   if fFlipVert then VerticalFlip(Result.contours);

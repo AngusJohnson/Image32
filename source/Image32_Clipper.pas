@@ -19,12 +19,15 @@ uses
 //nb: InflatePath assumes that there's consistent winding where
 //outer paths wind in one direction and inner paths in the other
 
-function InflatePath(const path: TPathD;
-  delta: Double; joinStyle: TJoinStyle; endStyle: TEndStyle;
-  miterLimit: double = 2.0): TPathsD;
-function InflatePaths(const paths: TPathsD;
-  delta: Double; joinStyle: TJoinStyle; endStyle: TEndStyle;
-  miterLimit: double = 2.0; arcTolerance: double = 0.0): TPathsD;
+function InflatePath(const path: TPathD; delta: Double;
+  joinStyle: TJoinStyle = jsAuto; endStyle: TEndStyle = esPolygon;
+  miterLimit: double = 2.0; arcTolerance: double = 0.0;
+  minEdgeLength: double = 0.25): TPathsD;
+
+function InflatePaths(const paths: TPathsD; delta: Double;
+  joinStyle: TJoinStyle = jsAuto; endStyle: TEndStyle = esPolygon;
+  miterLimit: double = 2.0; arcTolerance: double = 0.0;
+  minEdgeLength: double = 0): TPathsD;
 
 //UnionPolygon: removes self-intersections
 function UnionPolygon(const polygon: TPathD;
@@ -50,19 +53,20 @@ implementation
 
 function InflatePath(const path: TPathD;
   delta: Double; joinStyle: TJoinStyle; endStyle: TEndStyle;
-  miterLimit: double): TPathsD;
+  miterLimit: double; arcTolerance: double; minEdgeLength: double): TPathsD;
 var
   paths: TPathsD;
 begin
   setLength(paths, 1);
   paths[0] := path;
-  Result := InflatePaths(paths, delta, joinStyle, endStyle, miterLimit);
+  Result := InflatePaths(paths, delta, joinStyle, endStyle,
+    miterLimit, arcTolerance, minEdgeLength);
 end;
 //------------------------------------------------------------------------------
 
 function InflatePaths(const paths: TPathsD;
   delta: Double; joinStyle: TJoinStyle; endStyle: TEndStyle;
-  miterLimit: double; arcTolerance: double): TPathsD;
+  miterLimit: double; arcTolerance: double; minEdgeLength: double): TPathsD;
 var
   jt: ClipperOffset.TJoinType;
   et: TEndType;
@@ -75,14 +79,15 @@ begin
     else jt := jtSquare;
   end;
   case endStyle of
-    esButt: et := etOpenButt;
-    esSquare: et := etOpenSquare;
-    esRound: et := etOpenRound;
-    esClosed: et := etOpenJoined;
+    esButt: et := etButt;
+    esSquare: et := etSquare;
+    esRound: et := etRound;
+    esClosed: et := etJoined;
     else et := etPolygon;
   end;
-  Result := TPathsD(ClipperOffsetPaths( ClipperCore.TPathsD(paths),
-    delta, jt, et, miterLimit, arcTolerance));
+  Result := TPathsD(ClipperOffset.InflatePaths(
+    ClipperCore.TPathsD(paths), delta,
+    jt, et, miterLimit, arcTolerance, minEdgeLength));
 end;
 //------------------------------------------------------------------------------
 

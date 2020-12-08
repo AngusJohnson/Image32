@@ -39,6 +39,10 @@
           {$IF COMPILERVERSION >= 21}
             {$DEFINE GESTURES}           //Delphi 2010 - added screen gesture support
             {$IF COMPILERVERSION >= 23}
+			  {$IF declared(FireMonkeyVersion)}
+			    {$DEFINE FMX}
+              {$IFEND}			  
+              {$DEFINE TROUNDINGMODE}   
               {$DEFINE UITYPES}          //DelphiXE2   - added UITypes unit
               {$DEFINE XPLAT_GENERICS}   //DelphiXE2   - reasonable cross-platform & generics support
               {$DEFINE STYLESERVICES}    //DelphiXE2   - added StyleServices unit

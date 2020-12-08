@@ -52,7 +52,7 @@ type
 
   TColorRenderer = class(TCustomRenderer)
   private
-    fAlphaTbl: PByteArray;
+    fAlpha: Byte;
     fColor: TColor32;
   public
     constructor Create(color: TColor32 = clNone32);
@@ -246,8 +246,6 @@ type
   procedure DrawAlphaMask(img: TIMage32;
     const mask: TArrayOfByte; color: TColor32 = clBlack32);
 
-  procedure SetGamma(gamma: double);
-
   procedure Rasterize(const paths: TPathsD;
     const clipRec: TRect; fillRule: TFillRule; renderer: TCustomRenderer);
 
@@ -280,9 +278,6 @@ type
   end;
   PScanline = ^TScanline;
   TArrayOfScanline = array of TScanline;
-
-var
-  gammaTable: TArray256Bytes;
 
 //------------------------------------------------------------------------------
 // ApplyClearType (see DrawPolygon_ClearType below)
@@ -377,21 +372,21 @@ end;
 // Other miscellaneous functions
 //------------------------------------------------------------------------------
 
-//__Trunc: A very efficient Trunc() algorithm (ie rounds toward zero)
-function __Trunc(val: double): integer; {$IFDEF INLINE} inline; {$ENDIF}
-var
-  exp: integer;
-  i64: UInt64 absolute val;
-begin
-  //https://en.wikipedia.org/wiki/Double-precision_floating-point_format
-  Result := 0;
-  if i64 = 0 then Exit;
-  exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;
-  //nb: when exp == 1024 then val == INF or NAN
-  if exp < 0 then Exit;
-  Result := ((i64 and $1FFFFFFFFFFFFF) shr (52-exp)) or (1 shl exp);
-  if val < 0 then Result := -Result;
-end;
+////__Trunc: A very efficient Trunc() algorithm (ie rounds toward zero)
+//function __Trunc(val: double): integer; {$IFDEF INLINE} inline; {$ENDIF}
+//var
+//  exp: integer;
+//  i64: UInt64 absolute val;
+//begin
+//  //https://en.wikipedia.org/wiki/Double-precision_floating-point_format
+//  Result := 0;
+//  if i64 = 0 then Exit;
+//  exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;
+//  //nb: when exp == 1024 then val == INF or NAN
+//  if exp < 0 then Exit;
+//  Result := ((i64 and $1FFFFFFFFFFFFF) shr (52-exp)) or (1 shl exp);
+//  if val < 0 then Result := -Result;
+//end;
 //------------------------------------------------------------------------------
 
 function GetPixel(current: PARGB; delta: integer): PARGB;
@@ -522,12 +517,12 @@ begin
   if fg.A = 0 then
   begin
     Result := bgColor;
-    res.A := MulTable[res.A, not mask];
+    res.A := MulBytes(res.A, not mask);
   end
   else if bg.A = 0 then
   begin
     Result := fgColor;
-    res.A := MulTable[res.A, mask];
+    res.A := MulBytes(res.A, mask);
   end
   else if (mask = 0) then
     Result := bgColor
@@ -580,33 +575,6 @@ begin
     inc(i);
   until i = lenC;
 end;
-//------------------------------------------------------------------------------
-
-procedure SetGamma(gamma: double);
-var
-  i: integer;
-const
-  inv255: double = 1/255;
-begin
-  if gamma < 0.1 then gamma := 0.1
-  else if gamma > 3.0 then gamma := 3;
-  if gamma = 1 then
-    for i := 0 to 255 do gammaTable[i] := i
-  else
-    for i := 0 to 255 do
-      gammaTable[i] := Min(255, Round(255 * power(i* inv255, gamma)));
-end;
-//------------------------------------------------------------------------------
-
-function ApplyGamma(color: TColor32): TColor32;
-var
-  res: TARGB absolute Result;
-begin
-  result := color;
-  res.R := gammaTable[res.R];
-  res.G := gammaTable[res.G];
-  res.B := gammaTable[res.B];
-end;
 
 //------------------------------------------------------------------------------
 // Rasterize() support functions
@@ -624,13 +592,13 @@ begin
   begin
     highJ := high(polygons[i]);
     if highJ < 2 then continue;
-    y1 := __Trunc(polygons[i][highJ].Y);
+    y1 := Round(polygons[i][highJ].Y);
     for j := 0 to highJ do
     begin
-      y2 := __Trunc(polygons[i][j].Y);
+      y2 := Round(polygons[i][j].Y);
       if y1 < y2 then
       begin
-        //descending
+        //descending (ignoring edges outside the clipping range)
         if (y2 >= 0) and (y1 <= clipBottom) then
         begin
           if (y1 > 0) and (y1 <= clipBottom)  then
@@ -641,7 +609,7 @@ begin
         end;
       end else
       begin
-        //ascending
+        //ascending (ignoring edges outside the clipping range)
         if (y1 >= 0) and (y2 <= clipBottom) then
         begin
           if (y2 > 0) then
@@ -659,14 +627,16 @@ begin
   j := 0;
   highI := high(scanlines);
   psl := @scanlines[highI];
+
+  //'fragments' is a pointer and not a dynamic array because
+  //dynamic arrays are zero initialized (hence slower than GetMem).
   for i := highI downto 0 do
   begin
-    inc(j, psl.fragCnt);
-    //nb: GetMem is faster than dynamic arrays because it's not initialized
+    inc(j, psl.fragCnt); //nb: psl.fragCnt may be < 0 here!
     if j > 0 then
       GetMem(psl.fragments, j * SizeOf(TFragment));
     {$IFDEF MemCheck} psl.total := j; {$ENDIF}
-    psl.fragCnt := 0;
+    psl.fragCnt := 0; //reset for later
     psl.minX := clipRight;
     psl.maxX := 0;
     psl.Y := i;
@@ -715,7 +685,7 @@ begin
     //but still update maxX for each scanline the edge passes
     if bot.X > maxX then
     begin
-      for i := Min(maxY, __Trunc(bot.Y)) downto Max(0, __Trunc(top.Y)) do
+      for i := Min(maxY, Round(bot.Y)) downto Max(0, Round(top.Y)) do
         scanlines[i].maxX := maxX;
       Exit;
     end;
@@ -733,13 +703,13 @@ begin
   begin
     if top.X >= maxX then
     begin
-      for i := Min(maxY, __Trunc(bot.Y)) downto Max(0, __Trunc(top.Y)) do
+      for i := Min(maxY, Round(bot.Y)) downto Max(0, Round(top.Y)) do
         scanlines[i].maxX := maxX;
       Exit;
     end;
     //here the edge must be oriented bottom-right to top-left
     y := bot.Y - (bot.X - maxX) * Abs(dydx);
-    for i := Min(maxY, __Trunc(bot.Y)) downto Max(0, __Trunc(y)) do
+    for i := Min(maxY, Round(bot.Y)) downto Max(0, Round(y)) do
       scanlines[i].maxX := maxX;
     bot.Y := y;
     if bot.Y <= 0 then Exit;
@@ -749,7 +719,7 @@ begin
   begin
     //here the edge must be oriented bottom-left to top-right
     y := top.Y + (top.X - maxX) * Abs(dydx);
-    for i := Min(maxY, __Trunc(y)) downto Max(0, __Trunc(top.Y)) do
+    for i := Min(maxY, Round(y)) downto Max(0, Round(top.Y)) do
       scanlines[i].maxX := maxX;
     top.Y := y;
     if top.Y >= maxY then Exit;
@@ -769,8 +739,9 @@ begin
   end;
 
   //SPLIT THE EDGE INTO MULTIPLE SCANLINE FRAGMENTS
-  scanlineY := __Trunc(bot.Y);
+  scanlineY := Round(bot.Y);
   if bot.Y = scanlineY then dec(scanlineY);
+
   //at the lower-most extent of the edge 'split' the first fragment
   if scanlineY < 0 then Exit;
 
@@ -792,6 +763,7 @@ begin
     pFrag.dydx := dydx;
     Exit;
   end;
+
   x := bot.X + (bot.Y - scanlineY) * dxdy;
   pFrag.topX := x;
   pFrag.dy := bot.Y - scanlineY;
@@ -829,18 +801,18 @@ procedure InitializeScanlines(var polygons: TPathsD;
   const scanlines: TArrayOfScanline; const clipRec: TRect);
 var
   i,j, highJ: integer;
-  pt, pt2: PPointD;
+  pt1, pt2: PPointD;
 begin
  for i := 0 to high(polygons) do
   begin
     highJ := high(polygons[i]);
     if highJ < 2 then continue;
-    pt := @polygons[i][highJ];
+    pt1 := @polygons[i][highJ];
     pt2 := @polygons[i][0];
     for j := 0 to highJ do
     begin
-      SplitEdgeIntoFragments(pt^, pt2^, scanlines, clipRec);
-      pt := pt2;
+      SplitEdgeIntoFragments(pt1^, pt2^, scanlines, clipRec);
+      pt1 := pt2;
       inc(pt2);
     end;
   end;
@@ -850,31 +822,28 @@ end;
 procedure ProcessScanlineFragments(var scanline: TScanLine;
   var buffer: TArrayOfDouble);
 var
-  i,j, leftXi,rightXi, windDir: integer;
-  fracX, yy, q: double;
+  i,j, leftXi,rightXi: integer;
+  fracX, yy, q, windDir: double;
   pd: PDouble;
   frag: PFragment;
 begin
   frag := @scanline.fragments[0];
   for i := 1 to scanline.fragCnt do
   begin
-
-    //if frag.botX > frag.topX then swap. (Simplifies code)
     if frag.botX > frag.topX then
     begin
+      //just swapping botX and topX simplifies code
       q := frag.botX;
       frag.botX := frag.topX;
       frag.topX  := q;
     end;
 
-    leftXi := Max(0, __Trunc(frag.botX));
-    rightXi := Max(0, __Trunc(frag.topX));
-
-    //winding direction is stored as the sign of dydx.
-    if frag.dydx < 0 then windDir := -1 else windDir := 1;
+    leftXi := Max(0, Round(frag.botX));
+    rightXi := Max(0, Round(frag.topX));
 
     if (leftXi = rightXi) then
     begin
+      if frag.dydx < 0 then windDir := -1.0 else windDir := 1.0;
       //the fragment is only one pixel wide
       if leftXi < scanline.minX then
         scanline.minX := leftXi;
@@ -925,6 +894,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+
+{$IFNDEF TROUNDINGMODE}
+type
+  TRoundingMode = {$IFNDEF FPC}Math.{$ENDIF}TFPURoundingMode;
+{$ENDIF}
+
 procedure Rasterize(const paths: TPathsD;
   const clipRec: TRect; fillRule: TFillRule; renderer: TCustomRenderer);
 var
@@ -936,11 +911,17 @@ var
   byteBuffer: TArrayOfByte;
   scanlines: TArrayOfScanline;
   scanline: PScanline;
+  savedRoundMode: TRoundingMode;
 begin
   //See also https://nothings.org/gamedev/rasterize/
   if not assigned(renderer) then Exit;
   clipRec2 := Image32_Vector.IntersectRect(clipRec, GetBounds(paths));
   paths2 := OffsetPath(paths, -clipRec2.Left, -clipRec2.Top);
+
+  //Delphi's Round() function is *much* faster than its Trunc function, and
+  //it's even a little faster than the __Trunc function above (except when
+  //the FastMM4 memory manager is enabled.)
+  savedRoundMode := SetRoundMode(rmDown);
 
   maxW := RectWidth(clipRec2);
   maxH := RectHeight(clipRec2);
@@ -967,6 +948,9 @@ begin
     xri := Min(maxW -1, scanline.maxX +1);
     FillChar(byteBuffer[xli], xri - xli +1, 0);
 
+    //a 25% weighting has been added to the alpha channel to minimize any
+    //background bleed-through where polygons join with a common edge.
+
     accum := 0; //winding count accumulator
     for j := xli to xri do
     begin
@@ -974,23 +958,24 @@ begin
       case fillRule of
         frEvenOdd:
           begin
-            aa := __Trunc(Abs(accum) * 255) and $1FF;
-            if aa >= $100 then aa := aa xor $1ff;
-            byteBuffer[j] := aa;
+            aa := Round(Abs(accum) * 1275) mod 2550; //(255 * 5) shr 2.
+            if aa > 1275 then
+              byteBuffer[j] := Min(255, (2550 - aa) shr 2) else
+              byteBuffer[j] := Min(255, aa shr 2);
           end;
         frNonZero:
           begin
-            byteBuffer[j] := Min($FF, __Trunc(Abs(accum) * 255));
+            byteBuffer[j] := Min(255, Round(Abs(accum) * 318)); //318=255*1.25
           end;
         frPositive:
           begin
             if accum > 0.002 then
-              byteBuffer[j] := Min($FF, __Trunc(accum * 255));
+              byteBuffer[j] := Min(255, Round(accum * 318));
           end;
         frNegative:
           begin
             if accum < -0.002 then
-              byteBuffer[j] := Min($FF, __Trunc(-accum * 255));
+              byteBuffer[j] := Min(255, Round(-accum * 318));
           end;
       end;
     end;
@@ -1002,6 +987,7 @@ begin
     FreeMem(scanline.fragments);
     inc(scanline);
   end;
+  SetRoundMode(savedRoundMode);
 end;
 
 //------------------------------------------------------------------------------
@@ -1042,14 +1028,14 @@ end;
 function TColorRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
   //there's no point rendering if the color is fully transparent
-  result := inherited Initialize(targetImage) and assigned(fAlphaTbl);
+  result := inherited Initialize(targetImage) and (fAlpha > 0);
 end;
 //------------------------------------------------------------------------------
 
 procedure TColorRenderer.SetColor(value: TColor32);
 begin
   fColor := value and $FFFFFF;
-  fAlphaTbl := PByteArray(@MulTable[value shr 24]);
+  fAlpha := value shr 24;
 end;
 //------------------------------------------------------------------------------
 
@@ -1064,7 +1050,8 @@ begin
     //BlendToAlpha is marginally slower than BlendToOpaque but it's used
     //here because it's universally applicable.
     //Ord() is used here because very old compilers define PByte as a PChar
-    dst^ := BlendToAlpha(dst^, fAlphaTbl[Ord(alpha^)] shl 24 or fColor);
+
+    dst^ := BlendToAlpha(dst^, ((Ord(alpha^) * fAlpha) shr 8) shl 24 or fColor);
     inc(dst); inc(alpha);
   end;
 end;
@@ -1123,7 +1110,7 @@ begin
   for i := x1 to x2 do
   begin
     pDst^ := BlendToAlpha(pDst^,
-      MulTable[pBrush.A, Ord(alpha^)] shl 24 or (pBrush.Color and $FFFFFF));
+      MulBytes(pBrush.A, Ord(alpha^)) shl 24 or (pBrush.Color and $FFFFFF));
     inc(pDst); inc(alpha);
     pBrush := GetPixel(fBrushPixel, fBoundsProc(i, fImage.Width));
   end;
@@ -1299,7 +1286,7 @@ begin
       color.Color := fColors[fBoundsProc(i - off, fEndDist)];
     end;
     pDst^ := BlendToAlpha(pDst^,
-      MulTable[color.A, Ord(alpha^)] shl 24 or (color.Color and $FFFFFF));
+      MulBytes(color.A, Ord(alpha^)) shl 24 or (color.Color and $FFFFFF));
     inc(pDst); inc(alpha);
   end;
 end;
@@ -1365,7 +1352,7 @@ begin
     dist := Hypot((y - fCenterPt.Y) *fScaleY, (i - fCenterPt.X) *fScaleX);
     color.Color := fColors[fBoundsProc(Round(dist), fMaxColors)];
     pDst^ := BlendToAlpha(pDst^,
-      MulTable[color.A, Ord(alpha^)] shl 24 or (color.Color and $FFFFFF));
+      MulBytes(color.A, Ord(alpha^)) shl 24 or (color.Color and $FFFFFF));
     inc(pDst); inc(alpha);
   end;
 end;
@@ -1473,7 +1460,7 @@ begin
     end;
     color.Color := fColors[fBoundsProc(Round(q * fMaxColors), fMaxColors)];
     pDst^ := BlendToAlpha(pDst^,
-      MulTable[color.A, Ord(alpha^)] shl 24 or (color.Color and $FFFFFF));
+      MulBytes(color.A, Ord(alpha^)) shl 24 or (color.Color and $FFFFFF));
     inc(pDst); pt.X := pt.X + 1; inc(alpha);
   end;
 end;
@@ -1491,9 +1478,9 @@ begin
   for i := x1 to x2 do
   begin
     {$IFDEF PBYTE}
-    dst.A := MulTable[dst.A, not alpha^];
+    dst.A := MulBytes(dst.A, not alpha^);
     {$ELSE}
-    dst.A := MulTable[dst.A, not Ord(alpha^)];
+    dst.A := MulBytes(dst.A, not Ord(alpha^));
     {$ENDIF}
     inc(dst); inc(alpha);
   end;
@@ -1513,7 +1500,7 @@ begin
   for i := x1 to x2 do
   begin
     c.Color := not dst.Color;
-    c.A := MulTable[dst.A, Ord(alpha^)];
+    c.A := MulBytes(dst.A, Ord(alpha^));
     dst.Color := BlendToAlpha(dst.Color, c.Color);
     inc(dst); inc(alpha);
   end;
@@ -1914,8 +1901,5 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
-
-initialization
-  SetGamma(1.0);
 
 end.

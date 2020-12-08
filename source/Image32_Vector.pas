@@ -40,6 +40,9 @@ type
   function Ellipse(const rec: TRect; steps: integer = 0): TPathD; overload;
   function Ellipse(const rec: TRectD; steps: integer = 0): TPathD; overload;
 
+  function Circle(const pt: TPoint; radius: double; steps: integer = 0): TPathD; overload;
+  function Circle(const pt: TPointD; radius: double; steps: integer = 0): TPathD; overload;
+
   function Star(const focalPt: TPointD;
     innerRadius, outerRadius: double; points: integer): TPathD;
 
@@ -98,7 +101,7 @@ type
     dx, dy: double): TPathD; overload;
   function OffsetPath(const paths: TPathsD;
     dx, dy: double): TPathsD; overload;
-  function OffsetPath(const paths: TArrayOfPathsD;
+  function OffsetPath(const ppp: TArrayOfPathsD;
     dx, dy: double): TArrayOfPathsD; overload;
 
   function ScalePath(const path: TPathD;
@@ -122,7 +125,7 @@ type
   procedure AppendPath(var paths: TPathsD;
     const extra: TPathsD);
     {$IFDEF INLINE} inline; {$ENDIF} overload;
-  procedure AppendPath(var arrayOfPathsD: TArrayOfPathsD;
+  procedure AppendPath(var ppp: TArrayOfPathsD;
     const extra: TPathsD); overload;
 
   function GetAngle(const origin, pt: TPoint): double; overload;
@@ -160,6 +163,12 @@ type
 
   function PointsEqual(const pt1, pt2: TPointD): Boolean; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
+  function PointsNearEqual(const pt1, pt2: TPointD; distSqrd: double): Boolean;
+  {$IFDEF INLINING} inline; {$ENDIF}
+  function StripNearDuplicates(const path: TPathD;
+    minLength: double; isClosedPath: Boolean): TPathD; overload;
+  function StripNearDuplicates(const paths: TPathsD;
+    minLength: double; isClosedPath: Boolean): TPathsD; overload;
 
   function MidPoint(const rec: TRect): TPoint; overload;
   function MidPoint(const rec: TRectD): TPointD; overload;
@@ -340,6 +349,47 @@ end;
 function PointsEqual(const pt1, pt2: TPointD): Boolean;
 begin
   result := (pt1.X = pt2.X) and (pt1.Y = pt2.Y);
+end;
+//------------------------------------------------------------------------------
+
+function PointsNearEqual(const pt1, pt2: TPointD; distSqrd: double): Boolean;
+begin
+  Result := Sqr(pt1.X - pt2.X) + Sqr(pt1.Y - pt2.Y) < distSqrd;
+end;
+//------------------------------------------------------------------------------
+
+function StripNearDuplicates(const path: TPathD;
+  minLength: double; isClosedPath: Boolean): TPathD;
+var
+  i,j, len: integer;
+begin
+  len := length(path);
+  SetLength(Result, len);
+  if len = 0 then Exit;
+  Result[0] := path[0];
+  j := 0;
+  minLength := minLength * minLength;
+  for i := 1 to len -1 do
+    if not PointsNearEqual(Result[j], path[i], minLength) then
+    begin
+      inc(j);
+      Result[j] := path[i];
+    end;
+  if isClosedPath and
+    PointsNearEqual(Result[j], Result[0], minLength) then dec(j);
+  SetLength(Result, j +1);
+end;
+//------------------------------------------------------------------------------
+
+function StripNearDuplicates(const paths: TPathsD;
+  minLength: double; isClosedPath: Boolean): TPathsD;
+var
+  i, len: integer;
+begin
+  len := Length(paths);
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    Result[i] := StripNearDuplicates(paths[i], minLength, isClosedPath);
 end;
 //------------------------------------------------------------------------------
 
@@ -645,15 +695,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function OffsetPath(const paths: TArrayOfPathsD;
-  dx, dy: double): TArrayOfPathsD;
+function OffsetPath(const ppp: TArrayOfPathsD; dx, dy: double): TArrayOfPathsD;
 var
   i,len: integer;
 begin
-  len := length(paths);
+  len := length(ppp);
   setLength(result, len);
   for i := 0 to len -1 do
-    result[i] := OffsetPath(paths[i], dx, dy);
+    result[i] := OffsetPath(ppp[i], dx, dy);
 end;
 //------------------------------------------------------------------------------
 
@@ -1277,16 +1326,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure AppendPath(var arrayOfPathsD: TArrayOfPathsD;
+procedure AppendPath(var ppp: TArrayOfPathsD;
   const extra: TPathsD);
 var
   len: integer;
 begin
-  len := length(arrayOfPathsD);
-  setLength(arrayOfPathsD, len + 1);
+  len := length(ppp);
+  setLength(ppp, len + 1);
   if Assigned(extra) then
-    AppendPath(arrayOfPathsD[len], extra) else
-    arrayOfPathsD[len] := nil;
+    AppendPath(ppp[len], extra) else
+    ppp[len] := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -1874,7 +1923,31 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Ellipse(const rec: TRect; steps: integer = 0): TPathD;
+function Circle(const pt: TPoint; radius: double; steps: integer = 0): TPathD;
+var
+  rec: TRectD;
+begin
+  rec.Left := pt.X - radius;
+  rec.Right := pt.X + radius;
+  rec.Top := pt.Y - radius;
+  rec.Bottom := pt.Y + radius;
+  Result := Ellipse(rec);
+end;
+//------------------------------------------------------------------------------
+
+function Circle(const pt: TPointD; radius: double; steps: integer = 0): TPathD;
+var
+  rec: TRectD;
+begin
+  rec.Left := pt.X - radius;
+  rec.Right := pt.X + radius;
+  rec.Top := pt.Y - radius;
+  rec.Bottom := pt.Y + radius;
+  Result := Ellipse(rec);
+end;
+//------------------------------------------------------------------------------
+
+function Ellipse(const rec: TRect; steps: integer): TPathD;
 begin
   Result := Ellipse(RectD(rec), steps);
 end;
@@ -1895,8 +1968,10 @@ begin
     radius := PointD(width/2, Height/2);
   end;
   f := (radius.x + radius.y)/2;
+  if f < 0.5 then Exit;
+  
   if steps < 3 then
-    steps := Max(3, Trunc(Pi / (ArcCos(f / (f + 0.125)))));
+    steps := Max(3, Trunc(Pi / (ArcCos(1 - 0.2 /f ))));
   SinCos(2 * Pi / Steps, sinA, cosA);
   delta.x := cosA; delta.y := sinA;
 
@@ -1944,7 +2019,7 @@ end;
 function Arc(const rec: TRect; startAngle, endAngle: double): TPathD;
 var
   i, steps: Integer;
-  angle, radiusMax: double;
+  angle, radiusAvg: double;
   sinA, cosA: extended;
   centre, radius: TPointD;
   deltaX, deltaX2, deltaY: extended;
@@ -1953,11 +2028,11 @@ begin
   if (endAngle = startAngle) or IsEmptyRect(rec) then Exit;
   centre := PointD((rec.left+rec.right)/2, (rec.top+rec.bottom)/2);
   radius := PointD(RectWidth(rec)/2, RectHeight(rec)/2);
-  radiusMax := Max(radius.x, radius.y);
+  radiusAvg := (radius.X + radius.Y)/2;
   angle := endAngle - startAngle;
   if angle < 0 then angle := Pi * 2 + angle;
   //steps = (No. steps for a whole ellipse) * angle/(2*Pi)
-  steps := Max(2, Trunc(Pi/ArcCos(1 - 0.2/radiusMax) * angle /(2*Pi) ));
+  steps := Max(2, Trunc(Pi/ArcCos(1 - 0.2/radiusAvg) * angle /(2*Pi) ));
 
   SetLength(Result, Steps +1);
   //angle of the first step ...

@@ -268,7 +268,7 @@ type
     procedure AddPaths(const pathsD: TPathsD; polyType: TPathType = ptSubject;
       isOpen: Boolean = false); overload;
 
-    constructor Create(scale: double); reintroduce; overload;
+    constructor Create(scale: double = 100); reintroduce; overload;
     function Execute(clipType: TClipType; fillRule: TFillRule;
       out closedPaths: TPathsD): Boolean; overload;
     function Execute(clipType: TClipType; fillRule: TFillRule;

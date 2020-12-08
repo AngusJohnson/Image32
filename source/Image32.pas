@@ -48,6 +48,10 @@ const
   {$ZEROBASEDSTRINGS OFF}
 {$ENDIF}
 
+{$IFNDEF MSWINDOWS}
+  RT_BITMAP = PChar(2);
+{$ENDIF}
+
 type
   TClipboardPriority = (cpLow, cpMedium, cpHigh);
 
@@ -409,10 +413,12 @@ type
   function DPIAware(val: Integer): Integer; overload; {$IFDEF INLINE} inline; {$ENDIF}
   function DPIAware(val: double): double; overload; {$IFDEF INLINE} inline; {$ENDIF}
 
+  {$IFDEF MSWINDOWS}
   {$IFDEF FPC}
   function AlphaBlend(DC: HDC; p2, p3, p4, p5: Integer;
     DC6: HDC; p7, p8, p9, p10: Integer; p11: Windows.TBlendFunction): BOOL;
     stdcall; external 'msimg32.dll' name 'AlphaBlend';
+  {$ENDIF}
   {$ENDIF}
 
   //CreateResourceStream: handles both numeric and string names and types
@@ -472,6 +478,8 @@ var
   function SwapRedBlue(color: TColor32): TColor32; overload;
   procedure SwapRedBlue(color: PColor32; count: integer); overload;
 
+  function MulBytes(b1, b2: Byte) : Byte;
+
 implementation
 
 const
@@ -517,6 +525,13 @@ begin
     color^ := SwapRedBlue(color^);
     inc(color);
   end;
+end;
+//------------------------------------------------------------------------------
+
+function MulBytes(b1, b2: Byte) : Byte;
+  {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result := (b1 * b2) shr 8;
 end;
 //------------------------------------------------------------------------------
 
@@ -590,7 +605,7 @@ var
   fg: TARGB absolute alphaMask;
 begin
   Result := bgColor;
-  res.A := MulTable[bg.A, fg.A];
+  res.A := MulBytes(bg.A, fg.A);
   if res.A = 0 then Result := 0;
 end;
 //------------------------------------------------------------------------------
@@ -602,7 +617,7 @@ var
   fg: TARGB absolute alphaMask;
 begin
   Result := bgColor;
-  res.A := MulTable[bg.A, 255 - fg.A];
+  res.A := MulBytes(bg.A, 255 - fg.A);
   if res.A < 2 then Result := 0;
 end;
 
@@ -681,7 +696,7 @@ begin
     res := Sqr(mast.R - curr.R) + Sqr(mast.G - curr.G) + Sqr(mast.B - curr.B);
     if res >= 65025 then result := 0
     else result := 255 - Round(Sqrt(res));
-    if curr.A < 255 then result := MulTable[result, curr.A];
+    if curr.A < 255 then result := MulBytes(result, curr.A);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -701,12 +716,11 @@ end;
 // Miscellaneous functions ...
 //------------------------------------------------------------------------------
 
-{$IFNDEF UNICODE}
-function CharInSet(C: AnsiChar; const CharSet: TSysCharSet): Boolean;
+function IsAlphaChar(c: Char): Boolean;
 begin
-  Result := C in CharSet;
+  Result := ((c >= 'A') and (c <= 'Z')) or ((c >= 'a') and (c <= 'z'));
 end;
-{$ENDIF}
+//------------------------------------------------------------------------------
 
 function RectWidth(const rec: TRect): Integer;
 begin
@@ -1109,6 +1123,10 @@ var
 begin
   //https://en.wikipedia.org/wiki/HSL_and_HSV and
   //http://en.wikipedia.org/wiki/HSL_color_space
+{$IFDEF ANDROID}
+  color := SwapRedBlue(color);
+{$ENDIF}
+
   r := rgba.R; g := rgba.G; b := rgba.B;
   maxRGB := Max(r, Max(g, b));
   minRGB := Min(r, Min(g, b));
@@ -1168,6 +1186,9 @@ begin
     4: begin rgba.R := x + m; rgba.G := 0 + m; rgba.B := c + m; end;
     5: begin rgba.R := c + m; rgba.G := 0 + m; rgba.B := x + m; end;
   end;
+{$IFDEF ANDROID}
+  Result := SwapRedBlue(Result);
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -1223,10 +1244,6 @@ function CreateResourceStream(const resName: string;
   resType: PChar): TResourceStream;
 var
   nameId, typeId: Cardinal;
-{$IFNDEF MSWINDOWS}
-const
-  RT_BITMAP = PChar(2);
-{$ENDIF}
 begin
   Result := nil;
   typeId := NameToId(resType);
@@ -1356,7 +1373,7 @@ var
 begin
   if (ext = '') or (ext = '.') then Exit;
   if (ext[1] = '.') then Delete(ext, 1,1);
-  if not CharInSet(ext[1], ['A'..'Z','a'..'z']) then Exit;
+  if not IsAlphaChar(ext[1]) then Exit;
   //avoid duplicates
   for i := 0 to imageFormatClassList.count -1 do
   begin
@@ -2558,9 +2575,9 @@ begin
   begin
     if c.A > 0 then
     begin
-      c.R  := MulTable[c.R, c.A];
-      c.G  := MulTable[c.G, c.A];
-      c.B  := MulTable[c.B, c.A];
+      c.R  := MulBytes(c.R, c.A);
+      c.G  := MulBytes(c.G, c.A);
+      c.B  := MulBytes(c.B, c.A);
     end
     else
       c.Color := 0;

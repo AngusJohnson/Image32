@@ -18,6 +18,10 @@ interface
 uses
   Classes, SysUtils, Math;
 
+const
+  sqrtTwo = 1.4142135623731;
+  twoPointFiveDegrees = 0.0436332313; //as radians
+
 type
   TPoint64 = record X, Y: Int64; end;
   TPointD = record X, Y: double; end;
@@ -84,11 +88,24 @@ function Area(const path: TPathD): Double; overload;
 function Orientation(const path: TPath): Boolean;
 function PointInPolygon(const pt: TPoint64;
   const path: TPath): TPointInPolygonResult;
-function CrossProduct(const pt1, pt2, pt3: TPoint64): double;
 
-function PointsEqual(const p1, p2: TPoint64): Boolean; overload;
-function PointsEqual(const p1, p2: TPointD): Boolean; overload;
+function CrossProduct(const pt1, pt2, pt3: TPoint64): double; overload;
+function CrossProduct(const pt1, pt2, pt3: TPointD): double; overload;
+
+function DistanceSqr(const pt1, pt2: TPointD): double;
   {$IFDEF INLINING} inline; {$ENDIF}
+function DistanceFromLineSqrd(const pt, linePt1, linePt2: TPointD): double;
+function NearCollinear(const pt1, pt2, pt3: TPointD;
+  sinSqrdMinAngleRads: double): Boolean;
+function CleanPath(const path: TPathD; isClosed: Boolean;
+	minEdgeLength: double = sqrtTwo;
+  minAngleRads: double = twoPointFiveDegrees): TPathD;
+
+function PointsEqual(const pt1, pt2: TPoint64): Boolean; overload;
+  {$IFDEF INLINING} inline; {$ENDIF}
+function PointsNearEqual(const pt1, pt2: TPointD; distanceSqrd: double): Boolean;
+  {$IFDEF INLINING} inline; {$ENDIF}
+
 function Point64(const X, Y: Int64): TPoint64; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
 function Point64(const X, Y: Double): TPoint64; overload;
@@ -127,8 +144,9 @@ function OffsetPaths(const paths: TPathsD; dx, dy: double): TPathsD; overload;
 function Paths(const pathsD: TPathsD): TPaths;
 function PathsD(const paths: TPaths): TPathsD;
 
-procedure StripDuplicates(var path: TPath); overload;
-procedure StripDuplicates(var path: TPathD); overload;
+function StripDuplicates(const path: TPath; isClosedPath: Boolean = false): TPath;
+function StripNearDuplicates(const path: TPathD;
+  minLength: double; isClosedPath: Boolean): TPathD;
 
 function ReversePath(const path: TPath): TPath; overload;
 function ReversePath(const path: TPathD): TPathD; overload;
@@ -145,18 +163,22 @@ procedure AppendPaths(var paths: TPathsD; const extra: TPathsD); overload;
 
 function ArrayOfPathsToPaths(const ap: TArrayOfPaths): TPaths;
 
-//useful debugging functions ...
+{$IFDEF DEBUG}
 function PathToString(const path: TPath): string; overload;
 function PathsToString(const paths: TPaths): string; overload;
 function PathToString(const path: TPathD): string; overload;
 function PathsToString(const paths: TPathsD): string; overload;
 procedure StringToFile(const str, filename: string);
+function Ellipse(const rec: TRectD; steps: integer = 0): TPathD;
+{$ENDIF}
 
 const
-  MinInt64 = -9223372036854775807;
+  floatingPointTolerance: double = 1E-15;
+  defaultMinEdgeLen: double = 0.1;
+
   MaxInt64 = 9223372036854775807;
   NullRect64: TRect64 =
-    (left: MaxInt64; top: MaxInt64; right: MinInt64; Bottom: MinInt64);
+    (left: MaxInt64; top: MaxInt64; right: -MaxInt64; Bottom: -MaxInt64);
   NullRectD: TRectD =
     (left: MaxDouble; top: MaxDouble; right: -MaxDouble; Bottom: -MaxDouble);
 
@@ -214,39 +236,49 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure StripDuplicates(var path: TPath); overload;
+function StripDuplicates(const path: TPath; isClosedPath: Boolean): TPath;
 var
-  i, len: integer;
+  i,j, len: integer;
 begin
   len := length(path);
-  i := 1;
-  while i < len do
-    if PointsEqual(path[i], path[i-1]) then
+  SetLength(Result, len);
+  if len = 0 then Exit;
+  Result[0] := path[0];
+  j := 0;
+  for i := 1 to len -1 do
+    if not PointsEqual(Result[j], path[i]) then
     begin
-      dec(len);
-      if (i < len) then
-        Move(path[i+1], path[i], (len-i)*SizeOf(TPoint64));
-      SetLength(path, len);
-    end else
-      inc(i);
+      inc(j);
+      Result[j] := path[i];
+    end;
+  if isClosedPath and PointsEqual(Result[0], path[j]) then dec(j);
+  SetLength(Result, j +1);
 end;
 //------------------------------------------------------------------------------
 
-procedure StripDuplicates(var path: TPathD); overload;
+function StripNearDuplicates(const path: TPathD;
+  minLength: double; isClosedPath: Boolean): TPathD;
 var
-  i, len: integer;
+  i,j, len: integer;
+  minLengthSqrd: double;
 begin
   len := length(path);
-  i := 1;
-  while i < len do
-    if PointsEqual(path[i], path[i-1]) then
+  SetLength(Result, len);
+  if len = 0 then Exit;
+
+  Result[0] := path[0];
+  j := 0;
+  minLengthSqrd := minLength * minLength;
+  for i := 1 to len -1 do
+    if not PointsNearEqual(Result[j], path[i], minLengthSqrd) then
     begin
-      dec(len);
-      if (i < len) then
-        Move(path[i+1], path[i], (len-i)*SizeOf(TPointD));
-      SetLength(path, len);
-    end else
-      inc(i);
+      inc(j);
+      Result[j] := path[i];
+    end;
+
+  if isClosedPath and
+    PointsNearEqual(Result[j], Result[0], minLengthSqrd) then dec(j);
+  SetLength(Result, j +1);
 end;
 //------------------------------------------------------------------------------
 
@@ -263,7 +295,6 @@ begin
     result[i].X := Round(path[i].X * sx);
     result[i].Y := Round(path[i].Y * sy);
   end;
-  StripDuplicates(result);
 end;
 //------------------------------------------------------------------------------
 
@@ -280,7 +311,6 @@ begin
     result[i].X := Round(path[i].X * sx);
     result[i].Y := Round(path[i].Y * sy);
   end;
-  StripDuplicates(result);
 end;
 //------------------------------------------------------------------------------
 
@@ -325,7 +355,6 @@ begin
       result[i][j].X := paths[i][j].X * sx;
       result[i][j].Y := paths[i][j].Y * sy;
     end;
-    StripDuplicates(result[i]);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -602,17 +631,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function PointsEqual(const p1, p2: TPoint64): Boolean;
-  {$IFDEF INLINING} inline; {$ENDIF}
+function PointsEqual(const pt1, pt2: TPoint64): Boolean;
 begin
-  Result := (p1.X = p2.X) and (p1.Y = p2.Y);
+  Result := (pt1.X = pt2.X) and (pt1.Y = pt2.Y);
 end;
 //------------------------------------------------------------------------------
 
-function PointsEqual(const p1, p2: TPointD): Boolean;
-  {$IFDEF INLINING} inline; {$ENDIF}
+function PointsNearEqual(const pt1, pt2: TPointD; distanceSqrd: double): Boolean;
 begin
-  Result := (p1.X = p2.X) and (p1.Y = p2.Y);
+  Result := Sqr(pt1.X - pt2.X) + Sqr(pt1.Y - pt2.Y) < distanceSqrd;
 end;
 //------------------------------------------------------------------------------
 
@@ -965,6 +992,114 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function CrossProduct(const pt1, pt2, pt3: TPointD): double;
+var
+  x1,x2,y1,y2: double;
+begin
+  x1 := pt2.X - pt1.X;
+  y1 := pt2.Y - pt1.Y;
+  x2 := pt3.X - pt2.X;
+  y2 := pt3.Y - pt2.Y;
+  result := (x1 * y2 - y1 * x2);
+end;
+//------------------------------------------------------------------------------
+
+function DistanceSqr(const pt1, pt2: TPointD): double;
+begin
+  Result := Sqr(pt1.X - pt2.X) + Sqr(pt1.Y - pt2.Y);
+end;
+//------------------------------------------------------------------------------
+
+function DistanceFromLineSqrd(const pt, linePt1, linePt2: TPointD): double;
+var
+  a,b,c: double;
+begin
+	//perpendicular distance of point (x³,y³) = (Ax³ + By³ + C)/Sqrt(A² + B²)
+	//see http://en.wikipedia.org/wiki/Perpendicular_distance
+	a := (linePt1.Y - linePt2.Y);
+	b := (linePt2.X - linePt1.X);
+	c := a * linePt1.X + b * linePt1.Y;
+	c := a * pt.x + b * pt.y - c;
+	Result := (c * c) / (a * a + b * b);
+end;
+//---------------------------------------------------------------------------
+
+function NearCollinear(const pt1, pt2, pt3: TPointD;
+  sinSqrdMinAngleRads: double): Boolean;
+var
+  cp: double;
+begin
+	cp := CrossProduct(pt1, pt2, pt3);
+	Result := (cp * cp) / ( DistanceSqr(pt1, pt2) * DistanceSqr(pt2, pt3) ) <
+    sinSqrdMinAngleRads;
+end;
+//------------------------------------------------------------------------------
+
+function CleanPath(const path: TPathD; isClosed: Boolean;
+	minEdgeLength: double = sqrtTwo;
+  minAngleRads: double = twoPointFiveDegrees): TPathD;
+var
+  i,j, len: integer;
+  distSqrd, sinSqrdMinAngle: double;
+  tmpPath: TPathD;
+begin
+	Result := nil;
+	len := Length(path);
+	if (len < 2) then Exit;
+	distSqrd := minEdgeLength * minEdgeLength;
+	sinSqrdMinAngle := sin(minAngleRads);
+	sinSqrdMinAngle := sinSqrdMinAngle * sinSqrdMinAngle;
+
+  SetLength(tmpPath, len);
+	tmpPath[0] := path[0];
+	tmpPath[1] := path[1];
+	len := 2;
+
+	//clean up colinear edges
+	for i := 2 to High(path) do
+	begin
+		if (NearCollinear(tmpPath[len - 2],
+      tmpPath[len - 1], path[i], sinSqrdMinAngle)) then
+			  tmpPath[len - 1] := path[i]
+    else
+    begin
+			tmpPath[len] := path[i];
+			inc(len);
+		end;
+  end;
+
+	if isClosed then
+  begin
+    if NearCollinear(tmpPath[len - 2],
+      tmpPath[len - 1], tmpPath[0], sinSqrdMinAngle) then dec(len)
+    else if NearCollinear(tmpPath[len - 1],
+      tmpPath[0], tmpPath[1], sinSqrdMinAngle) then
+    begin
+      Move(tmpPath[1], tmpPath[0], (len - 1) * SizeOf(TPointD));
+      dec(len);
+    end;
+  end;
+
+	//clean up insignificant edges
+  SetLength(Result, len);
+  Result[0] := tmpPath[0];
+  j := 0;
+  for i := 1 to len -1 do
+		if not PointsNearEqual(Result[j], tmpPath[i], distSqrd) then
+		begin
+      inc(j);
+      Result[j] := tmpPath[i];
+    end;
+
+	if isClosed and PointsNearEqual(result[0], tmpPath[j], distSqrd) then dec(j);
+  SetLength(Result, j +1);
+end;
+
+//------------------------------------------------------------------------------
+// useful debugging functions
+//------------------------------------------------------------------------------
+
+{$IFDEF DEBUG}
 function PointTosString(const pt: TPoint64): string;
   {$IFDEF INLINING} inline; {$ENDIF}
 begin
@@ -1042,6 +1177,39 @@ end;
 
 //------------------------------------------------------------------------------
 
+function Ellipse(const rec: TRectD; steps: integer = 0): TPathD;
+var
+  i: integer;
+  centre, radii: TPointD;
+  avgRadius, sinA, cosA, dxx, dx,dy: double;
+begin
+  Result := nil;
+  if (rec.IsEmpty) then Exit;
+  centre.X := (rec.left + rec.right) / 2;
+  centre.Y := (rec.top + rec.bottom) / 2;
+  radii.X := (rec.right - rec.left) / 2;
+  radii.Y := (rec.bottom - rec.top) / 2;
+  avgRadius := (radii.x + radii.y) / 2;
+  if (steps = 0) then
+    steps := Round(PI / ArcCos(1 - 0.5 / avgRadius));
+  if (steps < 3) then steps := 3;
+
+  SinCos(Pi * 2 / steps, sinA, cosA);
+  dx := cosA;
+  dy := sinA;
+  SetLength(Result, steps);
+  Result[0] := PointD(centre.X + radii.X, centre.Y);
+  for i := 1 to steps -1 do
+  begin
+    Result[i].X := centre.X + radii.X * dx;
+    Result[i].Y := centre.Y + radii.Y * dy;
+    dxx := dx;
+    dx := dxx * cosA - dy * sinA;
+    dy := dy * cosA + dxx * sinA;
+  end;
+end;
+//------------------------------------------------------------------------------
+{$ENDIF}
 
 end.
 

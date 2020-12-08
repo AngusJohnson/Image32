@@ -57,6 +57,7 @@ type
     fScaleMin       : double;
     fScaleMax       : double;
     fFocusedColor   : TColor;
+    fUnfocusedColor : TColor;
     fMouseDown      : Boolean;
     fScrollbarVert  : TPanelScrollbar;
     fScrollbarHorz  : TPanelScrollbar;
@@ -67,7 +68,8 @@ type
     fOnDrawImage    : TDrawImageEvent;
     fOnKeyDown      : TKeyEvent;
     fOnKeyUp        : TKeyEvent;
-    fOnScrolling   : TNotifyEvent;
+    fOnScrolling    : TNotifyEvent;
+    fOnZooming      : TNotifyEvent;
 {$IFDEF GESTURES}
     fLastDistance: integer;
     fLastLocation: TPoint;
@@ -119,6 +121,7 @@ type
     procedure ResetImage;
     procedure ScaleToFit;
     function IsEmpty: Boolean;
+    function IsScaledToFit: Boolean;
     function ClientToImage(const clientPt: TPoint): TPoint;
     function ImageToClient(const surfacePt: TPoint): TPoint;
     property InnerClientRect: TRect read GetInnerClientRect;
@@ -130,6 +133,7 @@ type
     property Color: TColor read GetColor write SetColor;
     //FocusedColor: colour of the border when the panel is focused
     property FocusedColor: TColor read fFocusedColor write fFocusedColor;
+    property UnFocusedColor: TColor read fUnfocusedColor write fUnfocusedColor;
     //Scale: image scale (between ScaleMin and ScaleMax) if AllowZoom is enabled
     property Scale: double read fScale write SetScale;
     //ImageSize: ImageSize affects both scrollings and OnDrawImage bounds
@@ -147,6 +151,7 @@ type
     property OnKeyDown: TKeyEvent read fOnKeyDown write fOnKeyDown;
     property OnKeyUp: TKeyEvent read fOnKeyUp write fOnKeyUp;
     property OnScrolling: TNotifyEvent read fOnScrolling write fOnScrolling;
+    property OnZooming: TNotifyEvent read fOnZooming write fOnZooming;
   end;
 
   //TBitmapPanel - a powerful image viewer for when you only need to display
@@ -389,6 +394,7 @@ begin
   fAllowZoom := true;
   fAutoCenter := true;
   fFocusedColor := clActiveCaption;
+  fUnfocusedColor := clBtnFace;
 
   fScale := 1.0;
   fScaleMin := 0.05;
@@ -473,6 +479,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TImagePanel.IsScaledToFit: Boolean;
+var
+  rec: TRect;
+  h,w: integer;
+begin
+  rec := GetInnerClientRect;
+  h := RectHeight(rec); w := RectWidth(rec);
+  Result := (abs(fImageSize.cx * fScale - w) < 1) or
+    (abs(fImageSize.cy * fScale - h) < 1);
+end;
+//------------------------------------------------------------------------------
+
 procedure TImagePanel.ScaleToFit;
 var
   rec: TRect;
@@ -482,6 +500,7 @@ begin
   ResetImage;
   rec := GetInnerClientRect;
   h := RectHeight(rec); w := RectWidth(rec);
+  //fZoomFit := true;
   if w / fImageSize.cx < h / fImageSize.cy then
     SetScale(w / fImageSize.cx) else
     SetScale(h / fImageSize.cy);
@@ -523,6 +542,7 @@ begin
   if (fScale = scale) then Exit;
   fScale := scale;
   UpdateOffsetDelta(false);
+  if Assigned(fOnZooming) then fOnZooming(Self);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -953,7 +973,7 @@ begin
   InflateRect(tmpRec, -BevelWidth, -BevelWidth);
   if Focused then
     DrawFrame(tmpRec, fFocusedColor, fFocusedColor, BorderWidth) else
-    DrawFrame(tmpRec, Color, Color, BorderWidth);
+    DrawFrame(tmpRec, fUnfocusedColor, fUnfocusedColor, BorderWidth);
   InflateRect(tmpRec, -BorderWidth, -BorderWidth);
 
   //paint the inner bevel
@@ -1033,6 +1053,7 @@ begin
           Invalidate;
         end;
         FLastLocation := EventInfo.Location;
+        if assigned(fOnScrolling) then fOnScrolling(self);
         Handled := true;
       end;
   end;
@@ -1050,9 +1071,9 @@ begin
   {$ENDIF}
   if (ssCtrl in Shift) and fAllowZoom then
   begin
-      if WheelDelta > 0 then
-        ScaleAtPoint(1.1, MousePos) else
-        ScaleAtPoint(0.9, MousePos);
+    if WheelDelta > 0 then
+      ScaleAtPoint(1.1, MousePos) else
+      ScaleAtPoint(0.9, MousePos);
   end
   else if fAllowScroll then
   begin
@@ -1131,7 +1152,10 @@ begin
       end;
 
       Ord('0'):
-        if fAllowZoom and not (ssCtrl in shiftState) then ScaleToFit;
+        if fAllowZoom and not (ssCtrl in shiftState) then
+        begin
+          ScaleToFit;
+        end;
       Ord('1')..Ord('9'): if not (ssCtrl in shiftState) then
         begin
           if not AllowZoom then Exit
