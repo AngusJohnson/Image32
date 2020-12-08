@@ -436,10 +436,8 @@ end;
 
 procedure TForm1.mnuPastefromClipboardClick(Sender: TObject);
 begin
-  if (TImageFormat_PNG.CanPasteFromClipboard and
-    TImageFormat_PNG.PasteFromClipboard(masterLayer.Image)) or
-    (TImageFormat_BMP.CanPasteFromClipboard and
-    TImageFormat_BMP.PasteFromClipboard(masterLayer.Image)) then
+  if TImage32.CanPasteFromClipboard and
+    masterLayer.Image.PasteFromClipboard then
   begin
     case fTransformType of
       ttAfine: ResetSkew;

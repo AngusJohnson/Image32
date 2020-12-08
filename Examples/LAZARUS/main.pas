@@ -85,18 +85,17 @@ end;
 
 procedure TMainForm.PrepareBaseImage;
 var
-  i: integer;
   imgBooks: TImage32;
   tmpPath: TPathD;
   mainTxtPaths, copyTxtPaths: TPathsD;
-  textRec, textRec2, imageRec: TRect;
+  textRec, imageRec: TRect;
   matrix: TMatrixD;
   delta: TPoint;
   nextX: double;
   copyright, sillyText: UnicodeString;
 
   glyphCache: TGlyphCache;
-  fontReader : TTtfFontReader;
+  fontReader : TFontReader;
 begin
   //workaround a Lazarus quirk ...
   //it doesn't seem to dynamically convert static text ...
@@ -109,7 +108,7 @@ begin
 
   //create a TFontReader to access a couple of truetype font files (*.ttf)
   //that have been stored as font resources and create a TGlyphCache too
-  fontReader := TTtfFontReader.Create;
+  fontReader := TFontReader.Create;
   glyphCache := TGlyphCache.Create(fontReader, DpiAware(36));
   try
     //connect fontReader to a specific font
