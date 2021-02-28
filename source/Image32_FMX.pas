@@ -34,9 +34,14 @@ type
     property Ext: string read fExt write fExt;
   end;
 
+function DPIAwareFMX(val: Integer): Integer; overload; inline;
+function DPIAwareFMX(val: double): double; overload; inline;
+
 const
   RT_BITMAP = PChar(2);
 
+var
+  screenScale: double;
 
 implementation
 
@@ -169,10 +174,33 @@ procedure CheckScreenScale;
 var
   ScreenService: IFMXScreenService;
 begin
-  if (Image32.ScreenScale = 1) and
-    TPlatformServices.Current.SupportsPlatformService (
+  if TPlatformServices.Current.SupportsPlatformService(
+  IFMXScreenService, IInterface(ScreenService)) then
+    ScreenScale := ScreenService.GetScreenScale else
+    ScreenScale := 1;
+end;
+//------------------------------------------------------------------------------
+
+function DPIAwareFMX(val: Integer): Integer;
+begin
+  Result := Round(screenScale * val);
+end;
+//------------------------------------------------------------------------------
+
+function DPIAwareFMX(val: double): double;
+begin
+  Result := screenScale * val;
+end;
+//------------------------------------------------------------------------------
+
+procedure InitScreenScale;
+var
+  ScreenService: IFMXScreenService;
+begin
+  if TPlatformServices.Current.SupportsPlatformService (
     IFMXScreenService, IInterface(ScreenService)) then
-      Image32.ScreenScale := ScreenService.GetScreenScale
+      screenScale := ScreenService.GetScreenScale else
+      screenScale := 1.0;
 end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------

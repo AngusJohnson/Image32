@@ -2,10 +2,10 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.53                                                            *
-* Date      :  22 October 2020                                                 *
+* Version   :  2.0                                                             *
+* Date      :  20 February 2021                                                *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2020                                         *
+* Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -13,7 +13,8 @@ unit Image32_Draw;
 interface
 
 {$I Image32.inc}
-{.$DEFINE MemCheck} //adds a negligible cost to performance
+
+{.$DEFINE MemCheck} //for debugging only (adds a minimal cost to performance)
 
 uses
   SysUtils, Classes, Types, Math, Image32, Image32_Vector;
@@ -34,40 +35,53 @@ type
   //TBoundsProc: Function template for TCustomRenderer.
   TBoundsProc = function(X, maxX: integer): integer;
 
+  TImage32ChangeProc = procedure of object;
+
+  //TCustomRenderer: can accommodate pixels of any size
   TCustomRenderer = class {$IFDEF ABSTRACT_CLASSES} abstract {$ENDIF}
   private
-    fImage: TImage32;
-    fLastX: integer;
-    fLastY: integer;
-    fDst: PColor32;
+    fImgWidth    : integer;
+    fImgHeight   : integer;
+    fImgBase     : Pointer;
+    fCurrY       : integer;
+    fCurrLinePtr : Pointer;
+    fPixelSize   : integer;
+    fChangeProc  : TImage32ChangeProc;
   protected
-    function Initialize(targetImage: TImage32): Boolean; virtual;
-    function GetDstPixel(x,y: integer): PColor32;
-    property Target: TImage32 read fImage;
-  public
+    function Initialize(imgBase: Pointer;
+      imgWidth, imgHeight, pixelSize: integer): Boolean; overload; virtual;
+    function Initialize(targetImage: TImage32): Boolean; overload; virtual;
+    function GetDstPixel(x,y: integer): Pointer;
     //RenderProc: x & y refer to pixel coords in the destination image and
     //where x1 is the start (and left) and x2 is the end of the render
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); virtual; abstract;
+    property ImgWidth: integer read fImgWidth;
+    property ImgHeight: integer read fImgHeight;
+    property ImgBase: Pointer read fImgBase;
+    property PixelSize: integer read fPixelSize;
+  public
+    destructor Destroy; override;
   end;
 
   TColorRenderer = class(TCustomRenderer)
   private
     fAlpha: Byte;
     fColor: TColor32;
+  protected
+    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   public
     constructor Create(color: TColor32 = clNone32);
     function Initialize(targetImage: TImage32): Boolean; override;
     procedure SetColor(value: TColor32);
-    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   end;
 
   TEraseRenderer = class(TCustomRenderer)
-  public
+  protected
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   end;
 
   TInverseRenderer = class(TCustomRenderer)
-  public
+  protected
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   end;
 
@@ -80,18 +94,19 @@ type
     fMirrorY      : Boolean;
     fBoundsProc   : TBoundsProc;
     function GetFirstBrushPixel(x, y: integer): PARGB;
+  protected
+    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   public
     constructor Create(tileFillStyle: TTileFillStyle = tfsRepeat;
       brushImage: TImage32 = nil);
     destructor Destroy; override;
     function Initialize(targetImage: TImage32): Boolean; override;
     procedure SetTileFillStyle(value: TTileFillStyle);
-    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
     property Image: TImage32 read fImage;
     property Offset: TPoint read fOffset write fOffset;
   end;
 
-  //TCustomGradientRenderer: also an abstract class
+  //TCustomGradientRenderer is also an abstract class
   TCustomGradientRenderer = class(TCustomRenderer)
   private
     fStartPt         : TPointD;
@@ -111,12 +126,13 @@ type
     fPerpendicOffsets: TArrayOfInteger;
     fEndDist         : integer;
     fIsVert          : Boolean;
+  protected
+    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   public
     function Initialize(targetImage: TImage32): Boolean; override;
     procedure SetParameters(const startPt, endPt: TPointD;
       startColor, endColor: TColor32;
       gradFillStyle: TGradientFillStyle = gfsClamp);
-    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   end;
 
   TRadialGradientRenderer = class(TCustomGradientRenderer)
@@ -126,12 +142,13 @@ type
     fScaleY         : double;
     fMaxColors      : integer;
     fColors         : TArrayOfColor32;
+  protected
+    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   public
     function Initialize(targetImage: TImage32): Boolean; override;
     procedure SetParameters(const focalRect: TRect;
       innerColor, outerColor: TColor32;
       gradientFillStyle: TGradientFillStyle = gfsClamp);
-    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   end;
 
   TSvgRadialGradientRenderer = class(TCustomGradientRenderer)
@@ -142,11 +159,26 @@ type
     fFocusPt        : TPointD;
     fMaxColors      : integer;
     fColors         : TArrayOfColor32;
+  protected
+    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
   public
     function Initialize(targetImage: TImage32): Boolean; override;
     procedure SetParameters(const ellipseRect: TRect;
       const focus: TPoint; innerColor, outerColor: TColor32);
+  end;
+
+  //Barycentric rendering colorizes inside triangles
+  TBarycentricRenderer = class(TCustomRenderer)
+  private
+    a: TPointD;
+    c1, c2, c3: TARGB;
+    v0, v1: TPointD;
+    d00, d01, d11, invDenom: double;
+    function GetColor(const pt: TPointD): TColor32;
+  protected
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
+  public
+    procedure SetParameters(const a, b, c: TPointD; c1, c2, c3: TColor32);
   end;
 
   ///////////////////////////////////////////////////////////////////////////
@@ -387,6 +419,14 @@ end;
 //  Result := ((i64 and $1FFFFFFFFFFFFF) shr (52-exp)) or (1 shl exp);
 //  if val < 0 then Result := -Result;
 //end;
+//------------------------------------------------------------------------------
+
+function ClampByte(val: double): byte; {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  if val < 0 then result := 0
+  else if val > 255 then result := 255
+  else result := Round(val);
+end;
 //------------------------------------------------------------------------------
 
 function GetPixel(current: PARGB; delta: integer): PARGB;
@@ -894,14 +934,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
 {$IFNDEF TROUNDINGMODE}
 type
   TRoundingMode = {$IFNDEF FPC}Math.{$ENDIF}TFPURoundingMode;
 {$ENDIF}
 
-procedure Rasterize(const paths: TPathsD;
-  const clipRec: TRect; fillRule: TFillRule; renderer: TCustomRenderer);
+procedure Rasterize(const paths: TPathsD; const clipRec: TRect;
+  fillRule: TFillRule; renderer: TCustomRenderer);
 var
   i,j, xli, xri, maxW, maxH, aa: integer;
   clipRec2: TRect;
@@ -994,29 +1033,51 @@ end;
 // TAbstractRenderer
 //------------------------------------------------------------------------------
 
+destructor TCustomRenderer.Destroy;
+begin
+  if assigned(fChangeProc) then fChangeProc;
+  inherited;
+end;
+//------------------------------------------------------------------------------
+
+function TCustomRenderer.Initialize(imgBase: Pointer;
+  imgWidth, imgHeight, pixelSize: integer): Boolean;
+begin
+  fImgBase := imgBase;
+  fImgWidth := ImgWidth;
+  fImgHeight := ImgHeight;
+  fPixelSize := pixelSize;
+
+  fCurrLinePtr := fImgBase;
+  fCurrY       := 0;
+  result       := true;
+end;
+//------------------------------------------------------------------------------
+
+type THackedImage32 = class(TImage32); //to expose protected 'Changed' method.
+
 function TCustomRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
-  result := true;
-  fImage := targetImage;
-  fDst := targetImage.PixelBase;
-  fLastY := 0; fLastX := 0;
+  fChangeProc := THackedImage32(targetImage).Changed;
+  with targetImage do
+    result := Initialize(PixelBase, Width, Height, 4);
 end;
 //------------------------------------------------------------------------------
 
-function TCustomRenderer.GetDstPixel(x, y: integer): PColor32;
+function TCustomRenderer.GetDstPixel(x, y: integer): Pointer;
 begin
-  if (y <> fLastY) then
+  if (y <> fCurrY) then
   begin
-    fDst := @fImage.Pixels[y * fImage.Width + x];
-    fLastY := y;
-  end else
-    inc(fDst, x - fLastX);
-  fLastX := x;
-  Result := fDst;
+    fCurrY := y;
+    fCurrLinePtr := fImgBase;
+    inc(PByte(fCurrLinePtr), fCurrY * fImgWidth * fPixelSize);
+  end;
+  Result := fCurrLinePtr;
+  inc(PByte(Result), x * fPixelSize);
 end;
 
 //------------------------------------------------------------------------------
-// TBrushColorRenderer
+// TColorRenderer
 //------------------------------------------------------------------------------
 
 constructor TColorRenderer.Create(color: TColor32 = clNone32);
@@ -1231,10 +1292,10 @@ begin
     fEndDist := Ceil(dy + dxdy * (fEndPt.X - fStartPt.X));
     fColors := GetColorGradient(fGradientColors, fEndDist +1);
     //get a list of perpendicular offsets for each
-    SetLength(fPerpendicOffsets, Target.Width);
+    SetLength(fPerpendicOffsets, ImgWidth);
     //from an imaginary line that's through fStartPt and perpendicular to
     //the gradient line, get a list of Y offsets for each X in image width
-    for i := 0 to Target.Width -1 do
+    for i := 0 to ImgWidth -1 do
       fPerpendicOffsets[i] := Round(dxdy * (fStartPt.X - i));
   end
   else //gradient <= 45 degrees
@@ -1256,10 +1317,10 @@ begin
 
     fEndDist := Ceil(dx + dydx * (fEndPt.Y - fStartPt.Y));
     fColors := GetColorGradient(fGradientColors, fEndDist +1);
-    SetLength(fPerpendicOffsets, Target.Height);
+    SetLength(fPerpendicOffsets, ImgHeight);
     //from an imaginary line that's through fStartPt and perpendicular to
     //the gradient line, get a list of X offsets for each Y in image height
-    for i := 0 to Target.Height -1 do
+    for i := 0 to ImgHeight -1 do
       fPerpendicOffsets[i] := Round(dydx * (fStartPt.Y - i));
   end;
 end;
@@ -1503,6 +1564,68 @@ begin
     c.A := MulBytes(dst.A, Ord(alpha^));
     dst.Color := BlendToAlpha(dst.Color, c.Color);
     inc(dst); inc(alpha);
+  end;
+end;
+
+//------------------------------------------------------------------------------
+
+procedure TBarycentricRenderer.SetParameters(const a, b, c: TPointD;
+  c1, c2, c3: TColor32);
+begin
+
+  self.a := a;
+  self.c1.Color := c1;
+  self.c2.Color := c2;
+  self.c3.Color := c3;
+
+  v0.X := b.X - a.X;
+  v0.Y := b.Y - a.Y;
+  v1.X := c.X - a.X;
+  v1.Y := c.Y - a.Y;
+  d00 := (v0.X * v0.X + v0.Y * v0.Y);
+  d01 := (v0.X * v1.X + v0.Y * v1.Y);
+  d11 := (v1.X * v1.X + v1.Y * v1.Y);
+  invDenom := 1/(d00 * d11 - d01 * d01);
+end;
+//------------------------------------------------------------------------------
+
+function TBarycentricRenderer.GetColor(const pt: TPointD): TColor32;
+var
+  v2: TPointD;
+  d20, d21, v, w, u: Double;
+  res: TARGB absolute Result;
+begin
+  Result := 0;
+  v2.X := pt.X - a.X;
+  v2.Y := pt.Y - a.Y;
+  d20 := (v2.X * v0.X + v2.Y * v0.Y);
+  d21 := (v2.X * v1.X + v2.Y * v1.Y);
+
+  v := (d11 * d20 - d01 * d21) * invDenom;
+  w := (d00 * d21 - d01 * d20) * invDenom;
+  u := 1.0 - v - w;
+
+  Res.A := ClampByte(c1.A * u + c2.A * v + c3.A * w);
+  Res.R := ClampByte(c1.R * u + c2.R * v + c3.R * w);
+  Res.G := ClampByte(c1.G * u + c2.G * v + c3.G * w);
+  Res.B := ClampByte(c1.B * u + c2.B * v + c3.B * w);
+end;
+//------------------------------------------------------------------------------
+
+procedure TBarycentricRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
+var
+  x: integer;
+  p: PARGB;
+  c: TARGB;
+begin
+  p := PARGB(fImgBase);
+  inc(p, y * ImgWidth + x1);
+  for x := x1 to x2 do
+  begin
+    c.Color := GetColor(PointD(x, y));
+    c.A := c.A * Ord(alpha^) shr 8;
+    p.Color := BlendToAlpha(p.Color, c.Color);
+    inc(p); inc(alpha);
   end;
 end;
 

@@ -17,6 +17,8 @@ object Form1: TForm1
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnKeyDown = FormKeyDown
+  OnPaint = FormPaint
+  OnResize = FormResize
   PixelsPerInch = 96
   TextHeight = 16
   object StatusBar1: TStatusBar
@@ -32,18 +34,20 @@ object Form1: TForm1
   object pnlMemo: TPanel
     Left = 0
     Top = 0
-    Width = 569
+    Width = 512
     Height = 410
     Align = alClient
     TabOrder = 1
     Visible = False
+    ExplicitWidth = 433
     object Panel3: TPanel
       Left = 1
       Top = 1
-      Width = 567
+      Width = 510
       Height = 41
       Align = alTop
       TabOrder = 0
+      ExplicitWidth = 567
       object btnCloseMemo: TButton
         Left = 5
         Top = 9
@@ -88,55 +92,53 @@ object Form1: TForm1
     object Memo1: TMemo
       Left = 1
       Top = 42
-      Width = 567
+      Width = 510
       Height = 367
       Align = alClient
       HideSelection = False
       ReadOnly = True
       ScrollBars = ssVertical
       TabOrder = 1
+      ExplicitTop = 44
     end
   end
-  object pnlDisplayParent: TPanel
-    Left = 176
-    Top = 72
-    Width = 273
-    Height = 297
+  object pnlSmooth: TPanel
+    Left = 512
+    Top = 0
+    Width = 57
+    Height = 410
+    Align = alRight
+    ParentBackground = False
     TabOrder = 2
-    object pnlSmooth: TPanel
-      Left = 215
-      Top = 1
-      Width = 57
-      Height = 295
-      Align = alRight
-      ParentBackground = False
+    OnEnter = pnlSmoothEnter
+    OnExit = pnlSmoothExit
+    ExplicitLeft = 215
+    ExplicitTop = 1
+    ExplicitHeight = 295
+    DesignSize = (
+      57
+      410)
+    object Label1: TLabel
+      Left = 5
+      Top = 6
+      Width = 44
+      Height = 32
+      Caption = 'Smooth'#10'Amount'
+    end
+    object TrackBar1: TTrackBar
+      Left = 15
+      Top = 46
+      Width = 27
+      Height = 282
+      Anchors = [akLeft, akTop, akBottom]
+      Min = 1
+      Orientation = trVertical
+      PageSize = 0
+      Position = 3
       TabOrder = 0
-      OnEnter = pnlSmoothEnter
-      OnExit = pnlSmoothExit
-      DesignSize = (
-        57
-        295)
-      object Label1: TLabel
-        Left = 5
-        Top = 6
-        Width = 44
-        Height = 32
-        Caption = 'Smooth'#10'Amount'
-      end
-      object TrackBar1: TTrackBar
-        Left = 15
-        Top = 46
-        Width = 27
-        Height = 239
-        Anchors = [akLeft, akTop, akBottom]
-        Min = 1
-        Orientation = trVertical
-        PageSize = 0
-        Position = 3
-        TabOrder = 0
-        TickStyle = tsNone
-        OnChange = TrackBar1Change
-      end
+      TickStyle = tsNone
+      OnChange = TrackBar1Change
+      ExplicitHeight = 239
     end
   end
   object MainMenu1: TMainMenu

@@ -15,12 +15,12 @@ type
   TMainForm = class(TForm)
     btnRefresh: TButton;
     btnClose: TButton;
-    Image1: TImage;
     Timer1: TTimer;
     procedure btnCloseClick(Sender: TObject);
     procedure btnRefreshClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure FormPaint(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
   private
@@ -29,7 +29,6 @@ type
     zoomImages: array[0..16] of TImage32;
     procedure PrepareBaseImage;
     procedure PrepareZoomImages(var zoomGlyphs: TPathsD; const offset: TPoint);
-    procedure UpdateImageViewer;
   public
 
   end;
@@ -81,6 +80,7 @@ begin
   for i := 0 to High(zoomImages) do
     zoomImages[i].Free;
 end;
+
 //------------------------------------------------------------------------------
 
 procedure TMainForm.PrepareBaseImage;
@@ -194,7 +194,8 @@ begin
   PrepareZoomImages(mainTxtPaths, delta);
 
   btnRefresh.Enabled := false;
-  UpdateImageViewer;
+
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -236,15 +237,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.UpdateImageViewer;
-begin
-  with zoomImages[zoomIdx] do
-    Image1.Picture.Bitmap.SetSize(Width, Height);
-  zoomImages[zoomIdx].CopyToDc(Image1.Picture.Bitmap.Canvas.Handle);
-  Image1.Repaint;
-end;
-//------------------------------------------------------------------------------
-
 procedure TMainForm.FormShow(Sender: TObject);
 begin
   Timer1.Enabled := true;
@@ -255,9 +247,9 @@ procedure TMainForm.btnRefreshClick(Sender: TObject);
 begin
   btnRefresh.Enabled := false;
   zoomIdx := 0;
-  UpdateImageViewer;
   Timer1.Interval := 1000;
   Timer1.Enabled := true;
+  Invalidate;;
 end;
 //------------------------------------------------------------------------------
 
@@ -271,12 +263,24 @@ procedure TMainForm.Timer1Timer(Sender: TObject);
 begin
   Timer1.Interval := 25;
   inc(zoomIdx);
-  UpdateImageViewer;
+  Invalidate;
   if zoomIdx = High(zoomImages) then
   begin
     Timer1.Enabled := false;
     btnRefresh.Enabled := true;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.FormPaint(Sender: TObject);
+var
+  dstRec: TRect;
+begin
+  dstRec := zoomImages[0].Bounds;
+  OffsetRect(dstRec,
+    (ClientWidth-RectWidth(dstRec)) div 2 - dstRec.Left,
+    (ClientHeight- btnClose.Height -RectHeight(dstRec)) div 2 - dstRec.Top);
+  zoomImages[zoomIdx].CopyToDc(Canvas.Handle, dstRec.Left, dstRec.Top);
 end;
 //------------------------------------------------------------------------------
 

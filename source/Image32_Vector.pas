@@ -2,10 +2,10 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.53                                                            *
-* Date      :  22 October 2020                                                 *
+* Version   :  2.0                                                             *
+* Date      :  20 February 2021                                                *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2020                                         *
+* Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -104,6 +104,9 @@ type
   function OffsetPath(const ppp: TArrayOfPathsD;
     dx, dy: double): TArrayOfPathsD; overload;
 
+  function Paths(const path: TPathD): TPathsD;
+  function CopyPaths(const paths: TPathsD): TPathsD;
+
   function ScalePath(const path: TPathD;
     sx, sy: double): TPathD; overload;
   function ScalePath(const path: TPathD;
@@ -133,6 +136,9 @@ type
   function GetAngle(const a, b, c: TPoint): double; overload;
   function GetAngle(const a, b, c: TPointD): double; overload;
 
+  function GetPointAtAngleAndDist(const origin: TPointD;
+    angle, distance: double): TPointD;
+
   procedure RotatePoint(var pt: TPointD;
     const focalPoint: TPointD; angleRad: double); overload;
   procedure RotatePoint(var pt: TPointD;
@@ -150,8 +156,13 @@ type
   function GetBoundsD(const path: TPathD): TRectD; overload;
   function GetBoundsD(const paths: TPathsD): TRectD; overload;
 
+  function GetRotatedRectBounds(const rec: TRect; angle: double): TRect; overload;
+  function GetRotatedRectBounds(const rec: TRectD; angle: double): TRectD; overload;
+
   function Rect(const recD: TRectD): TRect; overload;
-  function Rect(const l,t,r,b: integer): TRect; overload;
+  function Rect(const left,top,right,bottom: integer): TRect; overload;
+
+  function RectWH(left, top, width, height: integer): TRect;
 
   function Area(const path: TPathD): Double;
   function RectsEqual(const rec1, rec2: TRect): Boolean;
@@ -313,9 +324,6 @@ resourcestring
   rsInvalidCBezier = 'Invalid number of control points for a CBezier';
   rsInvalidScale   = 'Invalid matrix scaling factor (0)';
 
-type
-  TArray256Bytes = array[0..255] of byte;
-
 const
   CBezierTolerance  = 0.5;
   QBezierTolerance  = 0.5;
@@ -393,12 +401,45 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Rect(const l,t,r,b: integer): TRect;
+function Rect(const left, top, right, bottom: integer): TRect;
 begin
-  Result.Left := l;
-  Result.Top := t;
-  Result.Right := r;
-  Result.Bottom := b;
+  Result.Left := left;
+  Result.Top := top;
+  Result.Right := right;
+  Result.Bottom := bottom;
+end;
+//------------------------------------------------------------------------------
+
+function RectWH(left, top, width, height: integer): TRect;
+begin
+  Result := Rect(left, top, left+width, top+height);
+end;
+//------------------------------------------------------------------------------
+
+function GetRotatedRectBounds(const rec: TRect; angle: double): TRect;
+begin
+  Result := Rect(GetRotatedRectBounds(RectD(rec), angle));
+end;
+//------------------------------------------------------------------------------
+
+function GetRotatedRectBounds(const rec: TRectD; angle: double): TRectD;
+var
+  s,c: extended;
+  w,h: double;
+  mp: TPointD;
+begin
+  NormalizeAngle(angle);
+  if angle <> 0 then
+  begin
+    SinCos(angle, s, c);
+    s := Abs(s); c := Abs(c);
+    w := (rec.Width *c + rec.Height *s) /2;
+    h := (rec.Width *s + rec.Height *c) /2;
+    mp := MidPoint(rec);
+    Result := RectD(mp.X - w, mp.Y - h, mp.X + w, mp.Y +h);
+  end
+  else
+    Result := rec;
 end;
 //------------------------------------------------------------------------------
 
@@ -641,6 +682,13 @@ begin
   dy := dy * inverseHypot;
   Result.X := dy;
   Result.Y := -dx
+end;
+//------------------------------------------------------------------------------
+
+function Paths(const path: TPathD): TPathsD;
+begin
+  SetLength(Result, 1);
+  result[0] := Copy(path, 0, length(path));
 end;
 //------------------------------------------------------------------------------
 
@@ -1342,7 +1390,11 @@ end;
 procedure RotatePoint(var pt: TPointD;
   const focalPoint: TPointD; angleRad: double);
 var
+  {$IFDEF FPC}
   sinA, cosA: double;
+  {$ELSE}
+  sinA, cosA: {$IF COMPILERVERSION = 15} extended; {$ELSE} double; {$IFEND}
+  {$ENDIF}
 begin
   SinCos(angleRad, sinA, cosA);
   RotatePoint(pt, focalPoint, sinA, cosA);
@@ -1486,6 +1538,15 @@ begin
   result := alpha2 / 2;
   if (dotProd < 0) then result := pi - result;
   if (ab.x * bc.y - ab.y * bc.x) < 0 then result := -result;
+end;
+//------------------------------------------------------------------------------
+
+function GetPointAtAngleAndDist(const origin: TPointD;
+  angle, distance: double): TPointD;
+begin
+  Result := origin;
+  Result.X := Result.X + distance;
+  RotatePoint(Result, origin, angle);
 end;
 
 //------------------------------------------------------------------------------
@@ -1633,6 +1694,9 @@ var
   sn, cs: extended; //D7 compatible
   origOffset: Boolean;
 begin
+  NormalizeAngle(angRad);
+  if angRad < 0.001 then Exit;
+
   m := IdentityMatrix;
   origOffset := (center.X <> 0) or (center.Y <> 0);
   if origOffset then MatrixTranslate(matrix, -center.X, -center.Y);

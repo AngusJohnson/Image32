@@ -1,0 +1,9 @@
+inherited MainForm_SmXhdpiPh: TMainForm_SmXhdpiPh
+  ClientHeight = 375
+  ClientWidth = 250
+  DesignerMasterStyle = 3
+  inherited Layout1: TLayout
+    Size.Width = 250.000000000000000000
+    Size.Height = 375.000000000000000000
+  end
+end

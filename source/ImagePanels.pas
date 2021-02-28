@@ -740,10 +740,10 @@ begin
 
   rec := GetInnerClientRect;
   inDrawRegion := PtInRect(rec, Point(X,Y));
-  if inDrawRegion then
-  begin
-    cursor := crHandPoint;
-  end;
+//  if inDrawRegion then
+//  begin
+//    cursor := crHandPoint;
+//  end;
 
   if not fMouseDown then
   begin

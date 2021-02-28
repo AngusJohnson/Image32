@@ -39,7 +39,7 @@
           {$IF COMPILERVERSION >= 21}
             {$DEFINE GESTURES}           //Delphi 2010 - added screen gesture support
             {$IF COMPILERVERSION >= 23}
-			  {$IF declared(FireMonkeyVersion)}
+			  {$IF declared(FireMonkeyVersion)} //defined in FMX.Types
 			    {$DEFINE FMX}
               {$IFEND}			  
               {$DEFINE TROUNDINGMODE}   

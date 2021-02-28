@@ -15,7 +15,7 @@ interface
 {$I Image32.inc}
 
 uses
-  {$IFDEF MSWINDOWS}Windows, ShlObj, {$ENDIF}
+  {$IFDEF MSWINDOWS}Windows, ShlObj, ActiveX, {$ENDIF}
   Types, SysUtils, Classes, Math,
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults,{$ENDIF}
   Image32, Image32_Draw;
@@ -24,6 +24,10 @@ type
   TFixed = type single;
   Int16 = type SmallInt;
   TFontFormat = (ffInvalid, ffTrueType, ffCompact);
+
+  {$IFNDEF Unicode}
+  UnicodeString = WideString;
+  {$ENDIF}
 
   TMacStyle = (msBold, msItalic, msUnderline, msOutline,
     msShadow, msCondensed, msExtended);
@@ -534,12 +538,16 @@ end;
 
 procedure TNotifySender.UnRegister(Recipient: TNotifyRecipient);
 var
-  i: integer;
+  i, highI: integer;
 begin
-  i := High(fRecipientList);
+  highI := High(fRecipientList);
+  i := highI;
   while (i >= 0) and (fRecipientList[i] <> Recipient) do dec(i);
   if i < 0 then Exit;
-  Delete(fRecipientList, i, 1);
+  if i < highI then
+    Move(fRecipientList[i+i], fRecipientList[i],
+      (highI - i) * SizeOf(TNotifyRecipient));
+  SetLength(fRecipientList, highI);
 end;
 //------------------------------------------------------------------------------
 
@@ -2234,7 +2242,7 @@ begin
       //get character offsets to see how many will fit within rec.Width
       offsets := GetCharOffsets(currentLine);
       j := 0;
-      while (j < High(offsets)) and (offsets[j+1] < rec.Width) do inc(j);
+      while (j < High(offsets)) and (offsets[j+1] < RectWidth(rec)) do inc(j);
       if j = 0 then Exit; //there's no room for any text!
 
       //if currentLine is too long to fit, break it at a space character ...
@@ -2280,9 +2288,9 @@ begin
         if not hardCR then
         begin
           spcCount := CountSpaces(currentLine);
-          if (spcCount > 0) and (currLineWidthPxls < rec.Width) then
+          if (spcCount > 0) and (currLineWidthPxls < RectWidth(rec)) then
           begin
-            spcDx := (rec.Width - currLineWidthPxls)/spcCount;
+            spcDx := (RectWidth(rec) - currLineWidthPxls)/spcCount;
             j := lenCurr;
             while spcCount > 0 do
             begin
@@ -2294,7 +2302,7 @@ begin
               Dec(spcCount);
               j := i -1;
             end;
-            currLineWidthPxls := rec.Width; //needed for underlining
+            currLineWidthPxls := RectWidth(rec); //needed for underlining
           end;
         end;
       end;
@@ -2512,7 +2520,7 @@ var
 begin
   SHGetSpecialFolderLocation(0, CSIDL_FONTS, pidl);
   SHGetPathFromIDList(pidl, path);
-  SHFree(pidl);
+  CoTaskMemFree(pidl);
   result := path;
 end;
 //------------------------------------------------------------------------------

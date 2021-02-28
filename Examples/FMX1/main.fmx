@@ -1,0 +1,56 @@
+object MainForm: TMainForm
+  Left = 0
+  Top = 0
+  Caption = 'Image32 FMX Demo1'
+  ClientHeight = 532
+  ClientWidth = 343
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  OnResize = FormResize
+  DesignerMasterStyle = 3
+  object Layout1: TLayout
+    Align = Client
+    Size.Width = 343.000000000000000000
+    Size.Height = 532.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 4
+    OnPaint = Layout1Paint
+  end
+  object Timer1: TTimer
+    Enabled = False
+    OnTimer = Timer1Timer
+    Left = 40
+    Top = 56
+  end
+  object btnRefresh: TButton
+    Anchors = []
+    Default = True
+    StyledSettings = [Family, Style, FontColor]
+    Position.X = 91.000000000000000000
+    Position.Y = 45.000000000000000000
+    Size.Width = 104.000000000000000000
+    Size.Height = 44.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    Text = '&Refresh'
+    TextSettings.Font.Size = 16.000000000000000000
+    OnClick = btnRefreshClick
+  end
+  object btnClose: TButton
+    Anchors = []
+    Cancel = True
+    StyledSettings = [Family, Style, FontColor]
+    Position.X = 198.000000000000000000
+    Position.Y = 45.000000000000000000
+    Size.Width = 104.000000000000000000
+    Size.Height = 44.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 2
+    Text = '&Close'
+    TextSettings.Font.Size = 16.000000000000000000
+    OnClick = btnCloseClick
+  end
+end

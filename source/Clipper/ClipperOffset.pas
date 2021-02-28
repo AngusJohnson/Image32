@@ -624,12 +624,6 @@ begin
   //cos(A) > 0: angles on both left and right sides > 90 degrees
   sinA := (fNorms[k].X * fNorms[j].Y - fNorms[j].X * fNorms[k].Y);
 
-  if (sinA < 0.005) and (sinA > -0.005) then //very near colinear (~1/4 deg.)
-  begin
-    k := j;
-    Exit;
-  end;
-
   if (sinA > 1.0) then sinA := 1.0
   else if (sinA < -1.0) then sinA := -1.0;
 

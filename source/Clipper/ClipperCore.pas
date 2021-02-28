@@ -20,7 +20,7 @@ uses
 
 const
   sqrtTwo = 1.4142135623731;
-  twoPointFiveDegrees = 0.0436332313; //as radians
+  oneDegreeAsRadian = 0.01745329252;
 
 type
   TPoint64 = record X, Y: Int64; end;
@@ -97,9 +97,11 @@ function DistanceSqr(const pt1, pt2: TPointD): double;
 function DistanceFromLineSqrd(const pt, linePt1, linePt2: TPointD): double;
 function NearCollinear(const pt1, pt2, pt3: TPointD;
   sinSqrdMinAngleRads: double): Boolean;
-function CleanPath(const path: TPathD; isClosed: Boolean;
-	minEdgeLength: double = sqrtTwo;
-  minAngleRads: double = twoPointFiveDegrees): TPathD;
+
+procedure CleanPath(var path: TPathD; isClosed: Boolean;
+	minEdgeLength: double = sqrtTwo; minAngleRads: double = oneDegreeAsRadian);
+procedure CleanPaths(var paths: TPathsD; isClosed: Boolean;
+	minEdgeLength: double = sqrtTwo; minAngleRads: double = oneDegreeAsRadian);
 
 function PointsEqual(const pt1, pt2: TPoint64): Boolean; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
@@ -1027,72 +1029,79 @@ end;
 function NearCollinear(const pt1, pt2, pt3: TPointD;
   sinSqrdMinAngleRads: double): Boolean;
 var
-  cp: double;
+  cp, sineSqrd: double;
 begin
 	cp := CrossProduct(pt1, pt2, pt3);
-	Result := (cp * cp) / ( DistanceSqr(pt1, pt2) * DistanceSqr(pt2, pt3) ) <
-    sinSqrdMinAngleRads;
+  sineSqrd := (cp * cp) / ( DistanceSqr(pt1, pt2) * DistanceSqr(pt2, pt3) );
+	Result := sineSqrd < sinSqrdMinAngleRads;
 end;
 //------------------------------------------------------------------------------
 
-function CleanPath(const path: TPathD; isClosed: Boolean;
-	minEdgeLength: double = sqrtTwo;
-  minAngleRads: double = twoPointFiveDegrees): TPathD;
+procedure CleanPathInternal(var path: TPathD; isClosed: Boolean;
+	minEdgeLength: double; sinSqrdMinAngleRads: double);
 var
-  i,j, len: integer;
-  distSqrd, sinSqrdMinAngle: double;
-  tmpPath: TPathD;
+  i,j, minLen, len: integer;
+  distSqrd: double;
 begin
-	Result := nil;
 	len := Length(path);
-	if (len < 2) then Exit;
-	distSqrd := minEdgeLength * minEdgeLength;
-	sinSqrdMinAngle := sin(minAngleRads);
-	sinSqrdMinAngle := sinSqrdMinAngle * sinSqrdMinAngle;
+  if isClosed then minLen := 3 else minLen := 2;
+	if (len < minLen) then Exit;
 
-  SetLength(tmpPath, len);
-	tmpPath[0] := path[0];
-	tmpPath[1] := path[1];
-	len := 2;
+	distSqrd := minEdgeLength * minEdgeLength;
+
+	//clean up insignificant edges
+  j := 1;
+  for i := 1 to len -1 do
+		if not PointsNearEqual(path[j -1], path[i], distSqrd) then
+		begin
+      path[j] := path[i];
+      inc(j);
+    end;
+	if (isClosed and PointsNearEqual(path[0], path[j -1], distSqrd)) then dec(j);
+	if (j < minLen) then Exit;
 
 	//clean up colinear edges
-	for i := 2 to High(path) do
+	len := j;
+  j := 1;
+	for i := 2 to len -1 do
 	begin
-		if (NearCollinear(tmpPath[len - 2],
-      tmpPath[len - 1], path[i], sinSqrdMinAngle)) then
-			  tmpPath[len - 1] := path[i]
-    else
-    begin
-			tmpPath[len] := path[i];
-			inc(len);
-		end;
+		if not (NearCollinear(path[j -1],
+      path[j], path[i], sinSqrdMinAngleRads)) then inc(j);
+    path[j] := path[i];
   end;
 
 	if isClosed then
   begin
-    if NearCollinear(tmpPath[len - 2],
-      tmpPath[len - 1], tmpPath[0], sinSqrdMinAngle) then dec(len)
-    else if NearCollinear(tmpPath[len - 1],
-      tmpPath[0], tmpPath[1], sinSqrdMinAngle) then
+    if NearCollinear(path[j -1], path[j], path[0], sinSqrdMinAngleRads) then dec(j)
+    else if NearCollinear(path[j], path[0], path[1], sinSqrdMinAngleRads) then
     begin
-      Move(tmpPath[1], tmpPath[0], (len - 1) * SizeOf(TPointD));
-      dec(len);
+      Move(path[1], path[0], j * SizeOf(TPointD));
+      dec(j);
     end;
   end;
+  SetLength(path, j +1);
+end;
+//------------------------------------------------------------------------------
 
-	//clean up insignificant edges
-  SetLength(Result, len);
-  Result[0] := tmpPath[0];
-  j := 0;
-  for i := 1 to len -1 do
-		if not PointsNearEqual(Result[j], tmpPath[i], distSqrd) then
-		begin
-      inc(j);
-      Result[j] := tmpPath[i];
-    end;
+procedure CleanPath(var path: TPathD; isClosed: Boolean;
+	minEdgeLength: double; minAngleRads: double);
+var
+  sinSqrdMinAngleRads: double;
+begin
+  sinSqrdMinAngleRads := Sqr(sin(minAngleRads));
+  CleanPathInternal(path, isClosed, minEdgeLength, sinSqrdMinAngleRads);
+end;
+//------------------------------------------------------------------------------
 
-	if isClosed and PointsNearEqual(result[0], tmpPath[j], distSqrd) then dec(j);
-  SetLength(Result, j +1);
+procedure CleanPaths(var paths: TPathsD; isClosed: Boolean;
+	minEdgeLength: double; minAngleRads: double);
+var
+  i: integer;
+  sinSqrdMinAngleRads: double;
+begin
+  sinSqrdMinAngleRads := Sqr(sin(minAngleRads));
+  for i := 0 to High(paths) do
+    CleanPathInternal(paths[i], isClosed, minEdgeLength, sinSqrdMinAngleRads);
 end;
 
 //------------------------------------------------------------------------------

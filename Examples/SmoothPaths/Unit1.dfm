@@ -1,7 +1,7 @@
 object FrmMain: TFrmMain
   Left = 554
   Top = 394
-  Caption = 'Image32 - Layers & SmoothPaths'
+  Caption = 'SmoothPaths'
   ClientHeight = 408
   ClientWidth = 466
   Color = clBtnFace
@@ -12,8 +12,15 @@ object FrmMain: TFrmMain
   Font.Style = []
   Menu = MainMenu1
   OldCreateOrder = False
+  PopupMenu = PopupMenu1
   OnCreate = FormCreate
+  OnDblClick = pnlMainDblClick
   OnDestroy = FormDestroy
+  OnKeyDown = FormKeyDown
+  OnMouseDown = pnlMainMouseDown
+  OnMouseMove = pnlMainMouseMove
+  OnMouseUp = pnlMainMouseUp
+  OnPaint = FormPaint
   OnResize = FormResize
   PixelsPerInch = 96
   TextHeight = 14
@@ -36,6 +43,7 @@ object FrmMain: TFrmMain
     Width = 466
     Height = 43
     Align = alTop
+    ParentBackground = False
     TabOrder = 1
     object Label2: TLabel
       Left = 8
@@ -74,7 +82,7 @@ object FrmMain: TFrmMain
       Height = 22
       TabOrder = 0
       Text = '5'
-      OnChange = edWidthChange
+      OnChange = edPenColorChange
     end
     object UpDown1: TUpDown
       Left = 109
@@ -88,19 +96,21 @@ object FrmMain: TFrmMain
       TabOrder = 3
     end
     object edPenColor: TEdit
-      Left = 380
+      Left = 379
       Top = 10
       Width = 73
       Height = 22
       TabOrder = 2
+      Text = '$FF000099'
       OnChange = edPenColorChange
     end
     object edFillColor: TEdit
-      Left = 201
+      Left = 200
       Top = 10
       Width = 73
       Height = 22
       TabOrder = 1
+      Text = '$FFCCCCFF'
       OnChange = edPenColorChange
     end
   end
@@ -136,9 +146,8 @@ object FrmMain: TFrmMain
     end
   end
   object PopupMenu1: TPopupMenu
-    OnPopup = PopupMenu1Popup
     Left = 192
-    Top = 93
+    Top = 101
     object mnuSmoothSym: TMenuItem
       AutoCheck = True
       Caption = 'Smooth - symmetric'
@@ -146,7 +155,7 @@ object FrmMain: TFrmMain
       GroupIndex = 1
       RadioItem = True
       ShortCut = 16461
-      OnClick = mnuSharpNoHdlsClick
+      OnClick = mnuSharpWithHdlsClick
     end
     object mnuSmoothAsym: TMenuItem
       AutoCheck = True
@@ -154,7 +163,7 @@ object FrmMain: TFrmMain
       GroupIndex = 1
       RadioItem = True
       ShortCut = 16449
-      OnClick = mnuSharpNoHdlsClick
+      OnClick = mnuSharpWithHdlsClick
     end
     object mnuSharpWithHdls: TMenuItem
       AutoCheck = True
@@ -162,7 +171,7 @@ object FrmMain: TFrmMain
       GroupIndex = 1
       RadioItem = True
       ShortCut = 16456
-      OnClick = mnuSharpNoHdlsClick
+      OnClick = mnuSharpWithHdlsClick
     end
     object mnuSharpNoHdls: TMenuItem
       AutoCheck = True
@@ -170,31 +179,9 @@ object FrmMain: TFrmMain
       GroupIndex = 1
       RadioItem = True
       ShortCut = 16472
-      OnClick = mnuSharpNoHdlsClick
+      OnClick = mnuSharpWithHdlsClick
     end
     object N5: TMenuItem
-      Caption = '-'
-      GroupIndex = 1
-    end
-    object mnuMakePolyline: TMenuItem
-      Caption = 'Convert Button Path to Poly&line Layer '
-      GroupIndex = 1
-      ShortCut = 16460
-      OnClick = mnuMakePolylineClick
-    end
-    object mnuMakePolygon: TMenuItem
-      Caption = 'Convert Button Path to &Polygon Layer '
-      GroupIndex = 1
-      ShortCut = 16464
-      OnClick = mnuMakePolylineClick
-    end
-    object mnuEditLayer: TMenuItem
-      Caption = '&Edit Layer'
-      GroupIndex = 1
-      ShortCut = 16453
-      OnClick = mnuEditLayerClick
-    end
-    object N3: TMenuItem
       Caption = '-'
       GroupIndex = 1
     end
@@ -208,23 +195,16 @@ object FrmMain: TFrmMain
       Caption = '-'
       GroupIndex = 1
     end
-    object mnuDeleteButton: TMenuItem
+    object mnuDeleteLast: TMenuItem
       Caption = 'D&elete Last Button'
       GroupIndex = 1
       ShortCut = 46
-      OnClick = mnuDeleteButtonClick
+      OnClick = mnuDeleteLastClick
     end
-    object mnuDeleteAllButtonControls: TMenuItem
-      Caption = 'Delete All &Button Controls'
+    object mnuDeletePath: TMenuItem
+      Caption = 'Delete &SmoothPath'
       GroupIndex = 1
-      ShortCut = 16450
-      OnClick = mnuDeleteAllButtonControlsClick
-    end
-    object mnuDeleteLayer: TMenuItem
-      Caption = 'Delete &Layer'
-      GroupIndex = 1
-      ShortCut = 16473
-      OnClick = mnuDeleteLayerClick
+      OnClick = mnuDeletePathClick
     end
   end
 end

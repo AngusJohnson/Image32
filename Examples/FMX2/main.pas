@@ -5,8 +5,8 @@ interface
 uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   System.Math, FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs,
-  FMX.StdCtrls, FMX.Controls.Presentation, FMX.Layouts, FMX.TabControl,
-  Image32;
+  FMX.StdCtrls, FMX.Platform, FMX.Surfaces, FMX.Controls.Presentation,
+  FMX.Layouts, FMX.TabControl, Image32;
 
 type
   TMainForm = class(TForm)
@@ -75,16 +75,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure CopyImage32ToBitmap(img: TImage32; bmp: TBitmap);
+procedure CopyImage32ToFmxBitmap(img: TImage32; bmp: TBitmap);
 var
-  stream: TMemoryStream;
+  src, dst: TBitmapData;
 begin
-  stream := TMemoryStream.Create;
+  src := TBitMapData.Create(img.Width, img.Height, TPixelFormat.BGRA);
+  src.Data := img.PixelBase;
+  src.Pitch := img.Width * 4;
+  if not Assigned(img) or not Assigned(bmp) then Exit;
+  bmp.SetSize(img.Width, img.Height);
+  if bmp.Map(TMapAccess.Write, dst) then
   try
-    img.SaveToStream(stream, 'PNG');
-    bmp.LoadFromStream(stream);
+    dst.Copy(src);
   finally
-    stream.Free;
+    bmp.Unmap(dst);
   end;
 end;
 
@@ -96,6 +100,7 @@ procedure TMainForm.FormCreate(Sender: TObject);
 var
   rs: TResourceStream;
 begin
+  margin := Round(screenScale * 12);
 
   clDarkRed32     := $FFCC0000;
   clDarkMaroon32  := $FF400000;
@@ -111,7 +116,7 @@ begin
 
   imgMain      := TImage32.Create;
   imgClockface := TImage32.Create;
-  margin := DPIAware(20);
+  margin := Round(screenScale * 20);
 
   rs := TResourceStream.Create(hInstance, 'ESSAY', RT_RCDATA);
   with TStringStream.Create('', TEncoding.Unicode) do
@@ -125,10 +130,7 @@ begin
   essay := StringReplace(essay, '\n', #10, [rfReplaceAll]);
 
   Layout1.Scale.Point := PointF(1/ScreenScale,1/ScreenScale);
-  fontHeight := DPIAware(9);
-
-  TabControl1.ActiveTab := TabItem2;
-  TabControl1.Tabs[0].Visible := false;
+  fontHeight := screenScale * 13;
 end;
 //------------------------------------------------------------------------------
 
@@ -157,8 +159,8 @@ begin
   //IMPORTANT: we need to avoid any screen scaling
   //as it causes unacceptible blurring (especially of text) ...
   outerRec := Image32_Vector.Rect(0, 0,
-    Round(DPIAware(ClientWidth) - margin * 2),
-    Round(DPIAware(ClientHeight - TabControl1.TabHeight) - margin * 2));
+    Round(screenScale * ClientWidth - margin * 2),
+    Round(screenScale * (ClientHeight - TabControl1.TabHeight) - margin * 2));
 
   imgMain.SetSize(outerRec.Width, outerRec.Height);
   //color fill the base image and give it a border ...
@@ -234,7 +236,7 @@ procedure TMainForm.DrawClockTab;
 var
   i,j: integer;
   x,y: double;
-  frameWidth, lineWidth6, numRadius: double;
+  frameWidth, lineWidth6: double;
   path, path2, path3: TPathD;
   recD, rec2, rec3: TRectD;
   pt, mp, mp3: TPointD;
@@ -245,13 +247,10 @@ var
   fontReader : TFontReader;
   glyphCache : TGlyphCache;
   numGlyphs  : array[1..12] of TPathsD;
-  dateStr    : string;
-  dateGlyphs, shadow: TPathsD;
-//  tmpImg     : TImage32;
 begin
   imgClockface.SetSize(
-    DPIAware(ClientWidth) - margin * 2,
-    Round(DPIAware(ClientHeight - TabControl1.TabHeight)) - margin * 2);
+    Round(screenScale * ClientWidth) - margin * 2,
+    Round(screenScale * (ClientHeight - TabControl1.TabHeight)) - margin * 2);
   imgClockface.Clear(clBackground32);
 
   //DRAW WATCH BAND
@@ -260,7 +259,7 @@ begin
   try
     ir.SetTileFillStyle(tfsRotate180); //or tfsMirrorHorz or tfsRepeat
     ir.Image.LoadFromResource('KOOKABURRA' , RT_RCDATA); // see image.res
-    ir.Image.Resize(DPIAware(16), DPIAware(16));
+    ir.Image.Resize(Round(screenScale * 16), Round(screenScale * 16));
 
     ir.Image.AdjustHue(10);
     ir.Image.AdjustSaturation(20);
@@ -346,18 +345,6 @@ begin
   DrawLine(imgClockface, path2, 1.0, clSilver32, esPolygon);
   DrawPolygon(imgClockface, path2, frEvenOdd, clWhite32);
   mp := MidPoint(recD);
-  numRadius := clockRadius * 0.78;
-
-//  //DRAW AN IMAGE IN THE CLOCK'S CENTER
-//  tmpImg := TImage32.Create;
-//  tmpImg.LoadFromResource('THOMAS', RT_RCDATA);
-//  tmpImg.ScaleAlpha(0.75);
-//  tmpImg.Scale(recD.Width *0.45 / tmpImg.Width);
-//  x := recD.Left + (recD.Width - tmpImg.Width) / 2;
-//  y := recD.Top + (recD.Height - tmpImg.Height) / 2;
-//  rec2 := RectD(x, y, x+tmpImg.Width, y+tmpImg.Height);
-//  imgClockface.CopyBlend(tmpImg, tmpImg.Bounds, Rect(rec2), BlendToOpaque);
-//  tmpImg.Free;
 
   //get the Noto Sans Regular font from the registry
   fontReader := TFontReader.CreateFromResource('FONT_NSR', RT_RCDATA);
@@ -371,33 +358,6 @@ begin
 
     fontReader.LoadFromResource('FONT_NSB', RT_RCDATA); //noto sans bold
     glyphCache.FontHeight := glyphCache.FontHeight * 1.5;
-
-//    //DRAW THE DATE (WITH BOTH A BOLDER AND SLIGHTLY LARGER FONT)
-//    dateStr := FormatDateTime('ddd d', date);
-//    glyphCache.GetTextGlyphs(0,0,dateStr, dateGlyphs);
-//    rec3 := GetBoundsD(dateGlyphs);
-//    //depending where the hour hand is, position the date either
-//    //below or to the right of clock center
-//    i := Trunc(time * 24) mod 12;
-//    if (i >= 4) and (i < 8) then
-//    begin
-//      mp3.X := mp.X + numRadius/2 -rec3.Left - rec3.Width/2;
-//      mp3.Y := mp.Y -rec3.Top - rec3.Height/2;
-//    end else
-//    begin
-//      mp3.X := mp.X -rec3.Left - rec3.Width/2;
-//      mp3.Y := mp.Y + numRadius/2 -rec3.Top - rec3.Height/2;
-//    end;
-//    OffsetRect(rec3, mp3.X, mp3.Y);
-//    rec3 := InflateRect(rec3, ScreenScale *10, ScreenScale *8);
-//    with rec3 do
-//      path := MakePathD([left, bottom, left, top, right, top]);
-//    DrawLine(imgClockface, path, clockRadius/240, $FFA0A0A0, esSquare);
-//    with rec3 do
-//      path := MakePathD([right, top, right,bottom, left, bottom]);
-//    DrawLine(imgClockface, path, clockRadius/240, $FFF0F0F0, esSquare);
-//    dateGlyphs := OffsetPath(dateGlyphs, mp3.X, mp3.Y);
-//    DrawPolygon(imgClockface, dateGlyphs, frNonZero, clBlack32);
 
     //GET CLOCK NUMBERS (AGAIN MAKING THE FONT LARGER)
     glyphCache.FontHeight := glyphCache.FontHeight * 1.4;
@@ -473,7 +433,7 @@ procedure TMainForm.Timer1Timer(Sender: TObject);
   procedure DrawHourMinHand(const origin: TPointD;
     handLength, handWidth, angle: double);
   var
-    path1, path2: TPathD;
+    path1: TPathD;
   begin
     path1 := MakeHandPath(origin, handLength, handWidth, 0.95);
     path1 := RotatePath(path1, origin, angle);
@@ -554,7 +514,7 @@ begin
 
   tmpBitmap := TBitmap.Create;
   try
-    CopyImage32ToBitmap(imgMain,tmpBitmap);
+    CopyImage32ToFmxBitmap(imgMain,tmpBitmap);
     Canvas.Lock;
     Canvas.DrawBitmap(tmpBitmap, srcRec, dstRec, 1);
     Canvas.UnLock;

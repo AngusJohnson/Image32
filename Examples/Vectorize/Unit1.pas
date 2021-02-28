@@ -5,7 +5,7 @@ interface
 uses
   Windows, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls,
-  Image32, ImagePanels, Dialogs, StdCtrls;
+  Image32, Dialogs, StdCtrls;
 
 type
   TForm1 = class(TForm)
@@ -26,9 +26,6 @@ type
     Panel3: TPanel;
     btnCloseMemo: TButton;
     Memo1: TMemo;
-    pnlDisplayParent: TPanel;
-    pnlSmooth: TPanel;
-    TrackBar1: TTrackBar;
     rbBeziers: TRadioButton;
     rbFlat: TRadioButton;
     SaveDialog1: TSaveDialog;
@@ -36,7 +33,9 @@ type
     mnuShowSmoothedOnly: TMenuItem;
     mnuShowSimplifiedSmoothed: TMenuItem;
     rbRaw: TRadioButton;
+    pnlSmooth: TPanel;
     Label1: TLabel;
+    TrackBar1: TTrackBar;
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -50,8 +49,9 @@ type
     procedure SaveAs1Click(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure TrackBar1Change(Sender: TObject);
+    procedure FormPaint(Sender: TObject);
+    procedure FormResize(Sender: TObject);
   private
-    pnlMain: TBitmapPanel;
     masterImg, workImg: TImage32;
     rawPaths, bezierPaths, flattenedPaths: TPathsD;
     procedure DisplayImage;
@@ -107,16 +107,6 @@ end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
-  pnlDisplayParent.Align := alClient;
-
-  //SETUP THE BITMAP DISPLAY PANEL
-  pnlMain := TBitmapPanel.Create(self);
-  pnlMain.Parent := pnlDisplayParent;
-  pnlMain.Align := alClient;
-
-  //enable image transparency - at least, as far as the panel background ;)
-  pnlMain.Bitmap.PixelFormat := pf32bit;
-
   masterImg := TImage32.Create;
   masterImg.LoadFromResource('sample2', 'PNG');
 
@@ -129,6 +119,21 @@ procedure TForm1.FormDestroy(Sender: TObject);
 begin
   masterImg.Free;
   workImg.Free;
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.FormPaint(Sender: TObject);
+begin
+  with workImg do
+    CopyToDc(Bounds,
+      Self.Canvas.Handle,
+      (ClientWidth - pnlSmooth.Width - Width) div 2,
+      (ClientHeight - Height) div 2);
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.FormResize(Sender: TObject);
+begin
 end;
 //------------------------------------------------------------------------------
 
@@ -192,16 +197,7 @@ begin
       StatusBar1.SimpleText := format(' Polygons drawn using both '+
         'simplify and smoothing (amount = %d)', [trackbar1.Position]);
   end;
-
-  {$IFDEF SETSIZE}
-  DisplayPanel.Bitmap.SetSize(displayImg.Width, displayImg.Height);
-  {$ELSE}
-  pnlMain.Bitmap.Width := workImg.Width;
-  pnlMain.Bitmap.Height := workImg.Height;
-  {$ENDIF}
-
-  pnlMain.ClearBitmap; //otherwise images will be blended
-  workImg.CopyToDc(pnlMain.Bitmap.Canvas.Handle);
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -210,7 +206,6 @@ begin
   if not OpenDialog1.Execute then Exit;
   btnCloseMemoClick(nil);
   masterImg.LoadFromFile(OpenDialog1.FileName);
-  pnlMain.ScaleToFit;
   DisplayImage;
 end;
 //------------------------------------------------------------------------------
@@ -224,7 +219,6 @@ end;
 procedure TForm1.pnlSmoothExit(Sender: TObject);
 begin
   pnlSmooth.Color := clBtnFace;
-  if pnlMain.CanFocus then pnlMain.SetFocus;
 end;
 //------------------------------------------------------------------------------
 
@@ -243,7 +237,7 @@ end;
 
 procedure TForm1.mnuShowPolygonCoordinatesClick(Sender: TObject);
 begin
-  pnlDisplayParent.Hide;
+  pnlSmooth.Hide;
   pnlMemo.Show;
   Screen.Cursor := crHourGlass;
   Application.ProcessMessages;
@@ -272,10 +266,9 @@ end;
 
 procedure TForm1.btnCloseMemoClick(Sender: TObject);
 begin
-  if not pnlDisplayParent.Visible then
+  if not pnlSmooth.Visible then
   begin
-    pnlDisplayParent.Show;
-    pnlMain.SetFocus;
+    pnlSmooth.Show;
     pnlMemo.Hide;
   end;
 end;
@@ -297,10 +290,10 @@ procedure TForm1.FormKeyDown(Sender: TObject; var Key: Word;
 begin
   Case Key of
     Ord('A'):
-      if (ssCtrl in Shift) and not pnlDisplayParent.Visible then
+      if (ssCtrl in Shift) and not pnlSmooth.Visible then
         Memo1.SelectAll;
     Ord('C'), Ord('X'):
-      if (ssCtrl in Shift) and not pnlDisplayParent.Visible then
+      if (ssCtrl in Shift) and not pnlSmooth.Visible then
       begin
         if Memo1.SelLength = 0 then Memo1.SelectAll;
         Memo1.CopyToClipboard;
@@ -311,7 +304,7 @@ end;
 
 procedure TForm1.Exit1Click(Sender: TObject);
 begin
-  if not pnlDisplayParent.Visible then
+  if not pnlSmooth.Visible then
     btnCloseMemoClick(nil) else
     Close;
 end;

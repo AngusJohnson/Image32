@@ -1,8 +1,8 @@
 object Form1: TForm1
   Left = 618
   Top = 336
-  Caption = 'Image32 - Transform'
-  ClientHeight = 385
+  Caption = 'Transform'
+  ClientHeight = 384
   ClientWidth = 370
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -12,13 +12,19 @@ object Form1: TForm1
   Font.Style = []
   Menu = MainMenu1
   OldCreateOrder = False
+  PopupMenu = PopupMenu1
   OnCreate = FormCreate
+  OnDblClick = FormDblClick
   OnDestroy = FormDestroy
+  OnMouseDown = pnlMainMouseDown
+  OnMouseMove = pnlMainMouseMove
+  OnPaint = FormPaint
+  OnResize = FormResize
   PixelsPerInch = 96
   TextHeight = 13
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 366
+    Top = 365
     Width = 370
     Height = 19
     Panels = <>
@@ -38,8 +44,8 @@ object Form1: TForm1
         OnClick = mnuOpenClick
       end
       object mnuSave: TMenuItem
-        Caption = '&Save ...'
-        ShortCut = 16467
+        Caption = 'Save &As...'
+        ShortCut = 16449
         OnClick = mnuSaveClick
       end
       object N1: TMenuItem
@@ -65,35 +71,52 @@ object Form1: TForm1
       end
     end
     object ransformType1: TMenuItem
-      Caption = '&Transform Type'
+      Caption = '&Action'
       object mnuVertSkew: TMenuItem
-        Caption = '&Vertical Skew'
+        Caption = 'V&ertical Skew'
         Checked = True
         GroupIndex = 11
         RadioItem = True
-        ShortCut = 16433
+        ShortCut = 16453
         OnClick = mnuVerticalSplineClick
       end
       object mnuHorizontalSkew: TMenuItem
-        Caption = '&Horizontal Skew'
+        Caption = 'Hori&zontal Skew'
         GroupIndex = 11
         RadioItem = True
-        ShortCut = 16434
+        ShortCut = 16474
         OnClick = mnuVerticalSplineClick
       end
       object mnuVertProjective: TMenuItem
         Caption = 'Vertical &Projective'
         GroupIndex = 11
         RadioItem = True
-        ShortCut = 16435
+        ShortCut = 16464
         OnClick = mnuVerticalSplineClick
       end
       object mnuVerticalSpline: TMenuItem
         Caption = 'Vertical &Spline'
         GroupIndex = 11
         RadioItem = True
-        ShortCut = 16436
+        ShortCut = 16467
         OnClick = mnuVerticalSplineClick
+      end
+      object Rotate1: TMenuItem
+        Caption = '&Rotate'
+        GroupIndex = 11
+        RadioItem = True
+        ShortCut = 16466
+        OnClick = mnuVerticalSplineClick
+      end
+      object N4: TMenuItem
+        Caption = '-'
+        GroupIndex = 11
+      end
+      object mnuHideDesigners: TMenuItem
+        Caption = '&Hide Designers'
+        GroupIndex = 11
+        ShortCut = 16456
+        OnClick = mnuHideDesignersClick
       end
     end
   end
@@ -110,6 +133,7 @@ object Form1: TForm1
     Top = 96
   end
   object PopupMenu1: TPopupMenu
+    OnPopup = PopupMenu1Popup
     Left = 184
     Top = 144
     object mnuAddNewCtrlPoint: TMenuItem
@@ -120,10 +144,9 @@ object Form1: TForm1
       Caption = '-'
     end
     object mnuHideControls: TMenuItem
-      AutoCheck = True
       Caption = '&Hide Designer Controls'
       ShortCut = 16456
-      OnClick = mnuHideControlsClick
+      OnClick = mnuHideDesignersClick
     end
   end
 end

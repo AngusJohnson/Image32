@@ -3,9 +3,9 @@ unit Unit1;
 interface
 
 uses
-  Windows, SysUtils, Classes, Graphics, Controls,
+  Windows, Messages, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls,
-  Image32, ImagePanels;
+  Image32, Image32_Layers;
 
 type
   TForm1 = class(TForm)
@@ -18,14 +18,17 @@ type
     procedure FormDestroy(Sender: TObject);
     procedure PnlMainDblClick(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
+    procedure FormPaint(Sender: TObject);
+    procedure FormResize(Sender: TObject);
   private
     timer: TTimer;
-    pnlMain: TBitmapPanel;
     reversing: Boolean;
     imgIndex: integer;
-    masterImageList: TImageList32;
+    layeredImage: TLayeredImage32;
+  protected
+    procedure WMERASEBKGND(var message: TMessage); message WM_ERASEBKGND;
   public
-    { Public declarations }
+    drawRec: TRect;
   end;
 
 var
@@ -45,73 +48,76 @@ const
 
 procedure TForm1.FormCreate(Sender: TObject);
 var
-  i, ImageSize, SpaceAbove, sqSize: integer;
+  i, ballsize, SpaceAbove, sqSize: integer;
   j,k: double;
-  img, img2: TImage32;
-  path, path2: TPathD;
-  rec: TRect;
+  img: TImage32;
+  path: TPathD;
+  ballRec: TRect;
 begin
-  ImageSize := DPIAware(100);
-  SpaceAbove := ImageSize *2;
+  ballsize := DPIAware(100);
+  SpaceAbove := ballsize *2;
+  drawRec := Rect(0, 0, ballsize, ballsize + SpaceAbove);
 
-  //SETUP THE DISPLAY PANEL
-  pnlMain := TBitmapPanel.Create(self);
-  pnlMain.Parent := self;
-  pnlMain.Align := alClient;
+  layeredImage := TLayeredImage32.Create;
+  layeredImage.SetSize(ballsize, ballsize + SpaceAbove);
+  layeredImage.BackgroundColor := Color32(clBtnFace);
 
-  //Panel1.FocusedColor := clGradientInactiveCaption;
-  //enable bitmap transparency (ie to the panel background)
-  pnlMain.Bitmap.PixelFormat := pf32bit;
-  pnlMain.Bitmap.Width := ImageSize;
-  pnlMain.Bitmap.Height := ImageSize + SpaceAbove;
-  pnlMain.AllowZoom := false;
-  pnlMain.AllowScroll := false;
-  pnlMain.OnDblClick := PnlMainDblClick;
+  //path: for drawing a black line at the bottom of the image
+  path := MakePathI([0, ballsize*3-8, ballsize, ballsize*3 -8]);
+  with layeredImage.AddLayer(TLayer32) do
+  begin
+    SetBounds(drawRec);
+    DrawLine(Image, path, 5, clBlack32, esSquare);
+  end;
 
-  rec := Rect(0,0,ImageSize,ImageSize);
-  Windows.InflateRect(rec, -15,-15);
-  path := Ellipse(rec);
+  ballRec := Rect(0,0,ballsize,ballsize);
 
-  //path2: for drawing a black line at the bottom of the image
-  path2 := MakePathI([0, ImageSize*3-8, ImageSize, ImageSize*3 -8]);
-
-  masterImageList := TImageList32.Create;
+  Windows.InflateRect(ballRec, -15,-15);
+  path := Ellipse(ballRec);
 
   //31 images (25 + 6) will be added to masterImageList. Each will be viewed
   //twice in each loop except for the top and bottom images. (60 frames/loop)
 
-  img := TImage32.Create(ImageSize, ImageSize);
-  DrawPolygon(img, path, frNonZero, clLime32);
-  Draw3D(img, path, frNonZero, 8, 8);
-  DrawLine(img, path, 3, clGreen32, esPolygon);
+  img := TImage32.Create(ballsize, ballsize);
+  try
+    //draw the ball
+    DrawPolygon(img, path, frNonZero, clLime32);
+    Draw3D(img, path, frNonZero, 8, 8);
+    DrawLine(img, path, 3, clGreen32, esPolygon);
 
-  //acceleration phase
-  k := power(SpaceAbove, 1/25); //k^25 = SpaceAbove
-  j := k;
-  for i := 1 to 25 do
-  begin
-    img2 := TImage32.Create(ImageSize, ImageSize + SpaceAbove);
-    rec := Rect(0, Round(j), ImageSize, Round(j) + ImageSize);
-    j := j * k;
-    img2.CopyBlend(img, img.Bounds, rec);
-    DrawLine(img2, path2, 5, clBlack32, esSquare);
-    masterImageList.Add(img2);
-  end;
+    //acceleration phase
+    k := power(SpaceAbove, 1/25); //k^25 = SpaceAbove
+    j := k;
+    for i := 1 to 25 do
+    begin
+      with layeredImage.AddLayer(TLayer32) do
+      begin
+        SetBounds(drawRec);
+        ballRec := Rect(0, Round(j), ballsize, Round(j) + ballsize);
+        j := j * k;
+        Image.CopyBlend(img, img.Bounds, ballRec);
+        Visible := false;
+      end;
+    end;
 
-  //deceleration (squishing) phase :)
-  sqSize := ImageSize *2 div 3;
-  k := power(sqSize, 1/6); //k^6 = sqSize
-  j := 100/k;
-  for i := 1 to 6 do
-  begin
-    img2 := TImage32.Create(ImageSize, ImageSize + SpaceAbove);
-    rec := Rect(0, SpaceAbove + sqSize -Round(j), ImageSize, SpaceAbove +ImageSize);
-    j := j/k;
-    img2.CopyBlend(img, img.Bounds, rec);
-    DrawLine(img2, path2, 5, clBlack32, esSquare);
-    masterImageList.Add(img2);
-  end;
-  img.Free;
+    //deceleration (squishing) phase :)
+    sqSize := ballsize *2 div 3;
+    k := power(sqSize, 1/6); //k^6 = sqSize
+    j := 100/k;
+
+    for i := 1 to 6 do
+      with layeredImage.AddLayer(TRasterLayer32) do
+      begin
+        SetBounds(drawRec);
+        ballRec := Rect(0, SpaceAbove + sqSize -Round(j), ballsize, SpaceAbove +ballsize);
+        j := j/k;
+        Image.CopyBlend(img, img.Bounds, ballRec);
+        Visible := false;
+      end;
+
+    finally
+      img.Free;
+    end;
 
   //set up the timer to kick things off
   timer := TTimer.Create(self);
@@ -132,24 +138,56 @@ end;
 
 procedure TForm1.FormDestroy(Sender: TObject);
 begin
-  masterImageList.Free;
+  layeredImage.Free;
   timer.Free;
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.WMERASEBKGND(var message: TMessage);
+begin
+  message.Result := 1;
+  //this stops windows unhelpfully erasing the form's canvas.
+  //We want full control of painting (see FormPaint below).
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.FormResize(Sender: TObject);
+begin
+  if csDestroying in ComponentState then Exit;
+
+  //repaint the whole background
+  Canvas.FillRect(ClientRect);
+
+  //center the animation in the form clientrect
+  Image32_Vector.OffsetRect(drawRec,
+    -drawRec.Left + (ClientWidth - layeredImage.Width) div 2,
+    -drawRec.Top + (ClientHeight - layeredImage.Height) div 2);
+
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.FormPaint(Sender: TObject);
+begin
+  with layeredImage.GetMergedImage do
+    CopyToDc(Bounds, Canvas.Handle, drawRec.Left, drawRec.Top, false);
 end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.Timer1Timer(Sender: TObject);
 begin
-  masterImageList[imgIndex].CopyToDc(pnlMain.Bitmap.Canvas.Handle, 0,0, false);
-  pnlMain.Repaint;
+  if imgIndex > 0 then
+    layeredImage[imgIndex].Visible := false;
   if reversing then
   begin
     dec(imgIndex);
-    if (imgIndex = 0) then reversing := false;
+    if (imgIndex = 1) then reversing := false;
   end else
   begin
     inc(imgIndex);
-    if (imgIndex = masterImageList.Count -1) then reversing := true;
+    if (imgIndex = layeredImage.Count -1) then reversing := true;
   end;
+  layeredImage[imgIndex].Visible := true;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 

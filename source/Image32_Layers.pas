@@ -2,10 +2,10 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.53                                                            *
-* Date      :  22 October 2020                                                 *
+* Version   :  2.0                                                             *
+* Date      :  20 February 2021                                                *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2020                                         *
+* Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Layer support for the Image32 library                           *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -15,196 +15,322 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Math, Types, Image32, Image32_Extra;
+  SysUtils, Classes, Math, Types,
+  {$IFDEF XPLAT_GENERICS} Generics.Collections, {$ENDIF}
+  Image32, Image32_Draw, Image32_Extra;
 
 type
-  TSizingStyle = (ssCorners, ssEdges, ssEdgesAndCorners, ssCustom);
-  TMergeImageState = (misUnknown, misMergeAll, misHideDesigners);
+  TSizingStyle = (ssCorners, ssEdges, ssEdgesAndCorners);
 
   TLayer32 = class;
   TLayer32Class = class of TLayer32;
   TLayeredImage32 = class;
+  TGroupLayer32 = class;
 
   TLayerHitTestEvent =
     function (layer: TLayer32; const pt: TPoint): Boolean of Object;
 
-  TLayer32 = class
-  private
-    fOwner       : TLayeredImage32;
-    fIndex       : integer;
-    fImage       : TImage32;
-    fPosition    : TPoint;
-    fVisible     : Boolean;
-    fOpacity     : Byte;
-    fName        : string;
-    fGroupId     : integer;
-    fCursorId    : integer;
-    fHitTestRegions: TPathsD;
-    function GetBounds: TRect;
-    function GetMidPoint: TPointD;
-    function GetClientMidPoint: TPointD;
-    procedure SetVisible(value: Boolean);
-    procedure ImageChanged(Sender: TObject);
-    function GetHeight: integer;
-    function GetWidth: integer;
-    function GetIsInGroup: Boolean;
-    function GetGroupIndex: integer;
-    procedure SetOpacity(value: Byte);
-  protected
-    function HitTest(const pt: TPoint): Boolean; virtual;
-    property IsInGroup: Boolean read GetIsInGroup;
-  public
-    constructor Create(owner: TLayeredImage32); virtual;
-    destructor Destroy; override;
-    procedure SetSize(width, height: integer);
-    function BringForward(newLevel: integer): Boolean;
-    function SendBack(newLevel: integer): Boolean;
-    procedure Offset(dx, dy: integer); virtual;
-    procedure PositionAt(const pt: TPoint); overload;
-    procedure PositionAt(x, y: integer); overload;
-    procedure PositionCenteredAt(X, Y: integer); overload;
-    procedure PositionCenteredAt(const pt: TPoint); overload;
-    procedure PositionCenteredAt(const pt: TPointD); overload;
-    procedure SetBounds(const bounds: TRect);
+  TArrayOfPointer = array of Pointer;
 
-    property Bounds: TRect read GetBounds;
-    property ClientMidPoint: TPointD read GetClientMidPoint;
-    property CursorId: integer read fCursorId write fCursorId;
-    property GroupId: integer read fGroupId;
-    property Height: integer read GetHeight;
-    property HitTestRegions: TPathsD
-      read fHitTestRegions write fHitTestRegions;
-    property Image: TImage32 read fImage;
-    property Index: integer read fIndex;
-    property IndexInGroup: integer read GetGroupIndex;
-    property Left: integer read fPosition.X;
-    property MidPoint: TPointD read GetMidPoint;
-    property Name: string read fName write fName;
-    property Opacity: Byte read fOpacity write SetOpacity;
-    property Owner: TLayeredImage32 read fOwner;
-    property Top: integer read fPosition.Y;
-    property Visible: Boolean read fVisible write SetVisible;
-    property Width: integer read GetWidth;
+  //THitTestRec is used for hit-testing (see TLayeredImage32.GetLayerAt).
+  THitTestRec = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
+    PtrPixels : TArrayOfPointer;
+    width  : integer;
+    height : integer;
+    function IsEmpty: Boolean;
+    procedure Init(ownerLayer: TLayer32);
+    procedure Clear;
   end;
 
-  //TCustomDesignerLayer32 objects can be filtered
-  //(ie excluded) from TLayeredImage32.GetMergedImage
-  TCustomDesignerLayer32 = class(TLayer32);
+  TLayerNotifyImage32 = class(TImage32)
+  protected
+    fOwnerLayer: TLayer32;
+    procedure Changed; override;
+  public
+    constructor Create(owner: TLayer32);
+  end;
 
-  TButtonDesignerLayer32 = class(TCustomDesignerLayer32);
+{$IFDEF ZEROBASEDSTR}
+  {$ZEROBASEDSTRINGS OFF}
+{$ENDIF}
+
+  TLayer32 = class
+  private
+    fImageLayer     : TLayeredImage32;
+    fGroupOwner     : TGroupLayer32;
+    fLeft           : integer;
+    fTop            : integer;
+    fImage          : TImage32;
+    fName           : string;
+    fIndex          : integer;
+    fVisible        : Boolean;
+    fOpacity        : Byte;
+    fCursorId       : integer;
+    fTag            : Cardinal;
+    fOldWidth       : integer;
+    fOldHeight      : integer;
+    fHitTestRec     : THitTestRec;
+    function   GetMidPoint: TPointD;
+    procedure  SetVisible(value: Boolean);
+    function   GetHeight: integer;
+    function   GetWidth: integer;
+    procedure  SetOpacity(value: Byte);
+  protected
+    procedure  BeginUpdate; virtual;
+    procedure  EndUpdate;   virtual;
+    function   CanUpdate: Boolean;
+    function   GetBounds: TRect;
+    property   HitTestRec: THitTestRec read fHitTestRec write fHitTestRec;
+  public
+    constructor Create(groupOwner: TGroupLayer32;
+      const name: string = ''); virtual;
+    destructor Destroy; override;
+    procedure  SetSize(width, height: integer);
+
+    function   BringForwardOne: Boolean;
+    function   SendBackOne: Boolean;
+    function   BringToFront: Boolean;
+    function   SendToBack: Boolean;
+
+    procedure  PositionAt(const pt: TPoint); overload;
+    procedure  PositionAt(x, y: integer); overload;
+    procedure  PositionCenteredAt(X, Y: integer); overload;
+    procedure  PositionCenteredAt(const pt: TPoint); overload;
+    procedure  PositionCenteredAt(const pt: TPointD); overload;
+    procedure  SetBounds(const newBounds: TRect); virtual;
+    procedure  Offset(dx, dy: integer); virtual;
+
+    property   Bounds: TRect read GetBounds;
+    property   CursorId: integer read fCursorId write fCursorId;
+    property   GroupOwner: TGroupLayer32 read fGroupOwner;
+    property   Height: integer read GetHeight;
+    property   Image: TImage32 read fImage;
+    property   Index: integer read fIndex;
+    property   Left: integer read fLeft;
+    property   MidPoint: TPointD read GetMidPoint;
+    property   Name: string read fName write fName;
+    property   Opacity: Byte read fOpacity write SetOpacity;
+    property   RootOwner: TLayeredImage32 read fImageLayer;
+    property   Top: integer read fTop;
+    property   Visible: Boolean read fVisible write SetVisible;
+    property   Width: integer read GetWidth;
+    property   Tag: Cardinal read fTag write fTag;
+  end;
+
+  TGroupType = (gtNone, gtFinal, gtDesign, gtMixed);
+
+  TGroupLayer32 = class(TLayer32)
+  private
+{$IFDEF XPLAT_GENERICS}
+    fChilds                : TList<TLayer32>;
+{$ELSE}
+    fChilds                : TList;
+{$ENDIF}
+    fGroupType             : TGroupType;
+    fFullRefreshPending    : Boolean;
+    fLocalInvalidRect      : TRect;
+    fUpdateCount           : Integer; //see beginUpdate/EndUpdate
+    fOnMerge  : TNotifyEvent;
+    function  GetChildCount: integer;
+    function  GetChild(index: integer): TLayer32;
+    function  FindLayerNamed(const name: string): TLayer32; virtual;
+    procedure ReindexChildsFrom(startIdx: Integer);
+    procedure UpdateGroupType;
+  protected
+    procedure Merge(hideDesigners: Boolean; const invalidRect: TRect);
+    function  GetLayerAt(const pt: TPoint; ignoreDesigners: Boolean): TLayer32;
+    procedure InternalDeleteChild(index: integer; fromChild: Boolean);
+    procedure BeginUpdate; override;
+    procedure EndUpdate;   override;
+    procedure ForceRefresh;
+    function   GetChildrenBounds(excludeDesigners: Boolean): TRect;
+    procedure MergeInvalidatedRects(mergeAll, hideDesigners: Boolean;
+      var invalidRects: TRect);
+    //DoOnMerge: for last minute sizing & painting (eg see Image32_SmoothPath)
+    procedure  DoOnMerge; virtual;
+  public
+    constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
+    destructor Destroy; override;
+    function   AddChild(layerClass: TLayer32Class; const name: string = ''): TLayer32;
+    function   InsertChild(layerClass: TLayer32Class; index: integer; const name: string = ''): TLayer32;
+    procedure  DeleteChild(index: integer);
+    procedure  Invalidate(rec: TRect);
+
+    procedure  SetBounds(const newBounds: TRect); override;
+    procedure  Offset(dx, dy: integer); override;
+    procedure  ClearChildren;
+    property   ChildCount: integer read GetChildCount;
+    property   Child[index: integer]: TLayer32 read GetChild; default;
+
+    property   OnMerge: TNotifyEvent read fOnMerge write fOnMerge;
+  end;
+
+  THitTestLayer32 = class(TLayer32)
+  public
+    function GetPathsFromHitTestMask: TPathsD;
+  end;
+
+  TVectorLayer32 = class(THitTestLayer32)
+  private
+    fPathsD: TPathsD;
+    procedure SetPaths(const paths: TPathsD);
+  public
+    procedure  UpdateHitTestMask(const vectorRegions: TPathsD;
+      fillRule: TFillRule); virtual;
+    property Paths: TPathsD read fPathsD write SetPaths;
+  end;
+
+  TRasterLayer32 = class(THitTestLayer32)
+  private
+    fMasterImg: TImage32;
+  public
+    constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
+    destructor Destroy; override;
+    procedure  UpdateHitTestMaskOpaque;
+    procedure  UpdateHitTestMaskTransparent; overload; virtual;
+    procedure  UpdateHitTestMaskTransparent(compareFunc: TCompareFunction;
+      referenceColor: TColor32; tolerance: integer); overload; virtual;
+    property MasterImage: TImage32 read fMasterImg;
+  end;
+
+  TSizingGroupLayer32 = class(TGroupLayer32)
+  private
+    fSizingStyle: TSizingStyle;
+  public
+    property SizingStyle: TSizingStyle read fSizingStyle write fSizingStyle;
+  end;
+
+  TRotatingGroupLayer32 = class(TGroupLayer32)
+  private
+    fZeroOffset: double;
+    function GetDistance: double;
+    function GetRotCur: integer;
+    procedure SetRotCur(curId: integer);
+    function GetAngle: double;
+    function GetCenter: TPointD;
+  public
+    property Angle: double read GetAngle;
+    property Center: TPointD read GetCenter;
+    property RotateCursorId: integer read GetRotCur write SetRotCur;
+    property DistBetweenButtons: double read GetDistance;
+  end;
+
+  TButtonDesignerLayer32 = class;
   TButtonDesignerLayer32Class = class of TButtonDesignerLayer32;
 
-  //TDesignerLayer32 objects are 'non-click' in that they won't be
+  TButtonGroupLayer32 = class(TGroupLayer32)
+  private
+    fBtnSize: integer;
+    fBtnShape: TButtonShape;
+    fBtnColor: TColor32;
+    fBbtnLayerClass: TButtonDesignerLayer32Class;
+  public
+    function AddButton(const pt: TPointD): TButtonDesignerLayer32;
+    function InsertButton(const pt: TPointD; btnIdx: integer): TButtonDesignerLayer32;
+  end;
+
+
+  //TBaseDesignerLayer32: see TLayeredImage32.GetMergedImage()
+  TBaseDesignerLayer32 = class(TVectorLayer32);
+
+  //TDesignerLayer32 objects are 'non-clickable' in that they won't be
   //returned by calls to TLayeredImage32.GetLayerAt(). This class also
   //contains a number of special designer methods.
-  TDesignerLayer32 = class(TCustomDesignerLayer32)
-  private
-    fPenWidth: double;
-    fPenColor: TColor32;
-    fButtonSize: double;
+  TDesignerLayer32 = class(TBaseDesignerLayer32)
   protected
-    procedure DrawDashedLine(const ctrlPts: TPathD; closed: Boolean);
     procedure DrawGridLine(const pt1, pt2: TPointD;
       width: double; color: TColor32); virtual;
-    function HitTest(const pt: TPoint): Boolean; override;
   public
-    constructor Create(owner: TLayeredImage32); override;
-    procedure DrawGrid(majorInterval, minorInterval: integer);
-    procedure DrawLine(const path: TPathD);
-    procedure DrawRectangle(const rec: TRect);
-    procedure DrawEllipse(const rec: TRect);
-    procedure DrawCSplineDesign(
-      const ctrlPts: TPathD; isStartOfPath: Boolean = true);
-    procedure DrawQSplineDesign(
-      const ctrlPts: TPathD; isStartOfPath: Boolean = true);
-    property ButtonSize: double read fButtonSize write fButtonSize;
-    property PenColor: TColor32 read fPenColor write fPenColor;
-    property PenWidth: double read fPenWidth write fPenWidth;
+    procedure DrawGrid(majorInterval, minorInterval: integer;
+      majColor: TColor32 = $30000000; minColor: TColor32 = $20000000);
+  end;
+
+  TButtonDesignerLayer32 = class(TBaseDesignerLayer32)
+  private
+    fSize     : integer;
+    fColor    : TColor32;
+    fShape    : TButtonShape;
+    fButtonOutline: TPathD;
+  protected
+    procedure Draw; virtual;
+    property Size  : integer read fSize write fSize;
+    property Color : TColor32 read fColor write fColor;
+    property Shape : TButtonShape read fShape write fShape;
+  public
+    procedure SetButtonAttributes(const shape: TButtonShape;
+      size: integer; color: TColor32);
+    property ButtonOutline: TPathD read fButtonOutline write fButtonOutline;
   end;
 
   TLayeredImage32 = class
   private
-    fMergedImage: TImage32;
-    fList: TList;
-    //fGroupList: Lists the layer index of the bottom of each group.
-    //Negative offsets indicate the group no longer exists.
-    //Given that group indexes start at 1 and fGroupList is zero based, then
-    //fGroupList[0] refers to group 1 and fGroupList[1] refers to group 2 etc.
-    //eg fGroupList[1] := 10 --> group 2 starts at Layer[10].
-    fGroupList: TList;
-    fBackColor: TColor32;
-    fUpdatePending: Boolean;
-    fMergeImageState: TMergeImageState;
-    function GetCount: integer;
-    function GetHeight: integer;
+    fRoot      : TGroupLayer32;
+    fBackColor      : TColor32;
+    fPreviousHideDesignerState: Boolean;
+    fBounds         : TRect;
+    function  GetRootLayersCount: integer;
+    function  GetLayer(index: integer): TLayer32;
+    function  GetImage: TImage32;
+    function  GetHeight: integer;
     procedure SetHeight(value: integer);
-    function GetWidth: integer;
+    function  GetWidth: integer;
     procedure SetWidth(value: integer);
-    function GetBounds: TRect;
-    function GetMidPoint: TPointD;
-    function GetLayer(index: integer): TLayer32;
-    function GetTopLayer: TLayer32;
-    procedure ReIndexFrom(start, stop: integer);
+    procedure SetBackColor(color: TColor32);
+    function  GetMidPoint: TPointD;
   public
     constructor Create(Width: integer = 0; Height: integer =0); virtual;
     destructor Destroy; override;
     procedure SetSize(width, height: integer);
-    function AddLayer(layerClass: TLayer32Class): TLayer32; overload;
-    function AddLayer: TLayer32; overload;
-    function InsertLayer(layerClass: TLayer32Class;
-      index: integer): TLayer32; overload;
-    function InsertLayer(index: integer): TLayer32; overload;
-    procedure DeleteLayer(index: integer);
     procedure Clear;
     procedure Invalidate;
-    function FindLayerNamed(const name: string): TLayer32;
-    function GetLayerAt(const pt: TPoint): TLayer32;
-    function GetMergedImage(hideDesigners: Boolean = false): TImage32;
+    function  AddLayer(layerClass: TLayer32Class = nil;
+      group: TGroupLayer32 = nil; const name: string = ''): TLayer32;
+    function  InsertLayer(layerClass: TLayer32Class; group: TGroupLayer32;
+      index: integer; const name: string = ''): TLayer32;
+    procedure DeleteLayer(layer: TLayer32); overload;
+    procedure DeleteLayer(layerIndex: integer;
+      groupOwner: TGroupLayer32 = nil); overload;
+    function  FindLayerNamed(const name: string): TLayer32;
+    function  GetLayerAt(const pt: TPoint; ignoreDesigners: Boolean = false): TLayer32;
+    function  GetMergedImage(hideDesigners: Boolean = false): TImage32; overload;
+    function  GetMergedImage(hideDesigners: Boolean;
+      out updateRect: TRect): TImage32; overload;
 
-    function Group(startIdx, endIdx: integer): integer;
-    procedure UnGroup(GroupId: integer);
-    function GroupCount(groupId: integer): integer;
-    function GetFirstInGroupIdx(GroupId: integer): integer;
-    function GetLastInGroupIdx(GroupId: integer): integer;
-    function BringGroupForward(GroupId, newLevel: integer): Boolean;
-    function SendGroupBack(GroupId, newLevel: integer): Boolean;
-    procedure OffsetGroup(GroupId, dx, dy: integer);
-    function DeleteGroup(GroupId: integer): Boolean;
-    procedure HideGroup(GroupId: integer);
-    procedure ShowGroup(GroupId: integer);
-
-    property BackgroundColor: TColor32 read fBackColor write fBackColor;
-    property Bounds: TRect read GetBounds;
-    property Count: integer read GetCount;
+    property BackgroundColor: TColor32 read fBackColor write SetBackColor;
+    property Bounds: TRect read fBounds;
+    property Count: integer read GetRootLayersCount;
     property Height: integer read GetHeight write SetHeight;
+    property Image: TImage32 read GetImage;
     property Layer[index: integer]: TLayer32 read GetLayer; default;
     property MidPoint: TPointD read GetMidPoint;
-    property TopLayer: TLayer32 read GetTopLayer;
+    property Root: TGroupLayer32 read fRoot;
     property Width: integer read GetWidth write SetWidth;
   end;
 
-  function CreateSizingBtnsGroup(targetLayer: TLayer32;
-    style: TSizingStyle; buttonColor: TColor32;
-    buttonSize: integer; buttonOptions: TButtonOptions;
-    buttonLayerClass: TButtonDesignerLayer32Class = nil): integer;
-  function UpdateButtonSizingGroup(movedBtnLayer: TButtonDesignerLayer32): TRect;
-  function CreateButtonGroup(layeredImage32: TLayeredImage32;
-    const buttonPts: TPathD; buttonColor: TColor32;
-    buttonSize: integer; buttonOptions: TButtonOptions;
-    buttonLayerClass: TButtonDesignerLayer32Class = nil): integer;
-  function StartButtonGroup(layeredImage32: TLayeredImage32;
-    const buttonPt: TPoint; buttonColor: TColor32;
-    buttonSize: integer; buttonOptions: TButtonOptions;
-    buttonLayerClass: TButtonDesignerLayer32Class = nil): TButtonDesignerLayer32;
-  function AddToButtonGroup(layeredImage32: TLayeredImage32;
-    GroupId: integer; const pt: TPoint; buttonColor: TColor32; buttonSize: integer;
-    buttonOptions: TButtonOptions): TButtonDesignerLayer32; overload;
-  function AddToButtonGroup(layeredImage32: TLayeredImage32;
-    GroupId: integer; const pt: TPoint): TButtonDesignerLayer32; overload;
+//CreateSizingButtonGroup: the buttonLayerClass parameter allows the
+//user to define their own buttonLayerClass with a custom Draw method.
+function CreateSizingButtonGroup(targetLayer: TLayer32;
+  sizingStyle: TSizingStyle; buttonShape: TButtonShape;
+  buttonSize: integer; buttonColor: TColor32;
+  buttonLayerClass: TButtonDesignerLayer32Class = nil): TSizingGroupLayer32;
+
+function CreateRotatingButtonGroup(targetLayer: TLayer32;
+  buttonSize: integer; centerButtonColor, movingButtonColor: TColor32;
+  startingAngle: double = 0; startingZeroOffset: double = 0;
+  buttonLayerClass: TButtonDesignerLayer32Class = nil): TRotatingGroupLayer32;
+
+function CreateButtonGroup(groupOwner: TGroupLayer32;
+  const buttonPts: TPathD; buttonShape: TButtonShape; buttonSize: integer;
+  buttonColor: TColor32; buttonLayerClass: TButtonDesignerLayer32Class = nil): TButtonGroupLayer32;
+
+function UpdateSizingButtonGroup(movedButton: TButtonDesignerLayer32): TRectD;
+
+//UpdateRotatingButtonGroup: returns rotation angle
+function UpdateRotatingButtonGroup(rotateButton: TLayer32): double;
 
 var
   DefaultButtonSize: integer;
-  ButtonLayerName: string = 'button';
+  dashes: TArrayOfInteger;
 
 const
   crDefault   =   0;
@@ -219,143 +345,277 @@ const
 implementation
 
 uses
-  Image32_Draw, Image32_Vector;
+  Image32_Vector;
 
 resourcestring
-  rsLayer32DeleteError =
-    'TLayer32 delete error: Individual layers must be ungrouped before they '+
-    'can be deleted. Otherwise, use TLayeredImage32.DeleteGroup.';
-  rsImageLayerRangeError = 'TLayeredImage32 error: index out of range.';
+  rsButton                 = 'Button';
+  rsDesign                 = 'Design';
+  rsSizingButtonGroup      = 'SizingButtonGroup';
+  rsRotatingButtonGroup    = 'RotatingButtonGroup';
+  rsDesignButtonGroup      = 'DesignAndButtonGroup';
+  rsChildIndexRangeError   = 'TGroupLayer32 - child index error';
+  rsCreateButtonGroupError = 'CreateButtonGroup - invalid target layer';
+  rsUpdateRotateGroupError = 'UpdateRotateGroup - invalid group';
+
 
 //------------------------------------------------------------------------------
-// Miscellaneous functions
+// TLayerNotifyImage32
 //------------------------------------------------------------------------------
 
-function GetRectCorners(const rec: TRect): TPathD;
+constructor TLayerNotifyImage32.Create(owner: TLayer32);
 begin
-  Result := Rectangle(rec);
+  inherited Create;
+  fOwnerLayer := owner;
 end;
 //------------------------------------------------------------------------------
 
-function GetRectEdgeMidPoints(const rec: TRect): TPathD;
-var
-  mp: TPointD;
+procedure TLayerNotifyImage32.Changed;
 begin
-  mp := MidPoint(RectD(rec));
-  SetLength(result, 4);
-  Result[0] := PointD(mp.X, rec.Top);
-  Result[1] := PointD(rec.Right, mp.Y);
-  Result[2] := PointD(mp.X, rec.Bottom);
-  Result[3] := PointD(rec.Left, mp.Y);
+  if (Self.UpdateCount = 0) and Assigned(fOwnerLayer) and
+    not (fOwnerLayer is TGroupLayer32) then
+      with fOwnerLayer do
+      begin
+        if not GroupOwner.fFullRefreshPending and CanUpdate then
+        begin
+          //invalidate the old bounds if the image is shrinking
+          if (fOldWidth > Width) or (fOldHeight > Height) then
+            GroupOwner.Invalidate(RectWH(fLeft, fTop, fOldWidth, fOldHeight))
+          //otherwise invalidate the current bounds
+          else if not Self.IsEmpty then
+            GroupOwner.Invalidate(Bounds);
+        end;
+        HitTestRec.Clear;
+        fOldWidth := Width;
+        fOldHeight := Height;
+      end;
+  inherited;
+end;
+
+//------------------------------------------------------------------------------
+// THitTestRec
+//------------------------------------------------------------------------------
+
+function THitTestRec.IsEmpty: Boolean;
+begin
+  Result := (width <= 0) or (height <= 0);
+end;
+//------------------------------------------------------------------------------
+
+procedure THitTestRec.Init(ownerLayer: TLayer32);
+begin
+  width := ownerLayer.width;
+  height := ownerLayer.height;
+  PtrPixels := nil;
+  if not IsEmpty then
+    SetLength(PtrPixels, width * height);
+end;
+//------------------------------------------------------------------------------
+
+procedure THitTestRec.Clear;
+begin
+  width := 0; height := 0; PtrPixels := nil;
+end;
+
+//------------------------------------------------------------------------------
+// TPointerRenderer: renders both 32 & 64bits pointer 'pixels' for hit-testing
+//------------------------------------------------------------------------------
+
+type
+
+  TPointerRenderer = class(TCustomRenderer)
+  private
+    fObjPointer: Pointer;
+  protected
+    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
+  public
+    constructor Create(objectPtr: Pointer);
+  end;
+
+procedure TPointerRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
+var
+  i: integer;
+  dst: PPointer;
+begin
+  dst := GetDstPixel(x1,y);
+  for i := x1 to x2 do
+  begin
+    if Byte(alpha^) > 127 then dst^ := fObjPointer;
+    inc(PByte(dst), PixelSize); inc(alpha);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+constructor TPointerRenderer.Create(objectPtr: Pointer);
+begin
+  fObjPointer := objectPtr;
+end;
+
+//------------------------------------------------------------------------------
+// THitTestRec helper functions
+//------------------------------------------------------------------------------
+
+procedure UpdateHitTestMaskUsingPath(layer: THitTestLayer32;
+  const paths: TPathsD; fillRule: TFillRule);
+var
+  monoRenderer: TPointerRenderer;
+begin
+  monoRenderer := TPointerRenderer.Create(layer);
+  try
+    with layer.HitTestRec do
+    begin
+      if IsEmpty then Exit;
+      monoRenderer.Initialize(@PtrPixels[0], width, height, sizeOf(Pointer));
+      Rasterize(paths, Rect(0,0,width,height), fillRule, monoRenderer);
+    end;
+  finally
+    monoRenderer.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+//Creates a pointer hit-test mask using the supplied image and compareFunc.
+procedure UpdateHitTestMaskUsingImage(var htr: THitTestRec;
+  objPtr: Pointer; img: TImage32; compareFunc: TCompareFunction;
+  referenceColor: TColor32; tolerance: integer);
+var
+  i: integer;
+  pc: PColor32;
+  pp: PPointer;
+begin
+  with img do
+  begin
+    htr.width := Width;
+    htr.height := Height;
+    htr.PtrPixels := nil;
+    if IsEmpty then Exit;
+    SetLength(htr.PtrPixels, Width * Height);
+  end;
+
+  pc := img.PixelBase;
+  pp := @htr.PtrPixels[0];
+  for i := 0 to high(htr.PtrPixels) do
+  begin
+    if compareFunc(referenceColor, pc^, tolerance) then pp^ := objPtr;
+    inc(pc); inc(pp);
+  end;
 end;
 
 //------------------------------------------------------------------------------
 // TLayer32 class
 //------------------------------------------------------------------------------
 
-constructor TLayer32.Create(owner: TLayeredImage32);
+constructor TLayer32.Create(groupOwner: TGroupLayer32; const name: string);
 begin
-  fImage   := TImage32.Create;
-  fOwner   := owner;
-  fIndex   := 0;
-  fVisible := true;
-  fOpacity := 255;
-  fGroupId := 0;
-  CursorId := crSizeAll;
-  fImage.OnChange := ImageChanged;
+  fGroupOwner := groupOwner;
+  if assigned(groupOwner) then fImageLayer := groupOwner.fImageLayer;
+  fImage      := TLayerNotifyImage32.Create(self);
+  fName       := name;
+  fVisible    := True;
+  fOpacity    := 255;
+  CursorId    := crDefault;
 end;
 //------------------------------------------------------------------------------
 
 destructor TLayer32.Destroy;
 begin
- fImage.Free;
- inherited;
+  fImage.Free;
+  fVisible := false;
+  if Assigned(fGroupOwner) then
+    fGroupOwner.InternalDeleteChild(Index, true);
 end;
 //------------------------------------------------------------------------------
 
-function TLayer32.HitTest(const pt: TPoint): Boolean;
+procedure TLayer32.BeginUpdate;
 begin
-  Result := PtInRect(Bounds, pt);
-  if Result and assigned(fHitTestRegions) then
-    Result := PointInPolygons(
-      OffsetPoint(PointD(pt),-left,-top), fHitTestRegions, frEvenOdd)
+  if Assigned(fGroupOwner) then
+    with fGroupOwner do
+    begin
+      if (fUpdateCount = 0) and not fFullRefreshPending then
+        Invalidate(self.Bounds);
+      Inc(fUpdateCount);
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.EndUpdate;
+begin
+  if Assigned(fGroupOwner) then
+    with fGroupOwner do
+    begin
+      Dec(fUpdateCount);
+      if (fUpdateCount <> 0) then Exit;
+      fFullRefreshPending := true;
+    end;
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.CanUpdate: Boolean;
+begin
+  Result := not assigned(fGroupOwner) or (fGroupOwner.fUpdateCount = 0);
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayer32.SetSize(width, height: integer);
 begin
-  if (width <> fImage.Width) or (height <> fImage.Height) then
-    fImage.SetSize(width, height) else
-    fImage.Clear;
-end;
-//------------------------------------------------------------------------------
-
-function TLayer32.GetIsInGroup: Boolean;
-begin
-  Result := fGroupId > 0;
-end;
-//------------------------------------------------------------------------------
-
-function TLayer32.GetGroupIndex: integer;
-begin
-  if IsInGroup then
-    Result := Index - Owner.GetFirstInGroupIdx(GroupId) else
-    result := -1;
+  if (width = Image.Width) and (height = Image.Height) then Exit;
+  BeginUpdate;
+  try
+    Image.SetSize(width, height);
+    fHitTestRec.Clear;
+  finally
+    EndUpdate;
+  end;
 end;
 //------------------------------------------------------------------------------
 
 function TLayer32.GetHeight: integer;
 begin
-  result := fImage.Height;
+  Result := Image.Height;
 end;
 //------------------------------------------------------------------------------
 
 function TLayer32.GetWidth: integer;
 begin
-  result := fImage.Width;
+  Result := Image.Width;
 end;
 //------------------------------------------------------------------------------
 
-procedure TLayer32.ImageChanged(Sender: TObject);
+procedure  TLayer32.SetBounds(const newBounds: TRect);
 begin
-  fOwner.Invalidate;
+  BeginUpdate;
+  try
+    fLeft := newBounds.Left;
+    fTop := newBounds.Top;
+    Image.SetSize(RectWidth(newBounds),RectHeight(newBounds));
+    fHitTestRec.Clear;
+  finally
+    EndUpdate;
+  end;
 end;
 //------------------------------------------------------------------------------
 
 function TLayer32.GetBounds: TRect;
 begin
-  Result.TopLeft := fPosition;
-  Result.Right := Result.Left + fImage.Width;
-  Result.Bottom := Result.Top + fImage.Height;
-end;
-//------------------------------------------------------------------------------
-
-procedure TLayer32.SetBounds(const bounds: TRect);
-begin
-  SetSize(RectWidth(bounds), RectHeight(bounds));
-  PositionAt(bounds.TopLeft);
-end;
-//------------------------------------------------------------------------------
-
-function TLayer32.GetClientMidPoint: TPointD;
-begin
-  if Image.IsEmpty then
-    Result := NullPointD else
-    Result := PointD(Image.Width, Image.Height);
+  Result := Rect(fLeft, fTop, fLeft + fImage.Width, fTop + fImage.Height)
 end;
 //------------------------------------------------------------------------------
 
 function TLayer32.GetMidPoint: TPointD;
 begin
-  Result := Image32_Vector.MidPoint(RectD(GetBounds));
+  Result := Image32_Vector.MidPoint(RectD(Bounds));
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayer32.PositionAt(const pt: TPoint);
 begin
-  if (pt.X = fPosition.X) and (pt.Y = fPosition.Y) then Exit;
-  fPosition := pt;
-  fOwner.Invalidate;
+  if (fLeft = pt.X) and (fTop = pt.Y) then Exit;
+
+  BeginUpdate;
+  try
+    fLeft := pt.X; fTop := pt.Y;
+  finally
+    EndUpdate;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -369,8 +629,8 @@ procedure TLayer32.PositionCenteredAt(X, Y: integer);
 var
   pt2: TPoint;
 begin
-  pt2.X := X - fImage.Width div 2;
-  pt2.Y := Y - fImage.Height div 2;
+  pt2.X := X - Image.Width div 2;
+  pt2.Y := Y - Image.Height div 2;
   PositionAt(pt2);
 end;
 //------------------------------------------------------------------------------
@@ -379,8 +639,8 @@ procedure TLayer32.PositionCenteredAt(const pt: TPoint);
 var
   pt2: TPoint;
 begin
-  pt2.X := pt.X - fImage.Width div 2;
-  pt2.Y := pt.Y - fImage.Height div 2;
+  pt2.X := pt.X - Image.Width div 2;
+  pt2.Y := pt.Y - Image.Height div 2;
   PositionAt(pt2);
 end;
 //------------------------------------------------------------------------------
@@ -389,15 +649,15 @@ procedure TLayer32.PositionCenteredAt(const pt: TPointD);
 var
   pt2: TPoint;
 begin
-  pt2.X := Round(pt.X - fImage.Width * 0.5);
-  pt2.Y := Round(pt.Y - fImage.Height  * 0.5);
+  pt2.X := Round(pt.X - Image.Width * 0.5);
+  pt2.Y := Round(pt.Y - Image.Height * 0.5);
   PositionAt(pt2);
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayer32.Offset(dx, dy: integer);
 begin
-  PositionAt(Types.Point(Left + dx, Top + dy));
+  PositionAt(Left + dx, Top + dy);
 end;
 //------------------------------------------------------------------------------
 
@@ -405,7 +665,7 @@ procedure TLayer32.SetVisible(value: Boolean);
 begin
   if (value = fVisible) then Exit;
   fVisible := value;
-  ImageChanged(self);
+  if Assigned(fGroupOwner) then fGroupOwner.Invalidate(Bounds);
 end;
 //------------------------------------------------------------------------------
 
@@ -413,74 +673,595 @@ procedure TLayer32.SetOpacity(value: Byte);
 begin
   if value = fOpacity then Exit;
   fOpacity := value;
-  ImageChanged(self);
+  if Assigned(fGroupOwner) then GroupOwner.Invalidate(Bounds);
 end;
 //------------------------------------------------------------------------------
 
-function TLayer32.BringForward(newLevel: integer): Boolean;
+function TLayer32.BringForwardOne: Boolean;
+begin
+  Result := assigned(fGroupOwner) and (index < fGroupOwner.ChildCount -1);
+  if not Result then Exit;
+  fGroupOwner.fChilds.Move(index, index +1);
+  fGroupOwner.ReindexChildsFrom(index);
+  fGroupOwner.Invalidate(Bounds);
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.SendBackOne: Boolean;
+begin
+  Result := assigned(fGroupOwner) and (index > 0);
+  if not Result then Exit;
+  fGroupOwner.fChilds.Move(index, index -1);
+  fGroupOwner.ReindexChildsFrom(index -1);
+  fGroupOwner.Invalidate(Bounds);
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.BringToFront: Boolean;
+begin
+  Result := index < fGroupOwner.ChildCount -1;
+  if not Result then Exit;
+  fGroupOwner.fChilds.Move(index, fGroupOwner.ChildCount -1);
+  fGroupOwner.ReindexChildsFrom(index);
+  fGroupOwner.Invalidate(Bounds);
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.SendToBack: Boolean;
+begin
+  Result := assigned(fGroupOwner) and (index > 0);
+  if not Result then Exit;
+  fGroupOwner.fChilds.Move(index, 0);
+  fGroupOwner.ReindexChildsFrom(0);
+  fGroupOwner.Invalidate(Bounds);
+end;
+
+//------------------------------------------------------------------------------
+// TGroupLayer32 class
+//------------------------------------------------------------------------------
+
+constructor TGroupLayer32.Create(groupOwner: TGroupLayer32; const name: string);
+begin
+  inherited;
+{$IFDEF XPLAT_GENERICS}
+  fChilds := TList<TLayer32>.Create;
+{$ELSE}
+  fChilds := TList.Create;
+{$ENDIF}
+
+  fGroupType := gtNone;
+end;
+//------------------------------------------------------------------------------
+
+destructor TGroupLayer32.Destroy;
+begin
+  ClearChildren;
+  fChilds.Free;
+  //pass this group's invalid rect on to its owner group
+  if assigned(fGroupOwner) then
+      fGroupOwner.Invalidate(fLocalInvalidRect);
+  inherited;
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupLayer32.BeginUpdate;
+begin
+  // we need to mark invalid the regions that WERE covered,
+  // unless it this region has already been marked invalid.
+  if (fUpdateCount = 0) then
+      Invalidate(GetChildrenBounds(false));
+  Inc(fUpdateCount);
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupLayer32.EndUpdate;
+begin
+  Dec(fUpdateCount);
+  //now mark this whole group's region as invalid ...
+  if (fUpdateCount = 0) then
+    Invalidate(GetChildrenBounds(false));
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupLayer32.ForceRefresh;
+begin
+  fFullRefreshPending := true;
+end;
+//------------------------------------------------------------------------------
+
+function  TGroupLayer32.GetChildrenBounds(excludeDesigners: Boolean): TRect;
+
+  function GetChildBounds(child: TLayer32): TRect;
+  begin
+    if child is TGroupLayer32 then
+      result := TGroupLayer32(child).GetChildrenBounds(excludeDesigners)
+    else if child.Visible and not child.Image.IsEmpty and
+      not (excludeDesigners and (child is TBaseDesignerLayer32)) then
+      Result := child.Bounds
+    else
+      Result := NullRect;
+  end;
+
 var
-  topIdx: integer;
+  i: integer;
 begin
-  topIdx := fOwner.Count -1;
-  if newLevel > topIdx then newLevel := topIdx;
-  Result := (newLevel > fIndex) and not IsInGroup;
-  if not Result then Exit;
-
-  if fOwner[newLevel].IsInGroup then
-    while (newLevel < topIdx) and
-      (fOwner[newLevel].fGroupId = fOwner[newLevel+1].fGroupId) do
-        inc(newLevel);
-
-  fOwner.fList.Move(fIndex, newLevel);
-  fOwner.ReIndexFrom(fIndex, newLevel);
-  fOwner.Invalidate;
+  Result := NullRect;
+  if not Visible or (ChildCount = 0) then Exit;
+  for i := 0 to ChildCount -1 do
+    Result := Image32_Vector.UnionRect(Result, GetChildBounds(Child[i]));
 end;
 //------------------------------------------------------------------------------
 
-function TLayer32.SendBack(newLevel: integer): Boolean;
+procedure TGroupLayer32.Invalidate(rec: TRect);
 begin
-  if newLevel < 0 then newLevel := 0;
-  Result := (newLevel < fIndex) and not IsInGroup;
-  if not Result then Exit;
+  if (fUpdateCount <> 0) or IsEmptyRect(rec) then Exit;
+  fLocalInvalidRect :=
+    Image32_Vector.UnionRect(fLocalInvalidRect, rec);
+end;
+//------------------------------------------------------------------------------
 
-  while fOwner[newLevel].IsInGroup and (newLevel > 0) and
-    (fOwner[newLevel].fGroupId = fOwner[newLevel-1].fGroupId) do
-      dec(newLevel);
-  fOwner.fList.Move(fIndex, newLevel);
-  fOwner.ReIndexFrom(newLevel,fIndex);
-  fOwner.Invalidate;
+function TGroupLayer32.GetChildCount: integer;
+begin
+  Result := fChilds.Count;
+end;
+//------------------------------------------------------------------------------
+
+function TGroupLayer32.GetChild(index: integer): TLayer32;
+begin
+  if (index < 0) or (index >= fChilds.Count) then
+    raise Exception.Create(rsChildIndexRangeError);
+  Result := TLayer32(fChilds[index]);
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupLayer32.ClearChildren;
+var
+  i: integer;
+begin
+  BeginUpdate;
+  try
+    for i := fChilds.Count -1 downto 0 do
+      TLayer32(fChilds[i]).Free;
+    fChilds.Clear;
+    fGroupType := gtNone;
+    SetBounds(NullRect);
+  finally
+    EndUpdate;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function   TGroupLayer32.AddChild(layerClass: TLayer32Class;
+  const name: string = ''): TLayer32;
+begin
+  Result := InsertChild(layerClass, MaxInt, name);
+end;
+//------------------------------------------------------------------------------
+
+function   TGroupLayer32.InsertChild(layerClass: TLayer32Class;
+  index: integer; const name: string = ''): TLayer32;
+begin
+  Result := layerClass.Create(self, name);
+  if index >= ChildCount then
+  begin
+    Result.fIndex := ChildCount;
+    fChilds.Add(Result);
+  end else
+  begin
+    Result.fIndex := index;
+    fChilds.Insert(index, Result);
+    ReindexChildsFrom(index +1);
+  end;
+
+  //update Group's type
+  if (Result is TBaseDesignerLayer32) then
+  begin
+    if fGroupType = gtNone then
+      fGroupType := gtDesign
+    else if fGroupType = gtFinal then
+      fGroupType := gtMixed;
+  end else
+  begin
+    if fGroupType = gtNone then
+      fGroupType := gtFinal
+    else if fGroupType = gtDesign then
+      fGroupType := gtMixed;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure  TGroupLayer32.InternalDeleteChild(index: integer; fromChild: Boolean);
+var
+  child: TLayer32;
+begin
+  if (index < 0) or (index >= fChilds.Count) then
+    raise Exception.Create(rsChildIndexRangeError);
+
+  child := TLayer32(fChilds[index]);
+  if child.Visible then
+    Invalidate(child.Bounds);
+
+  fChilds.Delete(index);
+  if not fromChild then
+  begin
+    child.fGroupOwner := nil; //avoids recursion :)
+    child.Free;
+  end;
+  if index < ChildCount then
+    ReindexChildsFrom(index);
+
+  if CanUpdate then UpdateGroupType;
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupLayer32.DeleteChild(index: integer);
+begin
+  InternalDeleteChild(index, false);
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupLayer32.UpdateGroupType;
+
+  function GetChildGroupType(child: TLayer32): TGroupType;
+  begin
+    if (child is TGroupLayer32) then
+      Result := TGroupLayer32(child).fGroupType
+    else if (child is TBaseDesignerLayer32) then
+      Result := gtDesign
+    else
+      Result := gtFinal;
+  end;
+
+var
+  i: integer;
+  cgt: TGroupType;
+begin
+  fGroupType := gtNone;
+  for i := 0 to ChildCount -1 do
+  begin
+    cgt := GetChildGroupType(Child[i]);
+    if cgt = gtNone then Continue
+    else if fGroupType = gtNone then fGroupType := cgt
+    else if cgt <> fGroupType then
+    begin
+      fGroupType := gtMixed;
+      break;
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure  TGroupLayer32.SetBounds(const newBounds: TRect);
+begin
+  //this method overrride bypasses the overhead of BeginUpdate/EndUpdate
+  fLeft := newBounds.Left;
+  fTop := newBounds.Top;
+  Image.SetSize(RectWidth(newBounds),RectHeight(newBounds));
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupLayer32.Offset(dx, dy: integer);
+var
+  i: integer;
+begin
+  if (dx = 0) and (dy = 0) then Exit;
+  BeginUpdate;
+  try
+    for i := 0 to ChildCount -1 do
+      Child[i].Offset(dx, dy);
+  finally
+    EndUpdate;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupLayer32.DoOnMerge;
+begin
+  if Assigned(fOnMerge) then fOnMerge(self);
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupLayer32.MergeInvalidatedRects(
+  mergeAll, hideDesigners: Boolean; var invalidRects: TRect);
+var
+  i: integer;
+begin
+
+  DoOnMerge;
+
+  //recursively apply this method ...
+  for i := 0 to ChildCount -1 do
+    if (Child[i] is TGroupLayer32) then
+      with TGroupLayer32(Child[i]) do
+        MergeInvalidatedRects(mergeAll, hideDesigners, invalidRects);
+
+  SetBounds(GetChildrenBounds(hideDesigners));
+
+  if mergeAll or
+    (not fFullRefreshPending and IsEmptyRect(fLocalInvalidRect)) then
+      Exit;
+
+  invalidRects := Image32_Vector.UnionRect(invalidRects, fLocalInvalidRect);
+  if fFullRefreshPending then
+    invalidRects := Image32_Vector.UnionRect(invalidRects, GetBounds);
+
+  fLocalInvalidRect := NullRect;
+  fFullRefreshPending := false;
+
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupLayer32.Merge(hideDesigners: Boolean; const invalidRect: TRect);
+var
+  i: integer;
+  tmp: TImage32;
+  srcRect, dstRect: TRect;
+begin
+  if not Visible or (Opacity < 2) or Image.IsEmpty or
+    (hideDesigners and (fGroupType = gtDesign)) then Exit;
+
+  for i := 0 to ChildCount -1 do
+    with Child[i] do
+    begin
+      if not Visible or
+        (hideDesigners and (Child[i] is TBaseDesignerLayer32)) then
+          Continue;
+
+      srcRect := Image32_Vector.IntersectRect(GetBounds, invalidRect);
+      if IsEmptyRect(srcRect) then Continue;
+
+      if (Child[i] is TGroupLayer32) then
+        with TGroupLayer32(Child[i]) do
+          Merge(hideDesigners, invalidRect);
+
+      //make srcRect relative to image
+      Image32_Vector.OffsetRect(srcRect, -Left, -Top);
+      //make dstRect relative to groupLayer
+      dstRect := srcRect;
+      Image32_Vector.OffsetRect(dstRect, Left -self.Left, Top -self.Top);
+
+      if fOpacity < 254 then //reduce layer opacity
+      begin
+        tmp := TImage32.Create(Image);
+        try
+          tmp.ApplyAlpha(fOpacity);
+          self.Image.CopyBlend(tmp, srcRect, dstRect, BlendToAlpha);
+        finally
+          tmp.Free;
+        end;
+      end else
+        self.Image.CopyBlend(Image, srcRect, dstRect, BlendToAlpha);
+    end;
+end;
+//------------------------------------------------------------------------------
+
+function TGroupLayer32.GetLayerAt(const pt: TPoint;
+  ignoreDesigners: Boolean): TLayer32;
+var
+  i: integer;
+begin
+  Result := nil;
+  for i := ChildCount -1 downto 0 do
+  begin
+    if Child[i] is TGroupLayer32 then
+      Result := TGroupLayer32(Child[i]).GetLayerAt(pt, ignoreDesigners)
+    else
+    begin
+      with Child[i] do
+        if not Visible or
+          (ignoreDesigners and (Child[i] is TBaseDesignerLayer32)) or
+          fHitTestRec.IsEmpty or not PtInRect(Bounds, pt) then
+            Continue
+        else
+          Result := fHitTestRec.PtrPixels[
+            fHitTestRec.width * (pt.Y - Top) + (pt.X  -Left)];
+    end;
+    if Assigned(Result) then Break;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupLayer32.ReindexChildsFrom(startIdx: Integer);
+var
+  i: integer;
+begin
+  for i := startIdx to ChildCount -1 do
+    Child[i].fIndex := i;
+end;
+//------------------------------------------------------------------------------
+
+function TGroupLayer32.FindLayerNamed(const name: string): TLayer32;
+var
+  i: integer;
+begin
+  if SameText(self.Name, name) then
+  begin
+    Result := self;
+    Exit;
+  end;
+
+  Result := nil;
+  for i := 0 to ChildCount -1 do
+  begin
+    if Child[i] is TGroupLayer32 then
+    begin
+      Result := TGroupLayer32(Child[i]).FindLayerNamed(name);
+      if assigned(Result) then Break;
+    end else if SameText(self.Name, name) then
+    begin
+      Result := Child[i];
+      Break;
+    end;
+  end;
+end;
+
+//------------------------------------------------------------------------------
+// THitTestLayer32 class
+//------------------------------------------------------------------------------
+
+function THitTestLayer32.GetPathsFromHitTestMask: TPathsD;
+var
+  i, len: integer;
+  tmpImg: TImage32;
+  pp: PPointer;
+  pc: PColor32;
+begin
+  Result := nil;
+  with fHitTestRec do
+  begin
+    len := Length(PtrPixels);
+    if (len = 0) or (len <> width * height) then Exit;
+    tmpImg := TImage32.Create(width, height);
+    try
+      pc := tmpImg.PixelBase;
+      pp := @PtrPixels[0];
+      for i := 0 to len -1 do
+      begin
+        if pp^ <> nil then pc^ := clWhite32;
+        inc(pp); inc(pc);
+      end;
+      result := Vectorize(tmpImg, clWhite32, CompareAlpha, 0);
+    finally
+      tmpImg.Free;
+    end;
+  end;
+end;
+
+//------------------------------------------------------------------------------
+// TVectorLayer32 class
+//------------------------------------------------------------------------------
+
+procedure TVectorLayer32.SetPaths(const paths: TPathsD);
+begin
+  fPathsD := CopyPaths(paths);
+end;
+//------------------------------------------------------------------------------
+
+procedure  TVectorLayer32.UpdateHitTestMask(const vectorRegions: TPathsD;
+  fillRule: TFillRule);
+begin
+  fHitTestRec.Init(self);
+  UpdateHitTestMaskUsingPath(self, vectorRegions, fillRule);
+end;
+
+//------------------------------------------------------------------------------
+// TRasterLayer32 class
+//------------------------------------------------------------------------------
+
+constructor TRasterLayer32.Create(groupOwner: TGroupLayer32; const name: string = '');
+begin
+  inherited;
+  fMasterImg := TImage32.Create;
+end;
+//------------------------------------------------------------------------------
+
+destructor TRasterLayer32.Destroy;
+begin
+  fMasterImg.Free;
+  inherited;
+end;
+//------------------------------------------------------------------------------
+
+procedure TRasterLayer32.UpdateHitTestMaskOpaque;
+var
+  i: integer;
+  htr: THitTestRec;
+  pp: PPointer;
+begin
+  //fill the entire Hittest mask with self pointers
+  with Image do
+  begin
+    htr.width := Width;
+    htr.height := Height;
+    SetLength(htr.PtrPixels, Width * Height);
+    if not IsEmpty then
+    begin
+      pp := @htr.PtrPixels[0];
+      for i := 0 to High(htr.PtrPixels) do
+      begin
+        pp^ := self; inc(pp);
+      end;
+    end;
+  end;
+  HitTestRec := htr;
+end;
+//------------------------------------------------------------------------------
+
+procedure TRasterLayer32.UpdateHitTestMaskTransparent;
+begin
+  //this method will mark all pixels with an opacity > 127.
+  UpdateHitTestMaskUsingImage(fHitTestRec,
+    Self, Image, CompareAlpha, clWhite32, 128);
+end;
+//------------------------------------------------------------------------------
+
+procedure  TRasterLayer32.UpdateHitTestMaskTransparent(
+  compareFunc: TCompareFunction;
+  referenceColor: TColor32; tolerance: integer);
+begin
+  UpdateHitTestMaskUsingImage(fHitTestRec, Self, Image,
+  compareFunc, referenceColor, tolerance);
+end;
+
+//------------------------------------------------------------------------------
+// TRotatingGroupLayer32 class
+//------------------------------------------------------------------------------
+
+function TRotatingGroupLayer32.GetCenter: TPointD;
+begin
+  Result := Child[1].MidPoint;
+end;
+//------------------------------------------------------------------------------
+
+function TRotatingGroupLayer32.GetAngle: double;
+begin
+  Result :=
+    Image32_Vector.GetAngle(Child[1].MidPoint, Child[2].MidPoint)  - fZeroOffset;
+  NormalizeAngle(Result);
+end;
+//------------------------------------------------------------------------------
+
+function TRotatingGroupLayer32.GetRotCur: integer;
+begin
+  Result := Child[2].CursorId;
+end;
+//------------------------------------------------------------------------------
+
+function TRotatingGroupLayer32.GetDistance: double;
+begin
+  Result := Image32_Vector.Distance(Child[1].MidPoint, Child[2].MidPoint);
+end;
+//------------------------------------------------------------------------------
+
+procedure TRotatingGroupLayer32.SetRotCur(curId: integer);
+begin
+  Child[2].CursorId := curId;
+end;
+
+//------------------------------------------------------------------------------
+// TButtonGroupLayer32 class
+//------------------------------------------------------------------------------
+
+function TButtonGroupLayer32.AddButton(const pt: TPointD): TButtonDesignerLayer32;
+begin
+  result := InsertButton(pt, MaxInt);
+end;
+//------------------------------------------------------------------------------
+
+function TButtonGroupLayer32.InsertButton(const pt: TPointD;
+  btnIdx: integer): TButtonDesignerLayer32;
+begin
+  result := TButtonDesignerLayer32(InsertChild(fBbtnLayerClass, btnIdx));
+  with result do
+  begin
+    SetButtonAttributes(fBtnShape, FBtnSize, fBtnColor);
+    PositionCenteredAt(pt);
+    CursorId := crHandPoint;
+  end;
 end;
 
 //------------------------------------------------------------------------------
 // TDesignerLayer32 class
-//------------------------------------------------------------------------------
-
-constructor TDesignerLayer32.Create(owner: TLayeredImage32);
-begin
-  inherited Create(owner);
-  fPenWidth := 1;
-  fPenColor := clRed32;
-  CursorId := 0;
-end;
-//------------------------------------------------------------------------------
-
-function TDesignerLayer32.HitTest(const pt: TPoint): Boolean;
-begin
-  Result := false;
-end;
-//------------------------------------------------------------------------------
-
-procedure TDesignerLayer32.DrawDashedLine(const ctrlPts: TPathD;
-  closed: Boolean);
-const
-  endstyle: array[Boolean] of TEndStyle = (esSquare, esPolygon);
-var
-  step: integer;
-begin
-  step := Round(fPenWidth * 1.5) + 3;
-  Image32_Draw.DrawDashedLine(Image, ctrlPts,
-    MakeArrayOfInteger([step,step]), nil, fPenWidth, fPenColor, endstyle[closed]);
-end;
 //------------------------------------------------------------------------------
 
 procedure TDesignerLayer32.DrawGridLine(const pt1, pt2: TPointD;
@@ -494,7 +1275,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TDesignerLayer32.DrawGrid(majorInterval, minorInterval: integer);
+procedure TDesignerLayer32.DrawGrid(majorInterval, minorInterval: integer;
+  majColor: TColor32 = $30000000; minColor: TColor32 = $20000000);
 var
   i, x,y, w,h: integer;
 begin
@@ -502,124 +1284,59 @@ begin
   if minorInterval <> 0 then
   begin
     x := minorInterval; y := minorInterval;
-    for i := 1 to (w div minorInterval) -1 do
+    for i := 1 to (w div minorInterval) do
     begin
-      DrawGridLine(PointD(x, 0), PointD(x, h), 1, $20000000);
+      DrawGridLine(PointD(x, 0), PointD(x, h), 1, minColor);
       inc(x, minorInterval);
     end;
-    for i := 1 to (h div minorInterval) -1 do
+    for i := 1 to (h div minorInterval) do
     begin
-      DrawGridLine(PointD(0, y), PointD(w, y), 1, $20000000);
+      DrawGridLine(PointD(0, y), PointD(w, y), 1, minColor);
       inc(y, minorInterval);
     end;
   end;
   if majorInterval <> 0 then
   begin
     x := majorInterval; y := majorInterval;
-    for i := 1 to (w div majorInterval) -1 do
+    for i := 1 to (w div majorInterval) do
     begin
-      DrawGridLine(PointD(x, 0), PointD(x, h), 1, $30000000);
+      DrawGridLine(PointD(x, 0), PointD(x, h), 1, majColor);
       inc(x, majorInterval);
     end;
-    for i := 1 to (h div majorInterval) -1 do
+    for i := 1 to (h div majorInterval) do
     begin
-      DrawGridLine(PointD(0, y), PointD(w, y), 1, $30000000);
+      DrawGridLine(PointD(0, y), PointD(w, y), 1, majColor);
       inc(y, majorInterval);
     end;
   end;
 end;
+
+//------------------------------------------------------------------------------
+// TButtonDesignerLayer32 class
 //------------------------------------------------------------------------------
 
-procedure TDesignerLayer32.DrawQSplineDesign(
-  const ctrlPts: TPathD; isStartOfPath: Boolean);
-var
-  i,j, len: integer;
-  pt, pt2: TPointD;
-  path: TPathD;
+procedure TButtonDesignerLayer32.SetButtonAttributes(const shape: TButtonShape;
+  size: integer; color: TColor32);
 begin
-  len := length(ctrlPts);
-  if len < 3 then Exit;
-  if fButtonSize < 2 then fButtonSize := DefaultButtonSize;
-  SetLength(path, 2);
-  if isStartOfPath then
-  begin
-    path[0] := ctrlPts[0];
-    path[1] := ctrlPts[1];
-    DrawDashedLine(path, false);
-    j := 2;
-  end else
-    j := 1;
-  pt := ctrlPts[j -1];
-  for i := j to len -2 do
-  begin
-    pt2 := ReflectPoint(pt, ctrlPts[i]);
-    path[0] := pt;
-    path[1] := pt2;
-    DrawDashedLine(path, false);
-    DrawButton(Image, pt2, fButtonSize);
-    pt := pt2;
+  fSize := size;
+  fShape := shape;
+  fColor := color;
+  size := Ceil(fSize * 1.25); //add room for button shadow
+  SetSize(size, size);
+  Draw;
+end;
+//------------------------------------------------------------------------------
+
+procedure TButtonDesignerLayer32.Draw;
+begin
+  BeginUpdate;
+  try
+    fButtonOutline := Image32_Extra.DrawButton(Image,
+      image.MidPoint, fSize, fColor, fShape, [ba3D, baShadow]);
+    UpdateHitTestMask(Image32_Vector.Paths(fButtonOutline), frEvenOdd);
+  finally
+    EndUpdate;
   end;
-  path[0] := pt; path[1] := ctrlPts[len-1];
-  DrawDashedLine(path, false);
-end;
-//------------------------------------------------------------------------------
-
-procedure TDesignerLayer32.DrawCSplineDesign(
-  const ctrlPts: TPathD; isStartOfPath: Boolean = true);
-var
-  i,len: integer;
-  pt: TPointD;
-  path: TPathD;
-begin
-  len := length(ctrlPts);
-  if Odd(len) then dec(len);
-  if len < 4 then Exit;
-  if fButtonSize < 2 then fButtonSize := DefaultButtonSize;
-  SetLength(path, 2);
-  if isStartOfPath then
-  begin
-    path[0] := ctrlPts[0];
-    path[1] := ctrlPts[1];
-    DrawDashedLine(path, false);
-    i := 2;
-  end else
-    i := 0;
-  while i < len -2 do
-  begin
-    pt := ReflectPoint(ctrlPts[i], ctrlPts[i+1]);
-    path[0] := ctrlPts[i];
-    path[1] := pt;
-    DrawDashedLine(path, false);
-    DrawButton(Image, pt, fButtonSize);
-    inc(i, 2);
-  end;
-  path[0] := ctrlPts[len-2];
-  path[1] := ctrlPts[len-1];
-  DrawDashedLine(path, false);
-end;
-//------------------------------------------------------------------------------
-
-procedure TDesignerLayer32.DrawLine(const path: TPathD);
-begin
-  DrawDashedLine(path, false);
-end;
-//------------------------------------------------------------------------------
-
-procedure TDesignerLayer32.DrawRectangle(const rec: TRect);
-var
-  path: TPathD;
-begin
-  path := Rectangle(rec);
-  DrawDashedLine(path, true);
-end;
-//------------------------------------------------------------------------------
-
-procedure TDesignerLayer32.DrawEllipse(const rec: TRect);
-var
-  path: TPathD;
-begin
-  path := Ellipse(rec);
-  DrawDashedLine(path, true);
 end;
 
 //------------------------------------------------------------------------------
@@ -628,725 +1345,459 @@ end;
 
 constructor TLayeredImage32.Create(Width: integer; Height: integer);
 begin
-  fList := TList.Create;
-  fGroupList := TList.Create;
-  fMergedImage := TImage32.Create(Width, Height);
-  fMergeImageState := misUnknown;
+  fRoot          := TGroupLayer32.Create(nil, 'root');
+  fRoot.fImageLayer   := self;
+  fBounds := Rect(0, 0, Width, Height);
+  fRoot.fLocalInvalidRect := fBounds;
 end;
 //------------------------------------------------------------------------------
 
 destructor TLayeredImage32.Destroy;
 begin
-  Clear;
-  fGroupList.Free;
-  fList.Free;
-  fMergedImage.Free;
+  fRoot.Free;
   inherited;
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayeredImage32.SetSize(width, height: integer);
 begin
-  fMergedImage.SetSize(width, height);
-  Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-function TLayeredImage32.GetLayer(index: integer): TLayer32;
-begin
-  if (index < 0) or (index >= Count) then
-    raise Exception.Create(rsImageLayerRangeError);
-  Result := TLayer32(fList[index]);
-end;
-//------------------------------------------------------------------------------
-
-function TLayeredImage32.GetTopLayer: TLayer32;
-begin
-  if Count = 0 then Result := nil else
-  result := Layer[Count -1];
-end;
-//------------------------------------------------------------------------------
-
-procedure TLayeredImage32.ReIndexFrom(start, stop: integer);
-var
-  i, lastGroupId: integer;
-begin
-  stop := Min(stop, Count -1);
-  lastGroupId := 0;
-  for i := start to stop do
-    with Layer[i] do
-    begin
-      fIndex := i;
-      if (fGroupId > 0) and (lastGroupId <> fGroupId) then
-      begin
-        fGroupList[fGroupId -1] := Pointer(i); //ie first in group
-        lastGroupId := fGroupId;
-      end;
-    end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TLayeredImage32.Invalidate;
-begin
-  fUpdatePending := true;
-end;
-//------------------------------------------------------------------------------
-
-procedure AdjustOpacity(image: TImage32; opacity: byte);
-var
-  i: Integer;
-  pb: PARGB;
-  alphaTbl: PByteArray;
-begin
-  pb := PARGB(image.PixelBase);
-  alphaTbl := PByteArray(@MulTable[opacity]);
-  for i := 0 to image.Width * image.Height - 1 do
-  begin
-    pb.A := alphaTbl[pb.A];
-    inc(pb);
-  end;
+  fBounds := Rect(0, 0, Width, Height);
+  fRoot.SetBounds(fBounds);
+  fRoot.fLocalInvalidRect := fBounds;
 end;
 //------------------------------------------------------------------------------
 
 function TLayeredImage32.GetMergedImage(hideDesigners: Boolean): TImage32;
 var
-  i: integer;
-  blendFunc: TBlendFunction;
-  tmp: TImage32;
+  updateRect: TRect;
 begin
-  if fUpdatePending or
-    (hideDesigners and (fMergeImageState <> misHideDesigners)) or
-    (not hideDesigners and (fMergeImageState <> misMergeAll)) then
-  begin
-    fMergedImage.Clear(fBackColor);
-
-    if fBackColor shr 24 < 254 then //ie semi-transparent
-      blendFunc  := BlendToAlpha else
-      blendFunc := BlendToOpaque;
-
-    for i := 0 to Count -1 do
-    begin
-      with Layer[i] do
-      begin
-        if not Visible or (fOpacity < 2) or Image.IsEmpty or
-          (hideDesigners and (layer[i] is TCustomDesignerLayer32)) then
-            Continue;
-
-        if fOpacity < 254 then
-        begin
-          //reduce layer opacity
-          tmp := TImage32.Create(Image);
-          try
-            AdjustOpacity(tmp, fOpacity);
-            fMergedImage.CopyBlend(tmp, tmp.Bounds, Bounds, blendFunc);
-          finally
-            tmp.Free;
-          end;
-        end else
-          fMergedImage.CopyBlend(Image, Image.Bounds, Bounds, blendFunc);
-      end;
-    end;
-
-    fUpdatePending := false;
-    if hideDesigners then fMergeImageState := misHideDesigners
-    else fMergeImageState := misMergeAll;
-  end;
-  Result := fMergedImage;
- end;
-//------------------------------------------------------------------------------
-
-procedure TLayeredImage32.Clear;
-var
-  i: integer;
-begin
-  fMergedImage.Clear;
-  for i := 0 to Count -1 do
-    TLayer32(fList[i]).free;
-  fList.Clear;
-  fGroupList.Clear;
+  Root.fLocalInvalidRect := fBounds; //forces a full repaint
+  Result := GetMergedImage(hideDesigners, updateRect);
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.GetCount: integer;
+function TLayeredImage32.GetMergedImage(hideDesigners: Boolean;
+  out updateRect: TRect): TImage32;
+var
+  mergeAll: Boolean;
 begin
-  Result := fList.Count;
+  updateRect := NullRect;
+  mergeAll := fPreviousHideDesignerState <> hideDesigners;
+  Root.MergeInvalidatedRects(mergeAll, hideDesigners, updateRect);
+  if mergeAll then
+    updateRect := fBounds else
+    updateRect := Image32_Vector.IntersectRect(updateRect, fBounds);
+  Root.SetBounds(fBounds);
+  Root.Image.FillRect(updateRect, fBackColor);
+  Root.Merge(hideDesigners, updateRect);
+  Result := Root.Image;
+
+  fPreviousHideDesignerState := hideDesigners;
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayeredImage32.Clear;
+begin
+  fRoot.Image.Clear(fBackColor); //check
+  fRoot.ClearChildren;
+  fPreviousHideDesignerState := false;
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayeredImage32.Invalidate;
+begin
+  fRoot.fLocalInvalidRect := fBounds;
+end;
+//------------------------------------------------------------------------------
+
+function TLayeredImage32.GetRootLayersCount: integer;
+begin
+  Result := fRoot.ChildCount;
+end;
+//------------------------------------------------------------------------------
+
+function TLayeredImage32.GetLayer(index: integer): TLayer32;
+begin
+  Result := fRoot[index];
+end;
+//------------------------------------------------------------------------------
+
+function TLayeredImage32.GetImage: TImage32;
+begin
+  Result := fRoot.Image;
 end;
 //------------------------------------------------------------------------------
 
 function TLayeredImage32.GetHeight: integer;
 begin
-  Result := fMergedImage.Height;
+  Result := RectHeight(fBounds);
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayeredImage32.SetHeight(value: integer);
 begin
-  if fMergedImage.Height = value then Exit;
-  fMergedImage.SetSize(Width, value);
-  Invalidate;
+  if Height <> value then SetSize(Width, value);
 end;
 //------------------------------------------------------------------------------
 
 function TLayeredImage32.GetWidth: integer;
 begin
-  Result := fMergedImage.Width;
+  Result := RectWidth(fBounds);
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayeredImage32.SetWidth(value: integer);
 begin
-  if fMergedImage.Width = value then Exit;
-  fMergedImage.SetSize(value, Height);
-  Invalidate;
+  if Width <> value then SetSize(value, Height);
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.GetBounds: TRect;
+procedure TLayeredImage32.SetBackColor(color: TColor32);
 begin
-  Result := Types.Rect(0, 0, Width, Height);
+  if color = fBackColor then Exit;
+  fBackColor := color;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 function TLayeredImage32.GetMidPoint: TPointD;
 begin
-  Result := PointD(fMergedImage.Width * 0.5, fMergedImage.Height * 0.5);
+  Result := PointD(Width * 0.5, Height * 0.5);
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.AddLayer(layerClass: TLayer32Class): TLayer32;
+function TLayeredImage32.AddLayer(layerClass: TLayer32Class;
+  group: TGroupLayer32; const name: string): TLayer32;
 begin
-  Result := InsertLayer(layerClass, Count);
-end;
-//------------------------------------------------------------------------------
-
-function TLayeredImage32.AddLayer: TLayer32;
-begin
-  Result := AddLayer(TLayer32);
-end;
-//------------------------------------------------------------------------------
-
-function TLayeredImage32.InsertLayer(index: integer): TLayer32;
-begin
-  Result := InsertLayer(TLayer32, index);
+  if not Assigned(layerClass) then layerClass := TLayer32;
+  Result := InsertLayer(layerClass, group, MaxInt, name);
 end;
 //------------------------------------------------------------------------------
 
 function TLayeredImage32.InsertLayer(layerClass: TLayer32Class;
-  index: integer): TLayer32;
+  group: TGroupLayer32; index: integer; const name: string): TLayer32;
 begin
-  if (index < 0) or (index > Count) then
-    raise Exception.Create(rsImageLayerRangeError);
-
-  //make sure a new layer isn't inserted into the middle of a group
-  if (index < Count) and Layer[index].IsInGroup then
-    while (index > 0) and
-      (Layer[index].fGroupId = Layer[index-1].fGroupId) do
-        dec(index);
-
-  //insert new layer into fList and update indexes
-  Result := layerClass.Create(Self);
-  fList.Insert(index, Result);
-  ReIndexFrom(index, Count -1);
-  Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-procedure TLayeredImage32.DeleteLayer(index: integer);
-begin
-  if (index < 0) or (index >= Count) then
-    raise Exception.Create(rsImageLayerRangeError);
-  if Layer[index].IsInGroup then
-    raise Exception.Create(rsLayer32DeleteError);
-  Layer[index].Free;
-  fList.Delete(index);
-  ReIndexFrom(index, Count -1);
-  Invalidate;
+  if not Assigned(group) then group := fRoot;
+  Result := group.InsertChild(layerClass, index, name);
 end;
 //------------------------------------------------------------------------------
 
 function TLayeredImage32.FindLayerNamed(const name: string): TLayer32;
+begin
+  Result := Root.FindLayerNamed(name);
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayeredImage32.DeleteLayer(layer: TLayer32);
+begin
+  if not assigned(layer) or not assigned(layer.fGroupOwner) then Exit;
+  layer.fGroupOwner.DeleteChild(layer.Index);
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayeredImage32.DeleteLayer(layerIndex: integer;
+  groupOwner: TGroupLayer32 = nil);
+begin
+  if not assigned(groupOwner) then groupOwner := Root;
+  if (layerIndex < 0) or (layerIndex >= groupOwner.ChildCount) then
+    raise Exception.Create(rsChildIndexRangeError);
+  groupOwner.DeleteChild(layerIndex);
+end;
+//------------------------------------------------------------------------------
+
+function TLayeredImage32.GetLayerAt(const pt: TPoint; ignoreDesigners: Boolean): TLayer32;
+begin
+  result := Root.GetLayerAt(pt, ignoreDesigners);
+end;
+
+//------------------------------------------------------------------------------
+// Miscellaneous button functions
+//------------------------------------------------------------------------------
+
+function GetRectEdgeMidPoints(const rec: TRectD): TPathD;
+var
+  mp: TPointD;
+begin
+  mp := MidPoint(rec);
+  SetLength(Result, 4);
+  Result[0] := PointD(mp.X, rec.Top);
+  Result[1] := PointD(rec.Right, mp.Y);
+  Result[2] := PointD(mp.X, rec.Bottom);
+  Result[3] := PointD(rec.Left, mp.Y);
+end;
+//------------------------------------------------------------------------------
+
+function CreateSizingButtonGroup(targetLayer: TLayer32;
+  sizingStyle: TSizingStyle; buttonShape: TButtonShape;
+  buttonSize: integer; buttonColor: TColor32;
+  buttonLayerClass: TButtonDesignerLayer32Class = nil): TSizingGroupLayer32;
 var
   i: integer;
-begin
-  for i := 0 to Count -1 do
-    if SameText(Layer[i].Name, name) then
-    begin
-      Result := Layer[i];
-      Exit;
-    end;
-  Result := nil;
-end;
-//------------------------------------------------------------------------------
-
-function TLayeredImage32.GetLayerAt(const pt: TPoint): TLayer32;
-var
-  i: integer;
-begin
-  Result := nil;
-  for i := Count -1 downto 0 do
-    with Layer[i] do
-      if Visible and not Image.IsEmpty and HitTest(pt) then
-      begin
-        Result := Layer[i];
-        Break;
-      end;
-end;
-//------------------------------------------------------------------------------
-
-function TLayeredImage32.Group(startIdx, endIdx: integer): integer;
-var
-  i: integer;
-begin
-  Result := 0;
-  startIdx := Max(0, startIdx);
-  endIdx := Min(Count -1, endIdx);
-  for i := startIdx to endIdx do
-    if Layer[i].IsInGroup then Exit;
-
-  //first look for an expired group (negative values => expired group)
-  Result := fGroupList.Count +1;
-  for i := 0 to fGroupList.Count -1 do
-    if integer(fGroupList[i]) < 0 then
-    begin
-      Result := i +1;
-      fGroupList[i] := Pointer(startIdx);
-      Break;
-    end;
-  //if no expired groups then add the new group index
-  if Result > fGroupList.Count then
-    fGroupList.Add(pointer(startIdx));
-
-  for i := startIdx to endIdx do
-    Layer[i].fGroupId := Result;
-end;
-//------------------------------------------------------------------------------
-
-procedure TLayeredImage32.UnGroup(GroupId: integer);
-var
-  i, fig, lig: integer;
-begin
-  fig := GetFirstInGroupIdx(GroupId);
-  if fig < 0 then Exit;
-  lig := GetLastInGroupIdx(GroupId);
-  for i := fig to lig do
-    Layer[i].fGroupId := 0;
-  fGroupList[GroupId -1] := pointer(-1);
-end;
-//------------------------------------------------------------------------------
-
-function TLayeredImage32.GetFirstInGroupIdx(GroupId: integer): integer;
-begin
-  if (GroupId < 1) or (GroupId > fGroupList.Count) then
-    Result := -1 else
-    Result := integer(fGroupList[GroupId -1]);
-end;
-//------------------------------------------------------------------------------
-
-function TLayeredImage32.GetLastInGroupIdx(GroupId: integer): integer;
-var
-  topLevel: integer;
-begin
-  Result := GetFirstInGroupIdx(GroupId);
-  if Result < 0 then Exit;
-  topLevel := Count -1;
-  while (Result < topLevel) and
-    (Layer[Result +1].fGroupId = GroupId) do inc(Result);
-end;
-//------------------------------------------------------------------------------
-
-function TLayeredImage32.GroupCount(groupId: integer): integer;
-var
-  idx, idx2, cnt: integer;
-begin
-  Result := 0;
-  cnt := Count;
-  idx := GetFirstInGroupIdx(groupId);
-  if idx < 0 then Exit;
-  idx2 := idx +1;
-  while (idx2  < cnt) and (Layer[idx2].fGroupId = groupId) do inc(idx2);
-  Result := idx2 - idx;
-end;
-//------------------------------------------------------------------------------
-
-procedure TLayeredImage32.OffsetGroup(GroupId, dx, dy: integer);
-var
-  i, fig, lig: integer;
-begin
-  fig := GetFirstInGroupIdx(GroupId);
-  if fig < 0 then Exit;
-  lig := GetLastInGroupIdx(GroupId);
-  //nb: it almost never makes sense offsetting design layers
-  for i := fig to lig do
-    if not (Layer[i] is TDesignerLayer32) then
-      Layer[i].Offset(dx, dy);
-end;
-//------------------------------------------------------------------------------
-
-function TLayeredImage32.BringGroupForward(GroupId, newLevel: integer): Boolean;
-var
-  i, fig, lig, cnt, topIdx: integer;
-begin
-  topIdx := Count -1;
-  fig := GetFirstInGroupIdx(GroupId);
-  if fig < 0 then begin Result := false; Exit; end;
-  lig := GetLastInGroupIdx(GroupId);
-  cnt := lig - fig +1;
-  result := (newLevel > lig) and (newLevel <= topIdx);
-  if not result then Exit;
-  //if newLevel is inside another group, adjust newLevel to above that group
-  if Layer[newLevel].IsInGroup then
-    while (newLevel < topIdx) and
-      (Layer[newLevel].fGroupId = Layer[newLevel+1].fGroupId) do
-        inc(newLevel);
-  for i := 1 to cnt do
-    fList.Move(fig, newLevel);
-  fGroupList[GroupId -1] := pointer(newLevel);
-  ReIndexFrom(fig, newLevel + cnt);
-end;
-//------------------------------------------------------------------------------
-
-function TLayeredImage32.SendGroupBack(GroupId, newLevel: integer): Boolean;
-var
-  i, fig, lig: integer;
-begin
-  fig := GetFirstInGroupIdx(GroupId);
-  if fig < 0 then begin Result := false; Exit; end;
-  lig := GetLastInGroupIdx(GroupId);
-  Result := (newLevel < fig) and (newLevel >= 0);
-  if not Result then Exit;
-  if Layer[newLevel].IsInGroup then
-    while (newLevel > 0) and
-      (Layer[newLevel].fGroupId = Layer[newLevel-1].fGroupId) do
-        dec(newLevel);
-  for i := fig to lig do
-    fList.Move(lig, newLevel);
-  fGroupList[GroupId -1] := pointer(newLevel);
-  ReIndexFrom(newLevel, lig);
-end;
-//------------------------------------------------------------------------------
-
-function TLayeredImage32.DeleteGroup(GroupId: integer): Boolean;
-var
-  i, fig, lig: integer;
-begin
-  fig := GetFirstInGroupIdx(GroupId);
-  result := fig >= 0;
-  if not Result then Exit;
-  lig := GetLastInGroupIdx(GroupId);
-  for i := lig downto fig do
-  begin
-    Layer[i].Free;
-    fList.Delete(i);
-  end;
-  ReIndexFrom(fig, Count -1);
-  //remove group from fGroupList
-  fGroupList[GroupId -1] := pointer(-1);
-  Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-procedure TLayeredImage32.HideGroup(GroupId: integer);
-var
-  i, fig, lig: integer;
-begin
-  fig := GetFirstInGroupIdx(GroupId);
-  if fig < 0 then Exit;
-  lig := GetLastInGroupIdx(GroupId);
-  for i := fig to lig do
-    Layer[i].Visible := false;
-end;
-//------------------------------------------------------------------------------
-
-procedure TLayeredImage32.ShowGroup(GroupId: integer);
-var
-  i, fig, lig: integer;
-begin
-  fig := GetFirstInGroupIdx(GroupId);
-  if fig < 0 then Exit;
-  lig := GetLastInGroupIdx(GroupId);
-  for i := fig to lig do
-    Layer[i].Visible := true;
-end;
-
-//------------------------------------------------------------------------------
-// Interface functions
-//------------------------------------------------------------------------------
-
-function GetRectFromGroupButtons(layeredImage32: TLayeredImage32;
-  GroupId: integer): TRect;
-var
-  fig, lig: integer;
-  pt: TPoint;
-begin
-  Result := NullRect;
-  fig := layeredImage32.GetFirstInGroupIdx(GroupId);
-  if fig < 0 then Exit;
-  lig := layeredImage32.GetLastInGroupIdx(GroupId);
-  result.TopLeft := Point(layeredImage32[fig].MidPoint);
-  result.BottomRight := result.TopLeft;
-  inc(fig);
-  while fig <= lig do
-  begin
-    pt := Point(layeredImage32[fig].MidPoint);
-    if pt.X < result.Left then result.Left := pt.X
-    else if pt.X > result.Right then result.Right := pt.X;
-    if pt.Y < result.Top then result.Top := pt.Y
-    else if pt.Y > result.Bottom then result.Bottom := pt.Y;
-    inc(fig);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure SizeAndDrawButtonLayer(layer: TLayer32; buttonSize: double;
-  buttonColor: TColor32; buttonOptions: TButtonOptions);
-var
-  layerSize: integer;
-begin
-  if buttonSize < 2 then buttonSize := DefaultButtonSize;
-  //allow room for a button drop shadow
-  layerSize := Ceil(DefaultButtonSize * 1.25);
-  //button layers must have even numbered width and height so the layer's
-  //(rounded) Midpoint will be accurate (see PositionCenteredAt)
-  //which is important when moving
-  if Odd(layerSize) then inc(layerSize);
-  layer.SetSize(layerSize, layerSize);
-  Image32_Extra.DrawButton(layer.Image,
-    layer.MidPoint, buttonSize, buttonColor, buttonOptions);
-end;
-//------------------------------------------------------------------------------
-
-function CreateSizingBtnsGroup(targetLayer: TLayer32;
-  style: TSizingStyle; buttonColor: TColor32;
-  buttonSize: integer; buttonOptions: TButtonOptions;
-  buttonLayerClass: TButtonDesignerLayer32Class = nil): integer;
-var
-  i, idxFirstBtn: integer;
-  rec: TRect;
+  rec: TRectD;
   corners, edges: TPathD;
-  layer: TLayer32;
-  lim: TLayeredImage32;
 const
   cnrCursorIds: array [0..3] of integer =
     (crSizeNWSE, crSizeNESW, crSizeNWSE, crSizeNESW);
   edgeCursorIds: array [0..3] of integer =
     (crSizeNS, crSizeWE, crSizeNS, crSizeWE);
 begin
-  result := 0;
-  if targetLayer is TDesignerLayer32 or
-    targetLayer.IsInGroup or targetLayer.Image.IsEmpty then Exit;
+  if not assigned(targetLayer) or
+    not (targetLayer is THitTestLayer32) then
+      raise Exception.Create(rsCreateButtonGroupError);
+  Result := TSizingGroupLayer32(
+    targetLayer.RootOwner.AddLayer(TSizingGroupLayer32,
+    nil, rsSizingButtonGroup));
+  Result.BeginUpdate;
+  try
+    Result.SizingStyle := sizingStyle;
+    rec := RectD(targetLayer.Bounds);
+    corners := Rectangle(rec);
+    edges := GetRectEdgeMidPoints(rec);
 
-  lim := targetLayer.fOwner;
-  idxFirstBtn := lim.Count;
-  if style = ssCustom then style := ssEdgesAndCorners;
-  if not assigned(buttonLayerClass) then
-    buttonLayerClass := TButtonDesignerLayer32;
+    if not assigned(buttonLayerClass) then
+      buttonLayerClass := TButtonDesignerLayer32;
 
-  rec := targetLayer.Bounds;
-  corners := Rectangle(rec);
-  edges := GetRectEdgeMidPoints(rec);
-
-  case style of
-    ssCorners:
-      for i := 0 to 3 do
-      begin
-        layer := lim.AddLayer(buttonLayerClass);
-        layer.Name := ButtonLayerName;
-        SizeAndDrawButtonLayer(layer, buttonSize, buttonColor, buttonOptions);
-        layer.PositionCenteredAt(Point(corners[i]));
-        layer.CursorId := cnrCursorIds[i];
-      end;
-    ssEdges:
-      for i := 0 to 3 do
-      begin
-        layer := lim.AddLayer(buttonLayerClass);
-        layer.Name := ButtonLayerName;
-        SizeAndDrawButtonLayer(layer, buttonSize, buttonColor, buttonOptions);
-        layer.PositionCenteredAt(Point(edges[i]));
-        layer.CursorId := edgeCursorIds[i];
-      end;
-    else
-      for i := 0 to 3 do
-      begin
-        layer := lim.AddLayer(buttonLayerClass);
-        layer.Name := ButtonLayerName;
-        SizeAndDrawButtonLayer(layer, buttonSize, buttonColor, buttonOptions);
-        layer.PositionCenteredAt(Point(corners[i]));
-        layer.CursorId := cnrCursorIds[i];
-
-        layer := lim.AddLayer(buttonLayerClass);
-        layer.Name := ButtonLayerName;
-        SizeAndDrawButtonLayer(layer, buttonSize, buttonColor, buttonOptions);
-        layer.PositionCenteredAt(Point(edges[i]));
-        layer.CursorId := edgeCursorIds[i];
-      end;
-  end;
-  Result := lim.Group(idxFirstBtn, layer.fIndex);
-end;
-//------------------------------------------------------------------------------
-
-function UpdateButtonSizingGroup(movedBtnLayer: TButtonDesignerLayer32): TRect;
-var
-  i, btnIdx, cnt, fig: integer;
-  lim: TLayeredImage32;
-  btnMP: TPoint;
-  corners, edgeMps: TPathD;
-  style: TSizingStyle;
-begin
-  lim := movedBtnLayer.Owner;
-  fig := lim.GetFirstInGroupIdx(movedBtnLayer.GroupId);
-  cnt := lim.GroupCount(movedBtnLayer.GroupId);
-  if (cnt <> 4) and (cnt = 8) then Exit; //not a recognised button group
-
-  Result := GetRectFromGroupButtons(lim, movedBtnLayer.GroupId);
-
-  //ADJUST REC ACCORDING TO THE NEW POSITION OF MOVEDBTNLAYER
-
-  btnMP := Point(movedBtnLayer.MidPoint);
-
-  //it's simpler for the library user (and probably safer too)
-  //if we determine sizing style here
-  style := ssCorners;
-  if (cnt = 4) and
-    ((Round(lim[fig].MidPoint.X) = btnMP.X) and
-      (Round(lim[fig+2].MidPoint.X) = btnMP.X)) or
-    ((Round(lim[fig+1].MidPoint.Y) = btnMP.Y) and
-      (Round(lim[fig+3].MidPoint.Y) = btnMP.Y)) then style := ssEdges;
-
-  //btnIdx: moved button index relative to base button index
-  btnIdx := movedBtnLayer.Index - fig;
-  if cnt = 8 then
-  begin
-    case btnIdx of
-      0: begin Result.Left := btnMP.X; Result.Top := btnMP.Y; end;
-      1: Result.Top := btnMP.Y;
-      2: begin Result.Right := btnMP.X; Result.Top := btnMP.Y; end;
-      3: Result.Right := btnMP.X;
-      4: begin Result.Right := btnMP.X; Result.Bottom := btnMP.Y; end;
-      5: Result.Bottom := btnMP.Y;
-      6: begin Result.Left := btnMP.X; Result.Bottom := btnMP.Y; end;
-      7: Result.Left := btnMP.X;
-    end;
-  end
-  else if style = ssCorners then
-  begin
-    case btnIdx of
-      0: begin Result.Left := btnMP.X; Result.Top := btnMP.Y; end;
-      1: begin Result.Right := btnMP.X; Result.Top := btnMP.Y; end;
-      2: begin Result.Right := btnMP.X; Result.Bottom := btnMP.Y; end;
-      3: begin Result.Left := btnMP.X; Result.Bottom := btnMP.Y; end;
-    end;
-  end else
-  begin
-    case btnIdx of
-      0: Result.Top := btnMP.Y;
-      1: Result.Right := btnMP.X;
-      2: Result.Bottom := btnMP.Y;
-      3: Result.Left := btnMP.X;
-    end;
-  end;
-
-  //REPOSITION ALL BUTTONS SO THAT THEY ALIGN WITH REC
-  //AND EDGE BUTTONS ARE RE-CENTERED TOO
-
-  if cnt = 8 then
-  begin
-    corners := GetRectCorners(Result);
-    edgeMps :=  GetRectEdgeMidPoints(Result);
     for i := 0 to 3 do
     begin
-      lim[fig + i*2].PositionCenteredAt(Point(corners[i]));
-      lim[fig + i*2 +1].PositionCenteredAt(Point(edgeMps[i]));
+      if sizingStyle <> ssEdges then
+      begin
+        with TButtonDesignerLayer32(Result.AddChild(
+          buttonLayerClass, rsButton)) do
+        begin
+          SetButtonAttributes(buttonShape, buttonSize, buttonColor);
+          PositionCenteredAt(corners[i]);
+          CursorId := cnrCursorIds[i];
+        end;
+      end;
+      if sizingStyle <> ssCorners then
+      begin
+        with TButtonDesignerLayer32(Result.AddChild(
+          buttonLayerClass, rsButton)) do
+        begin
+          SetButtonAttributes(buttonShape, buttonSize, buttonColor);
+          PositionCenteredAt(edges[i]);
+          CursorId := edgeCursorIds[i];
+        end;
+      end;
     end;
-  end
-  else if style = ssCorners then
-  begin
-    corners := GetRectCorners(Result);
-    for i := 0 to 3 do
-      lim[fig + i].PositionCenteredAt(Point(corners[i]));
-  end else
-  begin
-    edgeMps :=  GetRectEdgeMidPoints(Result);
-    for i := 0 to 3 do
-      lim[fig + i].PositionCenteredAt(Point(edgeMps[i]));
+  finally
+    Result.EndUpdate;
   end;
 end;
 //------------------------------------------------------------------------------
 
-function CreateButtonGroup(layeredImage32: TLayeredImage32;
-  const buttonPts: TPathD; buttonColor: TColor32;
-  buttonSize: integer; buttonOptions: TButtonOptions;
-  buttonLayerClass: TButtonDesignerLayer32Class = nil): integer;
+function UpdateSizingButtonGroup(movedButton: TButtonDesignerLayer32): TRectD;
 var
   i: integer;
-  layer: TButtonDesignerLayer32;
+  path, corners, edges: TPathD;
+  group: TSizingGroupLayer32;
 begin
-  layer := StartButtonGroup(layeredImage32, Point(buttonPts[0]), buttonColor,
-    buttonSize, buttonOptions, buttonLayerClass);
-  Result := layer.GroupId;
-  for i := 1 to High(buttonPts) do
-    AddToButtonGroup(layeredImage32, layer.GroupId, Point(buttonPts[i]),
-      buttonColor, buttonSize, buttonOptions);
+  Result := NullRectD;
+  if not assigned(movedButton) or
+    not (movedButton.GroupOwner is TSizingGroupLayer32) then Exit;
+
+  group := TSizingGroupLayer32(movedButton.GroupOwner);
+  with group do
+  begin
+    SetLength(path, ChildCount);
+    for i := 0 to ChildCount -1 do
+      path[i] := Child[i].MidPoint;
+  end;
+
+  Result := GetBoundsD(path);
+  case group.SizingStyle of
+    ssCorners:
+      begin
+        if Length(path) <> 4 then Exit;
+        with movedButton.MidPoint do
+        begin
+          case movedButton.Index of
+            0: begin Result.Left := X; Result.Top := Y; end;
+            1: begin Result.Right := X; Result.Top := Y; end;
+            2: begin Result.Right := X; Result.Bottom := Y; end;
+            3: begin Result.Left := X; Result.Bottom := Y; end;
+          end;
+        end;
+        corners := Rectangle(Result);
+        with group do
+          for i := 0 to 3 do
+            Child[i].PositionCenteredAt(corners[i]);
+      end;
+    ssEdges:
+      begin
+        if Length(path) <> 4 then Exit;
+        with movedButton.MidPoint do
+        begin
+          case movedButton.Index of
+            0: Result.Top := Y;
+            1: Result.Right := X;
+            2: Result.Bottom := Y;
+            3: Result.Left := X;
+          end;
+        end;
+        edges := GetRectEdgeMidPoints(Result);
+        with group do
+          for i := 0 to 3 do
+            Child[i].PositionCenteredAt(edges[i]);
+      end;
+    else
+      begin
+        if Length(path) <> 8 then Exit;
+        with movedButton.MidPoint do
+        begin
+          case movedButton.Index of
+            0: begin Result.Left := X; Result.Top := Y; end;
+            1: Result.Top := Y;
+            2: begin Result.Right := X; Result.Top := Y; end;
+            3: Result.Right := X;
+            4: begin Result.Right := X; Result.Bottom := Y; end;
+            5: Result.Bottom := Y;
+            6: begin Result.Left := X; Result.Bottom := Y; end;
+            7: Result.Left := X;
+          end;
+        end;
+        corners := Rectangle(Result);
+        edges := GetRectEdgeMidPoints(Result);
+        with group do
+          for i := 0 to 3 do
+          begin
+            Child[i*2].PositionCenteredAt(corners[i]);
+            Child[i*2 +1].PositionCenteredAt(edges[i]);
+          end;
+      end;
+  end;
 end;
 //------------------------------------------------------------------------------
 
-function StartButtonGroup(layeredImage32: TLayeredImage32;
-  const buttonPt: TPoint; buttonColor: TColor32;
-  buttonSize: integer; buttonOptions: TButtonOptions;
-  buttonLayerClass: TButtonDesignerLayer32Class = nil): TButtonDesignerLayer32;
+function CreateRotatingButtonGroup(targetLayer: TLayer32;
+  buttonSize: integer; centerButtonColor, movingButtonColor: TColor32;
+  startingAngle: double; startingZeroOffset: double;
+  buttonLayerClass: TButtonDesignerLayer32Class): TRotatingGroupLayer32;
+var
+  rec, rec2: TRect;
+  mp, pt: TPoint;
+  i, radius: integer;
 begin
+  if not assigned(targetLayer) or
+    not (targetLayer is THitTestLayer32) then
+      raise Exception.Create(rsCreateButtonGroupError);
+
+  Result := TRotatingGroupLayer32(targetLayer.RootOwner.AddLayer(
+    TRotatingGroupLayer32, nil, rsRotatingButtonGroup));
+
+  //startingZeroOffset: default = 0 (ie 3 o'clock)
+  Result.fZeroOffset := startingZeroOffset;
+
+  rec := targetLayer.Bounds;
+  radius := Max(RectWidth(rec), RectHeight(rec)) div 2;
+  mp := Image32_Vector.MidPoint(rec);
+
+  with Result.AddChild(TDesignerLayer32) do     //Layer 0 - design layer
+  begin
+    rec2 := Rect(mp.x -radius, mp.y -radius, mp.x +radius, mp.y +radius);
+    SetBounds(rec2);
+    i := DPIAware(2);
+    DrawDashedLine(Image, Ellipse(Rect(i,i,radius*2 -i, radius*2 -i)),
+      dashes, nil, i, clRed32, esPolygon);
+  end;
+
   if not assigned(buttonLayerClass) then
     buttonLayerClass := TButtonDesignerLayer32;
 
-  Result := TButtonDesignerLayer32(layeredImage32.AddLayer(buttonLayerClass));
-  Result.Name := ButtonLayerName;
-  SizeAndDrawButtonLayer(Result, buttonSize, buttonColor, buttonOptions);
-  Result.PositionCenteredAt(buttonPt);
-  Result.CursorId := crHandPoint;
-  layeredImage32.Group(Result.fIndex, Result.fIndex);
+  Result.BeginUpdate;
+  try
+    with TButtonDesignerLayer32(Result.AddChild(  //Layer 1 - center button
+      buttonLayerClass, rsButton)) do
+    begin
+      SetButtonAttributes(bsRound, buttonSize, centerButtonColor);
+      PositionCenteredAt(mp);
+      HitTestRec.Clear;
+    end;
+
+    with TButtonDesignerLayer32(Result.AddChild(  //layer 2 - rotating button
+      buttonLayerClass, rsButton)) do
+    begin
+      SetButtonAttributes(bsRound, buttonSize, movingButtonColor);
+
+      pt := Point(GetPointAtAngleAndDist(PointD(mp),
+        -(startingAngle + startingZeroOffset), radius));
+      PositionCenteredAt(pt);
+
+      CursorId := crHandPoint;
+    end;
+  finally
+    Result.EndUpdate;
+  end;
 end;
 //------------------------------------------------------------------------------
 
-function AddToButtonGroup(layeredImage32: TLayeredImage32;
-  GroupId: integer; const pt: TPoint; buttonColor: TColor32;
-  buttonSize: integer; buttonOptions: TButtonOptions): TButtonDesignerLayer32;
+function UpdateRotatingButtonGroup(rotateButton: TLayer32): double;
 var
-  fig, lig: integer;
+  rec: TRect;
+  mp, pt2: TPointD;
+  i, radius: integer;
 begin
-  Result := nil;
-  fig := layeredImage32.GetFirstInGroupIdx(GroupId);
-  if fig < 0 then Exit;
-  lig := layeredImage32.GetLastInGroupIdx(GroupId);
-  //nb: the only way to add to a group is to temporarily ungroup
-  layeredImage32.UnGroup(GroupId);
-  //create a new layer of the same class type as the first button layer
-  Result := TButtonDesignerLayer32(layeredImage32.InsertLayer(
-    TButtonDesignerLayer32Class(layeredImage32[fig].ClassType), lig+1));
-  Result.Name := ButtonLayerName;
-  SizeAndDrawButtonLayer(Result, buttonSize, buttonColor, buttonOptions);
-  Result.PositionCenteredAt(pt);
-  Result.CursorId := crHandPoint;
-  layeredImage32.Group(fig, Result.Index);
+  if not assigned(rotateButton) or
+    not (rotateButton.GroupOwner is TRotatingGroupLayer32) then
+      raise Exception.Create(rsUpdateRotateGroupError);
+
+  with TRotatingGroupLayer32(rotateButton.GroupOwner) do
+  begin
+    Invalidate(fImageLayer.bounds);
+    mp := Child[1].MidPoint;
+    pt2 := rotateButton.MidPoint;
+    radius := Round(Distance(mp, pt2));
+    rec := Rect(RectD(mp.X -radius, mp.Y -radius, mp.X +radius,mp.Y +radius));
+    Child[0].SetBounds(rec);
+    i :=  DPIAware(2);
+    DrawDashedLine(Child[0].Image, Ellipse(Rect(i,i,radius*2 -i, radius*2 -i)),
+      dashes, nil, i, clRed32, esPolygon);
+    Result := Image32_Vector.GetAngle(mp, pt2) - fZeroOffset;
+    NormalizeAngle(Result);
+  end;
 end;
 //------------------------------------------------------------------------------
 
-function AddToButtonGroup(layeredImage32: TLayeredImage32;
-  GroupId: integer; const pt: TPoint): TButtonDesignerLayer32;
+function CreateButtonGroup(groupOwner: TGroupLayer32;
+  const buttonPts: TPathD; buttonShape: TButtonShape;
+  buttonSize: integer; buttonColor: TColor32;
+  buttonLayerClass: TButtonDesignerLayer32Class = nil): TButtonGroupLayer32;
 var
-  fig, lig: integer;
-  layer: TLayer32;
+  i: integer;
 begin
-  Result := nil;
-  fig := layeredImage32.GetFirstInGroupIdx(GroupId);
-  if fig < 0 then Exit;
-  lig := layeredImage32.GetLastInGroupIdx(GroupId);
-  layer := layeredImage32[lig];
-  Result := AddToButtonGroup(layeredImage32, GroupId, pt, clNone32, 0, []);
-  Result.Image.Assign(layer.Image);
-  Result.PositionCenteredAt(pt);
+  if not assigned(groupOwner) then
+    raise Exception.Create(rsCreateButtonGroupError);
+
+  Result := TButtonGroupLayer32(groupOwner.AddChild(TButtonGroupLayer32));
+  if not assigned(buttonLayerClass) then
+    buttonLayerClass := TButtonDesignerLayer32;
+
+  Result.fBtnSize := buttonSize;
+  Result.fBtnShape := buttonShape;
+  Result.fBtnColor := buttonColor;
+  Result.fBbtnLayerClass := buttonLayerClass;
+
+  Result.BeginUpdate;
+  try
+    for i := 0 to high(buttonPts) do
+      Result.AddButton(buttonPts[i]);
+  finally
+    Result.EndUpdate;
+  end;
 end;
 //------------------------------------------------------------------------------
+
+procedure InitDashes;
+var
+  i: integer;
+begin
+  i := DPIAware(2);
+  setLength(dashes, 2);
+  dashes[0] := i; dashes[1] := i*2;
+end;
 
 initialization
+  InitDashes;
   DefaultButtonSize := DPIAware(10);
 
 end.

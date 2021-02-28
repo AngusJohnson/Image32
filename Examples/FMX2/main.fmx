@@ -1,7 +1,7 @@
 object MainForm: TMainForm
   Left = 0
   Top = 0
-  Caption = 'Image32 FMX Demo2'
+  Caption = 'FMX2'
   ClientHeight = 480
   ClientWidth = 320
   Position = DesktopCenter

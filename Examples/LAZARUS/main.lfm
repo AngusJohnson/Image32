@@ -1,7 +1,7 @@
 object MainForm: TMainForm
-  Left = 867
+  Left = 1028
   Height = 705
-  Top = 303
+  Top = 390
   Width = 729
   Caption = 'Image32 Lazarus Demo'
   ClientHeight = 705
@@ -9,17 +9,10 @@ object MainForm: TMainForm
   DesignTimePPI = 192
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnPaint = FormPaint
   OnShow = FormShow
   Position = poDesktopCenter
-  LCLVersion = '2.0.10.0'
-  object Image1: TImage
-    Left = 0
-    Height = 705
-    Top = 0
-    Width = 729
-    Align = alClient
-    Center = True
-  end
+  LCLVersion = '2.0.12.0'
   object btnRefresh: TButton
     Left = 328
     Height = 70

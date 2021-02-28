@@ -13,6 +13,11 @@ unit Image32_GIF;
 interface
 
 {$I Image32.inc}
+
+{$IF COMPILERVERSION = 15}
+implementation
+{$ELSE}
+
 uses
   SysUtils, Classes, Windows, Math, Image32, Graphics,
   {$IFDEF DELPHI_GIF} GifImg {$ELSE} GifImage {$ENDIF};
@@ -122,6 +127,11 @@ end;
 
 initialization
   TImage32.RegisterImageFormatClass('GIF', TImageFormat_GIF, cpLow);
-
+  
+{$IFEND}
 end.
+
+
+
+
 

@@ -2,10 +2,10 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.56                                                            *
-* Date      :  14 November 2020                                                 *
+* Version   :  2.0                                                             *
+* Date      :  20 February 2021                                                *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2020                                         *
+* Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  The core module of the Image32 library                          *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -104,8 +104,8 @@ type
     function GetIsEmpty: Boolean;
     function GetPixelBase: PColor32;
     function GetPixelRow(row: Integer): PColor32;
-    procedure DoResizeAA(newWidth, newHeight: Integer);
-    procedure DoResize(newWidth, newHeight: Integer);
+    procedure InternalStretchResizeFast(newWidth, newHeight: Integer);
+    procedure InternalStretchResizeAA(newWidth, newHeight: Integer);
     procedure RotateLeft90;
     procedure RotateRight90;
     procedure Rotate180;
@@ -122,6 +122,7 @@ type
     procedure EndUpdate;
     procedure Changed; virtual;
     procedure Resized; virtual;
+    property UpdateCount: integer read fUpdateCnt;
   public
     constructor Create(width: Integer = 0; height: Integer = 0); overload;
     constructor Create(src: TImage32); overload;
@@ -200,8 +201,8 @@ type
 
     //CropTransparentPixels: Trims transparent edges until each edge contains
     //at least one opaque or semi-opaque pixel.
-    procedure CropTransparentPixels;
-    procedure Rotate(angleRads: single);
+    function CropTransparentPixels: TRect;
+    procedure Rotate(angleRads: double);
     //RotateRect: Rotates part of an image, but also clips those parts of the
     //rotated image that fall outside rec. The eraseColor parameter indicates
     //the color to fill those uncovered pixels in rec following rotation.
@@ -211,6 +212,10 @@ type
 
     //ScaleAlpha: Scales the alpha byte of every pixel by the specified amount.
     procedure ScaleAlpha(scale: double);
+    //ApplyAlpha: Multiplies the alpha channel of all pixels by the 'alpha'
+    //value. (If 'alpha' param. = 255 then the image will remain unchanged.)
+    procedure ApplyAlpha(alpha: byte);
+
     //RegisterImageFormatClass: Registers a TImageFormatClass with TImage32 and
     //associates it with a specific 3 character file extension (eg BMP).
     class procedure RegisterImageFormatClass(ext: string;
@@ -407,18 +412,22 @@ type
   function ClampRange(val, min, max: single): single; overload;
   function IncPColor32(pc: Pointer; cnt: Integer): PColor32;
 
+  procedure NormalizeAngle(var angle: double);
+
+  {$IFDEF MSWINDOWS}
+
   //DPIAware: Useful for DPIAware sizing of images and their container controls.
   //It scales values relative to the display's resolution (PixelsPerInch).
   //See https://docs.microsoft.com/en-us/windows/desktop/hidpi/high-DPIAware-desktop-application-development-on-windows
   function DPIAware(val: Integer): Integer; overload; {$IFDEF INLINE} inline; {$ENDIF}
   function DPIAware(val: double): double; overload; {$IFDEF INLINE} inline; {$ENDIF}
 
-  {$IFDEF MSWINDOWS}
   {$IFDEF FPC}
   function AlphaBlend(DC: HDC; p2, p3, p4, p5: Integer;
     DC6: HDC; p7, p8, p9, p10: Integer; p11: Windows.TBlendFunction): BOOL;
     stdcall; external 'msimg32.dll' name 'AlphaBlend';
   {$ENDIF}
+
   {$ENDIF}
 
   //CreateResourceStream: handles both numeric and string names and types
@@ -482,6 +491,9 @@ var
 
 implementation
 
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
 const
   div255 : Double = 1 / 255;
 type
@@ -503,6 +515,15 @@ var
 {$ENDIF}
 
 
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+procedure NormalizeAngle(var angle: double);
+begin
+  while angle < 0 do angle := angle + angle360;
+  while angle > angle360 do angle := angle - angle360;
+  if (angle < 0.01) or (angle > angle360 - 0.01) then angle := 0; // <0.5 deg.
+end;
 //------------------------------------------------------------------------------
 
 function SwapRedBlue(color: TColor32): TColor32;
@@ -705,11 +726,8 @@ function CompareAlphaEx(master, current: TColor32): Byte;
 var
   mast: TARGB absolute master;
   curr: TARGB absolute current;
-  res: Cardinal;
 begin
-  res := Sqr(mast.A - curr.A);
-  if res >= 65025 then result := 0
-  else result := 255 - Round(Sqrt(res));
+  Result := 255 - abs(mast.A - curr.A);
 end;
 
 //------------------------------------------------------------------------------
@@ -824,14 +842,6 @@ begin
   Result.biCompression := BI_RGB;
 end;
 //------------------------------------------------------------------------------
-{$ENDIF}
-
-function RectsEqual(const rec1, rec2: TRect): Boolean;
-begin
-  result := (rec1.Left = rec2.Left) and (rec1.Top = rec2.Top) and
-    (rec1.Right = rec2.Right) and (rec1.Bottom = rec2.Bottom);
-end;
-//------------------------------------------------------------------------------
 
 function DPIAware(val: Integer): Integer;
 begin
@@ -842,6 +852,14 @@ end;
 function DPIAware(val: double): double;
 begin
   result := val * ScreenScale;
+end;
+//------------------------------------------------------------------------------
+{$ENDIF}
+
+function RectsEqual(const rec1, rec2: TRect): Boolean;
+begin
+  result := (rec1.Left = rec2.Left) and (rec1.Top = rec2.Top) and
+    (rec1.Right = rec2.Right) and (rec1.Bottom = rec2.Bottom);
 end;
 //------------------------------------------------------------------------------
 
@@ -1333,7 +1351,9 @@ end;
 constructor TImage32.Create(width: Integer; height: Integer);
 begin
   fAntiAliase := true;
-  SetSize(width, height);
+  fwidth := Max(0, width);
+  fheight := Max(0, height);
+  SetLength(fPixels, fwidth * fheight);
 end;
 //------------------------------------------------------------------------------
 
@@ -1346,9 +1366,11 @@ end;
 constructor TImage32.Create(src: TImage32; const srcRec: TRect);
 begin
   fAntiAliase := src.fAntiAliase;
+  fUpdateCnt := 1;
   SetSize(RectWidth(srcRec), RectHeight(srcRec));
   if not IsEmptyRect(srcRec) then
     fPixels := src.CopyPixels(srcRec);
+  fUpdateCnt := 0;
 end;
 //------------------------------------------------------------------------------
 
@@ -1462,28 +1484,33 @@ procedure TImage32.Assign(src: TImage32);
 begin
   if assigned(src) then
     src.AssignTo(self);
-  Changed;
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.AssignTo(dst: TImage32);
 begin
   if dst = self then Exit;
-  dst.fAntiAliase := fAntiAliase;
-  dst.fIsPremultiplied := fIsPremultiplied;
-  dst.fColorCount := 0;
+  dst.BeginUpdate;
   try
-    dst.SetSize(Width, Height);
-    if (Width > 0) and (Height > 0) then
-      move(fPixels[0], dst.fPixels[0], Width * Height * SizeOf(TColor32));
-  except
-    dst.SetSize(0,0);
+    dst.fAntiAliase := fAntiAliase;
+    dst.fIsPremultiplied := fIsPremultiplied;
+    dst.fColorCount := 0;
+    try
+      dst.SetSize(Width, Height);
+      if (Width > 0) and (Height > 0) then
+        move(fPixels[0], dst.fPixels[0], Width * Height * SizeOf(TColor32));
+    except
+      dst.SetSize(0,0);
+    end;
+  finally
+    dst.EndUpdate;
   end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.Changed;
 begin
+  if fUpdateCnt <> 0 then Exit;
   fColorCount := 0;
   if Assigned(fOnChange) then fOnChange(Self);
 end;
@@ -1491,8 +1518,8 @@ end;
 
 procedure TImage32.Resized;
 begin
-  if Assigned(fOnResize) then fOnResize(Self)
-  else if Assigned(fOnChange) then fOnChange(Self);
+  if Assigned(fOnResize) then fOnResize(Self);
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1505,8 +1532,7 @@ end;
 procedure TImage32.EndUpdate;
 begin
   dec(fUpdateCnt);
-  if (fUpdateCnt = 0) and Assigned(fOnChange) then
-    fOnChange(Self);
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1684,13 +1710,16 @@ procedure TImage32.SetSize(newWidth, newHeight: Integer; color: TColor32);
 begin
   fwidth := Max(0, newWidth);
   fheight := Max(0, newHeight);
-  if color = 0 then fPixels := nil; //clear image in case old size == new size
-  setLength(fPixels, fwidth * fheight);
+  fPixels := nil; //prevents unnecessary (and unsafe) pixel copy
+  SetLength(fPixels, fwidth * fheight);
   fIsPremultiplied := false;
-  //nb: dynamic arrays are zero-initialized with SetLength() UNLESS the array
-  //is returned as a function result. (So SetSize() does zero-initialize)
-  if color > 0 then Clear(color);
-  Resized;
+  BeginUpdate;
+  try
+    if color > 0 then Clear(color);
+    Resized;
+  finally
+    EndUpdate;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1703,6 +1732,7 @@ begin
   begin
     SetSize(0, 0);
     Exit;
+
   end;
   if (newWidth = fwidth) and (newHeight = fheight) then Exit;
 
@@ -1712,29 +1742,32 @@ begin
     Exit;
   end;
 
-  if stretchImage then
-  begin
-    if fAntiAliase then
-      DoResizeAA(newWidth, newHeight) else
-      DoResize(newWidth, newHeight);
-  end else
-  begin
-    tmp := TImage32.create(self);
-    try
-      BeginUpdate;
-      rec := Bounds;
-      SetSize(newWidth, newHeight, clNone32);
-      CopyBlend(tmp, rec, rec);
-    finally
-      tmp.Free;
-      EndUpdate;
+  BeginUpdate;
+  try
+    if stretchImage then
+    begin
+      if fAntiAliase then
+        InternalStretchResizeAA(newWidth, newHeight) else
+        InternalStretchResizeFast(newWidth, newHeight);
+    end else
+    begin
+      tmp := TImage32.create(self);
+      try
+        rec := Bounds;
+        SetSize(newWidth, newHeight, clNone32);
+        CopyBlend(tmp, rec, rec);
+      finally
+        tmp.Free;
+      end;
     end;
+  finally
+    Resized;
+    EndUpdate;
   end;
-  Resized;
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.DoResize(newWidth, newHeight: Integer);
+procedure TImage32.InternalStretchResizeFast(newWidth, newHeight: Integer);
 var
   x, y, srcY: Integer;
   scaledXi, scaledYi: TArrayOfInteger;
@@ -1770,7 +1803,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.DoResizeAA(newWidth, newHeight: Integer);
+procedure TImage32.InternalStretchResizeAA(newWidth, newHeight: Integer);
 var
   x,y, x256,y256,xx256,yy256: Integer;
   sx,sy: double;
@@ -1844,36 +1877,40 @@ begin
   if IsEmpty or (width <= 0) or (height <= 0) then Exit;
   sx := width / self.Width;
   sy := height / self.Height;
-  if sx <= sy then
-  begin
-    Scale(sx);
-    if height = self.Height then Exit;
-    rec2 := Bounds;
-    OffsetRect(rec2, 0, (height - self.Height) div 2);
-    tmp := TImage32.Create(self);
-    try
-      SetSize(width, height);
-      CopyInternal(tmp, tmp.Bounds, rec2, nil);
-    finally
-      tmp.Free;
+  BeginUpdate;
+  try
+    if sx <= sy then
+    begin
+      Scale(sx);
+      if height = self.Height then Exit;
+      rec2 := Bounds;
+      OffsetRect(rec2, 0, (height - self.Height) div 2);
+      tmp := TImage32.Create(self);
+      try
+        SetSize(width, height);
+        CopyInternal(tmp, tmp.Bounds, rec2, nil);
+      finally
+        tmp.Free;
+      end;
+    end else
+    begin
+      Scale(sy);
+      if width = self.Width then Exit;
+      rec2 := Bounds;
+      OffsetRect(rec2, (width - self.Width) div 2, 0);
+      tmp := TImage32.Create(self);
+      try
+        SetSize(width, height);
+        CopyInternal(tmp, tmp.Bounds, rec2, nil);
+      finally
+        tmp.Free;
+      end;
     end;
-  end else
-  begin
-    Scale(sy);
-    if width = self.Width then Exit;
-    rec2 := Bounds;
-    OffsetRect(rec2, (width - self.Width) div 2, 0);
-    tmp := TImage32.Create(self);
-    try
-      SetSize(width, height);
-      CopyInternal(tmp, tmp.Bounds, rec2, nil);
-    finally
-      tmp.Free;
-    end;
+  finally
+    EndUpdate;
   end;
 end;
 //------------------------------------------------------------------------------
-
 
 procedure TImage32.RotateLeft90;
 var
@@ -1882,9 +1919,10 @@ var
   tmp: TImage32;
 begin
   if IsEmpty then Exit;
+
+  BeginUpdate;
   tmp := TImage32.create(Self);
   try
-    BeginUpdate;
     SetSize(Height, Width);
     xx := (width - 1) * Height;
     dst := PixelBase;
@@ -1911,9 +1949,10 @@ var
   tmp: TImage32;
 begin
   if IsEmpty then Exit;
+
+  BeginUpdate;
   tmp := TImage32.create(Self);
   try
-    BeginUpdate;
     SetSize(Height, Width);
     dst := PixelBase;
     for y := 0 to Height -1 do
@@ -2058,11 +2097,9 @@ begin
 
   with image32FileFmtClass.Create do
   try
-    BeginUpdate;
     result := LoadFromFile(filename, self);
   finally
     free;
-    EndUpdate;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2080,11 +2117,9 @@ begin
   if not result then Exit;
   with image32FileFmtClass.Create do
   try
-    BeginUpdate;
     result := LoadFromStream(stream, self);
   finally
     free;
-    EndUpdate;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2252,6 +2287,7 @@ begin
     end;
     Exit;
   end;
+
   CopyInternal(src, srcRecClipped, dstRecClipped, blendFunc);
   result := true;
   Changed;
@@ -2264,12 +2300,10 @@ var
 begin
   resStream := CreateResourceStream(resName, resType);
   try
-    BeginUpdate;
     Result := assigned(resStream) and
       LoadFromStream(resStream, '');
   finally
     resStream.Free;
-    EndUpdate;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2332,8 +2366,7 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.CopyToDc(const srcRect, dstRect: TRect; dstDc: HDC;
-  transparent: Boolean = true;
-  bkColor: TColor32 = clNone32);
+  transparent: Boolean = true; bkColor: TColor32 = clNone32);
 var
   x,y, wSrc ,hSrc, wDest, hDest: integer;
   rec: TRect;
@@ -2361,6 +2394,7 @@ begin
     inc(y, rec.Top - srcRect.Top);
 
     bi := Get32bitBitmapInfoHeader(wSrc, hSrc);
+
     tmp.FlipVertical; //DIB sections store pixels Y-inverted
     hasTransparency :=
       transparent and (TARGB(bkColor).A < 255) and tmp.HasTransparency;
@@ -2470,8 +2504,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.ConvertToBoolMask(reference: TColor32; tolerance:
-  integer; colorFunc: TCompareFunction; maskBg: TColor32; maskFg: TColor32);
+procedure TImage32.ConvertToBoolMask(reference: TColor32; tolerance: integer;
+  colorFunc: TCompareFunction; maskBg: TColor32; maskFg: TColor32);
 var
   i: Integer;
   mask: TArrayOfByte;
@@ -2524,15 +2558,16 @@ procedure TImage32.FlipVertical;
 var
   i: Integer;
   a: TArrayOfColor32;
-  row: PColor32;
+  src, dst: PColor32;
 begin
   if IsEmpty then Exit;
   SetLength(a, fWidth * fHeight);
-  row := @fPixels[(height-1) * width];
+  src := @fPixels[(height-1) * width];
+  dst := @a[0];
   for i := 0 to fHeight -1 do
   begin
-    move(row^, a[i * fWidth], fWidth * SizeOf(TColor32));
-    dec(row, fWidth);
+    move(src^, dst^, fWidth * SizeOf(TColor32));
+    dec(src, fWidth); inc(dst, fWidth);
   end;
   fPixels := a;
   Changed;
@@ -2745,6 +2780,7 @@ begin
     end;
     inc(h2, h);
   end;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -2813,10 +2849,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.CropTransparentPixels;
+function TImage32.CropTransparentPixels: TRect;
 var
   x,y, x1,x2,y1,y2: Integer;
-  rec: TRect;
   found: Boolean;
 begin
   y1 := 0; y2 := 0;
@@ -2861,12 +2896,12 @@ begin
         if x > x2 then x2 := x;
       end;
 
-  rec := Rect(x1, y1, x2+1, y2+1);
-  Crop(rec);
+  Result := Rect(x1, y1, x2+1, y2+1);
+  Crop(Result);
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.Rotate(angleRads: single);
+procedure TImage32.Rotate(angleRads: double);
 var
   tmp: TArrayOfColor32;
   x, y, xi, yi, newWidth, newHeight: Integer;
@@ -2881,10 +2916,8 @@ begin
   //nb: There's no point rotating about a specific point
   //since the rotated image will be recentered.
 
-  while angleRads >= TwoPi do angleRads := angleRads - TwoPi;
-  while angleRads < 0 do angleRads := angleRads + TwoPi;
-  if IsEmpty or (angleRads < 0.001) or
-    (angleRads > TwoPi - 0.001) then Exit; //ignores rotations < 1/10 degree
+  NormalizeAngle(angleRads);
+  if IsEmpty or (angleRads = 0) then Exit;
 
   Math.SinCos(angleRads, sinA, cosA);
   if abs(sinA) < 0.000001 then
@@ -2941,10 +2974,14 @@ begin
         inc(dstColor);
       end;
   end;
+
   BeginUpdate;
-  SetSize(newWidth, newHeight);
-  fPixels := tmp;
-  EndUpdate;
+  try
+    SetSize(newWidth, newHeight);
+    fPixels := tmp;
+  finally
+    EndUpdate;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -2968,8 +3005,7 @@ begin
     rec2.Right := rec2.Left + recWidth;
     rec2.Bottom := rec2.Top + recHeight;
     //finally move the rotated rec back to the image ...
-    if eraseColor <> clNone32 then
-      FillRect(rec, eraseColor);
+    FillRect(rec, eraseColor);
     CopyBlend(tmp, rec2, rec);
   finally
     tmp.Free;
@@ -2997,10 +3033,31 @@ begin
       pcDst^ := GetWeightedPixel(self, Round(x*$100), Round(y*$100));
       inc(pcDst);
     end;
+
   BeginUpdate;
-  SetSize(newWidth, newHeight);
-  fPixels := tmpPxls;
-  EndUpdate;
+  try
+    SetSize(newWidth, newHeight);
+    fPixels := tmpPxls;
+  finally
+    EndUpdate;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.ApplyAlpha(alpha: byte);
+var
+  i: Integer;
+  pb: PARGB;
+  alphaTbl: PByteArray;
+begin
+  pb := PARGB(PixelBase);
+  alphaTbl := PByteArray(@MulTable[alpha]);
+  for i := 0 to Width * Height - 1 do
+  begin
+    pb.A := alphaTbl[pb.A];
+    inc(pb);
+  end;
+  Changed;
 end;
 //------------------------------------------------------------------------------
 

@@ -2,10 +2,10 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.52                                                            *
-* Date      :  1 October 2020                                                  *
+* Version   :  2.0                                                             *
+* Date      :  20 February 2021                                                *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2020                                         *
+* Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
 *           :  belong in other modules.                                        *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
@@ -20,8 +20,9 @@ uses
   Image32, Image32_Draw, Image32_Vector;
 
 type
-  TButtonOption = (boSquare, boDiamond, boPressed, boDropShadow);
-  TButtonOptions = set of TButtonOption;
+  TButtonShape = (bsRound, bsSquare, bsDiamond);
+  TButtonAttribute = (baShadow, ba3D);
+  TButtonAttributes = set of TButtonAttribute;
 
 procedure DrawShadow(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; depth: double; angleRads: double = angle225;
@@ -89,9 +90,10 @@ function GradientColor(color1, color2: TColor32; frac: single): TColor32;
 function MakeDarker(color: TColor32; percent: cardinal): TColor32;
 function MakeLighter(color: TColor32; percent: cardinal): TColor32;
 
-procedure DrawButton(img: TImage32; const pt: TPointD;
+function DrawButton(img: TImage32; const pt: TPointD;
   size: double; color: TColor32 = clNone32;
-  buttonOptions: TButtonOptions = []);
+  buttonShape: TButtonShape = bsRound;
+  buttonAttributes:TButtonAttributes = [baShadow, ba3D]): TPathD;
 
 //Vectorize: convert an image into polygon vectors
 function Vectorize(img: TImage32; compareColor: TColor32;
@@ -103,6 +105,11 @@ function VectorizeMask(const mask: TArrayOfByte;
 
 function GetFloodFillMask(img: TImage32; x, y: Integer;
   compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
+
+//2 additional blend functions (see TImage32.CopyBlend)
+
+function BlendLinearBurn(bgColor, fgColor: TColor32): TColor32;
+function BlendColorDodge(bgColor, fgColor: TColor32): TColor32;
 
 implementation
 
@@ -480,6 +487,7 @@ var
   bmpBlur: TImage32;
   pColor, pBlur: PARGB;
 begin
+  if radius = 0 then Exit;
   amt := ClampRange(amount/10, 0.1, 5);
   radius := ClampRange(radius, 1, 10);
   for i := -255 to 255 do
@@ -488,8 +496,8 @@ begin
   bmpBlur := TImage32.Create(img); //clone self
   try
     pColor := PARGB(img.pixelBase);
-    //bmpBlur.GaussianBlur(Bounds, radius);
-    BoxBlur(bmpBlur, bmpBlur.Bounds, Ceil(radius/4), 3);
+    //GaussianBlur(bmpBlur, bmpBlur.Bounds, radius);
+    BoxBlur(bmpBlur, bmpBlur.Bounds, Ceil(radius/4), (radius mod 4) + 1);
     pBlur := PARGB(bmpBlur.pixelBase);
     for i := 1 to img.Width * img.Height do
     begin
@@ -1033,53 +1041,66 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawButton(img: TImage32; const pt: TPointD;
-  size: double; color: TColor32; buttonOptions: TButtonOptions);
+type
+  THackedImage32 = class(TImage32); //exposes protected BeginUpdate/EndUpdate
+
+function DrawButton(img: TImage32; const pt: TPointD;
+  size: double; color: TColor32; buttonShape: TButtonShape;
+  buttonAttributes:TButtonAttributes): TPathD;
 var
   i: integer;
-  path: TPathD;
+  radius: double;
   rec: TRectD;
   shadowSize, shadowAngle: double;
 begin
+  img.Clear;
   if (size < 5) then Exit;
-  size := size * 0.5;
-  shadowSize := size * 0.25;
-  rec := RectD(pt.X -size, pt.Y -size, pt.X +size, pt.Y +size);
+  radius := size * 0.5;
+  shadowSize := radius * 0.25;
 
-  if boDiamond in buttonOptions then
-  begin
-    SetLength(path, 4);
-    for i := 0 to 3 do path[i] := pt;
-    path[0].X := path[0].X -size;
-    path[1].Y := path[1].Y -size;
-    path[2].X := path[2].X +size;
-    path[3].Y := path[3].Y +size;
-  end
-  else if boSquare in buttonOptions then
-  begin
-    rec := InflateRect(rec, -1,-1);
-    path := Rectangle(rec);
-  end else
-    path := Ellipse(rec);
-  if boPressed in buttonOptions then
-    shadowAngle := angle45 else
-    shadowAngle := angle225;
-  //nb: only need to cutout the inside shadow if
-  //the pending color fill is semi-transparent
-  if (boDropShadow in buttonOptions) then
-    DrawShadow(img, path, frNonZero, shadowSize,
-      255, $AA000000, color shr 24 < 254);
-  if color shr 24 > 2 then
-    DrawPolygon(img, path, frNonZero, color);
+  rec := RectD(pt.X -radius, pt.Y -radius, pt.X +radius, pt.Y +radius);
 
-  Draw3D(img, path, frNonZero, shadowSize*2,
-    Ceil(shadowSize), $AA000000, $CCFFFFFF, shadowAngle);
-  DrawLine(img, path, 1, clBlack32, esPolygon);
+  case buttonShape of
+    bsDiamond:
+      begin
+        SetLength(Result, 4);
+        for i := 0 to 3 do Result[i] := pt;
+        Result[0].X := Result[0].X -radius;
+        Result[1].Y := Result[1].Y -radius;
+        Result[2].X := Result[2].X +radius;
+        Result[3].Y := Result[3].Y +radius;
+      end;
+    bsSquare:
+      begin
+        rec := InflateRect(rec, -1,-1);
+        Result := Rectangle(rec);
+      end;
+    else
+      Result := Ellipse(rec);
+  end;
+  shadowAngle := angle315;
 
-  if not (boSquare in buttonOptions) then Exit;
-  path := Rectangle(rec);
-  setLength(path, 3);
-  DrawLine(img, path, 0.75, clWhite32, esSquare);
+  THackedImage32(img).BeginUpdate;
+  try
+
+    //nb: only need to cutout the inside shadow if
+    //the pending color fill is semi-transparent
+    if baShadow in buttonAttributes then
+      DrawShadow(img, Result, frNonZero, shadowSize,
+        shadowAngle, $AA000000, color shr 24 < 254);
+
+    if color shr 24 > 2 then
+      DrawPolygon(img, Result, frNonZero, color);
+
+    if ba3D in buttonAttributes then
+      Draw3D(img, Result, frNonZero, shadowSize*2,
+        Ceil(shadowSize), $AA000000, $CCFFFFFF, shadowAngle);
+    DrawLine(img, Result, DpiAware(1.0), clBlack32, esPolygon);
+  finally
+    THackedImage32(img).EndUpdate;
+    THackedImage32(img).Changed;
+  end;
+
 end;
 //------------------------------------------------------------------------------
 
@@ -1089,7 +1110,7 @@ var
   c1: TARGB absolute color1;
   c2: TARGB absolute color2;
 begin
-  result := c1.A + c2.A shr 1;
+  result := (c1.A + c2.A) shr 1;
 end;
 //------------------------------------------------------------------------------
 

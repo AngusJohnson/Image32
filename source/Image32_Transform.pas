@@ -157,7 +157,6 @@ end;
 
 function GetProjectionMatrix(const srcPts, dstPts: TPathD): TMatrixD;
 var
-  i: integer;
   srcMat, dstMat: TMatrixD;
 begin
   if (length(srcPts) <> 4) or (length(dstPts) <> 4) then

@@ -5,6 +5,7 @@ object Form1: TForm1
   ClientHeight = 444
   ClientWidth = 261
   Color = clBtnFace
+  TransparentColorValue = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -12
@@ -14,7 +15,10 @@ object Form1: TForm1
   OldCreateOrder = False
   Position = poScreenCenter
   OnCreate = FormCreate
+  OnDblClick = PnlMainDblClick
   OnDestroy = FormDestroy
+  OnPaint = FormPaint
+  OnResize = FormResize
   PixelsPerInch = 96
   TextHeight = 14
   object StatusBar1: TStatusBar
