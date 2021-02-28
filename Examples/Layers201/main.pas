@@ -323,18 +323,7 @@ begin
   r.G := r.G - Round(r.G * pcFrac);
   r.B := r.B - Round(r.B * pcFrac);
 end;
-//------------------------------------------------------------------------------
 
-function GetBoundsOfAngledRect(const rec: TRectD; angle: double): TRectD;
-var
-  mp: TPointD;
-  path: TPathD;
-begin
-  mp := Image32_Vector.MidPoint(rec);
-  path := Rectangle(rec);
-  path := RotatePath(path, mp, angle);
-  Result := GetBoundsD(path);
-end;
 
 //------------------------------------------------------------------------------
 // TMainForm
@@ -598,7 +587,7 @@ begin
       angle := 0;
 
     rotatingButtonGroup := CreateRotatingButtonGroup(
-      targetLayer, DPIAware(10), clWhite32, clLime32, angle);
+      targetLayer, DPIAware(10), clWhite32, clLime32, angle, Angle90);
     rotatingButtonGroup.RotateCursorId := crRotate;
 
     if angle > PI then angle := angle - Pi*2;

@@ -17,14 +17,15 @@ type
   private
     fPenColor: TColor32;
     fBrushColor: TColor32;
-  public
     procedure InitRandomColors;
-    procedure ScaleAndDrawVector;
+  public
+    constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
+    procedure RedrawVector(const p: TPathsD = nil);
   end;
 
   TMyRasterLayer32 = class(TRasterLayer32) //for imported raster image layers
   public
-    procedure InitAndPosition(const pt: TPoint);
+    procedure Init(const pt: TPoint);
   end;
 
   //----------------------------------------------------------------------
@@ -91,19 +92,16 @@ type
 
     wordStrings: TStringList;
 
-    activeLayerMouseDown: Boolean;
-    activeLayer: TLayer32;
-    activeDesign: TDesignerLayer32;
-    activeButton: TButtonDesignerLayer32;
-    activeButtonGroup: TGroupLayer32;
+    clickedLayer: TLayer32;
+    targetLayer: TLayer32;
+
+    buttonGroup: TGroupLayer32;
     popupPoint: TPoint;
     clickPoint: TPoint;
     function AddRectangle(const pt: TPoint): TMyVectorLayer32;
     function AddEllipse(const pt: TPoint): TMyVectorLayer32;
     function AddText(const pt: TPoint): TMyVectorLayer32;
-    procedure DeleteButtons;
-    procedure UpdateDesignLayer;
-    procedure MakeLayerActive(layer: TLayer32);
+    procedure SetTargetLayer(layer: TLayer32);
     procedure DoKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure DoDropImage(const filename: string);
   protected
@@ -151,6 +149,15 @@ end;
 // TMyVectorLayer32
 //------------------------------------------------------------------------------
 
+constructor TMyVectorLayer32.Create(groupOwner: TGroupLayer32;
+  const name: string = '');
+begin
+  inherited;
+  InitRandomColors;
+  CursorId := crHandPoint;
+end;
+//------------------------------------------------------------------------------
+
 procedure TMyVectorLayer32.InitRandomColors;
 var
   hsl: THsl;
@@ -164,32 +171,32 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMyVectorLayer32.ScaleAndDrawVector;
+procedure TMyVectorLayer32.RedrawVector(const p: TPathsD = nil);
 var
-  drawRect: TRect;
   vectorRect: TRectD;
   scaleX, scaleY: double;
+const
+  marg = 2;
 begin
-  CursorId := crHandPoint;
-  //stretch the vectors so they fit perfectly into the layer
-  drawRect := Bounds;
-  drawRect := Image32_Vector.InflateRect(drawRect, -2, -2);
-  vectorRect := GetBoundsD(paths);
-  scaleX := drawRect.Width/vectorRect.Width;
-  scaleY := drawRect.Height/vectorRect.Height;
-  paths := ScalePath(paths, scaleX, scaleY);
-  paths := OffsetPath(paths,
-    2 - vectorRect.Left*scaleX, 2 - vectorRect.Top*scaleY);
-  DrawPolygon(Image, paths, frEvenOdd, fBrushColor);
-  DrawLine(Image, paths, 4, fPenColor, esPolygon);
-  UpdateHitTestMask(paths, frEvenOdd);
+  if Assigned(p) then Paths := p;
+  //stretch the vectors so they fit neatly into the layer
+  vectorRect := GetBoundsD(Paths);
+  scaleX := (Image.Width - marg*2) / vectorRect.Width;
+  scaleY := (Image.Height - marg*2) / vectorRect.Height;
+  Paths := ScalePath(Paths, scaleX, scaleY);
+  Paths := OffsetPath(Paths,
+    marg - vectorRect.Left*scaleX,
+    marg - vectorRect.Top*scaleY);
+  DrawPolygon(Image, Paths, frEvenOdd, fBrushColor);
+  DrawLine(Image, Paths, 4, fPenColor, esPolygon);
+  UpdateHitTestMask(Paths, frEvenOdd);
 end;
 
 //------------------------------------------------------------------------------
 // TMyRasterLayer32 methods
 //------------------------------------------------------------------------------
 
-procedure TMyRasterLayer32.InitAndPosition(const pt: TPoint);
+procedure TMyRasterLayer32.Init(const pt: TPoint);
 begin
   MasterImage.CropTransparentPixels;
   image.Assign(MasterImage);
@@ -211,17 +218,18 @@ begin
 
   OnKeyDown := DoKeyDown;
 
-  //SETUP LAYEREDIMAGE32 (a non-visual class whose merged
-  //images will be manually drawn onto the form canvas).
   layeredImage32 := TLayeredImage32.Create; //sized in FormResize() below.
+
+  //add a design layer that displays a hatched background.
   layeredImage32.AddLayer(TDesignerLayer32, nil, 'grid');
 
+  //text support objects
   fontReader := TFontReader.Create;
   fontReader.LoadFromResource('FONT_NSB', RT_RCDATA);
   fontCache := TGlyphCache.Create(fontReader, DPIAware(48));
 
+  //random words
   wordStrings := TStringList.Create;
-
   resStream := TResourceStream.Create(hInstance, 'WORDS', RT_RCDATA);
   try
     wordStrings.LoadFromStream(resStream);
@@ -273,32 +281,32 @@ begin
 
   layeredImage32.SetSize(ClientWidth, ClientHeight);
 
-  if (layeredImage32.Count > 0) and
-    (layeredImage32[0] is TDesignerLayer32) then
-      with TDesignerLayer32(layeredImage32.Root[0]) do
-      begin
-        SetSize(layeredImage32.Width, layeredImage32.Height);
-        HatchBackground(Image);
-      end;
+  //resize the hatched design background layer
+  //nb use SetSize rather than Resize() to avoid stretching
+  with TDesignerLayer32(layeredImage32.Root[0]) do
+  begin
+    SetSize(layeredImage32.Width, layeredImage32.Height);
+    HatchBackground(Image);
+  end;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuAddEllipseClick(Sender: TObject);
 begin
-  MakeLayerActive(AddEllipse(popupPoint));
+  SetTargetLayer(AddEllipse(popupPoint));
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuAddRectangleClick(Sender: TObject);
 begin
-  MakeLayerActive(AddRectangle(popupPoint));
+  SetTargetLayer(AddRectangle(popupPoint));
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuAddTextClick(Sender: TObject);
 begin
-  MakeLayerActive(AddText(popupPoint));
+  SetTargetLayer(AddText(popupPoint));
 end;
 //------------------------------------------------------------------------------
 
@@ -307,11 +315,8 @@ begin
   Result := TMyVectorLayer32(layeredImage32.AddLayer(TMyVectorLayer32));
   with TMyVectorLayer32(Result) do
   begin
-    InitRandomColors;
     SetSize(DPIAware(50 + Random(200)), DPIAware(50 + Random(200)));
-    paths := Image32_Vector.Paths(Rectangle(Bounds));
-    CursorId := crHandPoint;
-    ScaleAndDrawVector;
+    RedrawVector(Image32_Vector.Paths(Rectangle(Bounds)));
   end;
   Result.PositionCenteredAt(pt);
 end;
@@ -322,35 +327,28 @@ begin
   Result := TMyVectorLayer32(layeredImage32.AddLayer(TMyVectorLayer32));
   with TMyVectorLayer32(Result) do
   begin
-    InitRandomColors;
     SetSize(DPIAware(50 + Random(200)), DPIAware(50 + Random(200)));
-    paths := Image32_Vector.Paths(Ellipse(Bounds));
-    ScaleAndDrawVector;
+    RedrawVector(Image32_Vector.Paths(Ellipse(Bounds)));
+    PositionCenteredAt(pt);
   end;
-  Result.PositionCenteredAt(pt);
 end;
 //------------------------------------------------------------------------------
 
 function TMainForm.AddText(const pt: TPoint): TMyVectorLayer32;
 var
-  rec: TRect;
   randomWord: string;
-  tmpPaths: TPathsD;
+  tmp: TPathsD;
 begin
-
-  //create a vector layer
+  randomWord := wordStrings[Random(wordStrings.Count)];
   Result := TMyVectorLayer32(layeredImage32.AddLayer(TMyVectorLayer32));
   with Result as TMyVectorLayer32 do
   begin
-    InitRandomColors;
-    randomWord := wordStrings[Random(wordStrings.Count)];
-    fontCache.GetTextGlyphs(0,0,randomWord, tmpPaths);
-    Paths := ScalePath(tmpPaths, 1, 2.0);
-    rec := Image32_Vector.GetBounds(paths);
-    SetSize(RectWidth(rec),RectHeight(rec));
-    ScaleAndDrawVector;
+    fontCache.GetTextGlyphs(0,0,randomWord, tmp);
+    Paths := ScalePath(tmp, 1, 2.0);
+    SetBounds(Image32_Vector.GetBounds(Paths));
+    RedrawVector;
+    PositionCenteredAt(pt);
   end;
-  Result.PositionCenteredAt(pt);
 end;
 //------------------------------------------------------------------------------
 
@@ -358,11 +356,10 @@ procedure TMainForm.mnuAddImageClick(Sender: TObject);
 var
   rasterLayer: TMyRasterLayer32;
 begin
-  //add a raster image
   if not OpenDialog1.Execute then Exit;
   rasterLayer := TMyRasterLayer32(layeredImage32.AddLayer(TMyRasterLayer32));
   rasterLayer.MasterImage.LoadFromFile(OpenDialog1.FileName);
-  rasterLayer.InitAndPosition(Point(layeredImage32.MidPoint));
+  rasterLayer.Init(Point(layeredImage32.MidPoint));
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -371,12 +368,11 @@ procedure TMainForm.mnuPastefromClipboardClick(Sender: TObject);
 var
   rasterLayer: TMyRasterLayer32;
 begin
-  //paste (add) a raster image
   if not TImage32.CanPasteFromClipBoard then Exit;
-  DeleteButtons;
+  FreeAndNil(buttonGroup);
   rasterLayer := TMyRasterLayer32(layeredImage32.AddLayer(TMyRasterLayer32));
   rasterLayer.MasterImage.PasteFromClipBoard;
-  rasterLayer.InitAndPosition(Point(layeredImage32.MidPoint));
+  rasterLayer.Init(Point(layeredImage32.MidPoint));
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -386,16 +382,15 @@ var
   rasterLayer: TMyRasterLayer32;
   pt: TPoint;
 begin
-  //drag drop (add) a raster image
   if not TImage32.IsRegisteredFormat(ExtractFileExt(filename)) then Exit;
 
   GetCursorPos(pt);
   pt := ScreenToClient(pt);
 
-  DeleteButtons;
+  FreeAndNil(buttonGroup);
   rasterLayer := TMyRasterLayer32(layeredImage32.AddLayer(TMyRasterLayer32));
   rasterLayer.MasterImage.LoadFromFile(FileName);
-  rasterLayer.InitAndPosition(pt);
+  rasterLayer.Init(pt);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -404,7 +399,7 @@ procedure TMainForm.FormPaint(Sender: TObject);
 var
   updateRect: TRect;
 begin
-  //copy layeredImage32 onto pnlMain.Bitmap
+  //copy layeredImage32 onto the form's canvas
   //nb: layeredImage32.GetMergedImage can also return the portion of
   //the image that's changed since the previous GetMergedImage call.
   //Updating only the changed region significantly speeds up drawing.
@@ -419,90 +414,44 @@ end;
 
 procedure TMainForm.DoKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-  if (Key = VK_ESCAPE) and Assigned(activeLayer) then
+  if (Key = VK_ESCAPE) and Assigned(targetLayer) then
   begin
-    MakeLayerActive(nil); //deselect the active control
+    SetTargetLayer(nil); //deselect the active control
     Key := 0;
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.DeleteButtons;
+procedure TMainForm.SetTargetLayer(layer: TLayer32);
 begin
-  FreeAndNil(activeDesign);
-  FreeAndNil(activeButtonGroup);
-  activeLayer := nil;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.UpdateDesignLayer;
-var
-  htOutline: TPathsD;
-  dashLen, dashMargin: integer;
-  alBounds: TRect;
-begin
-  //with activeDesign layer, draw a dashed outline of the image or vector
-  if not assigned(activeLayer) or not assigned(activeDesign) then Exit;
-  dashMargin := DPIAware(4);
-  alBounds := Image32_Vector.InflateRect(activeLayer.Bounds,
-    dashMargin, dashMargin);
-  activeDesign.SetBounds(alBounds);
-  with activeLayer as THitTestLayer32 do
-    htOutline := GetPathsFromHitTestMask;
-  htOutline := OffsetPath(htOutline, dashMargin, dashMargin);
-  htOutline := Image32_Clipper.InflatePaths(htOutline, dashMargin);
-  dashLen := DPIAware(5);
-  activeDesign.Image.Clear;
-  DrawDashedLine(activeDesign.Image,
-    htOutline, [dashLen, dashLen], nil, DPIAware(1), clMaroon32, esPolygon);
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.MakeLayerActive(layer: TLayer32);
-begin
-  if activeLayer = layer then Exit;
-  DeleteButtons;
-  activeLayer := layer;
-  if assigned(layer) then
-  begin
-    //activeDesign := TDesignerLayer32(layeredImage32.AddLayer(TDesignerLayer32));
-    UpdateDesignLayer;
-    activeButtonGroup :=
-      CreateSizingButtonGroup(layer, ssCorners, bsRound, DPIAware(10), clGreen32);
-  end;
+  if targetLayer = layer then Exit;
+  FreeAndNil(buttonGroup);
+  targetLayer := layer;
   Invalidate;
+  if not assigned(targetLayer) then Exit;
+  //add sizing buttons around the target layer
+  buttonGroup := CreateSizingButtonGroup(layer,
+    ssCorners, bsRound, DPIAware(10), clGreen32);
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.pnlMainMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
-var
-  clickedLayer: TLayer32;
 begin
   clickPoint := Types.Point(X,Y);
-
-  //get the clicked layer (if any)
   clickedLayer := layeredImage32.GetLayerAt(clickPoint);
 
-  //if a control button was clicked then get ready to move it
-  if Assigned(clickedLayer) and (clickedLayer is TButtonDesignerLayer32) then
+  if not Assigned(clickedLayer) then
   begin
-    activeButton := TButtonDesignerLayer32(clickedLayer);
-    //the activeLayer can't be a TButtonDesignerLayer32 so exit here
-    Exit;
-  end;
+    FreeAndNil(buttonGroup);
+    targetLayer := nil;
+  end
+  else if Assigned(clickedLayer) and
+     not (clickedLayer is TButtonDesignerLayer32) and
+    (clickedLayer <> targetLayer) then
+      SetTargetLayer(clickedLayer);
 
-  activeButton := nil;
-  //if anything but the activelayer was clicked then delete buttons
-  if assigned(activeLayer) and  (activeLayer <> clickedLayer) then
-    DeleteButtons;
-
-  if Assigned(clickedLayer) then //assign a new activeLayer
-  begin
-    if not Assigned(activeLayer) then MakeLayerActive(clickedLayer);
-    activeLayerMouseDown := true;
-  end else
-    Invalidate;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -516,41 +465,9 @@ var
 begin
   pt := Types.Point(X,Y);
 
-  dx := pt.X - clickPoint.X;
-  dy := pt.Y - clickPoint.Y;
-  clickPoint := pt;
-
-  if activeLayerMouseDown then              //about to move a 'normal' layer
+  //if not moving anything, just update the cursor
+  if not (ssLeft in Shift) then
   begin
-    activeLayer.Offset(dx, dy);
-    if assigned(activeButtonGroup) then
-       activeButtonGroup.Offset(dx, dy);
-    if assigned(activeDesign) then
-      activeDesign.Offset(dx, dy);
-  end
-  else if assigned(activeButton) then       //moving a button (layer)
-  begin
-    activeButton.Offset(dx, dy);
-
-    //get and assign the new bounds for activeLayer using sizing button group
-    rec := Rect(UpdateSizingButtonGroup(activeButton));
-    activeLayer.SetBounds(rec);
-
-    if activeLayer is TMyVectorLayer32 then
-      with TMyVectorLayer32(activeLayer) do
-    begin
-      ScaleAndDrawVector;
-    end
-    else if activeLayer is TMyRasterLayer32 then
-      with TMyRasterLayer32(activeLayer) do
-    begin
-      Image.Copy(MasterImage, MasterImage.Bounds, Image.Bounds);
-      UpdateHitTestMaskTransparent;
-    end;
-    UpdateDesignLayer;
-  end else
-  begin
-    //not moving anything so just update the cursor
     layer := layeredImage32.GetLayerAt(pt);
     if Assigned(layer) then
       Cursor := layer.CursorId else
@@ -558,6 +475,39 @@ begin
     Exit;
   end;
 
+  if not Assigned(clickedLayer) then Exit;
+
+  dx := pt.X - clickPoint.X;
+  dy := pt.Y - clickPoint.Y;
+  clickPoint := pt;
+
+  if clickedLayer is TButtonDesignerLayer32 then
+  begin
+    clickedLayer.Offset(dx, dy);
+
+    //get and assign the new bounds for activeLayer using sizing button group
+    rec := Rect(UpdateSizingButtonGroup(
+      TButtonDesignerLayer32(clickedLayer)));
+    targetLayer.SetBounds(rec);
+
+    if targetLayer is TMyVectorLayer32 then
+      with TMyVectorLayer32(targetLayer) do
+    begin
+      RedrawVector;
+    end
+    else if targetLayer is TMyRasterLayer32 then
+      with TMyRasterLayer32(targetLayer) do
+    begin
+      Image.Copy(MasterImage, MasterImage.Bounds, Image.Bounds);
+      UpdateHitTestMaskTransparent;
+    end;
+  end
+  else if Assigned(targetLayer) then
+  begin
+    targetLayer.Offset(dx, dy);
+    if assigned(buttonGroup) then
+       buttonGroup.Offset(dx, dy);
+  end;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -565,18 +515,17 @@ end;
 procedure TMainForm.pnlMainMouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  activeLayerMouseDown := false;
-  activeButton := nil;
+  clickedLayer := nil;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuCutToClipboardClick(Sender: TObject);
 begin
-  if Assigned(activeLayer) then
+  if Assigned(targetLayer) then
   begin
-    activeLayer.Image.CopyToClipBoard;
-    layeredImage32.DeleteLayer(activeLayer);
-    DeleteButtons;
+    targetLayer.Image.CopyToClipBoard;
+    layeredImage32.DeleteLayer(targetLayer);
+    FreeAndNil(buttonGroup);
     Invalidate;
   end;
 end;
@@ -584,8 +533,8 @@ end;
 
 procedure TMainForm.mnuCopytoClipboardClick(Sender: TObject);
 begin
-  if Assigned(activeLayer) then
-    activeLayer.Image.CopyToClipBoard;
+  if Assigned(targetLayer) then
+    targetLayer.Image.CopyToClipBoard;
 end;
 //------------------------------------------------------------------------------
 
@@ -597,9 +546,9 @@ end;
 
 procedure TMainForm.mnuBringToFrontClick(Sender: TObject);
 begin
-  if not assigned(activeLayer) then Exit;
-  if activeLayer.Index = activeLayer.GroupOwner.ChildCount -1 then Exit;
-  if activeLayer.BringForwardOne then
+  if not assigned(targetLayer) then Exit;
+  if targetLayer.Index = targetLayer.GroupOwner.ChildCount -1 then Exit;
+  if targetLayer.BringForwardOne then
     Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -608,31 +557,31 @@ procedure TMainForm.mnuSendToBackClick(Sender: TObject);
 var
   oldIdx: integer;
 begin
-  oldIdx := activeLayer.Index;
+  oldIdx := targetLayer.Index;
   //send to bottom except for the hatched background (index = 0)
   if oldIdx = 1 then Exit;
-  if activeLayer.SendBackOne then
+  if targetLayer.SendBackOne then
     Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuDeleteLayerClick(Sender: TObject);
 begin
-  if not assigned(activeLayer) then Exit;
-  layeredImage32.DeleteLayer(activeLayer);
-  DeleteButtons;
+  if not assigned(targetLayer) then Exit;
+  layeredImage32.DeleteLayer(targetLayer);
+  FreeAndNil(buttonGroup);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.PopupMenu1Popup(Sender: TObject);
 begin
-  mnuBringToFront.Enabled := assigned(activeLayer) and
-    (activeLayer.Index < layeredImage32.Root.ChildCount -1);
+  mnuBringToFront.Enabled := assigned(targetLayer) and
+    (targetLayer.Index < layeredImage32.Root.ChildCount -2);
   mnuBringtoFront2.Enabled := mnuBringtoFront.Enabled;
-  mnuSendToBack.Enabled := assigned(activeLayer) and (activeLayer.Index > 1);
+  mnuSendToBack.Enabled := assigned(targetLayer) and (targetLayer.Index > 1);
   mnuSendtoBack2.Enabled := mnuSendtoBack.Enabled;
-  mnuDeleteLayer.Enabled := assigned(activeLayer);
+  mnuDeleteLayer.Enabled := assigned(targetLayer);
   mnuDeleteLayer2.Enabled := mnuDeleteLayer.Enabled;
 
   if Sender = PopupMenu1 then

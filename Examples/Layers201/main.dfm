@@ -27,6 +27,7 @@ object MainForm: TMainForm
     Width = 416
     Height = 19
     Panels = <>
+    SimplePanel = True
   end
   object MainMenu1: TMainMenu
     Left = 24
