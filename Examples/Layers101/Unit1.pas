@@ -168,21 +168,22 @@ procedure TMyVectorLayer32.RedrawVector(const p: TPathsD = nil);
 var
   vectorRect: TRectD;
   scaleX, scaleY: double;
+  tmpPaths: TPathsD;
 const
   marg = 2;
 begin
-  if Assigned(p) then Paths := p;
+  if Assigned(p) then Paths := CopyPaths(p);
   //stretch the vectors so they fit neatly into the layer
   vectorRect := GetBoundsD(Paths);
   scaleX := (Image.Width - marg*2) / vectorRect.Width;
   scaleY := (Image.Height - marg*2) / vectorRect.Height;
-  Paths := ScalePath(Paths, scaleX, scaleY);
-  Paths := OffsetPath(Paths,
+  tmpPaths := ScalePath(Paths, scaleX, scaleY);
+  tmpPaths := OffsetPath(tmpPaths,
     marg - vectorRect.Left*scaleX,
     marg - vectorRect.Top*scaleY);
-  DrawPolygon(Image, Paths, frEvenOdd, fBrushColor);
-  DrawLine(Image, Paths, 4, fPenColor, esPolygon);
-  UpdateHitTestMask(Paths, frEvenOdd);
+  DrawPolygon(Image, tmpPaths, frEvenOdd, fBrushColor);
+  DrawLine(Image, tmpPaths, 4, fPenColor, esPolygon);
+  UpdateHitTestMask(tmpPaths, frEvenOdd);
 end;
 
 //------------------------------------------------------------------------------
@@ -240,22 +241,22 @@ begin
   wordStrings.Free;
   fontCache.Free;
   fontReader.Free;
-  layeredImage32.Free;
+  FreeAndNil(layeredImage32);
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormResize(Sender: TObject);
 begin
-  if (csDestroying in ComponentState) then Exit;
+  if not Assigned(layeredImage32) then Exit; //ie destroying
 
   layeredImage32.SetSize(ClientWidth, ClientHeight);
-
-  //repaint the hatched design background layer
+  //and resize and repaint the hatched design background layer
   with TDesignerLayer32(layeredImage32[0]) do
   begin
     SetSize(layeredImage32.Width, layeredImage32.Height);
     HatchBackground(Image);
   end;
+
   Invalidate;
 end;
 //------------------------------------------------------------------------------

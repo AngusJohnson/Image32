@@ -93,7 +93,7 @@ function MakeLighter(color: TColor32; percent: cardinal): TColor32;
 function DrawButton(img: TImage32; const pt: TPointD;
   size: double; color: TColor32 = clNone32;
   buttonShape: TButtonShape = bsRound;
-  buttonAttributes:TButtonAttributes = [baShadow, ba3D]): TPathD;
+  buttonAttributes: TButtonAttributes = [baShadow, ba3D]): TPathD;
 
 //Vectorize: convert an image into polygon vectors
 function Vectorize(img: TImage32; compareColor: TColor32;
@@ -1046,7 +1046,7 @@ type
 
 function DrawButton(img: TImage32; const pt: TPointD;
   size: double; color: TColor32; buttonShape: TButtonShape;
-  buttonAttributes:TButtonAttributes): TPathD;
+  buttonAttributes: TButtonAttributes): TPathD;
 var
   i: integer;
   radius: double;

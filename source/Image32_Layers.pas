@@ -229,23 +229,12 @@ type
     function InsertButton(const pt: TPointD; btnIdx: integer): TButtonDesignerLayer32;
   end;
 
-
-  //TBaseDesignerLayer32: see TLayeredImage32.GetMergedImage()
-  TBaseDesignerLayer32 = class(TVectorLayer32);
-
   //TDesignerLayer32 objects are 'non-clickable' in that they won't be
   //returned by calls to TLayeredImage32.GetLayerAt(). This class also
   //contains a number of special designer methods.
-  TDesignerLayer32 = class(TBaseDesignerLayer32)
-  protected
-    procedure DrawGridLine(const pt1, pt2: TPointD;
-      width: double; color: TColor32); virtual;
-  public
-    procedure DrawGrid(majorInterval, minorInterval: integer;
-      majColor: TColor32 = $30000000; minColor: TColor32 = $20000000);
-  end;
+  TDesignerLayer32 = class(TVectorLayer32);
 
-  TButtonDesignerLayer32 = class(TBaseDesignerLayer32)
+  TButtonDesignerLayer32 = class(TDesignerLayer32)
   private
     fSize     : integer;
     fColor    : TColor32;
@@ -260,6 +249,15 @@ type
     procedure SetButtonAttributes(const shape: TButtonShape;
       size: integer; color: TColor32);
     property ButtonOutline: TPathD read fButtonOutline write fButtonOutline;
+  end;
+
+  TGridDesignerLayer32 = class(TDesignerLayer32)
+  protected
+    procedure DrawGridLine(const pt1, pt2: TPointD;
+      width: double; color: TColor32); virtual;
+  public
+    procedure DrawGrid(majorInterval, minorInterval: integer;
+      majColor: TColor32 = $30000000; minColor: TColor32 = $20000000);
   end;
 
   TLayeredImage32 = class
@@ -323,7 +321,7 @@ function CreateButtonGroup(groupOwner: TGroupLayer32;
   const buttonPts: TPathD; buttonShape: TButtonShape; buttonSize: integer;
   buttonColor: TColor32; buttonLayerClass: TButtonDesignerLayer32Class = nil): TButtonGroupLayer32;
 
-function UpdateSizingButtonGroup(movedButton: TButtonDesignerLayer32): TRectD;
+function UpdateSizingButtonGroup(movedButton: TLayer32): TRectD;
 
 //UpdateRotatingButtonGroup: returns rotation angle
 function UpdateRotatingButtonGroup(rotateButton: TLayer32): double;
@@ -376,17 +374,11 @@ begin
       with fOwnerLayer do
       begin
         if not GroupOwner.fFullRefreshPending and CanUpdate then
-        begin
-          //invalidate the old bounds if the image is shrinking
-          if (fOldWidth > Width) or (fOldHeight > Height) then
-            GroupOwner.Invalidate(RectWH(fLeft, fTop, fOldWidth, fOldHeight))
-          //otherwise invalidate the current bounds
-          else if not Self.IsEmpty then
-            GroupOwner.Invalidate(Bounds);
-        end;
-        HitTestRec.Clear;
+          GroupOwner.Invalidate(RectWH(fLeft, fTop,
+            Max(Width, fOldWidth), Max(Height, fOldHeight)));
         fOldWidth := Width;
         fOldHeight := Height;
+        HitTestRec.Clear;
       end;
   inherited;
 end;
@@ -776,7 +768,7 @@ function  TGroupLayer32.GetChildrenBounds(excludeDesigners: Boolean): TRect;
     if child is TGroupLayer32 then
       result := TGroupLayer32(child).GetChildrenBounds(excludeDesigners)
     else if child.Visible and not child.Image.IsEmpty and
-      not (excludeDesigners and (child is TBaseDesignerLayer32)) then
+      not (excludeDesigners and (child is TDesignerLayer32)) then
       Result := child.Bounds
     else
       Result := NullRect;
@@ -854,7 +846,7 @@ begin
   end;
 
   //update Group's type
-  if (Result is TBaseDesignerLayer32) then
+  if (Result is TDesignerLayer32) then
   begin
     if fGroupType = gtNone then
       fGroupType := gtDesign
@@ -906,7 +898,7 @@ procedure TGroupLayer32.UpdateGroupType;
   begin
     if (child is TGroupLayer32) then
       Result := TGroupLayer32(child).fGroupType
-    else if (child is TBaseDesignerLayer32) then
+    else if (child is TDesignerLayer32) then
       Result := gtDesign
     else
       Result := gtFinal;
@@ -1004,7 +996,7 @@ begin
     with Child[i] do
     begin
       if not Visible or
-        (hideDesigners and (Child[i] is TBaseDesignerLayer32)) then
+        (hideDesigners and (Child[i] is TDesignerLayer32)) then
           Continue;
 
       srcRect := Image32_Vector.IntersectRect(GetBounds, invalidRect);
@@ -1049,7 +1041,7 @@ begin
     begin
       with Child[i] do
         if not Visible or
-          (ignoreDesigners and (Child[i] is TBaseDesignerLayer32)) or
+          (ignoreDesigners and (Child[i] is TDesignerLayer32)) or
           fHitTestRec.IsEmpty or not PtInRect(Bounds, pt) then
             Continue
         else
@@ -1261,10 +1253,10 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TDesignerLayer32 class
+// TGridDesignerLayer32 class
 //------------------------------------------------------------------------------
 
-procedure TDesignerLayer32.DrawGridLine(const pt1, pt2: TPointD;
+procedure TGridDesignerLayer32.DrawGridLine(const pt1, pt2: TPointD;
   width: double; color: TColor32);
 var
   path: TPathD;
@@ -1275,7 +1267,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TDesignerLayer32.DrawGrid(majorInterval, minorInterval: integer;
+procedure TGridDesignerLayer32.DrawGrid(majorInterval, minorInterval: integer;
   majColor: TColor32 = $30000000; minColor: TColor32 = $20000000);
 var
   i, x,y, w,h: integer;
@@ -1586,7 +1578,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function UpdateSizingButtonGroup(movedButton: TButtonDesignerLayer32): TRectD;
+function UpdateSizingButtonGroup(movedButton: TLayer32): TRectD;
 var
   i: integer;
   path, corners, edges: TPathD;
@@ -1594,6 +1586,7 @@ var
 begin
   Result := NullRectD;
   if not assigned(movedButton) or
+    not (movedButton is TButtonDesignerLayer32) or
     not (movedButton.GroupOwner is TSizingGroupLayer32) then Exit;
 
   group := TSizingGroupLayer32(movedButton.GroupOwner);
