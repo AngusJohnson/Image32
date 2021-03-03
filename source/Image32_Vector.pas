@@ -116,6 +116,9 @@ type
   function ScalePath(const paths: TPathsD;
     scale: double): TPathsD; overload;
 
+  function ScaleRect(const rec: TRect; scale: double): TRect; overload;
+  function ScaleRect(const rec: TRectD; scale: double): TRectD; overload;
+
   function ReversePath(const path: TPathD): TPathD; overload;
   function ReversePath(const paths: TPathsD): TPathsD; overload;
 
@@ -138,6 +141,9 @@ type
 
   function GetPointAtAngleAndDist(const origin: TPointD;
     angle, distance: double): TPointD;
+
+  function IntersectPoint(const ln1a, ln1b, ln2a, ln2b: TPointD;
+    out ip: TPointD): Boolean;
 
   procedure RotatePoint(var pt: TPointD;
     const focalPoint: TPointD; angleRad: double); overload;
@@ -793,6 +799,26 @@ function ScalePath(const paths: TPathsD;
   scale: double): TPathsD;
 begin
   result := ScalePath(paths, scale, scale);
+end;
+//------------------------------------------------------------------------------
+
+function ScaleRect(const rec: TRect; scale: double): TRect;
+begin
+  result := rec;
+  Result.Left := Round(Result.Left * scale);
+  Result.Top := Round(Result.Top * scale);
+  Result.Right := Round(Result.Right * scale);
+  Result.Bottom := Round(Result.Bottom * scale);
+end;
+//------------------------------------------------------------------------------
+
+function ScaleRect(const rec: TRectD; scale: double): TRectD;
+begin
+  result := rec;
+  Result.Left := Result.Left * scale;
+  Result.Top := Result.Top * scale;
+  Result.Right := Result.Right * scale;
+  Result.Bottom := Result.Bottom * scale;
 end;
 //------------------------------------------------------------------------------
 
@@ -1547,6 +1573,41 @@ begin
   Result := origin;
   Result.X := Result.X + distance;
   RotatePoint(Result, origin, angle);
+end;
+//------------------------------------------------------------------------------
+
+
+function IntersectPoint(const ln1a, ln1b, ln2a, ln2b: TPointD; out ip: TPointD): Boolean;
+var
+  m1,b1,m2,b2: double;
+begin
+  result := false;
+  //see http://astronomy.swin.edu.au/~pbourke/geometry/lineline2d/
+  if (ln1B.X = ln1A.X) then
+  begin
+    if (ln2B.X = ln2A.X) then exit; //parallel lines
+    m2 := (ln2B.Y - ln2A.Y)/(ln2B.X - ln2A.X);
+    b2 := ln2A.Y - m2 * ln2A.X;
+    ip.X := ln1A.X;
+    ip.Y := m2*ln1A.X + b2;
+  end
+  else if (ln2B.X = ln2A.X) then
+  begin
+    m1 := (ln1B.Y - ln1A.Y)/(ln1B.X - ln1A.X);
+    b1 := ln1A.Y - m1 * ln1A.X;
+    ip.X := ln2A.X;
+    ip.Y := m1*ln2A.X + b1;
+  end else
+  begin
+    m1 := (ln1B.Y - ln1A.Y)/(ln1B.X - ln1A.X);
+    b1 := ln1A.Y - m1 * ln1A.X;
+    m2 := (ln2B.Y - ln2A.Y)/(ln2B.X - ln2A.X);
+    b2 := ln2A.Y - m2 * ln2A.X;
+    if m1 = m2 then exit; //parallel lines
+    ip.X := (b2 - b1)/(m1 - m2);
+    ip.Y := m1 * ip.X + b1;
+  end;
+  result := true;
 end;
 
 //------------------------------------------------------------------------------

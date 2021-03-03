@@ -317,8 +317,11 @@ type
     function IsEmpty: Boolean;
     function Width: double;
     function Height: double;
-    //Normalize: Returns True if either top & bottom or left & right swap
+    //Normalize: Returns True if swapping either top & bottom or left & right
     function Normalize: Boolean;
+    function Contains(const Pt: TPoint): Boolean; overload;
+    function Contains(const Pt: TPointD): Boolean; overload;
+
   end;
 
   {$IFNDEF PBYTE}
@@ -1281,7 +1284,7 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TRectD methods
+// TRectD methods (and helpers)
 //------------------------------------------------------------------------------
 
 function TRectD.IsEmpty: Boolean;
@@ -1321,6 +1324,20 @@ begin
     Bottom := d;
     Result := True;
   end;
+end;
+//------------------------------------------------------------------------------
+
+function TRectD.Contains(const Pt: TPoint): Boolean;
+begin
+  Result := (pt.X >= Left) and (pt.X < Right) and
+    (pt.Y >= Top) and (pt.Y < Bottom);
+end;
+//------------------------------------------------------------------------------
+
+function TRectD.Contains(const Pt: TPointD): Boolean;
+begin
+  Result := (pt.X >= Left) and (pt.X < Right) and
+    (pt.Y >= Top) and (pt.Y < Bottom);
 end;
 //------------------------------------------------------------------------------
 
@@ -2395,7 +2412,7 @@ begin
 
     bi := Get32bitBitmapInfoHeader(wSrc, hSrc);
 
-    tmp.FlipVertical; //DIB sections store pixels Y-inverted
+    tmp.FlipVertical; //DIB sections store pixels Y-inverted.
     hasTransparency :=
       transparent and (TARGB(bkColor).A < 255) and tmp.HasTransparency;
     tmp.Premultiply;  //this is required for DIB sections

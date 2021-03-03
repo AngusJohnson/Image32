@@ -21,6 +21,7 @@ uses
 
 type
   TSizingStyle = (ssCorners, ssEdges, ssEdgesAndCorners);
+  TButtonShape = Image32_Extra.TButtonShape;
 
   TLayer32 = class;
   TLayer32Class = class of TLayer32;
