@@ -3,9 +3,9 @@ unit main;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, JPEG,
+  Windows, Messages, SysUtils, Classes, Graphics,
   Controls, Forms, Dialogs, ExtCtrls, Menus,
-  Image32, Image32_Layers, Vcl.ComCtrls, Vcl.StdCtrls, Vcl.Samples.Spin;
+  Image32, Image32_Layers, ComCtrls, StdCtrls;
 
 type
 
@@ -31,7 +31,6 @@ type
     SaveDialog1: TSaveDialog;
     StatusBar1: TStatusBar;
     pnlLeft: TPanel;
-    pnlRight: TPanel;
     Panel1: TPanel;
     btnTransform: TButton;
     N1: TMenuItem;
@@ -39,17 +38,22 @@ type
     mnuClearTransform: TMenuItem;
     mnuStartTransform: TMenuItem;
     gbMargins: TGroupBox;
-    SpinEdit1: TSpinEdit;
-    SpinEdit2: TSpinEdit;
-    SpinEdit3: TSpinEdit;
-    SpinEdit4: TSpinEdit;
     Help1: TMenuItem;
     mnuHowTo: TMenuItem;
+    SpinEdit1: TEdit;
+    pnlRight: TPanel;
+    UpDown1: TUpDown;
+    SpinEdit2: TEdit;
+    UpDown2: TUpDown;
+    SpinEdit3: TEdit;
+    UpDown3: TUpDown;
+    SpinEdit4: TEdit;
+    UpDown4: TUpDown;
     procedure Exit1Click(Sender: TObject);
     procedure Open1Click(Sender: TObject);
     procedure Save1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
-    procedure pnlLeftResize(Sender: TObject);
+    procedure Form1Resize(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure pnlLeftMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
@@ -62,7 +66,7 @@ type
     procedure mnuClearTransformClick(Sender: TObject);
     procedure mnuHowToClick(Sender: TObject);
   private
-    srcPts, dstPts, dstMargins: TPathD;
+    srcPts, dstPts: TPathD;
     srcBtnGroup: TGroupLayer32;
     dstBtnGroup: TGroupLayer32;
     updateNeeded: Boolean;
@@ -73,6 +77,7 @@ type
     designLayer: TDesignerLayer32;
     clickedLayer: TLayer32;
     clickedPoint: TPoint;
+    procedure ResizeLayeredImage;
     procedure ResetImage;
     procedure PanelPaint(Sender: TObject);
     procedure PaintDesignerLayer;
@@ -91,7 +96,7 @@ implementation
 
 uses
   Image32_BMP, Image32_PNG, Image32_JPG,
-  Image32_Vector, Image32_Draw, Image32_Transform;
+  Image32_Vector, Image32_Draw, Image32_Extra, Image32_Transform;
 
 
 //------------------------------------------------------------------------------
@@ -130,8 +135,6 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.FormCreate(Sender: TObject);
-var
-  img: TImage32;
 begin
   Application.OnIdle := OnIdle;
 
@@ -161,18 +164,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.pnlLeftResize(Sender: TObject);
+procedure TForm1.ResizeLayeredImage;
 var
-  i, w,h: integer;
+  i: integer;
   rec: TRect;
   scale: double;
 begin
-  if not Assigned(layeredImage) then
-    Exit; //ie when form destroying
-
-  //ON THE LEFT SIDE ...
-
-  pnlLeft.Width := ClientWidth div 2;
+  //rasterLayer.MasterImage is the unscaled 'source' image.
+  //rasterlayer.Image is the scaled version of MasterImage (scaled to fit
+  //the left panel. layerImage will be sized to rasterlayer.Image's size.
 
   with rasterLayer do
     if not MasterImage.IsEmpty then
@@ -183,29 +183,51 @@ begin
       scale := Image.Width/oldImageWidth;
       oldImageWidth := Image.Width;
 
-      //rescale control points
+      //now scale the control points
       FreeAndNil(srcBtnGroup);
       FreeAndNil(dstBtnGroup);
 
-      srcPts := ScalePath(srcPts, scale);
+      if Assigned(srcPts) then
+      begin
+        srcPts := ScalePath(srcPts, scale);
+      end else
+      begin
+        rec := Image.Bounds;
+        i := DefaultButtonSize div 2;
+        rec := InflateRect(rec, -i, -i);
+        srcPts := Rectangle(rec);
+      end;
+
       srcBtnGroup := CreateButtonGroup(layeredImage.Root, srcPts,
-        TButtonShape.bsRound, DefaultButtonSize, clRed32);
+        bsRound, DefaultButtonSize, clRed32);
 
       if assigned(dstPts) then
       begin
         dstPts := ScalePath(dstPts, scale);
         dstBtnGroup := CreateButtonGroup(layeredImage.Root, dstPts,
-          TButtonShape.bsRound, DefaultButtonSize, clBlue32);
+          bsRound, DefaultButtonSize, clBlue32);
       end;
 
       //resize layeredImage to the size of the scaled image
       layeredImage.SetSize(Image.Width, Image.Height);
     end;
 
-  //resize designLayer too
+  //resize and redraw the quadrilaterals on our designLayer too
   with designLayer do
     SetSize(layeredImage.Width, layeredImage.Height);
   PaintDesignerLayer;
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.Form1Resize(Sender: TObject);
+begin
+  if not showing or not Assigned(layeredImage) then
+    Exit; //ie when form destroying
+
+  //ON THE LEFT SIDE ...
+
+  pnlLeft.Width := ClientWidth div 2;
+  ResizeLayeredImage;
 
   //ON THE RIGHT SIDE ...
 
@@ -230,12 +252,12 @@ begin
     begin
       //partial repainting (faster for button moves)
       with layeredImage.GetMergedImage(false, updateRec) do
-        CopyToDc(updateRec, Canvas.Handle,
+        CopyToDc(updateRec, {Sender's}Canvas.Handle,
           updateRec.Left, updateRec.Top, false);
     end
     else if Sender = pnlRight then
     begin
-      //repaint the whole image
+      //repaint the whole of transformedImage
       with transformedImage do
         CopyToDc(Bounds, Bounds, {Sender's}Canvas.Handle, false);
     end;
@@ -284,11 +306,11 @@ begin
   if not assigned(clickedLayer) then
     Exit; //ie no button clicked
 
-  //when moving buttons make sure it remains inside the image bounds
-  //otherwise we'll lose sight (and control) of it.
   i := DefaultButtonSize div 2;
   rec := rasterLayer.Image.Bounds;
   rec := InflateRect(rec, -i, -i);
+  //when moving buttons make sure it remains inside the image bounds
+  //otherwise we'll lose sight (and control) of it.
   pt := SafePoint(Point(X,Y), rec);
 
   dx := pt.X - clickedPoint.X;
@@ -325,6 +347,8 @@ var
   scale: double;
   scaledSrc, scaledDst: TPathD;
 begin
+  //we only do (relatively slow) transforms when the message queue is empty
+
   Done := true;
   if not updateNeeded or not Assigned(dstPts) then Exit;
   updateNeeded := false;
@@ -377,7 +401,7 @@ begin
   if Assigned(dstPts) then Exit;
   dstPts := Rectangle(GetBoundsD(srcPts));
   dstBtnGroup := CreateButtonGroup(layeredImage.Root, dstPts,
-    TButtonShape.bsRound, DefaultButtonSize, clBlue32);
+    bsRound, DefaultButtonSize, clBlue32);
 
   gbMargins.Visible := true;
   PaintDesignerLayer;
@@ -424,46 +448,26 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.ResetImage;
-var
-  i: integer;
-  rec: TRect;
 begin
   FreeAndNil(srcBtnGroup);
   FreeAndNil(dstBtnGroup);
   srcPts := nil;
   dstPts := nil;
-  SpinEdit1.Value := 0;
-  SpinEdit2.Value := 0;
-  SpinEdit3.Value := 0;
-  SpinEdit4.Value := 0;
+  SpinEdit1.Text := '0';
+  SpinEdit2.Text := '0';
+  SpinEdit3.Text := '0';
+  SpinEdit4.Text := '0';
   gbMargins.Visible := false;
   transformedImage.Clear;
   btnTransform.Enabled := false;
   pnlLeft.Canvas.FillRect(pnlRight.ClientRect);
   pnlRight.Canvas.FillRect(pnlRight.ClientRect);
 
-  with rasterLayer do
-  begin
-    //scale master image
-    Image.Assign(MasterImage);
-    Image.ScaleToFit(pnlLeft.ClientWidth, pnlLeft.ClientHeight);
-    oldImageWidth := Image.Width;
-    //reset source buttons to just inside image bounds
-    i := DefaultButtonSize div 2;
-    rec := Image.Bounds;
-    rec := InflateRect(rec, -i, -i);
-    srcPts := Rectangle(rec);
-    srcBtnGroup := CreateButtonGroup(layeredImage.Root, srcPts,
-      TButtonShape.bsRound, DefaultButtonSize, clRed32);
+  if rasterLayer.MasterImage.IsEmpty then Exit;
 
-    //resize layeredImage to the size of the scaled image
-    layeredImage.SetSize(Image.Width, Image.Height);
-
-    //and resize the designer layer too.
-    designLayer.SetSize(Image.Width, Image.Height);
-  end;
+  oldImageWidth := rasterLayer.MasterImage.Width;
+  ResizeLayeredImage;
   btnTransform.Enabled := true;
-  PaintDesignerLayer;
   pnlLeft.Invalidate;
 end;
 //------------------------------------------------------------------------------

@@ -1,9 +1,9 @@
 object Form1: TForm1
-  Left = 0
-  Top = 0
+  Left = 244
+  Top = 142
+  Width = 851
+  Height = 544
   Caption = 'Projective Transform'
-  ClientHeight = 470
-  ClientWidth = 824
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -14,12 +14,13 @@ object Form1: TForm1
   OldCreateOrder = False
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnResize = Form1Resize
   PixelsPerInch = 96
   TextHeight = 14
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 451
-    Width = 824
+    Top = 467
+    Width = 835
     Height = 19
     Panels = <>
     SimplePanel = True
@@ -28,34 +29,23 @@ object Form1: TForm1
     Left = 0
     Top = 41
     Width = 417
-    Height = 410
+    Height = 426
     Align = alLeft
     ParentBackground = False
     TabOrder = 1
     OnMouseDown = pnlLeftMouseDown
     OnMouseMove = pnlLeftMouseMove
     OnMouseUp = pnlLeftMouseUp
-    OnResize = pnlLeftResize
-    ExplicitTop = 42
-  end
-  object pnlRight: TPanel
-    Left = 417
-    Top = 41
-    Width = 407
-    Height = 410
-    Align = alRight
-    TabOrder = 2
-    OnResize = pnlLeftResize
   end
   object Panel1: TPanel
     Left = 0
     Top = 0
-    Width = 824
+    Width = 835
     Height = 41
     Align = alTop
     BevelOuter = bvLowered
     BevelWidth = 2
-    TabOrder = 3
+    TabOrder = 2
     object btnTransform: TButton
       Left = 16
       Top = 9
@@ -68,57 +58,101 @@ object Form1: TForm1
     end
     object gbMargins: TGroupBox
       Left = 423
-      Top = 4
-      Width = 405
+      Top = 3
+      Width = 354
       Height = 32
       Caption = 'Margins'
       TabOrder = 1
       Visible = False
-      object SpinEdit1: TSpinEdit
-        Left = 59
+      object SpinEdit1: TEdit
+        Left = 64
         Top = 6
-        Width = 56
-        Height = 23
-        MaxValue = 800
-        MinValue = -800
+        Width = 33
+        Height = 22
         TabOrder = 0
-        Value = 0
+        Text = '0'
         OnChange = SpinEdit1Change
       end
-      object SpinEdit2: TSpinEdit
-        Left = 123
+      object UpDown1: TUpDown
+        Left = 97
         Top = 6
-        Width = 56
-        Height = 23
-        MaxValue = 800
-        MinValue = -800
+        Width = 16
+        Height = 22
+        Associate = SpinEdit1
+        Min = -500
+        Max = 1000
         TabOrder = 1
-        Value = 0
-        OnChange = SpinEdit1Change
       end
-      object SpinEdit3: TSpinEdit
-        Left = 186
+      object SpinEdit2: TEdit
+        Left = 128
         Top = 6
-        Width = 56
-        Height = 23
-        MaxValue = 800
-        MinValue = -800
+        Width = 33
+        Height = 22
         TabOrder = 2
-        Value = 0
+        Text = '0'
         OnChange = SpinEdit1Change
       end
-      object SpinEdit4: TSpinEdit
-        Left = 252
+      object UpDown2: TUpDown
+        Left = 161
         Top = 6
-        Width = 56
-        Height = 23
-        MaxValue = 800
-        MinValue = -800
+        Width = 16
+        Height = 22
+        Associate = SpinEdit2
+        Min = -500
+        Max = 1000
         TabOrder = 3
-        Value = 0
+      end
+      object SpinEdit3: TEdit
+        Left = 192
+        Top = 6
+        Width = 33
+        Height = 22
+        TabOrder = 4
+        Text = '0'
         OnChange = SpinEdit1Change
+      end
+      object UpDown3: TUpDown
+        Left = 225
+        Top = 6
+        Width = 16
+        Height = 22
+        Associate = SpinEdit3
+        Min = -500
+        Max = 1000
+        TabOrder = 5
+      end
+      object SpinEdit4: TEdit
+        Left = 254
+        Top = 6
+        Width = 33
+        Height = 22
+        TabOrder = 6
+        Text = '0'
+        OnChange = SpinEdit1Change
+      end
+      object UpDown4: TUpDown
+        Left = 287
+        Top = 6
+        Width = 16
+        Height = 22
+        Associate = SpinEdit4
+        Min = -500
+        Max = 1000
+        TabOrder = 7
       end
     end
+  end
+  object pnlRight: TPanel
+    Left = 418
+    Top = 41
+    Width = 417
+    Height = 426
+    Align = alRight
+    ParentBackground = False
+    TabOrder = 3
+    OnMouseDown = pnlLeftMouseDown
+    OnMouseMove = pnlLeftMouseMove
+    OnMouseUp = pnlLeftMouseUp
   end
   object MainMenu1: TMainMenu
     Left = 208
