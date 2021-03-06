@@ -210,7 +210,7 @@ begin
       inc(pc);
     end;
   img.SetSize(w, h);
-  Move(tmp[0], img.Pixels[0], w * h * sizeOf(TColor32));
+  Move(tmp[0], img.PixelBase^, w * h * sizeOf(TColor32));
 end;
 
 //------------------------------------------------------------------------------

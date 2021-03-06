@@ -118,6 +118,8 @@ type
 
   function ScaleRect(const rec: TRect; scale: double): TRect; overload;
   function ScaleRect(const rec: TRectD; scale: double): TRectD; overload;
+  function ScaleRect(const rec: TRect; sx, sy: double): TRect; overload;
+  function ScaleRect(const rec: TRectD; sx, sy: double): TRectD; overload;
 
   function ReversePath(const path: TPathD): TPathD; overload;
   function ReversePath(const paths: TPathsD): TPathsD; overload;
@@ -812,6 +814,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function ScaleRect(const rec: TRect; sx, sy: double): TRect;
+begin
+  result := rec;
+  Result.Left := Round(Result.Left * sx);
+  Result.Top := Round(Result.Top * sy);
+  Result.Right := Round(Result.Right * sx);
+  Result.Bottom := Round(Result.Bottom * sy);
+end;
+//------------------------------------------------------------------------------
+
 function ScaleRect(const rec: TRectD; scale: double): TRectD;
 begin
   result := rec;
@@ -819,6 +831,16 @@ begin
   Result.Top := Result.Top * scale;
   Result.Right := Result.Right * scale;
   Result.Bottom := Result.Bottom * scale;
+end;
+//------------------------------------------------------------------------------
+
+function ScaleRect(const rec: TRectD; sx, sy: double): TRectD;
+begin
+  result := rec;
+  Result.Left := Result.Left * sx;
+  Result.Top := Result.Top * sy;
+  Result.Right := Result.Right * sx;
+  Result.Bottom := Result.Bottom * sy;
 end;
 //------------------------------------------------------------------------------
 

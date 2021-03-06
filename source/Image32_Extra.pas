@@ -59,6 +59,10 @@ procedure Sharpen(img: TImage32; radius: Integer = 2; amount: Integer = 10);
 procedure HatchBackground(img: TImage32; color1: TColor32 = clWhite32;
   color2: TColor32= $FFE8E8E8; hatchSize: Integer = 10);
 
+procedure GridBackground(img: TImage32; majorInterval, minorInterval: integer;
+  fillColor: TColor32 = clWhite32;
+  majColor: TColor32 = $30000000; minColor: TColor32 = $20000000);
+
 procedure ReplaceColor(img: TImage32; oldColor, newColor: TColor32);
 
 //EraseColor: Removes the specified color from the image, even from
@@ -539,6 +543,57 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
+
+procedure GridBackground(img: TImage32; majorInterval, minorInterval: integer;
+  fillColor: TColor32; majColor: TColor32; minColor: TColor32);
+var
+  i, x,y, w,h: integer;
+  path: TPathD;
+begin
+  img.Clear(fillColor);
+  w := img.Width; h := img.Height;
+  SetLength(path, 2);
+  if minorInterval > 0 then
+  begin
+    x := minorInterval;
+    path[0] := PointD(x, 0); path[1] := PointD(x, h);;
+    for i := 1 to (w div minorInterval) do
+    begin
+      Image32_Draw.DrawLine(img, path, 1, minColor, esSquare);
+      path[0].X := path[0].X + minorInterval;
+      path[1].X := path[1].X + minorInterval;
+    end;
+    y := minorInterval;
+    path[0] := PointD(0, y); path[1] := PointD(w, y);
+    for i := 1 to (h div minorInterval) do
+    begin
+      Image32_Draw.DrawLine(img, path, 1, minColor, esSquare);
+      path[0].Y := path[0].Y + minorInterval;
+      path[1].Y := path[1].Y + minorInterval;
+    end;
+  end;
+  if majorInterval > minorInterval then
+  begin
+    x := majorInterval;
+    path[0] := PointD(x, 0); path[1] := PointD(x, h);;
+    for i := 1 to (w div majorInterval) do
+    begin
+      Image32_Draw.DrawLine(img, path, 1, majColor, esSquare);
+      path[0].X := path[0].X + majorInterval;
+      path[1].X := path[1].X + majorInterval;
+    end;
+    y := majorInterval;
+    path[0] := PointD(0, y); path[1] := PointD(w, y);
+    for i := 1 to (h div majorInterval) do
+    begin
+      Image32_Draw.DrawLine(img, path, 1, majColor, esSquare);
+      path[0].Y := path[0].Y + majorInterval;
+      path[1].Y := path[1].Y + majorInterval;
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
 
 function ColorDifference(color1, color2: TColor32): cardinal;
   {$IFDEF INLINE} inline; {$ENDIF}

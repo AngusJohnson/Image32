@@ -212,7 +212,7 @@ type
   public
     property Angle: double read GetAngle;
     property Center: TPointD read GetCenter;
-    property RotateCursorId: integer read GetRotCur write SetRotCur;
+    property CursorId: integer read GetRotCur write SetRotCur;
     property DistBetweenButtons: double read GetDistance;
   end;
 
@@ -246,19 +246,10 @@ type
     property Size  : integer read fSize write fSize;
     property Color : TColor32 read fColor write fColor;
     property Shape : TButtonShape read fShape write fShape;
-  public
     procedure SetButtonAttributes(const shape: TButtonShape;
       size: integer; color: TColor32);
-    property ButtonOutline: TPathD read fButtonOutline write fButtonOutline;
-  end;
-
-  TGridDesignerLayer32 = class(TDesignerLayer32)
-  protected
-    procedure DrawGridLine(const pt1, pt2: TPointD;
-      width: double; color: TColor32); virtual;
   public
-    procedure DrawGrid(majorInterval, minorInterval: integer;
-      majColor: TColor32 = $30000000; minColor: TColor32 = $20000000);
+    property ButtonOutline: TPathD read fButtonOutline write fButtonOutline;
   end;
 
   TLayeredImage32 = class
@@ -314,7 +305,8 @@ function CreateSizingButtonGroup(targetLayer: TLayer32;
   buttonLayerClass: TButtonDesignerLayer32Class = nil): TSizingGroupLayer32;
 
 function CreateRotatingButtonGroup(targetLayer: TLayer32;
-  buttonSize: integer; centerButtonColor, movingButtonColor: TColor32;
+  buttonSize: integer = 0; centerButtonColor: TColor32 = clWhite32;
+  movingButtonColor: TColor32 = clBlue32;
   startingAngle: double = 0; startingZeroOffset: double = 0;
   buttonLayerClass: TButtonDesignerLayer32Class = nil): TRotatingGroupLayer32;
 
@@ -322,7 +314,7 @@ function CreateButtonGroup(groupOwner: TGroupLayer32;
   const buttonPts: TPathD; buttonShape: TButtonShape; buttonSize: integer;
   buttonColor: TColor32; buttonLayerClass: TButtonDesignerLayer32Class = nil): TButtonGroupLayer32;
 
-function UpdateSizingButtonGroup(movedButton: TLayer32): TRectD;
+function UpdateSizingButtonGroup(movedButton: TLayer32): TRect;
 
 //UpdateRotatingButtonGroup: returns rotation angle
 function UpdateRotatingButtonGroup(rotateButton: TLayer32): double;
@@ -1254,57 +1246,6 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TGridDesignerLayer32 class
-//------------------------------------------------------------------------------
-
-procedure TGridDesignerLayer32.DrawGridLine(const pt1, pt2: TPointD;
-  width: double; color: TColor32);
-var
-  path: TPathD;
-begin
-  SetLength(path, 2);
-  path[0] := pt1; path[1] := pt2;
-  Image32_Draw.DrawLine(Image, path, width, color, esSquare);
-end;
-//------------------------------------------------------------------------------
-
-procedure TGridDesignerLayer32.DrawGrid(majorInterval, minorInterval: integer;
-  majColor: TColor32 = $30000000; minColor: TColor32 = $20000000);
-var
-  i, x,y, w,h: integer;
-begin
-  w := image.Width; h := image.Height;
-  if minorInterval <> 0 then
-  begin
-    x := minorInterval; y := minorInterval;
-    for i := 1 to (w div minorInterval) do
-    begin
-      DrawGridLine(PointD(x, 0), PointD(x, h), 1, minColor);
-      inc(x, minorInterval);
-    end;
-    for i := 1 to (h div minorInterval) do
-    begin
-      DrawGridLine(PointD(0, y), PointD(w, y), 1, minColor);
-      inc(y, minorInterval);
-    end;
-  end;
-  if majorInterval <> 0 then
-  begin
-    x := majorInterval; y := majorInterval;
-    for i := 1 to (w div majorInterval) do
-    begin
-      DrawGridLine(PointD(x, 0), PointD(x, h), 1, majColor);
-      inc(x, majorInterval);
-    end;
-    for i := 1 to (h div majorInterval) do
-    begin
-      DrawGridLine(PointD(0, y), PointD(w, y), 1, majColor);
-      inc(y, majorInterval);
-    end;
-  end;
-end;
-
-//------------------------------------------------------------------------------
 // TButtonDesignerLayer32 class
 //------------------------------------------------------------------------------
 
@@ -1579,13 +1520,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function UpdateSizingButtonGroup(movedButton: TLayer32): TRectD;
+function UpdateSizingButtonGroup(movedButton: TLayer32): TRect;
 var
   i: integer;
   path, corners, edges: TPathD;
   group: TSizingGroupLayer32;
+  rec: TRectD;
 begin
-  Result := NullRectD;
+  //nb: it may be tempting to store the targetlayer parameter in the
+  //CreateSizingButtonGroup function call and automatically update its
+  //bounds here, except that there are situations where blindly updating
+  //the target's bounds using the returned TRect is undesirable
+  //(eg when targetlayer needs to preserve its width/height ratio).
+  Result := NullRect;
   if not assigned(movedButton) or
     not (movedButton is TButtonDesignerLayer32) or
     not (movedButton.GroupOwner is TSizingGroupLayer32) then Exit;
@@ -1597,8 +1544,8 @@ begin
     for i := 0 to ChildCount -1 do
       path[i] := Child[i].MidPoint;
   end;
+  rec := GetBoundsD(path);
 
-  Result := GetBoundsD(path);
   case group.SizingStyle of
     ssCorners:
       begin
@@ -1606,13 +1553,13 @@ begin
         with movedButton.MidPoint do
         begin
           case movedButton.Index of
-            0: begin Result.Left := X; Result.Top := Y; end;
-            1: begin Result.Right := X; Result.Top := Y; end;
-            2: begin Result.Right := X; Result.Bottom := Y; end;
-            3: begin Result.Left := X; Result.Bottom := Y; end;
+            0: begin rec.Left := X; rec.Top := Y; end;
+            1: begin rec.Right := X; rec.Top := Y; end;
+            2: begin rec.Right := X; rec.Bottom := Y; end;
+            3: begin rec.Left := X; rec.Bottom := Y; end;
           end;
         end;
-        corners := Rectangle(Result);
+        corners := Rectangle(rec);
         with group do
           for i := 0 to 3 do
             Child[i].PositionCenteredAt(corners[i]);
@@ -1623,13 +1570,13 @@ begin
         with movedButton.MidPoint do
         begin
           case movedButton.Index of
-            0: Result.Top := Y;
-            1: Result.Right := X;
-            2: Result.Bottom := Y;
-            3: Result.Left := X;
+            0: rec.Top := Y;
+            1: rec.Right := X;
+            2: rec.Bottom := Y;
+            3: rec.Left := X;
           end;
         end;
-        edges := GetRectEdgeMidPoints(Result);
+        edges := GetRectEdgeMidPoints(rec);
         with group do
           for i := 0 to 3 do
             Child[i].PositionCenteredAt(edges[i]);
@@ -1640,18 +1587,18 @@ begin
         with movedButton.MidPoint do
         begin
           case movedButton.Index of
-            0: begin Result.Left := X; Result.Top := Y; end;
-            1: Result.Top := Y;
-            2: begin Result.Right := X; Result.Top := Y; end;
-            3: Result.Right := X;
-            4: begin Result.Right := X; Result.Bottom := Y; end;
-            5: Result.Bottom := Y;
-            6: begin Result.Left := X; Result.Bottom := Y; end;
-            7: Result.Left := X;
+            0: begin rec.Left := X; rec.Top := Y; end;
+            1: rec.Top := Y;
+            2: begin rec.Right := X; rec.Top := Y; end;
+            3: rec.Right := X;
+            4: begin rec.Right := X; rec.Bottom := Y; end;
+            5: rec.Bottom := Y;
+            6: begin rec.Left := X; rec.Bottom := Y; end;
+            7: rec.Left := X;
           end;
         end;
-        corners := Rectangle(Result);
-        edges := GetRectEdgeMidPoints(Result);
+        corners := Rectangle(rec);
+        edges := GetRectEdgeMidPoints(rec);
         with group do
           for i := 0 to 3 do
           begin
@@ -1660,6 +1607,7 @@ begin
           end;
       end;
   end;
+  Result := Rect(rec);
 end;
 //------------------------------------------------------------------------------
 
@@ -1681,6 +1629,8 @@ begin
 
   //startingZeroOffset: default = 0 (ie 3 o'clock)
   Result.fZeroOffset := startingZeroOffset;
+
+  if buttonSize <= 0 then buttonSize := DefaultButtonSize;
 
   rec := targetLayer.Bounds;
   radius := Max(RectWidth(rec), RectHeight(rec)) div 2;

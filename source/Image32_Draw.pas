@@ -969,6 +969,7 @@ begin
   AllocateScanlines(paths2, scanlines, maxH, maxW-1);
   InitializeScanlines(paths2, scanlines, clipRec2);
   SetLength(byteBuffer, RectWidth(clipRec2));
+  if byteBuffer = nil then Exit;
 
   scanline := @scanlines[0];
   for i := 0 to high(scanlines) do

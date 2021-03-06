@@ -208,6 +208,7 @@ var
   resStream: TResourceStream;
 begin
   Randomize;
+
   DefaultButtonSize := DPIAware(10); //ie the layered image's control buttons
 
   OnKeyDown := DoKeyDown;
@@ -241,18 +242,20 @@ begin
   wordStrings.Free;
   fontCache.Free;
   fontReader.Free;
-  FreeAndNil(layeredImage32);
+  FreeAndNil(layeredImage32); //see FormResize
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormResize(Sender: TObject);
 begin
-  if not Assigned(layeredImage32) then Exit; //ie destroying
+  if not Assigned(layeredImage32) then Exit;
 
   layeredImage32.SetSize(ClientWidth, ClientHeight);
   //and resize and repaint the hatched design background layer
   with TDesignerLayer32(layeredImage32[0]) do
   begin
+    //nb: use SetSize not Resize which would waste
+    //CPU cycles stretching the previous hatching
     SetSize(layeredImage32.Width, layeredImage32.Height);
     HatchBackground(Image);
   end;
@@ -491,7 +494,7 @@ begin
 
     //now call UpdateSizingButtonGroup to reposition the other buttons
     //in the sizing group and get the bounds rect for the target layer
-    rec := Rect( UpdateSizingButtonGroup(clickedLayer) );
+    rec := UpdateSizingButtonGroup(clickedLayer);
     targetLayer.SetBounds(rec);
 
     if targetLayer is TMyVectorLayer32 then
