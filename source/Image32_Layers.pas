@@ -3,7 +3,7 @@ unit Image32_Layers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.0                                                             *
-* Date      :  20 February 2021                                                *
+* Date      :  6 March 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -1009,7 +1009,7 @@ begin
       begin
         tmp := TImage32.Create(Image);
         try
-          tmp.ApplyAlpha(fOpacity);
+          tmp.ScaleAlpha(fOpacity/255);
           self.Image.CopyBlend(tmp, srcRect, dstRect, BlendToAlpha);
         finally
           tmp.Free;

@@ -1,9 +1,9 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 1.55
-Released: 8 November 2020
+Latest version: 2.0
+Released: 6 March 2021
 
-Copyright © 2019-2020 Angus Johnson
+Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
 https://www.boost.org/LICENSE_1_0.txt
 
@@ -12,6 +12,38 @@ Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
+Version 2.0
+  This is a major update. There are many changes (mainly 
+  to the Image32_Layers unit), and some of these changes 
+  are very likely to break your existing code. Sorry.
+  
+  The Image32_Layers unit has been completely rewritten.
+  The old unit was poorly written and cumbersome to use.
+  The most significant change in the new layers unit is the 
+  use of nested groups of layers that form a tree structure
+  under TLayeredImage.Root. This structure provides several
+  advantages over the old flat layer structure. These include
+  faster merges, and much simpler control over layer groups.
+  Hit-testing has also been dramatically improved, being
+  both much simpler to setup, and faster at detecting the 
+  correct layer.
+  
+  The Image32_Text unit that was deprecated has been removed. 
+  The Image32_Ttf unit provides all the functionality of the 
+  old Image32_Text unit but, unlike its predecessor, supports 
+  cross-platform development.
+  
+  Other units have had attention with minor bug fixes and 
+  assorted embelishments, including a significant code tidy
+  of the esoteric Image32_SmoothPath unit.
+
+  The sample applications have also had significant revision.
+  Some overly complicated apps have been removed, while others
+  have been rewritten and simplified.
+
+  The documentation has also been updated to address most if
+  not all these changes.
+  
 Version 1.55
   changes in Image32_Ttf
 	bugfix DrawAngledText function

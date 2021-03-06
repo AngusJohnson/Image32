@@ -2,10 +2,10 @@ unit Image32_JPG;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.52                                                            *
-* Date      :  1 October 2020                                                  *
+* Version   :  2.0                                                             *
+* Date      :  6 March 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2020                                         *
+* Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  JPG/JPEG file format extension for TImage32                     *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)

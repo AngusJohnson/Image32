@@ -2,10 +2,10 @@ unit Image32_Ttf;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  1.56                                                            *
-* Date      :  14 November 2020                                                *
+* Version   :  2.0                                                             *
+* Date      :  6 March 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2020                                              *
+* Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)

@@ -3,7 +3,7 @@ unit Image32_Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.0                                                             *
-* Date      :  20 February 2021                                                *
+* Date      :  6 March 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -185,9 +185,9 @@ type
   function PointsNearEqual(const pt1, pt2: TPointD; distSqrd: double): Boolean;
   {$IFDEF INLINING} inline; {$ENDIF}
   function StripNearDuplicates(const path: TPathD;
-    minLength: double; isClosedPath: Boolean): TPathD; overload;
+    minDist: double; isClosedPath: Boolean): TPathD; overload;
   function StripNearDuplicates(const paths: TPathsD;
-    minLength: double; isClosedPath: Boolean): TPathsD; overload;
+    minLength: double; isClosedPaths: Boolean): TPathsD; overload;
 
   function MidPoint(const rec: TRect): TPoint; overload;
   function MidPoint(const rec: TRectD): TPointD; overload;
@@ -375,7 +375,7 @@ end;
 //------------------------------------------------------------------------------
 
 function StripNearDuplicates(const path: TPathD;
-  minLength: double; isClosedPath: Boolean): TPathD;
+  minDist: double; isClosedPath: Boolean): TPathD;
 var
   i,j, len: integer;
 begin
@@ -384,28 +384,28 @@ begin
   if len = 0 then Exit;
   Result[0] := path[0];
   j := 0;
-  minLength := minLength * minLength;
+  minDist := minDist * minDist;
   for i := 1 to len -1 do
-    if not PointsNearEqual(Result[j], path[i], minLength) then
+    if not PointsNearEqual(Result[j], path[i], minDist) then
     begin
       inc(j);
       Result[j] := path[i];
     end;
   if isClosedPath and
-    PointsNearEqual(Result[j], Result[0], minLength) then dec(j);
+    PointsNearEqual(Result[j], Result[0], minDist) then dec(j);
   SetLength(Result, j +1);
 end;
 //------------------------------------------------------------------------------
 
 function StripNearDuplicates(const paths: TPathsD;
-  minLength: double; isClosedPath: Boolean): TPathsD;
+  minLength: double; isClosedPaths: Boolean): TPathsD;
 var
   i, len: integer;
 begin
   len := Length(paths);
   SetLength(Result, len);
   for i := 0 to len -1 do
-    Result[i] := StripNearDuplicates(paths[i], minLength, isClosedPath);
+    Result[i] := StripNearDuplicates(paths[i], minLength, isClosedPaths);
 end;
 //------------------------------------------------------------------------------
 

@@ -3,7 +3,7 @@ unit Image32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.0                                                             *
-* Date      :  20 February 2021                                                *
+* Date      :  6 March 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -212,10 +212,6 @@ type
 
     //ScaleAlpha: Scales the alpha byte of every pixel by the specified amount.
     procedure ScaleAlpha(scale: double);
-    //ApplyAlpha: Multiplies the alpha channel of all pixels by the 'alpha'
-    //value. (If 'alpha' param. = 255 then the image will remain unchanged.)
-    procedure ApplyAlpha(alpha: byte);
-
     //RegisterImageFormatClass: Registers a TImageFormatClass with TImage32 and
     //associates it with a specific 3 character file extension (eg BMP).
     class procedure RegisterImageFormatClass(ext: string;
@@ -3058,23 +3054,6 @@ begin
   finally
     EndUpdate;
   end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImage32.ApplyAlpha(alpha: byte);
-var
-  i: Integer;
-  pb: PARGB;
-  alphaTbl: PByteArray;
-begin
-  pb := PARGB(PixelBase);
-  alphaTbl := PByteArray(@MulTable[alpha]);
-  for i := 0 to Width * Height - 1 do
-  begin
-    pb.A := alphaTbl[pb.A];
-    inc(pb);
-  end;
-  Changed;
 end;
 //------------------------------------------------------------------------------
 

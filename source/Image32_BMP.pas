@@ -3,7 +3,7 @@ unit Image32_BMP;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.0                                                             *
-* Date      :  20 February 2021                                                *
+* Date      :  6 March 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  BMP file format extension for TImage32                          *
