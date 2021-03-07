@@ -437,7 +437,7 @@ begin
     (clickedLayer.GroupOwner is TSizingGroupLayer32) then
   begin
     clickedLayer.PositionCenteredAt(clickPoint);
-    rec := Rect(UpdateSizingButtonGroup(TButtonDesignerLayer32(clickedLayer)));
+    rec := UpdateSizingButtonGroup(clickedLayer);
     if targetLayer is TMyRasterLayer32 then
       with TMyRasterLayer32(targetLayer) do
         Stretch(rec)
@@ -588,7 +588,7 @@ begin
 
     rotatingButtonGroup := CreateRotatingButtonGroup(
       targetLayer, DPIAware(10), clWhite32, clLime32, angle, Angle90);
-    rotatingButtonGroup.RotateCursorId := crRotate;
+    rotatingButtonGroup.CursorId := crRotate;
 
     if angle > PI then angle := angle - Pi*2;
     StatusBar1.SimpleText := format('angle: %1.0n deg.',[angle * 180/pi]);

@@ -173,16 +173,19 @@ const
   marg = 2;
 begin
   if Assigned(p) then Paths := CopyPaths(p);
-  //stretch the vectors so they fit neatly into the layer
   vectorRect := GetBoundsD(Paths);
+  if IsEmptyRect(vectorRect) then Exit;
+
+  //stretch the vectors so they fit neatly into the layer
   scaleX := (Image.Width - marg*2) / vectorRect.Width;
   scaleY := (Image.Height - marg*2) / vectorRect.Height;
+
   tmpPaths := ScalePath(Paths, scaleX, scaleY);
   tmpPaths := OffsetPath(tmpPaths,
     marg - vectorRect.Left*scaleX,
     marg - vectorRect.Top*scaleY);
   DrawPolygon(Image, tmpPaths, frEvenOdd, fBrushColor);
-  DrawLine(Image, tmpPaths, 4, fPenColor, esPolygon);
+  DrawLine(Image, tmpPaths, DpiAware(2), fPenColor, esPolygon);
   UpdateHitTestMask(tmpPaths, frEvenOdd);
 end;
 

@@ -22,20 +22,22 @@ type
     OpenDialog1: TOpenDialog;
     mnuShowPolygonCoordinates: TMenuItem;
     N3: TMenuItem;
-    pnlMemo: TPanel;
-    Panel3: TPanel;
-    btnCloseMemo: TButton;
-    Memo1: TMemo;
-    rbBeziers: TRadioButton;
-    rbFlat: TRadioButton;
     SaveDialog1: TSaveDialog;
     SaveAs1: TMenuItem;
     mnuShowSmoothedOnly: TMenuItem;
     mnuShowSimplifiedSmoothed: TMenuItem;
-    rbRaw: TRadioButton;
     pnlSmooth: TPanel;
-    Label1: TLabel;
+    lblSmooth: TLabel;
     TrackBar1: TTrackBar;
+    pnlMemo: TPanel;
+    Panel3: TPanel;
+    btnCloseMemo: TButton;
+    rbBeziers: TRadioButton;
+    rbFlat: TRadioButton;
+    rbRaw: TRadioButton;
+    Memo1: TMemo;
+    TrackBar2: TTrackBar;
+    lblSimplify: TLabel;
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -50,7 +52,6 @@ type
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure TrackBar1Change(Sender: TObject);
     procedure FormPaint(Sender: TObject);
-    procedure FormResize(Sender: TObject);
   private
     masterImg, workImg: TImage32;
     rawPaths, bezierPaths, flattenedPaths: TPathsD;
@@ -132,16 +133,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.FormResize(Sender: TObject);
-begin
-end;
-//------------------------------------------------------------------------------
-
 procedure TForm1.DisplayImage;
 begin
-  rawPaths := nil;  bezierPaths := nil; flattenedPaths := nil;
-  TrackBar1.Enabled :=
-    mnuShowSmoothedOnly.Checked or mnuShowSimplifiedSmoothed.Checked;
+  rawPaths := nil;
+  bezierPaths := nil;
+  flattenedPaths := nil;
+
+  TrackBar1.Enabled := //enable if smoothing (with or without simplifying)
+    mnuShowSmoothedOnly.Checked or
+    mnuShowSimplifiedSmoothed.Checked;
+
+  TrackBar2.Enabled := //enable if simplifying (with or without smoothing)
+    mnuShowSimplified.Checked or
+    mnuShowSimplifiedSmoothed.Checked;
+
   rbBeziers.Enabled := TrackBar1.Enabled;
   rbRaw.Enabled := not mnuShowMonoImage.Checked;
 
@@ -149,54 +154,63 @@ begin
   begin
     workImg.Assign(masterImg); //shows the raw image only
     StatusBar1.SimpleText := ' Raw raster image';
-  end else
-  begin
-    workImg.SetSize(masterImg.Width, masterImg.Height);
-
-    //get the raw vectors (either using transparency or filtering on black)
-    if masterImg.HasTransparency then
-      rawPaths := Vectorize(masterImg, $FF000000, CompareAlpha, $80) else
-      rawPaths := Vectorize(masterImg, $FF000000, CompareRGB, $44);
-
-    //RamerDouglasPeucker: simplifies raw vectors (removes extraneous vertices)
-    //nb: the 'epsilon' value may need to be increased when the image was
-    //enlarged before vectorizing, effectively making pixel dimensions >1.
-    //Epsilon should be +1 greater than meaningful pixel size.
-    if mnuShowSimplified.Checked then
-      flattenedPaths := RamerDouglasPeucker(rawPaths, 1)
-    else if mnuShowSimplifiedSmoothed.Checked then
-      flattenedPaths := RamerDouglasPeucker(rawPaths, Min(3, TrackBar1.Position /2))
-    else
-      flattenedPaths := rawPaths;
-
-    if mnuShowSmoothedOnly.Checked then
-    begin
-      //note: SmoothToBezier returns poly-bezier paths
-      bezierPaths := SmoothToBezier(rawPaths, true, TrackBar1.Position, 2);
-      //and finally 'flatten' the poly-bezier paths
-      flattenedPaths := FlattenCBezier(bezierPaths);
-    end
-    else if mnuShowSimplifiedSmoothed.Checked then
-    begin
-      //note: SmoothToBezier returns poly-bezier paths (not flattened paths)
-      bezierPaths := SmoothToBezier(flattenedPaths, true, TrackBar1.Position, 2);
-      //and finally 'flatten' the poly-beziers
-      flattenedPaths := FlattenCBezier(bezierPaths);
-    end;
-    DrawPolygon(workImg, flattenedPaths, frEvenOdd, clNavy32);
-
-    if mnuShowRawPoly.Checked then
-      StatusBar1.SimpleText := ' Polygons drawn using raw vectors'
-    else if mnuShowSimplified.Checked then
-      StatusBar1.SimpleText :=
-        ' Polygons drawn using simplified vectors (Ramer-Douglas-Peucker)'
-    else if mnuShowSmoothedOnly.Checked then
-      StatusBar1.SimpleText := format(' Polygons drawn using '+
-        'smoothing only (amount = %d)', [trackbar1.Position])
-    else
-      StatusBar1.SimpleText := format(' Polygons drawn using both '+
-        'simplify and smoothing (amount = %d)', [trackbar1.Position]);
+    Invalidate;
+    Exit;
   end;
+
+  workImg.SetSize(masterImg.Width, masterImg.Height);
+
+  //get the raw vectors (either using transparency or filtering on black)
+  if masterImg.HasTransparency then
+    rawPaths := Vectorize(masterImg, $FF000000, CompareAlpha, $80) else
+    rawPaths := Vectorize(masterImg, $FF000000, CompareRGB, $44);
+
+  if mnuShowRawPoly.Checked then
+  begin
+    flattenedPaths := rawPaths;
+    StatusBar1.SimpleText := ' Polygons drawn using raw vectors';
+  end
+
+  //RamerDouglasPeucker: simplifies raw vectors (removes extraneous vertices)
+  //nb: the 'epsilon' value may need to be increased when the image was
+  //enlarged before vectorizing, effectively making pixel dimensions >1.
+  //Epsilon should be +1 greater than meaningful pixel size.
+  else if mnuShowSimplified.Checked then
+  begin
+    flattenedPaths := RamerDouglasPeucker(rawPaths, TrackBar2.Position);
+    lblSimplify.Caption :=
+      Format('Simplify'#10'Amount'#10'(%d)',[TrackBar2.Position]);
+    StatusBar1.SimpleText :=
+      ' Polygons drawn using simplified vectors (Ramer-Douglas-Peucker)';
+  end
+
+  else if mnuShowSmoothedOnly.Checked then
+  begin
+    //note: SmoothToBezier returns poly-bezier paths
+    bezierPaths := SmoothToBezier(rawPaths, true, TrackBar1.Position, 2);
+    //and finally 'flatten' the poly-bezier paths
+    flattenedPaths := FlattenCBezier(bezierPaths);
+    lblSmooth.Caption :=
+      Format('Smooth'#10'Amount'#10'(%d)',[TrackBar1.Position]);
+    StatusBar1.SimpleText :=' Polygons drawn using smoothing only';
+  end
+
+  else // if mnuShowSimplifiedSmoothed.Checked then
+  begin
+    flattenedPaths :=
+      RamerDouglasPeucker(rawPaths, TrackBar2.Position);
+    //note: SmoothToBezier returns poly-bezier paths (not flattened paths)
+    bezierPaths := SmoothToBezier(flattenedPaths, true, TrackBar1.Position, 2);
+    //and finally 'flatten' the poly-beziers
+    flattenedPaths := FlattenCBezier(bezierPaths);
+    lblSmooth.Caption :=
+      Format('Smooth'#10'Amount'#10'(%d)',[TrackBar1.Position]);
+    lblSimplify.Caption :=
+      Format('Simplify'#10'Amount'#10'(%d)',[TrackBar2.Position]);
+    StatusBar1.SimpleText := ' Polygons drawn using both simplify & smoothing';
+  end;
+
+  DrawPolygon(workImg, flattenedPaths, frEvenOdd, clNavy32);
   Invalidate;
 end;
 //------------------------------------------------------------------------------

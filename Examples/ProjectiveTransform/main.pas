@@ -49,6 +49,7 @@ type
     UpDown3: TUpDown;
     SpinEdit4: TEdit;
     UpDown4: TUpDown;
+    Label1: TLabel;
     procedure Exit1Click(Sender: TObject);
     procedure Open1Click(Sender: TObject);
     procedure Save1Click(Sender: TObject);

@@ -1,9 +1,9 @@
 object Form1: TForm1
   Left = 244
   Top = 142
-  Width = 851
-  Height = 544
   Caption = 'Projective Transform'
+  ClientHeight = 485
+  ClientWidth = 835
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -19,7 +19,7 @@ object Form1: TForm1
   TextHeight = 14
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 467
+    Top = 466
     Width = 835
     Height = 19
     Panels = <>
@@ -29,7 +29,7 @@ object Form1: TForm1
     Left = 0
     Top = 41
     Width = 417
-    Height = 426
+    Height = 425
     Align = alLeft
     ParentBackground = False
     TabOrder = 1
@@ -60,10 +60,16 @@ object Form1: TForm1
       Left = 423
       Top = 3
       Width = 354
-      Height = 32
-      Caption = 'Margins'
+      Height = 35
       TabOrder = 1
       Visible = False
+      object Label1: TLabel
+        Left = 14
+        Top = 9
+        Width = 40
+        Height = 14
+        Caption = 'Margins'
+      end
       object SpinEdit1: TEdit
         Left = 64
         Top = 6
@@ -146,7 +152,7 @@ object Form1: TForm1
     Left = 418
     Top = 41
     Width = 417
-    Height = 426
+    Height = 425
     Align = alRight
     ParentBackground = False
     TabOrder = 3

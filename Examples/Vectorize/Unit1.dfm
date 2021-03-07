@@ -18,7 +18,6 @@ object Form1: TForm1
   OnDestroy = FormDestroy
   OnKeyDown = FormKeyDown
   OnPaint = FormPaint
-  OnResize = FormResize
   PixelsPerInch = 96
   TextHeight = 16
   object StatusBar1: TStatusBar
@@ -31,15 +30,73 @@ object Form1: TForm1
     SimplePanel = True
     UseSystemFont = False
   end
+  object pnlSmooth: TPanel
+    Left = 512
+    Top = 0
+    Width = 57
+    Height = 410
+    Align = alRight
+    ParentBackground = False
+    TabOrder = 1
+    OnEnter = pnlSmoothEnter
+    OnExit = pnlSmoothExit
+    DesignSize = (
+      57
+      410)
+    object lblSmooth: TLabel
+      Left = 6
+      Top = 6
+      Width = 44
+      Height = 32
+      Alignment = taCenter
+      Caption = 'Smooth'#10'Amount'
+    end
+    object lblSimplify: TLabel
+      Left = 5
+      Top = 206
+      Width = 45
+      Height = 32
+      Alignment = taCenter
+      Caption = 'Simplify'#10'Amount'
+    end
+    object TrackBar1: TTrackBar
+      Left = 15
+      Top = 56
+      Width = 27
+      Height = 138
+      Anchors = [akLeft, akTop, akBottom]
+      Min = 1
+      Orientation = trVertical
+      PageSize = 0
+      Position = 3
+      TabOrder = 0
+      TickStyle = tsNone
+      OnChange = TrackBar1Change
+    end
+    object TrackBar2: TTrackBar
+      Left = 15
+      Top = 256
+      Width = 27
+      Height = 138
+      Anchors = [akLeft, akTop, akBottom]
+      Max = 5
+      Min = 1
+      Orientation = trVertical
+      PageSize = 0
+      Position = 2
+      TabOrder = 1
+      TickStyle = tsNone
+      OnChange = TrackBar1Change
+    end
+  end
   object pnlMemo: TPanel
     Left = 0
     Top = 0
     Width = 512
     Height = 410
     Align = alClient
-    TabOrder = 1
+    TabOrder = 2
     Visible = False
-    ExplicitWidth = 433
     object Panel3: TPanel
       Left = 1
       Top = 1
@@ -47,7 +104,6 @@ object Form1: TForm1
       Height = 41
       Align = alTop
       TabOrder = 0
-      ExplicitWidth = 567
       object btnCloseMemo: TButton
         Left = 5
         Top = 9
@@ -99,46 +155,6 @@ object Form1: TForm1
       ReadOnly = True
       ScrollBars = ssVertical
       TabOrder = 1
-      ExplicitTop = 44
-    end
-  end
-  object pnlSmooth: TPanel
-    Left = 512
-    Top = 0
-    Width = 57
-    Height = 410
-    Align = alRight
-    ParentBackground = False
-    TabOrder = 2
-    OnEnter = pnlSmoothEnter
-    OnExit = pnlSmoothExit
-    ExplicitLeft = 215
-    ExplicitTop = 1
-    ExplicitHeight = 295
-    DesignSize = (
-      57
-      410)
-    object Label1: TLabel
-      Left = 5
-      Top = 6
-      Width = 44
-      Height = 32
-      Caption = 'Smooth'#10'Amount'
-    end
-    object TrackBar1: TTrackBar
-      Left = 15
-      Top = 46
-      Width = 27
-      Height = 282
-      Anchors = [akLeft, akTop, akBottom]
-      Min = 1
-      Orientation = trVertical
-      PageSize = 0
-      Position = 3
-      TabOrder = 0
-      TickStyle = tsNone
-      OnChange = TrackBar1Change
-      ExplicitHeight = 239
     end
   end
   object MainMenu1: TMainMenu
