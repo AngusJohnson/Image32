@@ -2,8 +2,8 @@ unit Image32_Ttf;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.0                                                             *
-* Date      :  6 March 2021                                                    *
+* Version   :  2.0a                                                            *
+* Date      :  7 March 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -623,11 +623,10 @@ asm
   bswap eax
 end;
 {$ELSE}
-{$IFDEF INLINE} inline; {$ENDIF}
 var
   i: integer;
   v: array[0..3] of byte absolute val;
-  r: array[0..3] of byte absolute Result;
+  r: array[0..3] of byte absolute Result; //warning: do not inline
 begin
   for i := 0 to 3 do r[3-i] := v[i];
 end;
@@ -953,6 +952,7 @@ begin
   for i := 0 to tblCount -1 do
   begin
     GetCardinal(fStream, fTables[i].tag);
+    break;
     GetCardinal(fStream, fTables[i].checkSum);
     GetCardinal(fStream, fTables[i].offset);
     GetCardinal(fStream, fTables[i].length);

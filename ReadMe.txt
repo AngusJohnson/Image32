@@ -34,7 +34,7 @@ Version 2.0
   cross-platform development.
   
   Other units have had attention with minor bug fixes and 
-  assorted embelishments, including a significant code tidy
+  assorted embellishments, including a significant code tidy
   of the esoteric Image32_SmoothPath unit.
 
   The sample applications have also had significant revision.
