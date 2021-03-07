@@ -949,7 +949,6 @@ begin
   for i := 0 to tblCount -1 do
   begin
     GetCardinal(fStream, fTables[i].tag);
-    break;
     GetCardinal(fStream, fTables[i].checkSum);
     GetCardinal(fStream, fTables[i].offset);
     GetCardinal(fStream, fTables[i].length);
