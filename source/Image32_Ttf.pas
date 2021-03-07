@@ -589,7 +589,6 @@ asm
   rol ax,8;
 end;
 {$ELSE}
-{$IFDEF INLINE} inline; {$ENDIF}
 var
   v: array[0..1] of byte absolute val;
   r: array[0..1] of byte absolute result;
@@ -606,7 +605,6 @@ asm
   rol ax,8;
 end;
 {$ELSE}
-{$IFDEF INLINE} inline; {$ENDIF}
 var
   v: array[0..1] of byte absolute val;
   r: array[0..1] of byte absolute result;
@@ -642,7 +640,6 @@ asm
   BSWAP   EAX
 end;
 {$ELSE}
-{$IFDEF INLINE} inline; {$ENDIF}
 var
   i: integer;
   v: array[0..7] of byte absolute val;
