@@ -15,15 +15,17 @@ type
 
   TMyVectorLayer32 = class(TVectorLayer32) //for vector drawn layers
   private
-    fPenColor: TColor32;
-    fBrushColor: TColor32;
+    BrushColor : TColor32;
+    PenColor   : TColor32;
+    PenWidth   : double;
     procedure InitRandomColors;
   public
-    constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
-    procedure RedrawVector(const p: TPathsD = nil);
+    constructor Create(groupOwner: TGroupLayer32;
+      const name: string = ''); override;
+    procedure Draw(Sender: TObject);
   end;
 
-  TMyRasterLayer32 = class(TRasterLayer32) //for imported raster image layers
+  TMyRasterLayer32 = class(TRasterLayer32) //for raster image layers
   public
     procedure Init(const pt: TPoint);
   end;
@@ -84,6 +86,7 @@ type
     procedure FormResize(Sender: TObject);
     procedure FormPaint(Sender: TObject);
     procedure mnuCutToClipboardClick(Sender: TObject);
+    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   private
     layeredImage32: TLayeredImage32;
     fontReader: TFontReader;
@@ -95,10 +98,7 @@ type
     popupPoint: TPoint;
     clickPoint: TPoint;
     procedure SetTargetLayer(layer: TLayer32);
-    procedure DoKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
-    procedure DoDropImage(const filename: string);
   protected
-    procedure WMDROPFILES(var msg: TWMDropFiles); message WM_DROPFILES;
     procedure WMERASEBKGND(var message: TMessage); message WM_ERASEBKGND;
   public
   end;
@@ -147,7 +147,9 @@ constructor TMyVectorLayer32.Create(groupOwner: TGroupLayer32;
 begin
   inherited;
   InitRandomColors;
+  PenWidth := DpiAware(1.5);
   CursorId := crHandPoint;
+  OnDraw := Draw;
 end;
 //------------------------------------------------------------------------------
 
@@ -159,34 +161,19 @@ begin
   hsl.sat := 240;
   hsl.lum := 200;
   hsl.Alpha := 128;
-  fBrushColor := HslToRgb(hsl);
-  fPenColor := MakeDarker(fBrushColor, 60) or $FF000000;
+  BrushColor := HslToRgb(hsl);
+  PenColor := MakeDarker(BrushColor, 60) or $FF000000;
 end;
 //------------------------------------------------------------------------------
 
-procedure TMyVectorLayer32.RedrawVector(const p: TPathsD = nil);
+procedure TMyVectorLayer32.Draw(Sender: TObject);
 var
-  vectorRect: TRectD;
-  scaleX, scaleY: double;
-  tmpPaths: TPathsD;
-const
-  marg = 2;
+  p: TPathsD;
 begin
-  if Assigned(p) then Paths := CopyPaths(p);
-  vectorRect := GetBoundsD(Paths);
-  if IsEmptyRect(vectorRect) then Exit;
-
-  //stretch the vectors so they fit neatly into the layer
-  scaleX := (Image.Width - marg*2) / vectorRect.Width;
-  scaleY := (Image.Height - marg*2) / vectorRect.Height;
-
-  tmpPaths := ScalePath(Paths, scaleX, scaleY);
-  tmpPaths := OffsetPath(tmpPaths,
-    marg - vectorRect.Left*scaleX,
-    marg - vectorRect.Top*scaleY);
-  DrawPolygon(Image, tmpPaths, frEvenOdd, fBrushColor);
-  DrawLine(Image, tmpPaths, DpiAware(2), fPenColor, esPolygon);
-  UpdateHitTestMask(tmpPaths, frEvenOdd);
+  p := OffsetPath(Paths, -Left, -Top);
+  DrawPolygon(Image, p, frEvenOdd, BrushColor);
+  DrawLine(Image, p, PenWidth, PenColor, esPolygon);
+  UpdateHitTestMask(p, frEvenOdd);
 end;
 
 //------------------------------------------------------------------------------
@@ -198,7 +185,6 @@ begin
   MasterImage.CropTransparentPixels;
   Image.Assign(MasterImage);
   PositionCenteredAt(pt);
-  CursorId := crHandPoint;
   UpdateHitTestMaskTransparent;
 end;
 
@@ -211,10 +197,6 @@ var
   resStream: TResourceStream;
 begin
   Randomize;
-
-  DefaultButtonSize := DPIAware(10); //ie the layered image's control buttons
-
-  OnKeyDown := DoKeyDown;
 
   layeredImage32 := TLayeredImage32.Create; //sized in FormResize below.
 
@@ -235,13 +217,12 @@ begin
     resStream.Free;
   end;
 
-  DragAcceptFiles(Handle, True);
+  popupPoint := Point(layeredImage32.MidPoint);
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
-  DragAcceptFiles(Handle, False);
   wordStrings.Free;
   fontCache.Free;
   fontReader.Free;
@@ -254,11 +235,12 @@ begin
   if not Assigned(layeredImage32) then Exit;
 
   layeredImage32.SetSize(ClientWidth, ClientHeight);
+
   //and resize and repaint the hatched design background layer
   with TDesignerLayer32(layeredImage32[0]) do
   begin
     //nb: use SetSize not Resize which would waste
-    //CPU cycles stretching the previous hatching
+    //CPU cycles stretching any previous hatching
     SetSize(layeredImage32.Width, layeredImage32.Height);
     HatchBackground(Image);
   end;
@@ -267,70 +249,63 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.WMDROPFILES(var msg: TWMDropFiles);
-var
-  dropHdl: HDROP;
-  len: integer;
-  filename: string;
-begin
-  dropHdl := msg.Drop;
-  len := DragQueryFile(dropHdl, 0, nil, 0);
-  SetLength(filename, len);
-  DragQueryFile(dropHdl, 0, PChar(FileName), len + 1);
-  OpenDialog1.InitialDir := ExtractFilePath(filename);
-  OpenDialog1.FileName := filename;
-  DragFinish(dropHdl);
-  msg.Result := 0;     //ie message has been handled.
-  DoDropImage(filename);
-end;
-//------------------------------------------------------------------------------
-
 procedure TMainForm.mnuAddEllipseClick(Sender: TObject);
 var
-  newLayer: TMyVectorLayer32;
+  newLayer: TLayer32;
+  x,y: integer;
+  rec: TRect;
 begin
+  //create a semi-random sized object
+  x := DPIAware(25 + Random(100));
+  y := DPIAware(25 + Random(100));
+  rec := Rect(popupPoint.X -x,popupPoint.Y -y,
+    popupPoint.X +x,popupPoint.Y +y);
+
+  //create the new layer
   newLayer := TMyVectorLayer32(layeredImage32.AddLayer(TMyVectorLayer32));
-  with newLayer do
-  begin
-    SetSize(DPIAware(50 + Random(200)), DPIAware(50 + Random(200)));
-    RedrawVector(Image32_Vector.Paths(Ellipse(Bounds)));
-    PositionCenteredAt(popupPoint);
-  end;
+  with newLayer as TMyVectorLayer32 do
+    Paths := Image32_Vector.Paths(Ellipse(rec));
   SetTargetLayer(newLayer);
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuAddRectangleClick(Sender: TObject);
 var
-  newLayer: TMyVectorLayer32;
+  newLayer: TLayer32;
+  x,y: integer;
+  rec: TRect;
 begin
-  newLayer := TMyVectorLayer32(layeredImage32.AddLayer(TMyVectorLayer32));
-  with newLayer do
-  begin
-    SetSize(DPIAware(50 + Random(200)), DPIAware(50 + Random(200)));
-    RedrawVector(Image32_Vector.Paths(Rectangle(Bounds)));
-    PositionCenteredAt(popupPoint);
-  end;
+  //create a semi-random sized object
+  x := DPIAware(25 + Random(100));
+  y := DPIAware(25 + Random(100));
+  rec := Rect(popupPoint.X -x,popupPoint.Y -y,
+    popupPoint.X +x,popupPoint.Y +y);
+
+  newLayer := layeredImage32.AddLayer(TMyVectorLayer32);
+  with newLayer as TMyVectorLayer32 do
+    Paths := Image32_Vector.Paths(Rectangle(rec));
   SetTargetLayer(newLayer);
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuAddTextClick(Sender: TObject);
 var
-  newLayer: TMyVectorLayer32;
+  newLayer: TLayer32;
   randomWord: string;
   tmp: TPathsD;
+  rec: TRectD;
 begin
   randomWord := wordStrings[Random(wordStrings.Count)];
-  newLayer := TMyVectorLayer32(layeredImage32.AddLayer(TMyVectorLayer32));
-  with newLayer do
-  begin
-    fontCache.GetTextGlyphs(0,0,randomWord, tmp);
-    Paths := ScalePath(tmp, 1, 2.0);
-    SetBounds(Image32_Vector.GetBounds(Paths));
-    RedrawVector;
-    PositionCenteredAt(popupPoint);
-  end;
+  fontCache.GetTextGlyphs(0, 0, randomWord, tmp);
+  tmp := ScalePath(tmp, 1, 2.0);
+  rec := Image32_Vector.GetBoundsD(tmp);
+  with popupPoint do
+    tmp := OffsetPath(tmp,
+      X - rec.Left - rec.Width/2,
+      Y -rec.Top - rec.Height/2);
+
+  newLayer := layeredImage32.AddLayer(TMyVectorLayer32);
+  with newLayer as TMyVectorLayer32 do Paths := tmp;
   SetTargetLayer(newLayer);
 end;
 //------------------------------------------------------------------------------
@@ -340,17 +315,20 @@ var
   rasterLayer: TMyRasterLayer32;
 begin
   if not OpenDialog1.Execute then Exit;
-  rasterLayer := TMyRasterLayer32(layeredImage32.AddLayer(TMyRasterLayer32));
-  rasterLayer.MasterImage.LoadFromFile(OpenDialog1.FileName);
-  if rasterLayer.MasterImage.IsEmpty then
+
+  rasterLayer := layeredImage32.AddLayer(TMyRasterLayer32) as TMyRasterLayer32;
+  with rasterLayer do
   begin
-    rasterLayer.Free;
-  end else
-  begin
-    rasterLayer.Init(Point(layeredImage32.MidPoint));
-    SetTargetLayer(rasterLayer);
-    Invalidate;
+    MasterImage.LoadFromFile(OpenDialog1.FileName);
+    if MasterImage.IsEmpty then
+    begin
+      Free;
+      Exit;
+    end;
+    Init(Point(layeredImage32.MidPoint));
   end;
+  SetTargetLayer(rasterLayer);
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -360,39 +338,19 @@ var
 begin
   if not TImage32.CanPasteFromClipBoard then Exit;
   FreeAndNil(buttonGroup);
-  rasterLayer := TMyRasterLayer32(layeredImage32.AddLayer(TMyRasterLayer32));
-  rasterLayer.MasterImage.PasteFromClipBoard;
-  if rasterLayer.MasterImage.IsEmpty then
+  rasterLayer := layeredImage32.AddLayer(TMyRasterLayer32) as TMyRasterLayer32;
+  with rasterLayer do
   begin
-    rasterLayer.Free;
-  end else
-  begin
-    rasterLayer.Init(Point(layeredImage32.MidPoint));
-    SetTargetLayer(rasterLayer);
-    Invalidate;
+    MasterImage.PasteFromClipBoard;
+    if MasterImage.IsEmpty then
+    begin
+      Free;
+      Exit;
+    end;
+    Init(Point(layeredImage32.MidPoint));
   end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.DoDropImage(const filename: string);
-var
-  rasterLayer: TMyRasterLayer32;
-  pt: TPoint;
-begin
-  GetCursorPos(pt);
-  pt := ScreenToClient(pt);
-  FreeAndNil(buttonGroup);
-  rasterLayer := TMyRasterLayer32(layeredImage32.AddLayer(TMyRasterLayer32));
-  rasterLayer.MasterImage.LoadFromFile(FileName);
-  if rasterLayer.MasterImage.IsEmpty then
-  begin
-    rasterLayer.Free;
-  end else
-  begin
-    rasterLayer.Init(pt);
-    SetTargetLayer(rasterLayer);
-    Invalidate;
-  end;
+  SetTargetLayer(rasterLayer);
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -418,8 +376,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
-procedure TMainForm.DoKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
+procedure TMainForm.FormKeyDown(Sender: TObject;
+  var Key: Word; Shift: TShiftState);
 begin
   if (Key = VK_ESCAPE) and Assigned(targetLayer) then
   begin
@@ -482,8 +440,7 @@ begin
     Exit;
   end;
 
-  if not Assigned(clickedLayer) then
-    Exit; //we're definitely not moving anything :)
+  if not Assigned(clickedLayer) then Exit; //we're not moving anything :)
 
   dx := pt.X - clickPoint.X;
   dy := pt.Y - clickPoint.Y;
@@ -500,10 +457,7 @@ begin
     rec := UpdateSizingButtonGroup(clickedLayer);
     targetLayer.SetBounds(rec);
 
-    if targetLayer is TMyVectorLayer32 then
-      TMyVectorLayer32(targetLayer).RedrawVector
-
-    else if targetLayer is TMyRasterLayer32 then
+    if targetLayer is TMyRasterLayer32 then
       with TMyRasterLayer32(targetLayer) do
     begin
       Image.Copy(MasterImage, MasterImage.Bounds, Image.Bounds);

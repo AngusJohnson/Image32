@@ -238,7 +238,7 @@ begin
         end;
       ttAffineRotate:
         begin
-          pt := Point(buttonRotateGroup.Center);
+          pt := Point(buttonRotateGroup.Pivot);
           //matrix := IdentityMatrix;
           //MatrixRotate(matrix, Image.MidPoint,buttonRotateGroup.Angle);
           //AffineTransformImage(Image, matrix);

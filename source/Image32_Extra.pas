@@ -107,6 +107,14 @@ function Vectorize(img: TImage32; compareColor: TColor32;
 function VectorizeMask(const mask: TArrayOfByte;
   maskWidth: integer): TPathsD;
 
+//RamerDouglasPeucker: simplifies paths, recursively removing vertices where
+//they deviate no more than 'epsilon' from their adjacent vertices.
+function RamerDouglasPeucker(const path: TPathD;
+  epsilon: double): TPathD; overload;
+
+function RamerDouglasPeucker(const paths: TPathsD;
+  epsilon: double): TPathsD; overload;
+
 function GetFloodFillMask(img: TImage32; x, y: Integer;
   compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
 
@@ -1096,9 +1104,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-type
-  THackedImage32 = class(TImage32); //exposes protected BeginUpdate/EndUpdate
-
 function DrawButton(img: TImage32; const pt: TPointD;
   size: double; color: TColor32; buttonShape: TButtonShape;
   buttonAttributes: TButtonAttributes): TPathD;
@@ -1135,7 +1140,7 @@ begin
   end;
   shadowAngle := angle315;
 
-  THackedImage32(img).BeginUpdate;
+  img.BeginUpdate;
   try
 
     //nb: only need to cutout the inside shadow if
@@ -1152,8 +1157,7 @@ begin
         Ceil(shadowSize), $AA000000, $CCFFFFFF, shadowAngle);
     DrawLine(img, Result, DpiAware(1.0), clBlack32, esPolygon);
   finally
-    THackedImage32(img).EndUpdate;
-    THackedImage32(img).Changed;
+    img.EndUpdate;
   end;
 
 end;
@@ -1772,6 +1776,89 @@ begin
   Result := VectorizeMask(mask, img.Width);
   for i := 0 to high(Result) do
     Result[i] := Tidy(Result[i], roundingTolerance);
+end;
+//------------------------------------------------------------------------------
+
+function PerpendicularDistSqrd(const pt, line1, line2: TPointD): double;
+var
+  a,b,c,d: double;
+begin
+  a := pt.X - line1.X;
+  b := pt.Y - line1.Y;
+  c := line2.X - line1.X;
+  d := line2.Y - line1.Y;
+  if (c = 0) and (d = 0) then
+    result := 0 else
+    result := Sqr(a * d - c * b) / (c * c + d * d);
+end;
+//------------------------------------------------------------------------------
+
+procedure RDP(const path: TPathD; startIdx, endIdx: integer;
+  epsilonSqrd: double; const flags: TArrayOfInteger);
+var
+  i, idx: integer;
+  d, maxD: double;
+begin
+  idx := 0;
+  maxD := 0;
+  for i := startIdx +1 to endIdx -1 do
+  begin
+    //PerpendicularDistSqrd - avoids expensive Sqrt()
+    d := PerpendicularDistSqrd(path[i], path[startIdx], path[endIdx]);
+    if d <= maxD then Continue;
+    maxD := d;
+    idx := i;
+  end;
+  if maxD < epsilonSqrd then Exit;
+  flags[idx] := 1;
+  if idx > startIdx + 1 then RDP(path, startIdx, idx, epsilonSqrd, flags);
+  if endIdx > idx + 1 then RDP(path, idx, endIdx, epsilonSqrd, flags);
+end;
+//------------------------------------------------------------------------------
+
+function RamerDouglasPeucker(const path: TPathD;
+  epsilon: double): TPathD;
+var
+  i,j, len: integer;
+  buffer: TArrayOfInteger;
+begin
+  len := length(path);
+  if len < 5 then
+  begin
+    result := Copy(path, 0, len);
+    Exit;
+  end;
+  SetLength(buffer, len); //buffer is zero initialized
+
+  buffer[0] := 1;
+  buffer[len -1] := 1;
+  RDP(path, 0, len -1, Sqr(epsilon), buffer);
+  j := 0;
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    if buffer[i] = 1 then
+    begin
+      Result[j] := path[i];
+      inc(j);
+    end;
+  SetLength(Result, j);
+end;
+//------------------------------------------------------------------------------
+
+function RamerDouglasPeucker(const paths: TPathsD;
+  epsilon: double): TPathsD;
+var
+  i,j, len: integer;
+begin
+  j := 0;
+  len := length(paths);
+  setLength(Result, len);
+  for i := 0 to len -1 do
+  begin
+    Result[i] := RamerDouglasPeucker(paths[i], epsilon);
+    if Result[i] <> nil then inc(j);
+  end;
+  setLength(Result, j);
 end;
 //------------------------------------------------------------------------------
 

@@ -2,8 +2,8 @@ unit Image32_GIF;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.0                                                             *
-* Date      :  6 March 2021                                                    *
+* Version   :  2.1                                                             *
+* Date      :  12 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  GIF file format extension for TImage32                          *
@@ -73,10 +73,15 @@ begin
         inc(pcT); inc(pc);
       end;
     end;
-    //copy bmp to img32
-    img32.SetSize(w, h);
-    for I := 0 to h -1 do
-      Move(bmp.ScanLine[i]^, img32.PixelRow[i]^, w * 4);
+    img32.BeginUpdate;
+    try
+      //copy bmp to img32
+      img32.SetSize(w, h);
+      for I := 0 to h -1 do
+        Move(bmp.ScanLine[i]^, img32.PixelRow[i]^, w * 4);
+    finally
+      img32.EndUpdate;
+    end;
     result := true;
   finally
     gif.Free;

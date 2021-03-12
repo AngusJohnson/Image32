@@ -2,8 +2,8 @@ unit Image32_BMP;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.0                                                             *
-* Date      :  6 March 2021                                                    *
+* Version   :  2.1                                                             *
+* Date      :  12 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  BMP file format extension for TImage32                          *
@@ -501,32 +501,37 @@ begin
 
     tmp := nil;
     result := true;
-    img32.SetSize(bih.biWidth, bih.biHeight);
+    img32.BeginUpdate;
+    try
+      img32.SetSize(bih.biWidth, bih.biHeight);
 
-    //read pixels ....
-    if stream.Position < bfh.bfOffBits then stream.Position := bfh.bfOffBits;
+      //read pixels ....
+      if stream.Position < bfh.bfOffBits then stream.Position := bfh.bfOffBits;
 
-    if hasValidBitFields then
-      tmp := StreamReadImageWithBitfields(
-        stream, img32.Width, img32.Height, bih.biBitCount, bitfields)
+      if hasValidBitFields then
+        tmp := StreamReadImageWithBitfields(
+          stream, img32.Width, img32.Height, bih.biBitCount, bitfields)
 
-    else if (bih.biBitCount = 32) then
-    begin
-      Read(img32.Pixels[0], bih.biWidth * bih.biHeight * sizeof(TColor32));
-      if AlphaChannelAllZero(img32) then ResetAlphaChannel(img32);
-    end
+      else if (bih.biBitCount = 32) then
+      begin
+        Read(img32.Pixels[0], bih.biWidth * bih.biHeight * sizeof(TColor32));
+        if AlphaChannelAllZero(img32) then ResetAlphaChannel(img32);
+      end
 
-    else if (bih.biCompression = BI_RLE8) or (bih.biCompression = BI_RLE4) then
-      tmp := ReadRLE4orRLE8Compression(
-        stream, img32.Width, img32.Height, bih.biBitCount, pal)
+      else if (bih.biCompression = BI_RLE8) or (bih.biCompression = BI_RLE4) then
+        tmp := ReadRLE4orRLE8Compression(
+          stream, img32.Width, img32.Height, bih.biBitCount, pal)
 
-    else tmp := StreamReadImageWithPalette(
-      stream, img32.Width, img32.Height, bih.biBitCount, pal);
+      else tmp := StreamReadImageWithPalette(
+        stream, img32.Width, img32.Height, bih.biBitCount, pal);
 
-    if assigned(tmp) and (length(tmp) = img32.Width * img32.Height) then
-      move(tmp[0], img32.Pixels[0], length(tmp) * sizeof(TColor32));
+      if assigned(tmp) and (length(tmp) = img32.Width * img32.Height) then
+        move(tmp[0], img32.Pixels[0], length(tmp) * sizeof(TColor32));
 
-    if not isTopDown then img32.FlipVertical;
+      if not isTopDown then img32.FlipVertical;
+    finally
+      img32.EndUpdate;
+    end;
   end;
 end;
 
@@ -981,10 +986,15 @@ begin
     bi.bmiHeader.biBitCount := 32;
     bi.bmiHeader.biCompression := BI_RGB;
 
-    img32.SetSize(w, h);
-    if GetDIBits(memDc, bm, 0, h,
-      PByte(img32.PixelBase), bi, DIB_RGB_COLORS) = 0 then Exit;
-    img32.FlipVertical;
+    img32.BeginUpdate;
+    try
+      img32.SetSize(w, h);
+      if GetDIBits(memDc, bm, 0, h,
+        PByte(img32.PixelBase), bi, DIB_RGB_COLORS) = 0 then Exit;
+      img32.FlipVertical;
+    finally
+      img32.EndUpdate;
+    end;
 
     SelectObject(memDC, oldBitmap);
     if (oldPalette > 0) then

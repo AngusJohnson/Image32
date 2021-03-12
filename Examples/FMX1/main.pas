@@ -48,7 +48,7 @@ implementation
 {$R image.res}
 
 uses
-  Image32_Vector, Image32_Draw, Image32_Extra,
+  Image32_Vector, Image32_Transform, Image32_Draw, Image32_Extra,
     Image32_Ttf, Image32_Clipper;
 
 ResourceString

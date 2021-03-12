@@ -42,41 +42,46 @@ object MainForm: TMainForm
     end
     object Action1: TMenuItem
       Caption = '&Action'
-      object AddImage1: TMenuItem
+      object mnuAddImage: TMenuItem
         Caption = 'Add &Image ...'
         ShortCut = 16457
-        OnClick = AddImage1Click
+        OnClick = mnuAddImageClick
       end
-      object AddText1: TMenuItem
+      object mnuAddText: TMenuItem
         Caption = 'Add &Text'
         ShortCut = 16468
-        OnClick = AddText1Click
+        OnClick = mnuAddTextClick
+      end
+      object mnuAddArrow: TMenuItem
+        Caption = 'Add &Arrow'
+        ShortCut = 16449
+        OnClick = mnuAddArrowClick
       end
       object N1: TMenuItem
         Caption = '-'
       end
-      object Rotate1: TMenuItem
+      object mnuRotate: TMenuItem
         Caption = '&Rotate'
         ShortCut = 16466
-        OnClick = Rotate1Click
+        OnClick = mnuRotateClick
       end
-      object Delete1: TMenuItem
+      object mnuDelete: TMenuItem
         Caption = '&Delete'
         ShortCut = 46
-        OnClick = Delete1Click
+        OnClick = mnuDeleteClick
       end
       object N2: TMenuItem
         Caption = '-'
       end
-      object SendBackOne1: TMenuItem
+      object mnuSendBackOne: TMenuItem
         Caption = 'Send &Back One'
         ShortCut = 16450
-        OnClick = SendBackOne1Click
+        OnClick = mnuSendBackOneClick
       end
-      object BringForwardOne1: TMenuItem
+      object mnuBringForwardOne: TMenuItem
         Caption = 'Bring &Forward One'
         ShortCut = 16454
-        OnClick = BringForwardOne1Click
+        OnClick = mnuBringForwardOneClick
       end
     end
   end

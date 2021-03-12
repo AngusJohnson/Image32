@@ -2,8 +2,8 @@ unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.0                                                             *
-* Date      :  6 March 2021                                                    *
+* Version   :  2.1                                                             *
+* Date      :  12 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -17,25 +17,283 @@ interface
 uses
   SysUtils, Classes, Math, Types, Image32, Image32_Draw, Image32_Vector;
 
-procedure AffineTransformImage(img: TImage32; matrix: TMatrixD); overload;
-procedure AffineTransformImage(img: TImage32;
-  matrix: TMatrixD; out offset: TPoint); overload;
+  //Matrix functions
+  function IsIdentityMatrix(const matrix: TMatrixD): Boolean;
+  function Matrix(const m00, m01, m02, m10, m11, m12, m20, m21, m22: double): TMatrixD;
+  function MatrixDeterminant(const matrix: TMatrixD): double;
+  function MatrixAdjugate(const matrix: TMatrixD): TMatrixD;
+  function MatrixMultiply(const modifier, matrix: TMatrixD): TMatrixD;
 
-//ProjectiveTransform:
-//  srcPts, dstPts => each path must contain 4 points
-//  margins => the margins around dstPts (in the dest. projective).
-//  Margins are only meaningful when srcPts are inside the image.
-function ProjectiveTransform(img: TImage32;
-  const srcPts, dstPts: TPathD; const margins: TRect): Boolean;
+  procedure MatrixApply(const matrix: TMatrixD;
+    var pt: TPointD); overload;
+  procedure MatrixApply(const matrix: TMatrixD;
+    var path: TPathD); overload;
+  procedure MatrixApply(const matrix: TMatrixD;
+    var paths: TPathsD); overload;
+  procedure MatrixInvert(var matrix: TMatrixD);
 
-function SplineVertTransform(img: TImage32; const topSpline: TPathD;
-  splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
-  out offset: TPoint): Boolean;
-function SplineHorzTransform(img: TImage32; const leftSpline: TPathD;
-  splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
-  out offset: TPoint): Boolean;
+  //MatrixSkew: dx represents the delta offset of an X coordinate as a
+  //fraction of its Y coordinate, and likewise for dy. For example, if dx = 0.1
+  //and dy = 0, and the matrix is applied to the coordinate [20,15], then the
+  //transformed coordinate will become [20 + (15 * 0.1),10], ie [21.5,10].
+  procedure MatrixSkew(var matrix: TMatrixD; dx, dy: double);
+  procedure MatrixScale(var matrix: TMatrixD; scale: double); overload;
+  procedure MatrixScale(var matrix: TMatrixD; scaleX, scaleY: double); overload;
+  procedure MatrixRotate(var matrix: TMatrixD;
+    const center: TPointD; angRad: double);
+  procedure MatrixTranslate(var matrix: TMatrixD; dx, dy: double);
+
+  procedure AffineTransformImage(img: TImage32; matrix: TMatrixD); overload;
+  procedure AffineTransformImage(img: TImage32;
+    matrix: TMatrixD; out offset: TPoint); overload;
+
+  //ProjectiveTransform:
+  //  srcPts, dstPts => each path must contain 4 points
+  //  margins => the margins around dstPts (in the dest. projective).
+  //  Margins are only meaningful when srcPts are inside the image.
+  function ProjectiveTransform(img: TImage32;
+    const srcPts, dstPts: TPathD; const margins: TRect): Boolean;
+
+  function SplineVertTransform(img: TImage32; const topSpline: TPathD;
+    splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
+    out offset: TPoint): Boolean;
+  function SplineHorzTransform(img: TImage32; const leftSpline: TPathD;
+    splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
+    out offset: TPoint): Boolean;
+
+const
+  IdentityMatrix: TMatrixD = ((1, 0, 0),(0, 1, 0),(0, 0, 1));
 
 implementation
+
+resourcestring
+  rsInvalidScale   = 'Invalid matrix scaling factor (0)';
+
+//------------------------------------------------------------------------------
+// Matrix functions
+//------------------------------------------------------------------------------
+
+function IsIdentityMatrix(const matrix: TMatrixD): Boolean;
+var
+  i,j: integer;
+const
+  matVal: array [boolean] of double = (0.0, 1.0);
+begin
+  result := false;
+  for i := 0 to 2 do
+    for j := 0 to 2 do
+      if matrix[i][j] <> matVal[j=i] then Exit;
+  Result := true;
+end;
+//------------------------------------------------------------------------------
+
+function Matrix(const m00, m01, m02, m10, m11, m12, m20, m21, m22: double): TMatrixD;
+begin
+  Result[0,0] := m00; Result[0,1] := m01; Result[0,2] := m02;
+  Result[1,0] := m10; Result[1,1] := m11; Result[1,2] := m12;
+  Result[2,0] := m20; Result[2,1] := m21; Result[2,2] := m22;
+end;
+//------------------------------------------------------------------------------
+
+function Det4(a1, a2, b1, b2: double): double; {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result := a1 * b2 - a2 * b1;
+end;
+//------------------------------------------------------------------------------
+
+function Det9(a1, a2, a3, b1, b2, b3, c1, c2, c3: double): double;
+{$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result := a1 * Det4(b2, b3, c2, c3) -
+            b1 * Det4(a2, a3, c2, c3) +
+            c1 * Det4(a2, a3, b2, b3);
+end;
+//------------------------------------------------------------------------------
+
+function MatrixDeterminant(const matrix: TMatrixD): double;
+{$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result := Det9(matrix[0,0], matrix[1,0], matrix[2,0],
+                 matrix[0,1], matrix[1,1], matrix[2,1],
+                 matrix[0,2], matrix[1,2], matrix[2,2]);
+end;
+//------------------------------------------------------------------------------
+
+function MatrixAdjugate(const matrix: TMatrixD): TMatrixD;
+begin
+  //https://en.wikipedia.org/wiki/Adjugate_matrix
+  Result[0,0] :=  Det4(matrix[1,1], matrix[1,2], matrix[2,1], matrix[2,2]);
+  Result[0,1] := -Det4(matrix[0,1], matrix[0,2], matrix[2,1], matrix[2,2]);
+  Result[0,2] :=  Det4(matrix[0,1], matrix[0,2], matrix[1,1], matrix[1,2]);
+
+  Result[1,0] := -Det4(matrix[1,0], matrix[1,2], matrix[2,0], matrix[2,2]);
+  Result[1,1] :=  Det4(matrix[0,0], matrix[0,2], matrix[2,0], matrix[2,2]);
+  Result[1,2] := -Det4(matrix[0,0], matrix[0,2], matrix[1,0], matrix[1,2]);
+
+  Result[2,0] :=  Det4(matrix[1,0], matrix[1,1], matrix[2,0], matrix[2,1]);
+  Result[2,1] := -Det4(matrix[0,0], matrix[0,1], matrix[2,0], matrix[2,1]);
+  Result[2,2] :=  Det4(matrix[0,0], matrix[0,1], matrix[1,0], matrix[1,1]);
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixApply(const matrix: TMatrixD; var pt: TPointD);
+var
+  tmpX: double;
+begin
+  tmpX := pt.x;
+  pt.X := tmpX * matrix[0, 0] + pt.Y * matrix[1, 0] + matrix[2, 0];
+  pt.Y := tmpX * matrix[0, 1] + pt.Y * matrix[1, 1] + matrix[2, 1];
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixApply(const matrix: TMatrixD; var path: TPathD);
+var
+  i, len: integer;
+  tmpX: double;
+  pp: PPointD;
+begin
+  len := Length(path);
+  if (len = 0) or IsIdentityMatrix(matrix) then Exit;
+  pp := @path[0];
+  for i := 0 to len -1 do
+  begin
+    tmpX := pp.X;
+    pp.X := tmpX * matrix[0, 0] + pp.Y * matrix[1, 0] + matrix[2, 0];
+    pp.Y := tmpX * matrix[0, 1] + pp.Y * matrix[1, 1] + matrix[2, 1];
+    inc(pp);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixApply(const matrix: TMatrixD; var paths: TPathsD);
+var
+  i,j,len: integer;
+  tmpX: double;
+  pp: PPointD;
+begin
+  if IsIdentityMatrix(matrix) then Exit;
+  for i := 0 to High(paths) do
+  begin
+    len := Length(paths[i]);
+    if len = 0 then Continue;
+    pp := @paths[i][0];
+    for j := 0 to High(paths[i]) do
+    begin
+      tmpX := pp.X;
+      pp.X := tmpX * matrix[0, 0] + pp.Y * matrix[1, 0] + matrix[2, 0];
+      pp.Y := tmpX * matrix[0, 1] + pp.Y * matrix[1, 1] + matrix[2, 1];
+      inc(pp);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function MatrixMultiply(const modifier, matrix: TMatrixD): TMatrixD;
+var
+  i, j: Integer;
+begin
+//  if (modifier[2][2] <> 1) or (matrix[2][2] <> 1) then
+//    raise Exception.Create(rsInvalidMatrix);
+  for i := 0 to 2 do
+    for j := 0 to 2 do
+      Result[i, j] :=
+        (modifier[0, j] * matrix[i, 0]) +
+        (modifier[1, j] * matrix[i, 1]) +
+        (modifier[2, j] * matrix[i, 2]);
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixScale(var matrix: TMatrixD; scaleX, scaleY: double);
+var
+  m: TMatrixD;
+begin
+  m := IdentityMatrix;
+  if (scaleX = 0) or (scaleY = 0) then
+    raise Exception(rsInvalidScale);
+
+  if ValueAlmostOne(scaleX) and ValueAlmostOne(scaleY) then Exit;
+  m[0, 0] := scaleX;
+  m[1, 1] := scaleY;
+  matrix := MatrixMultiply(m, matrix);
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixScale(var matrix: TMatrixD; scale: double);
+begin
+  MatrixScale(matrix, scale, scale);
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixRotate(var matrix: TMatrixD;
+  const center: TPointD; angRad: double);
+var
+  m: TMatrixD;
+  sn, cs: extended; //D7 compatible
+  origOffset: Boolean;
+begin
+  NormalizeAngle(angRad);
+  if angRad < 0.001 then Exit;
+
+  m := IdentityMatrix;
+  origOffset := (center.X <> 0) or (center.Y <> 0);
+  if origOffset then MatrixTranslate(matrix, -center.X, -center.Y);
+  SinCos(angRad, sn, cs);
+  m := IdentityMatrix;
+  m[0, 0] := cs;   m[1, 0] := sn;
+  m[0, 1] := -sn;  m[1, 1] := cs;
+  matrix := MatrixMultiply(m, matrix);
+  if origOffset then MatrixTranslate(matrix, center.X, center.Y);
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixTranslate(var matrix: TMatrixD; dx, dy: double);
+var
+  m: TMatrixD;
+begin
+  if ValueAlmostZero(dx) and ValueAlmostZero(dy) then Exit;
+  m := IdentityMatrix;
+  m[2, 0] := dx;
+  m[2, 1] := dy;
+  matrix := MatrixMultiply(m, matrix);
+end;
+//------------------------------------------------------------------------------
+
+procedure ScaleInternal(var matrix: TMatrixD; s: double);
+var
+  i, j: Integer;
+begin
+  for i := 0 to 2 do
+    for j := 0 to 2 do
+      matrix[i,j] := matrix[i,j] * s;
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixInvert(var matrix: TMatrixD);
+var
+  d: double;
+const
+  tolerance = 1.0E-5;
+begin
+  d := MatrixDeterminant(matrix);
+  if abs(d) > tolerance then
+  begin
+    matrix := MatrixAdjugate(matrix);
+    ScaleInternal(matrix, 1/d);
+  end
+  else matrix := IdentityMatrix;
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixSkew(var matrix: TMatrixD; dx, dy: double);
+var
+  m: TMatrixD;
+begin
+  if ValueAlmostZero(dx) and ValueAlmostZero(dy) then Exit;
+  m := IdentityMatrix;
+  m[1, 0] := dx;
+  m[0, 1] := dy;
+  matrix := MatrixMultiply(m, matrix);
+end;
 
 //------------------------------------------------------------------------------
 // Affine Transformation
@@ -68,7 +326,9 @@ var
   tmp: TArrayOfColor32;
   rec: TRect;
 begin
-  if img.Width * img.Height = 0 then Exit;
+  offset := NullPoint;
+  if (img.Width * img.Height = 0) or
+    IsIdentityMatrix(matrix) then Exit;
   rec := GetTransformBounds(img, matrix);
   offset := rec.TopLeft;
 

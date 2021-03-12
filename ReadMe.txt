@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 2.01
-Released: 7 March 2021
+Latest version: 2.1
+Released: 12 March 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -11,6 +11,20 @@ Documentation : http://www.angusj.com/delphi/image32/Docs/
 Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
+
+Version 2.1
+  Image32_Layers
+	Bugfix to TLayeredImage32 - partial merging was broken
+	Major updates to TRasterLayer32 and TVectorLayer32
+  Image32_Vector
+	Moved all Matrix functions to Image32_Transform
+	Moved SmoothToBezier function to Image32_SmoothPath
+	Moved RamerDouglasPeucker function to Image32_Extra
+  Sample Applications
+    Updated Layers101 and Layers201 
+	
+Version 2.02
+  Minor updates to several Example applications.
 
 Version 2.01
   Fixed a significant bug in Image32_Ttf.
@@ -24,7 +38,7 @@ Version 2.0
   The old unit was poorly written and cumbersome to use.
   The most significant change in the new layers unit is the 
   use of nested groups of layers that form a tree structure
-  under TLayeredImage.Root. This structure provides several
+  under TLayeredImage32.Root. This structure provides several
   advantages over the old flat layer structure. These include
   faster merges, and much simpler control over layer groups.
   Hit-testing has also been dramatically improved, being

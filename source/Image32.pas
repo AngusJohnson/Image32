@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.0                                                             *
-* Date      :  6 March 2021                                                    *
+* Version   :  2.1                                                             *
+* Date      :  12 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -118,8 +118,6 @@ type
     //CopyInternal: Internal routine (has no scaling or bounds checking)
     procedure CopyInternal(src: TImage32;
       const srcRec, dstRec: TRect; blendFunc: TBlendFunction);
-    procedure BeginUpdate;
-    procedure EndUpdate;
     procedure Changed; virtual;
     procedure Resized; virtual;
     property UpdateCount: integer read fUpdateCnt;
@@ -128,6 +126,8 @@ type
     constructor Create(src: TImage32); overload;
     constructor Create(src: TImage32; const srcRec: TRect); overload;
     destructor Destroy; override;
+    procedure BeginUpdate;
+    procedure EndUpdate;
 
     procedure Assign(src: TImage32);
     procedure AssignTo(dst: TImage32);
@@ -317,6 +317,8 @@ type
     function Normalize: Boolean;
     function Contains(const Pt: TPoint): Boolean; overload;
     function Contains(const Pt: TPointD): Boolean; overload;
+    function TopLeft: TPointD;
+    function BottomRight: TPointD;
 
   end;
 
@@ -1298,6 +1300,18 @@ end;
 function TRectD.Height: double;
 begin
   result := Max(0, bottom - top);
+end;
+//------------------------------------------------------------------------------
+
+function TRectD.TopLeft: TPointD;
+begin
+  result := PointD(Left, Top);
+end;
+//------------------------------------------------------------------------------
+
+function TRectD.BottomRight: TPointD;
+begin
+  result := PointD(Right, Bottom);
 end;
 //------------------------------------------------------------------------------
 

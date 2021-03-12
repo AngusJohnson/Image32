@@ -14,6 +14,7 @@ object MainForm: TMainForm
   OldCreateOrder = False
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnKeyDown = FormKeyDown
   OnMouseDown = pnlMainMouseDown
   OnMouseMove = pnlMainMouseMove
   OnMouseUp = pnlMainMouseUp

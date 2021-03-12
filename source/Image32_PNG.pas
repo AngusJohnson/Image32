@@ -2,8 +2,8 @@ unit Image32_PNG;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.0                                                             *
-* Date      :  6 March 2021                                                    *
+* Version   :  2.1                                                             *
+* Date      :  12 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  PNG file format extension for TImage32                          *
@@ -58,8 +58,14 @@ begin
     result := (png.Width * png.Height > 0) and
       (png.RawImage.Description.BitsPerPixel = 32);
     if not Result then Exit;
-    img32.SetSize(png.Width, png.Height);
-    Move(png.ScanLine[0]^, img32.PixelBase^, png.Width * png.Height *4);
+
+    img.BeginUpdate;
+    try
+      img32.SetSize(png.Width, png.Height);
+      Move(png.ScanLine[0]^, img32.PixelBase^, png.Width * png.Height *4);
+    finally
+      img.EndUpdate;
+    end;
   finally
     png.Free;
   end;
@@ -79,6 +85,8 @@ var
   palleteChunk: TChunkPLTE;
 begin
   result := false;
+
+  img32.BeginUpdate;
   png := TPngImage.Create;
   try
     png.LoadFromStream(stream);
@@ -86,6 +94,7 @@ begin
       transColor := png.TransparentColor else
       transColor := DWord(-1);
     if png.Empty then Exit;
+
     img32.SetSize(png.Header.Width, png.Header.Height);
 
     BitDepth := png.Header.BitDepth;
@@ -191,6 +200,7 @@ begin
     result := true;
   finally
     png.Free;
+    img32.EndUpdate;
   end;
 end;
 {$ENDIF}
@@ -205,6 +215,8 @@ var
   png: TPortableNetworkGraphic;
 begin
   if (img32.Width * img32.Height = 0) then Exit;
+
+  img32.BeginUpdate;
   png := TPortableNetworkGraphic.Create;
   try
     png.SetSize(img32.Width, img32.Height);
@@ -213,6 +225,7 @@ begin
     png.SaveToStream(stream);
   finally
     png.Free;
+    img32.EndUpdate;
   end;
 end;
 //------------------------------------------------------------------------------
