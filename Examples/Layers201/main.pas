@@ -145,6 +145,7 @@ begin
   InitRandomColors;
   PenWidth := DPIAware(1.5);
   OnDraw := Draw;
+  AutoCenterPivot := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -537,7 +538,11 @@ begin
     if Assigned(sizingButtonGroup) then
       sizingButtonGroup.Offset(dx, dy)
     else if Assigned(rotatingButtonGroup) then
-      rotatingButtonGroup.Offset(dx, dy)
+    begin
+      if not (targetLayer is TMyVectorLayer32) or
+        TMyVectorLayer32(targetLayer).AutoCenterPivot then
+          rotatingButtonGroup.Offset(dx, dy)
+    end
     else if Assigned(arrowButtonGroup) then
       arrowButtonGroup.Offset(dx, dy);
     StatusBar1.SimpleText := '';

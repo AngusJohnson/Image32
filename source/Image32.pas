@@ -17,7 +17,8 @@ interface
 uses
   {$IFDEF MSWINDOWS} Windows,{$ENDIF} Types, SysUtils, Classes,
   {$IFDEF XPLAT_GENERICS} Generics.Collections,
-  Generics.Defaults, Character, {$ENDIF} {$IFDEF UITYPES} UITypes,{$ENDIF} Math;
+  Generics.Defaults, Character,
+  {$ENDIF} {$IFDEF UITYPES} UITypes,{$ENDIF} Math;
 
 type
   TRect = Types.TRect;
@@ -319,6 +320,7 @@ type
     function Contains(const Pt: TPointD): Boolean; overload;
     function TopLeft: TPointD;
     function BottomRight: TPointD;
+    function MidPoint: TPointD;
 
   end;
 
@@ -933,33 +935,24 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetRotatedRectD(const rec: TRectD; angleRad: double): TRectD;
+function GetRotatedRectBounds(const rec: TRectD; angle: double): TRectD;
 var
-  i: Integer;
-  sinA, cosA: extended;
-  pts: TPathD;
-  mp: TPointD;
+  s,c: extended;
+  w,h: double;
+  mpX, mpY: double;
 begin
-  setLength(pts, 4);
-  Math.SinCos(-angleRad, sinA, cosA);
-  pts[0] := PointD(rec.Left, rec.Top);
-  pts[1] := PointD(rec.Right, rec.Top);
-  pts[2] := PointD(rec.Left, rec.Bottom);
-  pts[3] := PointD(rec.Right, rec.Bottom);
-  mp.X := (rec.Left + rec.Right) * 0.5;
-  mp.Y := (rec.Top + rec.Bottom) * 0.5;
-  for i := 0 to 3 do RotatePt(pts[i], mp, sinA, cosA);
-  result.Left := pts[0].X;
-  result.Right := result.Left;
-  result.Top := pts[0].Y;
-  result.Bottom := result.Top;
-  for i := 1 to 3 do
+  NormalizeAngle(angle);
+  if angle <> 0 then
   begin
-    if pts[i].X < result.Left then result.Left := pts[i].X;
-    if pts[i].Y < result.Top then result.Top := pts[i].Y;
-    if pts[i].X > result.Right then result.Right := pts[i].X;
-    if pts[i].Y > result.Bottom then result.Bottom := pts[i].Y;
-  end;
+    SinCos(angle, s, c);
+    s := Abs(s); c := Abs(c);
+    w := (rec.Width *c + rec.Height *s) /2;
+    h := (rec.Width *s + rec.Height *c) /2;
+    with rec.MidPoint do
+      Result := RectD(X - w, Y - h, X + w, Y +h);
+  end
+  else
+    Result := rec;
 end;
 //------------------------------------------------------------------------------
 
@@ -1312,6 +1305,13 @@ end;
 function TRectD.BottomRight: TPointD;
 begin
   result := PointD(Right, Bottom);
+end;
+//------------------------------------------------------------------------------
+
+function TRectD.MidPoint: TPointD;
+begin
+  Result.X := (Right + Left)/2;
+  Result.Y := (Bottom + Top)/2;
 end;
 //------------------------------------------------------------------------------
 
@@ -1723,7 +1723,7 @@ end;
 
 function TImage32.GetBounds: TRect;
 begin
-  result := Rect(0, 0, Width, Height);
+  result := Types.Rect(0, 0, Width, Height);
 end;
 //------------------------------------------------------------------------------
 
@@ -1911,7 +1911,7 @@ begin
       Scale(sx);
       if height = self.Height then Exit;
       rec2 := Bounds;
-      OffsetRect(rec2, 0, (height - self.Height) div 2);
+      Types.OffsetRect(rec2, 0, (height - self.Height) div 2);
       tmp := TImage32.Create(self);
       try
         SetSize(width, height);
@@ -1924,7 +1924,7 @@ begin
       Scale(sy);
       if width = self.Width then Exit;
       rec2 := Bounds;
-      OffsetRect(rec2, (width - self.Width) div 2, 0);
+      Types.OffsetRect(rec2, (width - self.Width) div 2, 0);
       tmp := TImage32.Create(self);
       try
         SetSize(width, height);
@@ -2266,7 +2266,7 @@ begin
     scaleSrc.X := RectWidth(srcRecClipped)/RectWidth(srcRec);
     scaleSrc.Y := RectHeight(srcRecClipped)/RectHeight(srcRec);
     ScaleRect(dstRec, scaleSrc);
-    OffsetRect(dstRec,
+    Types.OffsetRect(dstRec,
       srcRecClipped.Left - srcRec.Left,
       srcRecClipped.Top - srcRec.Top);
   end;
@@ -2296,7 +2296,7 @@ begin
     scaleDst.X := RectWidth(dstRecClipped)/RectWidth(dstRec);
     scaleDst.Y := RectHeight(dstRecClipped)/RectHeight(dstRec);
     ScaleRect(srcRecClipped, scaleDst);
-    OffsetRect(srcRecClipped,
+    Types.OffsetRect(srcRecClipped,
       dstRecClipped.Left - dstRec.Left,
       dstRecClipped.Top - dstRec.Top);
   end;
@@ -2379,7 +2379,8 @@ end;
 procedure TImage32.CopyToDc(dstDc: HDC;
   x,y: Integer; transparent: Boolean; bkColor: TColor32);
 begin
-  CopyToDc(Bounds, Rect(x,y, x+Width, y+Height), dstDc, transparent, bkColor);
+  CopyToDc(Bounds, Types.Rect(x,y, x+Width, y+Height),
+    dstDc, transparent, bkColor);
 end;
 //------------------------------------------------------------------------------
 
@@ -2387,8 +2388,8 @@ procedure TImage32.CopyToDc(const srcRect: TRect; dstDc: HDC;
   x: Integer = 0; y: Integer = 0;
   transparent: Boolean = true; bkColor: TColor32 = 0);
 begin
-  CopyToDc(srcRect, Rect(x,y, x +RectWidth(srcRect), y +RectHeight(srcRect)),
-    dstDc, transparent, bkColor);
+  CopyToDc(srcRect, Types.Rect(x,y, x +RectWidth(srcRect),
+    y +RectHeight(srcRect)), dstDc, transparent, bkColor);
 end;
 //------------------------------------------------------------------------------
 
@@ -2738,7 +2739,7 @@ begin
   h2 := Min(h*2, newHeight);
 
   //do the first 4 tile square (as further tiling will be simple copies)
-  tmp := TImage32.Create(self, Rect(0, 0, w, h));
+  tmp := TImage32.Create(self, Types.Rect(0, 0, w, h));
   try
     SetSize(newWidth, newHeight);
     for i := 0 to h -1 do
@@ -2923,7 +2924,7 @@ begin
         if x > x2 then x2 := x;
       end;
 
-  Result := Rect(x1, y1, x2+1, y2+1);
+  Result := Types.Rect(x1, y1, x2+1, y2+1);
   Crop(Result);
 end;
 //------------------------------------------------------------------------------
@@ -2934,7 +2935,7 @@ var
   x, y, xi, yi, newWidth, newHeight: Integer;
   sinA, cosA: extended;
   dx, dy: double;
-  pt, cp2: TPointD;
+  pt, center: TPointD;
   rec: TRectD;
   dstColor: PColor32;
 const
@@ -2964,22 +2965,25 @@ begin
   end;
 
   rec := RectD(Bounds);
-  rec := GetRotatedRectD(rec, angleRads);
+  rec := GetRotatedRectBounds(rec, angleRads);
   newWidth := Ceil(rec.Right - rec.Left);
   newHeight := Ceil(rec.Bottom - rec.Top);
 
-  cp2 := PointD(newWidth / 2, newHeight / 2);
+  center := PointD(rec.Width/2, rec.Height/2);
   SetLength(tmp, newWidth * newHeight);
   dstColor := @tmp[0];
-  dx := (newWidth - fWidth) / 2;
-  dy := (newHeight - fHeight) / 2;
+  with MidPoint do
+  begin
+    dx := center.X - X;
+    dy := center.Y - Y;
+  end;
   if fAntiAliase then
   begin
     for y := 0 to newHeight -1 do
       for x := 0 to newWidth -1 do
       begin
         pt := PointD(x, y);
-        RotatePt(pt, cp2, sinA, cosA);
+        RotatePt(pt, center, sinA, cosA);
         xi := Round((pt.X - dx) *256);
         yi := Round((pt.Y - dy) *256);
         dstColor^ := GetWeightedPixel(self, xi, yi);
@@ -2991,7 +2995,7 @@ begin
       for x := 0 to newWidth -1 do
       begin
         pt := PointD(x, y);
-        RotatePt(pt, cp2, sinA, cosA);
+        RotatePt(pt, center, sinA, cosA);
         xi := Round(pt.X - dx);
         yi := Round(pt.Y - dy);
         if (xi < 0) or (xi >= Width) or (yi < 0) or (yi >= Height) then

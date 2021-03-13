@@ -162,6 +162,8 @@ type
   function Rect(const recD: TRectD): TRect; overload;
   function Rect(const left,top,right,bottom: integer): TRect; overload;
 
+  function Size(width, height: integer): TSize;
+
   function RectWH(left, top, width, height: integer): TRect; overload;
   function RectWH(left, top, width, height: double): TRectD; overload;
 
@@ -434,6 +436,13 @@ begin
   Result.Top := Floor(recD.Top);
   Result.Right := Ceil(recD.Right);
   Result.Bottom := Ceil(recD.Bottom);
+end;
+//------------------------------------------------------------------------------
+
+function Size(width, height: integer): TSize;
+begin
+  Result.cx := width;
+  Result.cy := height;
 end;
 //------------------------------------------------------------------------------
 
@@ -743,14 +752,20 @@ function ScalePath(const path: TPathD; sx, sy: double): TPathD;
 var
   i, len: integer;
 begin
-  if sx = 0 then sx := 1;
-  if sy = 0 then sy := 1;
-  len := length(path);
-  setLength(result, len);
-  for i := 0 to len -1 do
+  if (sx = 0) or (sy = 0) then
+    Result := nil
+  else if ((sx = 1) and (sy = 1)) then
   begin
-    result[i].x := path[i].x * sx;
-    result[i].y := path[i].y * sy;
+    Result := Copy(path, 0, Length(path));
+  end else
+  begin
+    len := length(path);
+    setLength(result, len);
+    for i := 0 to len -1 do
+    begin
+      result[i].x := path[i].x * sx;
+      result[i].y := path[i].y * sy;
+    end;
   end;
 end;
 //------------------------------------------------------------------------------

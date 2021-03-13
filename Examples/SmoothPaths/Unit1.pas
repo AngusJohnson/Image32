@@ -85,7 +85,7 @@ implementation
 
 uses
   Image32_BMP, Image32_PNG, Image32_JPG, Image32_Draw, Image32_Vector,
-  Image32_Extra, Image32_Text, Image32_Clipper;
+  Image32_Extra, Image32_Clipper;
 
 const
   crRotate = 1;
@@ -196,7 +196,6 @@ end;
 procedure TFrmMain.BeforeMerge(Sender: TObject);
 var
   i: integer;
-
   path: TPathD;
   outline: TPathsD;
 begin
@@ -261,7 +260,8 @@ begin
     smoothGroupLayer.ActiveButtonLayer := TSmoothButtonLayer32(clickedLayer);
     Invalidate;
   end
-  else if Assigned(smoothGroupLayer) then
+  else if Assigned(smoothGroupLayer) and
+    Assigned(smoothGroupLayer.ActiveButtonLayer) then
   begin
     smoothGroupLayer.ActiveButtonLayer := nil;
     Invalidate;

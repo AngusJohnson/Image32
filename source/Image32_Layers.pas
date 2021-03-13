@@ -83,7 +83,9 @@ type
     function   CanUpdate: Boolean;
     function   GetBounds: TRect;
     procedure  ImageChanged(Sender: TImage32); virtual;
-    property   HitTestRec: THitTestRec read fHitTestRec write fHitTestRec;
+    property   HitTestRec : THitTestRec read fHitTestRec write fHitTestRec;
+    property   OldWidth   : integer read fOldWidth;
+    property   OldHeight  : integer read fOldHeight;
   public
     constructor Create(groupOwner: TGroupLayer32;
       const name: string = ''); virtual;
@@ -178,11 +180,14 @@ type
     fAngle      : double;
     fMargin     : integer;
     fPivotPt    : TPointD;
+    fAutoPivot  : Boolean;
     fOnDraw     : TNotifyEvent;
     procedure SetAngle(newAngle: double);
     procedure SetMargin(new: integer);
     procedure RepositionAndDraw;
     procedure SetPaths(const newPaths: TPathsD);
+    procedure SetPivotPt(const pivot: TPointD);
+    procedure SetAutoPivot(val: Boolean);
   public
     constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
     procedure SetBounds(const newBounds: TRect); override;
@@ -195,7 +200,8 @@ type
     property  Paths: TPathsD read fPaths write SetPaths;
     property  Angle: double read fAngle write SetAngle;
     property  Margin: integer read fMargin write SetMargin;
-    property  PivotPt: TPointD read fPivotPt write fPivotPt;
+    property  PivotPt: TPointD read fPivotPt write SetPivotPt;
+    property  AutoCenterPivot: Boolean read fAutoPivot write SetAutoPivot;
     property  OnDraw: TNotifyEvent read fOnDraw write fOnDraw;
   end;
 
@@ -207,7 +213,7 @@ type
     fMatrix       : TMatrixD;
     fRotating     : Boolean;
     fAngle        : double;
-    fSavedBounds  : TRect;
+    fSavedSize    : TSize;
     fAutoHitTest  : Boolean;
     procedure SetAngle(newAngle: double);
     procedure DoAutoHitTest;
@@ -1178,6 +1184,7 @@ begin
   inherited;
   fMargin := DpiAware(2);
   fCursorId := crHandPoint;
+  fAutoPivot := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -1193,7 +1200,9 @@ end;
 
 procedure TVectorLayer32.Rotate(const pivot: TPointD; angleDelta: double);
 begin
-  fPivotPt := pivot;
+  if fAutoPivot then
+    fPivotPt := MidPoint else
+    fPivotPt := pivot;
   Rotate(angleDelta);
 end;
 //------------------------------------------------------------------------------
@@ -1217,11 +1226,27 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TVectorLayer32.SetPivotPt(const pivot: TPointD);
+begin
+  if fAutoPivot then
+    fPivotPt := MidPoint else
+    fPivotPt := pivot;
+end;
+//------------------------------------------------------------------------------
+
+procedure TVectorLayer32.SetAutoPivot(val: Boolean);
+begin
+  fAutoPivot := val;
+  if fAutoPivot then fPivotPt := MidPoint;
+end;
+//------------------------------------------------------------------------------
+
 procedure TVectorLayer32.SetBounds(const newBounds: TRect);
 var
-  x,y, w,h, m2: integer;
+  w,h, m2: integer;
   dx,dy: double;
   rec: TRect;
+  mat: TMatrixD;
 begin
   m2 := Margin *2;
   w := RectWidth(newBounds) -m2;
@@ -1230,16 +1255,19 @@ begin
   //make sure the bounds are large enough to scale safely
   if (Width > m2) and (Height > m2) and (w > 1) and (h > 1)  then
   begin
-    //scale Paths to new bounds
+
+    //get scaling amounts
     dx := w/(Width - m2);
     dy := h/(Height - m2);
-    fPaths := ScalePath(fPaths, dx, dy); //nb: avoid SetPaths
 
+    //apply scaling and translation
+    mat := IdentityMatrix;
     rec := Image32_Vector.GetBounds(fPaths);
-    x := newBounds.Left - rec.Left + Margin;
-    y := newBounds.Top - rec.Top + Margin;
-    if (x <> 0) or (y <> 0) then
-      fPaths := OffsetPath(fPaths, x, y);
+    MatrixTranslate(mat, -rec.Left, -rec.Top);
+    MatrixScale(mat, dx, dy);
+    MatrixTranslate(mat, newBounds.Left + Margin, newBounds.Top + Margin);
+    MatrixApply(mat, fPaths);
+
     RepositionAndDraw;
   end else
     inherited;
@@ -1250,7 +1278,8 @@ procedure TVectorLayer32.Offset(dx,dy: integer);
 begin
   inherited;
   fPaths := OffsetPath(fPaths, dx,dy);
-  fPivotPt := OffsetPoint(fPivotPt, dx,dy);
+  if fAutoPivot then
+    fPivotPt := OffsetPoint(fPivotPt, dx,dy);
 end;
 //------------------------------------------------------------------------------
 
@@ -1363,7 +1392,8 @@ begin
     fAngle := 0;
     fMatrix := IdentityMatrix;
     fRotating := false;
-    fSavedBounds := MasterImage.Bounds;
+    with MasterImage do
+      fSavedSize := Image32_Vector.Size(Width, Height);
     HitTestRec.Clear;
   end else
     inherited;
@@ -1444,7 +1474,6 @@ procedure TRasterLayer32.SetBounds(const newBounds: TRect);
 var
   newWidth, newHeight: integer;
 begin
-
   DoRotateCheck;
   newWidth := RectWidth(newBounds);
   newHeight := RectHeight(newBounds);
@@ -1458,6 +1487,7 @@ begin
       Image.Assign(MasterImage);
       //apply any prior transformations
       AffineTransformImage(Image, fMatrix);
+      SymmetricCropTransparent(Image);
       Image.Resize(newWidth, newHeight);
       PositionAt(newBounds.TopLeft);
     finally
@@ -1480,14 +1510,14 @@ procedure TRasterLayer32.DoRotateCheck;
 begin
   if fRotating then
   begin
-    //was rotating and about to start scaling, so
-    //apply the current rotation to the matrix
+    fRotating := false;
+    //rotation has just ended so add the rotation angle to fMatrix
     if (fAngle <> 0) then
       MatrixRotate(fMatrix, Image.MidPoint, fAngle);
-
-    fSavedBounds := Image.Bounds;
+    //and since we're about to start scaling, we need
+    //to store the starting size, and reset the angle
+    fSavedSize := Size(Image.Width, Image.Height);
     fAngle := 0;
-    fRotating := false;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1496,11 +1526,10 @@ procedure TRasterLayer32.DoScaleCheck;
 begin
   if not fRotating then
   begin
-    //was scaling and about to start rotating, so
-    //apply the current scaling to the matrix
-    MatrixScale(fMatrix, Image.Width/fSavedBounds.Width,
-      Image.Height/fSavedBounds.Height);
-
+    //scaling has just ended and rotating is about to start
+    //so apply the current scaling to the matrix
+    MatrixScale(fMatrix, Image.Width/fSavedSize.cx,
+      Image.Height/fSavedSize.cy);
     fRotating := true;
   end;
 end;

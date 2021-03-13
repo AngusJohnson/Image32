@@ -108,7 +108,7 @@ type
     function GetCursorId: integer;
     procedure SetCursorId(newCursorId: integer);
   protected
-    procedure PaintVectorLayer; virtual;
+    procedure PaintVectorLayer(Sender: TObject);
     procedure PaintDesignerLayer(layer: TDesignerLayer32); virtual;
     procedure DoOnMerge; override;
   public
@@ -679,7 +679,8 @@ begin
   //a TVectorLayer32 where the smoothpath is drawn
   //and a TDesignerLayer32 where designer lines etc are drawn.
   fVectorLayer32  := TVectorLayer32(AddChild(TVectorLayer32));
-  fVectorLayer32.CursorId := crHandPoint;
+  fVectorLayer32.OnDraw := Self.PaintVectorLayer;
+
 
   fDesignLayer32  := TDesignerLayer32(AddChild(TDesignerLayer32));
 
@@ -851,34 +852,30 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSmoothPathGroupLayer32.PaintVectorLayer;
+procedure TSmoothPathGroupLayer32.PaintVectorLayer(Sender: TObject);
 var
-  flattenedPath: TPathD;
+  pp: TPathsD;
 begin
   with fVectorLayer32 do
   begin
-    Image.Clear;
-    flattenedPath := fSmoothPath.GetFlattenedPath;
-    flattenedPath := OffsetPath(flattenedPath, -Left, -Top);
+    pp := OffsetPath(Paths, -Left, -Top);
     if fIsClosedPath then
     begin
-      DrawPolygon(Image, flattenedPath, fFillRule, fBrushColor);
-      DrawLine(Image, flattenedPath, fPenWidth, fPenColor, esPolygon);
-      UpdateHitTestMask(Image32_Vector.Paths(flattenedPath), frEvenOdd);
+      DrawPolygon(Image, pp, fFillRule, fBrushColor);
+      DrawLine(Image, pp, fPenWidth, fPenColor, esPolygon);
+      UpdateHitTestMask(pp, frEvenOdd);
     end else
-      DrawLine(Image, flattenedPath, fPenWidth, fPenColor, esRound);
+      DrawLine(Image, pp, fPenWidth, fPenColor, esRound);
   end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TSmoothPathGroupLayer32.PaintDesignerLayer(layer: TDesignerLayer32);
 var
-  i, dashLen, pathLen, dx,dy: integer;
+  i, pathLen, dx,dy: integer;
   rec: TRect;
   tmpPath, ctrlLine: TPathD;
 begin
-  dashLen := DPIAware(2);
-
   layer.Image.Clear;
   if Assigned(fActiveButton) then
   begin
@@ -886,7 +883,7 @@ begin
     OffsetRect(rec, -layer.Left, -layer.Top);
     tmpPath := Ellipse(rec);
     DrawDashedLine(layer.Image, tmpPath,
-      [dashLen,dashLen*2], nil, DPIAware(1), clRed32, esPolygon);
+      dashes, nil, DPIAware(1), clRed32, esPolygon);
   end;
 
   SetLength(ctrlLine, 2);
@@ -903,7 +900,7 @@ begin
       ctrlLine[1] := smoothPath[i+1];
       ctrlLine := OffsetPath(ctrlLine, -dx, -dy);
       DrawDashedLine(layer.Image, ctrlLine,
-        [dashLen,dashLen*2], nil, DPIAware(1), clRed32, esSquare);
+        dashes, nil, DPIAware(1), clRed32, esSquare);
     end;
 
     if i >= pathLen -1 then break;
@@ -913,7 +910,7 @@ begin
       ctrlLine[1] := smoothPath[i+3];
       ctrlLine := OffsetPath(ctrlLine, -dx, -dy);
       DrawDashedLine(layer.Image, ctrlLine,
-        [dashLen,dashLen*2], nil, DPIAware(1), clRed32, esSquare);
+        dashes, nil, DPIAware(1), clRed32, esSquare);
     end;
     inc(i, 3);
   end;
@@ -958,13 +955,12 @@ begin
   margin := Max(fButtonSize1, fButtonSize2) + Round(PenWidth);
   rec := InflateRect(rec, margin, margin);
 
-  Child[0].SetBounds(rec);
+  //just assign paths to VectorLayer. It'll do the rest.
+  VectorLayer.Paths := Image32_Vector.Paths(SmoothPath.FlattenedPath);
 
   if fDesignMargin > 0 then
     rec := Image32_Vector.InflateRect(rec, fDesignMargin, fDesignMargin);
   Child[1].SetBounds(rec);
-
-  PaintVectorLayer;
   PaintDesignerLayer(TDesignerLayer32(Child[1]));
 
   inherited;
