@@ -422,7 +422,7 @@ begin
     s := Abs(s); c := Abs(c);
     w := (rec.Width *c + rec.Height *s) /2;
     h := (rec.Width *s + rec.Height *c) /2;
-    mp := MidPoint(rec);
+    mp := rec.MidPoint;
     Result := RectD(mp.X - w, mp.Y - h, mp.X + w, mp.Y +h);
   end
   else

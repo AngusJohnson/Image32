@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.1                                                             *
-* Date      :  12 March 2021                                                   *
+* Version   :  2.11                                                            *
+* Date      :  13 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -939,7 +939,6 @@ function GetRotatedRectBounds(const rec: TRectD; angle: double): TRectD;
 var
   s,c: extended;
   w,h: double;
-  mpX, mpY: double;
 begin
   NormalizeAngle(angle);
   if angle <> 0 then

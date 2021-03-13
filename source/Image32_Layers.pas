@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.1                                                             *
-* Date      :  12 March 2021                                                   *
+* Version   :  2.12                                                            *
+* Date      :  13 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -70,7 +70,6 @@ type
     fTag            : Cardinal;
     fOldWidth       : integer;
     fOldHeight      : integer;
-    fHitTestRec     : THitTestRec;
     fFullRefreshPending : boolean;
     function   GetMidPoint: TPointD;
     procedure  SetVisible(value: Boolean);
@@ -83,7 +82,6 @@ type
     function   CanUpdate: Boolean;
     function   GetBounds: TRect;
     procedure  ImageChanged(Sender: TImage32); virtual;
-    property   HitTestRec : THitTestRec read fHitTestRec write fHitTestRec;
     property   OldWidth   : integer read fOldWidth;
     property   OldHeight  : integer read fOldHeight;
   public
@@ -151,7 +149,6 @@ type
     function   GetChildrenBounds(excludeDesigners: Boolean): TRect;
     procedure MergeInvalidatedRects(mergeAll, hideDesigners: Boolean;
       var invalidRects: TRect);
-    //DoOnMerge: for last minute sizing & painting (eg see Image32_SmoothPath)
     procedure  DoOnMerge; virtual;
   public
     constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
@@ -170,56 +167,71 @@ type
   end;
 
   THitTestLayer32 = class(TLayer32)
+  private
+    fHitTestRec     : THitTestRec;
+  protected
+    procedure  ImageChanged(Sender: TImage32); override;
+    property   HitTestRec : THitTestRec read fHitTestRec write fHitTestRec;
   public
     function GetPathsFromHitTestMask: TPathsD;
   end;
 
-  TVectorLayer32 = class(THitTestLayer32)
+  TRotateLayer32 = class(THitTestLayer32)
+  protected
+    function  GetAngle: double; virtual; abstract;
+    procedure SetAngle(newAngle: double); virtual; abstract;
+  public
+    procedure Rotate(angleDelta: double); virtual; abstract;
+    property  Angle: double read GetAngle write SetAngle;
+  end;
+
+  TVectorLayer32 = class(TRotateLayer32)
   private
     fPaths      : TPathsD;
-    fAngle      : double;
     fMargin     : integer;
+    fAngle      : double;
     fPivotPt    : TPointD;
     fAutoPivot  : Boolean;
     fOnDraw     : TNotifyEvent;
-    procedure SetAngle(newAngle: double);
     procedure SetMargin(new: integer);
     procedure RepositionAndDraw;
     procedure SetPaths(const newPaths: TPathsD);
     procedure SetPivotPt(const pivot: TPointD);
     procedure SetAutoPivot(val: Boolean);
+  protected
+    function  GetAngle: double; override;
+    procedure SetAngle(newAngle: double); override;
   public
     constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
     procedure SetBounds(const newBounds: TRect); override;
     procedure Offset(dx,dy: integer); override;
-    procedure Rotate(const pivot: TPointD; angleDelta: double); overload;
-    procedure Rotate(angleDelta: double); overload;
+    procedure Rotate(angleDelta: double); override;
     procedure ResetAngle;
     procedure UpdateHitTestMask(const vectorRegions: TPathsD;
       fillRule: TFillRule); virtual;
     property  Paths: TPathsD read fPaths write SetPaths;
-    property  Angle: double read fAngle write SetAngle;
     property  Margin: integer read fMargin write SetMargin;
     property  PivotPt: TPointD read fPivotPt write SetPivotPt;
     property  AutoCenterPivot: Boolean read fAutoPivot write SetAutoPivot;
     property  OnDraw: TNotifyEvent read fOnDraw write fOnDraw;
   end;
 
-  TRasterLayer32 = class(THitTestLayer32)
+  TRasterLayer32 = class(TRotateLayer32)
   private
     fMasterImg    : TImage32;
     //a matrix allows combining any number of sizing & rotating
     //operations into a single transformation
     fMatrix       : TMatrixD;
-    fRotating     : Boolean;
     fAngle        : double;
+    fRotating     : Boolean;
     fSavedSize    : TSize;
     fAutoHitTest  : Boolean;
-    procedure SetAngle(newAngle: double);
     procedure DoAutoHitTest;
     procedure DoRotateCheck;
     procedure DoScaleCheck;
   protected
+    function  GetAngle: double; override;
+    procedure SetAngle(newAngle: double); override;
     procedure  ImageChanged(Sender: TImage32); override;
   public
     constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
@@ -230,9 +242,8 @@ type
       referenceColor: TColor32; tolerance: integer); overload; virtual;
 
     procedure SetBounds(const newBounds: TRect); override;
-    procedure Rotate(angleDelta: double);
+    procedure Rotate(angleDelta: double); override;
 
-    property  Angle: double read fAngle write SetAngle;
     property  AutoSetHitTestMask: Boolean read fAutoHitTest write fAutoHitTest;
     property  MasterImage: TImage32 read fMasterImg;
   end;
@@ -591,7 +602,6 @@ begin
       Max(Width, fOldWidth), Max(Height, fOldHeight)));
   fOldWidth := Width;
   fOldHeight := Height;
-  HitTestRec.Clear;
 end;
 //------------------------------------------------------------------------------
 
@@ -601,7 +611,6 @@ begin
   BeginUpdate;
   try
     Image.SetSize(width, height);
-    fHitTestRec.Clear;
   finally
     EndUpdate;
   end;
@@ -627,7 +636,6 @@ begin
     fLeft := newBounds.Left;
     fTop := newBounds.Top;
     Image.SetSize(RectWidth(newBounds),RectHeight(newBounds));
-    fHitTestRec.Clear;
   finally
     EndUpdate;
   end;
@@ -1085,24 +1093,23 @@ end;
 function TGroupLayer32.GetLayerAt(const pt: TPoint;
   ignoreDesigners: Boolean): TLayer32;
 var
-  i: integer;
+  i, htIdx: integer;
 begin
   Result := nil;
   for i := ChildCount -1 downto 0 do
   begin
-    if Child[i] is TGroupLayer32 then
+    if Child[i] is TGroupLayer32 then //recursive
       Result := TGroupLayer32(Child[i]).GetLayerAt(pt, ignoreDesigners)
-    else
-    begin
-      with Child[i] do
-        if not Visible or
-          (ignoreDesigners and (Child[i] is TDesignerLayer32)) or
-          fHitTestRec.IsEmpty or not PtInRect(Bounds, pt) then
-            Continue
-        else
-          Result := fHitTestRec.PtrPixels[
-            fHitTestRec.width * (pt.Y - Top) + (pt.X  -Left)];
-    end;
+    else if not Visible or
+      (ignoreDesigners and (Child[i] is TDesignerLayer32)) then
+        Continue
+    else if Child[i] is THitTestLayer32 then
+      with THitTestLayer32(Child[i]) do
+        if not fHitTestRec.IsEmpty and PtInRect(Bounds, pt) then
+        begin
+          htIdx := fHitTestRec.width * (pt.Y - Top) + (pt.X  -Left);
+          Result := fHitTestRec.PtrPixels[htIdx];
+        end;
     if Assigned(Result) then Break;
   end;
 end;
@@ -1144,6 +1151,13 @@ end;
 
 //------------------------------------------------------------------------------
 // THitTestLayer32 class
+//------------------------------------------------------------------------------
+
+procedure THitTestLayer32.ImageChanged(Sender: TImage32);
+begin
+  inherited;
+  fHitTestRec.Clear;
+end;
 //------------------------------------------------------------------------------
 
 function THitTestLayer32.GetPathsFromHitTestMask: TPathsD;
@@ -1198,12 +1212,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TVectorLayer32.Rotate(const pivot: TPointD; angleDelta: double);
+function  TVectorLayer32.GetAngle: double;
 begin
-  if fAutoPivot then
-    fPivotPt := MidPoint else
-    fPivotPt := pivot;
-  Rotate(angleDelta);
+  Result := fAngle;
 end;
 //------------------------------------------------------------------------------
 
@@ -1299,6 +1310,7 @@ begin
   rec := Image32_Vector.GetBounds(fPaths);
   rec := Image32_Vector.InflateRect(rec, Margin, Margin);
   inherited SetBounds(rec);
+  if fAutoPivot then fPivotPt := MidPoint;
   if Assigned(fOnDraw) then fOnDraw(self);
 end;
 //------------------------------------------------------------------------------
@@ -1532,6 +1544,12 @@ begin
       Image.Height/fSavedSize.cy);
     fRotating := true;
   end;
+end;
+//------------------------------------------------------------------------------
+
+function TRasterLayer32.GetAngle: double;
+begin
+  Result := fAngle;
 end;
 //------------------------------------------------------------------------------
 
