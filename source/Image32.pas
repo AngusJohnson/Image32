@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.11                                                            *
-* Date      :  13 March 2021                                                   *
+* Version   :  2.12                                                            *
+* Date      :  14 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -321,7 +321,6 @@ type
     function TopLeft: TPointD;
     function BottomRight: TPointD;
     function MidPoint: TPointD;
-
   end;
 
   {$IFNDEF PBYTE}
@@ -439,8 +438,9 @@ type
 
 const
   angle180 = Pi;
-  angle0  = 0;
-  angle360 = angle180 *2;
+  angle360 = Pi *2;
+  angle0   = 0;
+  angle1   = Pi/180;
   angle15  = Pi /12;
   angle30  = angle15 *2;
   angle45  = angle15 *3;
@@ -465,6 +465,8 @@ const
   angle345 = angle360 - angle15;
 
 var
+  ClockwiseRotationIsAnglePositive: Boolean = true;//false;
+
   //Both MulTable and DivTable are used in blend functions<br>
   //MulTable[a,b] = a * b / 255
   MulTable: array [Byte,Byte] of Byte;
@@ -940,6 +942,8 @@ var
   s,c: extended;
   w,h: double;
 begin
+  //nb: direction doesn't matter re. ClockwiseRotationIsAnglePositive
+
   NormalizeAngle(angle);
   if angle <> 0 then
   begin
@@ -2940,6 +2944,9 @@ var
 const
   TwoPi = 2 * pi;
 begin
+  if ClockwiseRotationIsAnglePositive then
+    angleRads := -angleRads;
+
   //nb: There's no point rotating about a specific point
   //since the rotated image will be recentered.
 
@@ -3022,6 +3029,9 @@ var
   rec2: TRect;
   recWidth, recHeight: integer;
 begin
+  if ClockwiseRotationIsAnglePositive then
+    angleRads := -angleRads;
+
   recWidth := rec.Right - rec.Left;
   recHeight := rec.Bottom - rec.Top;
   //create a tmp image with a copy of the pixels inside rec ...

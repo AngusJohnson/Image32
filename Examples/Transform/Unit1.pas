@@ -239,12 +239,10 @@ begin
       ttAffineRotate:
         begin
           pt := Point(buttonRotateGroup.Pivot);
-          //matrix := IdentityMatrix;
-          //MatrixRotate(matrix, Image.MidPoint,buttonRotateGroup.Angle);
-          //AffineTransformImage(Image, matrix);
           Image.Rotate(buttonRotateGroup.Angle);
-          Image.CropTransparentPixels;
-          pt := OffsetPoint(pt, -Width div 2, -Height div 2);
+          SymmetricCropTransparent(Image);
+          with Point(Image.MidPoint) do
+            pt := OffsetPoint(pt, -X, -Y);
           StatusBar1.SimpleText := Format(' ROTATE TRANSFORM - angle:%1.0n',
             [buttonRotateGroup.Angle *180/PI]);
 

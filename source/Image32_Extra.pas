@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.0                                                             *
-* Date      :  6 March 2021                                                    *
+* Version   :  2.12                                                            *
+* Date      :  14 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -118,8 +118,9 @@ function RamerDouglasPeucker(const paths: TPathsD;
 function GetFloodFillMask(img: TImage32; x, y: Integer;
   compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
 
-//2 additional blend functions (see TImage32.CopyBlend)
+procedure SymmetricCropTransparent(img: TImage32);
 
+//2 additional blend functions (see TImage32.CopyBlend)
 function BlendLinearBurn(bgColor, fgColor: TColor32): TColor32;
 function BlendColorDodge(bgColor, fgColor: TColor32): TColor32;
 
@@ -1859,6 +1860,76 @@ begin
     if Result[i] <> nil then inc(j);
   end;
   setLength(Result, j);
+end;
+//------------------------------------------------------------------------------
+
+//SymmetricCropTransparent: after cropping, the image's midpoint
+//will be the same pixel as before cropping. (Important for rotating.)
+procedure SymmetricCropTransparent(img: TImage32);
+var
+  w, x,y, x1,y1: Integer;
+  newHeight: integer;
+  p1,p2: PARGB;
+  found: Boolean;
+  tmpPxls: TArrayOfColor32;
+begin
+  w := img.Width;
+  y1 := 0;
+  found := false;
+  for y := 0 to (img.Height div 2) -1 do
+  begin
+    p1 := PARGB(img.PixelRow[y]);
+    p2 := PARGB(img.PixelRow[img.Height - y -1]);
+    for x := 0 to w -1 do
+    begin
+      if (p1.A > 0) or (p2.A > 0) then
+      begin
+        y1 := y;
+        found := true;
+        break;
+      end;
+      inc(p1); inc(p2);
+    end;
+    if found then break;
+  end;
+
+  if not found then
+  begin
+    img.SetSize(0, 0);
+    Exit;
+  end;
+
+  if y1 > 0 then
+  begin
+    //trim top and bottom
+    newHeight := img.Height - (y1 * 2);
+    SetLength(tmpPxls, w * newHeight);
+    Move(img.PixelRow[y1]^, tmpPxls[0], w * newHeight * SizeOf(TColor32));
+    img.SetSize(w, newHeight);
+    Move(tmpPxls[0], img.PixelBase^ , Length(tmpPxls) * SizeOf(TColor32));
+  end;
+
+  x1 := 0;
+  found := false;
+  for x := 0 to (w div 2) -1 do
+  begin
+    p1 := PARGB(@img.Pixels[x]);
+    p2 := PARGB(@img.Pixels[w - x -1]);
+    for y := 0 to img.Height -1 do
+    begin
+      if (p1.A > 0) or (p2.A > 0) then
+      begin
+        x1 := x;
+        found := true;
+        break;
+      end;
+      inc(p1, w); inc(p2, w);
+    end;
+    if found then break;
+  end;
+
+  if not found then Exit;
+  img.Crop(Rect(x1, 0, w - x1, img.Height));
 end;
 //------------------------------------------------------------------------------
 

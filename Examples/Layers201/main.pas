@@ -88,7 +88,6 @@ uses
   Image32_Draw, Image32_Extra, Image32_Vector,
   Image32_BMP, Image32_PNG, Image32_JPG, Image32_Transform;
 
-
 type
 
   TMyRasterLayer32 = class(TRasterLayer32)
@@ -145,7 +144,7 @@ begin
   InitRandomColors;
   PenWidth := DPIAware(1.5);
   OnDraw := Draw;
-  AutoCenterPivot := false;
+  //AutoCenterPivot := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -213,14 +212,60 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TurnsLeft2(const pt1, pt2, pt3: TPointD): boolean;
+begin
+  result := CrossProduct(pt1, pt2, pt3) <= 0;
+end;
+//---------------------------------------------------------------------------
+
+function TurnsRight2(const pt1, pt2, pt3: TPointD): boolean;
+begin
+  result := CrossProduct(pt1, pt2, pt3) >= 0;
+end;
+//---------------------------------------------------------------------------
+
+function GrtrEqu90(const pt1, pt2, pt3: TPointD): boolean;
+begin
+  result := DotProduct(pt1, pt2, pt3) <= 0;
+end;
+//---------------------------------------------------------------------------
+
+function AlmostParallel(const pt1, pt2, pt3: TPointD): boolean;
+var
+  a: double;
+const
+  angle5 = angle1 *5;
+  angle175 = angle180 - angle5;
+begin
+  //precondition: angle <= 180 degrees
+  a := GetAngle(pt1, pt2, pt3);
+  Result := (a < angle5) or (a > angle175);
+end;
+//---------------------------------------------------------------------------
+
+function AlmostPerpendicular(const pt1, pt2, pt3: TPointD): boolean;
+var
+  a: double;
+const
+  angle5 = angle1 *5;
+  angle85 = angle90 - angle5;
+begin
+  //precondition: angle <= 90 degrees
+  a := GetAngle(pt1, pt2, pt3);
+  Result := a > angle85;
+end;
+//---------------------------------------------------------------------------
+
+
 procedure TMyArrowLayer32.UpdateArrow(btnGroup: TGroupLayer32;
   btnIdx: integer);
 var
   i: integer;
-  center, pt2, vec: TPointD;
+  center, newPt, pt2, vec: TPointD;
   dist: Double;
   p: TPathD;
-  newPt: TPointD;
+label
+  bottom; //goto label
 begin
   //preserve arrow symmetry and avoids 'broken' non-arrow polygons
   p := Copy(Paths[0], 0, 7);
@@ -230,22 +275,23 @@ begin
     0:
       begin
         newPt := ClosestPointOnLine(newPt, p[0], center);
-        if (CrossProduct(newPt, p[1], p[6]) > 0) and
-          (CrossProduct(newPt, p[1], p[2]) > 0) then
+        if TurnsRight(newPt, p[1], p[6]) and
+          TurnsRight(newPt, p[1], p[2]) then
           p[0] := newPt;
       end;
     1:
       begin
         dist := Distance(p[2], p[5]) * 0.5;
         pt2 := ClosestPointOnLine(newPt, p[0], center);
-        if (DotProduct(newPt, center, p[0]) <= 0) or
-          (DotProduct(newPt, p[0], center) <= 0) or
-          (Distance(newPt, pt2) <= dist) then Exit;
+        if GrtrEqu90(newPt, center, p[0]) or
+          GrtrEqu90(newPt, p[0], center) or
+          (Distance(newPt, pt2) <= dist) or
+          AlmostPerpendicular(center, p[0], newPt) then Goto bottom;
         p[1] := newPt;
         p[6] := ReflectPoint(newPt, pt2);
-        if (CrossProduct(newPt, p[2], p[0]) <= 0) or
-          (CrossProduct(newPt, p[2], p[5]) > 0) or
-          (CrossProduct(newPt, p[2], p[3]) >= 0) then
+        if TurnsLeft2(newPt, p[2], p[0]) or
+          TurnsRight(newPt, p[2], p[5]) or
+          TurnsRight2(newPt, p[2], p[3]) then
         begin
           vec := GetUnitVector(pt2, p[1]);
           p[2] := PointD(pt2.X + vec.X * dist, pt2.Y + vec.Y * dist);
@@ -254,50 +300,52 @@ begin
       end;
     2:
       begin
-        if (CrossProduct(newPt, p[1], p[0]) >= 0) or
-          (CrossProduct(p[1], newPt, p[3]) >= 0) or
-          (CrossProduct(newPt, p[3], p[4]) <= 0) or
-          (CrossProduct(p[0], newPt, center) <= 0) then Exit;
+        if TurnsRight2(newPt, p[1], p[0]) or
+          TurnsRight2(p[1], newPt, p[3]) or
+          TurnsLeft2(newPt, p[3], p[4]) or
+          TurnsLeft2(p[0], newPt, center) or
+          AlmostParallel(p[0], newPt, center) then Goto bottom;
         p[2] := newPt;
         pt2 := ClosestPointOnLine(newPt, p[0], center);
         p[5] := ReflectPoint(newPt, pt2);
-        if CrossProduct(p[1], newPt, p[6]) > 0 then
+        if TurnsRight2(p[1], newPt, p[6]) then
         begin
           dist := Distance(p[1], p[6]) * 0.5;
-          vec := GetUnitVector(pt2, newPt);
+          vec := GetUnitNormal(p[0], center); //perpendicular to center line
           p[1] := PointD(pt2.X + vec.X * dist, pt2.Y + vec.Y * dist);
           p[6] := PointD(pt2.X + vec.X * -dist, pt2.Y + vec.Y * -dist);
         end;
       end;
     3:
       begin
-        if (CrossProduct(newPt, p[0], center) > 0) or
-          (CrossProduct(p[1], p[2], newPt) >= 0) then Exit;
+        if TurnsRight(newPt, p[0], center) or
+          TurnsRight2(p[1], p[2], newPt) then Goto bottom;
         p[3] := newPt;
         center := ClosestPointOnLine(newPt, p[0], center);
         p[4] := ReflectPoint(newPt, center);
       end;
     4:
       begin
-        if (CrossProduct(newPt, p[0], center) < 0) or
-          (CrossProduct(p[6], p[5], newPt) <= 0) then Exit;
+        if TurnsLeft(newPt, p[0], center) or
+          TurnsLeft2(p[6], p[5], newPt) then Goto bottom;
         p[4] := newPt;
         center := ClosestPointOnLine(newPt, p[0], center);
         p[3] := ReflectPoint(newPt, center);
       end;
     5:
       begin
-        if (CrossProduct(newPt, p[6], p[0]) <= 0) or
-          (CrossProduct(p[6], newPt, p[4]) <= 0) or
-          (CrossProduct(newPt, p[4], p[3]) >= 0) or
-          (CrossProduct(p[0], newPt, center) >= 0) then Exit;
+        if TurnsLeft2(newPt, p[6], p[0]) or
+          TurnsLeft2(p[6], newPt, p[4]) or
+          TurnsRight2(newPt, p[4], p[3]) or
+          TurnsRight2(p[0], newPt, center) or
+          AlmostParallel(p[0], newPt, center) then Goto bottom;
         p[5] := newPt;
         pt2 := ClosestPointOnLine(newPt, p[0], center);
         p[2] := ReflectPoint(newPt, pt2);
-        if CrossProduct(p[6], newPt, p[1]) < 0 then
+        if TurnsLeft2(p[6], newPt, p[1]) then
         begin
           dist := Distance(p[6], p[1]) * 0.5;
-          vec := GetUnitVector(pt2, newPt);
+          vec := GetUnitNormal(center, p[0]); //perpendicular to center line
           p[6] := PointD(pt2.X + vec.X * dist, pt2.Y + vec.Y * dist);
           p[1] := PointD(pt2.X + vec.X * -dist, pt2.Y + vec.Y * -dist);
         end;
@@ -306,14 +354,15 @@ begin
       begin
         dist := Distance(p[5], p[2]) * 0.5;
         pt2 := ClosestPointOnLine(newPt, p[0], center);
-        if (DotProduct(newPt, center, p[0]) <= 0) or
-          (DotProduct(newPt, p[0], center) <= 0) or
-          (Distance(newPt, pt2) <= dist) then Exit;
+        if GrtrEqu90(newPt, center, p[0]) or
+          GrtrEqu90(newPt, p[0], center) or
+          (Distance(newPt, pt2) <= dist) or
+          AlmostPerpendicular(center, p[0], newPt) then Goto bottom;
         p[6] := newPt;
         p[1] := ReflectPoint(newPt, pt2);
-        if (CrossProduct(newPt, p[5], p[0]) >= 0) or
-          (CrossProduct(newPt, p[5], p[2]) < 0) or
-          (CrossProduct(newPt, p[5], p[4]) <= 0) then
+        if TurnsRight2(newPt, p[5], p[0]) or
+          TurnsLeft(newPt, p[5], p[2]) or
+          TurnsLeft2(newPt, p[5], p[4]) then
         begin
           vec := GetUnitVector(pt2, p[6]);
           p[5] := PointD(pt2.X + vec.X * dist, pt2.Y + vec.Y * dist);
@@ -322,6 +371,7 @@ begin
       end;
   end;
 
+bottom: //goto label
   for i := 0 to btnGroup.ChildCount -1 do
     btnGroup[i].PositionCenteredAt(p[i]);
   Paths := Image32_Vector.Paths(p);
@@ -516,10 +566,8 @@ begin
     //Update rotatingButtonGroup and get the new angle
     newAngle := UpdateRotatingButtonGroup(clickedLayer);
 
-    if targetLayer is TMyVectorLayer32 then
-      TMyVectorLayer32(targetLayer).Angle := newAngle
-    else if targetLayer is TMyRasterLayer32 then
-      TMyRasterLayer32(targetLayer).Angle := newAngle;
+    if targetLayer is TRotateLayer32 then
+      TRotateLayer32(targetLayer).Angle := newAngle;
 
     if newAngle > PI then newAngle := newAngle - Pi*2;
     StatusBar1.SimpleText := format('angle: %1.0n deg.',[newAngle * 180/pi]);
@@ -648,14 +696,9 @@ begin
     //toggle on the rotating button using the previous rotation angle
     DeleteAllControlButtons;
     pt := targetLayer.MidPoint;
-    if targetLayer is TMyRasterLayer32 then
-      displayAngle := TMyRasterLayer32(targetLayer).Angle
-    else if targetLayer is TMyVectorLayer32 then
-      with TMyVectorLayer32(targetLayer) do
-    begin
-      PivotPt := pt;
-      displayAngle := Angle;
-    end else
+    if targetLayer is TRotateLayer32 then
+      displayAngle := TRotateLayer32(targetLayer).Angle
+    else
       displayAngle := 0;
 
     rotatingButtonGroup := CreateRotatingButtonGroup(

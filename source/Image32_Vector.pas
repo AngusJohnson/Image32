@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.1                                                             *
-* Date      :  12 March 2021                                                    *
+* Version   :  2.12                                                            *
+* Date      :  14 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -1436,6 +1436,7 @@ var
   sinA, cosA: {$IF COMPILERVERSION = 15} extended; {$ELSE} double; {$IFEND}
   {$ENDIF}
 begin
+  if ClockwiseRotationIsAnglePositive then angleRad := -angleRad;
   SinCos(angleRad, sinA, cosA);
   RotatePoint(pt, focalPoint, sinA, cosA);
 end;
@@ -1475,6 +1476,7 @@ function RotatePath(const path: TPathD;
 var
   sinA, cosA: extended;
 begin
+  if ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
   Math.SinCos(angleRads, sinA, cosA);
   Result := RotatePathInternal(path, focalPoint, sinA, cosA);
 end;
@@ -1486,6 +1488,7 @@ var
   i: integer;
   sinA, cosA: extended;
 begin
+  if ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
   Math.SinCos(angleRads, sinA, cosA);
   SetLength(Result, length(paths));
   for i := 0 to high(paths) do
@@ -1501,13 +1504,11 @@ begin
   y := pt.Y - origin.Y;
   if x = 0 then
   begin
-    if y > 0 then result := angle270
+    if y > 0 then result := -angle90
     else result := angle90;
   end else
-  begin
-    result := arctan2(-y, x);
-    if result < 0 then result := result + angle360;
-  end;
+    result := arctan2(-y, x); //range between -Pi and Pi
+  if ClockwiseRotationIsAnglePositive then Result := -Result;
 end;
 //------------------------------------------------------------------------------
 
@@ -1519,65 +1520,41 @@ begin
   y := pt.Y - origin.Y;
   if x = 0 then
   begin
-    if y > 0 then result := angle270
+    if y > 0 then result := -angle90
     else result := angle90;
   end else
-  begin
-    result := arctan2(-y, x);
-    if result < 0 then result := result + angle360;
-  end;
+    result := arctan2(-y, x); //range between -Pi and Pi
+  if ClockwiseRotationIsAnglePositive then Result := -Result;
 end;
 //------------------------------------------------------------------------------
 
 function GetAngle(const a, b, c: TPoint): double;
 var
-  ab,bc: TPointD;
-  dotProd, abSqr, bcSqr, cosSqr, cos2, alpha2: single;
+  ab, bc: TPointD;
+  dp, cp: double;
 begin
-  //http://stackoverflow.com/questions/3486172/angle-between-3-points/3487062
-  ab.X := b.X - a.X;
-  ab.Y := b.Y - a.Y;
-  bc.X := b.X - c.X;
-  bc.Y := b.Y - c.Y;
-  dotProd := ab.X * bc.X + ab.Y * bc.Y;
-  abSqr := ab.x * ab.x + ab.y * ab.y;
-  bcSqr := bc.x * bc.x + bc.y * bc.y;
-  cosSqr := dotProd * dotProd / abSqr / bcSqr;
-  cos2 := 2 * cosSqr - 1;
-  if (cos2 <= -1) then alpha2 := pi
-  else if (cos2 >= 1) then alpha2 := 0
-  else alpha2 := arccos(cos2);
-  result := alpha2 / 2;
-  if (dotProd < 0) then result := pi - result;
-  if (ab.x * bc.y - ab.y * bc.x) < 0 then result := -result;
+  //https://stackoverflow.com/a/3487062/359538
+  ab := PointD(b.x - a.x, b.y - a.y);
+  bc := PointD(b.x - c.x, b.y - c.y);
+  dp := (ab.x * bc.x + ab.y * bc.y);
+  cp := (ab.x * bc.y - ab.y * bc.x);
+  Result := arctan2(cp, dp); //range between -Pi and Pi
+  if ClockwiseRotationIsAnglePositive then Result := -Result;
 end;
-//---------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 function GetAngle(const a, b, c: TPointD): double;
 var
-  ab,bc: TPointD;
-  dotProd, abSqr, bcSqr, cosSqr, cos2, alpha2: single;
+  ab, bc: TPointD;
+  dp, cp: double;
 begin
-  ab.X := b.X - a.X;
-  ab.Y := b.Y - a.Y;
-  bc.X := b.X - c.X;
-  bc.Y := b.Y - c.Y;
-  dotProd := ab.X * bc.X + ab.Y * bc.Y;
-  abSqr := ab.x * ab.x + ab.y * ab.y;
-  bcSqr := bc.x * bc.x + bc.y * bc.y;
-  if (abSqr = 0) or (bcSqr = 0) then
-  begin
-    Result := 0;
-    Exit;
-  end;
-  cosSqr := dotProd * dotProd / abSqr / bcSqr;
-  cos2 := 2 * cosSqr - 1;
-  if (cos2 <= -1) then alpha2 := pi
-  else if (cos2 >= 1) then alpha2 := 0
-  else alpha2 := arccos(cos2);
-  result := alpha2 / 2;
-  if (dotProd < 0) then result := pi - result;
-  if (ab.x * bc.y - ab.y * bc.x) < 0 then result := -result;
+  //https://stackoverflow.com/a/3487062/359538
+  ab := PointD(b.x - a.x, b.y - a.y);
+  bc := PointD(b.x - c.x, b.y - c.y);
+  dp := (ab.x * bc.x + ab.y * bc.y);
+  cp := (ab.x * bc.y - ab.y * bc.x);
+  Result := arctan2(cp, dp); //range between -Pi and Pi
+  if ClockwiseRotationIsAnglePositive then Result := -Result;
 end;
 //------------------------------------------------------------------------------
 
@@ -1958,6 +1935,13 @@ var
 begin
   Result := nil;
   if (endAngle = startAngle) or IsEmptyRect(rec) then Exit;
+
+  if ClockwiseRotationIsAnglePositive then
+  begin
+    startAngle := -startAngle;
+    endAngle := -endAngle;
+  end;
+
   centre := PointD((rec.left+rec.right)/2, (rec.top+rec.bottom)/2);
   radius := PointD(RectWidth(rec)/2, RectHeight(rec)/2);
   radiusAvg := (radius.X + radius.Y)/2;

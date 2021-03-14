@@ -1412,76 +1412,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-//SymmetricCropTransparent: after cropping, the image's midpoint
-//will be the same pixel as before cropping. (Important for rotating.)
-procedure SymmetricCropTransparent(img: TImage32);
-var
-  w, x,y, x1,y1: Integer;
-  newHeight: integer;
-  p1,p2: PARGB;
-  found: Boolean;
-  tmpPxls: TArrayOfColor32;
-begin
-  w := img.Width;
-  y1 := 0;
-  found := false;
-  for y := 0 to (img.Height div 2) -1 do
-  begin
-    p1 := PARGB(img.PixelRow[y]);
-    p2 := PARGB(img.PixelRow[img.Height - y -1]);
-    for x := 0 to w -1 do
-    begin
-      if (p1.A > 0) or (p2.A > 0) then
-      begin
-        y1 := y;
-        found := true;
-        break;
-      end;
-      inc(p1); inc(p2);
-    end;
-    if found then break;
-  end;
-
-  if not found then
-  begin
-    img.SetSize(0, 0);
-    Exit;
-  end;
-
-  if y1 > 0 then
-  begin
-    //trim top and bottom
-    newHeight := img.Height - (y1 * 2);
-    SetLength(tmpPxls, w * newHeight);
-    Move(img.PixelRow[y1]^, tmpPxls[0], w * newHeight * SizeOf(TColor32));
-    img.SetSize(w, newHeight);
-    Move(tmpPxls[0], img.PixelBase^ , Length(tmpPxls) * SizeOf(TColor32));
-  end;
-
-  x1 := 0;
-  found := false;
-  for x := 0 to (w div 2) -1 do
-  begin
-    p1 := PARGB(@img.Pixels[x]);
-    p2 := PARGB(@img.Pixels[w - x -1]);
-    for y := 0 to img.Height -1 do
-    begin
-      if (p1.A > 0) or (p2.A > 0) then
-      begin
-        x1 := x;
-        found := true;
-        break;
-      end;
-      inc(p1, w); inc(p2, w);
-    end;
-    if found then break;
-  end;
-
-  if not found then Exit;
-  img.Crop(Rect(x1, 0, w - x1, img.Height));
-end;
-//------------------------------------------------------------------------------
-
 procedure TRasterLayer32.SetBounds(const newBounds: TRect);
 var
   newWidth, newHeight: integer;
@@ -2051,6 +1981,8 @@ begin
     TRotatingGroupLayer32, nil, rsRotatingButtonGroup));
 
   //startingZeroOffset: default = 0 (ie 3 o'clock)
+  if ClockwiseRotationIsAnglePositive then
+    startingZeroOffset := -startingZeroOffset;
   Result.fZeroOffset := startingZeroOffset;
 
   if buttonSize <= 0 then buttonSize := DefaultButtonSize;
@@ -2163,7 +2095,10 @@ begin
   Result.BeginUpdate;
   try
     for i := 0 to high(buttonPts) do
+    begin
       Result.AddButton(buttonPts[i]);
+      Result[i].CursorId := crSizeAll;
+    end;
   finally
     Result.EndUpdate;
   end;

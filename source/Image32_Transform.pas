@@ -2,8 +2,8 @@ unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.1                                                             *
-* Date      :  12 March 2021                                                   *
+* Version   :  2.12                                                            *
+* Date      :  14 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -233,7 +233,7 @@ var
 begin
   NormalizeAngle(angRad);
   if angRad < 0.001 then Exit;
-
+  if ClockwiseRotationIsAnglePositive then angRad := -angRad;
   m := IdentityMatrix;
   origOffset := (center.X <> 0) or (center.Y <> 0);
   if origOffset then MatrixTranslate(matrix, -center.X, -center.Y);
