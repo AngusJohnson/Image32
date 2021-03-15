@@ -13,6 +13,8 @@ Download      : https://sourceforge.net/projects/image32/files/
 Recent changes:
 
 Version 2.13
+  Image32_Layers
+    Bugfix - invisible layers were 'clickable'
   Image32_SmoothPath
 	Bugfix and significant code tidy
 	

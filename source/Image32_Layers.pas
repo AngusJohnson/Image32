@@ -1103,7 +1103,7 @@ begin
   begin
     if Child[i] is TGroupLayer32 then //recursive
       Result := TGroupLayer32(Child[i]).GetLayerAt(pt, ignoreDesigners)
-    else if not Visible or
+    else if not Child[i].Visible or
       (ignoreDesigners and (Child[i] is TDesignerLayer32)) then
         Continue
     else if Child[i] is THitTestLayer32 then
