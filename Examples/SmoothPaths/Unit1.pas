@@ -9,6 +9,11 @@ uses
 
 type
 
+  TMySmoothPathGroupLayer32 = class(TSmoothPathGroupLayer32)
+  protected
+    procedure PaintDesignerLayer; override;
+  end;
+
   TFrmMain = class(TForm)
     MainMenu1: TMainMenu;
     File1: TMenuItem;
@@ -63,11 +68,7 @@ type
     smoothGroupLayer : TSmoothPathGroupLayer32;
     clickedLayer     : TLayer32;
     clickPoint       : TPoint;
-
-    fontReader       : TFontReader;
-    glyphCache       : TGlyphCache;
     procedure UpdateSmoothPathLayerAttributes;
-    procedure BeforeMerge(Sender: TObject);
   protected
     procedure WMERASEBKGND(var message: TMessage); message WM_ERASEBKGND;
   public
@@ -92,7 +93,38 @@ const
   margin = 100;
 var
   lineWidth: integer;
+  fontReader       : TFontReader;
+  glyphCache       : TGlyphCache;
 
+//------------------------------------------------------------------------------
+// TMySmoothPathGroupLayer32
+//------------------------------------------------------------------------------
+
+procedure TMySmoothPathGroupLayer32.PaintDesignerLayer;
+var
+  i: integer;
+  tmpPath: TPathD;
+  outline: TPathsD;
+begin
+  inherited;
+  with DesignLayer do
+  begin
+    //draw coordinates on smoothGroupLayer's designer layer
+    for i := 0 to SmoothPath.Count -1 do
+      DrawText(Image,
+        SmoothPath[i].X - Left, //offset the coords relative to the layer
+        SmoothPath[i].Y - Top,
+        Format('  %1.0n,%1.0n', [SmoothPath[i].X,SmoothPath[i].Y]),
+        glyphCache, clMaroon32);
+
+    //and draw a dashed outline of the smoothpath too
+    tmpPath := SmoothPath.FlattenedPath;
+    outline := InflatePath(tmpPath, lineWidth + DPIAware(8), jsRound, esRound);
+    outline := OffsetPath(outline, -Left, -Top);
+    DrawDashedLine(Image, outline, dashes, nil,
+      DPIAware(1), clMaroon32, esPolygon);
+  end;
+end;
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions
@@ -193,32 +225,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TFrmMain.BeforeMerge(Sender: TObject);
-var
-  i: integer;
-  path: TPathD;
-  outline: TPathsD;
-begin
-  with TSmoothPathGroupLayer32(Sender), DesignLayer do
-  begin
-    //draw coordinates on smoothGroupLayer's designer layer
-    for i := 0 to SmoothPath.Count -1 do
-      DrawText(Image,
-        SmoothPath[i].X - Left, //offset the coords relative to the layer
-        SmoothPath[i].Y - Top,
-        Format('  %1.0n,%1.0n', [SmoothPath[i].X,SmoothPath[i].Y]),
-        glyphCache, clMaroon32);
-
-    //and draw a dashed outline of the smoothpath too
-    path := SmoothPath.FlattenedPath;
-    outline := InflatePath(path, lineWidth + DPIAware(8), jsRound, esRound);
-    outline := OffsetPath(outline, -Left, -Top);
-    DrawDashedLine(Image, outline, dashes, nil,
-      DPIAware(1), clMaroon32, esPolygon);
-  end;
-end;
-//------------------------------------------------------------------------------
-
 procedure TFrmMain.FormPaint(Sender: TObject);
 var
   updateRec: TRect;
@@ -233,12 +239,11 @@ begin
   //double click adds a button control layer
   if not Assigned(smoothGroupLayer) then
   begin
-    smoothGroupLayer :=
-      TSmoothPathGroupLayer32(layeredImage32.AddLayer(TSmoothPathGroupLayer32));
-    //make room to display coordinates
-    smoothGroupLayer.DesignMargin := DPIAware(40);
-    smoothGroupLayer.OnMerge := BeforeMerge;
+    smoothGroupLayer := TSmoothPathGroupLayer32(
+      layeredImage32.AddLayer(TMySmoothPathGroupLayer32));
     UpdateSmoothPathLayerAttributes;
+    //and make room to display coordinates
+    smoothGroupLayer.DesignMargin := DPIAware(40);
   end;
   smoothGroupLayer.SmoothPath.Add(PointD(clickPoint), stSmoothSym);
   Invalidate;

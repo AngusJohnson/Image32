@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.12                                                            *
-* Date      :  13 March 2021                                                   *
+* Version   :  2.13                                                             *
+* Date      :  15 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -227,8 +227,9 @@ type
     fSavedSize    : TSize;
     fAutoHitTest  : Boolean;
     procedure DoAutoHitTest;
-    procedure DoRotateCheck;
-    procedure DoScaleCheck;
+    procedure DoPreScaleCheck;
+    procedure DoPreRotationCheck;
+    function GetMatrix: TMatrixD;
   protected
     function  GetAngle: double; override;
     procedure SetAngle(newAngle: double); override;
@@ -246,6 +247,7 @@ type
 
     property  AutoSetHitTestMask: Boolean read fAutoHitTest write fAutoHitTest;
     property  MasterImage: TImage32 read fMasterImg;
+    property  Matrix: TMatrixD read GetMatrix;
   end;
 
   TSizingGroupLayer32 = class(TGroupLayer32)
@@ -297,12 +299,14 @@ type
     fShape    : TButtonShape;
     fButtonOutline: TPathD;
   protected
+    constructor Create(groupOwner: TGroupLayer32;
+      const name: string = ''); override;
     procedure Draw; virtual;
     property Size  : integer read fSize write fSize;
     property Color : TColor32 read fColor write fColor;
     property Shape : TButtonShape read fShape write fShape;
     procedure SetButtonAttributes(const shape: TButtonShape;
-      size: integer; color: TColor32);
+      size: integer; color: TColor32); virtual;
   public
     property ButtonOutline: TPathD read fButtonOutline write fButtonOutline;
   end;
@@ -1014,7 +1018,6 @@ procedure TGroupLayer32.MergeInvalidatedRects(
 var
   i: integer;
 begin
-
   DoOnMerge;
 
   //recursively apply this method ...
@@ -1416,7 +1419,7 @@ procedure TRasterLayer32.SetBounds(const newBounds: TRect);
 var
   newWidth, newHeight: integer;
 begin
-  DoRotateCheck;
+  DoPreScaleCheck;
   newWidth := RectWidth(newBounds);
   newHeight := RectHeight(newBounds);
 
@@ -1448,31 +1451,46 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TRasterLayer32.DoRotateCheck;
+procedure TRasterLayer32.DoPreScaleCheck;
 begin
-  if fRotating then
-  begin
-    fRotating := false;
-    //rotation has just ended so add the rotation angle to fMatrix
-    if (fAngle <> 0) then
-      MatrixRotate(fMatrix, Image.MidPoint, fAngle);
-    //and since we're about to start scaling, we need
-    //to store the starting size, and reset the angle
-    fSavedSize := Size(Image.Width, Image.Height);
-    fAngle := 0;
-  end;
+  if not fRotating then Exit;
+  fRotating := false;
+
+  //rotation has just ended so add the rotation angle to fMatrix
+  if (fAngle <> 0) then
+    MatrixRotate(fMatrix, Image.MidPoint, fAngle);
+  //and since we're about to start scaling, we need
+  //to store the starting size, and reset the angle
+  fSavedSize := Size(Image.Width, Image.Height);
+  fAngle := 0;
 end;
 //------------------------------------------------------------------------------
 
-procedure TRasterLayer32.DoScaleCheck;
+procedure TRasterLayer32.DoPreRotationCheck;
 begin
-  if not fRotating then
+  if fRotating then Exit;
+  fRotating := true;
+
+  //scaling has just ended and rotating is about to start
+  //so apply the current scaling to the matrix
+  MatrixScale(fMatrix, Image.Width/fSavedSize.cx,
+    Image.Height/fSavedSize.cy);
+end;
+//------------------------------------------------------------------------------
+
+function TRasterLayer32.GetMatrix: TMatrixD;
+begin
+  Result := fMatrix;
+
+  //and update for transformations not yet unapplied to fMatrix
+  if fRotating then
   begin
-    //scaling has just ended and rotating is about to start
-    //so apply the current scaling to the matrix
-    MatrixScale(fMatrix, Image.Width/fSavedSize.cx,
+    if fAngle <> 0 then
+      MatrixRotate(Result, MidPoint, fAngle);
+  end else
+  begin
+    MatrixScale(Result, Image.Width/fSavedSize.cx,
       Image.Height/fSavedSize.cy);
-    fRotating := true;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1490,7 +1508,7 @@ begin
   NormalizeAngle(newAngle);
   if MasterImage.IsEmpty or (fAngle = newAngle) then Exit;
 
-  DoScaleCheck;
+  DoPreRotationCheck;
 
   fAngle := newAngle;
   savedMidpoint := MidPoint;
@@ -1499,7 +1517,6 @@ begin
     Image.Assign(MasterImage);
     //apply any prior transformations
     AffineTransformImage(Image, fMatrix);
-
     Image.Rotate(fAngle);
     //symmetric cropping prevents center wobbling
     SymmetricCropTransparent(Image);
@@ -1580,6 +1597,14 @@ end;
 
 //------------------------------------------------------------------------------
 // TButtonDesignerLayer32 class
+//------------------------------------------------------------------------------
+
+constructor TButtonDesignerLayer32.Create(groupOwner: TGroupLayer32;
+  const name: string = '');
+begin
+  inherited;
+  SetButtonAttributes(bsRound, DefaultButtonSize, clGreen32);
+end;
 //------------------------------------------------------------------------------
 
 procedure TButtonDesignerLayer32.SetButtonAttributes(const shape: TButtonShape;

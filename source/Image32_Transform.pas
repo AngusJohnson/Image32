@@ -17,6 +17,9 @@ interface
 uses
   SysUtils, Classes, Math, Types, Image32, Image32_Draw, Image32_Vector;
 
+type
+  TMatrixD = array [0..2, 0..2] of double;
+
   //Matrix functions
   function IsIdentityMatrix(const matrix: TMatrixD): Boolean;
   function Matrix(const m00, m01, m02, m10, m11, m12, m20, m21, m22: double): TMatrixD;

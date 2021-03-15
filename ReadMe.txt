@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 2.11
-Released: 13 March 2021
+Latest version: 2.13
+Released: 15 March 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -11,6 +11,21 @@ Documentation : http://www.angusj.com/delphi/image32/Docs/
 Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
+
+Version 2.13
+  Image32_SmoothPath
+	Bugfix and significant code tidy
+	
+Version 2.12
+  Image32
+	Added ClockwiseRotationIsAnglePositive global variable.
+	IMPORTANT: This variable defaults to true, which reverses
+	the previous direction of rotation. The default direction
+	now copies that of other Delphi graphics libraries.
+  Image32_Extra
+	Added SymmetricCropTransparent procedure
+  VCL_Image32 Package
+	Fixed broken link to deleted Image32_Text unit.
 
 Version 2.11
   Image32_Layers

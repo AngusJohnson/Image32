@@ -134,9 +134,10 @@ type
     procedure AssignTo(dst: TImage32);
     //SetSize: Erases any current image, and fills with the specified color.
     procedure SetSize(newWidth, newHeight: Integer; color: TColor32 = 0);
-    //Resize: unlike SetSize, resize will not eraze any existing image. The
-    //existing image will either be stretched or cropped depending on the
-    //stretchImage parameter.
+    //Resize: is similar to Scale() in that it won't eraze the existing
+    //image. Depending on the stretchImage parameter it will either stretch
+    //or crop the image. Don't confuse Resize() with SetSize(), as the latter
+    //does erase the image.
     procedure Resize(newWidth, newHeight: Integer; stretchImage: Boolean = true);
     //ScaleToFit: The new image will be scaled to fit within 'rec'
     procedure ScaleToFit(width, height: integer);

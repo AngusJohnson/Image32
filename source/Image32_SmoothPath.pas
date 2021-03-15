@@ -2,8 +2,8 @@ unit Image32_SmoothPath;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.1                                                             *
-* Date      :  12 March 2021                                                   *
+* Version   :  2.13                                                             *
+* Date      :  15 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Supports paths with multiple sub-curves                         *
@@ -35,6 +35,7 @@ type
     fCtrlPoints     : array of TSmoothPoint;
     fFlattened      : TPathD;
     fAutoAdjust     : Boolean;
+    fUpdateCount    : integer;
     fOnChange       : TNotifyEvent;
     function GetPoint(index: integer): TPointD;
     procedure SetPoint(index: integer; const pt: TPointD);
@@ -47,6 +48,7 @@ type
   protected
     procedure MovePoint(index: integer; const newPt: TPointD);
     procedure Changed; virtual;
+    function CanUpdate: Boolean;
   public
     constructor Create; virtual;
     procedure Add(const pt: TPointD; pointType: TSmoothType); overload;
@@ -54,6 +56,8 @@ type
     procedure Assign(mixedPath: TSmoothPath);
     procedure AssignTo(mixedPath: TSmoothPath);
     procedure Clear;
+    procedure BeginUpdate;
+    procedure EndUpdate;
 
     function  GetPoints: TPathD;
     function  GetBounds: TRect;
@@ -107,10 +111,12 @@ type
     function UpdateButtonsAndCalcBounds: TRect;
     function GetCursorId: integer;
     procedure SetCursorId(newCursorId: integer);
+    procedure SetPenWidth(val: double);
+    procedure VectorLayerDraw(Sender: TObject);
   protected
-    procedure PaintVectorLayer(Sender: TObject);
-    procedure PaintDesignerLayer(layer: TDesignerLayer32); virtual;
-    procedure DoOnMerge; override;
+    procedure SmoothPathUpdated; virtual;
+    procedure PaintVectorLayer; virtual;
+    procedure PaintDesignerLayer; virtual;
   public
     constructor Create(groupOwner: TGroupLayer32;
       const name: string = ''); override;
@@ -128,7 +134,7 @@ type
     property ColorCtrlBtns : TColor32 read fColorCtrlBtn write fColorCtrlBtn;
 
     property PenColor: TColor32 read fPenColor write fPenColor;
-    property PenWidth: double read fPenWidth write fPenWidth;
+    property PenWidth: double read fPenWidth write SetPenWidth;
     property BrushColor: TColor32 read fBrushColor write fBrushColor;
     property FillRule: TFillRule read fFillRule write fFillRule;
     property IsClosedPath: Boolean read fIsClosedPath write fIsClosedPath;
@@ -183,7 +189,8 @@ type
 
 procedure TNotifySmoothPath.Changed;
 begin
-  fGroupLayerOwner.ForceRefresh;
+  if not CanUpdate then Exit;
+  fGroupLayerOwner.SmoothPathUpdated;
   inherited;
 end;
 
@@ -215,9 +222,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TSmoothPath.CanUpdate: Boolean;
+begin
+  Result := (fUpdateCount = 0);
+end;
+//------------------------------------------------------------------------------
+
 procedure TSmoothPath.Changed;
 begin
-  if Assigned(fOnChange) then fOnChange(Self);
+  if CanUpdate and Assigned(fOnChange) then
+    fOnChange(Self);
 end;
 //------------------------------------------------------------------------------
 
@@ -228,6 +242,19 @@ begin
   fFlattened := nil;
   fCapacity := 0;
   fCount := 0;
+  Changed;
+end;
+//------------------------------------------------------------------------------
+
+procedure TSmoothPath.BeginUpdate;
+begin
+  inc(fUpdateCount);
+end;
+//------------------------------------------------------------------------------
+
+procedure TSmoothPath.EndUpdate;
+begin
+  dec(fUpdateCount);
   Changed;
 end;
 //------------------------------------------------------------------------------
@@ -245,7 +272,7 @@ begin
   mixedPath.fCount := self.fCount;
   mixedPath.fCtrlPoints := Copy(self.fCtrlPoints, 0, self.fCapacity);
   mixedPath.fFlattened := nil;
-  Changed;
+  mixedPath.Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -279,6 +306,8 @@ begin
   if (index < 0) or (index >= Count) then
     raise Exception.Create(rsSmoothPathRangeError)
   else if PointsEqual(fCtrlPoints[index].Point, pt) then Exit;
+
+  if PointsEqual(pt, fCtrlPoints[index].Point) then Exit;
 
   if fAutoAdjust then
   begin
@@ -679,7 +708,7 @@ begin
   //a TVectorLayer32 where the smoothpath is drawn
   //and a TDesignerLayer32 where designer lines etc are drawn.
   fVectorLayer32  := TVectorLayer32(AddChild(TVectorLayer32));
-  fVectorLayer32.OnDraw := Self.PaintVectorLayer;
+  fVectorLayer32.OnDraw := Self.VectorLayerDraw;
 
 
   fDesignLayer32  := TDesignerLayer32(AddChild(TDesignerLayer32));
@@ -747,9 +776,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TSmoothPathGroupLayer32.SetPenWidth(val: double);
+begin
+  val := Max(0.5, val);
+  if (fPenWidth = val)  then Exit;
+  fPenWidth := val;
+  fVectorLayer32.Margin := ceil(val/2);
+end;
+//------------------------------------------------------------------------------
+
 function TSmoothPathGroupLayer32.UpdateButtonsAndCalcBounds: TRect;
 
-  procedure UpdateAttribs(btnLayer: TSmoothButtonLayer32);
+  procedure SetBtnVisibilityAndPosition(btnLayer: TSmoothButtonLayer32);
   var
     i: integer;
   begin
@@ -766,9 +804,7 @@ function TSmoothPathGroupLayer32.UpdateButtonsAndCalcBounds: TRect;
     end;
   end;
 
-  procedure SetAttribs(btnLayer: TSmoothButtonLayer32);
-  var
-    i: integer;
+  procedure SetAttributes(btnLayer: TSmoothButtonLayer32);
   begin
     with btnLayer do
     begin
@@ -789,23 +825,18 @@ function TSmoothPathGroupLayer32.UpdateButtonsAndCalcBounds: TRect;
         Size := fButtonSize2;
         Color := fColorCtrlBtn;
       end;
-      i := Round(Size * 2.25);
-      Image.SetSize(i, i);
-      Draw;
+      SetButtonAttributes(Shape, Size, Color);
     end;
-    UpdateAttribs(btnLayer);
   end;
 
 var
   i,j, pathCnt, btnCnt: integer;
   btnLayer: TSmoothButtonLayer32;
 begin
+  //precondition: there will always be at least one button
+
   pathCnt := SmoothPath.Count;
   btnCnt := ChildCount -2;
-
-  //?? delete active
-  if Assigned(fActiveButton) and (fActiveButton.fPathIdx >= pathCnt) then
-    fActiveButton := nil;
 
   //update color of last button
   if (btnCnt > 1) and ((btnCnt -1) mod 3 = 0) and (pathCnt > btnCnt) then
@@ -823,8 +854,6 @@ begin
     DeleteChild(btnCnt +2);
   end;
 
-  //precondition: there will always be at least one button
-
   for i := 0 to pathCnt -1 do
   begin
     //control buttons should always be on top of path buttons
@@ -834,17 +863,16 @@ begin
       else j := i;
     end;
 
-    if j >= btnCnt then       //either add new buttons
+    if j >= btnCnt then       //adding a new button
     begin
       btnLayer := TSmoothButtonLayer32(AddChild(TSmoothButtonLayer32));
       btnLayer.fPathIdx := j;
-      SetAttribs(btnLayer);
+      SetAttributes(btnLayer);
     end else
-    begin                     //or update old ones
       btnLayer := TSmoothButtonLayer32(Child[i +2]);
-      UpdateAttribs(btnLayer);
-    end;
 
+    SetBtnVisibilityAndPosition(btnLayer);
+    //update group bounds
     if i = 0 then
       Result := btnLayer.Bounds else
       Result := Image32_Vector.UnionRect(Result, btnLayer.Bounds);
@@ -852,12 +880,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSmoothPathGroupLayer32.PaintVectorLayer(Sender: TObject);
+procedure TSmoothPathGroupLayer32.VectorLayerDraw(Sender: TObject);
+begin
+  PaintVectorLayer;
+end;
+//------------------------------------------------------------------------------
+
+procedure TSmoothPathGroupLayer32.PaintVectorLayer;
 var
   pp: TPathsD;
 begin
   with fVectorLayer32 do
   begin
+    Image.Clear;
+
     pp := OffsetPath(Paths, -Left, -Top);
     if fIsClosedPath then
     begin
@@ -870,54 +906,64 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSmoothPathGroupLayer32.PaintDesignerLayer(layer: TDesignerLayer32);
+procedure TSmoothPathGroupLayer32.PaintDesignerLayer;
 var
   i, pathLen, dx,dy: integer;
-  rec: TRect;
+  rec: TRectD;
   tmpPath, ctrlLine: TPathD;
 begin
-  layer.Image.Clear;
-  if Assigned(fActiveButton) then
+  with DesignLayer do
   begin
-    rec := fActiveButton.Bounds;
-    OffsetRect(rec, -layer.Left, -layer.Top);
-    tmpPath := Ellipse(rec);
-    DrawDashedLine(layer.Image, tmpPath,
-      dashes, nil, DPIAware(1), clRed32, esPolygon);
-  end;
+    Image.Clear;
+    dx := Left;
+    dy := Top;
 
-  SetLength(ctrlLine, 2);
-  i := 0;
-  dx := layer.Left;
-  dy := layer.Top;
-
-  pathLen := SmoothPath.Count -1;
-  while i < pathLen -1 do
-  begin
-    if smoothPath.PointTypes[i] <> stSharpNoHdls then
+    //if ActiveButton is assigned, then give it a dashed outline
+    if Assigned(Self.ActiveButtonLayer) then
     begin
-      ctrlLine[0] := smoothPath[i];
-      ctrlLine[1] := smoothPath[i+1];
-      ctrlLine := OffsetPath(ctrlLine, -dx, -dy);
-      DrawDashedLine(layer.Image, ctrlLine,
-        dashes, nil, DPIAware(1), clRed32, esSquare);
+      with ActiveButtonLayer do
+      begin
+        rec := RectD(Bounds);
+        rec := InflateRect(rec, Size/2, Size/2);
+      end;
+      OffsetRect(rec, -dx, -dy);
+      tmpPath := Ellipse(rec);
+      DrawDashedLine(Image, tmpPath,
+        dashes, nil, DPIAware(1), clRed32, esPolygon);
     end;
 
-    if i >= pathLen -1 then break;
-    if smoothPath.PointTypes[i+3] <> stSharpNoHdls then
+    SetLength(ctrlLine, 2);
+    i := 0;
+
+    //draw dashed lines between on-path 'nodes' and off-path 'controls'
+    pathLen := SmoothPath.Count -1;
+    while i < pathLen -1 do
     begin
-      ctrlLine[0] := smoothPath[i+2];
-      ctrlLine[1] := smoothPath[i+3];
-      ctrlLine := OffsetPath(ctrlLine, -dx, -dy);
-      DrawDashedLine(layer.Image, ctrlLine,
-        dashes, nil, DPIAware(1), clRed32, esSquare);
+      if smoothPath.PointTypes[i] <> stSharpNoHdls then
+      begin
+        ctrlLine[0] := smoothPath[i];
+        ctrlLine[1] := smoothPath[i+1];
+        ctrlLine := OffsetPath(ctrlLine, -dx, -dy);
+        DrawDashedLine(Image, ctrlLine,
+          dashes, nil, DPIAware(1), clRed32, esSquare);
+      end;
+
+      if i >= pathLen -1 then break;
+      if smoothPath.PointTypes[i+3] <> stSharpNoHdls then
+      begin
+        ctrlLine[0] := smoothPath[i+2];
+        ctrlLine[1] := smoothPath[i+3];
+        ctrlLine := OffsetPath(ctrlLine, -dx, -dy);
+        DrawDashedLine(Image, ctrlLine,
+          dashes, nil, DPIAware(1), clRed32, esSquare);
+      end;
+      inc(i, 3);
     end;
-    inc(i, 3);
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TSmoothPathGroupLayer32.DoOnMerge;
+procedure TSmoothPathGroupLayer32.SmoothPathUpdated;
 var
   idx, margin, pathLen: integer;
   rec: TRect;
@@ -940,9 +986,8 @@ begin
 
   if pathLen = 0 then
   begin
-    Child[0].SetSize(0,0);
-    Child[1].SetSize(0,0);
-    inherited;
+    VectorLayer.SetSize(0,0);
+    DesignLayer.SetSize(0,0);
     Exit;
   end;
 
@@ -952,18 +997,20 @@ begin
 
   rec := UpdateButtonsAndCalcBounds;
 
-  margin := Max(fButtonSize1, fButtonSize2) + Round(PenWidth);
+  margin := Max(fButtonSize1, fButtonSize2) * 2; // *2 for active btn outline
+  margin := Max(Max(Margin, Ceil(PenWidth/2)), DesignMargin);
+
   rec := InflateRect(rec, margin, margin);
-
-  //just assign paths to VectorLayer. It'll do the rest.
-  VectorLayer.Paths := Image32_Vector.Paths(SmoothPath.FlattenedPath);
-
-  if fDesignMargin > 0 then
-    rec := Image32_Vector.InflateRect(rec, fDesignMargin, fDesignMargin);
-  Child[1].SetBounds(rec);
-  PaintDesignerLayer(TDesignerLayer32(Child[1]));
-
-  inherited;
+  BeginUpdate;
+  try
+    VectorLayer.Margin := margin;
+    //nb: assigning VectorLayer.Paths will adjust Bounds automatically
+    VectorLayer.Paths := Image32_Vector.Paths(SmoothPath.FlattenedPath);
+    DesignLayer.SetBounds(rec);
+    PaintDesignerLayer;
+  finally
+    EndUpdate;
+  end;
 end;
 
 //------------------------------------------------------------------------------

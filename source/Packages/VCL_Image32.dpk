@@ -13,18 +13,17 @@ package VCL_Image32;
 {$LOCALSYMBOLS OFF}
 {$LONGSTRINGS ON}
 {$OPENSTRINGS ON}
-{$OPTIMIZATION OFF}
+{$OPTIMIZATION ON}
 {$OVERFLOWCHECKS OFF}
 {$RANGECHECKS OFF}
 {$REFERENCEINFO OFF}
 {$SAFEDIVIDE OFF}
-{$STACKFRAMES ON}
+{$STACKFRAMES OFF}
 {$TYPEDADDRESS OFF}
 {$VARSTRINGCHECKS ON}
 {$WRITEABLECONST OFF}
 {$MINENUMSIZE 1}
 {$IMAGEBASE $400000}
-{$DEFINE DEBUG}
 {$DEFINE RELEASE}
 {$ENDIF IMPLICITBUILDING}
 {$IMPLICITBUILD ON}
@@ -45,11 +44,12 @@ contains
   Image32_Layers in '..\Image32_Layers.pas',
   Image32_PNG in '..\Image32_PNG.pas',
   Image32_SmoothPath in '..\Image32_SmoothPath.pas',
-  Image32_Text in '..\Image32_Text.pas',
-  Image32_Transform in '..\Image32_Transform.pas',
   Image32_Vector in '..\Image32_Vector.pas',
   ClipperOffset in '..\Clipper\ClipperOffset.pas',
   Clipper in '..\Clipper\Clipper.pas',
-  ClipperCore in '..\Clipper\ClipperCore.pas';
+  ClipperCore in '..\Clipper\ClipperCore.pas',
+  Image32_GIF in '..\Image32_GIF.pas',
+  Image32_Transform in '..\Image32_Transform.pas',
+  Image32_Ttf in '..\Image32_Ttf.pas';
 
 end.
