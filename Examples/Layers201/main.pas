@@ -50,12 +50,12 @@ type
     layeredImage       : TLayeredImage32;
     words              : TStringList;
     clickedLayer       : TLayer32;
-    targetLayer        : TLayer32;
+    targetLayer        : TRotateLayer32;
     sizingButtonGroup  : TSizingGroupLayer32;
     rotatingButtonGroup: TRotatingGroupLayer32;
     arrowButtonGroup   : TGroupLayer32;
     clickPoint         : TPoint;
-    disableOnIdle      : Boolean;
+    UseAppOnIdle       : Boolean;
     delayedMovePending : Boolean;
     delayedShift       : TShiftState;
     delayedPos         : TPoint;
@@ -181,7 +181,6 @@ var
   tmp: TPathsD;
 begin
   Name := word;
-
   fontCache.GetTextGlyphs(0, 0, word, tmp);
   tmp := ScalePath(tmp, 1, 2.0);
   rec := Image32_Vector.GetBoundsD(tmp);
@@ -417,11 +416,13 @@ begin
 
   Randomize;
 
-  //Using Application.OnIdle to process FormMouseMove code avoids
-  //wasting a *lot* of CPU cycles drawing stuff that will never be seen.
-  //Set 'disableOnIdle' to true to see the difference (esp. rotating images)
-  disableOnIdle := false;
   Application.OnIdle := AppOnIdle;
+  //Using Application.OnIdle to process FormMouseMove code avoids
+  //wasting a *lot* of CPU cycles drawing stuff that's never seen.
+  //This will be especially noticeable when rotating images that have been
+  //resized, or resizing images that have been rotated (and hence require
+  //an additional affine transformation.)
+  UseAppOnIdle := true;//false;//
 end;
 //------------------------------------------------------------------------------
 
@@ -490,12 +491,10 @@ begin
   else if (clickedLayer = targetLayer) or
     (clickedLayer is TButtonDesignerLayer32) then Exit
 
-  else if (clickedLayer is TMyRasterLayer32) or
-    (clickedLayer is TMyArrowLayer32) or
-    (clickedLayer is TMyTextLayer32) then
+  else if (clickedLayer is TRotateLayer32) then
   begin
     DeleteAllControlButtons;
-    targetLayer := clickedLayer;
+    targetLayer := TRotateLayer32(clickedLayer);
 
     if (clickedLayer is TMyArrowLayer32) then
       arrowButtonGroup := CreateButtonGroup(layeredImage.Root,
@@ -513,15 +512,13 @@ end;
 procedure TMainForm.FormMouseMove(Sender: TObject;
   Shift: TShiftState; X, Y: Integer);
 begin
-  if disableOnIdle then
-  begin
-    DelayedMouseMove(Sender, Shift, X, Y);
-  end else
+  if UseAppOnIdle then
   begin
     delayedShift := Shift;
     delayedPos := Point(X,Y);
     delayedMovePending := true;
-  end;
+  end else
+    DelayedMouseMove(Sender, Shift, X, Y);
 end;
 //------------------------------------------------------------------------------
 
@@ -566,8 +563,7 @@ begin
     //Update rotatingButtonGroup and get the new angle
     newAngle := UpdateRotatingButtonGroup(clickedLayer);
 
-    if targetLayer is TRotateLayer32 then
-      TRotateLayer32(targetLayer).Angle := newAngle;
+    TRotateLayer32(targetLayer).Angle := newAngle;
 
     if newAngle > PI then newAngle := newAngle - Pi*2;
     StatusBar1.SimpleText := format('angle: %1.0n deg.',[newAngle * 180/pi]);
@@ -580,16 +576,18 @@ begin
       UpdateArrow(arrowButtonGroup, clickedLayer.Index)
   end
 
-  //if moving a (non-button) 'target' layer
+  //if moving targetlayer (ie not a button layer)
   else if (clickedLayer = targetLayer) then
   begin
     if Assigned(sizingButtonGroup) then
       sizingButtonGroup.Offset(dx, dy)
     else if Assigned(rotatingButtonGroup) then
     begin
-      if not (targetLayer is TMyVectorLayer32) or
-        TMyVectorLayer32(targetLayer).AutoCenterPivot then
-          rotatingButtonGroup.Offset(dx, dy)
+      if (targetLayer is TMyVectorLayer32) and
+        not TMyVectorLayer32(targetLayer).AutoCenterPivot then
+        //don't move the rotatingButtonGroup if AutoCenterPivot is disabled.
+      else
+        rotatingButtonGroup.Offset(dx, dy);
     end
     else if Assigned(arrowButtonGroup) then
       arrowButtonGroup.Offset(dx, dy);
@@ -617,6 +615,8 @@ begin
   begin
     CopyToDc(updateRec, self.Canvas.Handle,
       updateRec.Left, updateRec.Top, false);
+//    with updateRec do
+//      caption := Format('%d,%d,%d,%d',[left,top,width,height]);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -627,7 +627,7 @@ begin
   DeleteAllControlButtons;
 
   //create a text layer
-  targetLayer  := layeredImage.AddLayer(TMyTextLayer32);
+  targetLayer  := layeredImage.AddLayer(TMyTextLayer32) as TRotateLayer32;
   with TMyTextLayer32(targetLayer) do
     Init(Words[Random(Words.Count)], layeredImage.MidPoint);
   //add sizing buttons
@@ -644,7 +644,7 @@ begin
   DeleteAllControlButtons;
 
   //create a raster image layer
-  targetLayer := layeredImage.AddLayer(TMyRasterLayer32);
+  targetLayer := layeredImage.AddLayer(TMyRasterLayer32) as TRotateLayer32;
   with TMyRasterLayer32(targetLayer) as TMyRasterLayer32 do
     Init(OpenDialog1.FileName, layeredImage.MidPoint);
 
@@ -661,7 +661,7 @@ begin
   DeleteAllControlButtons;
 
   //create an arrow layer
-  targetLayer  := layeredImage.AddLayer(TMyArrowLayer32);
+  targetLayer  := layeredImage.AddLayer(TMyArrowLayer32) as TRotateLayer32;
   with TMyArrowLayer32(targetLayer) do
   begin
     Init(layeredImage.MidPoint);
@@ -696,10 +696,7 @@ begin
     //toggle on the rotating button using the previous rotation angle
     DeleteAllControlButtons;
     pt := targetLayer.MidPoint;
-    if targetLayer is TRotateLayer32 then
-      displayAngle := TRotateLayer32(targetLayer).Angle
-    else
-      displayAngle := 0;
+    displayAngle := targetLayer.Angle;
 
     rotatingButtonGroup := CreateRotatingButtonGroup(
       targetLayer, pt, DPIAware(10),

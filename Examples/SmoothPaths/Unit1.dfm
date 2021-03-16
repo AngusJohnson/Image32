@@ -186,7 +186,7 @@ object FrmMain: TFrmMain
       GroupIndex = 1
     end
     object mnuRotateButtons: TMenuItem
-      Caption = '&Rotate Buttons'
+      Caption = '&Rotate Button'
       GroupIndex = 1
       ShortCut = 16466
       OnClick = mnuRotateButtonsClick

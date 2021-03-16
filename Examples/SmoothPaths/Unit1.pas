@@ -66,8 +66,10 @@ type
   private
     layeredImage32   : TLayeredImage32;
     smoothGroupLayer : TSmoothPathGroupLayer32;
+    rotateGroupLayer : TRotatingGroupLayer32;
     clickedLayer     : TLayer32;
     clickPoint       : TPoint;
+    rotateAngle      : double;
     procedure UpdateSmoothPathLayerAttributes;
   protected
     procedure WMERASEBKGND(var message: TMessage); message WM_ERASEBKGND;
@@ -105,6 +107,7 @@ var
   i: integer;
   tmpPath: TPathD;
   outline: TPathsD;
+  dx, dy : integer;
 begin
   inherited;
   with DesignLayer do
@@ -119,11 +122,16 @@ begin
 
     //and draw a dashed outline of the smoothpath too
     tmpPath := SmoothPath.FlattenedPath;
-    outline := InflatePath(tmpPath, lineWidth + DPIAware(8), jsRound, esRound);
+    outline := InflatePath(tmpPath, lineWidth + DPIAware(5), jsRound, esRound);
     outline := OffsetPath(outline, -Left, -Top);
     DrawDashedLine(Image, outline, dashes, nil,
       DPIAware(1), clMaroon32, esPolygon);
   end;
+
+  dx := DesignLayer.Left - VectorLayer.Left;
+  dy := DesignLayer.Top - VectorLayer.Top;
+  outline := OffsetPath(outline, dx, dy);
+  VectorLayer.UpdateHitTestMask(outline, frEvenOdd);
 end;
 
 //------------------------------------------------------------------------------
@@ -220,6 +228,8 @@ begin
     PenColor := pc;
     BrushColor := bc;
     PenWidth := lineWidth;
+    SmoothPath.BeginUpdate;
+    SmoothPath.EndUpdate;   //calls (protected) Change method.
   end;
   Invalidate;
 end;
@@ -265,28 +275,50 @@ begin
     smoothGroupLayer.ActiveButtonLayer := TSmoothButtonLayer32(clickedLayer);
     Invalidate;
   end
+  else if Assigned(clickedLayer) and
+    (clickedLayer.GroupOwner = smoothGroupLayer) then
+  begin
+    //clicking the smooth path
+  end
+  else if Assigned(clickedLayer) and
+    (clickedLayer.GroupOwner = rotateGroupLayer) then
+  begin
+    //clicking the rotate button
+  end
   else if Assigned(smoothGroupLayer) and
     Assigned(smoothGroupLayer.ActiveButtonLayer) then
   begin
+    //clicking 'air'
+    FreeAndNil(rotateGroupLayer);
+    mnuRotateButtons.Checked := false;
     smoothGroupLayer.ActiveButtonLayer := nil;
     Invalidate;
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TFrmMain.pnlMainMouseMove(Sender: TObject; Shift: TShiftState; X,
-  Y: Integer);
+procedure TFrmMain.pnlMainMouseMove(Sender: TObject;
+  Shift: TShiftState; X, Y: Integer);
 var
+  dx,dy: integer;
   layer: TLayer32;
+  angle: double;
 begin
+
+  dx := X - clickPoint.X;
+  dy := Y - clickPoint.Y;
   clickPoint := Types.Point(X,Y);
 
-  layer := layeredImage32.GetLayerAt(clickPoint, mnuHideControls.Checked);
-  if Assigned(layer) then
-    Cursor := layer.CursorId else
-    Cursor := crDefault;
+  if not (ssLeft in Shift) then
+  begin
+    layer := layeredImage32.GetLayerAt(clickPoint, mnuHideControls.Checked);
+    if Assigned(layer) then
+      Cursor := layer.CursorId else
+      Cursor := crDefault;
+    Exit;
+  end;
 
-  if not Assigned(clickedLayer) or not (ssLeft in Shift) then Exit;
+  if not Assigned(clickedLayer) then Exit;
 
   if (clickedLayer is TSmoothButtonLayer32) and
     (clickedLayer.GroupOwner = smoothGroupLayer) then
@@ -294,8 +326,21 @@ begin
     with TSmoothButtonLayer32(clickedLayer) do
       smoothGroupLayer.SmoothPath[PathIdx] := PointD(clickPoint);
     Invalidate;
+  end
+  else if (clickedLayer.GroupOwner = smoothGroupLayer) then
+  begin
+    smoothGroupLayer.Offset(dx, dy);
+    Invalidate;
+  end
+  else if (clickedLayer.GroupOwner = rotateGroupLayer) then
+  begin
+    clickedLayer.PositionCenteredAt(clickPoint);
+    angle := UpdateRotatingButtonGroup(clickedLayer);
+    smoothGroupLayer.SmoothPath.Rotate(rotateGroupLayer.Pivot,
+      angle - rotateAngle);
+    rotateAngle := angle;
+    Invalidate;
   end;
-
 end;
 //------------------------------------------------------------------------------
 
@@ -354,7 +399,19 @@ end;
 
 procedure TFrmMain.mnuRotateButtonsClick(Sender: TObject);
 begin
-
+  if Assigned(rotateGroupLayer) then
+  begin
+    mnuRotateButtons.Checked := false;
+    FreeAndNil(rotateGroupLayer);
+    Invalidate;
+  end else if Assigned(smoothGroupLayer) then
+  begin
+    mnuRotateButtons.Checked := true;
+    rotateAngle := 0;
+    rotateGroupLayer := CreateRotatingButtonGroup(
+      smoothGroupLayer.VectorLayer, smoothGroupLayer.VectorLayer.MidPoint);
+    Invalidate;
+  end;
 end;
 //------------------------------------------------------------------------------
 
