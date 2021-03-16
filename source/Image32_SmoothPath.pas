@@ -3,7 +3,7 @@ unit Image32_SmoothPath;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.15                                                            *
-* Date      :  16 March 2021                                                   *
+* Date      :  17 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Supports paths with multiple sub-curves                         *
@@ -12,11 +12,11 @@ unit Image32_SmoothPath;
 
 interface
 
+{$I Image32.inc}
+
 uses
   SysUtils, Classes, Math,
   Image32, Image32_Vector, Image32_Layers, Image32_Extra;
-
-{$I Image32.inc}
 
 type
   TSmoothType = (stSmoothSym, stSmoothAsym, stSharpWithHdls, stSharpNoHdls);
@@ -118,8 +118,8 @@ type
     procedure PaintVectorLayer; virtual;
     procedure PaintDesignerLayer; virtual;
   public
-    constructor Create(groupOwner: TGroupLayer32;
-      const name: string = ''); override;
+    constructor Create(grpOwner: TGroupLayer32;
+      const aName: string = ''); override;
     destructor Destroy; override;
     procedure Offset(dx, dy: integer); override;
     function GroupIdxToPathIdx(groupIdx: integer): integer;
@@ -568,7 +568,7 @@ var
   pointType: TSmoothType;
   i: integer;
 
-  procedure Offset(idx: integer; dx, dy: double);
+  procedure OffsetPt(idx: integer; dx, dy: double);
   var
     ctrlPt: TSmoothPoint;
   begin
@@ -597,8 +597,8 @@ begin
         //move adjacent handles too
         dx := newPt.X - oldPt.X;
         dy := newPt.Y - oldPt.Y;
-        if index > 0 then Offset(index -1, dx, dy);
-        if index < Count -1 then Offset(index +1, dx, dy);
+        if index > 0 then OffsetPt(index -1, dx, dy);
+        if index < Count -1 then OffsetPt(index +1, dx, dy);
       end;
     1:
       begin
@@ -695,7 +695,7 @@ end;
 // TSmoothPathGroupLayer32
 //------------------------------------------------------------------------------
 
-constructor TSmoothPathGroupLayer32.Create(groupOwner: TGroupLayer32; const name: string);
+constructor TSmoothPathGroupLayer32.Create(grpOwner: TGroupLayer32; const aName: string);
 begin
   inherited;
   if Self.Name = '' then
@@ -1039,10 +1039,10 @@ type
     function ComputeRightTangent(p: PPt): TPointD;
     function ComputeCenterTangent(p: PPt): TPointD;
     function ChordLengthParameterize(
-      first, last: PPt; count: integer): TArrayOfDouble;
-    function GenerateBezier(first, last: PPt; count: integer;
+      first: PPt; cnt: integer): TArrayOfDouble;
+    function GenerateBezier(first, last: PPt; cnt: integer;
       const u: TArrayOfDouble; const firstTan, lastTan: TPointD): TPathD;
-    function Reparameterize(first, last: PPt; count: integer;
+    function Reparameterize(first: PPt; cnt: integer;
       const u: TArrayOfDouble; const bezier: TPathD): TArrayOfDouble;
     function NewtonRaphsonRootFind(const q: TPathD;
       const pt: TPointD; u: double): double;
@@ -1234,26 +1234,26 @@ end;
 //------------------------------------------------------------------------------
 
 function TFitCurveContainer.ChordLengthParameterize(
-  first, last: PPt; count: integer): TArrayOfDouble;
+  first: PPt; cnt: integer): TArrayOfDouble;
 var
   d: double;
   i: integer;
 begin
-  SetLength(Result, count);
+  SetLength(Result, cnt);
   Result[0] := 0;
   d := 0;
-  for i := 1 to count -1 do
+  for i := 1 to cnt -1 do
   begin
     d := d + first.len;
     Result[i] := d;
     first := first.next;
   end;
-  for i := 1 to count -1 do
+  for i := 1 to cnt -1 do
     Result[i] := Result[i] / d;
 end;
 //------------------------------------------------------------------------------
 
-function TFitCurveContainer.GenerateBezier(first, last: PPt; count: integer;
+function TFitCurveContainer.GenerateBezier(first, last: PPt; cnt: integer;
   const u: TArrayOfDouble; const firstTan, lastTan: TPointD): TPathD;
 var
   i: integer;
@@ -1265,11 +1265,11 @@ var
   x: array [0..1] of double;
   det_c0_c1, det_c0_x, det_x_c1, alphaL, alphaR: double;
 begin
-  SetLength(a0, count);
-  SetLength(a1, count);
+  SetLength(a0, cnt);
+  SetLength(a1, cnt);
   dist := Distance(first.pt, last.pt);
 
-  for i := 0 to count -1 do
+  for i := 0 to cnt -1 do
   begin
 		v1 := Scale(firstTan, B1(u[i]));
 		v2 := Scale(lastTan, B2(u[i]));
@@ -1281,7 +1281,7 @@ begin
   FillChar(x[0], 2 * SizeOf(double), 0);
 
   p := first;
-  for i := 0 to count -1 do
+  for i := 0 to cnt -1 do
   begin
 		c[0][0] := c[0][0] + DotProdVecs(a0[i], (a0[i]));
 		c[0][1] := c[0][1] + DotProdVecs(a0[i], (a1[i]));
@@ -1332,15 +1332,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFitCurveContainer.Reparameterize(first, last: PPt; count: integer;
+function TFitCurveContainer.Reparameterize(first: PPt; cnt: integer;
   const u: TArrayOfDouble; const bezier: TPathD): TArrayOfDouble;
 var
   i: integer;
 begin
-  SetLength(Result, count);
-  for i := 0 to count -1 do
+  SetLength(Result, cnt);
+  for i := 0 to cnt -1 do
   begin
-		Result[i] := NewtonRaphsonRootFind(bezier, first.pt, u[i]);
+    Result[i] := NewtonRaphsonRootFind(bezier, first.pt, u[i]);
     first := first.next;
   end;
 end;
@@ -1460,7 +1460,7 @@ begin
   end;
 
 
-  clps := ChordLengthParameterize(first, last, cnt);
+  clps := ChordLengthParameterize(first, cnt);
   bezier := GenerateBezier(first, last, cnt, clps, firstTan, lastTan);
   maxErrorSqrd := ComputeMaxErrorSqrd(first, last, bezier, clps, splitPoint);
   if (maxErrorSqrd < tolSqrd) then
@@ -1473,7 +1473,7 @@ begin
   begin
 		for i := 1 to maxRetries do
     begin
-			uPrime := Reparameterize(first, last, cnt, clps, bezier);
+      uPrime := Reparameterize(first, cnt, clps, bezier);
       bezier := GenerateBezier(first, last, cnt, uPrime, firstTan, lastTan);
       maxErrorSqrd :=
         ComputeMaxErrorSqrd(first, last, bezier, uPrime, splitPoint);

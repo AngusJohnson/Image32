@@ -69,7 +69,7 @@ implementation
 {$R Image.res}
 
 uses
-  Image32_Draw, Image32_Vector, Image32_Extra,
+  Image32_Draw, Image32_Vector, Image32_Extra, Image32_SmoothPath,
   Image32_BMP, Image32_JPG, Image32_PNG;
 
 //------------------------------------------------------------------------------

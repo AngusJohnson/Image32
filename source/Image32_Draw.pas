@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.0                                                             *
-* Date      :  6 March 2021                                                    *
+* Version   :  2.15                                                            *
+* Date      :  17 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -289,11 +289,9 @@ resourcestring
 {$ENDIF}
 
 type
-  TArray256Bytes = array[0..255] of byte;
 
   //A horizontal scanline contains any number of line fragments. A fragment
   //can be a number of pixels wide but it can't be more than one pixel high.
-
   TFragment = record
     botX, topX, dy, dydx: double;
   end;
@@ -1741,7 +1739,7 @@ var
 begin
   if (not assigned(lines)) or (not assigned(renderer)) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
-  lines2 := Outline(lines, lineWidth, joinStyle, endStyle, 2);
+  lines2 := Outline(lines, lineWidth, joinStyle, endStyle, miterLimit);
   if renderer.Initialize(img) then
     Rasterize(lines2, img.bounds, frNonZero, renderer);
 end;

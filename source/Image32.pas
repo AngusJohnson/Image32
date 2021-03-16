@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.12                                                            *
-* Date      :  14 March 2021                                                   *
+* Version   :  2.15                                                            *
+* Date      :  17 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -526,9 +526,9 @@ var
 
 procedure NormalizeAngle(var angle: double);
 begin
-  while angle < 0 do angle := angle + angle360;
-  while angle > angle360 do angle := angle - angle360;
-  if (angle < 0.01) or (angle > angle360 - 0.01) then angle := 0; // <0.5 deg.
+  while angle < -angle180 do angle := angle + angle360;
+  while angle > angle180 do angle := angle - angle360;
+  if Abs(angle) < 0.01 then angle := 0; // <0.5 deg.
 end;
 //------------------------------------------------------------------------------
 
@@ -2942,8 +2942,6 @@ var
   pt, center: TPointD;
   rec: TRectD;
   dstColor: PColor32;
-const
-  TwoPi = 2 * pi;
 begin
   if ClockwiseRotationIsAnglePositive then
     angleRads := -angleRads;

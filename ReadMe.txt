@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
 Latest version: 2.15
-Released: 16 March 2021
+Released: 17 March 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -14,8 +14,9 @@ Recent changes:
 
 Version 2.15
   Image32_Layers
-	Another significant revision
-	
+	Further revisions
+  Other minor updates
+  
 Version 2.14
   Image32_Layers
 	Bugfix.

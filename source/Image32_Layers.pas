@@ -3,7 +3,7 @@ unit Image32_Layers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.15                                                            *
-* Date      :  16 March 2021                                                   *
+* Date      :  17 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -139,7 +139,6 @@ type
     procedure Merge(hideDesigners: Boolean; const paintRect: TRect);
     function  GetLayerAt(const pt: TPoint; ignoreDesigners: Boolean): TLayer32;
     procedure InternalDeleteChild(index: integer; fromChild: Boolean);
-    function   GetChildrenBounds(excludeDesigners: Boolean): TRect;
     procedure  DoOnMerge; virtual;
   public
     constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
@@ -777,29 +776,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function  TGroupLayer32.GetChildrenBounds(excludeDesigners: Boolean): TRect;
-
-  function GetChildBounds(child: TLayer32): TRect;
-  begin
-    if child is TGroupLayer32 then
-      result := TGroupLayer32(child).GetChildrenBounds(excludeDesigners)
-    else if child.Visible and not child.Image.IsEmpty and
-      not (excludeDesigners and (child is TDesignerLayer32)) then
-      Result := child.Bounds
-    else
-      Result := NullRect;
-  end;
-
-var
-  i: integer;
-begin
-  Result := NullRect;
-  if not Visible or (ChildCount = 0) then Exit;
-  for i := 0 to ChildCount -1 do
-    Result := Image32_Vector.UnionRect(Result, GetChildBounds(Child[i]));
-end;
-//------------------------------------------------------------------------------
-
 procedure TGroupLayer32.Invalidate(rec: TRect);
 begin
   if (fUpdateCount <> 0) or IsEmptyRect(rec) then Exit;
@@ -945,7 +921,7 @@ begin
     Child[i].fRefreshPending := false;
   end;
   if Assigned(GroupOwner) then
-    SetBounds(rec);
+    SetBounds(rec); //nb: root bounds is fixed to layeredImage bounds
 end;
 //------------------------------------------------------------------------------
 
@@ -957,6 +933,8 @@ var
 begin
   if not Visible or (Opacity < 2) or Image.IsEmpty then
     Exit;
+
+   DoOnMerge;
 
   for i := 0 to ChildCount -1 do
   begin
@@ -1536,8 +1514,12 @@ end;
 procedure TLayeredImage32.SetSize(width, height: integer);
 begin
   fBounds := Rect(0, 0, Width, Height);
+
   fRoot.SetBounds(fBounds);
   fRoot.fLocalInvalidRect := fBounds;
+  fRoot.fLastUpdateType := utUndefined;
+  if fBackColor <> clNone32 then
+    fRoot.Image.Clear(fBackColor);
 end;
 //------------------------------------------------------------------------------
 
@@ -1545,7 +1527,7 @@ function TLayeredImage32.GetMergedImage(hideDesigners: Boolean): TImage32;
 var
   updateRect: TRect;
 begin
-  Root.fLocalInvalidRect := fBounds; //forces a full repaint
+  Root.fLastUpdateType := utUndefined; //forces a full repaint
   Result := GetMergedImage(hideDesigners, updateRect);
 end;
 //------------------------------------------------------------------------------
@@ -1562,12 +1544,14 @@ begin
   with Root do
   begin
     PreMerge(hideDesigners, forceRefresh);
-    //clip invalid rect to layeredImage boundaries
+
+    //clip fLocalInvalidRect to layeredImage boundaries
     updateRect := Self.Bounds;
     if not forceRefresh then
-      updateRect := Image32_Vector.IntersectRect(fLocalInvalidRect, updateRect);
-    fLocalInvalidRect := NullRect;
+      updateRect :=
+        Image32_Vector.IntersectRect(fLocalInvalidRect, updateRect);
 
+    fLocalInvalidRect := NullRect;
     if fBackColor <> clNone32 then
       Image.FillRect(updateRect, fBackColor);
     Merge(hideDesigners, updateRect);
@@ -1639,6 +1623,8 @@ procedure TLayeredImage32.SetBackColor(color: TColor32);
 begin
   if color = fBackColor then Exit;
   fBackColor := color;
+  fRoot.Image.Clear(fBackColor);
+  fRoot.fLastUpdateType := utUndefined;
   Invalidate;
 end;
 //------------------------------------------------------------------------------

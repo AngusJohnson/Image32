@@ -59,12 +59,12 @@ begin
       (png.RawImage.Description.BitsPerPixel = 32);
     if not Result then Exit;
 
-    img.BeginUpdate;
+    img32.BeginUpdate;
     try
       img32.SetSize(png.Width, png.Height);
       Move(png.ScanLine[0]^, img32.PixelBase^, png.Width * png.Height *4);
     finally
-      img.EndUpdate;
+      img32.EndUpdate;
     end;
   finally
     png.Free;

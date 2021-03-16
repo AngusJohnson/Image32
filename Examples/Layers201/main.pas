@@ -59,6 +59,8 @@ type
     delayedMovePending : Boolean;
     delayedShift       : TShiftState;
     delayedPos         : TPoint;
+    repaintAll         : Boolean;
+    procedure AppActivate(Sender: TObject);
     procedure DeleteAllControlButtons;
     procedure AppOnIdle(Sender: TObject; var Done: Boolean);
     procedure DelayedMouseMove(Sender: TObject;
@@ -237,7 +239,7 @@ const
   angle175 = angle180 - angle5;
 begin
   //precondition: angle <= 180 degrees
-  a := GetAngle(pt1, pt2, pt3);
+  a := Abs(GetAngle(pt1, pt2, pt3));
   Result := (a < angle5) or (a > angle175);
 end;
 //---------------------------------------------------------------------------
@@ -393,6 +395,8 @@ begin
   defArrowBtns :=
     MakePathI([0,100, 100,0, 100,50, 200,50, 200,150, 100,150, 100,200]);
 
+  Application.OnActivate := AppActivate;
+    
   layeredImage := TLayeredImage32.Create();
   layeredImage.AddLayer(TDesignerLayer32);
 
@@ -591,7 +595,7 @@ begin
     end
     else if Assigned(arrowButtonGroup) then
       arrowButtonGroup.Offset(dx, dy);
-    StatusBar1.SimpleText := '';
+    //StatusBar1.SimpleText := '';
   end;
 
   Invalidate;
@@ -601,7 +605,7 @@ end;
 procedure TMainForm.FormMouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  if not Assigned(rotatingButtonGroup) then StatusBar1.SimpleText := '';
+  //if not Assigned(rotatingButtonGroup) then StatusBar1.SimpleText := '';
 end;
 //------------------------------------------------------------------------------
 
@@ -609,15 +613,33 @@ procedure TMainForm.FormPaint(Sender: TObject);
 var
   updateRec: TRect;
 begin
-  //draw layeredImage onto the form's canvas. But to optimize performance,
-  //only draw whatever's changed since the last draw (hence updateRec).
-  with layeredImage.GetMergedImage(false, updateRec) do
+  if repaintAll then
   begin
-    CopyToDc(updateRec, self.Canvas.Handle,
-      updateRec.Left, updateRec.Top, false);
-//    with updateRec do
-//      caption := Format('%d,%d,%d,%d',[left,top,width,height]);
+    with layeredImage.GetMergedImage(false) do
+      CopyToDc(self.Canvas.Handle);
+    repaintAll := false;
+  end else
+  begin
+    //draw layeredImage onto the form's canvas. But to optimize performance,
+    //only draw whatever's changed since the last draw (hence updateRec).
+    with layeredImage.GetMergedImage(false, updateRec) do
+    begin
+      CopyToDc(updateRec, self.Canvas.Handle,
+        updateRec.Left, updateRec.Top, false);
+
+      //display the area updated ...
+      if not Assigned(rotatingButtonGroup) then
+        with updateRec do
+          StatusBar1.SimpleText :=
+            Format('%d,%d,%d,%d',[left,top,width,height]);
+    end;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.AppActivate(Sender: TObject);
+begin
+  repaintAll := true;
 end;
 //------------------------------------------------------------------------------
 

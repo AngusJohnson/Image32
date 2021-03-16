@@ -2,8 +2,8 @@ unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.12                                                            *
-* Date      :  14 March 2021                                                   *
+* Version   :  2.15                                                            *
+* Date      :  17 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -15,7 +15,7 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Math, Types, Image32, Image32_Draw, Image32_Vector;
+  SysUtils, Classes, Math, Types, Image32, Image32_Vector;
 
 type
   TMatrixD = array [0..2, 0..2] of double;

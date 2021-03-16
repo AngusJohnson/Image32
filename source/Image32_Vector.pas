@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.12                                                            *
-* Date      :  14 March 2021                                                   *
+* Version   :  2.15                                                            *
+* Date      :  17 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -38,8 +38,8 @@ type
   function Ellipse(const rec: TRect; steps: integer = 0): TPathD; overload;
   function Ellipse(const rec: TRectD; steps: integer = 0): TPathD; overload;
 
-  function Circle(const pt: TPoint; radius: double; steps: integer = 0): TPathD; overload;
-  function Circle(const pt: TPointD; radius: double; steps: integer = 0): TPathD; overload;
+  function Circle(const pt: TPoint; radius: double): TPathD; overload;
+  function Circle(const pt: TPointD; radius: double): TPathD; overload;
 
   function Star(const focalPt: TPointD;
     innerRadius, outerRadius: double; points: integer): TPathD;
@@ -209,10 +209,8 @@ type
 
   //GetUnitVector: Used internally
   function GetUnitVector(const pt1, pt2: TPointD): TPointD;
-  {$IFDEF INLINE} inline; {$ENDIF}
   //GetUnitNormal: Used internally
   function GetUnitNormal(const pt1, pt2: TPointD): TPointD;
-  {$IFDEF INLINE} inline; {$ENDIF}
   //GetVectors: Used internally
   function GetVectors(const path: TPathD): TPathD;
   //GetNormals: Used internally
@@ -407,19 +405,35 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure GetSinCos(angle: double; out sinA, cosA: double);
+{$IFDEF INLINE} inline; {$ENDIF}
+{$IFNDEF FPC}
+var s, c: extended;
+{$ENDIF}
+begin
+{$IFDEF FPC}
+  Math.SinCos(angle, sinA, cosA);
+{$ELSE}
+  Math.SinCos(angle, s, c);
+  sinA := s; cosA := c;
+{$ENDIF}
+end;
+//------------------------------------------------------------------------------
+
+
 function GetRotatedRectBounds(const rec: TRectD; angle: double): TRectD;
 var
-  s,c: extended;
+  sinA, cosA: double;
   w,h: double;
   mp: TPointD;
 begin
   NormalizeAngle(angle);
   if angle <> 0 then
   begin
-    SinCos(angle, s, c);
-    s := Abs(s); c := Abs(c);
-    w := (rec.Width *c + rec.Height *s) /2;
-    h := (rec.Width *s + rec.Height *c) /2;
+    GetSinCos(angle, sinA, cosA);
+    sinA := Abs(sinA); cosA := Abs(cosA);
+    w := (rec.Width *cosA + rec.Height *sinA) /2;
+    h := (rec.Width *sinA + rec.Height *cosA) /2;
     mp := rec.MidPoint;
     Result := RectD(mp.X - w, mp.Y - h, mp.X + w, mp.Y +h);
   end
@@ -636,7 +650,6 @@ end;
 //------------------------------------------------------------------------------
 
 function GetUnitVector(const pt1, pt2: TPointD): TPointD;
-{$IFDEF INLINE} inline; {$ENDIF}
 var
   dx, dy, inverseHypot: Double;
 begin
@@ -657,7 +670,6 @@ end;
 //------------------------------------------------------------------------------
 
 function GetUnitNormal(const pt1, pt2: TPointD): TPointD;
-{$IFDEF INLINE} inline; {$ENDIF}
 var
   dx, dy, inverseHypot: Double;
 begin
@@ -1239,7 +1251,7 @@ var
   i,prevI, highI: cardinal;
   buffLen, resultLen: cardinal;
   steps360, stepsPerRad: double;
-  stepSin, stepCos, cosA: extended;
+  stepSin, stepCos, cosA: double;
   P: TPointD;
   norms: TPathD;
   normalA, normalB: TPointD;
@@ -1317,7 +1329,7 @@ begin
   begin
     steps360 := PI / ArcCos(1 - 0.2 / abs(delta));
     stepsPerRad := steps360 / (Pi *2);
-    SinCos(Pi*2/steps360, stepSin, stepCos);
+    GetSinCos(Pi*2/steps360, stepSin, stepCos);
   end;
 
   result := nil; resultLen := 0; buffLen := 0;
@@ -1428,14 +1440,10 @@ end;
 procedure RotatePoint(var pt: TPointD;
   const focalPoint: TPointD; angleRad: double);
 var
-  {$IFDEF FPC}
   sinA, cosA: double;
-  {$ELSE}
-  sinA, cosA: {$IF COMPILERVERSION = 15} extended; {$ELSE} double; {$IFEND}
-  {$ENDIF}
 begin
   if ClockwiseRotationIsAnglePositive then angleRad := -angleRad;
-  SinCos(angleRad, sinA, cosA);
+  GetSinCos(angleRad, sinA, cosA);
   RotatePoint(pt, focalPoint, sinA, cosA);
 end;
 //------------------------------------------------------------------------------
@@ -1472,10 +1480,10 @@ end;
 function RotatePath(const path: TPathD;
   const focalPoint: TPointD; angleRads: double): TPathD;
 var
-  sinA, cosA: extended;
+  sinA, cosA: double;
 begin
   if ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
-  Math.SinCos(angleRads, sinA, cosA);
+  GetSinCos(angleRads, sinA, cosA);
   Result := RotatePathInternal(path, focalPoint, sinA, cosA);
 end;
 //------------------------------------------------------------------------------
@@ -1484,10 +1492,10 @@ function RotatePath(const paths: TPathsD;
   const focalPoint: TPointD; angleRads: double): TPathsD;
 var
   i: integer;
-  sinA, cosA: extended;
+  sinA, cosA: double;
 begin
   if ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
-  Math.SinCos(angleRads, sinA, cosA);
+  GetSinCos(angleRads, sinA, cosA);
   SetLength(Result, length(paths));
   for i := 0 to high(paths) do
     Result[i] := RotatePathInternal(paths[i], focalPoint, sinA, cosA);
@@ -1830,7 +1838,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Circle(const pt: TPoint; radius: double; steps: integer = 0): TPathD;
+function Circle(const pt: TPoint; radius: double): TPathD;
 var
   rec: TRectD;
 begin
@@ -1842,7 +1850,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Circle(const pt: TPointD; radius: double; steps: integer = 0): TPathD;
+function Circle(const pt: TPointD; radius: double): TPathD;
 var
   rec: TRectD;
 begin
@@ -1864,7 +1872,7 @@ function Ellipse(const rec: TRectD; steps: integer): TPathD;
 var
   i: Integer;
   f: double;
-  sinA, cosA: extended;
+  sinA, cosA: double;
   centre, radius, delta: TPointD;
 begin
   result := nil;
@@ -1879,7 +1887,7 @@ begin
   
   if steps < 3 then
     steps := Max(3, Trunc(Pi / (ArcCos(1 - 0.2 /f ))));
-  SinCos(2 * Pi / Steps, sinA, cosA);
+  GetSinCos(2 * Pi / Steps, sinA, cosA);
   delta.x := cosA; delta.y := sinA;
 
   SetLength(Result, Steps);
@@ -1898,14 +1906,14 @@ function Star(const focalPt: TPointD;
   innerRadius, outerRadius: double; points: integer): TPathD;
 var
   i: Integer;
-  sinA, cosA: extended;
+  sinA, cosA: double;
   delta: TPointD;
 begin
   result := nil;
   if (innerRadius <= 0) or (outerRadius <= 0) then Exit;
   if points <= 5 then points := 10
   else points := points * 2;
-  SinCos(2 * Pi / points, sinA, cosA);
+  GetSinCos(2 * Pi / points, sinA, cosA);
   delta.x := cosA; delta.y := sinA;
   SetLength(Result, points);
   Result[0] := PointD(focalPt.X + innerRadius, focalPt.Y);
@@ -1927,9 +1935,9 @@ function Arc(const rec: TRect; startAngle, endAngle: double): TPathD;
 var
   i, steps: Integer;
   angle, radiusAvg: double;
-  sinA, cosA: extended;
+  sinA, cosA: double;
   centre, radius: TPointD;
-  deltaX, deltaX2, deltaY: extended;
+  deltaX, deltaX2, deltaY: double;
 begin
   Result := nil;
   if (endAngle = startAngle) or IsEmptyRect(rec) then Exit;
@@ -1950,11 +1958,11 @@ begin
 
   SetLength(Result, Steps +1);
   //angle of the first step ...
-  SinCos(-startAngle, deltaY, deltaX);
+  GetSinCos(-startAngle, deltaY, deltaX);
   Result[0].X := centre.X + radius.X * deltaX;
   Result[0].Y := centre.Y + radius.y * deltaY;
   //angle of each subsequent step ...
-  SinCos(-angle / Steps, sinA, cosA);
+  GetSinCos(-angle / Steps, sinA, cosA);
   for i := 1 to steps do
   begin
     deltaX2 := deltaX * cosA - deltaY * sinA;
