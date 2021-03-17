@@ -2,8 +2,8 @@ unit Image32_SmoothPath;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.15                                                            *
-* Date      :  17 March 2021                                                   *
+* Version   :  2.16                                                            *
+* Date      :  18 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Supports paths with multiple sub-curves                         *
@@ -15,8 +15,7 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Math,
-  Image32, Image32_Vector, Image32_Layers, Image32_Extra;
+  SysUtils, Classes, Math, Image32, Image32_Vector, Image32_Layers;
 
 type
   TSmoothType = (stSmoothSym, stSmoothAsym, stSharpWithHdls, stSharpNoHdls);
@@ -162,7 +161,7 @@ var
 implementation
 
 uses
-  Image32_Draw;
+  Image32_Extra, Image32_Draw;
 
 resourcestring
   rsSmoothPath = 'SmoothPath';
@@ -667,11 +666,12 @@ end;
 procedure TSmoothPath.Rotate(const focalPoint: TPointD; angleRads: double);
 var
   i: integer;
-  sinA, cosA: extended;
+  sinA, cosA: double;
 begin
+  NormalizeAngle(angleRads);
   if angleRads = 0.0 then Exit;
-
-  Math.SinCos(angleRads, sinA, cosA);
+  if not ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
+  GetSinCos(angleRads, sinA, cosA);
   for i := 0 to Count -1 do
     RotatePoint(fCtrlPoints[i].Point, focalPoint, sinA, cosA);
   Changed;

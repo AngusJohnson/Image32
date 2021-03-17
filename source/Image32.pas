@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.15                                                            *
-* Date      :  17 March 2021                                                   *
+* Version   :  2.16                                                            *
+* Date      :  18 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -143,8 +143,8 @@ type
     procedure ScaleToFit(width, height: integer);
     //ScaleToFitCentered: The new image will be scaled and also centred
     procedure ScaleToFitCentered(width, height: integer);
-    procedure Scale(s: single); overload;
-    procedure Scale(sx, sy: single); overload;
+    procedure Scale(s: double); overload;
+    procedure Scale(sx, sy: double); overload;
 
     function Copy(src: TImage32; srcRec, dstRec: TRect): Boolean;
     //CopyBlend: Copies part or all of another TImage32 image (src).
@@ -209,7 +209,7 @@ type
     //rotated image that fall outside rec. The eraseColor parameter indicates
     //the color to fill those uncovered pixels in rec following rotation.
     procedure RotateRect(const rec: TRect;
-      angleRads: single; eraseColor: TColor32 = 0);
+      angleRads: double; eraseColor: TColor32 = 0);
     procedure Skew(dx,dy: double);
 
     //ScaleAlpha: Scales the alpha byte of every pixel by the specified amount.
@@ -412,10 +412,10 @@ type
 
   function ClampByte(val: Integer): byte;
   function ClampRange(val, min, max: Integer): Integer; overload;
-  function ClampRange(val, min, max: single): single; overload;
+  function ClampRange(val, min, max: double): double; overload;
   function IncPColor32(pc: Pointer; cnt: Integer): PColor32;
 
-  procedure NormalizeAngle(var angle: double);
+  procedure NormalizeAngle(var angle: double; tollerance: double = Pi/360);
 
   {$IFDEF MSWINDOWS}
 
@@ -466,7 +466,7 @@ const
   angle345 = angle360 - angle15;
 
 var
-  ClockwiseRotationIsAnglePositive: Boolean = true;//false;
+  ClockwiseRotationIsAnglePositive: Boolean = true;
 
   //Both MulTable and DivTable are used in blend functions<br>
   //MulTable[a,b] = a * b / 255
@@ -497,6 +497,9 @@ var
 
 implementation
 
+uses
+  Image32_Vector, Image32_Transform;
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
@@ -524,11 +527,19 @@ var
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-procedure NormalizeAngle(var angle: double);
+procedure NormalizeAngle(var angle: double; tollerance: double = Pi/360);
+var
+  aa: double;
 begin
   while angle < -angle180 do angle := angle + angle360;
   while angle > angle180 do angle := angle - angle360;
-  if Abs(angle) < 0.01 then angle := 0; // <0.5 deg.
+
+  aa := Abs(angle);
+  if aa < tollerance then angle := 0
+  else if aa > angle180 - tollerance then angle := angle180
+  else if (aa < angle90 - tollerance) or (aa > angle90 + tollerance) then Exit
+  else if angle < 0 then angle := -angle90
+  else angle := angle90;
 end;
 //------------------------------------------------------------------------------
 
@@ -862,13 +873,6 @@ end;
 //------------------------------------------------------------------------------
 {$ENDIF}
 
-function RectsEqual(const rec1, rec2: TRect): Boolean;
-begin
-  result := (rec1.Left = rec2.Left) and (rec1.Top = rec2.Top) and
-    (rec1.Right = rec2.Right) and (rec1.Bottom = rec2.Bottom);
-end;
-//------------------------------------------------------------------------------
-
 function ClampByte(val: Integer): byte;
 begin
   if val < 0 then result := 0
@@ -885,7 +889,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ClampRange(val, min, max: single): single;
+function ClampRange(val, min, max: double): double;
 begin
   if val < min then result := min
   else if val > max then result := max
@@ -924,39 +928,6 @@ function PointD(const pt: TPoint): TPointD;
 begin
   Result.X := pt.X;
   Result.Y := pt.Y;
-end;
-//------------------------------------------------------------------------------
-
-procedure RotatePt(var pt: TPointD; const origin: TPointD; sinA, cosA: double);
-var
-  tmpX, tmpY: double;
-begin
-  tmpX := pt.X-origin.X;
-  tmpY := pt.Y-origin.Y;
-  pt.X := tmpX * cosA - tmpY * sinA + origin.X;
-  pt.Y := tmpX * sinA + tmpY * cosA + origin.Y;
-end;
-//------------------------------------------------------------------------------
-
-function GetRotatedRectBounds(const rec: TRectD; angle: double): TRectD;
-var
-  s,c: extended;
-  w,h: double;
-begin
-  //nb: direction doesn't matter re. ClockwiseRotationIsAnglePositive
-
-  NormalizeAngle(angle);
-  if angle <> 0 then
-  begin
-    SinCos(angle, s, c);
-    s := Abs(s); c := Abs(c);
-    w := (rec.Width *c + rec.Height *s) /2;
-    h := (rec.Width *s + rec.Height *c) /2;
-    with rec.MidPoint do
-      Result := RectD(X - w, Y - h, X + w, Y +h);
-  end
-  else
-    Result := rec;
 end;
 //------------------------------------------------------------------------------
 
@@ -1872,13 +1843,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.Scale(s: single);
+procedure TImage32.Scale(s: double);
 begin
   Scale(s, s);
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.Scale(sx, sy: single);
+procedure TImage32.Scale(sx, sy: double);
 begin
   sx := Min(sx, 100); sy := Min(sy, 100);
   if (sx > 0) and (sy > 0) then
@@ -2935,15 +2906,10 @@ end;
 
 procedure TImage32.Rotate(angleRads: double);
 var
-  tmp: TArrayOfColor32;
-  x, y, xi, yi, newWidth, newHeight: Integer;
-  sinA, cosA: extended;
-  dx, dy: double;
-  pt, center: TPointD;
   rec: TRectD;
-  dstColor: PColor32;
+  mat: TMatrixD;
 begin
-  if ClockwiseRotationIsAnglePositive then
+  if not ClockwiseRotationIsAnglePositive then
     angleRads := -angleRads;
 
   //nb: There's no point rotating about a specific point
@@ -2952,85 +2918,42 @@ begin
   NormalizeAngle(angleRads);
   if IsEmpty or (angleRads = 0) then Exit;
 
-  Math.SinCos(angleRads, sinA, cosA);
-  if abs(sinA) < 0.000001 then
+  if angleRads = angle180 then
   begin
     Rotate180; //because we've excluded 0 & 360 deg angles
-    Exit;
   end
-  else if sinA > 0.999999 then
+  else if angleRads = angle90 then
   begin
     RotateRight90;
-    Exit;
   end
-  else if sinA < -0.999999 then
+  else if angleRads = -angle90 then
   begin
     RotateLeft90;
-    Exit;
-  end;
-
-  rec := RectD(Bounds);
-  rec := GetRotatedRectBounds(rec, angleRads);
-  newWidth := Ceil(rec.Right - rec.Left);
-  newHeight := Ceil(rec.Bottom - rec.Top);
-
-  center := PointD(rec.Width/2, rec.Height/2);
-  SetLength(tmp, newWidth * newHeight);
-  dstColor := @tmp[0];
-  with MidPoint do
-  begin
-    dx := center.X - X;
-    dy := center.Y - Y;
-  end;
-  if fAntiAliase then
-  begin
-    for y := 0 to newHeight -1 do
-      for x := 0 to newWidth -1 do
-      begin
-        pt := PointD(x, y);
-        RotatePt(pt, center, sinA, cosA);
-        xi := Round((pt.X - dx) *256);
-        yi := Round((pt.Y - dy) *256);
-        dstColor^ := GetWeightedPixel(self, xi, yi);
-        inc(dstColor);
-      end;
   end else
   begin
-    for y := 0 to newHeight -1 do
-      for x := 0 to newWidth -1 do
-      begin
-        pt := PointD(x, y);
-        RotatePt(pt, center, sinA, cosA);
-        xi := Round(pt.X - dx);
-        yi := Round(pt.Y - dy);
-        if (xi < 0) or (xi >= Width) or (yi < 0) or (yi >= Height) then
-          dstColor^ := clNone32
-        else
-          dstColor^ := fPixels[xi + yi * Width];
-        inc(dstColor);
-      end;
-  end;
-
-  BeginUpdate;
-  try
-    SetSize(newWidth, newHeight);
-    fPixels := tmp;
-  finally
-    EndUpdate;
+    mat := IdentityMatrix;
+    MatrixTranslate(mat, Width/2, Height/2);
+    rec := RectD(Bounds);
+    rec := GetRotatedRectBounds(rec, angleRads);
+    MatrixRotate(mat, NullPointD, angleRads);
+    MatrixTranslate(mat, rec.Width/2, rec.Height/2);
+    BeginUpdate;
+    try
+      AffineTransformImage(self, mat);
+    finally
+      EndUpdate;
+    end;
   end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.RotateRect(const rec: TRect;
-  angleRads: single; eraseColor: TColor32 = 0);
+  angleRads: double; eraseColor: TColor32 = 0);
 var
   tmp: TImage32;
   rec2: TRect;
   recWidth, recHeight: integer;
 begin
-  if ClockwiseRotationIsAnglePositive then
-    angleRads := -angleRads;
-
   recWidth := rec.Right - rec.Left;
   recHeight := rec.Bottom - rec.Top;
   //create a tmp image with a copy of the pixels inside rec ...
@@ -3058,28 +2981,17 @@ var
   x,y: double;
   tmpPxls: TArrayOfColor32;
   pcDst: PColor32;
+  mat: TMatrixD;
 begin
   if IsEmpty or ((dx = 0) and (dy = 0)) then Exit;
-  newWidth := Width + Ceil(Abs(dx));
-  newHeight := Height + Ceil(Abs(dy));
-  SetLength(tmpPxls, newWidth * newHeight);
-  pcDst := @tmpPxls[0];
-  for i := 0 to newHeight - 1 do
-    for j := 0 to newWidth - 1 do
-    begin
-      x := Min(0,  dx) + j - i * dx/newHeight;
-      y := Min(0, -dy) + j * dy/newWidth + i;
-      pcDst^ := GetWeightedPixel(self, Round(x*$100), Round(y*$100));
-      inc(pcDst);
-    end;
-
+  //limit skewing to twice the width and/or height of the image
+  dx := Min(2, dx);
+  dy := Min(2, dy);
+  mat := IdentityMatrix;
+  MatrixSkew(mat, dx, dy);
   BeginUpdate;
-  try
-    SetSize(newWidth, newHeight);
-    fPixels := tmpPxls;
-  finally
-    EndUpdate;
-  end;
+  AffineTransformImage(self, mat);
+  EndUpdate;
 end;
 //------------------------------------------------------------------------------
 

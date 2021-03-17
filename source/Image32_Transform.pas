@@ -2,8 +2,8 @@ unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.15                                                            *
-* Date      :  17 March 2021                                                   *
+* Version   :  2.16                                                            *
+* Date      :  18 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -27,6 +27,8 @@ type
   function MatrixAdjugate(const matrix: TMatrixD): TMatrixD;
   function MatrixMultiply(const modifier, matrix: TMatrixD): TMatrixD;
 
+  procedure MatrixApply(const matrix: TMatrixD;
+    var x, y: double); overload;
   procedure MatrixApply(const matrix: TMatrixD;
     var pt: TPointD); overload;
   procedure MatrixApply(const matrix: TMatrixD;
@@ -139,6 +141,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure MatrixApply(const matrix: TMatrixD; var x, y: double);
+var
+  tmpX: double;
+begin
+  tmpX := x;
+  x := tmpX * matrix[0, 0] + y * matrix[1, 0] + matrix[2, 0];
+  y := tmpX * matrix[0, 1] + y * matrix[1, 1] + matrix[2, 1];
+end;
+//------------------------------------------------------------------------------
+
 procedure MatrixApply(const matrix: TMatrixD; var pt: TPointD);
 var
   tmpX: double;
@@ -231,19 +243,19 @@ procedure MatrixRotate(var matrix: TMatrixD;
   const center: TPointD; angRad: double);
 var
   m: TMatrixD;
-  sn, cs: extended; //D7 compatible
+  sinA, cosA: double;
   origOffset: Boolean;
 begin
   NormalizeAngle(angRad);
-  if angRad < 0.001 then Exit;
-  if ClockwiseRotationIsAnglePositive then angRad := -angRad;
+  if angRad = 0 then Exit;
+  if not ClockwiseRotationIsAnglePositive then angRad := -angRad;
   m := IdentityMatrix;
   origOffset := (center.X <> 0) or (center.Y <> 0);
   if origOffset then MatrixTranslate(matrix, -center.X, -center.Y);
-  SinCos(angRad, sn, cs);
+  GetSinCos(-angRad, sinA, cosA); //negated angle because of inverted Y-axis.
   m := IdentityMatrix;
-  m[0, 0] := cs;   m[1, 0] := sn;
-  m[0, 1] := -sn;  m[1, 1] := cs;
+  m[0, 0] := cosA;   m[1, 0] := sinA;
+  m[0, 1] := -sinA;  m[1, 1] := cosA;
   matrix := MatrixMultiply(m, matrix);
   if origOffset then MatrixTranslate(matrix, center.X, center.Y);
 end;
@@ -323,15 +335,15 @@ end;
 procedure AffineTransformImage(img: TImage32;
   matrix: TMatrixD; out offset: TPoint); overload;
 var
-  i,j, w,h, dx,dy: integer;
-  pt: TPointD;
+  i,j, w,h, dx,dy, srcX,srcY, xi,yi: integer;
+  dstX, dstY: double;
   pc: PColor32;
   tmp: TArrayOfColor32;
   rec: TRect;
 begin
   offset := NullPoint;
-  if (img.Width * img.Height = 0) or
-    IsIdentityMatrix(matrix) then Exit;
+  srcX := img.Width; srcY := img.Height;
+  if (srcX * srcY = 0) or IsIdentityMatrix(matrix) then Exit;
   rec := GetTransformBounds(img, matrix);
   offset := rec.TopLeft;
 
@@ -344,14 +356,33 @@ begin
 
   SetLength(tmp, w * h);
   pc := @tmp[0];
-  for i := 0 to h -1 do
-    for j := 0 to w -1 do
-    begin
-      pt.X := j + dx; pt.Y := i + dy;
-      MatrixApply(matrix, pt);
-      pc^ := GetWeightedPixel(img, Round(pt.X * 256), Round(pt.Y * 256));
-      inc(pc);
-    end;
+
+  if img.AntiAliased then
+  begin
+    for i := 0 to h -1 do
+      for j := 0 to w -1 do
+      begin
+        dstX := j + dx; dstY := i + dy;
+        MatrixApply(matrix, dstX, dstY);
+        //get weighted pixel (slow)
+        pc^ := GetWeightedPixel(img, Round(dstX * 256), Round(dstY * 256));
+        inc(pc);
+      end;
+  end else
+  begin
+    for i := 0 to h -1 do
+      for j := 0 to w -1 do
+      begin
+        dstX := j + dx; dstY := i + dy;
+        MatrixApply(matrix, dstX, dstY);
+        xi := Round(dstX); yi := Round(dstY);
+        //get unweighted pixel
+        if (xi < 0) or (xi >= srcX) or (yi < 0) or (yi >= srcY) then
+          pc^ := clNone32 else
+          pc^ := img.Pixel[xi, yi];
+        inc(pc);
+      end;
+  end;
   img.SetSize(w, h);
   Move(tmp[0], img.Pixels[0], w * h * sizeOf(TColor32));
 end;

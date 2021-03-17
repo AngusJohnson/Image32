@@ -130,6 +130,19 @@ begin
   if not MasterImage.LoadFromFile(filename) then
     MasterImage.SetSize(100,100, clBlack32);
   MasterImage.CropTransparentPixels;
+
+  //Setting MasterImage.AntiAliased := false
+  //will speed up transformations significantly,
+  //but with slightly reduced quality of the
+  //transformed image.
+  //Changing this property will have no
+  //affect on MasterImage because it won't be
+  //transformed (ie scaled or rotated here).
+  //But we change MasterImage's AntiAliased
+  //property because this property is also assigned
+  //whenever MasterImage is assigned to Image.
+  MasterImage.AntiAliased := false;
+
   Image.Assign(MasterImage);
   PositionCenteredAt(centerPt);
   UpdateHitTestMaskTransparent;
@@ -146,7 +159,7 @@ begin
   InitRandomColors;
   PenWidth := DPIAware(1.5);
   OnDraw := Draw;
-  //AutoCenterPivot := false;
+  Margin := 20;
 end;
 //------------------------------------------------------------------------------
 
@@ -396,7 +409,7 @@ begin
     MakePathI([0,100, 100,0, 100,50, 200,50, 200,150, 100,150, 100,200]);
 
   Application.OnActivate := AppActivate;
-    
+
   layeredImage := TLayeredImage32.Create();
   layeredImage.AddLayer(TDesignerLayer32);
 
@@ -722,7 +735,7 @@ begin
 
     rotatingButtonGroup := CreateRotatingButtonGroup(
       targetLayer, pt, DPIAware(10),
-      clWhite32, clLime32, displayAngle, Angle90);
+      clWhite32, clLime32, displayAngle, -Angle90);
     rotatingButtonGroup.CursorId := crRotate;
 
     if displayAngle > PI then displayAngle := displayAngle - Pi*2;

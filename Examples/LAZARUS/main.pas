@@ -6,7 +6,8 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, StdCtrls, ExtCtrls, Math,
-  Image32, Image32_PNG, Image32_Ttf, Image32_Vector, Image32_Extra, Image32_Draw;
+  Image32, Image32_PNG, Image32_Ttf,
+  Image32_Vector, Image32_Transform, Image32_Extra, Image32_Draw;
 
 type
 

@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.15                                                            *
-* Date      :  17 March 2021                                                   *
+* Version   :  2.16                                                            *
+* Date      :  18 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -132,6 +132,7 @@ type
   function GetAngle(const a, b, c: TPoint): double; overload;
   function GetAngle(const a, b, c: TPointD): double; overload;
 
+  procedure GetSinCos(angle: double; out sinA, cosA: double);
   function GetPointAtAngleAndDist(const origin: TPointD;
     angle, distance: double): TPointD;
 
@@ -139,9 +140,9 @@ type
     out ip: TPointD): Boolean;
 
   procedure RotatePoint(var pt: TPointD;
-    const focalPoint: TPointD; angleRad: double); overload;
-  procedure RotatePoint(var pt: TPointD;
     const focalPoint: TPointD; sinA, cosA: double); overload;
+  procedure RotatePoint(var pt: TPointD;
+    const focalPoint: TPointD; angleRad: double); overload;
   function RotatePath(const path: TPathD;
     const focalPoint: TPointD; angleRads: double): TPathD; overload;
   function RotatePath(const paths: TPathsD;
@@ -286,9 +287,6 @@ resourcestring
 
 implementation
 
-uses
-  Image32_SmoothPath;
-
 resourcestring
   rsInvalidQBezier = 'Invalid number of control points for a QBezier';
   rsInvalidCBezier = 'Invalid number of control points for a CBezier';
@@ -430,7 +428,7 @@ begin
   NormalizeAngle(angle);
   if angle <> 0 then
   begin
-    GetSinCos(angle, sinA, cosA);
+    GetSinCos(angle, sinA, cosA); //the sign of the angle isn't important
     sinA := Abs(sinA); cosA := Abs(cosA);
     w := (rec.Width *cosA + rec.Height *sinA) /2;
     h := (rec.Width *sinA + rec.Height *cosA) /2;
@@ -1438,17 +1436,6 @@ end;
 //------------------------------------------------------------------------------
 
 procedure RotatePoint(var pt: TPointD;
-  const focalPoint: TPointD; angleRad: double);
-var
-  sinA, cosA: double;
-begin
-  if ClockwiseRotationIsAnglePositive then angleRad := -angleRad;
-  GetSinCos(angleRad, sinA, cosA);
-  RotatePoint(pt, focalPoint, sinA, cosA);
-end;
-//------------------------------------------------------------------------------
-
-procedure RotatePoint(var pt: TPointD;
   const focalPoint: TPointD; sinA, cosA: double);
 var
   tmpX, tmpY: double;
@@ -1460,8 +1447,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure RotatePoint(var pt: TPointD;
+  const focalPoint: TPointD; angleRad: double);
+var
+  sinA, cosA: double;
+begin
+  if not ClockwiseRotationIsAnglePositive then angleRad := -angleRad;
+  GetSinCos(angleRad, sinA, cosA);
+  RotatePoint(pt, focalPoint, sinA, cosA);
+end;
+//------------------------------------------------------------------------------
+
 function RotatePathInternal(const path: TPathD;
-  const focalPoint: TPointD; sinA, cosA: extended): TPathD;
+  const focalPoint: TPointD; sinA, cosA: double): TPathD;
 var
   i: integer;
   x,y: double;
@@ -1482,7 +1480,7 @@ function RotatePath(const path: TPathD;
 var
   sinA, cosA: double;
 begin
-  if ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
+  if not ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
   GetSinCos(angleRads, sinA, cosA);
   Result := RotatePathInternal(path, focalPoint, sinA, cosA);
 end;
@@ -1494,7 +1492,7 @@ var
   i: integer;
   sinA, cosA: double;
 begin
-  if ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
+  if not ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
   GetSinCos(angleRads, sinA, cosA);
   SetLength(Result, length(paths));
   for i := 0 to high(paths) do
@@ -1510,11 +1508,16 @@ begin
   y := pt.Y - origin.Y;
   if x = 0 then
   begin
-    if y > 0 then result := -angle90
-    else result := angle90;
+    if y > 0 then result := angle90
+    else result := -angle90;
+  end
+  else if y = 0 then
+  begin
+    if x > 0 then result := 0
+    else result := angle180;
   end else
-    result := arctan2(-y, x); //range between -Pi and Pi
-  if ClockwiseRotationIsAnglePositive then Result := -Result;
+    result := arctan2(y, x); //range between -Pi and Pi
+  if not ClockwiseRotationIsAnglePositive then Result := -Result;
 end;
 //------------------------------------------------------------------------------
 
@@ -1526,11 +1529,16 @@ begin
   y := pt.Y - origin.Y;
   if x = 0 then
   begin
-    if y > 0 then result := -angle90
-    else result := angle90;
+    if y > 0 then result := angle90
+    else result := -angle90;
+  end
+  else if y = 0 then
+  begin
+    if x > 0 then result := 0
+    else result := angle180;
   end else
-    result := arctan2(-y, x); //range between -Pi and Pi
-  if ClockwiseRotationIsAnglePositive then Result := -Result;
+    result := arctan2(y, x); //range between -Pi and Pi
+  if not ClockwiseRotationIsAnglePositive then Result := -Result;
 end;
 //------------------------------------------------------------------------------
 
@@ -1545,7 +1553,7 @@ begin
   dp := (ab.x * bc.x + ab.y * bc.y);
   cp := (ab.x * bc.y - ab.y * bc.x);
   Result := arctan2(cp, dp); //range between -Pi and Pi
-  if ClockwiseRotationIsAnglePositive then Result := -Result;
+  if not ClockwiseRotationIsAnglePositive then Result := -Result;
 end;
 //------------------------------------------------------------------------------
 
@@ -1560,7 +1568,7 @@ begin
   dp := (ab.x * bc.x + ab.y * bc.y);
   cp := (ab.x * bc.y - ab.y * bc.x);
   Result := arctan2(cp, dp); //range between -Pi and Pi
-  if ClockwiseRotationIsAnglePositive then Result := -Result;
+  if not ClockwiseRotationIsAnglePositive then Result := -Result;
 end;
 //------------------------------------------------------------------------------
 
@@ -1884,7 +1892,7 @@ begin
   end;
   f := (radius.x + radius.y)/2;
   if f < 0.5 then Exit;
-  
+
   if steps < 3 then
     steps := Max(3, Trunc(Pi / (ArcCos(1 - 0.2 /f ))));
   GetSinCos(2 * Pi / Steps, sinA, cosA);
@@ -1898,7 +1906,7 @@ begin
       centre.Y + radius.y * delta.y);
     delta :=  PointD(delta.X * cosA - delta.Y * sinA,
       delta.Y * cosA + delta.X * sinA);
-  end;
+  end; //rotates clockwise
 end;
 //------------------------------------------------------------------------------
 
@@ -1942,7 +1950,7 @@ begin
   Result := nil;
   if (endAngle = startAngle) or IsEmptyRect(rec) then Exit;
 
-  if ClockwiseRotationIsAnglePositive then
+  if not ClockwiseRotationIsAnglePositive then
   begin
     startAngle := -startAngle;
     endAngle := -endAngle;
@@ -1951,26 +1959,27 @@ begin
   centre := PointD((rec.left+rec.right)/2, (rec.top+rec.bottom)/2);
   radius := PointD(RectWidth(rec)/2, RectHeight(rec)/2);
   radiusAvg := (radius.X + radius.Y)/2;
-  angle := endAngle - startAngle;
-  if angle < 0 then angle := Pi * 2 + angle;
+  if endAngle < startAngle then
+    angle := endAngle - startAngle + angle360 else
+    angle := endAngle - startAngle;
   //steps = (No. steps for a whole ellipse) * angle/(2*Pi)
   steps := Max(2, Trunc(Pi/ArcCos(1 - 0.2/radiusAvg) * angle /(2*Pi) ));
 
   SetLength(Result, Steps +1);
   //angle of the first step ...
-  GetSinCos(-startAngle, deltaY, deltaX);
+  GetSinCos(startAngle, deltaY, deltaX);
   Result[0].X := centre.X + radius.X * deltaX;
   Result[0].Y := centre.Y + radius.y * deltaY;
   //angle of each subsequent step ...
-  GetSinCos(-angle / Steps, sinA, cosA);
+  GetSinCos(angle / Steps, sinA, cosA);
   for i := 1 to steps do
   begin
     deltaX2 := deltaX * cosA - deltaY * sinA;
     deltaY := deltaY * cosA + deltaX * sinA;
     deltaX := deltaX2;
-    Result[i] := PointD(centre.X + radius.X * deltaX,
-      centre.Y + radius.y * deltaY);
-  end;
+    Result[i].X := centre.X + radius.X * deltaX;
+    Result[i].Y := centre.Y + radius.y * deltaY;
+  end; //progresses clockwise from start to end
 end;
 //------------------------------------------------------------------------------
 

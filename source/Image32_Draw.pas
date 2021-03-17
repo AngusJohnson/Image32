@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.15                                                            *
-* Date      :  17 March 2021                                                   *
+* Version   :  2.16                                                            *
+* Date      :  18 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -25,7 +25,7 @@ type
   //TGradientColor: used internally by both
   //TLinearGradientRenderer and TRadialGradientRenderer
   TGradientColor = record
-    offset: single;
+    offset: double;
     color: TColor32;
   end;
   TArrayOfGradientColor = array of TGradientColor;
@@ -118,7 +118,7 @@ type
     procedure SetGradientFillStyle(value: TGradientFillStyle);
   public
     constructor Create;
-    procedure InsertColorStop(offsetFrac: single; color: TColor32);
+    procedure InsertColorStop(offsetFrac: double; color: TColor32);
   end;
 
   TLinearGradientRenderer = class(TCustomGradientRenderer)
@@ -1211,7 +1211,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TCustomGradientRenderer.InsertColorStop(offsetFrac: single; color: TColor32);
+procedure TCustomGradientRenderer.InsertColorStop(offsetFrac: double; color: TColor32);
 var
   i, len: integer;
   gradColor: TGradientColor;

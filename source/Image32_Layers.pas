@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.15                                                            *
-* Date      :  17 March 2021                                                   *
+* Version   :  2.16                                                            *
+* Date      :  18 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -55,9 +55,9 @@ type
   {$ZEROBASEDSTRINGS OFF}
 {$ENDIF}
 
-  TLayer32 = class
+  TLayer32 = class  //base layer class (rarely if ever instantiated)
   private
-    fImageLayer     : TLayeredImage32;
+    fLayeredImage   : TLayeredImage32;
     fGroupOwner     : TGroupLayer32;
     fLeft           : integer;
     fTop            : integer;
@@ -68,7 +68,7 @@ type
     fOpacity        : Byte;
     fCursorId       : integer;
     fTag            : Cardinal;
-    fOldBounds      : TRect;
+    fDirtyBounds      : TRect;
     fRefreshPending : boolean;
     function   GetMidPoint: TPointD;
     procedure  SetVisible(value: Boolean);
@@ -110,7 +110,7 @@ type
     property   MidPoint: TPointD read GetMidPoint;
     property   Name: string read fName write fName;
     property   Opacity: Byte read fOpacity write SetOpacity;
-    property   RootOwner: TLayeredImage32 read fImageLayer;
+    property   RootOwner: TLayeredImage32 read fLayeredImage;
     property   Top: integer read fTop;
     property   Visible: Boolean read fVisible write SetVisible;
     property   Width: integer read GetWidth;
@@ -119,7 +119,7 @@ type
 
   TUpdateType = (utUndefined, utShowDesigners, utHideDesigners);
 
-  TGroupLayer32 = class(TLayer32)
+  TGroupLayer32 = class(TLayer32) //container class for other layers
   private
 {$IFDEF XPLAT_GENERICS}
     fChilds                : TList<TLayer32>;
@@ -156,7 +156,7 @@ type
     property   OnMerge: TNotifyEvent read fOnMerge write fOnMerge;
   end;
 
-  THitTestLayer32 = class(TLayer32)
+  THitTestLayer32 = class(TLayer32) //abstract classs
   private
     fHitTestRec     : THitTestRec;
   protected
@@ -166,7 +166,7 @@ type
     function GetPathsFromHitTestMask: TPathsD;
   end;
 
-  TRotateLayer32 = class(THitTestLayer32)
+  TRotateLayer32 = class(THitTestLayer32) //abstract rotating layer class
   protected
     function  GetAngle: double; virtual; abstract;
     procedure SetAngle(newAngle: double); virtual; abstract;
@@ -175,7 +175,7 @@ type
     property  Angle: double read GetAngle write SetAngle;
   end;
 
-  TVectorLayer32 = class(TRotateLayer32)
+  TVectorLayer32 = class(TRotateLayer32) //display layer for vector images
   private
     fPaths      : TPathsD;
     fMargin     : integer;
@@ -206,7 +206,7 @@ type
     property  OnDraw: TNotifyEvent read fOnDraw write fOnDraw;
   end;
 
-  TRasterLayer32 = class(TRotateLayer32)
+  TRasterLayer32 = class(TRotateLayer32) //display laer for raster images
   private
     fMasterImg    : TImage32;
     //a matrix allows combining any number of sizing & rotating
@@ -219,7 +219,7 @@ type
     procedure DoAutoHitTest;
     procedure DoPreScaleCheck;
     procedure DoPreRotationCheck;
-    function GetMatrix: TMatrixD;
+    function  GetMatrix: TMatrixD;
   protected
     function  GetAngle: double; override;
     procedure SetAngle(newAngle: double); override;
@@ -240,14 +240,14 @@ type
     property  Matrix: TMatrixD read GetMatrix;
   end;
 
-  TSizingGroupLayer32 = class(TGroupLayer32)
+  TSizingGroupLayer32 = class(TGroupLayer32) //groups sizing buttons
   private
     fSizingStyle: TSizingStyle;
   public
     property SizingStyle: TSizingStyle read fSizingStyle write fSizingStyle;
   end;
 
-  TRotatingGroupLayer32 = class(TGroupLayer32)
+  TRotatingGroupLayer32 = class(TGroupLayer32) //groups rotation buttons
   private
     fZeroOffset: double;
     function GetDistance: double;
@@ -265,7 +265,7 @@ type
   TButtonDesignerLayer32 = class;
   TButtonDesignerLayer32Class = class of TButtonDesignerLayer32;
 
-  TButtonGroupLayer32 = class(TGroupLayer32)
+  TButtonGroupLayer32 = class(TGroupLayer32) //groups generic buttons
   private
     fBtnSize: integer;
     fBtnShape: TButtonShape;
@@ -276,13 +276,13 @@ type
     function InsertButton(const pt: TPointD; btnIdx: integer): TButtonDesignerLayer32;
   end;
 
-  TDesignerLayer32 = class(THitTestLayer32)
+  TDesignerLayer32 = class(THitTestLayer32) //generic design layer
   public
     procedure UpdateHitTestMask(const vectorRegions: TPathsD;
       fillRule: TFillRule); virtual;
   end;
 
-  TButtonDesignerLayer32 = class(TDesignerLayer32)
+  TButtonDesignerLayer32 = class(TDesignerLayer32) //button (design) layer
   private
     fSize     : integer;
     fColor    : TColor32;
@@ -536,7 +536,7 @@ constructor TLayer32.Create(groupOwner: TGroupLayer32; const name: string);
 begin
   fGroupOwner := groupOwner;
   if assigned(groupOwner) then
-    fImageLayer := groupOwner.fImageLayer
+    fLayeredImage := groupOwner.fLayeredImage
   else if name <> rsRoot then
     raise Exception.Create(rsCreateLayerError);
   fImage      := TLayerNotifyImage32.Create(self);
@@ -561,10 +561,10 @@ begin
   //invalidate the maximum 'dirty' area
   if CanUpdate then
   begin
-    if IsEmptyRect(fOldBounds) then
-      fOldBounds := Bounds else
-      fOldBounds := Image32_Vector.UnionRect(fOldBounds, Bounds);
-    GroupOwner.Invalidate(fOldBounds);
+    if IsEmptyRect(fDirtyBounds) then
+      fDirtyBounds := Bounds else
+      fDirtyBounds := Image32_Vector.UnionRect(fDirtyBounds, Bounds);
+    GroupOwner.Invalidate(fDirtyBounds);
   end;
   Inc(fGroupOwner.fUpdateCount);
   fRefreshPending := true;
@@ -585,13 +585,13 @@ end;
 
 procedure TLayer32.ImageChanged(Sender: TImage32);
 begin
-  if (Self is TGroupLayer32) or not CanUpdate then
-    Exit;
+  if (Self is TGroupLayer32) or not CanUpdate then Exit;
+
   //invalidate the maximum 'dirty' area
-  if IsEmptyRect(fOldBounds) then
-    fOldBounds := Bounds else
-    fOldBounds := Image32_Vector.UnionRect(fOldBounds, Bounds);
-  GroupOwner.Invalidate(fOldBounds);
+  if IsEmptyRect(fDirtyBounds) then
+    fDirtyBounds := Bounds else
+    fDirtyBounds := Image32_Vector.UnionRect(fDirtyBounds, Bounds);
+  GroupOwner.Invalidate(fDirtyBounds);
   fRefreshPending := true;
   GroupOwner.fRefreshPending := true;
 end;
@@ -894,7 +894,7 @@ var
   rec: TRect;
 begin
   if forceRefresh then fRefreshPending := true;
-  if (Self <> fImageLayer.fRoot) and not fRefreshPending then Exit;
+  if (Self <> fLayeredImage.fRoot) and not fRefreshPending then Exit;
 
   //this recursive method updates the group's bounds and fLocalInvalidRect
   rec := NullRect;
@@ -917,7 +917,7 @@ begin
           Image32_Vector.UnionRect(fLocalInvalidRect, Child[i].Bounds);
       rec := Image32_Vector.UnionRect(rec, Child[i].Bounds);
     end;
-    Child[i].fOldBounds := Child[i].Bounds;
+    Child[i].fDirtyBounds := Child[i].Bounds;
     Child[i].fRefreshPending := false;
   end;
   if Assigned(GroupOwner) then
@@ -1086,7 +1086,7 @@ begin
   if angleDelta = 0 then Exit;
   fAngle := fAngle + angleDelta;
   NormalizeAngle(fAngle);
-  fPaths := RotatePath(fPaths, fPivotPt, -angleDelta);
+  fPaths := RotatePath(fPaths, fPivotPt, angleDelta);
   RepositionAndDraw;
 end;
 //------------------------------------------------------------------------------
@@ -1285,7 +1285,7 @@ begin
     fRotating := false;
     with MasterImage do
       fSavedSize := Image32_Vector.Size(Width, Height);
-    HitTestRec.Clear;
+    Image.Assign(MasterImage); //will call ImageChange again
   end else
     inherited;
 end;
@@ -1324,7 +1324,7 @@ end;
 
 procedure TRasterLayer32.DoPreScaleCheck;
 begin
-  if not fRotating then Exit;
+  if not fRotating or not Assigned(Image) then Exit;
   fRotating := false;
 
   //rotation has just ended so add the rotation angle to fMatrix
@@ -1339,7 +1339,7 @@ end;
 
 procedure TRasterLayer32.DoPreRotationCheck;
 begin
-  if fRotating then Exit;
+  if fRotating or not Assigned(Image) then Exit;
   fRotating := true;
 
   //scaling has just ended and rotating is about to start
@@ -1375,18 +1375,25 @@ end;
 procedure TRasterLayer32.SetAngle(newAngle: double);
 var
   savedMidpoint: TPointD;
+  mat: TMatrixD;
+  rec: TRectD;
 begin
   NormalizeAngle(newAngle);
   if MasterImage.IsEmpty or (fAngle = newAngle) then Exit;
-
   DoPreRotationCheck;
 
   fAngle := newAngle;
   savedMidpoint := MidPoint;
   Image.Assign(MasterImage);
-  //apply any prior transformations
-  AffineTransformImage(Image, fMatrix);
-  Image.Rotate(fAngle);
+  rec := GetRotatedRectBounds(RectD(Image.Bounds), fAngle);
+
+  //get prior transformations and apply new rotation
+  mat := fMatrix;
+  MatrixTranslate(mat, -Width/2,-Height/2);
+  MatrixRotate(mat, NullPointD, fAngle);
+  MatrixTranslate(mat, rec.Width/2, rec.Height/2);
+  AffineTransformImage(Image, mat);
+
   //symmetric cropping prevents center wobbling
   SymmetricCropTransparent(Image);
   PositionCenteredAt(savedMidpoint);
@@ -1499,8 +1506,9 @@ end;
 constructor TLayeredImage32.Create(Width: integer; Height: integer);
 begin
   fRoot := TGroupLayer32.Create(nil, rsRoot);
-  fRoot.fImageLayer := self;
+  fRoot.fLayeredImage := self;
   fBounds := Rect(0, 0, Width, Height);
+  fRoot.SetSize(width, Height);
 end;
 //------------------------------------------------------------------------------
 
@@ -1877,7 +1885,7 @@ begin
     TRotatingGroupLayer32, nil, rsRotatingButtonGroup));
 
   //startingZeroOffset: default = 0 (ie 3 o'clock)
-  if ClockwiseRotationIsAnglePositive then
+  if not ClockwiseRotationIsAnglePositive then
     startingZeroOffset := -startingZeroOffset;
   Result.fZeroOffset := startingZeroOffset;
 
@@ -1913,7 +1921,7 @@ begin
     SetButtonAttributes(bsRound, buttonSize, movingButtonColor);
 
     pt := Point(GetPointAtAngleAndDist(pivot,
-      -(startingAngle + startingZeroOffset), radius));
+      startingAngle + startingZeroOffset, radius));
     PositionCenteredAt(pt);
 
     CursorId := crHandPoint;

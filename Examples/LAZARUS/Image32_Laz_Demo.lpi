@@ -126,7 +126,7 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <OtherUnitFiles Value="..\..\source;..\..\source\Clipper"/>
+      <OtherUnitFiles Value="..\..\source"/>
       <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <Linking>
@@ -138,7 +138,7 @@
     </Linking>
     <Other>
       <CompilerMessages>
-        <IgnoredMessages idx5093="True" idx5060="True"/>
+        <IgnoredMessages idx6058="True" idx5094="True" idx5093="True" idx5092="True" idx5091="True" idx5060="True" idx5058="True" idx5057="True"/>
       </CompilerMessages>
     </Other>
   </CompilerOptions>
