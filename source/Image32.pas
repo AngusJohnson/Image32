@@ -129,6 +129,8 @@ type
     destructor Destroy; override;
     procedure BeginUpdate;
     procedure EndUpdate;
+    procedure BlockUpdate;    //Changed not called when unblocked.
+    procedure UnblockUpdate;
 
     procedure Assign(src: TImage32);
     procedure AssignTo(dst: TImage32);
@@ -355,9 +357,7 @@ type
   function BlendToAlpha(bgColor, fgColor: TColor32): TColor32;
   //BlendMask: Whereever the mask is, preserves the background
   function BlendMask(bgColor, alphaMask: TColor32): TColor32;
-  {$IFDEF INLINE} inline; {$ENDIF}
   function BlendInvertedMask(bgColor, alphaMask: TColor32): TColor32;
-  {$IFDEF INLINE} inline; {$ENDIF}
 
   //COMPARE COLOR FUNCTIONS (ConvertToBoolMask, FloodFill, Vectorize etc.)
 
@@ -415,7 +415,7 @@ type
   function ClampRange(val, min, max: double): double; overload;
   function IncPColor32(pc: Pointer; cnt: Integer): PColor32;
 
-  procedure NormalizeAngle(var angle: double; tollerance: double = Pi/360);
+  procedure NormalizeAngle(var angle: double; tolerance: double = Pi/360);
 
   {$IFDEF MSWINDOWS}
 
@@ -527,7 +527,7 @@ var
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-procedure NormalizeAngle(var angle: double; tollerance: double = Pi/360);
+procedure NormalizeAngle(var angle: double; tolerance: double = Pi/360);
 var
   aa: double;
 begin
@@ -535,9 +535,9 @@ begin
   while angle > angle180 do angle := angle - angle360;
 
   aa := Abs(angle);
-  if aa < tollerance then angle := 0
-  else if aa > angle180 - tollerance then angle := angle180
-  else if (aa < angle90 - tollerance) or (aa > angle90 + tollerance) then Exit
+  if aa < tolerance then angle := 0
+  else if aa > angle180 - tolerance then angle := angle180
+  else if (aa < angle90 - tolerance) or (aa > angle90 + tolerance) then Exit
   else if angle < 0 then angle := -angle90
   else angle := angle90;
 end;
@@ -622,7 +622,7 @@ begin
   begin
     //combine alphas ...
     //res.A := not MulTable[not fg.A, not bg.A];
-    res.A := ((fg.A xor 255) * (bg.A xor 255) shr 8) xor 255; //marginally faster
+    res.A := ((fg.A xor 255) * (bg.A xor 255) shr 8) xor 255; // ~faster
 
     fgWeight := DivTable[fg.A, res.A]; //fgWeight = amount foreground color
                                        //contibutes to total (result) color
@@ -1535,6 +1535,18 @@ procedure TImage32.EndUpdate;
 begin
   dec(fUpdateCnt);
   Changed;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.BlockUpdate;
+begin
+  inc(fUpdateCnt);
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.UnblockUpdate;
+begin
+  dec(fUpdateCnt);
 end;
 //------------------------------------------------------------------------------
 
@@ -2937,12 +2949,7 @@ begin
     rec := GetRotatedRectBounds(rec, angleRads);
     MatrixRotate(mat, NullPointD, angleRads);
     MatrixTranslate(mat, rec.Width/2, rec.Height/2);
-    BeginUpdate;
-    try
-      AffineTransformImage(self, mat);
-    finally
-      EndUpdate;
-    end;
+    AffineTransformImage(self, mat);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2977,21 +2984,15 @@ end;
 
 procedure TImage32.Skew(dx,dy: double);
 var
-  i,j, newWidth, newHeight: integer;
-  x,y: double;
-  tmpPxls: TArrayOfColor32;
-  pcDst: PColor32;
   mat: TMatrixD;
 begin
   if IsEmpty or ((dx = 0) and (dy = 0)) then Exit;
-  //limit skewing to twice the width and/or height of the image
-  dx := Min(2, dx);
-  dy := Min(2, dy);
+  //limit skewing to twice the image's width and/or height
+  dx := ClampRange(dx, -2.0, 2.0);
+  dy := ClampRange(dy, -2.0, 2.0);
   mat := IdentityMatrix;
   MatrixSkew(mat, dx, dy);
-  BeginUpdate;
   AffineTransformImage(self, mat);
-  EndUpdate;
 end;
 //------------------------------------------------------------------------------
 

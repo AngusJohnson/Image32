@@ -12,6 +12,10 @@ Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
+Version 2.16a
+  Fixed broken SmoothPaths Demo.
+  Otherwise, a few minor tweaks.
+  
 Version 2.16
   Image32
     TImage32.Antialias property is applied 

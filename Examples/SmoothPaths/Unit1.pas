@@ -163,9 +163,9 @@ begin
   glyphCache := TGlyphCache.Create(fontReader, DpiAware(11));
 
   //SETUP LAYEREDIMAGE32
-  layeredImage32 := TLayeredImage32.Create(RectWidth(rec), RectHeight(rec));
+  layeredImage32 := TLayeredImage32.Create;
   layeredImage32.BackgroundColor := Color32(clBtnFace);
-  
+
   //the first layer will be a hatched TDesignerLayer32 which is 'non-clickable'
   layeredImage32.AddLayer(TDesignerLayer32);
 

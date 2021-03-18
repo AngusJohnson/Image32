@@ -68,7 +68,7 @@ type
     fOpacity        : Byte;
     fCursorId       : integer;
     fTag            : Cardinal;
-    fDirtyBounds      : TRect;
+    fDirtyBounds    : TRect;
     fRefreshPending : boolean;
     function   GetMidPoint: TPointD;
     procedure  SetVisible(value: Boolean);
@@ -865,7 +865,7 @@ end;
 
 procedure  TGroupLayer32.SetBounds(const newBounds: TRect);
 begin
-  //this method overrride bypasses the overhead of BeginUpdate/EndUpdate
+  //this overrride bypasses the overhead of BeginUpdate/EndUpdate
   fLeft := newBounds.Left;
   fTop := newBounds.Top;
   Image.SetSize(RectWidth(newBounds),RectHeight(newBounds));
@@ -948,11 +948,11 @@ begin
     if (Child[i] is TGroupLayer32) then
       TGroupLayer32(Child[i]).Merge(hideDesigners, paintRect); //recursive
 
-    //make srcRect relative to image
-    Image32_Vector.OffsetRect(srcRect, -Child[i].Left, -Child[i].Top);
     //make dstRect relative to groupLayer
     dstRect := srcRect;
-    Image32_Vector.OffsetRect(dstRect, Child[i].Left-Left, Child[i].Top-Top);
+    Image32_Vector.OffsetRect(dstRect, -Left, -Top);
+    //make srcRect relative to image
+    Image32_Vector.OffsetRect(srcRect, -Child[i].Left, -Child[i].Top);
 
     if fOpacity < 254 then //reduce layer opacity
     begin
@@ -1134,7 +1134,6 @@ end;
 procedure TVectorLayer32.SetBounds(const newBounds: TRect);
 var
   w,h, m2: integer;
-  dx,dy: double;
   rec: TRect;
   mat: TMatrixD;
 begin
@@ -1145,16 +1144,11 @@ begin
   //make sure the bounds are large enough to scale safely
   if (Width > m2) and (Height > m2) and (w > 1) and (h > 1)  then
   begin
-
-    //get scaling amounts
-    dx := w/(Width - m2);
-    dy := h/(Height - m2);
-
     //apply scaling and translation
     mat := IdentityMatrix;
     rec := Image32_Vector.GetBounds(fPaths);
     MatrixTranslate(mat, -rec.Left, -rec.Top);
-    MatrixScale(mat, dx, dy);
+    MatrixScale(mat, w/(Width - m2), h/(Height - m2));
     MatrixTranslate(mat, newBounds.Left + Margin, newBounds.Top + Margin);
     MatrixApply(mat, fPaths);
 
@@ -1256,7 +1250,7 @@ end;
 
 procedure  TRasterLayer32.UpdateHitTestMaskTransparent(
   compareFunc: TCompareFunction;
-  referenceColor: TColor32; tolerance: integer);
+   referenceColor: TColor32; tolerance: integer);
 begin
   UpdateHitTestMaskUsingImage(fHitTestRec, Self, Image,
   compareFunc, referenceColor, tolerance);
@@ -1277,15 +1271,22 @@ end;
 
 procedure TRasterLayer32.ImageChanged(Sender: TImage32);
 begin
-  if Sender = MasterImage then
+  if (Sender = MasterImage) then
   begin
-    //reset the layer whenever MasterImage changes
-    fAngle := 0;
-    fMatrix := IdentityMatrix;
-    fRotating := false;
-    with MasterImage do
-      fSavedSize := Image32_Vector.Size(Width, Height);
-    Image.Assign(MasterImage); //will call ImageChange again
+    MasterImage.BlockUpdate; //avoid endless recursion
+    try
+      //reset the layer whenever MasterImage changes
+      fAngle := 0;
+      fMatrix := IdentityMatrix;
+      fRotating := false;
+      fRefreshPending := true;
+      SymmetricCropTransparent(MasterImage);
+      with MasterImage do
+        fSavedSize := Image32_Vector.Size(Width, Height);
+      Image.Assign(MasterImage); //this will call ImageChange for Image
+    finally
+      MasterImage.UnblockUpdate;
+    end;
   end else
     inherited;
 end;
@@ -1303,12 +1304,17 @@ begin
   if (MasterImage.Width > 1) and (MasterImage.Height > 1) and
     (newWidth > 1) and (newHeight > 1) then
   begin
-    Image.Assign(MasterImage);
-    //apply any prior transformations
-    AffineTransformImage(Image, fMatrix);
-    SymmetricCropTransparent(Image);
-    Image.Resize(newWidth, newHeight);
-    PositionAt(newBounds.TopLeft);
+    Image.BeginUpdate;
+    try
+      Image.Assign(MasterImage);
+      //apply any prior transformations
+      AffineTransformImage(Image, fMatrix);
+      SymmetricCropTransparent(Image);
+      Image.Resize(newWidth, newHeight);
+      PositionAt(newBounds.TopLeft);
+    finally
+      Image.EndUpdate;
+    end;
     DoAutoHitTest;
   end else
     inherited;
@@ -1393,7 +1399,6 @@ begin
   MatrixRotate(mat, NullPointD, fAngle);
   MatrixTranslate(mat, rec.Width/2, rec.Height/2);
   AffineTransformImage(Image, mat);
-
   //symmetric cropping prevents center wobbling
   SymmetricCropTransparent(Image);
   PositionCenteredAt(savedMidpoint);

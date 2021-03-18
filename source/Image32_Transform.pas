@@ -383,8 +383,13 @@ begin
         inc(pc);
       end;
   end;
-  img.SetSize(w, h);
-  Move(tmp[0], img.Pixels[0], w * h * sizeOf(TColor32));
+  img.BeginUpdate;
+  try
+    img.SetSize(w, h);
+    Move(tmp[0], img.Pixels[0], w * h * sizeOf(TColor32));
+  finally
+    img.EndUpdate;
+  end;
 end;
 
 //------------------------------------------------------------------------------
