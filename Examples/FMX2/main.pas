@@ -203,8 +203,8 @@ begin
     tmpRec := Image32_Vector.Rect(innerMargin, innerMargin, w,
       h + innerMargin + Round(noto14Cache.LineHeight));
 
-    noto14Cache.GetTextGlyphs(tmpRec, essay,
-      taJustify, tvaTop, txtPaths, nextCharIdx, nextCharPt);
+    txtPaths := noto14Cache.GetTextGlyphs(tmpRec, essay,
+      taJustify, tvaTop, nextCharIdx, nextCharPt);
     if useClearType then
       DrawPolygon_ClearType(imgMain, txtPaths, frNonZero, clBlack32) else
       DrawPolygon(imgMain, txtPaths, frNonZero, clBlack32);
@@ -216,8 +216,8 @@ begin
       if (tmpStr[1] <= #32) then Delete(tmpStr,1,1); //ie skip a CR or a space
 
       innerRec.Top := Round(nextCharPt.Y);
-      noto14Cache.GetTextGlyphs(innerRec, tmpStr,
-        taJustify, tvaTop, txtPaths, nextCharIdx, nextCharPt);
+      txtPaths := noto14Cache.GetTextGlyphs(innerRec, tmpStr,
+        taJustify, tvaTop, nextCharIdx, nextCharPt);
 
       if useClearType then
         DrawPolygon_ClearType(imgMain, txtPaths, frNonZero, clBlack32) else
@@ -362,7 +362,7 @@ begin
     //GET CLOCK NUMBERS (AGAIN MAKING THE FONT LARGER)
     glyphCache.FontHeight := glyphCache.FontHeight * 1.4;
     for i := 1 to 12 do
-      glyphCache.GetTextGlyphs(0,0,inttostr(i), numGlyphs[i]);
+      numGlyphs[i] := glyphCache.GetTextGlyphs(0,0,inttostr(i));
 
   finally
     fontReader.Free;

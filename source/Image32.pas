@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.16                                                            *
-* Date      :  18 March 2021                                                   *
+* Version   :  2.17                                                            *
+* Date      :  19 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -164,13 +164,11 @@ type
     procedure CopyFromDC(srcDc: HDC; const srcRect: TRect);
     //CopyToDc: Copies the image into a Windows device context
     procedure CopyToDc(dstDc: HDC; x: Integer = 0; y: Integer = 0;
-      transparent: Boolean = true; bkColor: TColor32 = clNone32); overload;
+      transparent: Boolean = true); overload;
     procedure CopyToDc(const srcRect: TRect; dstDc: HDC;
-      x: Integer = 0; y: Integer = 0; transparent: Boolean = true;
-      bkColor: TColor32 = clNone32); overload;
+      x: Integer = 0; y: Integer = 0; transparent: Boolean = true); overload;
     procedure CopyToDc(const srcRect, dstRect: TRect; dstDc: HDC;
-      transparent: Boolean = true;
-      bkColor: TColor32 = clNone32); overload;
+      transparent: Boolean = true); overload;
 {$ENDIF}
     function CopyToClipBoard: Boolean;
     class function CanPasteFromClipBoard: Boolean;
@@ -2363,89 +2361,100 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.CopyToDc(dstDc: HDC;
-  x,y: Integer; transparent: Boolean; bkColor: TColor32);
+procedure TImage32.CopyToDc(dstDc: HDC; x,y: Integer; transparent: Boolean);
 begin
   CopyToDc(Bounds, Types.Rect(x,y, x+Width, y+Height),
-    dstDc, transparent, bkColor);
+    dstDc, transparent);
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.CopyToDc(const srcRect: TRect; dstDc: HDC;
-  x: Integer = 0; y: Integer = 0;
-  transparent: Boolean = true; bkColor: TColor32 = 0);
+  x: Integer = 0; y: Integer = 0; transparent: Boolean = true);
 begin
   CopyToDc(srcRect, Types.Rect(x,y, x +RectWidth(srcRect),
-    y +RectHeight(srcRect)), dstDc, transparent, bkColor);
+    y +RectHeight(srcRect)), dstDc, transparent);
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.CopyToDc(const srcRect, dstRect: TRect; dstDc: HDC;
-  transparent: Boolean = true; bkColor: TColor32 = clNone32);
+procedure TImage32.CopyToDc(const srcRect, dstRect: TRect;
+  dstDc: HDC; transparent: Boolean = true);
 var
-  x,y, wSrc ,hSrc, wDest, hDest: integer;
+  i, x,y, wSrc ,hSrc, wDest, hDest: integer;
   rec: TRect;
-  tmp: TImage32;
   bi: TBitmapInfoHeader;
   bm, oldBm: HBitmap;
   dibBits: Pointer;
+  pc: PARGB;
   memDc: HDC;
-  hasTransparency: Boolean;
+  isTransparent: Boolean;
   bf: BLENDFUNCTION;
 begin
   IntersectRect(rec, srcRect, Bounds);
-  if IsEmpty or IsEmptyRect(rec) then Exit;
+  if IsEmpty or IsEmptyRect(rec) or IsEmptyRect(dstRect) then Exit;
   wSrc := RectWidth(rec);
   hSrc := RectHeight(rec);
   wDest := RectWidth(dstRect);
   hDest := RectHeight(dstRect);
-  tmp := TImage32.create;
+  x := dstRect.Left;
+  y := dstRect.Top;
+  inc(x, rec.Left - srcRect.Left);
+  inc(y, rec.Top - srcRect.Top);
+
+  bi := Get32bitBitmapInfoHeader(wSrc, hSrc);
+
+  isTransparent := transparent and Self.HasTransparency;
+  memDc := CreateCompatibleDC(0);
   try
-    tmp.SetSize(wSrc, hSrc);
-    tmp.CopyInternal(self, rec, tmp.Bounds, nil);
-    x := dstRect.Left;
-    y := dstRect.Top;
-    inc(x, rec.Left - srcRect.Left);
-    inc(y, rec.Top - srcRect.Top);
+    bm := CreateDIBSection(memDc, PBITMAPINFO(@bi)^,
+      DIB_RGB_COLORS, dibBits, 0, 0);
+    if bm = 0 then Exit;
 
-    bi := Get32bitBitmapInfoHeader(wSrc, hSrc);
-
-    tmp.FlipVertical; //DIB sections store pixels Y-inverted.
-    hasTransparency :=
-      transparent and (TARGB(bkColor).A < 255) and tmp.HasTransparency;
-    tmp.Premultiply;  //this is required for DIB sections
-    if bkColor <> 0 then
-      tmp.SetBackgroundColor(bkColor);
-    memDc := CreateCompatibleDC(0);
     try
-      bm := CreateDIBSection(memDc, PBITMAPINFO(@bi)^,
-        DIB_RGB_COLORS, dibBits, 0, 0);
-      if bm = 0 then Exit;
-      try
-        Move(tmp.PixelBase^, dibBits^, wSrc * hSrc * SizeOf(TColor32));
-        oldBm := SelectObject(memDC, bm);
-        if HasTransparency then
-        begin
-          bf.BlendOp := AC_SRC_OVER;
-          bf.BlendFlags := 0;
-          bf.SourceConstantAlpha := 255;
-          bf.AlphaFormat := AC_SRC_ALPHA;
-          AlphaBlend(dstDc, x,y, wDest,hDest, memDC, 0,0, wSrc,hSrc, bf);
-        end
-        else if (wDest = wSrc) and (hDest = hSrc) then
-          BitBlt(dstDc, x,y, wSrc, hSrc, memDc, 0,0, SRCCOPY)
-        else
-          StretchBlt(dstDc, x,y, wDest,hDest, memDc, 0,0, wSrc,hSrc, SRCCOPY);
-
-        SelectObject(memDC, oldBm);
-      finally
-        DeleteObject(bm);
+      //copy Image to dibBits (with vertical flip)
+      pc := dibBits;
+      for i := rec.Bottom -1 downto rec.Top do
+      begin
+        Move(Pixels[i * Width + rec.Left], pc^, wSrc * SizeOf(TColor32));
+        inc(pc, wSrc);
       end;
+
+      oldBm := SelectObject(memDC, bm);
+
+      if isTransparent then
+      begin
+
+        //premultiplied alphas are required when alpha blending
+        pc := dibBits;
+        for i := 0 to wSrc * hSrc -1 do
+        begin
+          if pc.A = 0 then
+            pc.Color := 0
+          else
+          begin
+            pc.R  := MulBytes(pc.R, pc.A);
+            pc.G  := MulBytes(pc.G, pc.A);
+            pc.B  := MulBytes(pc.B, pc.A);
+          end;
+          inc(pc);
+        end;
+
+        bf.BlendOp := AC_SRC_OVER;
+        bf.BlendFlags := 0;
+        bf.SourceConstantAlpha := 255;
+        bf.AlphaFormat := AC_SRC_ALPHA;
+        AlphaBlend(dstDc, x,y, wDest,hDest, memDC, 0,0, wSrc,hSrc, bf);
+      end
+      else if (wDest = wSrc) and (hDest = hSrc) then
+        BitBlt(dstDc, x,y, wSrc, hSrc, memDc, 0,0, SRCCOPY)
+      else
+        StretchBlt(dstDc, x,y, wDest,hDest, memDc, 0,0, wSrc,hSrc, SRCCOPY);
+
+      SelectObject(memDC, oldBm);
     finally
-      DeleteDc(memDc);
+      DeleteObject(bm);
     end;
   finally
-    tmp.Free;
+    DeleteDc(memDc);
   end;
 end;
 //------------------------------------------------------------------------------

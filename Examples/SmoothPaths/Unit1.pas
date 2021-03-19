@@ -216,7 +216,7 @@ var
 begin
   pc := TColor32(StrToInt64Def(edPenColor.Text, $990000));
   bc := TColor32(StrToInt64Def(edFillColor.Text, $FFAAAA));
-  lineWidth := Max(2, Min(25, strtoint(edWidth.text)));
+  lineWidth := Max(2, Min(50, strtoint(edWidth.text)));
 
   FrmMain.Shape1.Pen.Width := lineWidth div 2;
   FrmMain.Shape1.Pen.Color := RgbColor(pc);
@@ -288,7 +288,7 @@ begin
   else if Assigned(smoothGroupLayer) and
     Assigned(smoothGroupLayer.ActiveButtonLayer) then
   begin
-    //clicking 'air'
+    //clicking nothing
     FreeAndNil(rotateGroupLayer);
     mnuRotateButtons.Checked := false;
     smoothGroupLayer.ActiveButtonLayer := nil;

@@ -90,6 +90,7 @@ procedure Draw3D(img: TImage32; const polygons: TPathsD;
   colorLt: TColor32 = $DDFFFFFF; colorDk: TColor32 = $80000000;
   angleRads: double = angle45); overload;
 
+function RainbowColor(fraction: double): TColor32;
 function GradientColor(color1, color2: TColor32; frac: single): TColor32;
 function MakeDarker(color: TColor32; percent: cardinal): TColor32;
 function MakeLighter(color: TColor32; percent: cardinal): TColor32;
@@ -1081,6 +1082,25 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function RainbowColor(fraction: double): TColor32;
+begin
+  if (fraction >= 1) or (fraction <= 0) then
+    result := clRed32
+  else
+  begin
+    fraction := fraction * 6;
+    case trunc(fraction) of
+      0: result := GradientColor(clRed32, clYellow32, frac(fraction));
+      1: result := GradientColor(clYellow32, clLime32, frac(fraction));
+      2: result := GradientColor(clLime32, clAqua32, frac(fraction));
+      3: result := GradientColor(clAqua32, clBlue32, frac(fraction));
+      4: result := GradientColor(clBlue32, clFuchsia32, frac(fraction));
+      else result := GradientColor(clFuchsia32, clRed32, frac(fraction));
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
 function GradientColor(color1, color2: TColor32; frac: single): TColor32;
 var
   c1: TARGB absolute color1;
@@ -1898,11 +1918,8 @@ begin
     if opaquePxlFound then break;
   end;
 
-  if not opaquePxlFound then
-  begin
-    Result := NullRect;
-    Exit;
-  end;
+  //probably safeset not to resize empty images
+  if not opaquePxlFound then Exit;
 
   if y1 > 0 then
   begin

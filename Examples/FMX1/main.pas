@@ -62,7 +62,6 @@ ResourceString
 procedure TMainForm.FormCreate(Sender: TObject);
 var
   matrix: TMatrixD;
-  nextX: double;
   fontCache: TGlyphCache;
   fontReader : TFontReader;
 begin
@@ -89,15 +88,15 @@ begin
     //and get 'copyright' glyph outline ...
     fontReader.LoadFromResource('FONT_1', RT_RCDATA);
     if fontReader.IsValidFontFormat then
-      fontCache.GetTextGlyphs(0,0,#$00A9' 2020 Angus Johnson',
-        copyrightGlyphs, nextX);
+      copyrightGlyphs :=
+        fontCache.GetTextGlyphs(0,0,#$00A9' 2020 Angus Johnson');
 
     //connect fontReader to a decorative ttf font resource
     //and get 'bigText' glyph outlines ...
     fontReader.LoadFromResource('FONT_2', RT_RCDATA);
     fontCache.FontHeight := screenScale * 25;
     if fontReader.IsValidFontFormat then
-      fontCache.GetTextGlyphs(0, 0, rsBigText, bigTextGlyphs, nextX);
+      bigTextGlyphs := fontCache.GetTextGlyphs(0, 0, rsBigText);
 
     bigTextGlyphs := InflatePaths(bigTextGlyphs,1.5,jsAuto,esPolygon); //bolder
     matrix := IdentityMatrix;

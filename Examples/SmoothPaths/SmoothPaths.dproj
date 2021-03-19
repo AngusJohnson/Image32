@@ -54,6 +54,10 @@
         <DCC_S>false</DCC_S>
         <DCC_F>false</DCC_F>
         <DCC_K>false</DCC_K>
+        <DCC_ExeOutput>.\</DCC_ExeOutput>
+        <DCC_DcuOutput>.\bin</DCC_DcuOutput>
+        <VerInfo_Locale>3081</VerInfo_Locale>
+        <VerInfo_Keys>CompanyName=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName);FileDescription=$(MSBuildProjectName);ProductName=$(MSBuildProjectName)</VerInfo_Keys>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_ExeOutput>.\bin</DCC_ExeOutput>
@@ -134,13 +138,13 @@
                 </Excluded_Packages>
             </Delphi.Personality>
             <Deployment Version="3">
-                <DeployFile LocalName="bin\SmoothPaths.exe" Configuration="Release" Class="ProjectOutput">
+                <DeployFile LocalName="bin\SmoothPaths.exe" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>SmoothPaths.exe</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="bin\SmoothPaths.exe" Configuration="Debug" Class="ProjectOutput">
+                <DeployFile LocalName="bin\SmoothPaths.exe" Configuration="Release" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>SmoothPaths.exe</RemoteName>
                         <Overwrite>true</Overwrite>

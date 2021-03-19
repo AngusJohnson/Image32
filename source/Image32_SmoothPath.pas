@@ -761,6 +761,7 @@ begin
     (Assigned(activeButton) and (activeButton.GroupOwner <> self)) then Exit;
   fActiveButton := activeButton;
   if Assigned(activeButton) then Invalidate(activeButton.Bounds);
+  PaintDesignerLayer;
 end;
 //------------------------------------------------------------------------------
 

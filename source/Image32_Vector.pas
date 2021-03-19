@@ -1292,9 +1292,11 @@ var
     P2: TPointD;
   begin
     sinA := normalA.x * normalB.y - normalA.y * normalB.x;
-    if (delta * sinA < 0) then //concave
+    //nb: accommodate float imprecision with values >>> 180 degrees
+    if (delta * sinA < -0.01) then //concave
+    begin
       AddBevel(N1, N2)
-    else
+    end else
     begin
       a := ArcTan2(sinA, cosA);
       steps := Round(stepsPerRad * Abs(a));

@@ -91,7 +91,7 @@ object FrmMain: TFrmMain
       Height = 22
       Associate = edWidth
       Min = 1
-      Max = 25
+      Max = 50
       Position = 5
       TabOrder = 3
     end

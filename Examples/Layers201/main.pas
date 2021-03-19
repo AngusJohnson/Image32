@@ -129,7 +129,7 @@ procedure TMyRasterLayer32.Init(const filename: string; const centerPt: TPointD)
 begin
   if not MasterImage.LoadFromFile(filename) then
     MasterImage.SetSize(100,100, clBlack32);
-  MasterImage.CropTransparentPixels;
+  SymmetricCropTransparent(MasterImage);
 
   //Setting MasterImage.AntiAliased := false
   //will speed up transformations significantly,
@@ -196,7 +196,7 @@ var
   tmp: TPathsD;
 begin
   Name := word;
-  fontCache.GetTextGlyphs(0, 0, word, tmp);
+  tmp := fontCache.GetTextGlyphs(0, 0, word);
   tmp := ScalePath(tmp, 1, 2.0);
   rec := Image32_Vector.GetBoundsD(tmp);
   with centerPt do
@@ -412,6 +412,7 @@ begin
 
   layeredImage := TLayeredImage32.Create();
   layeredImage.AddLayer(TDesignerLayer32);
+  layeredImage.BackgroundColor := Color32(Self.Color);
 
   fontReader := TFontReader.Create;
   fontReader.LoadFromResource('FONT_NSB', RT_RCDATA);
@@ -458,10 +459,11 @@ var
 begin
   if not Assigned(layeredImage) then Exit; //ie when form closing
 
-  // resize layeredImage
+  //resize layeredImage
   rec := ClientRect;
   Dec(rec.Bottom, StatusBar1.Height);
   layeredImage.SetSize(RectWidth(rec), RectHeight(rec));
+
   with layeredImage[0] do
   begin
     SetSize(layeredImage.Width, layeredImage.Height);

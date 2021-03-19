@@ -183,7 +183,7 @@ end;
 procedure TMyRasterLayer32.Init(const pt: TPoint);
 begin
   MasterImage.CropTransparentPixels;
-  Image.Assign(MasterImage);
+  SymmetricCropTransparent(MasterImage);
   PositionCenteredAt(pt);
   UpdateHitTestMaskTransparent;
 end;
@@ -296,7 +296,7 @@ var
   rec: TRectD;
 begin
   randomWord := wordStrings[Random(wordStrings.Count)];
-  fontCache.GetTextGlyphs(0, 0, randomWord, tmp);
+  tmp := fontCache.GetTextGlyphs(0, 0, randomWord);
   tmp := ScalePath(tmp, 1, 2.0);
   rec := Image32_Vector.GetBoundsD(tmp);
   with popupPoint do
@@ -456,13 +456,6 @@ begin
     //in the sizing group and get the bounds rect for the target layer
     rec := UpdateSizingButtonGroup(clickedLayer);
     targetLayer.SetBounds(rec);
-
-    if targetLayer is TMyRasterLayer32 then
-      with TMyRasterLayer32(targetLayer) do
-    begin
-      Image.Copy(MasterImage, MasterImage.Bounds, Image.Bounds);
-      UpdateHitTestMaskTransparent;
-    end;
 
   end
   else if Assigned(targetLayer) then

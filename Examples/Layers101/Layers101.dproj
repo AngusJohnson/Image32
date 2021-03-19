@@ -68,6 +68,8 @@
         <DCC_K>false</DCC_K>
         <VerInfo_Locale>3081</VerInfo_Locale>
         <VerInfo_Keys>CompanyName=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName);FileDescription=$(MSBuildProjectName);ProductName=$(MSBuildProjectName)</VerInfo_Keys>
+        <DCC_ExeOutput>.\</DCC_ExeOutput>
+        <DCC_DcuOutput>.\bin</DCC_DcuOutput>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_DcuOutput>.\bin</DCC_DcuOutput>
@@ -167,13 +169,13 @@
                 </Excluded_Packages>
             </Delphi.Personality>
             <Deployment Version="3">
-                <DeployFile LocalName="bin\Layers101.exe" Configuration="Release" Class="ProjectOutput">
+                <DeployFile LocalName="Layers101.exe" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>Layers101.exe</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="Layers101.exe" Configuration="Debug" Class="ProjectOutput">
+                <DeployFile LocalName="bin\Layers101.exe" Configuration="Release" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>Layers101.exe</RemoteName>
                         <Overwrite>true</Overwrite>

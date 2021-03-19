@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.16                                                            *
-* Date      :  18 March 2021                                                   *
+* Version   :  2.17                                                            *
+* Date      :  19 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -1280,7 +1280,7 @@ begin
       fMatrix := IdentityMatrix;
       fRotating := false;
       fRefreshPending := true;
-      SymmetricCropTransparent(MasterImage);
+      //SymmetricCropTransparent(MasterImage); //not safe here!
       with MasterImage do
         fSavedSize := Image32_Vector.Size(Width, Height);
       Image.Assign(MasterImage); //this will call ImageChange for Image
@@ -1565,11 +1565,9 @@ begin
         Image32_Vector.IntersectRect(fLocalInvalidRect, updateRect);
 
     fLocalInvalidRect := NullRect;
-    if fBackColor <> clNone32 then
-      Image.FillRect(updateRect, fBackColor);
+    Image.FillRect(updateRect, fBackColor);
     Merge(hideDesigners, updateRect);
     Result := Image;
-
     if hideDesigners then
       fLastUpdateType := utHideDesigners else
       fLastUpdateType := utShowDesigners;
