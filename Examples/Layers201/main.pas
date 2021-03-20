@@ -103,10 +103,11 @@ type
     PenColor  : TColor32;
     PenWidth  : double;
     procedure InitRandomColors;
+  protected
+    procedure Draw; override;
   public
     constructor Create(groupOwner: TGroupLayer32;
       const name: string = ''); override;
-    procedure Draw(Sender: TObject);
   end;
 
   TMyTextLayer32 = class(TMyVectorLayer32)
@@ -129,7 +130,7 @@ procedure TMyRasterLayer32.Init(const filename: string; const centerPt: TPointD)
 begin
   if not MasterImage.LoadFromFile(filename) then
     MasterImage.SetSize(100,100, clBlack32);
-  SymmetricCropTransparent(MasterImage);
+  MasterImage.CropTransparentPixels; //important for rotational stability
 
   //Setting MasterImage.AntiAliased := false
   //will speed up transformations significantly,
@@ -146,6 +147,7 @@ begin
   Image.Assign(MasterImage);
   PositionCenteredAt(centerPt);
   UpdateHitTestMaskTransparent;
+  AutoPivot := false; // :)
 end;
 
 //------------------------------------------------------------------------------
@@ -157,9 +159,9 @@ constructor TMyVectorLayer32.Create(groupOwner: TGroupLayer32;
 begin
   inherited;
   InitRandomColors;
-  PenWidth := DPIAware(1.5);
-  OnDraw := Draw;
+  PenWidth := DPIAware(1);
   Margin := 20;
+  AutoPivot := false; // :)
 end;
 //------------------------------------------------------------------------------
 
@@ -176,14 +178,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMyVectorLayer32.Draw(Sender: TObject);
+procedure TMyVectorLayer32.Draw;
 var
-  p: TPathsD;
+  pp: TPathsD;
 begin
-  p := OffsetPath(Paths, -Left, -Top);
-  DrawPolygon(Image, p, frEvenOdd, BrushColor);
-  DrawLine(Image, p, PenWidth, PenColor, esPolygon);
-  UpdateHitTestMask(p, frEvenOdd);
+  pp := OffsetPath(Paths, -Left, -Top);
+  DrawPolygon(Image, pp, frEvenOdd, BrushColor);
+  Draw3D(Image, pp, frEvenOdd, 5, 2);
+  DrawLine(Image, pp, PenWidth, PenColor, esPolygon);
+  UpdateHitTestMask(pp, frEvenOdd);
 end;
 
 //------------------------------------------------------------------------------
@@ -576,16 +579,22 @@ begin
     targetLayer.SetBounds(rec);
   end
 
-  //if moving the rotate button
+  //if moving a rotate button
   else if (clickedLayer.GroupOwner = rotatingButtonGroup) then
   begin
-    //Update rotatingButtonGroup and get the new angle
-    newAngle := UpdateRotatingButtonGroup(clickedLayer);
-
-    TRotateLayer32(targetLayer).Angle := newAngle;
-
-    if newAngle > PI then newAngle := newAngle - Pi*2;
-    StatusBar1.SimpleText := format('angle: %1.0n deg.',[newAngle * 180/pi]);
+    if clickedLayer = rotatingButtonGroup.PivotButton then
+    begin
+      clickedLayer.Offset(-dx, -dy);     //temp undo button move
+      rotatingButtonGroup.Offset(dx,dy); //move the rotate group
+      targetLayer.PivotPt := clickedLayer.MidPoint;
+    end else
+    begin
+      //Update rotatingButtonGroup and get the new angle
+      newAngle := UpdateRotatingButtonGroup(clickedLayer);
+      TRotateLayer32(targetLayer).Angle := newAngle;
+      if newAngle > PI then newAngle := newAngle - Pi*2;
+      StatusBar1.SimpleText := format('angle: %1.0n deg.',[newAngle * 180/pi]);
+    end;
   end
 
   //if moving an arrow designer button
@@ -602,17 +611,13 @@ begin
       sizingButtonGroup.Offset(dx, dy)
     else if Assigned(rotatingButtonGroup) then
     begin
-      if (targetLayer is TMyVectorLayer32) and
-        not TMyVectorLayer32(targetLayer).AutoCenterPivot then
-        //don't move the rotatingButtonGroup if AutoCenterPivot is disabled.
-      else
+      if TRotateLayer32(targetLayer).AutoPivot then
         rotatingButtonGroup.Offset(dx, dy);
     end
     else if Assigned(arrowButtonGroup) then
       arrowButtonGroup.Offset(dx, dy);
     //StatusBar1.SimpleText := '';
   end;
-
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -713,7 +718,7 @@ end;
 procedure TMainForm.mnuRotateClick(Sender: TObject);
 var
   displayAngle: double;
-  pt: TPointD;
+  pivot: TPointD;
 begin
   if not assigned(targetLayer) then Exit;
 
@@ -732,11 +737,16 @@ begin
   begin
     //toggle on the rotating button using the previous rotation angle
     DeleteAllControlButtons;
-    pt := targetLayer.MidPoint;
-    displayAngle := targetLayer.Angle;
 
+    pivot := targetLayer.MidPoint;
+
+    with TRotateLayer32(targetLayer) do
+      if not AutoPivot then
+        targetLayer.PivotPt := pivot;
+
+    displayAngle := targetLayer.Angle;
     rotatingButtonGroup := CreateRotatingButtonGroup(
-      targetLayer, pt, DPIAware(10),
+      targetLayer, pivot, DPIAware(10),
       clWhite32, clLime32, displayAngle, -Angle90);
     rotatingButtonGroup.CursorId := crRotate;
 

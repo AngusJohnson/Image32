@@ -167,30 +167,32 @@ type
   end;
 
   TRotateLayer32 = class(THitTestLayer32) //abstract rotating layer class
-  protected
-    function  GetAngle: double; virtual; abstract;
-    procedure SetAngle(newAngle: double); virtual; abstract;
+  private
+    fAngle      : double;
+    fPivotPt    : TPointD;
+    fAutoPivot  : Boolean;
+    procedure SetAngle(newAngle: double);
+    function  GetPivotPt: TPointD;
+    procedure SetPivotPt(const pivot: TPointD);
+    procedure SetAutoPivot(val: Boolean);
   public
-    procedure Rotate(angleDelta: double); virtual; abstract;
-    property  Angle: double read GetAngle write SetAngle;
+    constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
+    procedure Rotate(angleDelta: double); virtual;
+    property  Angle: double read fAngle write SetAngle;
+    property  PivotPt: TPointD read GetPivotPt write SetPivotPt;
+    property  AutoPivot: Boolean read fAutoPivot write SetAutoPivot;
   end;
 
   TVectorLayer32 = class(TRotateLayer32) //display layer for vector images
   private
     fPaths      : TPathsD;
     fMargin     : integer;
-    fAngle      : double;
-    fPivotPt    : TPointD;
-    fAutoPivot  : Boolean;
     fOnDraw     : TNotifyEvent;
     procedure SetMargin(new: integer);
     procedure RepositionAndDraw;
     procedure SetPaths(const newPaths: TPathsD);
-    procedure SetPivotPt(const pivot: TPointD);
-    procedure SetAutoPivot(val: Boolean);
   protected
-    function  GetAngle: double; override;
-    procedure SetAngle(newAngle: double); override;
+    procedure Draw; virtual;
   public
     constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
     procedure SetBounds(const newBounds: TRect); override;
@@ -201,18 +203,15 @@ type
       fillRule: TFillRule); virtual;
     property  Paths: TPathsD read fPaths write SetPaths;
     property  Margin: integer read fMargin write SetMargin;
-    property  PivotPt: TPointD read fPivotPt write SetPivotPt;
-    property  AutoCenterPivot: Boolean read fAutoPivot write SetAutoPivot;
     property  OnDraw: TNotifyEvent read fOnDraw write fOnDraw;
   end;
 
   TRasterLayer32 = class(TRotateLayer32) //display laer for raster images
   private
     fMasterImg    : TImage32;
-    //a matrix allows combining any number of sizing & rotating
+    //a matrix allows the combining any number of sizing & rotating
     //operations into a single transformation
     fMatrix       : TMatrixD;
-    fAngle        : double;
     fRotating     : Boolean;
     fSavedSize    : TSize;
     fAutoHitTest  : Boolean;
@@ -221,8 +220,6 @@ type
     procedure DoPreRotationCheck;
     function  GetMatrix: TMatrixD;
   protected
-    function  GetAngle: double; override;
-    procedure SetAngle(newAngle: double); override;
     procedure ImageChanged(Sender: TImage32); override;
   public
     constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
@@ -231,7 +228,6 @@ type
     procedure UpdateHitTestMaskTransparent; overload; virtual;
     procedure UpdateHitTestMaskTransparent(compareFunc: TCompareFunction;
       referenceColor: TColor32; tolerance: integer); overload; virtual;
-
     procedure SetBounds(const newBounds: TRect); override;
     procedure Rotate(angleDelta: double); override;
 
@@ -239,6 +235,10 @@ type
     property  MasterImage: TImage32 read fMasterImg;
     property  Matrix: TMatrixD read GetMatrix;
   end;
+
+  TDesignerLayer32 = class;
+  TButtonDesignerLayer32 = class;
+  TButtonDesignerLayer32Class = class of TButtonDesignerLayer32;
 
   TSizingGroupLayer32 = class(TGroupLayer32) //groups sizing buttons
   private
@@ -255,15 +255,23 @@ type
     procedure SetRotCur(curId: integer);
     function GetAngle: double;
     function GetPivot: TPointD;
+    function GetAngleBtn: TButtonDesignerLayer32;
+    function GetPivotBtn: TButtonDesignerLayer32;
+    function GetDesignLayer: TDesignerLayer32;
+    property DesignLayer: TDesignerLayer32 read GetDesignLayer;
   public
+    procedure Init(const rec: TRect; buttonSize: integer;
+      centerButtonColor, movingButtonColor: TColor32;
+      startingAngle: double; startingZeroOffset: double;
+      buttonLayerClass: TButtonDesignerLayer32Class);
     property Angle: double read GetAngle;
     property Pivot: TPointD read GetPivot;
+    property AngleButton: TButtonDesignerLayer32 read GetAngleBtn;
+    property PivotButton: TButtonDesignerLayer32 read GetPivotBtn;
     property CursorId: integer read GetRotCur write SetRotCur;
     property DistBetweenButtons: double read GetDistance;
   end;
 
-  TButtonDesignerLayer32 = class;
-  TButtonDesignerLayer32Class = class of TButtonDesignerLayer32;
 
   TButtonGroupLayer32 = class(TGroupLayer32) //groups generic buttons
   private
@@ -353,16 +361,16 @@ function CreateSizingButtonGroup(targetLayer: TLayer32;
 
 function CreateRotatingButtonGroup(targetLayer: TLayer32;
   const pivot: TPointD; buttonSize: integer = 0;
-  centerButtonColor: TColor32 = clWhite32;
-  movingButtonColor: TColor32 = clBlue32;
-  startingAngle: double = 0; startingZeroOffset: double = 0;
+  pivotButtonColor: TColor32 = clWhite32;
+  angleButtonColor: TColor32 = clBlue32;
+  initialAngle: double = 0; angleOffset: double = 0;
   buttonLayerClass: TButtonDesignerLayer32Class = nil): TRotatingGroupLayer32; overload;
 
 function CreateRotatingButtonGroup(targetLayer: TLayer32;
   buttonSize: integer = 0;
-  centerButtonColor: TColor32 = clWhite32;
-  movingButtonColor: TColor32 = clBlue32;
-  startingAngle: double = 0; startingZeroOffset: double = 0;
+  pivotButtonColor: TColor32 = clWhite32;
+  angleButtonColor: TColor32 = clBlue32;
+  initialAngle: double = 0; angleOffset: double = 0;
   buttonLayerClass: TButtonDesignerLayer32Class = nil): TRotatingGroupLayer32; overload;
 
 function CreateButtonGroup(groupOwner: TGroupLayer32;
@@ -1068,6 +1076,59 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// TRotateLayer32 class
+//------------------------------------------------------------------------------
+
+constructor TRotateLayer32.Create(groupOwner: TGroupLayer32;
+  const name: string = '');
+begin
+  inherited;
+  fAutoPivot := true;
+  fPivotPt := InvalidPointD;
+end;
+//------------------------------------------------------------------------------
+
+procedure TRotateLayer32.SetAngle(newAngle: double);
+begin
+  NormalizeAngle(newAngle);
+  if newAngle = fAngle then Exit;
+  if PointsEqual(fPivotPt, InvalidPointD) then
+    fPivotPt := MidPoint;
+  Rotate(newAngle - fAngle);
+end;
+//------------------------------------------------------------------------------
+
+procedure TRotateLayer32.Rotate(angleDelta: double);
+begin
+  if angleDelta = 0 then Exit;
+  fAngle := fAngle + angleDelta;
+  NormalizeAngle(fAngle);
+end;
+//------------------------------------------------------------------------------
+
+function TRotateLayer32.GetPivotPt: TPointD;
+begin
+  if PointsEqual(fPivotPt, InvalidPointD) then
+    Result := MidPoint else
+    Result := fPivotPt;
+end;
+//------------------------------------------------------------------------------
+
+procedure TRotateLayer32.SetPivotPt(const pivot: TPointD);
+begin
+  if fAutoPivot then fAutoPivot := false;
+  fPivotPt := pivot;
+end;
+//------------------------------------------------------------------------------
+
+procedure TRotateLayer32.SetAutoPivot(val: Boolean);
+begin
+  if val = fAutoPivot then Exit;
+  fAutoPivot := val;
+  fPivotPt := InvalidPointD;
+end;
+
+//------------------------------------------------------------------------------
 // TVectorLayer32 class
 //------------------------------------------------------------------------------
 
@@ -1077,29 +1138,16 @@ begin
   inherited;
   fMargin := DpiAware(2);
   fCursorId := crHandPoint;
-  fAutoPivot := true;
 end;
 //------------------------------------------------------------------------------
 
 procedure TVectorLayer32.Rotate(angleDelta: double);
 begin
   if angleDelta = 0 then Exit;
-  fAngle := fAngle + angleDelta;
-  NormalizeAngle(fAngle);
+  inherited;
+
   fPaths := RotatePath(fPaths, fPivotPt, angleDelta);
   RepositionAndDraw;
-end;
-//------------------------------------------------------------------------------
-
-function  TVectorLayer32.GetAngle: double;
-begin
-  Result := fAngle;
-end;
-//------------------------------------------------------------------------------
-
-procedure TVectorLayer32.SetAngle(newAngle: double);
-begin
-  Rotate(newAngle - fAngle);
 end;
 //------------------------------------------------------------------------------
 
@@ -1112,22 +1160,8 @@ end;
 procedure TVectorLayer32.SetPaths(const newPaths: TPathsD);
 begin
   fPaths := CopyPaths(newPaths);
+  fPivotPt := InvalidPointD;
   RepositionAndDraw;
-end;
-//------------------------------------------------------------------------------
-
-procedure TVectorLayer32.SetPivotPt(const pivot: TPointD);
-begin
-  if fAutoPivot then
-    fPivotPt := MidPoint else
-    fPivotPt := pivot;
-end;
-//------------------------------------------------------------------------------
-
-procedure TVectorLayer32.SetAutoPivot(val: Boolean);
-begin
-  fAutoPivot := val;
-  if fAutoPivot then fPivotPt := MidPoint;
 end;
 //------------------------------------------------------------------------------
 
@@ -1151,7 +1185,7 @@ begin
     MatrixScale(mat, w/(Width - m2), h/(Height - m2));
     MatrixTranslate(mat, newBounds.Left + Margin, newBounds.Top + Margin);
     MatrixApply(mat, fPaths);
-
+    if fAutoPivot then fPivotPt := InvalidPointD;
     RepositionAndDraw;
   end else
     inherited;
@@ -1162,7 +1196,7 @@ procedure TVectorLayer32.Offset(dx,dy: integer);
 begin
   inherited;
   fPaths := OffsetPath(fPaths, dx,dy);
-  if fAutoPivot then
+  if fAutoPivot and not PointsEqual(fPivotPt, InvalidPointD) then
     fPivotPt := OffsetPoint(fPivotPt, dx,dy);
 end;
 //------------------------------------------------------------------------------
@@ -1183,7 +1217,19 @@ begin
   rec := Image32_Vector.GetBounds(fPaths);
   rec := Image32_Vector.InflateRect(rec, Margin, Margin);
   inherited SetBounds(rec);
-  if fAutoPivot then fPivotPt := MidPoint;
+  Image.BlockUpdate;
+  try
+    Draw;
+  finally
+    Image.UnblockUpdate;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TVectorLayer32.Draw;
+begin
+  //to draw the layer, either override this event
+  //in a descendant class or assign the OnDraw property
   if Assigned(fOnDraw) then fOnDraw(self);
 end;
 //------------------------------------------------------------------------------
@@ -1280,7 +1326,6 @@ begin
       fMatrix := IdentityMatrix;
       fRotating := false;
       fRefreshPending := true;
-      //SymmetricCropTransparent(MasterImage); //not safe here!
       with MasterImage do
         fSavedSize := Image32_Vector.Size(Width, Height);
       Image.Assign(MasterImage); //this will call ImageChange for Image
@@ -1309,6 +1354,8 @@ begin
       Image.Assign(MasterImage);
       //apply any prior transformations
       AffineTransformImage(Image, fMatrix);
+      //unfortunately cropping isn't an affine transformation
+      //so we have to crop separately and before the final resize
       SymmetricCropTransparent(Image);
       Image.Resize(newWidth, newHeight);
       PositionAt(newBounds.TopLeft);
@@ -1318,13 +1365,6 @@ begin
     DoAutoHitTest;
   end else
     inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TRasterLayer32.Rotate(angleDelta: double);
-begin
-  if angleDelta = 0 then Exit;
-  SetAngle(fAngle + angleDelta);
 end;
 //------------------------------------------------------------------------------
 
@@ -1372,36 +1412,39 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TRasterLayer32.GetAngle: double;
-begin
-  Result := fAngle;
-end;
-//------------------------------------------------------------------------------
-
-procedure TRasterLayer32.SetAngle(newAngle: double);
+procedure TRasterLayer32.Rotate(angleDelta: double);
 var
-  savedMidpoint: TPointD;
+  mp: TPointD;
   mat: TMatrixD;
   rec: TRectD;
 begin
-  NormalizeAngle(newAngle);
-  if MasterImage.IsEmpty or (fAngle = newAngle) then Exit;
+
+  if MasterImage.IsEmpty or (angleDelta = 0) then Exit;
+  inherited;
+
   DoPreRotationCheck;
 
-  fAngle := newAngle;
-  savedMidpoint := MidPoint;
-  Image.Assign(MasterImage);
-  rec := GetRotatedRectBounds(RectD(Image.Bounds), fAngle);
+  mp := MidPoint;
+  if not AutoPivot then
+    RotatePoint(mp, PivotPt, angleDelta);
 
-  //get prior transformations and apply new rotation
-  mat := fMatrix;
-  MatrixTranslate(mat, -Width/2,-Height/2);
-  MatrixRotate(mat, NullPointD, fAngle);
-  MatrixTranslate(mat, rec.Width/2, rec.Height/2);
-  AffineTransformImage(Image, mat);
-  //symmetric cropping prevents center wobbling
-  SymmetricCropTransparent(Image);
-  PositionCenteredAt(savedMidpoint);
+  Image.BlockUpdate;
+  try
+    Image.Assign(MasterImage);
+    rec := GetRotatedRectBounds(RectD(Image.Bounds), Angle);
+
+    //get prior transformations and apply new rotation
+    mat := fMatrix;
+    MatrixTranslate(mat, -Width/2,-Height/2);
+    MatrixRotate(mat, NullPointD, Angle);
+    MatrixTranslate(mat, rec.Width/2, rec.Height/2);
+    AffineTransformImage(Image, mat);
+    //symmetric cropping prevents center wobbling
+    SymmetricCropTransparent(Image);
+  finally
+    Image.UnblockUpdate;
+  end;
+  PositionCenteredAt(mp);
   DoAutoHitTest;
 end;
 
@@ -1409,9 +1452,80 @@ end;
 // TRotatingGroupLayer32 class
 //------------------------------------------------------------------------------
 
+procedure TRotatingGroupLayer32.Init(const rec: TRect;
+  buttonSize: integer; centerButtonColor, movingButtonColor: TColor32;
+  startingAngle: double; startingZeroOffset: double;
+  buttonLayerClass: TButtonDesignerLayer32Class);
+var
+  i, dist: integer;
+  pivot, pt: TPoint;
+  rec2, r: TRectD;
+begin
+  //startingZeroOffset: default = 0 (ie 3 o'clock)
+  if not ClockwiseRotationIsAnglePositive then
+    startingZeroOffset := -startingZeroOffset;
+  fZeroOffset := startingZeroOffset;
+
+  if buttonSize <= 0 then buttonSize := DefaultButtonSize;
+  pivot := Image32_Vector.MidPoint(rec);
+  dist := Average(RectWidth(rec), RectHeight(rec)) div 2;
+  rec2 := RectD(pivot.X -dist,pivot.Y -dist,pivot.X +dist,pivot.Y +dist);
+
+  with AddChild(TDesignerLayer32) do     //Layer 0 - design layer
+  begin
+    SetBounds(Rect(rec2));
+    i := DPIAware(2);
+    r := InflateRect(rec2, -i,-i);
+    OffsetRect(r, -Left, -Top);
+    DrawDashedLine(Image, Ellipse(r), dashes, nil, i, clRed32, esPolygon);
+  end;
+
+  if not assigned(buttonLayerClass) then
+    buttonLayerClass := TButtonDesignerLayer32;
+
+  with TButtonDesignerLayer32(AddChild(  //Layer 1 - pivot button
+    buttonLayerClass, rsButton)) do
+  begin
+    SetButtonAttributes(bsRound, buttonSize, centerButtonColor);
+    PositionCenteredAt(Image32_Vector.MidPoint(rec));
+    CursorId := crSizeAll;
+  end;
+
+  with TButtonDesignerLayer32(AddChild(  //layer 2 - angle (rotating) button
+    buttonLayerClass, rsButton)) do
+  begin
+    SetButtonAttributes(bsRound, buttonSize, movingButtonColor);
+
+    pt := Point(GetPointAtAngleAndDist(PointD(pivot),
+      startingAngle + startingZeroOffset, dist));
+    PositionCenteredAt(pt);
+    CursorId := crHandPoint;
+  end;
+
+end;
+//------------------------------------------------------------------------------
+
 function TRotatingGroupLayer32.GetPivot: TPointD;
 begin
   Result := Child[1].MidPoint;
+end;
+//------------------------------------------------------------------------------
+
+function TRotatingGroupLayer32.GetAngleBtn: TButtonDesignerLayer32;
+begin
+  Result := Child[2] as TButtonDesignerLayer32;
+end;
+//------------------------------------------------------------------------------
+
+function TRotatingGroupLayer32.GetPivotBtn: TButtonDesignerLayer32;
+begin
+  Result := Child[1] as TButtonDesignerLayer32;
+end;
+//------------------------------------------------------------------------------
+
+function TRotatingGroupLayer32.GetDesignLayer: TDesignerLayer32;
+begin
+  Result := Child[0] as TDesignerLayer32;
 end;
 //------------------------------------------------------------------------------
 
@@ -1872,13 +1986,12 @@ end;
 
 function CreateRotatingButtonGroup(targetLayer: TLayer32;
   const pivot: TPointD; buttonSize: integer;
-  centerButtonColor, movingButtonColor: TColor32;
-  startingAngle: double; startingZeroOffset: double;
+  pivotButtonColor, angleButtonColor: TColor32;
+  initialAngle: double; angleOffset: double;
   buttonLayerClass: TButtonDesignerLayer32Class): TRotatingGroupLayer32;
 var
-  rec, rec2: TRectD;
-  pt: TPoint;
-  radius, i: integer;
+  rec: TRectD;
+  radius: integer;
 begin
   if not assigned(targetLayer) or
     not (targetLayer is THitTestLayer32) then
@@ -1887,64 +2000,32 @@ begin
   Result := TRotatingGroupLayer32(targetLayer.RootOwner.AddLayer(
     TRotatingGroupLayer32, nil, rsRotatingButtonGroup));
 
-  //startingZeroOffset: default = 0 (ie 3 o'clock)
-  if not ClockwiseRotationIsAnglePositive then
-    startingZeroOffset := -startingZeroOffset;
-  Result.fZeroOffset := startingZeroOffset;
+  radius := Min(targetLayer.Width, targetLayer.Height) div 2;
+  if PointsNearEqual(pivot, targetLayer.MidPoint, 1) then
+    rec := RectD(targetLayer.Bounds)
+  else
+    rec := RectD(pivot.X -radius, pivot.Y -radius,
+      pivot.X +radius,pivot.Y +radius);
 
-  if buttonSize <= 0 then buttonSize := DefaultButtonSize;
-
-  rec := RectD(targetLayer.Bounds);
-  radius := Round(GetMaxToDistRectFromPointInRect(pivot, rec));
-
-  with Result.AddChild(TDesignerLayer32) do     //Layer 0 - design layer
-  begin
-    rec2 := RectD(pivot.x -radius, pivot.y -radius,
-      pivot.x +radius, pivot.y +radius);
-    SetBounds(Rect(rec2));
-    i := DPIAware(2);
-    DrawDashedLine(Image, Ellipse(Rect(i,i,radius*2 -i, radius*2 -i)),
-      dashes, nil, i, clRed32, esPolygon);
-  end;
-
-  if not assigned(buttonLayerClass) then
-    buttonLayerClass := TButtonDesignerLayer32;
-
-  with TButtonDesignerLayer32(Result.AddChild(  //Layer 1 - center button
-    buttonLayerClass, rsButton)) do
-  begin
-    SetButtonAttributes(bsRound, buttonSize, centerButtonColor);
-    PositionCenteredAt(pivot);
-    HitTestRec.Clear;
-  end;
-
-  with TButtonDesignerLayer32(Result.AddChild(  //layer 2 - rotating button
-    buttonLayerClass, rsButton)) do
-  begin
-    SetButtonAttributes(bsRound, buttonSize, movingButtonColor);
-
-    pt := Point(GetPointAtAngleAndDist(pivot,
-      startingAngle + startingZeroOffset, radius));
-    PositionCenteredAt(pt);
-
-    CursorId := crHandPoint;
-  end;
+  Result.Init(Rect(rec), buttonSize,
+    pivotButtonColor, angleButtonColor, initialAngle,
+    angleOffset, buttonLayerClass);
 end;
 //------------------------------------------------------------------------------
 
 function CreateRotatingButtonGroup(targetLayer: TLayer32;
   buttonSize: integer = 0;
-  centerButtonColor: TColor32 = clWhite32;
-  movingButtonColor: TColor32 = clBlue32;
-  startingAngle: double = 0; startingZeroOffset: double = 0;
+  pivotButtonColor: TColor32 = clWhite32;
+  angleButtonColor: TColor32 = clBlue32;
+  initialAngle: double = 0; angleOffset: double = 0;
   buttonLayerClass: TButtonDesignerLayer32Class = nil): TRotatingGroupLayer32;
 var
   pivot: TPointD;
 begin
   pivot := PointD(Image32_Vector.MidPoint(targetLayer.Bounds));
   Result := CreateRotatingButtonGroup(targetLayer, pivot, buttonSize,
-  centerButtonColor, movingButtonColor, startingAngle, startingZeroOffset,
-  buttonLayerClass);
+    pivotButtonColor, angleButtonColor, initialAngle, angleOffset,
+    buttonLayerClass);
 end;
 //------------------------------------------------------------------------------
 
@@ -1960,11 +2041,11 @@ begin
 
   with TRotatingGroupLayer32(rotateButton.GroupOwner) do
   begin
-    mp := Child[1].MidPoint;
+    mp := PivotButton.MidPoint;
     pt2 := rotateButton.MidPoint;
     radius := Round(Distance(mp, pt2));
     rec := Rect(RectD(mp.X -radius, mp.Y -radius, mp.X +radius,mp.Y +radius));
-    Child[0].SetBounds(rec);
+    DesignLayer.SetBounds(rec);
     i :=  DPIAware(2);
     DrawDashedLine(Child[0].Image, Ellipse(Rect(i,i,radius*2 -i, radius*2 -i)),
       dashes, nil, i, clRed32, esPolygon);

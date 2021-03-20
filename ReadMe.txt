@@ -12,6 +12,14 @@ Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
+Version 2.18
+  Image32_Layers
+	Refactored and improved TRotateLayer32
+	Improved TRotatingGroupLayer32
+  Examples
+	Updated Layers201 example app.
+  Other minor tweaks.
+
 Version 2.17
   Image32
     Significantly sped up TImage32.CopyToDc

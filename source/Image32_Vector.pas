@@ -189,6 +189,8 @@ type
   function MidPoint(const pt1, pt2: TPoint): TPoint; overload;
   function MidPoint(const pt1, pt2: TPointD): TPointD; overload;
 
+  function Average(val1, val2: integer): integer;
+
   function ReflectPoint(const pt, pivot: TPointD): TPointD;
 
   function IntersectRect(const rec1, rec2: TRect): TRect; overload;
@@ -263,8 +265,11 @@ type
   function ValueAlmostOne(val: double; epsilon: double = 0.001): Boolean;
 
 const
-  NullPoint: TPoint = (X: 0; Y: 0);
-  NullPointD: TPointD = (X: 0; Y: 0);
+  NullPoint     : TPoint  = (X: 0; Y: 0);
+  NullPointD    : TPointD = (X: 0; Y: 0);
+  InvalidPoint  : TPoint  = (X: -MaxInt; Y: -MaxInt);
+  InvalidPointD : TPointD = (X: -Infinity; Y: -Infinity);
+
   NullRect: TRect = (left: 0; top: 0; right: 0; Bottom: 0);
   NullRectD: TRectD = (left: 0; top: 0; right: 0; Bottom: 0);
 
@@ -518,6 +523,12 @@ function MidPoint(const pt1, pt2: TPointD): TPointD;
 begin
   Result.X := (pt1.X + pt2.X) * 0.5;
   Result.Y := (pt1.Y + pt2.Y) * 0.5;
+end;
+//------------------------------------------------------------------------------
+
+function Average(val1, val2: integer): integer;
+begin
+  Result := (val1 + val2) div 2;
 end;
 //------------------------------------------------------------------------------
 
