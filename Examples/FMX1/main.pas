@@ -65,8 +65,8 @@ var
   fontCache: TGlyphCache;
   fontReader : TFontReader;
 begin
-  margin := Round(screenScale * 14);
-  Layout1.Scale.Point := PointF(1/ScreenScale,1/ScreenScale);
+  margin := DPIAwareFMX(14);
+  Layout1.Scale.Point := PointF(1/ScreenScale, 1/ScreenScale);
 
   bkColor  := $FFF8F8BB; //yellow
   penColor := clMaroon32;
@@ -82,19 +82,19 @@ begin
   //create a fontReader to access truetype font files (*.ttf) that
   //have been stored as font resources and create a glyph cache too
   fontReader := TFontReader.Create;
-  fontCache := TGlyphCache.Create(fontReader, screenScale *13);
+  fontCache := TGlyphCache.Create(fontReader, DPIAwareFMX(12));
   try
     //connect fontReader to a simple ttf font resource
     //and get 'copyright' glyph outline ...
     fontReader.LoadFromResource('FONT_1', RT_RCDATA);
     if fontReader.IsValidFontFormat then
       copyrightGlyphs :=
-        fontCache.GetTextGlyphs(0,0,#$00A9' 2020 Angus Johnson');
+        fontCache.GetTextGlyphs(0,0,#$00A9' 2021 Angus Johnson');
 
     //connect fontReader to a decorative ttf font resource
     //and get 'bigText' glyph outlines ...
     fontReader.LoadFromResource('FONT_2', RT_RCDATA);
-    fontCache.FontHeight := screenScale * 25;
+    fontCache.FontHeight := DPIAwareFMX(25);
     if fontReader.IsValidFontFormat then
       bigTextGlyphs := fontCache.GetTextGlyphs(0, 0, rsBigText);
 

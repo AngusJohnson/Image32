@@ -19,10 +19,8 @@ type
     PenColor   : TColor32;
     PenWidth   : double;
     procedure InitRandomColors;
-  public
-    constructor Create(groupOwner: TGroupLayer32;
-      const name: string = ''); override;
-    procedure Draw(Sender: TObject);
+  protected
+    procedure Draw; override;
   end;
 
   TMyRasterLayer32 = class(TRasterLayer32) //for raster image layers
@@ -142,17 +140,6 @@ end;
 // TMyVectorLayer32
 //------------------------------------------------------------------------------
 
-constructor TMyVectorLayer32.Create(groupOwner: TGroupLayer32;
-  const name: string = '');
-begin
-  inherited;
-  InitRandomColors;
-  PenWidth := DpiAware(1.5);
-  CursorId := crHandPoint;
-  OnDraw := Draw;
-end;
-//------------------------------------------------------------------------------
-
 procedure TMyVectorLayer32.InitRandomColors;
 var
   hsl: THsl;
@@ -166,10 +153,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMyVectorLayer32.Draw(Sender: TObject);
+procedure TMyVectorLayer32.Draw;
 var
   p: TPathsD;
 begin
+  if PenWidth = 0 then
+  begin
+    InitRandomColors;
+    PenWidth := DpiAware(1.5);
+  end;
+
   p := OffsetPath(Paths, -Left, -Top);
   DrawPolygon(Image, p, frEvenOdd, BrushColor);
   DrawLine(Image, p, PenWidth, PenColor, esPolygon);
@@ -183,9 +176,8 @@ end;
 procedure TMyRasterLayer32.Init(const pt: TPoint);
 begin
   MasterImage.CropTransparentPixels;
-  SymmetricCropTransparent(MasterImage);
-  PositionCenteredAt(pt);
   UpdateHitTestMaskTransparent;
+  PositionCenteredAt(pt);
 end;
 
 //------------------------------------------------------------------------------

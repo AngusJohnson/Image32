@@ -211,7 +211,7 @@ end;
 procedure TForm1.DoTransform;
 var
   pt: TPoint;
-  matrix: TMatrixD;
+  mat: TMatrixD;
 begin
   //using fPts, update the 'transformed' layer
   with transformLayer do
@@ -221,19 +221,19 @@ begin
     case fTransformType of
       ttAffineSkew:
         begin
-          matrix := IdentityMatrix;
+          mat := IdentityMatrix;
           with Image do
           begin
             if mnuVertSkew.Checked then
-              matrix[0][1] := (fCtrlPoints[1].Y -fCtrlPoints[0].Y -Height) / Width
+              mat[0][1] := (fCtrlPoints[1].Y -fCtrlPoints[0].Y -Height) / Width
             else
-              matrix[1][0] := (fCtrlPoints[1].X - fCtrlPoints[0].X -Width)/ Height;
+              mat[1][0] := (fCtrlPoints[1].X - fCtrlPoints[0].X -Width)/ Height;
             //for unrestricted skews, use the following commented code instead.
             //(and make changes in Panel1MouseMove too) ...
-            //matrix[0][1] := (fCtrlPoints[1].Y -fCtrlPoints[0].Y -Height) / Width;
-            //matrix[1][0] := (fCtrlPoints[1].X - fCtrlPoints[0].X -Width)/ Height;
+            //mat[0][1] := (fCtrlPoints[1].Y -fCtrlPoints[0].Y -Height) / Width;
+            //mat[1][0] := (fCtrlPoints[1].X - fCtrlPoints[0].X -Width)/ Height;
           end;
-          AffineTransformImage(Image, matrix, pt);
+          AffineTransformImage(Image, mat, pt);
           pt := OffsetPoint(pt, Round(fCtrlPoints[0].X), Round(fCtrlPoints[0].Y));
         end;
       ttAffineRotate:
