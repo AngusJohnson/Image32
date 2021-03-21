@@ -3,7 +3,7 @@
         <ProjectGuid>{A7234653-015E-4B1B-97CE-C70D504450E5}</ProjectGuid>
         <MainSource>Layers201.dpr</MainSource>
         <Base>True</Base>
-        <Config Condition="'$(Config)'==''">Release</Config>
+        <Config Condition="'$(Config)'==''">Debug</Config>
         <TargetedPlatforms>32769</TargetedPlatforms>
         <AppType>Application</AppType>
         <FrameworkType>VCL</FrameworkType>

@@ -131,20 +131,6 @@ begin
   if not MasterImage.LoadFromFile(filename) then
     MasterImage.SetSize(100,100, clBlack32);
   MasterImage.CropTransparentPixels; //important for rotational stability
-
-  //Setting MasterImage.AntiAliased := false
-  //will speed up transformations significantly,
-  //but with slightly reduced quality of the
-  //transformed image.
-  //Changing this property will have no
-  //affect on MasterImage because it won't be
-  //transformed (ie scaled or rotated here).
-  //But we change MasterImage's AntiAliased
-  //property because this property is also assigned
-  //whenever MasterImage is assigned to Image.
-  MasterImage.AntiAliased := false;
-
-  Image.Assign(MasterImage);
   PositionCenteredAt(centerPt);
   UpdateHitTestMaskTransparent;
   AutoPivot := false; // :)
@@ -748,7 +734,7 @@ begin
     rotatingButtonGroup := CreateRotatingButtonGroup(
       targetLayer, pivot, DPIAware(10),
       clWhite32, clLime32, displayAngle, -Angle90);
-    rotatingButtonGroup.CursorId := crRotate;
+    rotatingButtonGroup.AngleButton.CursorId := crRotate;
 
     if displayAngle > PI then displayAngle := displayAngle - Pi*2;
     StatusBar1.SimpleText := format('angle: %1.0n deg.',[displayAngle * 180/pi]);

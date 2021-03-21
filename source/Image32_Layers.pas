@@ -129,7 +129,8 @@ type
     fLastUpdateType        : TUpdateType;
     fLocalInvalidRect      : TRect;
     fUpdateCount           : Integer; //see beginUpdate/EndUpdate
-    fOnMerge               : TNotifyEvent;
+    fBeforeMerge           : TNotifyEvent;
+    fAfterMerge            : TNotifyEvent;
     function  GetChildCount: integer;
     function  GetChild(index: integer): TLayer32;
     function  FindLayerNamed(const name: string): TLayer32; virtual;
@@ -139,7 +140,8 @@ type
     procedure Merge(hideDesigners: Boolean; const paintRect: TRect);
     function  GetLayerAt(const pt: TPoint; ignoreDesigners: Boolean): TLayer32;
     procedure InternalDeleteChild(index: integer; fromChild: Boolean);
-    procedure  DoOnMerge; virtual;
+    procedure  DoBeforeMerge; virtual;
+    procedure  DoAfterMerge; virtual;
   public
     constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
     destructor Destroy; override;
@@ -153,7 +155,8 @@ type
     procedure  ClearChildren;
     property   ChildCount: integer read GetChildCount;
     property   Child[index: integer]: TLayer32 read GetChild; default;
-    property   OnMerge: TNotifyEvent read fOnMerge write fOnMerge;
+    property   OnBeforeMerge: TNotifyEvent read fBeforeMerge write fBeforeMerge;
+    property   OnAfterMerge: TNotifyEvent read fAfterMerge write fAfterMerge;
   end;
 
   THitTestLayer32 = class(TLayer32) //abstract classs
@@ -251,24 +254,22 @@ type
   private
     fZeroOffset: double;
     function GetDistance: double;
-    function GetRotCur: integer;
-    procedure SetRotCur(curId: integer);
     function GetAngle: double;
     function GetPivot: TPointD;
     function GetAngleBtn: TButtonDesignerLayer32;
     function GetPivotBtn: TButtonDesignerLayer32;
     function GetDesignLayer: TDesignerLayer32;
-    property DesignLayer: TDesignerLayer32 read GetDesignLayer;
-  public
+  protected
     procedure Init(const rec: TRect; buttonSize: integer;
       centerButtonColor, movingButtonColor: TColor32;
       startingAngle: double; startingZeroOffset: double;
-      buttonLayerClass: TButtonDesignerLayer32Class);
+      buttonLayerClass: TButtonDesignerLayer32Class); virtual;
+    property DesignLayer: TDesignerLayer32 read GetDesignLayer;
+  public
     property Angle: double read GetAngle;
     property Pivot: TPointD read GetPivot;
     property AngleButton: TButtonDesignerLayer32 read GetAngleBtn;
     property PivotButton: TButtonDesignerLayer32 read GetPivotBtn;
-    property CursorId: integer read GetRotCur write SetRotCur;
     property DistBetweenButtons: double read GetDistance;
   end;
 
@@ -315,6 +316,7 @@ type
     fRoot              : TGroupLayer32;
     fBounds            : TRect;
     fBackColor         : TColor32;
+    fAntialiasEnabled  : Boolean;
     function  GetRootLayersCount: integer;
     function  GetLayer(index: integer): TLayer32;
     function  GetImage: TImage32;
@@ -343,6 +345,8 @@ type
     function  GetMergedImage(hideDesigners: Boolean;
       out updateRect: TRect): TImage32; overload;
 
+    property Antialiased: Boolean read
+      fAntialiasEnabled write fAntialiasEnabled;
     property BackgroundColor: TColor32 read fBackColor write SetBackColor;
     property Bounds: TRect read fBounds;
     property Count: integer read GetRootLayersCount;
@@ -422,7 +426,7 @@ end;
 
 procedure TLayerNotifyImage32.Changed;
 begin
-  if (Self.UpdateCount = 0) and Assigned(fOwnerLayer) then
+  if (Self.UpdateCount = 0) then
     fOwnerLayer.ImageChanged(Self);
   inherited;
 end;
@@ -608,7 +612,6 @@ end;
 procedure TLayer32.SetSize(width, height: integer);
 begin
   if (width = Image.Width) and (height = Image.Height) then Exit;
-  //fRefreshPending := true;      //since SetSize() clears the image
   Image.SetSize(width, height);
 end;
 //------------------------------------------------------------------------------
@@ -651,7 +654,8 @@ begin
 
   BeginUpdate;
   try
-    fLeft := pt.X; fTop := pt.Y;
+    fLeft := pt.X;
+    fTop := pt.Y;
   finally
     EndUpdate;
   end;
@@ -703,9 +707,9 @@ end;
 
 procedure TLayer32.SetVisible(value: Boolean);
 begin
-  if (value = fVisible) then Exit;
+  if (value = fVisible) or (RootOwner.Root = Self) then Exit;
   fVisible := value;
-  if Assigned(fGroupOwner) then fGroupOwner.Invalidate(Bounds);
+  fGroupOwner.Invalidate(Bounds);
 end;
 //------------------------------------------------------------------------------
 
@@ -713,7 +717,9 @@ procedure TLayer32.SetOpacity(value: Byte);
 begin
   if value = fOpacity then Exit;
   fOpacity := value;
-  if Assigned(fGroupOwner) then GroupOwner.Invalidate(Bounds);
+  if not Assigned(fGroupOwner) then
+    TGroupLayer32(Self).fLocalInvalidRect := Bounds else
+    GroupOwner.Invalidate(Bounds);
 end;
 //------------------------------------------------------------------------------
 
@@ -739,7 +745,8 @@ end;
 
 function TLayer32.BringToFront: Boolean;
 begin
-  Result := index < fGroupOwner.ChildCount -1;
+  Result := assigned(fGroupOwner) and
+    (index < fGroupOwner.ChildCount -1);
   if not Result then Exit;
   fGroupOwner.fChilds.Move(index, fGroupOwner.ChildCount -1);
   fGroupOwner.ReindexChildsFrom(index);
@@ -890,9 +897,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TGroupLayer32.DoOnMerge;
+procedure TGroupLayer32.DoBeforeMerge;
 begin
-  if Assigned(fOnMerge) then fOnMerge(self);
+  if Assigned(fBeforeMerge) then fBeforeMerge(self);
+end;
+//------------------------------------------------------------------------------
+
+procedure  TGroupLayer32.DoAfterMerge;
+begin
+  if Assigned(fAfterMerge) then fAfterMerge(self);
 end;
 //------------------------------------------------------------------------------
 
@@ -902,7 +915,7 @@ var
   rec: TRect;
 begin
   if forceRefresh then fRefreshPending := true;
-  if (Self <> fLayeredImage.fRoot) and not fRefreshPending then Exit;
+  if (Self <> RootOwner.fRoot) and not fRefreshPending then Exit;
 
   //this recursive method updates the group's bounds and fLocalInvalidRect
   rec := NullRect;
@@ -942,7 +955,7 @@ begin
   if not Visible or (Opacity < 2) or Image.IsEmpty then
     Exit;
 
-   DoOnMerge;
+   DoBeforeMerge;
 
   for i := 0 to ChildCount -1 do
   begin
@@ -974,6 +987,8 @@ begin
     end else
       Image.CopyBlend(Child[i].Image, srcRect, dstRect, BlendToAlpha);
   end;
+
+  DoAfterMerge;
 end;
 //------------------------------------------------------------------------------
 
@@ -1103,6 +1118,7 @@ begin
   if angleDelta = 0 then Exit;
   fAngle := fAngle + angleDelta;
   NormalizeAngle(fAngle);
+  //the rest is done in descendant classes
 end;
 //------------------------------------------------------------------------------
 
@@ -1329,6 +1345,7 @@ begin
       with MasterImage do
         fSavedSize := Image32_Vector.Size(Width, Height);
       Image.Assign(MasterImage); //this will call ImageChange for Image
+      Image.AntiAliased := RootOwner.fAntialiasEnabled;
     finally
       MasterImage.UnblockUpdate;
     end;
@@ -1352,6 +1369,7 @@ begin
     Image.BeginUpdate;
     try
       Image.Assign(MasterImage);
+      Image.AntiAliased := RootOwner.fAntialiasEnabled;
       //apply any prior transformations
       AffineTransformImage(Image, fMatrix);
       //unfortunately cropping isn't an affine transformation
@@ -1431,6 +1449,7 @@ begin
   Image.BlockUpdate;
   try
     Image.Assign(MasterImage);
+    Image.AntiAliased := RootOwner.fAntialiasEnabled;
     rec := GetRotatedRectBounds(RectD(Image.Bounds), Angle);
 
     //get prior transformations and apply new rotation
@@ -1537,21 +1556,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TRotatingGroupLayer32.GetRotCur: integer;
-begin
-  Result := Child[2].CursorId;
-end;
-//------------------------------------------------------------------------------
-
 function TRotatingGroupLayer32.GetDistance: double;
 begin
   Result := Image32_Vector.Distance(Child[1].MidPoint, Child[2].MidPoint);
-end;
-//------------------------------------------------------------------------------
-
-procedure TRotatingGroupLayer32.SetRotCur(curId: integer);
-begin
-  Child[2].CursorId := curId;
 end;
 
 //------------------------------------------------------------------------------
