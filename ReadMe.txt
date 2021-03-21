@@ -18,6 +18,8 @@ Version 2.19
 	Renamed TGroupLayer32.OnMerge property to OnBeforeMerge
 	Added TGroupLayer32.OnAfterMerge property
 	Minor tidy up.
+  Image32_Transform
+    Transforms can now have antialiasing disabled
   Added Image32Panels
     which contains a TImage32 enhanced TPanel component
 	

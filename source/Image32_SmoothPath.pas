@@ -2,8 +2,8 @@ unit Image32_SmoothPath;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.16                                                            *
-* Date      :  18 March 2021                                                   *
+* Version   :  2.19                                                            *
+* Date      :  21 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Supports paths with multiple sub-curves                         *
@@ -103,6 +103,7 @@ type
     fColorLastBtn   : TColor32;
     fColorMiddleBtn : TColor32;
     fColorCtrlBtn   : TColor32;
+    fColorActiveBtn : TColor32;
 
     fDesignMargin   : integer;
     fActiveButton   : TSmoothButtonLayer32;
@@ -131,6 +132,7 @@ type
     property ColorLastBtn: TColor32 read fColorLastBtn write fColorLastBtn;
     property ColorMiddleBtns: TColor32 read fColorMiddleBtn write fColorMiddleBtn;
     property ColorCtrlBtns : TColor32 read fColorCtrlBtn write fColorCtrlBtn;
+    property ColorActiveBtn : TColor32 read fColorActiveBtn write fColorActiveBtn;
 
     property PenColor: TColor32 read fPenColor write fPenColor;
     property PenWidth: double read fPenWidth write SetPenWidth;
@@ -719,6 +721,7 @@ begin
   fColorLastBtn   := defaultSmoothBtnColor1;
   fColorMiddleBtn := defaultSmoothBtnColor1;
   fColorCtrlBtn   := defaultSmoothBtnColor2;
+  fColorActiveBtn := clLime32;
 
   fButtonSize1    := DefaultButtonSize + DpiAware(1);
   fButtonSize2    := DefaultButtonSize;
@@ -805,6 +808,20 @@ function TSmoothPathGroupLayer32.UpdateButtonsAndCalcBounds: TRect;
     end;
   end;
 
+  procedure SetBtnColor(btnLayer: TSmoothButtonLayer32);
+  begin
+    with btnLayer do
+    begin
+      if btnLayer = fActiveButton then Color := fColorActiveBtn
+      else if PathIdx mod 3 > 0 then Color := fColorCtrlBtn
+      else if PathIdx = 0  then Color := fColorFirstBtn
+      else if PathIdx = SmoothPath.Count -1 then Color := fColorLastBtn
+      else Color := fColorMiddleBtn;
+
+      if Visible then btnLayer.Draw;
+    end;
+  end;
+
   procedure SetAttributes(btnLayer: TSmoothButtonLayer32);
   begin
     with btnLayer do
@@ -814,17 +831,10 @@ function TSmoothPathGroupLayer32.UpdateButtonsAndCalcBounds: TRect;
       begin
         Shape := bsDiamond;
         Size := fButtonSize1;
-        if PathIdx = 0 then
-          Color := fColorFirstBtn
-        else if PathIdx = SmoothPath.Count -1 then
-          Color := fColorLastBtn
-        else
-          Color := fColorMiddleBtn;
       end else
       begin
         Shape := bsRound;
         Size := fButtonSize2;
-        Color := fColorCtrlBtn;
       end;
       SetButtonAttributes(Shape, Size, Color);
     end;
@@ -873,6 +883,8 @@ begin
       btnLayer := TSmoothButtonLayer32(Child[i +2]);
 
     SetBtnVisibilityAndPosition(btnLayer);
+    SetBtnColor(btnLayer);
+
     //update group bounds
     if i = 0 then
       Result := btnLayer.Bounds else
@@ -975,6 +987,11 @@ begin
       raise Exception.Create(rsSmoothPathGroupLayerError);
 
   pathLen := fSmoothPath.Count;
+
+  if assigned(fActiveButton) and
+    (fActiveButton.PathIdx >= pathLen) then
+      fActiveButton := nil;
+
   idx := ChildCount -1;
   while idx >= pathLen + 2 do
   begin
@@ -992,18 +1009,14 @@ begin
     Exit;
   end;
 
-  if assigned(fActiveButton) and
-    (fActiveButton.Index >= ChildCount) then
-      fActiveButton := nil;
-
-  rec := UpdateButtonsAndCalcBounds;
-
   margin := Max(fButtonSize1, fButtonSize2) * 2; // *2 for active btn outline
   margin := Max(Max(Margin, Ceil(PenWidth/2)), DesignMargin);
 
-  rec := InflateRect(rec, margin, margin);
   BeginUpdate;
   try
+    rec := UpdateButtonsAndCalcBounds;
+    rec := InflateRect(rec, margin, margin);
+
     VectorLayer.Margin := margin;
     //nb: assigning VectorLayer.Paths will adjust Bounds automatically
     VectorLayer.Paths := Image32_Vector.Paths(SmoothPath.FlattenedPath);

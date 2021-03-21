@@ -280,11 +280,10 @@ var
   //also requries more processing and hence is slower to execute.
   AutoWidthThreshold: double = 5.0;
 
-  //Empirically, line widths of less than about 1.3 will produce noticeable
-  //Moire Effect when the lines are close to horizontal or close to vertical.
+  //When lines are too narrow, they become too faint to sensibly draw
   MinStrokeWidth: double = 0.5;
 
-  //DefaultMiterLimit: Avoids excessive spikes when line offsetting
+  //Miter limit avoids excessive spikes when line offsetting
   DefaultMiterLimit: double = 2.0;
 
 resourcestring

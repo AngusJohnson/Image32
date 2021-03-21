@@ -2,11 +2,11 @@ unit Image32Panels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.0                                                             *
-* Date      :  30 March 2020                                                   *
+* Version   :  2.1                                                             *
+* Date      :  22 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2020                                         *
-* Purpose   :  Module that uses 2 custom TPanel descendants to display images  *
+* Copyright :  Angus Johnson 2019-2021                                         *
+* Purpose   :  Component that displays images on a TPanel descendant           *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
@@ -112,6 +112,7 @@ type
     function IsScaledToFit: Boolean;
     function ClientToImage(const clientPt: TPoint): TPoint;
     function ImageToClient(const surfacePt: TPoint): TPoint;
+
     property InnerClientRect: TRect read GetInnerClientRect;
     property InnerMargin: integer read GetInnerMargin;
     property Offset: TPoint read GetOffset write SetOffset;
@@ -142,7 +143,7 @@ type
 
   TImage32Panel = class(TBaseImgPanel)
   private
-    fImg               : TImage32;
+    fImage             : TImage32;
     fOnFileDrop        : TFileDropEvent;
     fFileDropEnabled   : Boolean;
     procedure SetFileDropEnabled(value: Boolean);
@@ -157,7 +158,7 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure ClearImage;
-    property Image: TImage32 read fImg;
+    property Image: TImage32 read fImage;
     property FileDropEnabled: Boolean
       read fFileDropEnabled write SetFileDropEnabled;
     property OnFileDrop: TFileDropEvent
@@ -428,7 +429,7 @@ end;
 function TBaseImgPanel.GetInnerMargin: integer;
 begin
   //nb: BorderWidth is the space between outer and inner bevels
-  Result := BorderWidth;
+  Result := DpiAware(BorderWidth);
   if BevelInner <> bvNone then inc(result, BevelWidth);
   if BevelOuter <> bvNone then inc(result, BevelWidth);
   //BorderStyle changes the OUTSIDE of the panel so won't affect InnerMargin.
@@ -734,7 +735,7 @@ begin
 
   if not fMouseDown then
   begin
-    if (BorderWidth >= MinBorderWidth) and
+    if (DpiAware(BorderWidth) >= MinBorderWidth) and
       fAllowScroll and ((fShowScrollBtns = ssAlways) or
       (focused and (fShowScrollBtns = ssbFocused))) then
     begin
@@ -883,7 +884,7 @@ procedure TBaseImgPanel.Paint;
   end;
 
 var
-  marg, btnMin: integer;
+  marg, btnMin, bw: integer;
   tmpRec, innerRec, srcRec, dstRec: TRect;
   backgroundPainted: Boolean;
   pt: TPoint;
@@ -891,6 +892,7 @@ begin
   //calculate un-scaled source rectangle that corresponds with dstRec
   marg := GetInnerMargin;
   innerRec := GetInnerClientRect;
+  bw := DpiAware(BorderWidth);
   dstRec := innerRec;
   srcRec := dstRec;
   OffsetRect(srcRec, -marg, -marg);
@@ -933,7 +935,8 @@ begin
     ThemeServices.ThemesEnabled and
   {$ENDIF}
     Succeeded(DrawThemeParentBackground(Handle, Canvas.Handle, @innerRec));
-  if not backgroundPainted then
+
+  if (csDesigning in ComponentState) or not backgroundPainted then
   begin
     if ParentColor then
       Canvas.Brush.Color := TControl(parent).Color else
@@ -956,9 +959,10 @@ begin
   //paint the border
   InflateRect(tmpRec, -BevelWidth, -BevelWidth);
   if Focused then
-    DrawFrame(tmpRec, fFocusedColor, fFocusedColor, BorderWidth) else
-    DrawFrame(tmpRec, fUnfocusedColor, fUnfocusedColor, BorderWidth);
-  InflateRect(tmpRec, -BorderWidth, -BorderWidth);
+    DrawFrame(tmpRec, fFocusedColor, fFocusedColor, bw)
+  else
+    DrawFrame(tmpRec, fUnfocusedColor, fUnfocusedColor, bw);
+  InflateRect(tmpRec, -bw, -bw);
 
   //paint the inner bevel
   case BevelInner of
@@ -1168,40 +1172,14 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TPnlBitmap - TBitmap descendant that's used by TBitmapPanel internally.
-//              It just updates TBitmapPanel's ImageSize property automatically.
-//------------------------------------------------------------------------------
-
-type
-  TPnlBitmap = class(TBitmap)
-  private
-    fOwner: TImage32Panel;
-  protected
-    procedure Changed(Sender: TObject); override;
-  end;
-
-procedure TPnlBitmap.Changed(Sender: TObject);
-begin
-  inherited;
-  if (fOwner.fImageSize.cx <> Width) or
-    (fOwner.fImageSize.cy <> Height) then
-  begin
-    fOwner.SetSize(Size(Width, Height));
-    fOwner.ResetImage;
-  end else
-    fOwner.Invalidate;
-end;
-
-//------------------------------------------------------------------------------
 // TBitmapPanel
 //------------------------------------------------------------------------------
 
 constructor TImage32Panel.Create(AOwner: TComponent);
 begin
   inherited;
-  fImg := TNotifyImage32.Create(Self);
-  //TPnlBitmap(fImg).fOwner := self;
-  fImg.SetSize(200,200);
+  fImage := TNotifyImage32.Create(Self);
+  fImage.SetSize(200,200);
 end;
 //------------------------------------------------------------------------------
 
@@ -1209,28 +1187,33 @@ destructor TImage32Panel.Destroy;
 begin
   if fFileDropEnabled and HandleAllocated then
     DragAcceptFiles(Handle, False);
-  fImg.Free;
+  fImage.Free;
   inherited;
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32Panel.ImageChanged(Sender: TObject);
 begin
-  fImageSize.cx := Image.Width;
-  fImageSize.cy := Image.Height;
+  if (fImageSize.cx <> Image.Width) or (fImageSize.cy <> Image.Height) then 
+  begin
+    fImageSize.cx := Image.Width;
+    fImageSize.cy := Image.Height;
+    ResetImage;
+    UpdateOffsetDelta(true);
+  end;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32Panel.DrawToPanelCanvas(const srcRect, dstRect: TRect);
 begin
-  fImg.CopyToDc(srcRect, dstRect, canvas.Handle);
+  fImage.CopyToDc(srcRect, dstRect, canvas.Handle);
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32Panel.ClearImage;
 begin
-  fImg.Clear;
+  fImage.Clear;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -1284,7 +1267,7 @@ begin
   if assigned(fOnFileDrop) then fOnFileDrop(Self, filename)
   else if (Lowercase(ExtractFileExt(filename)) = '.bmp') then
   try
-    fImg.LoadFromFile(filename);
+    fImage.LoadFromFile(filename);
   except
   end;
 end;
@@ -1298,16 +1281,16 @@ begin
   shiftState := KeyDataToShiftState(Message.KeyData);
   case Message.CharCode of
     Ord('C'):
-      if (ssCtrl in shiftState) and fImg.CanPasteFromClipBoard then
-        fImg.CopyToClipboard;
+      if (ssCtrl in shiftState) and fImage.CanPasteFromClipBoard then
+        fImage.CopyToClipboard;
     Ord('V'):
-      if (ssCtrl in shiftState) and fImg.CanPasteFromClipBoard then
-        fImg.PasteFromClipboard;
+      if (ssCtrl in shiftState) and fImage.CanPasteFromClipBoard then
+        fImage.PasteFromClipboard;
   end;
 end;
 //------------------------------------------------------------------------------
 
 initialization
-  MinBorderWidth := DpiAware(10);
+  MinBorderWidth := 10;
 
 end.

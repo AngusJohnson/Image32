@@ -6,7 +6,7 @@
         <Config Condition="'$(Config)'==''">Release</Config>
         <TargetedPlatforms>32769</TargetedPlatforms>
         <AppType>Package</AppType>
-        <FrameworkType>None</FrameworkType>
+        <FrameworkType>VCL</FrameworkType>
         <ProjectVersion>18.8</ProjectVersion>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
     </PropertyGroup>
@@ -71,7 +71,7 @@
         <DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
         <VerInfo_Locale>3081</VerInfo_Locale>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=;CFBundleName=</VerInfo_Keys>
-        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Winapi;Vcl;Vcl.Imaging;$(DCC_Namespace)</DCC_Namespace>
+        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Winapi;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Android)'!=''">
         <VerInfo_Keys>package=com.embarcadero.$(MSBuildProjectName);label=$(MSBuildProjectName);versionCode=1;versionName=1.0.0;persistent=False;restoreAnyVersion=False;installLocation=auto;largeHeap=False;theme=TitleBar;hardwareAccelerated=true;apiKey=</VerInfo_Keys>
@@ -115,9 +115,9 @@
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
         <DCCReference Include="..\ImagePanels.dcr"/>
+        <DCCReference Include="..\Image32Panels.dcr"/>
         <DCCReference Include="rtl.dcp"/>
         <DCCReference Include="designide.dcp"/>
-        <DCCReference Include="..\ImagePanels.pas"/>
         <DCCReference Include="..\Image32.pas"/>
         <DCCReference Include="..\Image32_BMP.pas"/>
         <DCCReference Include="..\Image32_Clipper.pas"/>
@@ -135,6 +135,7 @@
         <DCCReference Include="..\Image32_GIF.pas"/>
         <DCCReference Include="..\Image32_Transform.pas"/>
         <DCCReference Include="..\Image32_Ttf.pas"/>
+        <DCCReference Include="..\Image32Panels.pas"/>
         <BuildConfiguration Include="Debug">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

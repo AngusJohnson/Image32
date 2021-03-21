@@ -564,8 +564,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function MulBytes(b1, b2: Byte) : Byte;
-  {$IFDEF INLINE} inline; {$ENDIF}
+function MulBytes(b1, b2: Byte) : Byte; {$IFDEF INLINE} inline; {$ENDIF}
 begin
   Result := (b1 * b2) shr 8;
 end;
@@ -2419,7 +2418,6 @@ begin
       end;
 
       oldBm := SelectObject(memDC, bm);
-
       if isTransparent then
       begin
 
@@ -2427,14 +2425,13 @@ begin
         pc := dibBits;
         for i := 0 to wSrc * hSrc -1 do
         begin
-          if pc.A = 0 then
-            pc.Color := 0
-          else
+          if pc.A > 0 then
           begin
             pc.R  := MulBytes(pc.R, pc.A);
             pc.G  := MulBytes(pc.G, pc.A);
             pc.B  := MulBytes(pc.B, pc.A);
-          end;
+          end else
+            pc.Color := 0;
           inc(pc);
         end;
 

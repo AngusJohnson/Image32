@@ -44,6 +44,7 @@ contains
   Clipper in '..\Clipper\Clipper.pas',
   ClipperCore in '..\Clipper\ClipperCore.pas',
   ClipperOffset in '..\Clipper\ClipperOffset.pas',
-  Image32_Clipper in '..\Image32_Clipper.pas';
+  Image32_Clipper in '..\Image32_Clipper.pas',
+  Image32_Ttf in '..\Image32_Ttf.pas';
 
 end.

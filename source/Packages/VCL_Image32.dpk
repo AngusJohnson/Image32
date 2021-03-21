@@ -2,6 +2,7 @@ package VCL_Image32;
 
 {$R *.res}
 {$R '..\ImagePanels.dcr'}
+{$R '..\Image32Panels.dcr'}
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
 {$ALIGN 8}
 {$ASSERTIONS ON}
@@ -33,7 +34,6 @@ requires
   designide;
 
 contains
-  ImagePanels in '..\ImagePanels.pas',
   Image32 in '..\Image32.pas',
   Image32_BMP in '..\Image32_BMP.pas',
   Image32_Clipper in '..\Image32_Clipper.pas',
@@ -50,6 +50,7 @@ contains
   ClipperCore in '..\Clipper\ClipperCore.pas',
   Image32_GIF in '..\Image32_GIF.pas',
   Image32_Transform in '..\Image32_Transform.pas',
-  Image32_Ttf in '..\Image32_Ttf.pas';
+  Image32_Ttf in '..\Image32_Ttf.pas',
+  Image32Panels in '..\Image32Panels.pas';
 
 end.

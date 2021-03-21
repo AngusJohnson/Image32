@@ -2,8 +2,8 @@ unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.16                                                            *
-* Date      :  18 March 2021                                                   *
+* Version   :  2.19                                                            *
+* Date      :  21 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -28,9 +28,9 @@ type
   function MatrixMultiply(const modifier, matrix: TMatrixD): TMatrixD;
 
   procedure MatrixApply(const matrix: TMatrixD;
-    var x, y: double); overload;
+    var x, y: double); overload; {$IFDEF INLINE} inline; {$ENDIF}
   procedure MatrixApply(const matrix: TMatrixD;
-    var pt: TPointD); overload;
+    var pt: TPointD); overload; {$IFDEF INLINE} inline; {$ENDIF}
   procedure MatrixApply(const matrix: TMatrixD;
     var path: TPathD); overload;
   procedure MatrixApply(const matrix: TMatrixD;
@@ -335,49 +335,50 @@ end;
 procedure AffineTransformImage(img: TImage32;
   matrix: TMatrixD; out offset: TPoint); overload;
 var
-  i,j, w,h, dx,dy, srcX,srcY, xi,yi: integer;
-  dstX, dstY: double;
+  i,j, dstWidth,dstHeight, dstOffsetX,dstOffsetY, srcWidth, srcHeight, xi,yi: integer;
+  x, y: double;
   pc: PColor32;
   tmp: TArrayOfColor32;
   rec: TRect;
 begin
   offset := NullPoint;
-  srcX := img.Width; srcY := img.Height;
-  if (srcX * srcY = 0) or IsIdentityMatrix(matrix) then Exit;
+  srcWidth := img.Width;
+  srcHeight := img.Height;
+  if (srcWidth * srcHeight = 0) or IsIdentityMatrix(matrix) then Exit;
   rec := GetTransformBounds(img, matrix);
-  offset := rec.TopLeft;
-
-  dx := rec.Left; dy := rec.Top;
-  w := RectWidth(rec); h := RectHeight(rec);
+  offset := rec.TopLeft; //out parameter
+  dstWidth := RectWidth(rec);
+  dstHeight := RectHeight(rec);
 
   //starting with the result pixel coords, reverse find
   //the fractional coordinates in the current image
   MatrixInvert(matrix);
-
-  SetLength(tmp, w * h);
+  SetLength(tmp, dstWidth * dstHeight);
   pc := @tmp[0];
-
+  dstOffsetX := rec.Left; dstOffsetY := rec.Top;
   if img.AntiAliased then
   begin
-    for i := 0 to h -1 do
-      for j := 0 to w -1 do
+    for i := dstOffsetY to + dstOffsetY + dstHeight -1 do
+      for j := dstOffsetX to dstOffsetX + dstWidth -1 do
       begin
-        dstX := j + dx; dstY := i + dy;
-        MatrixApply(matrix, dstX, dstY);
+        //convert dest X,Y to src X,Y ...
+        x := j; y := i;
+        MatrixApply(matrix, x, y);
         //get weighted pixel (slow)
-        pc^ := GetWeightedPixel(img, Round(dstX * 256), Round(dstY * 256));
+        pc^ := GetWeightedPixel(img, Round(x * 256), Round(y * 256));
         inc(pc);
       end;
   end else
   begin
-    for i := 0 to h -1 do
-      for j := 0 to w -1 do
+    for i := dstOffsetY to dstOffsetY + dstHeight -1 do
+      for j := dstOffsetX to dstOffsetX + dstWidth -1 do
       begin
-        dstX := j + dx; dstY := i + dy;
-        MatrixApply(matrix, dstX, dstY);
-        xi := Round(dstX); yi := Round(dstY);
-        //get unweighted pixel
-        if (xi < 0) or (xi >= srcX) or (yi < 0) or (yi >= srcY) then
+        //convert dest X,Y to src X,Y ...
+        x := j; y := i;
+        MatrixApply(matrix, x, y);
+        //get nearest pixel (fast)
+        xi := Round(x); yi := Round(y);
+        if (xi < 0) or (xi >= srcWidth) or (yi < 0) or (yi >= srcHeight) then
           pc^ := clNone32 else
           pc^ := img.Pixel[xi, yi];
         inc(pc);
@@ -385,8 +386,8 @@ begin
   end;
   img.BeginUpdate;
   try
-    img.SetSize(w, h);
-    Move(tmp[0], img.Pixels[0], w * h * sizeOf(TColor32));
+    img.SetSize(dstWidth, dstHeight);
+    Move(tmp[0], img.Pixels[0], dstWidth * dstHeight * sizeOf(TColor32));
   finally
     img.EndUpdate;
   end;
