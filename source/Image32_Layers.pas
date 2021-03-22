@@ -167,6 +167,7 @@ type
     property   HitTestRec : THitTestRec read fHitTestRec write fHitTestRec;
   public
     function GetPathsFromHitTestMask: TPathsD;
+    procedure ClearHitTesting;
   end;
 
   TRotateLayer32 = class(THitTestLayer32) //abstract rotating layer class
@@ -181,6 +182,8 @@ type
   public
     constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
     procedure Rotate(angleDelta: double); virtual;
+    procedure ResetAngle;
+    procedure Offset(dx,dy: integer); override;
     property  Angle: double read fAngle write SetAngle;
     property  PivotPt: TPointD read GetPivotPt write SetPivotPt;
     property  AutoPivot: Boolean read fAutoPivot write SetAutoPivot;
@@ -201,7 +204,6 @@ type
     procedure SetBounds(const newBounds: TRect); override;
     procedure Offset(dx,dy: integer); override;
     procedure Rotate(angleDelta: double); override;
-    procedure ResetAngle;
     procedure UpdateHitTestMask(const vectorRegions: TPathsD;
       fillRule: TFillRule); virtual;
     property  Paths: TPathsD read fPaths write SetPaths;
@@ -846,6 +848,7 @@ begin
     fChilds.Insert(index, Result);
     ReindexChildsFrom(index +1);
   end;
+  fRefreshPending := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -1089,6 +1092,12 @@ begin
     end;
   end;
 end;
+//------------------------------------------------------------------------------
+
+procedure THitTestLayer32.ClearHitTesting;
+begin
+  fHitTestRec.Clear;
+end;
 
 //------------------------------------------------------------------------------
 // TRotateLayer32 class
@@ -1119,6 +1128,24 @@ begin
   fAngle := fAngle + angleDelta;
   NormalizeAngle(fAngle);
   //the rest is done in descendant classes
+end;
+//------------------------------------------------------------------------------
+
+procedure TRotateLayer32.ResetAngle;
+begin
+  fAngle := 0;
+  fPivotPt := InvalidPointD;
+end;
+//------------------------------------------------------------------------------
+
+procedure TRotateLayer32.Offset(dx,dy: integer);
+begin
+  inherited;
+  if fAutoPivot then
+  begin
+    fPivotPt.X := fPivotPt.X + dx;
+    fPivotPt.Y := fPivotPt.Y + dy;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1164,12 +1191,6 @@ begin
 
   fPaths := RotatePath(fPaths, fPivotPt, angleDelta);
   RepositionAndDraw;
-end;
-//------------------------------------------------------------------------------
-
-procedure TVectorLayer32.ResetAngle;
-begin
-  fAngle := 0;
 end;
 //------------------------------------------------------------------------------
 
@@ -1463,7 +1484,9 @@ begin
   finally
     Image.UnblockUpdate;
   end;
-  PositionCenteredAt(mp);
+  if fAutoPivot then
+    PositionCenteredAt(PivotPt) else
+    PositionCenteredAt(mp);
   DoAutoHitTest;
 end;
 
@@ -1635,6 +1658,7 @@ begin
   fRoot.fLayeredImage := self;
   fBounds := Rect(0, 0, Width, Height);
   fRoot.SetSize(width, Height);
+  fAntialiasEnabled := true;
 end;
 //------------------------------------------------------------------------------
 

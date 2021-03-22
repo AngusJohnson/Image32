@@ -327,11 +327,11 @@ end;
 function AffineImageInternal(img: TImage32; matrix: TMatrixD;
   newWidth, newHeight: integer): TPoint;
 var
-  i,j, transX,transY, srcWidth, srcHeight, xi,yi: integer;
+  i,j, srcWidth, srcHeight, xi,yi: integer;
   x,y: double;
   pc: PColor32;
   tmp: TArrayOfColor32;
-  rec: TRect;
+  dstRec: TRect;
 begin
   Result := NullPoint;
   srcWidth := img.Width;
@@ -341,28 +341,25 @@ begin
   if (newWidth = 0) or (newHeight = 0) then
   begin
     //auto-resize the image so it'll fit transformed image
-    rec := GetTransformBounds(img, matrix);
-    newWidth := RectWidth(rec);
-    newHeight := RectHeight((rec));
+    dstRec := GetTransformBounds(img, matrix);
+    newWidth := RectWidth(dstRec);
+    newHeight := RectHeight((dstRec));
     //auto-translate the image too
-    transX := rec.Left;
-    transY := rec.Top;
-    Result := Types.Point(transX, transY);
+    Result := dstRec.TopLeft;
   end else
   begin
-    rec := Rect(0, 0, newWidth, newHeight);
-    transX := 0; transY := 0;
+    dstRec := Rect(0, 0, newWidth, newHeight);
   end;
 
   //starting with the result pixel coords, reverse find
   //the fractional coordinates in the current image
   MatrixInvert(matrix);
-  SetLength(tmp, newWidth * newHeight);
+  SetLength(tmp, RectWidth(dstRec) * RectHeight(dstRec));
   pc := @tmp[0];
   if img.AntiAliased then
   begin
-    for i := transY to + transY + newHeight -1 do
-      for j := transX to transX + newWidth -1 do
+    for i := dstRec.Top to + dstRec.Bottom -1 do
+      for j := dstRec.Left to dstRec.Right -1 do
       begin
         //convert dest X,Y to src X,Y ...
         x := j; y := i;
@@ -373,8 +370,8 @@ begin
       end;
   end else
   begin
-    for i := transY to transY + newHeight -1 do
-      for j := transX to transX + newWidth -1 do
+    for i := dstRec.Top to + dstRec.Bottom -1 do
+      for j := dstRec.Left to dstRec.Right -1 do
       begin
         //convert dest X,Y to src X,Y ...
         x := j; y := i;

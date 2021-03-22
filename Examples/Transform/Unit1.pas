@@ -108,8 +108,12 @@ begin
   //Layer 1: for the transformed image
   transformLayer := TRasterLayer32(layeredImage.AddLayer(TRasterLayer32));
   transformLayer.MasterImage.LoadFromResource('UNION_JACK', 'BMP');
-  transformLayer.CursorId := crSizeAll;
+  transformLayer.MasterImage.AntiAliased := false;
+
+  transformLayer.CursorId := crHandPoint;
   transformLayer.PositionAt(100,100);
+  transformLayer.AutoPivot := true;
+  transformLayer.UpdateHitTestMaskTransparent;
 
   ResetSkew(mnuVertSkew.Checked);
 end;
@@ -143,10 +147,9 @@ begin
   buttonGroup := CreateButtonGroup(layeredImage.Root,
     fCtrlPoints, bsRound, DefaultButtonSize, clGreen32);
 
+  Invalidate;
   if isVerticalSkew then StatusBar1.SimpleText := ' VERTICAL SKEW'
   else StatusBar1.SimpleText := ' HORIZONTAL SKEW';
-
-  DoTransform;
 end;
 //------------------------------------------------------------------------------
 
@@ -164,8 +167,9 @@ begin
 
   buttonGroup := CreateButtonGroup(layeredImage.Root, fCtrlPoints,
     bsRound, DefaultButtonSize, clGreen32);
+
+  Invalidate;
   StatusBar1.SimpleText := ' PROJECTIVE TRANSFORM';
-  DoTransform;
 end;
 //------------------------------------------------------------------------------
 
@@ -183,8 +187,10 @@ begin
     fCtrlPoints := OffsetPath(fCtrlPoints, Left, Top);
   buttonGroup := CreateButtonGroup(layeredImage.Root, fCtrlPoints,
     bsRound, DefaultButtonSize, clGreen32);
+
+  Invalidate;
   StatusBar1.SimpleText := ' VERT SPLINE TRANSFORM: Right click to add control points';
-  DoTransform;
+
 end;
 //------------------------------------------------------------------------------
 
@@ -194,17 +200,17 @@ begin
   FreeAndNil(buttonRotateGroup);
 
   fTransformType := ttAffineRotate;
-
-  transformLayer.Image.CropTransparentPixels;
   transformLayer.UpdateHitTestMaskOpaque;
 
-  //nb: fCtrlPoints are ignored with rotation
+  //nb: CtrlPoints are ignored with rotation
 
+  transformLayer.ResetAngle;
   buttonRotateGroup := CreateRotatingButtonGroup(transformLayer,
-    DefaultButtonSize, clWhite32, clAqua32, 0, PI/2);
+    DefaultButtonSize, clWhite32, clAqua32, 0, -Angle90);
+  buttonRotateGroup.PivotButton.ClearHitTesting;
 
+  Invalidate;
   StatusBar1.SimpleText := ' ROTATE TRANSFORM';
-  DoTransform;
 end;
 //------------------------------------------------------------------------------
 
@@ -212,58 +218,55 @@ procedure TForm1.DoTransform;
 var
   pt: TPoint;
   mat: TMatrixD;
+  delta: double;
 begin
-  //using fPts, update the 'transformed' layer
+  //except for rotation, use fPts to update the 'transformed' layer
   with transformLayer do
   begin
     Image.Assign(masterImage);
-
     case fTransformType of
       ttAffineSkew:
         begin
           mat := IdentityMatrix;
-          with Image do
+          if mnuVertSkew.Checked then
           begin
-            if mnuVertSkew.Checked then
-              mat[0][1] := (fCtrlPoints[1].Y -fCtrlPoints[0].Y -Height) / Width
-            else
-              mat[1][0] := (fCtrlPoints[1].X - fCtrlPoints[0].X -Width)/ Height;
-            //for unrestricted skews, use the following commented code instead.
-            //(and make changes in Panel1MouseMove too) ...
-            //mat[0][1] := (fCtrlPoints[1].Y -fCtrlPoints[0].Y -Height) / Width;
-            //mat[1][0] := (fCtrlPoints[1].X - fCtrlPoints[0].X -Width)/ Height;
+            delta := (fCtrlPoints[1].Y-Image.Height) - fCtrlPoints[0].Y;
+            mat[0][1] := delta / Image.Width;
+          end else
+          begin
+            delta := (fCtrlPoints[1].X-Image.Width) - fCtrlPoints[0].X;
+            mat[1][0] := delta / Image.Height;
           end;
-          AffineTransformImage(Image, mat, pt);
-          pt := OffsetPoint(pt, Round(fCtrlPoints[0].X), Round(fCtrlPoints[0].Y));
+          //returned pt is the offset to the old (untransformed) image
+          pt := AffineTransformImage(Image, mat);
+          //add this offset to fCtrlPoints[0] to reposition the layer
+          pt.X := pt.X + Round(fCtrlPoints[0].X);
+          pt.Y := pt.Y + Round(fCtrlPoints[0].Y);
+          PositionAt(pt);
         end;
       ttAffineRotate:
         begin
-          pt := Point(buttonRotateGroup.Pivot);
-          Image.Rotate(buttonRotateGroup.Angle);
-          SymmetricCropTransparent(Image);
-          with Point(Image.MidPoint) do
-            pt := OffsetPoint(pt, -X, -Y);
+          //with rotation, just let rasterlayer do all the work ;)
+          Angle := buttonRotateGroup.Angle;
           StatusBar1.SimpleText := Format(' ROTATE TRANSFORM - angle:%1.0n',
             [buttonRotateGroup.Angle *180/PI]);
-
         end;
       ttProjective:
         begin
           if not ProjectiveTransform(image,
             Rectangle(image.Bounds), fCtrlPoints, NullRect) then Exit;
-        pt := GetBounds(fCtrlPoints).TopLeft;
+          pt := GetBounds(fCtrlPoints).TopLeft;
+          PositionAt(pt);
         end;
       ttSpline:
         begin
           SplineVertTransform(Image, fCtrlPoints,
             stQuadratic, clRed32, false, pt);
-          pt := GetBounds(fCtrlPoints).TopLeft;
+          PositionAt(pt);
         end;
     end;
-    PositionAt(pt);
     UpdateHitTestMaskTransparent;
   end;
-
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -291,8 +294,8 @@ var
 begin
   //nb: layeredImage32.GetMergedImage returns the rectangular region of the
   //image that has changed since the last GetMergedImage call.
-  //This accommodates updating just this changed region (which is generally
-  //much faster than updating the whole merged image).
+  //This accommodates updating just this changed region (which is usually
+  //considerably faster than updating the whole merged image).
   with layeredImage.GetMergedImage(mnuHideControls.Checked, updateRect) do
   begin
     CopyToDc(updateRect, self.Canvas.Handle,
@@ -408,7 +411,6 @@ begin
   begin
     clickedLayer.PositionCenteredAt(pt);
     UpdateRotatingButtonGroup(clickedLayer); //redraws dotted circle
-    fCtrlPoints[1] := PointD(pt);
     DoTransform;
   end else if clickedLayer.GroupOwner = buttonGroup then
   begin

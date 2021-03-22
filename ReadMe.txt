@@ -17,6 +17,7 @@ Version 2.19
     Added AntiAliased property to TLayeredImage32
 	Renamed TGroupLayer32.OnMerge property to OnBeforeMerge
 	Added TGroupLayer32.OnAfterMerge property
+	Added THitTestLayer32.ClearHitTesting method
 	Minor tidy up.
   Image32_Transform
     Transforms can now have antialiasing disabled
