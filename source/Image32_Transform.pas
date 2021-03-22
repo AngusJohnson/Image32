@@ -48,9 +48,9 @@ type
     const center: TPointD; angRad: double);
   procedure MatrixTranslate(var matrix: TMatrixD; dx, dy: double);
 
-  procedure AffineTransformImage(img: TImage32; matrix: TMatrixD); overload;
-  procedure AffineTransformImage(img: TImage32;
-    matrix: TMatrixD; out offset: TPoint); overload;
+  //AffineTransformImage: automagically resizes and translates the image
+  function AffineTransformImage(img: TImage32; matrix: TMatrixD): TPoint;
+  procedure AffineTransformImageRaw(img: TImage32; matrix: TMatrixD);
 
   //ProjectiveTransform:
   //  srcPts, dstPts => each path must contain 4 points
@@ -324,42 +324,45 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure AffineTransformImage(img: TImage32; matrix: TMatrixD);
+function AffineImageInternal(img: TImage32; matrix: TMatrixD;
+  newWidth, newHeight: integer): TPoint;
 var
-  dummy: TPoint;
-begin
-  AffineTransformImage(img, matrix, dummy);
-end;
-//------------------------------------------------------------------------------
-
-procedure AffineTransformImage(img: TImage32;
-  matrix: TMatrixD; out offset: TPoint); overload;
-var
-  i,j, dstWidth,dstHeight, dstOffsetX,dstOffsetY, srcWidth, srcHeight, xi,yi: integer;
-  x, y: double;
+  i,j, transX,transY, srcWidth, srcHeight, xi,yi: integer;
+  x,y: double;
   pc: PColor32;
   tmp: TArrayOfColor32;
   rec: TRect;
 begin
-  offset := NullPoint;
+  Result := NullPoint;
   srcWidth := img.Width;
   srcHeight := img.Height;
   if (srcWidth * srcHeight = 0) or IsIdentityMatrix(matrix) then Exit;
-  rec := GetTransformBounds(img, matrix);
-  offset := rec.TopLeft; //out parameter
-  dstWidth := RectWidth(rec);
-  dstHeight := RectHeight(rec);
+
+  if (newWidth = 0) or (newHeight = 0) then
+  begin
+    //auto-resize the image so it'll fit transformed image
+    rec := GetTransformBounds(img, matrix);
+    newWidth := RectWidth(rec);
+    newHeight := RectHeight((rec));
+    //auto-translate the image too
+    transX := rec.Left;
+    transY := rec.Top;
+    Result := Types.Point(transX, transY);
+  end else
+  begin
+    rec := Rect(0, 0, newWidth, newHeight);
+    transX := 0; transY := 0;
+  end;
 
   //starting with the result pixel coords, reverse find
   //the fractional coordinates in the current image
   MatrixInvert(matrix);
-  SetLength(tmp, dstWidth * dstHeight);
+  SetLength(tmp, newWidth * newHeight);
   pc := @tmp[0];
-  dstOffsetX := rec.Left; dstOffsetY := rec.Top;
   if img.AntiAliased then
   begin
-    for i := dstOffsetY to + dstOffsetY + dstHeight -1 do
-      for j := dstOffsetX to dstOffsetX + dstWidth -1 do
+    for i := transY to + transY + newHeight -1 do
+      for j := transX to transX + newWidth -1 do
       begin
         //convert dest X,Y to src X,Y ...
         x := j; y := i;
@@ -370,8 +373,8 @@ begin
       end;
   end else
   begin
-    for i := dstOffsetY to dstOffsetY + dstHeight -1 do
-      for j := dstOffsetX to dstOffsetX + dstWidth -1 do
+    for i := transY to transY + newHeight -1 do
+      for j := transX to transX + newWidth -1 do
       begin
         //convert dest X,Y to src X,Y ...
         x := j; y := i;
@@ -386,11 +389,23 @@ begin
   end;
   img.BeginUpdate;
   try
-    img.SetSize(dstWidth, dstHeight);
-    Move(tmp[0], img.Pixels[0], dstWidth * dstHeight * sizeOf(TColor32));
+    img.SetSize(newWidth, newHeight);
+    Move(tmp[0], img.Pixels[0], newWidth * newHeight * sizeOf(TColor32));
   finally
     img.EndUpdate;
   end;
+end;
+//------------------------------------------------------------------------------
+
+function AffineTransformImage(img: TImage32; matrix: TMatrixD): TPoint;
+begin
+  Result := AffineImageInternal(img, matrix, 0, 0);
+end;
+//------------------------------------------------------------------------------
+
+procedure AffineTransformImageRaw(img: TImage32; matrix: TMatrixD);
+begin
+  AffineImageInternal(img, matrix, img.Width, img.Height);
 end;
 
 //------------------------------------------------------------------------------

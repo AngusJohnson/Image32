@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.16                                                            *
-* Date      :  18 March 2021                                                   *
+* Version   :  2.17                                                            *
+* Date      :  19 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -119,8 +119,12 @@ function RamerDouglasPeucker(const paths: TPathsD;
 function GetFloodFillMask(img: TImage32; x, y: Integer;
   compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
 
-function GetSymmetricCropTransparentRect(img: TImage32): TRect;
 procedure SymmetricCropTransparent(img: TImage32);
+//ResizeCenterImageForRotation: accommodate inplace rotation (without
+//image resizing), making it easy to rotate about the image's midpoint
+//without causing image wobble.
+procedure ResizeAndCenterImgForRotation(image: TImage32);
+
 
 //2 additional blend functions (see TImage32.CopyBlend)
 function BlendLinearBurn(bgColor, fgColor: TColor32): TColor32;
@@ -610,7 +614,6 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
-
 
 function ColorDifference(color1, color2: TColor32): cardinal;
   {$IFDEF INLINE} inline; {$ENDIF}
@@ -1961,6 +1964,28 @@ var
 begin
   rec := GetSymmetricCropTransparentRect(img);
   if (rec.Top > 0) or (rec.Left > 0) then img.Crop(rec);
+end;
+//------------------------------------------------------------------------------
+
+procedure ResizeAndCenterImgForRotation(image: TImage32);
+var
+  i, radius, w,h, dx,dy: integer;
+  rec: TRect;
+  tmpImg: TImage32;
+begin
+  tmpImg := TImage32.Create(image);
+  try
+    SymmetricCropTransparent(tmpImg);
+    radius := Ceil(Distance(NullPointD, tmpImg.MidPoint));
+    rec := Rect(0,0,radius *2, radius *2);
+    image.SetSize(RectWidth(rec), RectHeight(rec)); //covers all rotations
+    dx := (image.Width - tmpImg.Width) div 2;
+    dy := (image.Height - tmpImg.Height) div 2;
+    rec := RectWH(dx, dy, tmpImg.Width, tmpImg.Height);
+    image.Copy(tmpImg, tmpImg.Bounds, rec);
+  finally
+    tmpImg.Free;
+  end;
 end;
 //------------------------------------------------------------------------------
 

@@ -156,7 +156,8 @@ type
   function GetBoundsD(const path: TPathD): TRectD; overload;
   function GetBoundsD(const paths: TPathsD): TRectD; overload;
 
-  function GetRotatedRectBounds(const rec: TRectD; angle: double): TRectD;
+  function GetRotatedRectBounds(const rec: TRect; angle: double): TRect; overload;
+  function GetRotatedRectBounds(const rec: TRectD; angle: double): TRectD; overload;
 
   function Rect(const recD: TRectD): TRect; overload;
   function Rect(const left,top,right,bottom: integer): TRect; overload;
@@ -422,6 +423,26 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function GetRotatedRectBounds(const rec: TRect; angle: double): TRect;
+var
+  sinA, cosA: double;
+  w,h: integer;
+  mp: TPoint;
+begin
+  NormalizeAngle(angle);
+  if angle <> 0 then
+  begin
+    GetSinCos(angle, sinA, cosA); //the sign of the angle isn't important
+    sinA := Abs(sinA); cosA := Abs(cosA);
+    w := Ceil((rec.Width *cosA + rec.Height *sinA) /2);
+    h := Ceil((rec.Width *sinA + rec.Height *cosA) /2);
+    mp := MidPoint(rec);
+    Result := Rect(mp.X - w, mp.Y - h, mp.X + w, mp.Y +h);
+  end
+  else
+    Result := rec;
+end;
+//------------------------------------------------------------------------------
 
 function GetRotatedRectBounds(const rec: TRectD; angle: double): TRectD;
 var

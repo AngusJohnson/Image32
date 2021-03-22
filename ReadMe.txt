@@ -20,6 +20,9 @@ Version 2.19
 	Minor tidy up.
   Image32_Transform
     Transforms can now have antialiasing disabled
+	Added AffineTransformImageRaw procedure
+  Image32_Extra
+    Added ResizeAndCenterImgForRotation procedure 
   Added Image32Panels
     which contains a TImage32 enhanced TPanel component
 	
