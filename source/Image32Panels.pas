@@ -2,8 +2,8 @@ unit Image32Panels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.1                                                             *
-* Date      :  22 March 2021                                                   *
+* Version   :  2.19                                                             *
+* Date      :  23 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Component that displays images on a TPanel descendant           *
@@ -89,9 +89,12 @@ type
     procedure CMFontChanged(var Message: TMessage); message CM_FONTCHANGED;
     procedure WMEraseBkgnd(var message: TMessage); message WM_ERASEBKGND;
     procedure WMGetDlgCode(var Message: TWMGetDlgCode); message WM_GETDLGCODE;
+    procedure WMMouseHWheel(var Message: TCMMouseWheel); message WM_MOUSEHWHEEL;
   protected
     function DoMouseWheel(Shift: TShiftState;
       WheelDelta: Integer; MousePos: TPoint): Boolean; override;
+    function DoMouseHWheel(Shift: TShiftState;
+      WheelDelta: Integer; MousePos: TPoint): Boolean;
     procedure MouseDown(Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
@@ -1014,7 +1017,6 @@ var
   p: double;
 begin
   inherited;
-
   case EventInfo.GestureID of
     igiZoom:
       begin
@@ -1051,24 +1053,53 @@ end;
 
 function TBaseImgPanel.DoMouseWheel(Shift: TShiftState;
   WheelDelta: Integer; MousePos: TPoint): Boolean;
+var
+  isZooming: Boolean;
 begin
   Result := inherited DoMouseWheel(Shift, WheelDelta, MousePos);
-  if Result or not focused then Exit;
+  if Result then Exit;
+
+  isZooming := (ssCtrl in Shift) and fAllowZoom;
+  if not isZooming and not fAllowScroll then Exit;
+
   {$IFNDEF FPC}
   MousePos := ScreenToClient(MousePos);
   {$ENDIF}
-  if (ssCtrl in Shift) and fAllowZoom then
+  if isZooming then
   begin
     if WheelDelta > 0 then
       ScaleAtPoint(1.1, MousePos) else
       ScaleAtPoint(0.9, MousePos);
-  end
-  else if fAllowScroll then
+  end else
   begin
     dec(fScrollbarVert.srcOffset, Round(WheelDelta / fScale));
     Invalidate;
   end;
   Result := true;
+end;
+//------------------------------------------------------------------------------
+
+procedure TBaseImgPanel.WMMouseHWheel(var Message: TCMMouseWheel);
+begin
+  with Message do
+  begin
+    if DoMouseHWheel(ShiftState, WheelDelta, SmallPointToPoint(Pos)) then
+      Message.Result := 1 else
+      Message.Result := 0;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TBaseImgPanel.DoMouseHWheel(Shift: TShiftState;
+  WheelDelta: Integer; MousePos: TPoint): Boolean;
+begin
+  Result := focused and fAllowScroll;
+  if not Result then Exit;
+  {$IFNDEF FPC}
+  MousePos := ScreenToClient(MousePos);
+  {$ENDIF}
+  dec(fScrollbarHorz.srcOffset, Round(WheelDelta / fScale));
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 

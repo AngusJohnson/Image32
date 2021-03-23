@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 2.19
-Released: 21 March 2021
+Latest version: 2.20
+Released: 24 March 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -12,9 +12,16 @@ Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
+Version 2.20
+  Image32_Layers
+	Fixed broken layer opacity and other minor bugs
+	CreateRotatingButtonGroup parameters changed
+  Image32Panels
+    Implemented WM_MOUSEHWHEEL for horizontal scrolling
+
 Version 2.19
   Image32_Layers
-    Added AntiAliased property to TLayeredImage32
+	Added AntiAliased property to TLayeredImage32
 	Renamed TGroupLayer32.OnMerge property to OnBeforeMerge
 	Added TGroupLayer32.OnAfterMerge property
 	Added THitTestLayer32.ClearHitTesting method

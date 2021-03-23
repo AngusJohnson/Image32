@@ -39,10 +39,7 @@ type
     mnuSharpWithHdls: TMenuItem;
     mnuSharpNoHdls: TMenuItem;
     lblPenColor: TLabel;
-    lblFillColor: TLabel;
     edPenColor: TEdit;
-    edFillColor: TEdit;
-    Shape1: TShape;
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -138,12 +135,6 @@ end;
 // Miscellaneous functions
 //------------------------------------------------------------------------------
 
-function GetFillColor: TColor32;
-begin
-  result := StrToInt64Def(FrmMain.edFillColor.Text, clNone32);
-end;
-//------------------------------------------------------------------------------
-
 function GetPenColor: TColor32;
 begin
   result := StrToInt64Def(FrmMain.edPenColor.Text, clBlack32);
@@ -154,8 +145,6 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TFrmMain.FormCreate(Sender: TObject);
-var
-  rec: TRect;
 begin
   //load a font for drawing text onto TImage32 objects
   fontReader := TFontReader.Create;
@@ -212,21 +201,15 @@ end;
 
 procedure TFrmMain.UpdateSmoothPathLayerAttributes;
 var
-  pc, bc: TColor32;
+  pc: TColor32;
 begin
   pc := TColor32(StrToInt64Def(edPenColor.Text, $990000));
-  bc := TColor32(StrToInt64Def(edFillColor.Text, $FFAAAA));
   lineWidth := Max(2, Min(50, strtoint(edWidth.text)));
-
-  FrmMain.Shape1.Pen.Width := lineWidth div 2;
-  FrmMain.Shape1.Pen.Color := RgbColor(pc);
-  FrmMain.Shape1.Brush.Color := RgbColor(bc);
 
   if not Assigned(smoothGroupLayer) then Exit;
   with smoothGroupLayer do
   begin
     PenColor := pc;
-    BrushColor := bc;
     PenWidth := lineWidth;
     SmoothPath.BeginUpdate;
     SmoothPath.EndUpdate;   //calls (protected) Change method.
@@ -336,7 +319,7 @@ begin
   begin
     clickedLayer.PositionCenteredAt(clickPoint);
     angle := UpdateRotatingButtonGroup(clickedLayer);
-    smoothGroupLayer.SmoothPath.Rotate(rotateGroupLayer.Pivot,
+    smoothGroupLayer.SmoothPath.Rotate(rotateGroupLayer.PivotPoint,
       angle - rotateAngle);
     rotateAngle := angle;
     Invalidate;
@@ -417,8 +400,7 @@ end;
 
 procedure TFrmMain.edPenColorChange(Sender: TObject);
 begin
-  if (Length(FrmMain.edPenColor.Text) = 9) and
-    (Length(FrmMain.edFillColor.Text) = 9) then
+  if (Length(FrmMain.edPenColor.Text) = 9) then
       UpdateSmoothPathLayerAttributes;
 end;
 //------------------------------------------------------------------------------

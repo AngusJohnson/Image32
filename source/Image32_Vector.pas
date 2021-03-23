@@ -190,7 +190,8 @@ type
   function MidPoint(const pt1, pt2: TPoint): TPoint; overload;
   function MidPoint(const pt1, pt2: TPointD): TPointD; overload;
 
-  function Average(val1, val2: integer): integer;
+  function Average(val1, val2: integer): integer; overload;
+  function Average(val1, val2: double): double; overload;
 
   function ReflectPoint(const pt, pivot: TPointD): TPointD;
 
@@ -549,6 +550,12 @@ end;
 function Average(val1, val2: integer): integer;
 begin
   Result := (val1 + val2) div 2;
+end;
+//------------------------------------------------------------------------------
+
+function Average(val1, val2: double): double;
+begin
+  Result := (val1 + val2) * 0.5;
 end;
 //------------------------------------------------------------------------------
 

@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.17                                                            *
-* Date      :  19 March 2021                                                   *
+* Version   :  2.20                                                            *
+* Date      :  24 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -269,7 +269,7 @@ type
     property DesignLayer: TDesignerLayer32 read GetDesignLayer;
   public
     property Angle: double read GetAngle;
-    property Pivot: TPointD read GetPivot;
+    property PivotPoint: TPointD read GetPivot;
     property AngleButton: TButtonDesignerLayer32 read GetAngleBtn;
     property PivotButton: TButtonDesignerLayer32 read GetPivotBtn;
     property DistBetweenButtons: double read GetDistance;
@@ -370,6 +370,7 @@ function CreateRotatingButtonGroup(targetLayer: TLayer32;
   pivotButtonColor: TColor32 = clWhite32;
   angleButtonColor: TColor32 = clBlue32;
   initialAngle: double = 0; angleOffset: double = 0;
+  enablePivotMove: Boolean = True;
   buttonLayerClass: TButtonDesignerLayer32Class = nil): TRotatingGroupLayer32; overload;
 
 function CreateRotatingButtonGroup(targetLayer: TLayer32;
@@ -377,6 +378,7 @@ function CreateRotatingButtonGroup(targetLayer: TLayer32;
   pivotButtonColor: TColor32 = clWhite32;
   angleButtonColor: TColor32 = clBlue32;
   initialAngle: double = 0; angleOffset: double = 0;
+  enablePivotMove: Boolean = True;
   buttonLayerClass: TButtonDesignerLayer32Class = nil): TRotatingGroupLayer32; overload;
 
 function CreateButtonGroup(groupOwner: TGroupLayer32;
@@ -572,16 +574,14 @@ end;
 
 procedure TLayer32.BeginUpdate;
 begin
-  //invalidate the maximum 'dirty' area
-  if CanUpdate then
+  if not fRefreshPending then
   begin
-    if IsEmptyRect(fDirtyBounds) then
-      fDirtyBounds := Bounds else
-      fDirtyBounds := Image32_Vector.UnionRect(fDirtyBounds, Bounds);
+    //invalidate the 'dirty' area
+    if IsEmptyRect(fDirtyBounds) then fDirtyBounds := Bounds;
     GroupOwner.Invalidate(fDirtyBounds);
+    fRefreshPending := true;
   end;
   Inc(fGroupOwner.fUpdateCount);
-  fRefreshPending := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -599,15 +599,15 @@ end;
 
 procedure TLayer32.ImageChanged(Sender: TImage32);
 begin
-  if (Self is TGroupLayer32) or not CanUpdate then Exit;
+  if (Self is TGroupLayer32) then Exit;
 
-  //invalidate the maximum 'dirty' area
-  if IsEmptyRect(fDirtyBounds) then
-    fDirtyBounds := Bounds else
-    fDirtyBounds := Image32_Vector.UnionRect(fDirtyBounds, Bounds);
-  GroupOwner.Invalidate(fDirtyBounds);
-  fRefreshPending := true;
-  GroupOwner.fRefreshPending := true;
+  if not fRefreshPending then
+  begin
+    //invalidate the 'dirty' area
+    if IsEmptyRect(fDirtyBounds) then fDirtyBounds := Bounds;
+    GroupOwner.Invalidate(fDirtyBounds);
+    fRefreshPending := true;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -937,8 +937,8 @@ begin
     end else
     begin
       if Child[i].fRefreshPending then
-        fLocalInvalidRect :=
-          Image32_Vector.UnionRect(fLocalInvalidRect, Child[i].Bounds);
+        Self.fLocalInvalidRect :=
+          Image32_Vector.UnionRect(Self.fLocalInvalidRect, Child[i].Bounds);
       rec := Image32_Vector.UnionRect(rec, Child[i].Bounds);
     end;
     Child[i].fDirtyBounds := Child[i].Bounds;
@@ -1362,7 +1362,14 @@ begin
       fAngle := 0;
       fMatrix := IdentityMatrix;
       fRotating := false;
-      fRefreshPending := true;
+
+      if not fRefreshPending then
+      begin
+        if not IsEmptyRect(fDirtyBounds) then
+          GroupOwner.Invalidate(fDirtyBounds);
+        fRefreshPending := true;
+      end;
+
       with MasterImage do
         fSavedSize := Image32_Vector.Size(Width, Height);
       Image.Assign(MasterImage); //this will call ImageChange for Image
@@ -2019,6 +2026,7 @@ function CreateRotatingButtonGroup(targetLayer: TLayer32;
   const pivot: TPointD; buttonSize: integer;
   pivotButtonColor, angleButtonColor: TColor32;
   initialAngle: double; angleOffset: double;
+  enablePivotMove: Boolean;
   buttonLayerClass: TButtonDesignerLayer32Class): TRotatingGroupLayer32;
 var
   rec: TRectD;
@@ -2045,18 +2053,19 @@ end;
 //------------------------------------------------------------------------------
 
 function CreateRotatingButtonGroup(targetLayer: TLayer32;
-  buttonSize: integer = 0;
-  pivotButtonColor: TColor32 = clWhite32;
-  angleButtonColor: TColor32 = clBlue32;
-  initialAngle: double = 0; angleOffset: double = 0;
-  buttonLayerClass: TButtonDesignerLayer32Class = nil): TRotatingGroupLayer32;
+  buttonSize: integer;
+  pivotButtonColor: TColor32;
+  angleButtonColor: TColor32;
+  initialAngle: double; angleOffset: double;
+  enablePivotMove: Boolean;
+  buttonLayerClass: TButtonDesignerLayer32Class): TRotatingGroupLayer32;
 var
   pivot: TPointD;
 begin
   pivot := PointD(Image32_Vector.MidPoint(targetLayer.Bounds));
   Result := CreateRotatingButtonGroup(targetLayer, pivot, buttonSize,
     pivotButtonColor, angleButtonColor, initialAngle, angleOffset,
-    buttonLayerClass);
+    enablePivotMove, buttonLayerClass);
 end;
 //------------------------------------------------------------------------------
 
@@ -2066,9 +2075,11 @@ var
   mp, pt2: TPointD;
   i, radius: integer;
 begin
-  if not assigned(rotateButton) or
-    not (rotateButton.GroupOwner is TRotatingGroupLayer32) then
-      raise Exception.Create(rsUpdateRotateGroupError);
+  with rotateButton do
+    if not assigned(rotateButton) or
+      not (GroupOwner is TRotatingGroupLayer32) or
+      (rotateButton <> TRotatingGroupLayer32(GroupOwner).AngleButton) then
+        raise Exception.Create(rsUpdateRotateGroupError);
 
   with TRotatingGroupLayer32(rotateButton.GroupOwner) do
   begin
@@ -2080,8 +2091,7 @@ begin
     i :=  DPIAware(2);
     DrawDashedLine(Child[0].Image, Ellipse(Rect(i,i,radius*2 -i, radius*2 -i)),
       dashes, nil, i, clRed32, esPolygon);
-    Result := Image32_Vector.GetAngle(mp, pt2) - fZeroOffset;
-    NormalizeAngle(Result);
+    Result := Angle;
   end;
 end;
 //------------------------------------------------------------------------------

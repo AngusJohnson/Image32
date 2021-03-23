@@ -54,26 +54,12 @@ object FrmMain: TFrmMain
       FocusControl = edWidth
     end
     object lblPenColor: TLabel
-      Left = 317
-      Top = 13
-      Width = 56
+      Left = 140
+      Top = 14
+      Width = 53
       Height = 14
       Alignment = taRightJustify
-      Caption = '&Pen Color:'
-    end
-    object lblFillColor: TLabel
-      Left = 147
-      Top = 13
-      Width = 47
-      Height = 14
-      Alignment = taRightJustify
-      Caption = '&Fill Color:'
-    end
-    object Shape1: TShape
-      Left = 288
-      Top = 12
-      Width = 18
-      Height = 18
+      Caption = 'Line&Color:'
     end
     object edWidth: TEdit
       Left = 77
@@ -93,24 +79,15 @@ object FrmMain: TFrmMain
       Min = 1
       Max = 50
       Position = 5
-      TabOrder = 3
+      TabOrder = 2
     end
     object edPenColor: TEdit
-      Left = 379
-      Top = 10
-      Width = 73
-      Height = 22
-      TabOrder = 2
-      Text = '$FF000099'
-      OnChange = edPenColorChange
-    end
-    object edFillColor: TEdit
-      Left = 200
+      Left = 199
       Top = 10
       Width = 73
       Height = 22
       TabOrder = 1
-      Text = '$FFCCCCFF'
+      Text = '$FF000099'
       OnChange = edPenColorChange
     end
   end
