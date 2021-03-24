@@ -2,8 +2,8 @@ unit Image32_Ttf;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.16                                                            *
-* Date      :  18 March 2021                                                   *
+* Version   :  2.17                                                            *
+* Date      :  19 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -390,17 +390,16 @@ type
     destructor Destroy; override;
     procedure Clear;
     function GetCharInfo(charOrdinal: WORD): PGlyphInfo;
-    function GetTextGlyphs(x, y: double; const text: UnicodeString;
-      out glyphs: TPathsD): Boolean; overload;
-    function GetTextGlyphs(x, y: double; const text: UnicodeString;
-      out glyphs: TPathsD; out nextX: double): Boolean; overload;
+    function GetTextGlyphs(x, y: double;
+      const text: UnicodeString): TPathsD; overload;
+    function GetTextGlyphs(x, y: double;
+      const text: UnicodeString; out nextX: double): TPathsD; overload;
     function GetTextGlyphs(const rec: TRect; const text: UnicodeString;
       textAlign: TTextAlign; textAlignV: TTextVAlign;
-      out glyphs: TPathsD; out nextIdx: integer;
-      out nextPt: TPointD): Boolean; overload;
+      out nextIdx: integer; out nextPt: TPointD): TPathsD; overload;
     function GetAngledTextGlyphs(x, y: double; const text: UnicodeString;
       angleRadians: double; const rotatePt: TPointD;
-      out glyphs: TPathsD; out nextPt: TPointD): Boolean;
+      out nextPt: TPointD): TPathsD;
 
     function GetCharOffsets(const text: UnicodeString): TArrayOfDouble;
     function GetTextWidth(const text: UnicodeString): double;
@@ -2090,51 +2089,50 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TGlyphCache.GetTextGlyphs(x, y: double; const text: UnicodeString;
-  out glyphs: TPathsD): Boolean;
+function TGlyphCache.GetTextGlyphs(x, y: double;
+  const text: UnicodeString): TPathsD;
 var
   dummy: double;
 begin
-  Result := GetTextGlyphs(x, y, text, glyphs, dummy);
+  Result := GetTextGlyphs(x, y, text, dummy);
 end;
 //------------------------------------------------------------------------------
 
-function TGlyphCache.GetTextGlyphs(x, y: double; const text: UnicodeString;
-  out glyphs: TPathsD; out nextX: double): Boolean;
+function TGlyphCache.GetTextGlyphs(x, y: double;
+  const text: UnicodeString; out nextX: double): TPathsD;
 var
   i: integer;
   w, y2: double;
   p: TPathD;
   arrayOfGlyphs: TArrayOfPathsD;
 begin
-  glyphs := nil;
-  Result := GetTextGlyphsInternal(x, y, text, arrayOfGlyphs, nextX);
-  if not Result then Exit;
+  Result := nil;
+  if not GetTextGlyphsInternal(x, y, text, arrayOfGlyphs, nextX) then Exit;
 
   if fUnderlined then
   begin
     w := LineHeight * lineFrac;
     y2 := y + 1.5 *(1+w);
     p := Rectangle(x, y2, nextX, y2 + w);
-    AppendPath(glyphs, p);
+    AppendPath(Result, p);
   end;
 
   for i := 0 to high(arrayOfGlyphs) do
-    AppendPath(glyphs, arrayOfGlyphs[i]);
+    AppendPath(Result, arrayOfGlyphs[i]);
 
   if fStrikeOut then
   begin
     w := LineHeight * lineFrac;
     y := y - LineHeight/4;
     p := Rectangle(x, y , nextX, y + w);
-    AppendPath(glyphs, p);
+    AppendPath(Result, p);
   end;
 end;
 //------------------------------------------------------------------------------
 
 function TGlyphCache.GetTextGlyphsInternal(x, y: double;
-  const text: UnicodeString;
-  out glyphs: TArrayOfPathsD; out nextX: double): Boolean;
+  const text: UnicodeString; out glyphs: TArrayOfPathsD;
+  out nextX: double): Boolean;
 var
   i,j, len: integer;
   unicodes: TArrayOfWord;
@@ -2195,7 +2193,7 @@ end;
 
 function TGlyphCache.GetTextGlyphs(const rec: TRect;
   const text: UnicodeString; textAlign: TTextAlign; textAlignV: TTextVAlign;
-  out glyphs: TPathsD; out nextIdx: integer; out nextPt: TPointD): Boolean;
+  out nextIdx: integer; out nextPt: TPointD): TPathsD;
 var
   i,j,k, lenCurr, lenRem, spcCount: integer;
   lh, currLineWidthPxls, spcDx, dx, dy, y2, w: double;
@@ -2208,10 +2206,9 @@ begin
   //precondition: 'text' may contain '#10 chars but not #13 chars
 
   nextIdx := 1;
-  glyphs := nil;
   nextPt := PointD(rec.left, rec.Top);
-  Result := IsValidFont;
-  if not Result then Exit;
+  Result := nil;
+  if not IsValidFont then Exit;
 
   lh := LineHeight;
   if (nextPt.Y +lh > rec.Bottom) then Exit;
@@ -2310,11 +2307,11 @@ begin
         y2 := nextPt.Y + ascent + 1.5 *(1+w);
         underline := Rectangle(nextPt.X, y2,
           nextPt.X + currLineWidthPxls, y2 + w);
-        AppendPath(glyphs, underline);
+        AppendPath(Result, underline);
       end;
 
       for i := 0 to High(currLineGlyphs) do
-        AppendPath(glyphs, currLineGlyphs[i]);
+        AppendPath(Result, currLineGlyphs[i]);
 
       strikeOut := nil;
       if fStrikeOut then
@@ -2323,7 +2320,7 @@ begin
         y2 := nextPt.Y + ascent - LineHeight/4;
         strikeOut := Rectangle(nextPt.X, y2,
           nextPt.X + currLineWidthPxls, y2 + w);
-        AppendPath(glyphs, strikeOut);
+        AppendPath(Result, strikeOut);
       end;
 
 
@@ -2354,7 +2351,7 @@ begin
         dy := (rec.Bottom - nextPt.Y - descent) / 2;
         if dy > 0 then
         begin
-          glyphs := Image32_Vector.OffsetPath(glyphs, 0, dy);
+          Result := Image32_Vector.OffsetPath(Result, 0, dy);
           nextPt.Y := nextPt.Y + dy;
         end;
       end;
@@ -2363,7 +2360,7 @@ begin
         dy := rec.Bottom - nextPt.Y;
         if dy > 0 then
         begin
-          glyphs := Image32_Vector.OffsetPath(glyphs, 0, dy);
+          Result := Image32_Vector.OffsetPath(Result, 0, dy);
           nextPt.Y := nextPt.Y + dy;
         end;
         nextPt.Y := rec.Bottom;
@@ -2373,14 +2370,13 @@ end;
 //------------------------------------------------------------------------------
 
 function TGlyphCache.GetAngledTextGlyphs(x, y: double;
-  const text: UnicodeString;
-  angleRadians: double; const rotatePt: TPointD;
-  out glyphs: TPathsD; out nextPt: TPointD): Boolean;
+  const text: UnicodeString; angleRadians: double;
+  const rotatePt: TPointD; out nextPt: TPointD): TPathsD;
 begin
   nextPt.Y := y;
-  Result := GetTextGlyphs(x,y, text, glyphs, nextPt.X);
-  if not Result then Exit;
-  glyphs := RotatePath(glyphs, rotatePt, angleRadians);
+  Result := GetTextGlyphs(x,y, text, nextPt.X);
+  if not Assigned(Result) then Exit;
+  Result := RotatePath(Result, rotatePt, angleRadians);
   RotatePoint(nextPt, PointD(x,y), angleRadians);
 end;
 //------------------------------------------------------------------------------
@@ -2558,7 +2554,7 @@ var
 begin
   Result := 0;
   if not assigned(glyphCache) or not glyphCache.IsValidFont then Exit;
-  glyphCache.GetTextGlyphs(x,y, text, glyphs, Result);
+  glyphs := glyphCache.GetTextGlyphs(x,y, text, Result);
   DrawPolygon(image, glyphs, frNonZero, textColor);
 end;
 //------------------------------------------------------------------------------
@@ -2570,7 +2566,7 @@ var
 begin
   Result := 0;
   if not assigned(glyphCache) or not glyphCache.IsValidFont then Exit;
-  glyphCache.GetTextGlyphs(x,y, text, glyphs, Result);
+  glyphs := glyphCache.GetTextGlyphs(x,y, text, Result);
   DrawPolygon(image, glyphs, frNonZero, renderer);
 end;
 //------------------------------------------------------------------------------
@@ -2584,8 +2580,8 @@ var
 begin
   Result := NullPointD;
   if not assigned(glyphCache) or not glyphCache.IsValidFont then Exit;
-  glyphCache.GetTextGlyphs(rec, text,
-    textAlign, textAlignV, glyphs, dummy, Result);
+  glyphs := glyphCache.GetTextGlyphs(rec, text,
+    textAlign, textAlignV, dummy, Result);
   DrawPolygon(image, glyphs, frNonZero, textColor);
 end;
 //------------------------------------------------------------------------------
@@ -2599,9 +2595,9 @@ var
   rotatePt: TPointD;
 begin
   rotatePt := PointD(x,y);
-  if not assigned(glyphCache) or not glyphCache.IsValidFont or
-    not glyphCache.GetAngledTextGlyphs(x, y, text,
-      angleRadians, rotatePt, glyphs, Result) then Exit;
+  if not assigned(glyphCache) or not glyphCache.IsValidFont then Exit;
+  glyphs := glyphCache.GetAngledTextGlyphs(x, y,
+    text, angleRadians, rotatePt, Result);
   DrawPolygon(image, glyphs, frNonZero, textColor);
 end;
 //------------------------------------------------------------------------------

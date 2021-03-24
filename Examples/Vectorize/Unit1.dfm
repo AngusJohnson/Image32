@@ -65,7 +65,6 @@ object Form1: TForm1
       Width = 27
       Height = 138
       Anchors = [akLeft, akTop, akBottom]
-      Min = 1
       Orientation = trVertical
       PageSize = 0
       Position = 3
@@ -80,7 +79,6 @@ object Form1: TForm1
       Height = 138
       Anchors = [akLeft, akTop, akBottom]
       Max = 5
-      Min = 1
       Orientation = trVertical
       PageSize = 0
       Position = 2
@@ -115,23 +113,14 @@ object Form1: TForm1
         TabOrder = 0
         OnClick = btnCloseMemoClick
       end
-      object rbBeziers: TRadioButton
-        Left = 187
-        Top = 14
-        Width = 158
-        Height = 14
-        Caption = 'Smoothed &Bezier Paths'
-        TabOrder = 2
-        OnClick = rbBeziersClick
-      end
       object rbFlat: TRadioButton
-        Left = 351
+        Left = 186
         Top = 13
         Width = 188
         Height = 17
         Caption = 'Smoothed && &Flattened Paths'
         Checked = True
-        TabOrder = 3
+        TabOrder = 2
         TabStop = True
         OnClick = rbBeziersClick
       end
@@ -168,8 +157,8 @@ object Form1: TForm1
         OnClick = Open1Click
       end
       object SaveAs1: TMenuItem
-        Caption = '&Save As ...'
-        ShortCut = 16467
+        Caption = 'Save &As ...'
+        ShortCut = 16449
         OnClick = SaveAs1Click
       end
       object N1: TMenuItem
@@ -187,28 +176,14 @@ object Form1: TForm1
         Caption = 'Monochrome Im&age'
         GroupIndex = 1
         RadioItem = True
-        ShortCut = 16433
+        ShortCut = 16461
         OnClick = mnuShowSimplifiedClick
       end
       object mnuShowRawPoly: TMenuItem
         Caption = '&Raw Vector Polygons'
         GroupIndex = 1
         RadioItem = True
-        ShortCut = 16434
-        OnClick = mnuShowSimplifiedClick
-      end
-      object mnuShowSimplified: TMenuItem
-        Caption = 'Simplified Ve&ctor Polygons'
-        GroupIndex = 1
-        RadioItem = True
-        ShortCut = 16435
-        OnClick = mnuShowSimplifiedClick
-      end
-      object mnuShowSmoothedOnly: TMenuItem
-        Caption = 'Smoothe&d (unsimplified) Polygons'
-        GroupIndex = 1
-        RadioItem = True
-        ShortCut = 16436
+        ShortCut = 16466
         OnClick = mnuShowSimplifiedClick
       end
       object mnuShowSimplifiedSmoothed: TMenuItem
@@ -216,7 +191,7 @@ object Form1: TForm1
         Checked = True
         GroupIndex = 1
         RadioItem = True
-        ShortCut = 16437
+        ShortCut = 16467
         OnClick = mnuShowSimplifiedClick
       end
       object N3: TMenuItem

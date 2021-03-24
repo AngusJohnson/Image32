@@ -105,22 +105,54 @@ begin
   layeredImage := TLayeredImage32.Create;
   layeredImage.BackgroundColor := Color32(clBtnFace);
 
-  //width & height will be set in UpdateLayeredImage method below
-
   //Layer 0: bottom 'hatched' design layer
   layeredImage.AddLayer(TDesignerLayer32, nil, 'hatched');
 
   //Layer 1: for the transformed image
   transformLayer := TRasterLayer32(layeredImage.AddLayer(TRasterLayer32));
-  transformLayer.MasterImage.LoadFromResource('UNION_JACK', 'BMP');
-  //transformLayer.MasterImage.AntiAliased := false;
+  transformLayer.MasterImage.LoadFromResource('GRADIENT', 'PNG');
 
   transformLayer.CursorId := crHandPoint;
-  transformLayer.PositionAt(100,100);
   transformLayer.AutoPivot := true;
   transformLayer.UpdateHitTestMaskTransparent;
 
   ResetSkew(mnuVertSkew.Checked);
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.FormResize(Sender: TObject);
+var
+  w,h: integer;
+  mp: TPointD;
+  dx, dy: double;
+begin
+  if csDestroying in ComponentState then Exit;
+
+  w := ClientWidth; h := ClientHeight;
+
+  //resize layeredImage and the background hatch layer
+  layeredImage.SetSize(w, h);
+  with layeredImage[0] do
+  begin
+    SetSize(w, h);
+    HatchBackground(Image, clWhite32, $FFE0E0E0);
+  end;
+  //and center transformlayer
+  mp := transformLayer.MidPoint;
+  transformlayer.PositionCenteredAt(w/2,h/2);
+
+  //and offset everything else
+  with transformLayer.MidPoint do
+  begin
+    dx := X - mp.X;
+    dy := Y - mp.Y;
+  end;
+  if Assigned(buttonGroup) then
+    buttonGroup.Offset(dx, dy)
+  else if Assigned(rotateGroup) then
+    rotateGroup.Offset(dx, dy);
+  ctrlPoints := OffsetPath(ctrlPoints, dx, dy);
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -136,9 +168,25 @@ end;
 
 procedure TForm1.WMERASEBKGND(var message: TMessage);
 begin
+  //Since we want full control of painting (see FormPaint below),
+  //we'll stops Windows unhelpfully erasing the form's canvas.
   message.Result := 1;
-  //this stops windows unhelpfully erasing the form's canvas.
-  //We want full control of painting (see FormPaint below).
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.FormPaint(Sender: TObject);
+var
+  updateRect: TRect;
+begin
+  //nb: layeredImage32.GetMergedImage returns the rectangular region of the
+  //image that has changed since the last GetMergedImage call.
+  //This accommodates updating just the region that's changed. This is
+  //generally a lot faster than updating the whole merged image).
+  with layeredImage.GetMergedImage(mnuHideControls.Checked, updateRect) do
+  begin
+    //now we just refresh the 'updateRect' region
+    CopyToDc(updateRect, updateRect, self.Canvas.Handle, false);
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -225,6 +273,7 @@ begin
   //create rotate button group while also disabling pivot button moves
   rotateGroup := CreateRotatingButtonGroup(transformLayer,
     DefaultButtonSize, clWhite32, clAqua32, 0, -Angle90, allowRotatePivotMove);
+  rotateGroup.AngleButton.CursorId := crSizeWE;
 
   Invalidate;
   StatusBar1.SimpleText := ' ROTATE TRANSFORM';
@@ -237,7 +286,7 @@ var
   mat: TMatrixD;
   delta: double;
 begin
-  //except for rotation, use fPts to update the 'transformed' layer
+  //except for rotation, use ctrlPoints to update the 'transformed' layer
   with transformLayer do
   begin
     Image.Assign(masterImage);
@@ -254,16 +303,17 @@ begin
             delta := (ctrlPoints[1].X-Image.Width) - ctrlPoints[0].X;
             mat[1][0] := delta / Image.Height;
           end;
-          //returned pt is the offset to the old (untransformed) image
+          //the returned pt states the offset of the new (transformed) image
           pt := AffineTransformImage(Image, mat);
-          //add this offset to fCtrlPoints[0] to reposition the layer
-          pt.X := pt.X + Round(ctrlPoints[0].X);
-          pt.Y := pt.Y + Round(ctrlPoints[0].Y);
-          PositionAt(pt);
+          with Point(ctrlPoints[0]) do
+            PositionAt(X +pt.X, Y +pt.Y);
         end;
       ttAffineRotate:
         begin
           //rotation is managed internally by transformlayer
+          transformLayer.Angle := rotateGroup.Angle;
+          StatusBar1.SimpleText := Format(' ROTATE TRANSFORM - angle:%1.0n',
+            [transformLayer.Angle *180/PI]);
         end;
       ttProjective:
         begin
@@ -285,53 +335,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.FormResize(Sender: TObject);
-var
-  w,h: integer;
-begin
-  if csDestroying in ComponentState then Exit;
-
-  w := ClientWidth; h := ClientHeight;
-  layeredImage.SetSize(w, h);
-  //and update hatched layer too
-  with layeredImage[0] do
-  begin
-    SetSize(w, h);
-    HatchBackground(Image, clWhite32, $FFE0E0E0);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TForm1.FormPaint(Sender: TObject);
-var
-  updateRect: TRect;
-begin
-  //nb: layeredImage32.GetMergedImage returns the rectangular region of the
-  //image that has changed since the last GetMergedImage call.
-  //This accommodates updating just this changed region (which is usually
-  //considerably faster than updating the whole merged image).
-  with layeredImage.GetMergedImage(mnuHideControls.Checked, updateRect) do
-  begin
-    CopyToDc(updateRect, self.Canvas.Handle,
-      updateRect.Left, updateRect.Top, false);
-  end;
-end;
-//------------------------------------------------------------------------------
-
 procedure TForm1.mnuVerticalSplineClick(Sender: TObject);
 var
   rec: TRect;
+  oldTopLeft: TPoint;
 begin
   TMenuItem(Sender).Checked := true;
 
-  //rather than started each transform afresh,
-  //let's make them additive ...
+  //rather than started each transform afresh, let's make them additive
   with transformLayer do
   begin
+    oldTopLeft := Bounds.TopLeft;
     MasterImage.Assign(Image);
     rec := MasterImage.CropTransparentPixels;
-    //and adjust for the cropped offset
-    Offset(rec.Left, rec.Top);
+    //adjust for the cropped offset
+    PositionAt(oldTopLeft.X + rec.Left, oldTopLeft.Y + rec.Top);
   end;
 
   if (Sender = mnuVertSkew) then            ResetSkew(true)
@@ -401,16 +419,18 @@ var
 begin
   pt := Types.Point(X,Y);
 
+  //if not clicked-moving a layer, then update the cursor and exit.
   if not (ssLeft in Shift) then
   begin
+    //get the top-most 'clickable' layer under the mouse cursor
     layer := layeredImage.GetLayerAt(pt);
     if Assigned(layer) then
       Cursor := layer.CursorId else
       Cursor := crDefault;
     Exit;
   end;
-
   if not Assigned(clickedLayer) then Exit;
+
 
   if clickedLayer = transformLayer then
   begin
@@ -422,47 +442,47 @@ begin
     if Assigned(buttonGroup) then buttonGroup.Offset(dx, dy);
     if Assigned(rotateGroup) and transformLayer.AutoPivot then
       rotateGroup.Offset(dx, dy);
-
-    with transformLayer.Bounds do
-      StatusBar1.SimpleText := Format('%d,%d,%d,%d',[left,top,right,bottom]);
     Invalidate;
   end else if clickedLayer.GroupOwner = rotateGroup then
   begin
     if clickedLayer = rotateGroup.PivotButton then
     begin
+      //moving the pivot button in the rotation group
       dx := pt.X - clickPoint.X;
       dy := pt.Y - clickPoint.Y;
       clickPoint := pt;
       rotateGroup.Offset(dx, dy);
-      transformLayer.PivotPt :=
-        rotateGroup.PivotButton.MidPoint; //also disables autopivot
+      transformLayer.PivotPt := rotateGroup.PivotButton.MidPoint;
     end else
     begin
+      //moving the angle button in the rotation group
       clickedLayer.PositionCenteredAt(pt);
-      transformLayer.Angle := UpdateRotatingButtonGroup(clickedLayer);
-      StatusBar1.SimpleText := Format(' ROTATE TRANSFORM - angle:%1.0n',
-        [transformLayer.Angle *180/PI]);
+      UpdateRotatingButtonGroup(clickedLayer);
+      //we could do the rotation here, but it's
+      //much smoother when done via the AppIdle event.
+      doTransformOnIdle := True;
     end;
     Invalidate;
-  end else if clickedLayer.GroupOwner = buttonGroup then
+  end
+  else if clickedLayer.GroupOwner = buttonGroup then
   begin
-    //keep button controls axis aligned for appropriate transforms, otherwise
-    //comment out below for an unrestricted skews (and change DoTransform too)
+    //clicking a general purpose button (layer)
+
+    //if skewing, keep the buttons axis aligned
     if mnuVertSkew.Checked then
       pt.X := Round(clickedLayer.MidPoint.X);
     if mnuHorizontalSkew.Checked then
       pt.Y := Round(clickedLayer.MidPoint.Y);
 
     idx := clickedLayer.Index;
-    //for unrestricted projective transforms, comment out the code block below
     if mnuVertProjective.Checked then
     begin
       //get the index of the moving button's vertical partner
+      //noting that there are 4 buttons in the group ...
       altIdx := 3 - idx;
       ctrlPoints[altIdx].X := pt.X;
       buttonGroup[altIdx].PositionCenteredAt(ctrlPoints[altIdx]);
     end;
-
     clickedLayer.PositionCenteredAt(pt);
     ctrlPoints[idx] := PointD(pt);
     doTransformOnIdle := true;

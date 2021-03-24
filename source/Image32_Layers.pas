@@ -59,8 +59,7 @@ type
   private
     fLayeredImage   : TLayeredImage32;
     fGroupOwner     : TGroupLayer32;
-    fLeft           : integer;
-    fTop            : integer;
+    fMidPoint       : TPointD;
     fImage          : TImage32;
     fName           : string;
     fIndex          : integer;
@@ -70,7 +69,8 @@ type
     fTag            : Cardinal;
     fDirtyBounds    : TRect;
     fRefreshPending : boolean;
-    function   GetMidPoint: TPointD;
+    function   GetLeft: integer;
+    function   GetTop: integer;
     procedure  SetVisible(value: Boolean);
     function   GetHeight: integer;
     function   GetWidth: integer;
@@ -94,11 +94,11 @@ type
 
     procedure  PositionAt(const pt: TPoint); overload;
     procedure  PositionAt(x, y: integer); overload;
-    procedure  PositionCenteredAt(X, Y: integer); overload;
+    procedure  PositionCenteredAt(X, Y: double); overload;
     procedure  PositionCenteredAt(const pt: TPoint); overload;
     procedure  PositionCenteredAt(const pt: TPointD); overload;
     procedure  SetBounds(const newBounds: TRect); virtual;
-    procedure  Offset(dx, dy: integer); virtual;
+    procedure  Offset(dx, dy: double); virtual;
 
     property   Bounds: TRect read GetBounds;
     property   CursorId: integer read fCursorId write fCursorId;
@@ -106,12 +106,12 @@ type
     property   Height: integer read GetHeight;
     property   Image: TImage32 read fImage;
     property   Index: integer read fIndex;
-    property   Left: integer read fLeft;
-    property   MidPoint: TPointD read GetMidPoint;
+    property   Left: integer read GetLeft;
+    property   MidPoint: TPointD read fMidPoint;
     property   Name: string read fName write fName;
     property   Opacity: Byte read fOpacity write SetOpacity;
     property   RootOwner: TLayeredImage32 read fLayeredImage;
-    property   Top: integer read fTop;
+    property   Top: integer read GetTop;
     property   Visible: Boolean read fVisible write SetVisible;
     property   Width: integer read GetWidth;
     property   Tag: Cardinal read fTag write fTag;
@@ -136,8 +136,10 @@ type
     function  FindLayerNamed(const name: string): TLayer32; virtual;
     procedure ReindexChildsFrom(startIdx: Integer);
   protected
+    procedure  BeginUpdate; override;
+    procedure  EndUpdate;   override;
     procedure PreMerge(hideDesigners, forceRefresh: Boolean);
-    procedure Merge(hideDesigners: Boolean; const paintRect: TRect);
+    procedure Merge(hideDesigners: Boolean; const staleRect: TRect);
     function  GetLayerAt(const pt: TPoint; ignoreDesigners: Boolean): TLayer32;
     procedure InternalDeleteChild(index: integer; fromChild: Boolean);
     procedure  DoBeforeMerge; virtual;
@@ -150,8 +152,7 @@ type
     procedure  DeleteChild(index: integer);
     procedure  Invalidate(rec: TRect);
 
-    procedure  SetBounds(const newBounds: TRect); override;
-    procedure  Offset(dx, dy: integer); override;
+    procedure  Offset(dx, dy: double); override;
     procedure  ClearChildren;
     property   ChildCount: integer read GetChildCount;
     property   Child[index: integer]: TLayer32 read GetChild; default;
@@ -183,7 +184,7 @@ type
     constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
     procedure Rotate(angleDelta: double); virtual;
     procedure ResetAngle;
-    procedure Offset(dx,dy: integer); override;
+    procedure Offset(dx,dy: double); override;
     property  Angle: double read fAngle write SetAngle;
     property  PivotPt: TPointD read GetPivotPt write SetPivotPt;
     property  AutoPivot: Boolean read fAutoPivot write SetAutoPivot;
@@ -202,7 +203,7 @@ type
   public
     constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
     procedure SetBounds(const newBounds: TRect); override;
-    procedure Offset(dx,dy: integer); override;
+    procedure Offset(dx,dy: double); override;
     procedure Rotate(angleDelta: double); override;
     procedure UpdateHitTestMask(const vectorRegions: TPathsD;
       fillRule: TFillRule); virtual;
@@ -612,9 +613,18 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TLayer32.SetSize(width, height: integer);
+var
+  sx, sy: integer;
 begin
-  if (width = Image.Width) and (height = Image.Height) then Exit;
-  Image.SetSize(width, height);
+  sx := width - Image.Width;
+  sy := height - Image.Height;
+  if (sx <> 0) or (sy <> 0) then
+  begin
+    Image.SetSize(width, height);
+    fMidPoint.X := fMidPoint.X + sx * 0.5;
+    fMidPoint.Y := fMidPoint.Y + sy * 0.5;
+  end else
+    Image.Clear;
 end;
 //------------------------------------------------------------------------------
 
@@ -632,78 +642,80 @@ end;
 
 procedure  TLayer32.SetBounds(const newBounds: TRect);
 begin
-  fLeft := newBounds.Left;
-  fTop := newBounds.Top;
-  Image.SetSize(RectWidth(newBounds),RectHeight(newBounds));
-end;
-//------------------------------------------------------------------------------
-
-function TLayer32.GetBounds: TRect;
-begin
-  Result := Rect(fLeft, fTop, fLeft + fImage.Width, fTop + fImage.Height)
-end;
-//------------------------------------------------------------------------------
-
-function TLayer32.GetMidPoint: TPointD;
-begin
-  Result := Image32_Vector.MidPoint(RectD(Bounds));
-end;
-//------------------------------------------------------------------------------
-
-procedure TLayer32.PositionAt(const pt: TPoint);
-begin
-  if (fLeft = pt.X) and (fTop = pt.Y) then Exit;
-
   BeginUpdate;
   try
-    fLeft := pt.X;
-    fTop := pt.Y;
+    SetSize(RectWidth(newBounds),RectHeight(newBounds));
+    fMidPoint.X := (newBounds.Left + newBounds.Right) * 0.5;
+    fMidPoint.Y := (newBounds.Top + newBounds.Bottom) * 0.5;
   finally
     EndUpdate;
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TLayer32.PositionAt(x, y: integer);
+function TLayer32.GetBounds: TRect;
 begin
-  PositionAt(Types.Point(x, y));
+  Result.Left := GetLeft;
+  Result.Top := GetTop;
+  Result.Right := Result.Left + Image.Width;
+  Result.Bottom := Result.Top + Image.Height;
 end;
 //------------------------------------------------------------------------------
 
-procedure TLayer32.PositionCenteredAt(X, Y: integer);
-var
-  pt2: TPoint;
+function TLayer32.GetLeft: integer;
 begin
-  pt2.X := X - Image.Width div 2;
-  pt2.Y := Y - Image.Height div 2;
-  PositionAt(pt2);
+  Result := Round(fMidPoint.X - Image.Width * 0.5);
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.GetTop: integer;
+begin
+  Result := Round(fMidPoint.Y - Image.Height * 0.5);
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.PositionAt(const pt: TPoint);
+begin
+  if (Left = pt.X) and (Top = pt.Y) then Exit;
+  PositionCenteredAt(pt.X + Image.Width * 0.5, pt.Y + Image.Height * 0.5);
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.PositionAt(x, y: integer);
+begin
+  if (Left = X) and (Top = Y) then Exit;
+  PositionCenteredAt(X + Image.Width * 0.5, Y + Image.Height * 0.5);
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.PositionCenteredAt(X, Y: double);
+begin
+  PositionCenteredAt(PointD(X,Y));
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayer32.PositionCenteredAt(const pt: TPoint);
-var
-  pt2: TPoint;
 begin
-  pt2.X := pt.X - Image.Width div 2;
-  pt2.Y := pt.Y - Image.Height div 2;
-  PositionAt(pt2);
+  PositionCenteredAt(PointD(pt));
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayer32.PositionCenteredAt(const pt: TPointD);
-var
-  pt2: TPoint;
 begin
-  pt2.X := Round(pt.X - Image.Width * 0.5);
-  pt2.Y := Round(pt.Y - Image.Height * 0.5);
-  PositionAt(pt2);
+  if PointsNearEqual(pt, fMidPoint, 0.001) then Exit;
+  BeginUpdate;
+  try
+    fMidPoint := pt;
+  finally
+    EndUpdate;
+  end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TLayer32.Offset(dx, dy: integer);
+procedure TLayer32.Offset(dx, dy: double);
 begin
   if (dx <> 0) or (dy <> 0) then
-    PositionAt(Left + dx, Top + dy);
+    PositionCenteredAt(fMidPoint.X + dx, fMidPoint.Y + dy);
 end;
 //------------------------------------------------------------------------------
 
@@ -881,22 +893,23 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure  TGroupLayer32.SetBounds(const newBounds: TRect);
-begin
-  //this overrride bypasses the overhead of BeginUpdate/EndUpdate
-  fLeft := newBounds.Left;
-  fTop := newBounds.Top;
-  Image.SetSize(RectWidth(newBounds),RectHeight(newBounds));
-end;
-//------------------------------------------------------------------------------
-
-procedure TGroupLayer32.Offset(dx, dy: integer);
+procedure TGroupLayer32.Offset(dx, dy: double);
 var
   i: integer;
 begin
   if (dx = 0) and (dy = 0) then Exit;
   for i := 0 to ChildCount -1 do
     Child[i].Offset(dx, dy);
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupLayer32.BeginUpdate;
+begin
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupLayer32.EndUpdate;
+begin
 end;
 //------------------------------------------------------------------------------
 
@@ -949,7 +962,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TGroupLayer32.Merge(hideDesigners: Boolean; const paintRect: TRect);
+procedure TGroupLayer32.Merge(hideDesigners: Boolean; const staleRect: TRect);
 var
   i: integer;
   tmp: TImage32;
@@ -966,11 +979,11 @@ begin
       (hideDesigners and (Child[i] is TDesignerLayer32)) then
         Continue;
 
-    srcRect := Image32_Vector.IntersectRect(paintRect, Child[i].Bounds);
+    srcRect := Image32_Vector.IntersectRect(staleRect, Child[i].Bounds);
     if IsEmptyRect(srcRect) then Continue;
 
     if (Child[i] is TGroupLayer32) then
-      TGroupLayer32(Child[i]).Merge(hideDesigners, paintRect); //recursive
+      TGroupLayer32(Child[i]).Merge(hideDesigners, staleRect); //recursive
 
     //make dstRect relative to groupLayer
     dstRect := srcRect;
@@ -978,11 +991,11 @@ begin
     //make srcRect relative to image
     Image32_Vector.OffsetRect(srcRect, -Child[i].Left, -Child[i].Top);
 
-    if fOpacity < 254 then //reduce layer opacity
+    if Child[i].Opacity < 254 then //reduce layer opacity
     begin
       tmp := TImage32.Create(Child[i].Image);
       try
-        tmp.ScaleAlpha(fOpacity/255);
+        tmp.ScaleAlpha(Child[i].Opacity/255);
         Image.CopyBlend(tmp, srcRect, dstRect, BlendToAlpha);
       finally
         tmp.Free;
@@ -1138,7 +1151,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TRotateLayer32.Offset(dx,dy: integer);
+procedure TRotateLayer32.Offset(dx,dy: double);
 begin
   inherited;
   if fAutoPivot then
@@ -1229,7 +1242,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TVectorLayer32.Offset(dx,dy: integer);
+procedure TVectorLayer32.Offset(dx,dy: double);
 begin
   inherited;
   fPaths := OffsetPath(fPaths, dx,dy);
@@ -1474,7 +1487,7 @@ begin
   if not AutoPivot then
     RotatePoint(mp, PivotPt, angleDelta);
 
-  Image.BlockUpdate;
+  Image.BeginUpdate;
   try
     Image.Assign(MasterImage);
     Image.AntiAliased := RootOwner.fAntialiasEnabled;
@@ -1489,7 +1502,7 @@ begin
     //symmetric cropping prevents center wobbling
     SymmetricCropTransparent(Image);
   finally
-    Image.UnblockUpdate;
+    Image.EndUpdate;
   end;
   if fAutoPivot then
     PositionCenteredAt(PivotPt) else

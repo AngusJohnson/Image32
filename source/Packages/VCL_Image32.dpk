@@ -1,7 +1,6 @@
 package VCL_Image32;
 
 {$R *.res}
-{$R '..\ImagePanels.dcr'}
 {$R '..\Image32Panels.dcr'}
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
 {$ALIGN 8}

@@ -16,7 +16,6 @@ type
     View1: TMenuItem;
     mnuShowMonoImage: TMenuItem;
     mnuShowRawPoly: TMenuItem;
-    mnuShowSimplified: TMenuItem;
     N1: TMenuItem;
     Open1: TMenuItem;
     OpenDialog1: TOpenDialog;
@@ -24,7 +23,6 @@ type
     N3: TMenuItem;
     SaveDialog1: TSaveDialog;
     SaveAs1: TMenuItem;
-    mnuShowSmoothedOnly: TMenuItem;
     mnuShowSimplifiedSmoothed: TMenuItem;
     pnlSmooth: TPanel;
     lblSmooth: TLabel;
@@ -32,7 +30,6 @@ type
     pnlMemo: TPanel;
     Panel3: TPanel;
     btnCloseMemo: TButton;
-    rbBeziers: TRadioButton;
     rbFlat: TRadioButton;
     rbRaw: TRadioButton;
     Memo1: TMemo;
@@ -139,15 +136,9 @@ begin
   bezierPaths := nil;
   flattenedPaths := nil;
 
-  TrackBar1.Enabled := //enable if smoothing (with or without simplifying)
-    mnuShowSmoothedOnly.Checked or
-    mnuShowSimplifiedSmoothed.Checked;
+  TrackBar1.Enabled := mnuShowSimplifiedSmoothed.Checked;
+  TrackBar2.Enabled := mnuShowSimplifiedSmoothed.Checked;
 
-  TrackBar2.Enabled := //enable if simplifying (with or without smoothing)
-    mnuShowSimplified.Checked or
-    mnuShowSimplifiedSmoothed.Checked;
-
-  rbBeziers.Enabled := TrackBar1.Enabled;
   rbRaw.Enabled := not mnuShowMonoImage.Checked;
 
   if mnuShowMonoImage.Checked then
@@ -169,40 +160,24 @@ begin
   begin
     flattenedPaths := rawPaths;
     StatusBar1.SimpleText := ' Polygons drawn using raw vectors';
-  end
-
-  //RamerDouglasPeucker: simplifies raw vectors (removes extraneous vertices)
-  //nb: the 'epsilon' value may need to be increased when the image was
-  //enlarged before vectorizing, effectively making pixel dimensions >1.
-  //Epsilon should be +1 greater than meaningful pixel size.
-  else if mnuShowSimplified.Checked then
+  end else
   begin
-    flattenedPaths := RamerDouglasPeucker(rawPaths, TrackBar2.Position);
-    lblSimplify.Caption :=
-      Format('Simplify'#10'Amount'#10'(%d)',[TrackBar2.Position]);
-    StatusBar1.SimpleText :=
-      ' Polygons drawn using simplified vectors (Ramer-Douglas-Peucker)';
-  end
+    //RamerDouglasPeucker: simplifies raw vectors (removes extraneous vertices)
+    //nb: the 'epsilon' value may need to be increased when the image was
+    //enlarged before vectorizing, effectively making pixel dimensions >1.
+    //Epsilon should be +1 greater than meaningful pixel size.
+    if TrackBar2.Position = 0 then
+      flattenedPaths := CopyPaths(rawPaths) else
+      flattenedPaths := RamerDouglasPeucker(rawPaths, TrackBar2.Position);
 
-  else if mnuShowSmoothedOnly.Checked then
-  begin
-    //note: SmoothToBezier returns poly-bezier paths
-    bezierPaths := SmoothToBezier(rawPaths, true, TrackBar1.Position, 2);
-    //and finally 'flatten' the poly-bezier paths
-    flattenedPaths := FlattenCBezier(bezierPaths);
-    lblSmooth.Caption :=
-      Format('Smooth'#10'Amount'#10'(%d)',[TrackBar1.Position]);
-    StatusBar1.SimpleText :=' Polygons drawn using smoothing only';
-  end
-
-  else // if mnuShowSimplifiedSmoothed.Checked then
-  begin
-    flattenedPaths :=
-      RamerDouglasPeucker(rawPaths, TrackBar2.Position);
     //note: SmoothToBezier returns poly-bezier paths (not flattened paths)
-    bezierPaths := SmoothToBezier(flattenedPaths, true, TrackBar1.Position, 2);
-    //and finally 'flatten' the poly-beziers
-    flattenedPaths := FlattenCBezier(bezierPaths);
+    if TrackBar1.Position > 0 then
+    begin
+      bezierPaths := SmoothToBezier(flattenedPaths, true, TrackBar1.Position, 2);
+      //and finally 'flatten' the poly-beziers
+      flattenedPaths := FlattenCBezier(bezierPaths);
+    end;
+
     lblSmooth.Caption :=
       Format('Smooth'#10'Amount'#10'(%d)',[TrackBar1.Position]);
     lblSimplify.Caption :=
@@ -267,11 +242,8 @@ procedure TForm1.rbBeziersClick(Sender: TObject);
 begin
   memo1.Lines.BeginUpdate;
   memo1.Clear;
-  if rbBeziers.Checked then
-    memo1.Lines.Add(PathsToStr(bezierPaths))
-  else if rbRaw.Checked then
-    memo1.Lines.Add(PathsToStr(rawPaths))
-  else
+  if rbRaw.Checked then
+    memo1.Lines.Add(PathsToStr(rawPaths)) else
     memo1.Lines.Add(PathsToStr(flattenedPaths));
   memo1.SelStart := 0;
   memo1.Lines.EndUpdate;

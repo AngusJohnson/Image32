@@ -61,7 +61,7 @@ type
     function  GetPoints: TPathD;
     function  GetBounds: TRect;
     procedure DeleteLast; //DeleteLast: deletes the last curve
-    procedure Offset(dx, dy: integer);
+    procedure Offset(dx, dy: double);
     procedure Rotate(const focalPoint: TPointD; angleRads: double);
     procedure Scale(sx, sy: double);
 
@@ -121,7 +121,7 @@ type
     constructor Create(grpOwner: TGroupLayer32;
       const aName: string = ''); override;
     destructor Destroy; override;
-    procedure Offset(dx, dy: integer); override;
+    procedure Offset(dx, dy: double); override;
     function GroupIdxToPathIdx(groupIdx: integer): integer;
 
     property SmoothPath: TSmoothPath read fSmoothPath;
@@ -651,7 +651,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSmoothPath.Offset(dx, dy: integer);
+procedure TSmoothPath.Offset(dx, dy: double);
 var
   i: integer;
 begin
@@ -745,7 +745,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSmoothPathGroupLayer32.Offset(dx, dy: integer);
+procedure TSmoothPathGroupLayer32.Offset(dx, dy: double);
 begin
   fSmoothPath.Offset(dx, dy);
 end;

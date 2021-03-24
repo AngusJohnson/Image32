@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
 Latest version: 2.20
-Released: 24 March 2021
+Released: 25 March 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -14,8 +14,13 @@ Recent changes:
 
 Version 2.20
   Image32_Layers
+	Internal changes to TLayer32 so that layers 
+      will now rotate without 'wobble'. (Layer 
+	  position is now stored using its midpoint.)
 	Fixed broken layer opacity and other minor bugs
 	CreateRotatingButtonGroup parameters changed
+  Image32_Ttf
+    TGlyphCache.GetTextGlyphs function result changed
   Image32Panels
     Implemented WM_MOUSEHWHEEL for horizontal scrolling
 
