@@ -24,14 +24,14 @@ type
     mnuSendBackOne: TMenuItem;
     mnuBringForwardOne: TMenuItem;
     mnuAddArrow: TMenuItem;
+    mnuCopytoclipboard: TMenuItem;
+    N3: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormMouseDown(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure FormMouseMove(Sender: TObject; Shift: TShiftState; X,
       Y: Integer);
-    procedure FormMouseUp(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
     procedure FormPaint(Sender: TObject);
     procedure FormResize(Sender: TObject);
     procedure mnuExitClick(Sender: TObject);
@@ -42,6 +42,7 @@ type
     procedure mnuSendBackOneClick(Sender: TObject);
     procedure mnuBringForwardOneClick(Sender: TObject);
     procedure mnuAddArrowClick(Sender: TObject);
+    procedure mnuCopytoclipboardClick(Sender: TObject);
   private
     { Private declarations }
   protected
@@ -72,7 +73,7 @@ var
 
   fontReader: TFontReader; //TTF font reader
   fontCache: TGlyphCache;
-  defArrowBtns: TPathD;
+  defaultArrowBtns: TPathsD;
 
 
 const
@@ -88,7 +89,7 @@ implementation
 
 uses
   Image32_Draw, Image32_Extra, Image32_Vector,
-  Image32_BMP, Image32_PNG, Image32_JPG, Image32_Transform;
+  Image32_BMP, Image32_PNG, Image32_JPG, Image32_Transform, Image32_Resamplers;
 
 type
 
@@ -130,7 +131,7 @@ procedure TMyRasterLayer32.Init(const filename: string; const centerPt: TPointD)
 begin
   if not MasterImage.LoadFromFile(filename) then
     MasterImage.SetSize(100,100, clBlack32);
-  MasterImage.CropTransparentPixels; //important for rotational stability
+  MasterImage.CropTransparentPixels;
   PositionCenteredAt(centerPt);
   UpdateHitTestMaskTransparent;
   AutoPivot := false; // :)
@@ -158,7 +159,7 @@ begin
   hsl.hue := Random(256);
   hsl.sat := 240;
   hsl.lum := 200;
-  hsl.Alpha := 128;
+  hsl.Alpha := 172;
   BrushColor := HslToRgb(hsl);
   PenColor := MakeDarker(BrushColor, 80) or $FF000000;
 end;
@@ -202,16 +203,11 @@ end;
 procedure TMyArrowLayer32.Init(const centerPt: TPointD);
 var
   rec: TRectD;
-  tmp: TPathsD;
 begin
-  SetLength(tmp, 1);
-  tmp[0] := defArrowBtns;
-  rec := Image32_Vector.GetBoundsD(tmp);
-  with centerPt do
-    tmp := OffsetPath(tmp,
-      X - rec.Left - rec.Width/2,
-      Y -rec.Top - rec.Height/2);
-  Paths := tmp;
+  rec := Image32_Vector.GetBoundsD(defaultArrowBtns);
+  Self.Paths := OffsetPath(defaultArrowBtns,
+    centerPt.X - rec.Left - rec.Width/2,
+    centerPt.Y -rec.Top - rec.Height/2);
 end;
 //------------------------------------------------------------------------------
 
@@ -394,14 +390,19 @@ procedure TMainForm.FormCreate(Sender: TObject);
 var
   resStream: TResourceStream;
 begin
-  defArrowBtns :=
+  SetLength(defaultArrowBtns, 1);
+  defaultArrowBtns[0] :=
     MakePathI([0,100, 100,0, 100,50, 200,50, 200,150, 100,150, 100,200]);
 
   Application.OnActivate := AppActivate;
 
   layeredImage := TLayeredImage32.Create();
   layeredImage.AddLayer(TDesignerLayer32);
-  layeredImage.BackgroundColor := Color32(Self.Color);
+  //layeredImage.BackgroundColor := Color32(Self.Color);
+
+  //layeredImage.Resampler := rNearestResampler;   //draft quality (fast)
+  layeredImage.Resampler := rBiLinearResampler;  //high quality (moderately fast)
+  //layeredImage.Resampler := rBiCubicResampler;   //excellent quality (slow)
 
   fontReader := TFontReader.Create;
   fontReader.LoadFromResource('FONT_NSB', RT_RCDATA);
@@ -602,16 +603,9 @@ begin
     end
     else if Assigned(arrowButtonGroup) then
       arrowButtonGroup.Offset(dx, dy);
-    //StatusBar1.SimpleText := '';
+    StatusBar1.SimpleText := '';
   end;
   Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.FormMouseUp(Sender: TObject; Button: TMouseButton;
-  Shift: TShiftState; X, Y: Integer);
-begin
-  //if not Assigned(rotatingButtonGroup) then StatusBar1.SimpleText := '';
 end;
 //------------------------------------------------------------------------------
 
@@ -632,12 +626,6 @@ begin
     begin
       CopyToDc(updateRec, self.Canvas.Handle,
         updateRec.Left, updateRec.Top, false);
-
-      //display the area updated ...
-      if not Assigned(rotatingButtonGroup) then
-        with updateRec do
-          StatusBar1.SimpleText :=
-            Format('%d,%d,%d,%d',[left,top,width,height]);
     end;
   end;
 end;
@@ -768,6 +756,13 @@ procedure TMainForm.mnuBringForwardOneClick(Sender: TObject);
 begin
   if assigned(targetLayer) then targetLayer.BringForwardOne;
   Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.mnuCopytoclipboardClick(Sender: TObject);
+begin
+  with layeredImage.GetMergedImage(true) do
+    CopyToClipBoard;
 end;
 //------------------------------------------------------------------------------
 

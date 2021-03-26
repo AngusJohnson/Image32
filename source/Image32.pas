@@ -1770,6 +1770,9 @@ var
   tmp: TArrayOfColor32;
   pc: PColor32;
 begin
+  //this NearestNeighbor code is slightly more efficient than
+  //the more general purpose one in Image32_Resamplers
+
   if (newWidth = fWidth) and (newHeight = fHeight) then Exit;
   SetLength(tmp, newWidth * newHeight * SizeOf(TColor32));
 

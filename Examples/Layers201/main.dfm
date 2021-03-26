@@ -16,7 +16,6 @@ object MainForm: TMainForm
   OnDestroy = FormDestroy
   OnMouseDown = FormMouseDown
   OnMouseMove = FormMouseMove
-  OnMouseUp = FormMouseUp
   OnPaint = FormPaint
   OnResize = FormResize
   PixelsPerInch = 96
@@ -34,6 +33,14 @@ object MainForm: TMainForm
     Top = 32
     object File1: TMenuItem
       Caption = '&File'
+      object mnuCopytoclipboard: TMenuItem
+        Caption = '&Copy to clipboard'
+        ShortCut = 16451
+        OnClick = mnuCopytoclipboardClick
+      end
+      object N3: TMenuItem
+        Caption = '-'
+      end
       object mnuExit: TMenuItem
         Caption = 'E&xit'
         ShortCut = 27
