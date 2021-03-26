@@ -319,7 +319,7 @@ type
     fRoot              : TGroupLayer32;
     fBounds            : TRect;
     fBackColor         : TColor32;
-    fAntialiasEnabled  : Boolean;
+    fResampler         : integer;
     function  GetRootLayersCount: integer;
     function  GetLayer(index: integer): TLayer32;
     function  GetImage: TImage32;
@@ -329,6 +329,7 @@ type
     procedure SetWidth(value: integer);
     procedure SetBackColor(color: TColor32);
     function  GetMidPoint: TPointD;
+    procedure SetResampler(newSamplerId: integer);
   public
     constructor Create(Width: integer = 0; Height: integer =0); virtual;
     destructor Destroy; override;
@@ -348,8 +349,7 @@ type
     function  GetMergedImage(hideDesigners: Boolean;
       out updateRect: TRect): TImage32; overload;
 
-    property Antialiased: Boolean read
-      fAntialiasEnabled write fAntialiasEnabled;
+    property Resampler: integer read fResampler write SetResampler;
     property BackgroundColor: TColor32 read fBackColor write SetBackColor;
     property Bounds: TRect read fBounds;
     property Count: integer read GetRootLayersCount;
@@ -944,12 +944,13 @@ begin
       with TGroupLayer32(Child[i]) do
     begin
       PreMerge(hideDesigners, forceRefresh);
-      Self.fLocalInvalidRect := Image32_Vector.UnionRect(
-        Self.fLocalInvalidRect, fLocalInvalidRect);
+      if not forceRefresh then
+        Self.fLocalInvalidRect := Image32_Vector.UnionRect(
+          Self.fLocalInvalidRect, fLocalInvalidRect);
       fLocalInvalidRect := NullRect;
     end else
     begin
-      if Child[i].fRefreshPending then
+      if not forceRefresh and Child[i].fRefreshPending then
         Self.fLocalInvalidRect :=
           Image32_Vector.UnionRect(Self.fLocalInvalidRect, Child[i].Bounds);
       rec := Image32_Vector.UnionRect(rec, Child[i].Bounds);
@@ -1386,7 +1387,7 @@ begin
       with MasterImage do
         fSavedSize := Image32_Vector.Size(Width, Height);
       Image.Assign(MasterImage); //this will call ImageChange for Image
-      Image.AntiAliased := RootOwner.fAntialiasEnabled;
+      Image.Resampler := RootOwner.Resampler;
     finally
       MasterImage.UnblockUpdate;
     end;
@@ -1410,7 +1411,7 @@ begin
     Image.BeginUpdate;
     try
       Image.Assign(MasterImage);
-      Image.AntiAliased := RootOwner.fAntialiasEnabled;
+      Image.Resampler := RootOwner.Resampler;
       //apply any prior transformations
       AffineTransformImage(Image, fMatrix);
       //unfortunately cropping isn't an affine transformation
@@ -1490,7 +1491,7 @@ begin
   Image.BeginUpdate;
   try
     Image.Assign(MasterImage);
-    Image.AntiAliased := RootOwner.fAntialiasEnabled;
+    Image.Resampler := RootOwner.Resampler;
     rec := GetRotatedRectBounds(RectD(Image.Bounds), Angle);
 
     //get prior transformations and apply new rotation
@@ -1678,7 +1679,7 @@ begin
   fRoot.fLayeredImage := self;
   fBounds := Rect(0, 0, Width, Height);
   fRoot.SetSize(width, Height);
-  fAntialiasEnabled := true;
+  fResampler := DefaultResampler;
 end;
 //------------------------------------------------------------------------------
 
@@ -1694,8 +1695,7 @@ begin
   fBounds := Rect(0, 0, Width, Height);
 
   fRoot.SetBounds(fBounds);
-  fRoot.fLocalInvalidRect := fBounds;
-  fRoot.fLastUpdateType := utUndefined;
+  Invalidate;
   if fBackColor <> clNone32 then
     fRoot.Image.Clear(fBackColor);
 end;
@@ -1723,11 +1723,11 @@ begin
   begin
     PreMerge(hideDesigners, forceRefresh);
 
-    //clip fLocalInvalidRect to layeredImage boundaries
+    //intersect layeredImage's bounds with Root.fLocalInvalidRect
+    //to clip any regions outside the drawing surface
     updateRect := Self.Bounds;
     if not forceRefresh then
-      updateRect :=
-        Image32_Vector.IntersectRect(fLocalInvalidRect, updateRect);
+      updateRect := Image32_Vector.IntersectRect(fLocalInvalidRect, updateRect);
 
     fLocalInvalidRect := NullRect;
     Image.FillRect(updateRect, fBackColor);
@@ -1743,13 +1743,22 @@ end;
 procedure TLayeredImage32.Clear;
 begin
   fRoot.ClearChildren;
-  fRoot.fLastUpdateType := utUndefined;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayeredImage32.Invalidate;
 begin
   fRoot.fLocalInvalidRect := fBounds;
+  Root.fLastUpdateType := utUndefined;
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayeredImage32.SetResampler(newSamplerId: integer);
+begin
+  if fResampler = newSamplerId then Exit;
+  fResampler := newSamplerId;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -1800,7 +1809,6 @@ begin
   if color = fBackColor then Exit;
   fBackColor := color;
   fRoot.Image.Clear(fBackColor);
-  fRoot.fLastUpdateType := utUndefined;
   Invalidate;
 end;
 //------------------------------------------------------------------------------

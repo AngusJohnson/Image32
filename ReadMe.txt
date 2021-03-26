@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
 Latest version: 2.20
-Released: 25 March 2021
+Released: 26 March 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -13,14 +13,29 @@ Download      : https://sourceforge.net/projects/image32/files/
 Recent changes:
 
 Version 2.20
+  Image32_Resamplers
+    New library unit added containing 3 resampler functions
+      NearestResampler  - draft quality (fast)
+	  BiLinearResampler - very good quality (reasonably fast) BiCubicResampler  - excellent quality (relatively slow)
+  Image32
+    DefaultResampler variable added
+    RegisterResampler function added	
+    TImage32.AntiAliased property removed and replaced with a new 
+	  Resampler property (user can explicit choose a resampler)
   Image32_Layers
-	Internal changes to TLayer32 so that layers 
-      will now rotate without 'wobble'. (Layer 
-	  position is now stored using its midpoint.)
+    TLayeredImage32.AntiAliased property removed and replaced
+	  with a new Resampler property
+	Mostly internal changes to TLayer32 so that 
+      layers will now rotate without 'wobble'. 
+	  (Layer positions now stored using its midpoint.)
 	Fixed broken layer opacity and other minor bugs
 	CreateRotatingButtonGroup parameters changed
+  Image32_Transform
+    Transform functions will now use the resampler associated 
+	with  the image being transformed
   Image32_Ttf
     TGlyphCache.GetTextGlyphs function result changed
+	TGlyphCache.GetAngledTextGlyphs function result changed
   Image32Panels
     Implemented WM_MOUSEHWHEEL for horizontal scrolling
 

@@ -88,11 +88,13 @@ type
 
   TTileFillStyle = (tfsRepeat, tfsMirrorHorz, tfsMirrorVert, tfsRotate180);
 
+  TResamplerFunction = function(img: TImage32; x256, y256: integer): TColor32;
+
   TImage32 = class
   private
     fWidth: integer;
     fHeight: Integer;
-    fAntiAliase: Boolean;
+    fResampler: integer;
     fIsPremultiplied: Boolean;
     fColorCount: integer;
     fPixels: TArrayOfColor32;
@@ -105,8 +107,8 @@ type
     function GetIsEmpty: Boolean;
     function GetPixelBase: PColor32;
     function GetPixelRow(row: Integer): PColor32;
-    procedure InternalStretchResizeFast(newWidth, newHeight: Integer);
-    procedure InternalStretchResizeAA(newWidth, newHeight: Integer);
+    procedure NearestResize(newWidth, newHeight: Integer);
+    procedure ResamplerResize(newWidth, newHeight: Integer);
     procedure RotateLeft90;
     procedure RotateRight90;
     procedure Rotate180;
@@ -253,8 +255,8 @@ type
     property ColorCount: Integer read GetColorCount;
     //HasTransparency: Returns true if any pixel's alpha byte < 255.
     property HasTransparency: Boolean read GetHasTransparency;
-    //AntiAliased: Antialiasing is used in scaling and rotation transforms
-    property AntiAliased: Boolean read fAntiAliase write fAntiAliase;
+    //Resampler: is used in scaling and rotation transforms
+    property Resampler: integer read fResampler write fResampler;
     property OnChange: TNotifyEvent read fOnChange write fOnChange;
     property OnResize: TNotifyEvent read fOnResize write fOnResize;
   end;
@@ -375,8 +377,9 @@ type
   function GetByteMask(img: TImage32; reference: TColor32;
     compareFunc: TCompareFunctionEx): TArrayOfByte;
 
-  //GetWeightedPixel: coordinates x256, y256 are scaled up by 256.
-  function GetWeightedPixel(img: TImage32; x256, y256: Integer): TColor32;
+  //GetWeightedPixel - bilinear interpolation:
+  //parameters x256, y256 are coords scaled up by 256.
+  //function GetWeightedPixel(img: TImage32; x256, y256: Integer): TColor32;
 
   {$IFDEF MSWINDOWS}
   //Color32: Converts a Graphics.TColor value into a TColor32 value.
@@ -435,6 +438,9 @@ type
   function CreateResourceStream(const resName: string;
     resType: PChar): TResourceStream;
 
+  function GetResampler(id: integer): TResamplerFunction;
+  procedure RegisterResampler(id: integer; func: TResamplerFunction);
+
 const
   angle180 = Pi;
   angle360 = Pi *2;
@@ -466,6 +472,8 @@ const
 var
   ClockwiseRotationIsAnglePositive: Boolean = true;
 
+  DefaultResampler: Integer = 0;
+
   //Both MulTable and DivTable are used in blend functions<br>
   //MulTable[a,b] = a * b / 255
   MulTable: array [Byte,Byte] of Byte;
@@ -496,7 +504,7 @@ var
 implementation
 
 uses
-  Image32_Vector, Image32_Transform;
+  Image32_Vector, Image32_Resamplers, Image32_Transform;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -514,15 +522,34 @@ type
   end;
   PImgFmtRec = ^TImgFmtRec;
 
+  TResamplerRec = record
+    id: integer;
+    func: TResamplerFunction;
+  end;
+  PResamplerRec = ^TResamplerRec;
+
 var
 {$IFDEF XPLAT_GENERICS}
   ImageFormatClassList: TList<PImgFmtRec>; //list of supported file extensions
+  ResamplerList: TList<PResamplerRec>;     //list of resampler functions
 {$ELSE}
   ImageFormatClassList: TList;
+  CustomResamplerList: TList;
 {$ENDIF}
 
-
 //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+procedure CreateImageFormatList;
+begin
+  if Assigned(ImageFormatClassList) then Exit;
+
+{$IFDEF XPLAT_GENERICS}
+  ImageFormatClassList := TList<PImgFmtRec>.Create;
+{$ELSE}
+  ImageFormatClassList := TList.Create;
+{$ENDIF}
+end;
 //------------------------------------------------------------------------------
 
 procedure NormalizeAngle(var angle: double; tolerance: double = Pi/360);
@@ -990,53 +1017,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetWeightedPixel(img: TImage32; x256, y256: Integer): TColor32;
-var
-  xi, yi, weight: Integer;
-  width, height: integer;
-  pixels: TArrayOfColor32;
-  color: TWeightedColor;
-  xf, yf: cardinal;
-begin
-  width := img.Width; height := img.Height;
-  pixels := img.Pixels;
-  //coordinate integers (can be negative) -> x256 div 256 & y256 div 256.
-  //coordinate fractions ->  (x256 and $FF) / 256 & (y256 and $FF) / 256
-  if (x256 < -$FF) or (y256 < -$FF) or
-    (x256 >= width * $100) or (y256 >= height * $100) then
-  begin
-    result := clNone32;
-    Exit;
-  end;
-  xi := abs(x256) shr 8;
-  xf := x256 and $FF;
-  yi := abs(y256) shr 8;
-  yf := y256 and $FF;
-
-  color.Reset;
-  weight := (($100 - xf) * ($100 - yf)) shr 8;         //top-left
-  if (x256 < 0) or (y256 < 0) then
-    color.AddWeight(weight) else
-    color.Add(pixels[xi + yi * width], weight);
-
-  weight := (xf * ($100 - yf)) shr 8;                  //top-right
-  if (xi + 1 >= width) or (y256 < 0) then
-    color.AddWeight(weight) else
-    color.Add(pixels[xi + 1 + yi * width], weight);
-
-  weight := (($100 - xf) * yf) shr 8;                  //bottom-left
-  if (x256 < 0) or (yi + 1 = height) then
-    color.AddWeight(weight) else
-    color.Add(pixels[xi + (yi +1) * width], weight);
-
-  weight := (xf * yf) shr 8;                           //bottom-right
-  if (xi + 1 >= width) or (yi + 1 = height) then
-    color.AddWeight(weight) else
-    color.Add(pixels[(xi + 1)  + (yi + 1) * width], weight);
-  Result := color.Color;
-end;
-//------------------------------------------------------------------------------
-
 function GetWeightedColor(const srcBits: TArrayOfColor32;
   x256, y256, xx256, yy256, maxX: Integer): TColor32;
 var
@@ -1044,10 +1024,13 @@ var
   xf, yf, xxf, yyf: cardinal;
   color: TWeightedColor;
 begin
-  //note: This function differs from GetWeightedPixel in one very important
-  //aspect - this function accommodates weighting any number of pixels
-  //(rather than just adjacent pixels) which is important went performing
-  //significant downsizing.
+  //This function performs 'box sampling' and differs from GetWeightedPixel
+  //(bilinear resampling) in one important aspect - it accommodates weighting
+  //any number of pixels (rather than just adjacent pixels) and this produces
+  //better image quality when significantly downsizing.
+
+  //Note: there's no range checking here, so the precondition is that the
+  //supplied boundary values are within the bounds of the srcBits array.
 
   color.Reset;
 
@@ -1349,7 +1332,7 @@ end;
 
 constructor TImage32.Create(width: Integer; height: Integer);
 begin
-  fAntiAliase := true;
+  fResampler := DefaultResampler;
   fwidth := Max(0, width);
   fheight := Max(0, height);
   SetLength(fPixels, fwidth * fheight);
@@ -1364,7 +1347,7 @@ end;
 
 constructor TImage32.Create(src: TImage32; const srcRec: TRect);
 begin
-  fAntiAliase := src.fAntiAliase;
+  fResampler := src.fResampler;
   fUpdateCnt := 1;
   SetSize(RectWidth(srcRec), RectHeight(srcRec));
   if not IsEmptyRect(srcRec) then
@@ -1392,6 +1375,8 @@ var
   i: Integer;
   imgFmtRec: PImgFmtRec;
 begin
+  if not Assigned(ImageFormatClassList) then CreateImageFormatList;
+
   if (ext = '') or (ext = '.') then Exit;
   if (ext[1] = '.') then Delete(ext, 1,1);
   if not IsAlphaChar(ext[1]) then Exit;
@@ -1491,7 +1476,7 @@ begin
   if dst = self then Exit;
   dst.BeginUpdate;
   try
-    dst.fAntiAliase := fAntiAliase;
+    dst.fResampler := fResampler;
     dst.fIsPremultiplied := fIsPremultiplied;
     dst.fColorCount := 0;
     try
@@ -1757,9 +1742,9 @@ begin
   try
     if stretchImage then
     begin
-      if fAntiAliase then
-        InternalStretchResizeAA(newWidth, newHeight) else
-        InternalStretchResizeFast(newWidth, newHeight);
+      if fResampler = 0 then
+        NearestResize(newWidth, newHeight) else
+        ResamplerResize(newWidth, newHeight);
     end else
     begin
       tmp := TImage32.create(self);
@@ -1778,7 +1763,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.InternalStretchResizeFast(newWidth, newHeight: Integer);
+procedure TImage32.NearestResize(newWidth, newHeight: Integer);
 var
   x, y, srcY: Integer;
   scaledXi, scaledYi: TArrayOfInteger;
@@ -1814,41 +1799,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.InternalStretchResizeAA(newWidth, newHeight: Integer);
+procedure TImage32.ResamplerResize(newWidth, newHeight: Integer);
 var
-  x,y, x256,y256,xx256,yy256: Integer;
-  sx,sy: double;
-  tmp: TArrayOfColor32;
-  pc: PColor32;
-  scaledX: array of Integer;
+  mat: TMatrixD;
 begin
-  sx := fWidth/newWidth * 256;
-  sy := fHeight/newHeight * 256;
-  SetLength(tmp, newWidth * newHeight);
-
-  SetLength(scaledX, newWidth +1); //+1 for fractional overrun
-  for x := 0 to newWidth -1 do
-    scaledX[x] := Round((x+1) * sx);
-
-  y256 := 0;
-  pc := @tmp[0];
-  for y := 0 to newHeight - 1 do
-  begin
-    x256 := 0;
-    yy256 := Round((y+1) * sy);
-    for x := 0 to newWidth - 1 do
-    begin
-      xx256 := scaledX[x];
-      pc^ := GetWeightedColor(fPixels, x256, y256, xx256, yy256, fWidth);
-      x256 := xx256;
-      inc(pc);
-    end;
-    y256 := yy256;
-  end;
-
-  fPixels := tmp;
-  fwidth := newWidth;
-  fheight := newHeight;
+  mat := IdentityMatrix;
+  MatrixScale(mat, newWidth/fWidth, newHeight/fHeight);
+  AffineTransformImage(self, mat);
 end;
 //------------------------------------------------------------------------------
 
@@ -3260,16 +3217,63 @@ begin
     Dispose(PImgFmtRec(ImageFormatClassList[i]));
   ImageFormatClassList.Free;
 end;
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+procedure CreateResamplerList;
+begin
+{$IFDEF XPLAT_GENERICS}
+  ResamplerList := TList<PResamplerRec>.Create;
+{$ELSE}
+  CustomResamplerList := TList.Create;
+{$ENDIF}
+end;
+//------------------------------------------------------------------------------
+
+function GetResampler(id: integer): TResamplerFunction;
+var
+  i: integer;
+begin
+  result := nil;
+  if not Assigned(ResamplerList) then Exit;
+
+  for i := ResamplerList.Count -1 downto 0 do
+    if PResamplerRec(ResamplerList[i]).id = id then
+  begin
+    Result := PResamplerRec(ResamplerList[i]).func;
+    Break;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure RegisterResampler(id: integer; func: TResamplerFunction);
+var
+  resampRec: PResamplerRec;
+begin
+  if not Assigned(ResamplerList) then
+    CreateResamplerList;
+
+  new(resampRec);
+  resampRec.id := id;
+  resampRec.func := func;
+  ResamplerList.Add(resampRec);
+end;
+//------------------------------------------------------------------------------
+
+procedure CleanUpResamplerClassList;
+var
+  i: integer;
+begin
+  if not Assigned(ResamplerList) then Exit;
+  for i := ResamplerList.Count -1 downto 0 do
+    Dispose(PResamplerRec(ResamplerList[i]));
+  ResamplerList.Free;
+end;
 //------------------------------------------------------------------------------
 
 initialization
-
-{$IFDEF XPLAT_GENERICS}
-  ImageFormatClassList := TList<PImgFmtRec>.Create;
-{$ELSE}
-  ImageFormatClassList := TList.Create;
-{$ENDIF}
-
+  CreateImageFormatList;
   MakeBlendTables;
 
 {$IFDEF MSWINDOWS}
@@ -3278,5 +3282,6 @@ initialization
 
 finalization
   CleanUpImageFormatClassList;
+  CleanUpResamplerClassList;
 
 end.

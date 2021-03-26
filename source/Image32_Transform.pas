@@ -1,4 +1,4 @@
-unit Image32_Transform;
+﻿unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
@@ -332,11 +332,18 @@ var
   pc: PColor32;
   tmp: TArrayOfColor32;
   dstRec: TRect;
+  resampler: TResamplerFunction;
 begin
   Result := NullPoint;
   srcWidth := img.Width;
   srcHeight := img.Height;
-  if (srcWidth * srcHeight = 0) or IsIdentityMatrix(matrix) then Exit;
+
+  if img.Resampler = 0 then
+    resampler := nil else
+    resampler := GetResampler(img.Resampler);
+
+  if not Assigned(resampler) or
+    (srcWidth * srcHeight = 0) or IsIdentityMatrix(matrix) then Exit;
 
   if (newWidth = 0) or (newHeight = 0) then
   begin
@@ -351,39 +358,22 @@ begin
     dstRec := Rect(0, 0, newWidth, newHeight);
   end;
 
-  //starting with the result pixel coords, reverse find
-  //the fractional coordinates in the current image
+  //starting with the result pixel coords, reverse lookup
+  //the fractional coordinates in the untransformed image
   MatrixInvert(matrix);
   SetLength(tmp, RectWidth(dstRec) * RectHeight(dstRec));
   pc := @tmp[0];
-  if img.AntiAliased then
-  begin
-    for i := dstRec.Top to + dstRec.Bottom -1 do
-      for j := dstRec.Left to dstRec.Right -1 do
-      begin
-        //convert dest X,Y to src X,Y ...
-        x := j; y := i;
-        MatrixApply(matrix, x, y);
-        //get weighted pixel (slow)
-        pc^ := GetWeightedPixel(img, Round(x * 256), Round(y * 256));
-        inc(pc);
-      end;
-  end else
-  begin
-    for i := dstRec.Top to + dstRec.Bottom -1 do
-      for j := dstRec.Left to dstRec.Right -1 do
-      begin
-        //convert dest X,Y to src X,Y ...
-        x := j; y := i;
-        MatrixApply(matrix, x, y);
-        //get nearest pixel (fast)
-        xi := Round(x); yi := Round(y);
-        if (xi < 0) or (xi >= srcWidth) or (yi < 0) or (yi >= srcHeight) then
-          pc^ := clNone32 else
-          pc^ := img.Pixel[xi, yi];
-        inc(pc);
-      end;
-  end;
+
+  for i := dstRec.Top to + dstRec.Bottom -1 do
+    for j := dstRec.Left to dstRec.Right -1 do
+    begin
+      //convert dest X,Y to src X,Y ...
+      x := j; y := i;
+      MatrixApply(matrix, x, y);
+      //get weighted pixel (slow)
+      pc^ := resampler(img, Round(x * 256), Round(y * 256));
+      inc(pc);
+    end;
   img.BeginUpdate;
   try
     img.SetSize(newWidth, newHeight);
@@ -494,10 +484,15 @@ var
   mat: TMatrixD;
   tmp: TArrayOfColor32;
   pc: PColor32;
+  resampler: TResamplerFunction;
 begin
   //https://math.stackexchange.com/a/339033/384709
 
-  Result := not img.IsEmpty and
+  if img.Resampler = 0 then
+    resampler := nil else
+    resampler := GetResampler(img.Resampler);
+
+  Result := Assigned(resampler) and not img.IsEmpty and
     (Length(dstPts) = 4) and IsPathConvex(dstPts);
   if not Result then Exit;
 
@@ -518,7 +513,7 @@ begin
     begin
       x := j; y := i;
       GetSrcCoords256(mat, x, y);
-      pc^ := GetWeightedPixel(img, x, y);
+      pc^ := resampler(img, x, y);
       inc(pc);
     end;
   img.SetSize(w, h);
@@ -572,7 +567,7 @@ var
   tmp: TPathD;
 begin
   //returns a coordinate array for every value of X and y along the path based
-  //on 2D distance. (This is a sadly only a poor approximation to perspective
+  //on 2D distance. (This is sadly only a poor approximation to perspective
   //distance - eg with tight bezier curves).
   len := length(path);
   setLength(result, 0);
@@ -600,8 +595,14 @@ var
   pc: PColor32;
   tmp: TArrayOfColor32;
   backColoring, allowBackColoring: Boolean;
+  resampler: TResamplerFunction;
 begin
   offset := NullPoint;
+
+  if img.Resampler = 0 then
+    resampler := nil else
+    resampler := GetResampler(img.Resampler);
+
   //convert the top spline control points into a flattened path
   if splineType = stQuadratic then
     topPath := FlattenQSpline(topSpline) else
@@ -609,7 +610,7 @@ begin
 
   rec := GetBounds(topPath);
   //return false if the spline is invalid or there's no vertical transformation
-  Result := not IsEmptyRect(rec);
+  Result := Assigned(resampler) and not IsEmptyRect(rec);
   if not Result then Exit;
 
   offset := rec.TopLeft;
@@ -682,11 +683,10 @@ begin
 
       if backColoring then
         pc^ := BlendToAlpha(pc^,
-          ReColor(GetWeightedPixel(img, x, Round(y * 256)), backColor))
+          ReColor(resampler(img, x, Round(y * 256)), backColor))
       else
         //blend in case spline causes folding overlap
-        pc^ := BlendToAlpha(pc^,
-          GetWeightedPixel(img, x, Round(y * 256)));
+        pc^ := BlendToAlpha(pc^, resampler(img, x, Round(y * 256)));
       inc(pc, w);
     end;
     inc(u, t);
@@ -708,16 +708,22 @@ var
   pc: PColor32;
   tmp: TArrayOfColor32;
   backColoring, allowBackColoring: Boolean;
+  resampler: TResamplerFunction;
 begin
   offset := NullPoint;
+
+  if img.Resampler = 0 then
+    resampler := nil else
+    resampler := GetResampler(img.Resampler);
 
   //convert the left spline control points into a flattened path
   if splineType = stQuadratic then
     leftPath := FlattenQSpline(leftSpline) else
     leftPath := FlattenCSpline(leftSpline);
   rec := GetBounds(leftPath);
+
   //return false if the spline is invalid or there's no horizontal transformation
-  Result := not IsEmptyRect(rec);
+  Result := Assigned(resampler) and not IsEmptyRect(rec);
   if not Result then Exit;
 
   offset := rec.TopLeft;
@@ -788,10 +794,10 @@ begin
       x := (j - dx) * sx;
       if backColoring then
         pc^ := BlendToAlpha(pc^,
-          ReColor(GetWeightedPixel(img, Round(x * 256), y), backColor))
+          ReColor(resampler(img, Round(x * 256), y), backColor))
       else
         //blend in case spline causes folding overlap
-        pc^ := BlendToAlpha(pc^, GetWeightedPixel(img, Round(x * 256), y));
+        pc^ := BlendToAlpha(pc^, resampler(img, Round(x * 256), y));
       inc(pc);
     end;
     inc(u, t);
