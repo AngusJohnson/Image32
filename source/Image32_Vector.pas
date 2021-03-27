@@ -116,16 +116,12 @@ type
   function ReversePath(const paths: TPathsD): TPathsD; overload;
 
   function OpenPathToFlatPolygon(const path: TPathD): TPathD;
-  function JoinPaths(const path1, path2: TPathD):TPathD;
   procedure AppendPoint(var path: TPathD; const extra: TPointD);
-  procedure AppendPath(var paths: TPathsD;
-    const extra: TPathD);
-    {$IFDEF INLINE} inline; {$ENDIF} overload;
-  procedure AppendPath(var paths: TPathsD;
-    const extra: TPathsD);
-    {$IFDEF INLINE} inline; {$ENDIF} overload;
-  procedure AppendPath(var ppp: TArrayOfPathsD;
-    const extra: TPathsD); overload;
+
+  procedure AppendPath(var path1: TPathD; const path2: TPathD); overload;
+  procedure AppendPath(var paths: TPathsD; const extra: TPathD); overload;
+  procedure AppendPath(var paths: TPathsD; const extra: TPathsD); overload;
+  procedure AppendPath(var ppp: TArrayOfPathsD; const extra: TPathsD); overload;
 
   function GetAngle(const origin, pt: TPoint): double; overload;
   function GetAngle(const origin, pt: TPointD): double; overload;
@@ -1402,26 +1398,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function JoinPaths(const path1, path2: TPathD):TPathD;
+procedure AppendPath(var path1: TPathD; const path2: TPathD);
 var
   len1, len2: integer;
 begin
   len1 := length(path1);
   len2 := length(path2);
-  if len1 > 0 then
-    Result := Copy(path1, 0, len1);
   if len2 = 0 then Exit;
-  if (len1 > 0) and PointsEqual(path2[0], path1[len1 -1]) then
-  begin
-    if len2 = 1 then Exit;
-    dec(len2);
-    setLength(Result, len1 + len2);
-    Move(path2[1], Result[len1], len2 * SizeOf(TPointD));
-  end else
-  begin
-    setLength(Result, len1 + len2);
-    Move(path2[0], Result[len1], len2 * SizeOf(TPointD));
-  end;
+  if (len1 > 0) and PointsEqual(path2[0], path1[len1 -1]) then dec(len1);
+  setLength(path1, len1 + len2);
+  Move(path2[0], path1[len1], len2 * SizeOf(TPointD));
 end;
 //------------------------------------------------------------------------------
 
@@ -1462,8 +1448,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure AppendPath(var ppp: TArrayOfPathsD;
-  const extra: TPathsD);
+procedure AppendPath(var ppp: TArrayOfPathsD; const extra: TPathsD);
 var
   len: integer;
 begin
@@ -2406,7 +2391,7 @@ begin
     end else
     begin
       p := FlattenQBezier(pts[i*2], pts[i*2+1], pts[i*2+2]);
-      Result := JoinPaths(Result, Copy(p, 1, Length(p) -1));
+      AppendPath(Result, Copy(p, 1, Length(p) -1));
     end;
   end;
 end;
@@ -2495,7 +2480,7 @@ begin
     end else
     begin
       p := FlattenCBezier(pts[i*3], pts[i*3+1], pts[i*3+2], pts[i*3+3]);
-      Result := JoinPaths(Result, Copy(p, 1, Length(p) -1));
+      AppendPath(Result, Copy(p, 1, Length(p) -1));
     end;
   end;
 end;

@@ -16,7 +16,8 @@ Version 2.20
   Image32_Resamplers
     New library unit added containing 3 resampler functions
       NearestResampler  - draft quality (fast)
-	  BiLinearResampler - very good quality (reasonably fast) BiCubicResampler  - excellent quality (relatively slow)
+	  BiLinearResampler - very good quality (reasonably fast) 
+	  BiCubicResampler  - excellent quality (relatively slow)
   Image32
     DefaultResampler variable added (rBiLinearResampler)
     RegisterResampler function added
@@ -25,9 +26,6 @@ Version 2.20
   Image32_Layers
     TLayeredImage32.AntiAliased property removed and replaced
 	  with a new Resampler property
-	Mostly internal changes to TLayer32 so that 
-      layers will now rotate without 'wobble'. 
-	  (Layer positions now stored using its midpoint.)
 	Fixed broken layer opacity and other minor bugs
 	CreateRotatingButtonGroup parameters changed
   Image32_Transform

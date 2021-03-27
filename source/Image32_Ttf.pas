@@ -1759,7 +1759,7 @@ begin
           pt2 := pathsEx[i][j+1];
         bez := FlattenQBezier(pathsEx[i][j-1].pt,
                   pathsEx[i][j].pt, pt2.pt);
-        paths[i] := JoinPaths(paths[i], bez);
+        AppendPath(paths[i], bez);
       end;
     end;
   end;
