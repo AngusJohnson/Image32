@@ -121,7 +121,7 @@ type
     constructor Create(grpOwner: TGroupLayer32;
       const aName: string = ''); override;
     destructor Destroy; override;
-    procedure Offset(dx, dy: double); override;
+    procedure Offset(dx, dy: integer); override;
     function GroupIdxToPathIdx(groupIdx: integer): integer;
 
     property SmoothPath: TSmoothPath read fSmoothPath;
@@ -448,7 +448,7 @@ begin
   begin
     for k := j to j + 3 do
         tmp[k - j] := fCtrlPoints[k].Point;
-    Result := JoinPaths(Result, FlattenCBezier(tmp));
+    AppendPath(Result, FlattenCBezier(tmp));
     inc(j, 3);
   end;
   fFlattened := Result;
@@ -745,7 +745,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSmoothPathGroupLayer32.Offset(dx, dy: double);
+procedure TSmoothPathGroupLayer32.Offset(dx, dy: integer);
 begin
   fSmoothPath.Offset(dx, dy);
 end;

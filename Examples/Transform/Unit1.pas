@@ -82,6 +82,8 @@ type
 var
   Form1: TForm1;
 
+  a,b: double;
+
 implementation
 
 {$R *.dfm}
@@ -89,16 +91,18 @@ implementation
 
 uses
   Image32_BMP, Image32_PNG, Image32_JPG, Image32_Draw, Image32_Vector,
-  Image32_Extra, Image32_Transform;
+  Image32_Extra, Image32_Resamplers, Image32_Transform;
 
 //------------------------------------------------------------------------------
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
+  DefaultResampler := rNearestResampler;
+  //DefaultResampler := rBiCubicResampler;
 
   //SETUP THE LAYERED IMAGE
   DefaultButtonSize := DPIAware(10);
-  allowRotatePivotMove := true;
+  allowRotatePivotMove := true;//false;//
 
   Application.OnIdle := AppIdle;
 
@@ -139,7 +143,7 @@ begin
   end;
   //and center transformlayer
   mp := transformLayer.MidPoint;
-  transformlayer.PositionCenteredAt(w/2,h/2);
+  transformlayer.PositionCenteredAt(PointD(w/2,h/2));
 
   //and offset everything else
   with transformLayer.MidPoint do
@@ -148,9 +152,9 @@ begin
     dy := Y - mp.Y;
   end;
   if Assigned(buttonGroup) then
-    buttonGroup.Offset(dx, dy)
+    buttonGroup.Offset(Round(dx), Round(dy))
   else if Assigned(rotateGroup) then
-    rotateGroup.Offset(dx, dy);
+    rotateGroup.Offset(Round(dx), Round(dy));
   ctrlPoints := OffsetPath(ctrlPoints, dx, dy);
   Invalidate;
 end;
@@ -267,6 +271,7 @@ begin
 
   //nb: CtrlPoints are ignored with rotation
 
+  transformLayer.AutoPivot := not allowRotatePivotMove;
   if allowRotatePivotMove then
     transformLayer.PivotPt := transformLayer.MidPoint;
 
@@ -289,10 +294,10 @@ begin
   //except for rotation, use ctrlPoints to update the 'transformed' layer
   with transformLayer do
   begin
-    Image.Assign(masterImage);
     case transformType of
       ttAffineSkew:
         begin
+          Image.Assign(masterImage);
           mat := IdentityMatrix;
           if mnuVertSkew.Checked then
           begin
@@ -310,13 +315,13 @@ begin
         end;
       ttAffineRotate:
         begin
-          //rotation is managed internally by transformlayer
-          transformLayer.Angle := rotateGroup.Angle;
+          transformLayer.Angle := UpdateRotatingButtonGroup(rotateGroup);
           StatusBar1.SimpleText := Format(' ROTATE TRANSFORM - angle:%1.0n',
             [transformLayer.Angle *180/PI]);
         end;
       ttProjective:
         begin
+          Image.Assign(masterImage);
           if not ProjectiveTransform(image,
             Rectangle(image.Bounds), ctrlPoints, NullRect) then Exit;
           pt := GetBounds(ctrlPoints).TopLeft;
@@ -324,6 +329,7 @@ begin
         end;
       ttSpline:
         begin
+          Image.Assign(masterImage);
           if not SplineVertTransform(Image, ctrlPoints,
             stQuadratic, clRed32, false, pt) then Exit;
           PositionAt(pt);
@@ -431,7 +437,6 @@ begin
   end;
   if not Assigned(clickedLayer) then Exit;
 
-
   if clickedLayer = transformLayer then
   begin
     dx := pt.X - clickPoint.X;
@@ -440,7 +445,7 @@ begin
     ctrlPoints := OffsetPath(ctrlPoints, dx, dy);
     clickedLayer.Offset(dx, dy);
     if Assigned(buttonGroup) then buttonGroup.Offset(dx, dy);
-    if Assigned(rotateGroup) and transformLayer.AutoPivot then
+    if Assigned(rotateGroup) and not allowRotatePivotMove then
       rotateGroup.Offset(dx, dy);
     Invalidate;
   end else if clickedLayer.GroupOwner = rotateGroup then
@@ -457,7 +462,6 @@ begin
     begin
       //moving the angle button in the rotation group
       clickedLayer.PositionCenteredAt(pt);
-      UpdateRotatingButtonGroup(clickedLayer);
       //we could do the rotation here, but it's
       //much smoother when done via the AppIdle event.
       doTransformOnIdle := True;

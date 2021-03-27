@@ -289,8 +289,9 @@ end;
 initialization
   InitByteExponents;
 
-  RegisterResampler(rNearestResampler, NearestResampler);
-  RegisterResampler(rBiLinearResampler, BiLinearResample);
-  RegisterResampler(rBiCubicResampler, BiCubicResample);
+  rNearestResampler := RegisterResampler(NearestResampler);
+  rBiLinearResampler := RegisterResampler(BiLinearResample);
+  rBiCubicResampler := RegisterResampler(BiCubicResample);
+  DefaultResampler := rBiLinearResampler;
 
 end.

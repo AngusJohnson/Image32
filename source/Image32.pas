@@ -439,7 +439,7 @@ type
     resType: PChar): TResourceStream;
 
   function GetResampler(id: integer): TResamplerFunction;
-  procedure RegisterResampler(id: integer; func: TResamplerFunction);
+  function RegisterResampler(func: TResamplerFunction): integer;
 
 const
   angle180 = Pi;
@@ -3250,7 +3250,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure RegisterResampler(id: integer; func: TResamplerFunction);
+function RegisterResampler(func: TResamplerFunction): integer;
 var
   resampRec: PResamplerRec;
 begin
@@ -3258,9 +3258,9 @@ begin
     CreateResamplerList;
 
   new(resampRec);
-  resampRec.id := id;
+  Result := ResamplerList.Add(resampRec) +1;
+  resampRec.id := Result;
   resampRec.func := func;
-  ResamplerList.Add(resampRec);
 end;
 //------------------------------------------------------------------------------
 

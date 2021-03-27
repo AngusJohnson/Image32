@@ -18,10 +18,10 @@ Version 2.20
       NearestResampler  - draft quality (fast)
 	  BiLinearResampler - very good quality (reasonably fast) BiCubicResampler  - excellent quality (relatively slow)
   Image32
-    DefaultResampler variable added
-    RegisterResampler function added	
+    DefaultResampler variable added (rBiLinearResampler)
+    RegisterResampler function added
     TImage32.AntiAliased property removed and replaced with a new 
-	  Resampler property (user can explicit choose a resampler)
+	  Resampler property (defaults to DefaultResampler)
   Image32_Layers
     TLayeredImage32.AntiAliased property removed and replaced
 	  with a new Resampler property
@@ -36,6 +36,8 @@ Version 2.20
   Image32_Ttf
     TGlyphCache.GetTextGlyphs function result changed
 	TGlyphCache.GetAngledTextGlyphs function result changed
+  Image32_Vector
+    JoinPath procedure renamed AppendPath
   Image32Panels
     Implemented WM_MOUSEHWHEEL for horizontal scrolling
 

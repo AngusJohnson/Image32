@@ -396,9 +396,8 @@ begin
 
   Application.OnActivate := AppActivate;
 
-  layeredImage := TLayeredImage32.Create();
+  layeredImage := TLayeredImage32.Create;
   layeredImage.AddLayer(TDesignerLayer32);
-  //layeredImage.BackgroundColor := Color32(Self.Color);
 
   //layeredImage.Resampler := rNearestResampler;   //draft quality (fast)
   layeredImage.Resampler := rBiLinearResampler;  //high quality (moderately fast)
@@ -429,7 +428,7 @@ begin
   //wasting a *lot* of CPU cycles drawing stuff that's never seen.
   //This will be especially noticeable when rotating images that have been
   //resized, or resizing images that have been rotated (and hence require
-  //an additional affine transformation.)
+  //an additional affine transformation).
   UseAppOnIdle := true;//false;//
 end;
 //------------------------------------------------------------------------------

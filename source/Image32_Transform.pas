@@ -2,8 +2,8 @@
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.19                                                            *
-* Date      :  21 March 2021                                                   *
+* Version   :  2.20                                                            *
+* Date      :  27 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -15,7 +15,8 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Math, Types, Image32, Image32_Vector;
+  SysUtils, Classes, Math, Types,
+  Image32, Image32_Vector;
 
 type
   TMatrixD = array [0..2, 0..2] of double;
@@ -35,7 +36,7 @@ type
     var path: TPathD); overload;
   procedure MatrixApply(const matrix: TMatrixD;
     var paths: TPathsD); overload;
-  procedure MatrixInvert(var matrix: TMatrixD);
+  function MatrixInvert(var matrix: TMatrixD): Boolean;
 
   //MatrixSkew: dx represents the delta offset of an X coordinate as a
   //fraction of its Y coordinate, and likewise for dy. For example, if dx = 0.1
@@ -50,7 +51,6 @@ type
 
   //AffineTransformImage: automagically resizes and translates the image
   function AffineTransformImage(img: TImage32; matrix: TMatrixD): TPoint;
-  procedure AffineTransformImageRaw(img: TImage32; matrix: TMatrixD);
 
   //ProjectiveTransform:
   //  srcPts, dstPts => each path must contain 4 points
@@ -283,19 +283,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure MatrixInvert(var matrix: TMatrixD);
+function MatrixInvert(var matrix: TMatrixD): Boolean;
 var
   d: double;
 const
   tolerance = 1.0E-5;
 begin
   d := MatrixDeterminant(matrix);
-  if abs(d) > tolerance then
+  Result := abs(d) > tolerance;
+  if Result then
   begin
     matrix := MatrixAdjugate(matrix);
     ScaleInternal(matrix, 1/d);
-  end
-  else matrix := IdentityMatrix;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -324,10 +324,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function AffineImageInternal(img: TImage32; matrix: TMatrixD;
-  newWidth, newHeight: integer): TPoint;
+function AffineTransformImage(img: TImage32; matrix: TMatrixD): TPoint;
 var
   i,j, srcWidth, srcHeight, xi,yi: integer;
+  newWidth, newHeight: integer;
   x,y: double;
   pc: PColor32;
   tmp: TArrayOfColor32;
@@ -343,24 +343,20 @@ begin
     resampler := GetResampler(img.Resampler);
 
   if not Assigned(resampler) or
-    (srcWidth * srcHeight = 0) or IsIdentityMatrix(matrix) then Exit;
+    (srcWidth * srcHeight = 0) or IsIdentityMatrix(matrix) then
+      Exit;
 
-  if (newWidth = 0) or (newHeight = 0) then
-  begin
-    //auto-resize the image so it'll fit transformed image
-    dstRec := GetTransformBounds(img, matrix);
-    newWidth := RectWidth(dstRec);
-    newHeight := RectHeight((dstRec));
-    //auto-translate the image too
-    Result := dstRec.TopLeft;
-  end else
-  begin
-    dstRec := Rect(0, 0, newWidth, newHeight);
-  end;
+  //auto-resize the image so it'll fit transformed image
+  dstRec := GetTransformBounds(img, matrix);
+  newWidth := RectWidth(dstRec);
+  newHeight := RectHeight((dstRec));
+  //auto-translate the image too
+  Result := dstRec.TopLeft;
 
   //starting with the result pixel coords, reverse lookup
   //the fractional coordinates in the untransformed image
-  MatrixInvert(matrix);
+  if not MatrixInvert(matrix) then Exit;
+
   SetLength(tmp, RectWidth(dstRec) * RectHeight(dstRec));
   pc := @tmp[0];
 
@@ -381,18 +377,6 @@ begin
   finally
     img.EndUpdate;
   end;
-end;
-//------------------------------------------------------------------------------
-
-function AffineTransformImage(img: TImage32; matrix: TMatrixD): TPoint;
-begin
-  Result := AffineImageInternal(img, matrix, 0, 0);
-end;
-//------------------------------------------------------------------------------
-
-procedure AffineTransformImageRaw(img: TImage32; matrix: TMatrixD);
-begin
-  AffineImageInternal(img, matrix, img.Width, img.Height);
 end;
 
 //------------------------------------------------------------------------------
