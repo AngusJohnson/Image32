@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
 Latest version: 2.20
-Released: 26 March 2021
+Released: 28 March 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -15,11 +15,11 @@ Recent changes:
 Version 2.20
   Image32_Resamplers
     New library unit added containing 3 resampler functions
-      NearestResampler  - draft quality (fast)
-	  BiLinearResampler - very good quality (reasonably fast) 
-	  BiCubicResampler  - excellent quality (relatively slow)
+      NearestResampler  - draft quality, fast
+	  BilinearResampler - high quality , average speed (default)
+	  BicubicResampler  - best quality , slow
   Image32
-    DefaultResampler variable added (rBiLinearResampler)
+    DefaultResampler variable added
     RegisterResampler function added
     TImage32.AntiAliased property removed and replaced with a new 
 	  Resampler property (defaults to DefaultResampler)

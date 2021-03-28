@@ -326,7 +326,7 @@ end;
 
 function AffineTransformImage(img: TImage32; matrix: TMatrixD): TPoint;
 var
-  i,j, srcWidth, srcHeight, xi,yi: integer;
+  i,j, srcWidth, srcHeight: integer;
   newWidth, newHeight: integer;
   x,y: double;
   pc: PColor32;

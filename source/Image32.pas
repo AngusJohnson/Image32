@@ -472,6 +472,11 @@ const
 var
   ClockwiseRotationIsAnglePositive: Boolean = true;
 
+  //Resampling function identifiers (initialized in Image32_Resamplers)
+  rNearestResampler : integer;
+  rBilinearResampler: integer;
+  rBicubicResampler : integer;
+
   DefaultResampler: Integer = 0;
 
   //Both MulTable and DivTable are used in blend functions<br>

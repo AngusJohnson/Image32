@@ -15,11 +15,6 @@ interface
 uses
   SysUtils, Classes, Math, Types, Image32, Image32_Vector;
 
-var
-  rNearestResampler : integer = 1;
-  rBiLinearResampler: integer = 2;
-  rBiCubicResampler : integer = 3;
-
 implementation
 
 
@@ -56,7 +51,7 @@ end;
 // BiLinear resampler
 //------------------------------------------------------------------------------
 
-function BiLinearResample(img: TImage32; x256, y256: Integer): TColor32;
+function BilinearResample(img: TImage32; x256, y256: Integer): TColor32;
 var
   xi, yi, weight: Integer;
   width, height: integer;
@@ -201,7 +196,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function BiCubicResample(img: TImage32; x256, y256: Integer): TColor32;
+function BicubicResample(img: TImage32; x256, y256: Integer): TColor32;
 var
   i, dx,dy, pi, iw, w,h: Integer;
   c: array[0..3] of TColor32;
@@ -289,9 +284,9 @@ end;
 initialization
   InitByteExponents;
 
-  rNearestResampler := RegisterResampler(NearestResampler);
-  rBiLinearResampler := RegisterResampler(BiLinearResample);
-  rBiCubicResampler := RegisterResampler(BiCubicResample);
-  DefaultResampler := rBiLinearResampler;
+  rNearestResampler  := RegisterResampler(NearestResampler);
+  rBilinearResampler := RegisterResampler(BilinearResample);
+  rBicubicResampler  := RegisterResampler(BicubicResample);
+  DefaultResampler   := rBilinearResampler;
 
 end.
