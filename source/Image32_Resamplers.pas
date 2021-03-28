@@ -2,8 +2,8 @@ unit Image32_Resamplers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.20                                                            *
-* Date      :  27 March 2021                                                   *
+* Version   :  2.21                                                            *
+* Date      :  29 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  For image transformations (scaling, rotating etc.)              *
@@ -202,8 +202,7 @@ var
   c: array[0..3] of TColor32;
   x: Integer;
   y: Integer;
-  tx,ty: Byte;
-  bce: TBiCubicEdgeAdjust;
+  bceX, bceY: TBiCubicEdgeAdjust;
 begin
   Result := clNone32;
   iw := img.Width;
@@ -214,51 +213,36 @@ begin
 
   if (x256 < -$FF) or (x > w) or  (y256 < -$FF) or (y > h) then Exit;
 
-  dx := 0;
-  if (x256 < 0) then
-  begin
-    dx := 1;
-    bce := eaOne;
-  end
-  else if (x = 0) then
-  begin
-    dx := 1;
-    bce := eaTwo;
-  end
-  else if (x256 > w shl 8) then
-    bce := eaFour
-  else if (x256 > (w -1) shl 8) then
-    bce := eaThree
-  else
-    bce := eaNone;
+  if (x256 < 0) then bceX := eaOne
+  else if (x = 0) then bceX := eaTwo
+  else if (x256 > w shl 8) then bceX := eaFour
+  else if (x256 > (w -1) shl 8) then bceX := eaThree
+  else bceX := eaNone;
 
-  if (y = 0) then dy := 1
+  if (bceX = eaOne) or (bceX = eaTwo) then dx := 1
+  else dx := 0;
+
+  if (y256 < 0) then bceY := eaOne
+  else if y = 0 then bceY := eaTwo
+  else if y = h -1 then bceY := eaThree
+  else if y = h then bceY := eaFour
+  else bceY := eaNone;
+
+  if (bceY = eaOne) or (bceY = eaTwo) then dy := 1
   else dy := 0;
+
   pi := (y -1 +dy) * iw + (x -1 + dx);
 
-  tx := x256 and $FF;
-  if x256 < 0 then tx := 1 -tx;
-
-  //reuse dx to avoid too many y loops below
-  if y = h -1 then dx := 1
-  else if y = h then dx := 2
+  if bceY = eaFour then dx := 2
+  else if bceY = eaThree then dx := 1
   else dx := 0;
 
   for i := dy to 3 -dx do
   begin
-    c[i] := CubicHermite(@img.Pixels[pi], tx, bce);
+    c[i] := CubicHermite(@img.Pixels[pi], x256 and $FF, bceX);
     inc(pi, iw);
   end;
-
-  if (y256 < 0) then bce := eaOne
-  else if dy = 1 then bce := eaTwo
-  else if y = h -1 then bce := eaThree
-  else if y = h then bce := eaFour
-  else bce := eaNone;
-
-  ty := y256 and $FF;
-  if y256 < 0 then ty := 1 -ty;
-  Result := CubicHermite(@c[dy], ty, bce);
+  Result := CubicHermite(@c[dy], y256 and $FF, bceY);
 end;
 
 //------------------------------------------------------------------------------
