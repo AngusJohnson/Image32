@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 2.20
-Released: 28 March 2021
+Latest version: 2.21
+Released: 29 March 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -11,6 +11,12 @@ Documentation : http://www.angusj.com/delphi/image32/Docs/
 Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
+
+Version 2.21
+  Image32_Resamplers
+    Fixed bug in BicubicResampler
+  Image32_Transform
+    Tidied up Spline transform algorithms
 
 Version 2.20
   Image32_Resamplers
