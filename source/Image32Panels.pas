@@ -2,8 +2,8 @@ unit Image32Panels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.19                                                             *
-* Date      :  23 March 2021                                                   *
+* Version   :  2.20                                                            *
+* Date      :  30 March 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Component that displays images on a TPanel descendant           *
@@ -64,18 +64,17 @@ type
     fLastLocation: TPoint;
 {$ENDIF}
     procedure UpdateOffsetDelta(resetOrigin: Boolean);
-    function GetMinScrollBtnSize: integer;
-    function GetDstOffset: TPoint;
-    function GetInnerMargin: integer;
-    function GetOffset: TPoint;
+    function  GetMinScrollBtnSize: integer;
+    function  GetDstOffset: TPoint;
+    function  GetInnerMargin: integer;
+    function  GetOffset: TPoint;
     procedure SetOffset(const value: TPoint);
-    function GetInnerClientRect: TRect;
+    function  GetInnerClientRect: TRect;
     procedure SetScale(scale: double);
     procedure SetScaleMin(value: double);
     procedure SetScaleMax(value: double);
     //ScaleAtPoint: zooms in or out keeping 'pt' stationary relative to display
     procedure ScaleAtPoint(scaleDelta: double; const pt: TPoint);
-    procedure SetSize(size: TSize);
     function  GetColor: TColor;
     procedure SetColor(acolor: TColor);
     procedure SetAutoCenter(value: Boolean);
@@ -109,12 +108,13 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    procedure ResetImage;
     procedure ScaleToFit;
     function IsEmpty: Boolean;
     function IsScaledToFit: Boolean;
     function ClientToImage(const clientPt: TPoint): TPoint;
     function ImageToClient(const surfacePt: TPoint): TPoint;
+
+    function CenterImagePoint(const imagePt: TPoint): Boolean;
 
     property InnerClientRect: TRect read GetInnerClientRect;
     property InnerMargin: integer read GetInnerMargin;
@@ -128,8 +128,6 @@ type
     property UnFocusedColor: TColor read fUnfocusedColor write fUnfocusedColor;
     //Scale: image scale (between ScaleMin and ScaleMax) if AllowZoom is enabled
     property Scale: double read fScale write SetScale;
-    //ImageSize: ImageSize affects both scrollings and OnDrawImage bounds
-    property ImageSize: TSize read fImageSize write SetSize;
     property ScaleMin: double read fScaleMin write SetScaleMin;
     property ScaleMax: double read fScaleMax write SetScaleMax;
     //ShowScrollButtons: defaults to ssbFocused (ie only when Panel has focus)
@@ -147,9 +145,11 @@ type
   TImage32Panel = class(TBaseImgPanel)
   private
     fImage             : TImage32;
+    fAllowCopyPaste    : Boolean;
     fOnFileDrop        : TFileDropEvent;
-    fFileDropEnabled   : Boolean;
-    procedure SetFileDropEnabled(value: Boolean);
+    fAllowFileDrop   : Boolean;
+    fOnPaste           : TNotifyEvent;
+    procedure SetAllowFileDrop(value: Boolean);
     procedure WMKeyDown(var Message: TWMKey); message WM_KEYDOWN;
   protected
     procedure CreateWnd; override;
@@ -160,12 +160,18 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    procedure ClearImage;
+    procedure  ClearImage;
+    function   CopyToClipboard: Boolean;
+    function   PasteFromClipboard: Boolean;
+
     property Image: TImage32 read fImage;
-    property FileDropEnabled: Boolean
-      read fFileDropEnabled write SetFileDropEnabled;
+    property AllowCopyPaste: Boolean
+      read fAllowCopyPaste write fAllowCopyPaste;
+    property AllowFileDrop: Boolean
+      read fAllowFileDrop write SetAllowFileDrop;
     property OnFileDrop: TFileDropEvent
       read fOnFileDrop write fOnFileDrop;
+    property OnPaste: TNotifyEvent read fOnPaste write fOnPaste;
   end;
 
 procedure Register;
@@ -175,7 +181,7 @@ implementation
 procedure Register;
 
 begin
-  RegisterComponents('Image Panels', [TImage32Panel]);
+  RegisterComponents('Image32 Panels', [TImage32Panel]);
 end;
 
 type
@@ -400,15 +406,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TBaseImgPanel.ResetImage;
-begin
-  SetScale(1.0);
-  fScrollbarHorz.srcOffset := 0;
-  fScrollbarVert.srcOffset := 0;
-  Invalidate;
-end;
-//------------------------------------------------------------------------------
-
 procedure TBaseImgPanel.WMSize(var Message: TWMSize);
 begin
   inherited;
@@ -488,10 +485,11 @@ var
   h,w: integer;
 begin
   if IsEmpty then Exit;
-  ResetImage;
+  fScale := 1;
+  fScrollbarHorz.srcOffset := 0;
+  fScrollbarVert.srcOffset := 0;
   rec := GetInnerClientRect;
   h := RectHeight(rec); w := RectWidth(rec);
-  //fZoomFit := true;
   if w / fImageSize.cx < h / fImageSize.cy then
     SetScale(w / fImageSize.cx) else
     SetScale(h / fImageSize.cy);
@@ -550,17 +548,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TBaseImgPanel.SetSize(size: TSize);
-begin
-  if (fImageSize.cx = size.cx) and (fImageSize.cy = size.cy) then Exit;
-  fImageSize.cx := size.cx;
-  fImageSize.cy := size.cy;
-  if not HandleAllocated then Exit;
-  UpdateOffsetDelta(true);
-  Invalidate;
-end;
-//------------------------------------------------------------------------------
-
 function  TBaseImgPanel.GetColor: TColor;
 begin
   Result := inherited Color;
@@ -601,45 +588,45 @@ end;
 procedure TBaseImgPanel.UpdateOffsetDelta(resetOrigin: Boolean);
 var
   innerRec: TRect;
-  innerWidth, innerHeight, btnMin: integer;
-  scaledX, scaledY: double;
+  innerClientW, innerClientH, btnMin: integer;
+  scaledW, scaledH: double;
 begin
   //we need to determine 2 things:
   //  1. scroll button size
   //  2. how much a 1px button move moves the scaled image
 
   btnMin      := GetMinScrollBtnSize;
-  innerRec    := GetInnerClientRect;
-  innerWidth  := innerRec.Right - innerRec.Left;
-  innerHeight := innerRec.Bottom - innerRec.Top;
-  scaledX     := fImageSize.cx * fScale;
-  scaledY     := fImageSize.cy * fScale;
+  innerRec      := GetInnerClientRect;
+  innerClientW  := innerRec.Right - innerRec.Left;
+  innerClientH  := innerRec.Bottom - innerRec.Top;
+  scaledW       := fImageSize.cx * fScale;
+  scaledH       := fImageSize.cy * fScale;
+
   with fScrollbarVert do
   begin
     if resetOrigin then srcOffset := 0;
-    if (scaledY = 0) or
-      (scaledY < innerHeight + tolerance) then //no scroll button needed
+    if (scaledH < innerClientH + tolerance) then //no scroll button needed
     begin
       btnSize := 0; btnDelta := 0; maxSrcOffset := 0;
     end else
     begin
-      btnSize := Max(btnMin, Round(innerHeight * innerHeight / scaledY));
-      maxSrcOffset := (scaledY - innerHeight) / fScale;
-      btnDelta := (innerHeight - btnSize) / maxSrcOffset;
+      btnSize := Max(btnMin, Round(innerClientH * innerClientH / scaledH));
+      maxSrcOffset := (scaledH - innerClientH) / fScale;
+      btnDelta := (innerClientH - btnSize) / maxSrcOffset;
     end;
   end;
 
   with fScrollbarHorz do
   begin
     if resetOrigin then srcOffset := 0;
-    if (scaledX = 0) or (scaledX < innerWidth + tolerance) then  //no scroll button needed
+    if (scaledW < innerClientW + tolerance) then  //no scroll button needed
     begin
       btnSize := 0; btnDelta := 0; maxSrcOffset := 0;
     end else
     begin
-      btnSize := Max(btnMin, Round(innerWidth * innerWidth / scaledX));
-      maxSrcOffset := (scaledX - innerWidth) / fScale;
-      btnDelta := (innerWidth - btnSize) / maxSrcOffset;
+      btnSize := Max(btnMin, Round(innerClientW * innerClientW / scaledW));
+      maxSrcOffset := (scaledW - innerClientW) / fScale;
+      btnDelta := (innerClientW - btnSize) / maxSrcOffset;
     end;
   end;
 end;
@@ -682,6 +669,44 @@ begin
   marg := GetInnerMargin;
   Result.X := Round((surfacePt.X -fScrollbarHorz.srcOffset)*fScale +marg +pt.X);
   Result.Y := Round((surfacePt.Y -fScrollbarVert.srcOffset)*fScale +marg +pt.Y);
+end;
+//------------------------------------------------------------------------------
+
+function TBaseImgPanel.CenterImagePoint(const imagePt: TPoint): Boolean;
+var
+  scaledW, scaledH: Double;
+  marg, innerW, innerH: Integer;
+  pt1, pt2: TPoint;
+  q, maxOffset: double;
+begin
+  Result := (fScrollbarHorz.maxSrcOffset > 0) or
+    (fScrollbarVert.maxSrcOffset = 0);
+  if not Result then Exit;
+
+  scaledW := fImageSize.cx * fScale;
+  scaledH := fImageSize.cy * fScale;
+
+  marg := GetInnerMargin;
+  innerW := ClientWidth - marg*2;
+  innerH := ClientHeight - marg*2;
+
+  pt1 := imagePt;
+  pt2 := ClientToImage(Point(marg + innerW div 2, marg + innerH div 2));
+
+  with fScrollbarHorz do
+  begin
+    q := (pt1.X - pt2.X);
+    maxOffset := (scaledW - innerW) / fScale;
+    srcOffset := Round(Max(0,Min(maxOffset, q)));
+  end;
+
+  with fScrollbarVert do
+  begin
+    q := (pt1.Y - pt2.Y);
+    maxOffset := (scaledH - innerH) / fScale;
+    srcOffset := Round(Max(0,Min(maxOffset, q)));
+  end;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -731,10 +756,6 @@ begin
 
   rec := GetInnerClientRect;
   inDrawRegion := PtInRect(rec, Point(X,Y));
-//  if inDrawRegion then
-//  begin
-//    cursor := crHandPoint;
-//  end;
 
   if not fMouseDown then
   begin
@@ -1211,12 +1232,13 @@ begin
   inherited;
   fImage := TNotifyImage32.Create(Self);
   fImage.SetSize(200,200);
+  fAllowCopyPaste := true;
 end;
 //------------------------------------------------------------------------------
 
 destructor TImage32Panel.Destroy;
 begin
-  if fFileDropEnabled and HandleAllocated then
+  if fAllowFileDrop and HandleAllocated then
     DragAcceptFiles(Handle, False);
   fImage.Free;
   inherited;
@@ -1229,7 +1251,7 @@ begin
   begin
     fImageSize.cx := Image.Width;
     fImageSize.cy := Image.Height;
-    ResetImage;
+    fScale := 1.0;
     UpdateOffsetDelta(true);
   end;
   Invalidate;
@@ -1253,32 +1275,32 @@ procedure TImage32Panel.CreateWnd;
 begin
   inherited;
 
-  if fFileDropEnabled then
+  if fAllowFileDrop then
     DragAcceptFiles(Handle, True);
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32Panel.DestroyWnd;
 begin
-  if fFileDropEnabled then
+  if fAllowFileDrop then
   begin
     DragAcceptFiles(Handle, False);
-    fFileDropEnabled := false;
+    fAllowFileDrop := false;
   end;
   inherited;
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32Panel.SetFileDropEnabled(value: Boolean);
+procedure TImage32Panel.SetAllowFileDrop(value: Boolean);
 begin
-  if (fFileDropEnabled = value) then Exit;
+  if (fAllowFileDrop = value) then Exit;
   if not (csDesigning in ComponentState) and HandleAllocated then
   begin
-    if fFileDropEnabled then
+    if fAllowFileDrop then
       DragAcceptFiles(Handle, false) else
       DragAcceptFiles(Handle, true);
   end;
-  fFileDropEnabled := value;
+  fAllowFileDrop := value;
 end;
 //------------------------------------------------------------------------------
 
@@ -1312,12 +1334,30 @@ begin
   shiftState := KeyDataToShiftState(Message.KeyData);
   case Message.CharCode of
     Ord('C'):
-      if (ssCtrl in shiftState) and fImage.CanPasteFromClipBoard then
-        fImage.CopyToClipboard;
+      if (ssCtrl in shiftState) and fAllowCopyPaste and
+        not fImage.IsEmpty then
+          fImage.CopyToClipboard;
     Ord('V'):
-      if (ssCtrl in shiftState) and fImage.CanPasteFromClipBoard then
-        fImage.PasteFromClipboard;
+      if (ssCtrl in shiftState) and fAllowCopyPaste and
+        fImage.CanPasteFromClipBoard then
+        begin
+          if fImage.PasteFromClipboard and assigned(fOnPaste) then
+            fOnPaste(self);
+        end;
   end;
+end;
+//------------------------------------------------------------------------------
+
+function TImage32Panel.CopyToClipboard: Boolean;
+begin
+  Result := fAllowCopyPaste and Image.CopyToClipBoard;
+end;
+//------------------------------------------------------------------------------
+
+function TImage32Panel.PasteFromClipboard: Boolean;
+begin
+  Result := fAllowCopyPaste and Image.PasteFromClipBoard;
+  if Result and assigned(fOnPaste) then fOnPaste(self);
 end;
 //------------------------------------------------------------------------------
 

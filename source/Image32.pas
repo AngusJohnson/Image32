@@ -107,7 +107,7 @@ type
     function GetIsEmpty: Boolean;
     function GetPixelBase: PColor32;
     function GetPixelRow(row: Integer): PColor32;
-    procedure NearestResize(newWidth, newHeight: Integer);
+    procedure NearestNeighborResize(newWidth, newHeight: Integer);
     procedure ResamplerResize(newWidth, newHeight: Integer);
     procedure RotateLeft90;
     procedure RotateRight90;
@@ -151,12 +151,12 @@ type
     procedure Scale(sx, sy: double); overload;
 
     function Copy(src: TImage32; srcRec, dstRec: TRect): Boolean;
-    //CopyBlend: Copies part or all of another TImage32 image (src).
+    //CopyBlend: Copies part or all of another image (src).
     //If no blend function is provided, then the pixels in src's srcRec
-    //simply replace whatever is in 'dstRec'. If a blend function is provided,
-    //then that functions determines how the image from src will be blended
-    //with the current image. Also the image from src's srcRec will be
-    //stretched if necessary to fit into dstRec.
+    //simply replace whatever is in 'dstRec' exactly as in the Copy function
+    //above. When a blend function is provided, that functions determines how
+    //the image from src will be blended with the current image. The image
+    //from src's srcRec will also be stretched if necessary to fit into dstRec.
     function CopyBlend(src: TImage32; srcRec, dstRec: TRect;
       blendFunc: TBlendFunction = nil): Boolean;
 
@@ -439,7 +439,8 @@ type
     resType: PChar): TResourceStream;
 
   function GetResampler(id: integer): TResamplerFunction;
-  function RegisterResampler(func: TResamplerFunction): integer;
+  function RegisterResampler(func: TResamplerFunction; const name: string): integer;
+  procedure GetResamplerList(stringList: TStringList);
 
 const
   angle180 = Pi;
@@ -529,6 +530,7 @@ type
 
   TResamplerRec = record
     id: integer;
+    name: string;
     func: TResamplerFunction;
   end;
   PResamplerRec = ^TResamplerRec;
@@ -1748,7 +1750,8 @@ begin
     if stretchImage then
     begin
       if fResampler = 0 then
-        NearestResize(newWidth, newHeight) else
+        NearestNeighborResize(newWidth, newHeight)
+      else
         ResamplerResize(newWidth, newHeight);
     end else
     begin
@@ -1756,7 +1759,7 @@ begin
       try
         rec := Bounds;
         SetSize(newWidth, newHeight, clNone32);
-        CopyBlend(tmp, rec, rec);
+        Copy(tmp, rec, rec); //this will clip as required.
       finally
         tmp.Free;
       end;
@@ -1768,7 +1771,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.NearestResize(newWidth, newHeight: Integer);
+procedure TImage32.NearestNeighborResize(newWidth, newHeight: Integer);
 var
   x, y, srcY: Integer;
   scaledXi, scaledYi: TArrayOfInteger;
@@ -1825,7 +1828,7 @@ end;
 
 procedure TImage32.Scale(sx, sy: double);
 begin
-  sx := Min(sx, 100); sy := Min(sy, 100);
+  //sx := Min(sx, 100); sy := Min(sy, 100);
   if (sx > 0) and (sy > 0) then
     ReSize(Round(width * sx), Round(height * sy));
 end;
@@ -3255,7 +3258,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RegisterResampler(func: TResamplerFunction): integer;
+function RegisterResampler(func: TResamplerFunction; const name: string): integer;
 var
   resampRec: PResamplerRec;
 begin
@@ -3265,7 +3268,20 @@ begin
   new(resampRec);
   Result := ResamplerList.Add(resampRec) +1;
   resampRec.id := Result;
+  resampRec.name := name;
   resampRec.func := func;
+end;
+//------------------------------------------------------------------------------
+
+procedure GetResamplerList(stringList: TStringList);
+var
+  i: integer;
+begin
+  stringList.Clear;
+  stringList.Capacity := ResamplerList.Count;
+  for i := 0 to ResamplerList.Count -1 do
+    with PResamplerRec(ResamplerList[i])^ do
+      stringList.AddObject(name, Pointer(id));
 end;
 //------------------------------------------------------------------------------
 

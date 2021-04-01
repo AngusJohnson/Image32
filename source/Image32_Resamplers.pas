@@ -2,8 +2,8 @@ unit Image32_Resamplers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.21                                                            *
-* Date      :  29 March 2021                                                   *
+* Version   :  2.22                                                            *
+* Date      :  2 April 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  For image transformations (scaling, rotating etc.)              *
@@ -11,6 +11,8 @@ unit Image32_Resamplers;
 *******************************************************************************)
 
 interface
+
+{$I Image32.inc}
 
 uses
   SysUtils, Classes, Math, Types, Image32, Image32_Vector;
@@ -122,7 +124,9 @@ end;
 function CubicHermite(aclr: PColor32; t: Byte; bce: TBiCubicEdgeAdjust): TColor32;
 var
   a,b,c,d: PARGB;
-	aa, bb, cc: double;
+  q: TARGB;
+	aa, bb, cc: integer;
+  t1, t2, t3: double;
   res: TARGB absolute Result;
 const
   clTrans: TColor32 = clNone32;
@@ -174,25 +178,47 @@ begin
       end;
   end;
 
-	aa := -a.A*0.5 + 1.5*b.A - 1.5*c.A + d.A*0.5;
-	bb := a.A - 2.5*b.A + 2*c.A - d.A*0.5;
-	cc := -a.A*0.5 + c.A*0.5;
-  Res.A := ClampByte(aa*byteFracCubed[t] + bb*byteFracSq[t] + cc*byteFrac[t] + b.A);
+  if (b.A = 0) and (c.A = 0) then
+  begin
+    result := clNone32;
+    Exit;
+  end
+  else if b.A = 0 then
+  begin
+    q := c^;
+    q.A := 0;
+    b := @q;
+  end;
+  if c.A = 0 then
+  begin
+    q := b^;
+    q.A := 0;
+    c := @q;
+  end;
 
-	aa := -a.R*0.5 + 1.5*b.R - 1.5*c.R + d.R*0.5;
-	bb := a.R - 2.5*b.R + 2*c.R - d.R*0.5;
-	cc := -a.R*0.5 + c.R*0.5;
-  Res.R := ClampByte(aa*byteFracCubed[t] + bb*byteFracSq[t] + cc*byteFrac[t] + b.R);
+  t1 := byteFrac[t];
+  t2 := byteFracSq[t];
+  t3 := byteFracCubed[t];
 
-	aa := -a.G*0.5 + 1.5*b.G - 1.5*c.G + d.G*0.5;
-	bb := a.G - 2.5*b.G + 2*c.G - d.G*0.5;
-	cc := -a.G*0.5 + c.G*0.5;
-  Res.G := ClampByte(aa*byteFracCubed[t] + bb*byteFracSq[t] + cc*byteFrac[t] + b.G);
+	aa := (-a.A + 3*b.A - 3*c.A + d.A) div 2;
+	bb := (2*a.A - 5*b.A + 4*c.A - d.A) div 2;
+	cc := (-a.A + c.A) div 2;
+  Res.A := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.A);
 
-	aa := -a.B*0.5 + 1.5*b.B - 1.5*c.B + d.B*0.5;
-	bb := a.B - 2.5*b.B + 2*c.B - d.B*0.5;
-	cc := -a.B*0.5 + c.B*0.5;
-  Res.B := ClampByte(aa*byteFracCubed[t] + bb*byteFracSq[t] + cc*byteFrac[t] + b.B);
+	aa := (-a.R + 3*b.R - 3*c.R + d.R) div 2;
+	bb := (2*a.R - 5*b.R + 4*c.R - d.R) div 2;
+	cc := (-a.R + c.R) div 2;
+  Res.R := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.R);
+
+	aa := (-a.G + 3*b.G - 3*c.G + d.G) div 2;
+	bb := (2*a.G - 5*b.G + 4*c.G - d.G) div 2;
+	cc := (-a.G + c.G) div 2;
+  Res.G := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.G);
+
+	aa := (-a.B + 3*b.B - 3*c.B + d.B) div 2;
+	bb := (2*a.B - 5*b.B + 4*c.B - d.B) div 2;
+	cc := (-a.B + c.B) div 2;
+  Res.B := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.B);
 end;
 //------------------------------------------------------------------------------
 
@@ -205,9 +231,11 @@ var
   bceX, bceY: TBiCubicEdgeAdjust;
 begin
   Result := clNone32;
+
   iw := img.Width;
   w := iw -1;
   h := img.Height -1;
+
   x := Abs(x256) shr 8;
   y := Abs(y256) shr 8;
 
@@ -268,9 +296,10 @@ end;
 initialization
   InitByteExponents;
 
-  rNearestResampler  := RegisterResampler(NearestResampler);
-  rBilinearResampler := RegisterResampler(BilinearResample);
-  rBicubicResampler  := RegisterResampler(BicubicResample);
+  rNearestResampler  := RegisterResampler(NearestResampler, 'NearestNeighbor');
+  rBilinearResampler := RegisterResampler(BilinearResample, 'Bilinear');
+  rBicubicResampler  := RegisterResampler(BicubicResample, 'HermiteBicubic');
   DefaultResampler   := rBilinearResampler;
 
 end.
+

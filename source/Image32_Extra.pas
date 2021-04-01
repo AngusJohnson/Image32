@@ -126,7 +126,8 @@ procedure SymmetricCropTransparent(img: TImage32);
 procedure ResizeAndCenterImgForRotation(image: TImage32);
 
 
-//2 additional blend functions (see TImage32.CopyBlend)
+//3 additional blend functions (see TImage32.CopyBlend)
+function BlendAverage(bgColor, fgColor: TColor32): TColor32;
 function BlendLinearBurn(bgColor, fgColor: TColor32): TColor32;
 function BlendColorDodge(bgColor, fgColor: TColor32): TColor32;
 
@@ -1202,6 +1203,19 @@ var
   c2: TARGB absolute color2;
 begin
   result := (c1.A + c2.A) shr 1;
+end;
+//------------------------------------------------------------------------------
+
+function BlendAverage(bgColor, fgColor: TColor32): TColor32;
+var
+  res: TARGB absolute Result;
+  bg: TARGB absolute bgColor;
+  fg: TARGB absolute fgColor;
+begin
+  res.A := (fg.A + bg.A) shr 1;
+  res.R := (fg.R + bg.R) shr 1;
+  res.G := (fg.G + bg.G) shr 1;
+  res.B := (fg.B + bg.B) shr 1;
 end;
 //------------------------------------------------------------------------------
 
