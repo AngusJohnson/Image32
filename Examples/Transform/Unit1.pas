@@ -8,7 +8,8 @@ uses
   Dialogs, ClipBrd, Vcl.StdCtrls;
 
 type
-  TTransformType = (ttAffineSkew, ttProjective, ttSpline, ttAffineRotate);
+  TTransformType = (ttAffineSkew, ttProjective,
+    ttSplineV, ttSplineH, ttAffineRotate);
 
   TForm1 = class(TForm)
     MainMenu1: TMainMenu;
@@ -35,6 +36,9 @@ type
     Rotate1: TMenuItem;
     N4: TMenuItem;
     mnuHideDesigners: TMenuItem;
+    mnuHorizontalSpline: TMenuItem;
+    Reset1: TMenuItem;
+    N5: TMenuItem;
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -54,6 +58,7 @@ type
     procedure PopupMenu1Popup(Sender: TObject);
     procedure FormDblClick(Sender: TObject);
     procedure mnuHideDesignersClick(Sender: TObject);
+    procedure Reset1Click(Sender: TObject);
   private
     layeredImage: TLayeredImage32;
     buttonGroup: TButtonGroupLayer32;
@@ -67,7 +72,7 @@ type
     transformType: TTransformType;
     doTransformOnIdle: Boolean;
     allowRotatePivotMove: Boolean;
-    procedure ResetSpline;
+    procedure ResetSpline(vert: Boolean);
     procedure ResetVertProjective;
     procedure ResetSkew(isVerticalSkew: Boolean);
     procedure ResetRotate;
@@ -97,8 +102,9 @@ uses
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
-  DefaultResampler := rNearestResampler;
-  //DefaultResampler := rBiCubicResampler;
+  //DefaultResampler := rNearestResampler;
+  //DefaultResampler := rBilinearResampler;
+  DefaultResampler := rBicubicResampler;
 
   //SETUP THE LAYERED IMAGE
   DefaultButtonSize := DPIAware(10);
@@ -114,7 +120,8 @@ begin
 
   //Layer 1: for the transformed image
   transformLayer := TRasterLayer32(layeredImage.AddLayer(TRasterLayer32));
-  transformLayer.MasterImage.LoadFromResource('GRADIENT', 'PNG');
+  //transformLayer.MasterImage.LoadFromResource('GRADIENT', 'PNG');
+  transformLayer.MasterImage.LoadFromResource('UNION_JACK', 'PNG');
 
   transformLayer.CursorId := crHandPoint;
   transformLayer.AutoPivot := true;
@@ -240,14 +247,24 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.ResetSpline;
+procedure TForm1.ResetSpline(vert: Boolean);
 begin
   FreeAndNil(buttonGroup);
   FreeAndNil(rotateGroup);
 
-  transformType := ttSpline;
-  with transformLayer.MasterImage do
-    ctrlPoints := MakePathI([0,0, Width div 2,0, Width,0]);
+  if vert then
+  begin
+    transformType := ttSplineV;
+    with transformLayer.MasterImage do
+      ctrlPoints := MakePathI([0, 0, Width div 2, 0, Width, 0]);
+    StatusBar1.SimpleText := ' VERT SPLINE TRANSFORM: Right click to add control points';
+  end else
+  begin
+    transformType := ttSplineH;
+    with transformLayer.MasterImage do
+      ctrlPoints := MakePathI([0,0, 0,Height div 2, 0, Height]);
+    StatusBar1.SimpleText := ' HORZ SPLINE TRANSFORM: Right click to add control points';
+  end;
 
   //now make fPts relative to the canvas surface
   with transformLayer do
@@ -256,7 +273,6 @@ begin
     bsRound, DefaultButtonSize, clGreen32);
 
   Invalidate;
-  StatusBar1.SimpleText := ' VERT SPLINE TRANSFORM: Right click to add control points';
 
 end;
 //------------------------------------------------------------------------------
@@ -327,10 +343,17 @@ begin
           pt := GetBounds(ctrlPoints).TopLeft;
           PositionAt(pt);
         end;
-      ttSpline:
+      ttSplineV:
         begin
           Image.Assign(masterImage);
           if not SplineVertTransform(Image, ctrlPoints,
+            stQuadratic, clRed32, false, pt) then Exit;
+          PositionAt(pt);
+        end;
+      ttSplineH:
+        begin
+          Image.Assign(masterImage);
+          if not SplineHorzTransform(Image, ctrlPoints,
             stQuadratic, clRed32, false, pt) then Exit;
           PositionAt(pt);
         end;
@@ -343,9 +366,14 @@ end;
 
 procedure TForm1.mnuVerticalSplineClick(Sender: TObject);
 var
+  i: integer;
   rec: TRect;
   oldTopLeft: TPoint;
 begin
+  with TMenuItem(Sender).Parent do
+  for i := 0 to Count -1 do
+    Items[i].Checked := false;
+
   TMenuItem(Sender).Checked := true;
 
   //rather than started each transform afresh, let's make them additive
@@ -361,7 +389,8 @@ begin
   if (Sender = mnuVertSkew) then            ResetSkew(true)
   else if (Sender = mnuHorizontalSkew) then ResetSkew(false)
   else if Sender = mnuVertProjective then   ResetVertProjective
-  else if Sender = mnuVerticalSpline then   ResetSpline
+  else if Sender = mnuVerticalSpline then   ResetSpline(true)
+  else if Sender = mnuHorizontalSpline then ResetSpline(false)
   else                                      ResetRotate;
 end;
 //------------------------------------------------------------------------------
@@ -374,7 +403,8 @@ end;
 
 procedure TForm1.PopupMenu1Popup(Sender: TObject);
 begin
-  mnuAddNewCtrlPoint.Visible := transformType = ttSpline;
+  mnuAddNewCtrlPoint.Visible :=
+    (transformType = ttSplineV) or (transformType = ttSplineH);
 
   GetCursorPos(popupPoint);
   popupPoint := ScreenToClient(popupPoint);
@@ -399,7 +429,7 @@ end;
 
 procedure TForm1.FormDblClick(Sender: TObject);
 begin
-  if transformType <> ttSpline then Exit;
+  if (transformType <> ttSplineV) and (transformType <> ttSplineH) then Exit;
   GetCursorPos(popupPoint);
   popupPoint := ScreenToClient(popupPoint);
   mnuAddNewCtrlPointClick(nil);
@@ -510,7 +540,8 @@ begin
   case transformType of
     ttAffineSkew:   ResetSkew(mnuVertSkew.Checked);
     ttProjective:   ResetVertProjective;
-    ttSpline:       ResetSpline;
+    ttSplineV:       ResetSpline(true);
+    ttSplineH:       ResetSpline(false);
     ttAffineRotate: ResetRotate;
   end;
 end;
@@ -525,7 +556,8 @@ begin
     case transformType of
       ttAffineSkew  : ResetSkew(mnuVertSkew.Checked);
       ttProjective  : ResetVertProjective;
-      ttSpline      : ResetSpline;
+      ttSplineV      : ResetSpline(True);
+      ttSplineH      : ResetSpline(False);
       ttAffineRotate: ResetRotate;
     end;
   end;
@@ -548,6 +580,16 @@ end;
 procedure TForm1.CopytoClipboard1Click(Sender: TObject);
 begin
   transformLayer.Image.CopyToClipBoard;
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.Reset1Click(Sender: TObject);
+begin
+  transformLayer.MasterImage.LoadFromResource('UNION_JACK', 'PNG');
+  transformlayer.PositionCenteredAt(PointD(ClientWidth/2, ClientHeight/2));
+  transformLayer.AutoPivot := true;
+  transformLayer.UpdateHitTestMaskTransparent;
+  mnuVerticalSplineClick(mnuVertSkew);
 end;
 //------------------------------------------------------------------------------
 

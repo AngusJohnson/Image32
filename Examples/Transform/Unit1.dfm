@@ -75,46 +75,62 @@ object Form1: TForm1
       object mnuVertSkew: TMenuItem
         Caption = 'V&ertical Skew'
         Checked = True
-        GroupIndex = 11
+        GroupIndex = 12
         RadioItem = True
-        ShortCut = 16453
+        ShortCut = 16459
         OnClick = mnuVerticalSplineClick
       end
       object mnuHorizontalSkew: TMenuItem
         Caption = 'Hori&zontal Skew'
-        GroupIndex = 11
+        GroupIndex = 12
         RadioItem = True
-        ShortCut = 16474
+        ShortCut = 16471
         OnClick = mnuVerticalSplineClick
       end
       object mnuVertProjective: TMenuItem
         Caption = 'Vertical &Projective'
-        GroupIndex = 11
+        GroupIndex = 12
         RadioItem = True
         ShortCut = 16464
         OnClick = mnuVerticalSplineClick
       end
       object mnuVerticalSpline: TMenuItem
         Caption = 'Vertical &Spline'
-        GroupIndex = 11
+        GroupIndex = 12
         RadioItem = True
         ShortCut = 16467
         OnClick = mnuVerticalSplineClick
       end
+      object mnuHorizontalSpline: TMenuItem
+        Caption = 'Horizontal Splin&e'
+        GroupIndex = 12
+        ShortCut = 16453
+        OnClick = mnuVerticalSplineClick
+      end
       object Rotate1: TMenuItem
         Caption = '&Rotate'
-        GroupIndex = 11
+        GroupIndex = 12
         RadioItem = True
         ShortCut = 16466
         OnClick = mnuVerticalSplineClick
       end
       object N4: TMenuItem
         Caption = '-'
-        GroupIndex = 11
+        GroupIndex = 12
+      end
+      object Reset1: TMenuItem
+        Caption = 'Rese&t'
+        GroupIndex = 12
+        ShortCut = 16468
+        OnClick = Reset1Click
+      end
+      object N5: TMenuItem
+        Caption = '-'
+        GroupIndex = 12
       end
       object mnuHideDesigners: TMenuItem
         Caption = '&Hide Designers'
-        GroupIndex = 11
+        GroupIndex = 12
         ShortCut = 16456
         OnClick = mnuHideDesignersClick
       end

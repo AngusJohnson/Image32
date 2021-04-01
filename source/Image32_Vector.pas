@@ -47,10 +47,12 @@ type
   function Arc(const rec: TRect; startAngle, endAngle: double): TPathD;
   function Pie(const rec: TRect; StartAngle, EndAngle: double): TPathD;
 
+  function QuadraticBezier(const a,b,c: TPointD; t: double): TPointD;
   function FlattenQBezier(const pt1, pt2, pt3: TPointD): TPathD; overload;
   function FlattenQBezier(const pts: TPathD): TPathD; overload;
   function FlattenQBezier(const pts: TPathsD): TPathsD; overload;
 
+  function CubicBezier(const a,b,c,d: TPointD; t: double): TPointD;
   function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD): TPathD; overload;
   function FlattenCBezier(const pts: TPathD): TPathD; overload;
   function FlattenCBezier(const pts: TPathsD): TPathsD; overload;
@@ -226,6 +228,10 @@ type
   {$IFDEF INLINE} inline; {$ENDIF}
   function Distance(const pt1, pt2: TPointD): double; overload;
   {$IFDEF INLINE} inline; {$ENDIF}
+
+  function Distance(const path: TPathD; stopAt: integer = 0): double; overload;
+  function GetDistances(const path: TPathD): TArrayOfDouble;
+  function GetCumulativeDistances(const path: TPathD): TArrayOfDouble;
 
   function PointInPolygon(const pt: TPointD;
     const polygon: TPathD; fillRule: TFillRule): Boolean;
@@ -1012,6 +1018,44 @@ end;
 function Distance(const pt1, pt2: TPointD): double;
 begin
   Result := Sqrt(DistanceSqrd(pt1, pt2));
+end;
+//------------------------------------------------------------------------------
+
+function Distance(const path: TPathD; stopAt: integer): double;
+var
+  i, highI: integer;
+begin
+  Result := 0;
+  highI := High(path);
+  if (stopAt > 0) and (stopAt < HighI) then highI := stopAt;
+  for i := 1 to highI do
+    Result := Result + Distance(path[i-1],path[i]);
+end;
+//------------------------------------------------------------------------------
+
+function GetDistances(const path: TPathD): TArrayOfDouble;
+var
+  i, len: integer;
+begin
+  len := Length(path);
+  SetLength(Result, len);
+  if len = 0 then Exit;
+  Result[0] := 0;
+  for i := 1 to len -1 do
+    Result[i] := Distance(path[i-1], path[i]);
+end;
+//------------------------------------------------------------------------------
+
+function GetCumulativeDistances(const path: TPathD): TArrayOfDouble;
+var
+  i, len: integer;
+begin
+  len := Length(path);
+  SetLength(Result, len);
+  if len = 0 then Exit;
+  Result[0] := 0;
+  for i := 1 to len -1 do
+    Result[i] := Result[i-1] + Distance(path[i-1], path[i]);
 end;
 //------------------------------------------------------------------------------
 
@@ -2358,6 +2402,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function QuadraticBezier(const a,b,c: TPointD; t: double): TPointD;
+var
+  omt: double;
+begin
+  if t > 1 then t := 1
+  else if t < 0 then t := 0;
+  omt := 1 - t;
+  Result.X := a.X*omt*omt + b.X*2*omt*t + c.X*t*t;
+  Result.Y := a.Y*omt*omt + b.Y*2*omt*t + c.Y*t*t;
+end;
+//------------------------------------------------------------------------------
+
 function FlattenQBezier(const pts: TPathsD): TPathsD;
 var
   i, len: integer;
@@ -2444,6 +2500,18 @@ begin
   end else
     DoCurve(pt1, pt2, pt3);
   SetLength(result, resultCnt);
+end;
+//------------------------------------------------------------------------------
+
+function CubicBezier(const a,b,c,d: TPointD; t: double): TPointD;
+var
+  omt: double;
+begin
+  if t > 1 then t := 1
+  else if t < 0 then t := 0;
+  omt := 1 - t;
+  Result.X := a.X*omt*omt*omt +b.X*3*omt*omt*t +c.X*3*omt*t*t +d.X*t*t*t;
+  Result.Y := a.Y*omt*omt*omt +b.Y*3*omt*omt*t +c.Y*3*omt*t*t +d.Y*t*t*t;
 end;
 //------------------------------------------------------------------------------
 

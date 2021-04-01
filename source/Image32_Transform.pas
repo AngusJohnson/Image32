@@ -625,6 +625,7 @@ function SplineVertTransform(img: TImage32; const topSpline: TPathD;
 var
   i,j, w,h, len: integer;
   y, q: double;
+  distances: TArrayOfDouble;
   pc: PColor32;
   rec: TRect;
   tmp: TArrayOfColor32;
@@ -659,7 +660,9 @@ begin
   prevX := topPath[0].X;
   allowBackColoring := (backColor shr 24) > 2;
   backColor := backColor and $00FFFFFF;
-  q := img.Width * 256 /len;
+
+  distances := GetCumulativeDistances(topPath);
+  q := img.Width * 256 / distances[High(distances)];;
   for i := 0 to len -1 do
   begin
     pc := @tmp[Round(topPath[i].X)-rec.Left];
@@ -671,10 +674,10 @@ begin
       if (j > y-1.0) and (j < y + img.Height) then
         if backColoring then
           pc^ := BlendToAlpha(pc^,
-            ReColor(resampler(img, Round(i*q) ,Round((j - y)*256)), backColor))
+            ReColor(resampler(img, Round(Distances[i]*q) ,Round((j - y)*256)), backColor))
         else
           pc^ := BlendToAlpha(pc^,
-            resampler(img, Round(i*q) ,Round((j - y)*256)));
+            resampler(img, Round(Distances[i]*q) ,Round((j - y)*256)));
       inc(pc, w);
     end;
   end;
@@ -686,7 +689,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
 function SplineHorzTransform(img: TImage32; const leftSpline: TPathD;
   splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
   out offset: TPoint): Boolean;
@@ -694,6 +696,7 @@ var
   i,j, len, w,h: integer;
   x, q, prevY: double;
   leftPath: TPathD;
+  distances: TArrayOfDouble;
   rec: TRect;
   pc: PColor32;
   tmp: TArrayOfColor32;
@@ -727,7 +730,9 @@ begin
   prevY := leftPath[0].Y;
   allowBackColoring := (backColor shr 24) > 2;
   backColor :=   backColor and $00FFFFFF;
-  q := img.Height * 256 /len;
+
+  distances := GetCumulativeDistances(leftPath);
+  q := img.Height * 256 / distances[High(distances)];;
   for i := 0 to len -1 do
   begin
     pc := @tmp[Round(leftPath[i].Y - rec.Top) * w];
@@ -739,10 +744,10 @@ begin
       if (j > x-1.0) and (j < x + img.Width) then
         if backColoring then
           pc^ := BlendToAlpha(pc^,
-            ReColor(resampler(img, Round((j - x) *256), Round(i*q)), backColor))
+            ReColor(resampler(img, Round((j - x) *256), Round(Distances[i]*q)), backColor))
         else
           pc^ := BlendToAlpha(pc^,
-            resampler(img, Round((j - x) *256), Round(i*q)));
+            resampler(img, Round((j - x) *256), Round(Distances[i]*q)));
       inc(pc);
     end;
   end;
