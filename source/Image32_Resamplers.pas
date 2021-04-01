@@ -55,47 +55,54 @@ end;
 
 function BilinearResample(img: TImage32; x256, y256: Integer): TColor32;
 var
-  xi, yi, weight: Integer;
-  width, height: integer;
+  xi,yi, weight: Integer;
+  iw, ih: integer;
   pixels: TArrayOfColor32;
   color: TWeightedColor;
   xf, yf: cardinal;
 begin
-  width := img.Width; height := img.Height;
+  iw := img.Width;
+  ih := img.Height;
   pixels := img.Pixels;
-  //coordinate integers (can be negative) -> x256 div 256 & y256 div 256.
-  //coordinate fractions ->  (x256 and $FF) / 256 & (y256 and $FF) / 256
-  if (x256 < -$FF) or (y256 < -$FF) or
-    (x256 >= width * $100) or (y256 >= height * $100) then
+
+  if (x256 <= -$100) or (x256 >= iw *$100) or
+     (y256 <= -$100) or (y256 >= ih *$100) then
   begin
     result := clNone32;
     Exit;
   end;
-  xi := abs(x256) shr 8;
+
+  if x256 < 0 then xi := -1
+  else xi := x256 shr 8;
+
+  if y256 < 0 then yi := -1
+  else yi := y256 shr 8;
+
   xf := x256 and $FF;
-  yi := abs(y256) shr 8;
   yf := y256 and $FF;
 
   color.Reset;
-  weight := (($100 - xf) * ($100 - yf)) shr 8;         //top-left
-  if (x256 < 0) or (y256 < 0) then
-    color.AddWeight(weight) else
-    color.Add(pixels[xi + yi * width], weight);
 
-  weight := (xf * ($100 - yf)) shr 8;                  //top-right
-  if (xi + 1 >= width) or (y256 < 0) then
+  weight := (($100 - xf) * ($100 - yf)) shr 8;        //top-left
+  if (xi < 0) or (yi < 0) then
     color.AddWeight(weight) else
-    color.Add(pixels[xi + 1 + yi * width], weight);
+    color.Add(pixels[xi + yi * iw], weight);
 
-  weight := (($100 - xf) * yf) shr 8;                  //bottom-left
-  if (x256 < 0) or (yi + 1 = height) then
+  weight := (xf * ($100 - yf)) shr 8;                 //top-right
+  if ((xi+1) >= iw) or (yi < 0) then
     color.AddWeight(weight) else
-    color.Add(pixels[xi + (yi +1) * width], weight);
+    color.Add(pixels[(xi+1) + yi * iw], weight);
 
-  weight := (xf * yf) shr 8;                           //bottom-right
-  if (xi + 1 >= width) or (yi + 1 = height) then
+  weight := (($100 - xf) * yf) shr 8;                 //bottom-left
+  if (xi < 0) or ((yi+1) >= ih) then
     color.AddWeight(weight) else
-    color.Add(pixels[(xi + 1)  + (yi + 1) * width], weight);
+    color.Add(pixels[(xi) + (yi+1) * iw], weight);
+
+  weight := (xf * yf) shr 8;                          //bottom-right
+  if (xi + 1 >= iw) or (yi + 1 >= ih) then
+    color.AddWeight(weight) else
+    color.Add(pixels[(xi+1) + (yi+1) * iw], weight);
+
   Result := color.Color;
 end;
 
@@ -226,8 +233,7 @@ function BicubicResample(img: TImage32; x256, y256: Integer): TColor32;
 var
   i, dx,dy, pi, iw, w,h: Integer;
   c: array[0..3] of TColor32;
-  x: Integer;
-  y: Integer;
+  x, y: Integer;
   bceX, bceY: TBiCubicEdgeAdjust;
 begin
   Result := clNone32;

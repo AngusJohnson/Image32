@@ -151,12 +151,12 @@ type
     procedure Scale(sx, sy: double); overload;
 
     function Copy(src: TImage32; srcRec, dstRec: TRect): Boolean;
-    //CopyBlend: Copies part or all of another image (src).
-    //If no blend function is provided, then the pixels in src's srcRec
-    //simply replace whatever is in 'dstRec' exactly as in the Copy function
-    //above. When a blend function is provided, that functions determines how
-    //the image from src will be blended with the current image. The image
-    //from src's srcRec will also be stretched if necessary to fit into dstRec.
+    //CopyBlend: Copies part or all of another image (src) on top of the
+    //existing image. If no blend function is provided, then the function
+    //will behave exactly as the Copy function above. However, when a blend
+    //function is specified, that function will determine how the images will
+    //be blended. If srcRec and dstRec have different widths or heights,
+    //then the image in srcRec will also be stretched to fit dstRec.
     function CopyBlend(src: TImage32; srcRec, dstRec: TRect;
       blendFunc: TBlendFunction = nil): Boolean;
 

@@ -14,6 +14,7 @@ Recent changes:
 
 Version 2.22
   Image32_Resamplers
+    Fixed minor bug in BilinearResampler
     Fixed minor transparency bug in BicubicResampler
   Image32Panels
 	Minor update
