@@ -12,12 +12,27 @@ Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
+Version 2.23 (preliminary)
+  Image32_SVG_Reader
+	New unit added (beta - and still much to do)
+  Image32_Transform
+    Changed MatrixSkew parameters
+	Added ImageScaleDown procedure
+  Image32_Vector
+    Added UseDynamicTolerances variable (default = true)
+	  for flattening bezier curves and all rounding
+  Image32Panels
+    Renamed CenterImagePoint function to GetImageCenter
+  Examples
+    Added a new SVG example app.
+	
 Version 2.22
   Image32_Resamplers
     Fixed minor bug in BilinearResampler
     Fixed minor transparency bug in BicubicResampler
-	Minor updates to SplineHorzTransform and 
-	  SplineVertTransform functions
+  Image32_Transform
+    Minor updates to SplineHorzTransform and 
+      SplineVertTransform functions
   Image32Panels
 	Minor update
   Image32
@@ -36,24 +51,24 @@ Version 2.20
   Image32_Resamplers
     New library unit added containing 3 resampler functions
       NearestResampler  - draft quality, fast
-	  BilinearResampler - high quality , average speed (default)
-	  BicubicResampler  - best quality , slow
+      BilinearResampler - high quality , average speed (default)
+      BicubicResampler  - best quality , slow
   Image32
     DefaultResampler variable added
     RegisterResampler function added
     TImage32.AntiAliased property removed and replaced with a new 
-	  Resampler property (defaults to DefaultResampler)
+      Resampler property (defaults to DefaultResampler)
   Image32_Layers
     TLayeredImage32.AntiAliased property removed and replaced
 	  with a new Resampler property
-	Fixed broken layer opacity and other minor bugs
-	CreateRotatingButtonGroup parameters changed
+    Fixed broken layer opacity and other minor bugs
+    CreateRotatingButtonGroup parameters changed
   Image32_Transform
     Transform functions will now use the resampler associated 
 	with  the image being transformed
   Image32_Ttf
     TGlyphCache.GetTextGlyphs function result changed
-	TGlyphCache.GetAngledTextGlyphs function result changed
+    TGlyphCache.GetAngledTextGlyphs function result changed
   Image32_Vector
     JoinPath procedure renamed AppendPath
   Image32Panels
@@ -61,14 +76,14 @@ Version 2.20
 
 Version 2.19
   Image32_Layers
-	Added AntiAliased property to TLayeredImage32
-	Renamed TGroupLayer32.OnMerge property to OnBeforeMerge
-	Added TGroupLayer32.OnAfterMerge property
-	Added THitTestLayer32.ClearHitTesting method
-	Minor tidy up.
+    Added AntiAliased property to TLayeredImage32
+    Renamed TGroupLayer32.OnMerge property to OnBeforeMerge
+    Added TGroupLayer32.OnAfterMerge property
+    Added THitTestLayer32.ClearHitTesting method
+    Minor tidy up.
   Image32_Transform
-    Transforms can now have antialiasing disabled
-	Added AffineTransformImageRaw procedure
+    Transforms can now have antialiasing disabled    
+    Added AffineTransformImageRaw procedure
   Image32_Extra
     Added ResizeAndCenterImgForRotation procedure 
   Added Image32Panels
@@ -76,10 +91,10 @@ Version 2.19
 	
 Version 2.18
   Image32_Layers
-	Refactored and improved TRotateLayer32
-	Improved TRotatingGroupLayer32
+    Refactored and improved TRotateLayer32
+    Improved TRotatingGroupLayer32
   Examples
-	Updated Layers201 example app.
+    Updated Layers201 example app.
   Other minor tweaks.
 
 Version 2.17

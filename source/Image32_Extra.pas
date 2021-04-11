@@ -120,11 +120,6 @@ function GetFloodFillMask(img: TImage32; x, y: Integer;
   compareFunc: TCompareFunction; tolerance: Integer): TArrayOfByte;
 
 procedure SymmetricCropTransparent(img: TImage32);
-//ResizeCenterImageForRotation: accommodate inplace rotation (without
-//image resizing), making it easy to rotate about the image's midpoint
-//without causing image wobble.
-procedure ResizeAndCenterImgForRotation(image: TImage32);
-
 
 //3 additional blend functions (see TImage32.CopyBlend)
 function BlendAverage(bgColor, fgColor: TColor32): TColor32;
@@ -132,6 +127,9 @@ function BlendLinearBurn(bgColor, fgColor: TColor32): TColor32;
 function BlendColorDodge(bgColor, fgColor: TColor32): TColor32;
 
 implementation
+
+uses
+  Image32_Transform;
 
 const
   FloodFillDefaultRGBTolerance: byte = 20;
@@ -536,7 +534,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-//HatchBackground: Assumes the current image is semi-transparent.
 procedure HatchBackground(img: TImage32;
   color1: TColor32; color2: TColor32; hatchSize: Integer);
 var
@@ -1979,28 +1976,5 @@ begin
   rec := GetSymmetricCropTransparentRect(img);
   if (rec.Top > 0) or (rec.Left > 0) then img.Crop(rec);
 end;
-//------------------------------------------------------------------------------
-
-procedure ResizeAndCenterImgForRotation(image: TImage32);
-var
-  i, radius, w,h, dx,dy: integer;
-  rec: TRect;
-  tmpImg: TImage32;
-begin
-  tmpImg := TImage32.Create(image);
-  try
-    SymmetricCropTransparent(tmpImg);
-    radius := Ceil(Distance(NullPointD, tmpImg.MidPoint));
-    rec := Rect(0,0,radius *2, radius *2);
-    image.SetSize(RectWidth(rec), RectHeight(rec)); //covers all rotations
-    dx := (image.Width - tmpImg.Width) div 2;
-    dy := (image.Height - tmpImg.Height) div 2;
-    rec := RectWH(dx, dy, tmpImg.Width, tmpImg.Height);
-    image.Copy(tmpImg, tmpImg.Bounds, rec);
-  finally
-    tmpImg.Free;
-  end;
-end;
-//------------------------------------------------------------------------------
 
 end.

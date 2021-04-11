@@ -113,8 +113,7 @@ type
     function IsScaledToFit: Boolean;
     function ClientToImage(const clientPt: TPoint): TPoint;
     function ImageToClient(const surfacePt: TPoint): TPoint;
-
-    function CenterImagePoint(const imagePt: TPoint): Boolean;
+    function GetImageCenter(const imagePt: TPoint): Boolean;
 
     property InnerClientRect: TRect read GetInnerClientRect;
     property InnerMargin: integer read GetInnerMargin;
@@ -672,7 +671,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TBaseImgPanel.CenterImagePoint(const imagePt: TPoint): Boolean;
+function TBaseImgPanel.GetImageCenter(const imagePt: TPoint): Boolean;
 var
   scaledW, scaledH: Double;
   marg, innerW, innerH: Integer;
@@ -1231,6 +1230,7 @@ constructor TImage32Panel.Create(AOwner: TComponent);
 begin
   inherited;
   fImage := TNotifyImage32.Create(Self);
+  fImage.Resampler := rBicubicResampler;
   fImage.SetSize(200,200);
   fAllowCopyPaste := true;
 end;

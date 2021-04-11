@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.16                                                            *
-* Date      :  18 March 2021                                                   *
+* Version   :  2.23                                                            *
+* Date      :  12 April 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -44,8 +44,8 @@ type
   function Star(const focalPt: TPointD;
     innerRadius, outerRadius: double; points: integer): TPathD;
 
-  function Arc(const rec: TRect; startAngle, endAngle: double): TPathD;
-  function Pie(const rec: TRect; StartAngle, EndAngle: double): TPathD;
+  function Arc(const rec: TRectD; startAngle, endAngle: double): TPathD;
+  function Pie(const rec: TRectD; StartAngle, EndAngle: double): TPathD;
 
   function QuadraticBezier(const a,b,c: TPointD; t: double): TPointD;
   function FlattenQBezier(const pt1, pt2, pt3: TPointD): TPathD; overload;
@@ -98,6 +98,9 @@ type
     dx, dy: double): TArrayOfPathsD; overload;
 
   function Paths(const path: TPathD): TPathsD;
+  {$IFDEF INLINING} inline; {$ENDIF}
+  function CopyPath(const path: TPathD): TPathD;
+  {$IFDEF INLINING} inline; {$ENDIF}
   function CopyPaths(const paths: TPathsD): TPathsD;
 
   function ScalePath(const path: TPathD;
@@ -169,6 +172,11 @@ type
   function RectsEqual(const rec1, rec2: TRect): Boolean;
   procedure OffsetRect(var rec: TRect; dx, dy: integer); overload;
   procedure OffsetRect(var rec: TRectD; dx, dy: double); overload;
+
+  function IsValid(value: integer): Boolean; overload;
+  function IsValid(value: double): Boolean; overload;
+  function IsValid(const pt: TPoint): Boolean; overload;
+  function IsValid(const pt: TPointD): Boolean; overload;
 
   function Point(X,Y: Integer): TPoint; overload;
   function Point(const pt: TPointD): TPoint; overload;
@@ -269,6 +277,8 @@ type
   function ValueAlmostOne(val: double; epsilon: double = 0.001): Boolean;
 
 const
+  Invalid       : integer = -MaxInt;
+  InvalidD      : double = -Infinity;
   NullPoint     : TPoint  = (X: 0; Y: 0);
   NullPointD    : TPointD = (X: 0; Y: 0);
   InvalidPoint  : TPoint  = (X: -MaxInt; Y: -MaxInt);
@@ -290,6 +300,11 @@ var
   //Miter limit avoids excessive spikes when line offsetting
   DefaultMiterLimit: double = 2.0;
 
+  CBezierTolerance: double  = 0.25;
+  QBezierTolerance: double  = 0.25;
+  ArcTolerance    : double  = 0.25;
+  UseDynamicTolerances: Boolean = true;
+
 resourcestring
   rsInvalidMatrix = 'Invalid matrix.'; //nb: always start with IdentityMatrix
 
@@ -300,10 +315,7 @@ resourcestring
   rsInvalidCBezier = 'Invalid number of control points for a CBezier';
 
 const
-  CBezierTolerance  = 0.5;
-  QBezierTolerance  = 0.5;
-  BuffSize          = 64;
-
+  BuffSize = 64;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -312,6 +324,30 @@ function RectsEqual(const rec1, rec2: TRect): Boolean;
 begin
   result := (rec1.Left = rec2.Left) and (rec1.Top = rec2.Top) and
     (rec1.Right = rec2.Right) and (rec1.Bottom = rec2.Bottom);
+end;
+//------------------------------------------------------------------------------
+
+function IsValid(value: integer): Boolean;
+begin
+  Result := value <> -MaxInt;
+end;
+//------------------------------------------------------------------------------
+
+function IsValid(value: double): Boolean;
+begin
+  Result := value <> -Infinity;
+end;
+//------------------------------------------------------------------------------
+
+function IsValid(const pt: TPoint): Boolean;
+begin
+  result := pt.X <> -MaxInt;
+end;
+//------------------------------------------------------------------------------
+
+function IsValid(const pt: TPointD): Boolean;
+begin
+  result := pt.X <> -Infinity;
 end;
 //------------------------------------------------------------------------------
 
@@ -733,6 +769,13 @@ begin
   result[0] := Copy(path, 0, length(path));
 end;
 //------------------------------------------------------------------------------
+
+function CopyPath(const path: TPathD): TPathD;
+begin
+  Result := Copy(path, 0, Length(path));
+end;
+//------------------------------------------------------------------------------
+
 
 function CopyPaths(const paths: TPathsD): TPathsD;
 var
@@ -1405,7 +1448,10 @@ begin
 
   if joinStyle = jsRound then
   begin
-    steps360 := PI / ArcCos(1 - 0.2 / abs(delta));
+    if abs(delta) < ArcTolerance then Exit;
+    if UseDynamicTolerances then
+      steps360 := Pi * 20 else //20 = 1/ArcCos(1-0.00125)
+      steps360 := Pi / ArcCos(1 - ArcTolerance / abs(delta));
     stepsPerRad := steps360 / (Pi *2);
     GetSinCos(Pi*2/steps360, stepSin, stepCos);
   end;
@@ -1963,7 +2009,13 @@ begin
   if f < 0.5 then Exit;
 
   if steps < 3 then
-    steps := Max(3, Trunc(Pi / (ArcCos(1 - 0.2 /f ))));
+  begin
+    if f < ArcTolerance then Exit;
+    if UseDynamicTolerances then
+      steps := Trunc(Pi * 20) else //20 = 1/ArcCos(1-0.00125)
+      steps := Trunc(Pi / ArcCos(1 - ArcTolerance/f));
+    if steps < 3 then steps := 3;
+  end;
   GetSinCos(2 * Pi / Steps, sinA, cosA);
   delta.x := cosA; delta.y := sinA;
 
@@ -2008,7 +2060,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Arc(const rec: TRect; startAngle, endAngle: double): TPathD;
+function Arc(const rec: TRectD; startAngle, endAngle: double): TPathD;
 var
   i, steps: Integer;
   angle, radiusAvg: double;
@@ -2025,15 +2077,21 @@ begin
     endAngle := -endAngle;
   end;
 
-  centre := PointD((rec.left+rec.right)/2, (rec.top+rec.bottom)/2);
-  radius := PointD(RectWidth(rec)/2, RectHeight(rec)/2);
+  NormalizeAngle(startAngle);
+  NormalizeAngle(endAngle);
+
+  centre := rec.MidPoint;
+  radius := PointD(rec.Width/2, rec.Height/2);
   radiusAvg := (radius.X + radius.Y)/2;
   if endAngle < startAngle then
     angle := endAngle - startAngle + angle360 else
     angle := endAngle - startAngle;
   //steps = (No. steps for a whole ellipse) * angle/(2*Pi)
-  steps := Max(2, Trunc(Pi/ArcCos(1 - 0.2/radiusAvg) * angle /(2*Pi) ));
-
+  if radiusAvg < ArcTolerance then Exit;
+  if UseDynamicTolerances then
+    steps := Trunc(Pi *20 * angle/(2*Pi)) else //20 = 1/ArcCos(1-0.00125)
+    steps := Trunc(Pi/ArcCos(1 - ArcTolerance/radiusAvg) * angle/(2*Pi));
+  if steps < 2 then steps := 2;
   SetLength(Result, Steps +1);
   //angle of the first step ...
   GetSinCos(startAngle, deltaY, deltaX);
@@ -2052,7 +2110,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Pie(const rec: TRect; StartAngle, EndAngle: double): TPathD;
+function Pie(const rec: TRectD; StartAngle, EndAngle: double): TPathD;
 var
   len: integer;
 begin
@@ -2456,6 +2514,8 @@ end;
 function FlattenQBezier(const pt1, pt2, pt3: TPointD): TPathD;
 var
   resultCnt, resultLen: integer;
+  tolerance: double;
+  rec: TRectD;
 
   procedure AddPoint(const pt: TPointD);
   begin
@@ -2473,8 +2533,7 @@ var
     p12, p23, p123: TPointD;
   begin
     if (abs(p1.x + p3.x - 2 * p2.x) +
-      abs(p1.y + p3.y - 2 * p2.y) <
-      QBezierTolerance) then //assessing curve 'flatness'
+      abs(p1.y + p3.y - 2 * p2.y) < tolerance) then
     begin
       AddPoint(p3);
     end else
@@ -2492,6 +2551,13 @@ var
 
 begin
   resultLen := 0; resultCnt := 0;
+  if UseDynamicTolerances then
+  begin
+    rec := GetBoundsD(MakePathD([pt1.X, pt1.Y, pt2.X, pt2.Y, pt3.X, pt3.Y]));
+    tolerance := (rec.Width + rec.Height) * 0.01;
+  end else
+    tolerance := QBezierTolerance;
+
   AddPoint(pt1);
   if ((pt1.X = pt2.X) and (pt1.Y = pt2.Y)) or
     ((pt2.X = pt3.X) and (pt2.Y = pt3.Y)) then
@@ -2557,6 +2623,8 @@ end;
 function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD): TPathD;
 var
   resultCnt, resultLen: integer;
+  tolerance: double;
+  rec: TRectD;
 
   procedure AddPoint(const pt: TPointD);
   begin
@@ -2574,8 +2642,7 @@ var
     p12, p23, p34, p123, p234, p1234: TPointD;
   begin
     if (abs(p1.x + p3.x - 2*p2.x) + abs(p2.x + p4.x - 2*p3.x) +
-      abs(p1.y + p3.y - 2*p2.y) + abs(p2.y + p4.y - 2*p3.y)) <
-        CBezierTolerance then
+      abs(p1.y + p3.y - 2*p2.y) + abs(p2.y + p4.y - 2*p3.y)) < tolerance then
     begin
       if resultCnt = length(result) then
         setLength(result, length(result) +BuffSize);
@@ -2603,6 +2670,14 @@ var
 begin
   result := nil;
   resultLen := 0; resultCnt := 0;
+  if UseDynamicTolerances then
+  begin
+    rec := GetBoundsD(MakePathD([pt1.X, pt1.Y,
+      pt2.X, pt2.Y, pt3.X, pt3.Y, pt4.X, pt4.Y]));
+    tolerance := (rec.Width + rec.Height) * 0.01;
+  end else
+    tolerance := CBezierTolerance;
+
   AddPoint(pt1);
   if (pt1.X = pt2.X) and (pt1.Y = pt2.Y) and
     (pt3.X = pt4.X) and (pt3.Y = pt4.Y) then
@@ -2624,6 +2699,7 @@ end;
 function FlattenCSpline(const pts: TPathD): TPathD;
 var
   resultCnt, resultLen: integer;
+  tolerance: double;
 
   procedure AddPoint(const pt: TPointD);
   begin
@@ -2641,8 +2717,7 @@ var
     p12, p23, p34, p123, p234, p1234: TPointD;
   begin
     if (abs(p1.x + p3.x - 2*p2.x) + abs(p2.x + p4.x - 2*p3.x) +
-      abs(p1.y + p3.y - 2*p2.y) + abs(p2.y + p4.y - 2*p3.y)) <
-        CBezierTolerance then
+      abs(p1.y + p3.y - 2*p2.y) + abs(p2.y + p4.y - 2*p3.y)) < tolerance then
     begin
       if resultCnt = length(result) then
         setLength(result, length(result) +BuffSize);
@@ -2671,10 +2746,20 @@ var
   i, len: integer;
   p: PPointD;
   pt1,pt2,pt3,pt4: TPointD;
+  rec: TRectD;
 begin
   result := nil;
   len := Length(pts); resultLen := 0; resultCnt := 0;
   if (len < 4) then Exit;
+
+  if UseDynamicTolerances then
+  begin
+    rec := GetBoundsD(MakePathD([pt1.X, pt1.Y,
+      pt2.X, pt2.Y, pt3.X, pt3.Y, pt4.X, pt4.Y]));
+    tolerance := (rec.Width + rec.Height) * 0.01;
+  end else
+    tolerance := CBezierTolerance;
+
   //ignore incomplete trailing control points
   if Odd(len) then dec(len);
   p := @pts[0];
@@ -2696,6 +2781,7 @@ end;
 function FlattenQSpline(const pts: TPathD): TPathD;
 var
   resultCnt, resultLen: integer;
+  tolerance: double;
 
   procedure AddPoint(const pt: TPointD);
   begin
@@ -2713,8 +2799,7 @@ var
     p12, p23, p123: TPointD;
   begin
     if (abs(p1.x + p3.x - 2 * p2.x) +
-      abs(p1.y + p3.y - 2 * p2.y) <
-      QBezierTolerance) then //assessing curve 'flatness'
+      abs(p1.y + p3.y - 2 * p2.y) < tolerance) then
     begin
       AddPoint(p3);
     end else
@@ -2734,10 +2819,20 @@ var
   i, len: integer;
   p: PPointD;
   pt1, pt2, pt3: TPointD;
+  rec: TRectD;
 begin
   result := nil;
   len := Length(pts); resultLen := 0; resultCnt := 0;
   if (len < 3) then Exit;
+
+  if UseDynamicTolerances then
+  begin
+    rec := GetBoundsD(MakePathD([pt1.X, pt1.Y,
+      pt2.X, pt2.Y, pt3.X, pt3.Y]));
+    tolerance := (rec.Width + rec.Height) * 0.01;
+  end else
+    tolerance := QBezierTolerance;
+
   p := @pts[0];
   AddPoint(p^);
   pt1 := p^; inc(p);

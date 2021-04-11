@@ -2,8 +2,8 @@
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.21                                                            *
-* Date      :  29 March 2021                                                   *
+* Version   :  2.23                                                            *
+* Date      :  12 April 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -19,6 +19,7 @@ uses
   Image32, Image32_Vector;
 
 type
+  PMatrixD = ^TMatrixD;
   TMatrixD = array [0..2, 0..2] of double;
 
   //Matrix functions
@@ -42,7 +43,7 @@ type
   //fraction of its Y coordinate, and likewise for dy. For example, if dx = 0.1
   //and dy = 0, and the matrix is applied to the coordinate [20,15], then the
   //transformed coordinate will become [20 + (15 * 0.1),10], ie [21.5,10].
-  procedure MatrixSkew(var matrix: TMatrixD; dx, dy: double);
+  procedure MatrixSkew(var matrix: TMatrixD; angleX, angleY: double);
   procedure MatrixScale(var matrix: TMatrixD; scale: double); overload;
   procedure MatrixScale(var matrix: TMatrixD; scaleX, scaleY: double); overload;
   procedure MatrixRotate(var matrix: TMatrixD;
@@ -65,6 +66,36 @@ type
   function SplineHorzTransform(img: TImage32; const leftSpline: TPathD;
     splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
     out offset: TPoint): Boolean;
+
+  //ImageScaleDown: uses a box down-sampling algorithm that's probably better
+  //than any other single resampling algorithm when scaling images down by
+  //more than 50%. With significant down-sampling, algorithms such as Bilinear
+  //and Bicubic lose too much detail, whereas this algorithm tends to lose
+  //contrast. For optimal downsizing results, the user will need to combine
+  //algorithms (eg by averaging the results of this and the Bicubic resampling
+  //function) and after that applying a sharpening filter.
+  procedure ImageScaleDown(Image: TImage32; newWidth, newHeight: Integer);
+
+
+type
+  PWeightedColor = ^TWeightedColor;
+  TWeightedColor = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
+  private
+    fAddCount : Integer;
+    fAlphaTot : Int64;
+    fColorTotR: Int64;
+    fColorTotG: Int64;
+    fColorTotB: Int64;
+    function GetColor: TColor32;
+  public
+    procedure Reset;
+    procedure Add(c: TColor32; weight: Integer);
+    procedure Subtract(c: TColor32; weight: Integer);
+    procedure AddWeight(weight: Integer); //ie add clNone32
+    property AddCount: Integer read fAddCount;
+    property Color: TColor32 read GetColor;
+  end;
+  TArrayOfWeightedColor = array of TWeightedColor;
 
 const
   IdentityMatrix: TMatrixD = ((1, 0, 0),(0, 1, 0),(0, 0, 1));
@@ -186,7 +217,9 @@ var
   tmpX: double;
   pp: PPointD;
 begin
-  if IsIdentityMatrix(matrix) then Exit;
+  if not Assigned(paths) or IsIdentityMatrix(matrix) then
+    Exit;
+
   for i := 0 to High(paths) do
   begin
     len := Length(paths[i]);
@@ -207,8 +240,6 @@ function MatrixMultiply(const modifier, matrix: TMatrixD): TMatrixD;
 var
   i, j: Integer;
 begin
-//  if (modifier[2][2] <> 1) or (matrix[2][2] <> 1) then
-//    raise Exception.Create(rsInvalidMatrix);
   for i := 0 to 2 do
     for j := 0 to 2 do
       Result[i, j] :=
@@ -248,11 +279,12 @@ var
 begin
   NormalizeAngle(angRad);
   if angRad = 0 then Exit;
-  if not ClockwiseRotationIsAnglePositive then angRad := -angRad;
+  if ClockwiseRotationIsAnglePositive then
+    angRad := -angRad; //negated angle because of inverted Y-axis.
   m := IdentityMatrix;
   origOffset := (center.X <> 0) or (center.Y <> 0);
   if origOffset then MatrixTranslate(matrix, -center.X, -center.Y);
-  GetSinCos(-angRad, sinA, cosA); //negated angle because of inverted Y-axis.
+  GetSinCos(angRad, sinA, cosA);
   m := IdentityMatrix;
   m[0, 0] := cosA;   m[1, 0] := sinA;
   m[0, 1] := -sinA;  m[1, 1] := cosA;
@@ -299,14 +331,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure MatrixSkew(var matrix: TMatrixD; dx, dy: double);
+procedure MatrixSkew(var matrix: TMatrixD; angleX, angleY: double);
 var
   m: TMatrixD;
 begin
-  if ValueAlmostZero(dx) and ValueAlmostZero(dy) then Exit;
+  if ValueAlmostZero(angleX) and ValueAlmostZero(angleY) then Exit;
   m := IdentityMatrix;
-  m[1, 0] := dx;
-  m[0, 1] := dy;
+  m[1, 0] := tan(angleX);
+  m[0, 1] := tan(angleY);
   matrix := MatrixMultiply(m, matrix);
 end;
 
@@ -756,6 +788,185 @@ begin
   img.SetSize(w,h);
   Move(tmp[0], img.Pixels[0], img.Width * img.Height * SizeOf(TColor32));
   img.EndUpdate;
+end;
+
+//------------------------------------------------------------------------------
+// TWeightedColor
+//------------------------------------------------------------------------------
+
+procedure TWeightedColor.Reset;
+begin
+  fAddCount := 0;
+  fAlphaTot := 0;
+  fColorTotR := 0;
+  fColorTotG := 0;
+  fColorTotB := 0;
+end;
+//------------------------------------------------------------------------------
+
+procedure TWeightedColor.AddWeight(weight: Integer);
+begin
+  inc(fAddCount, weight);
+end;
+//------------------------------------------------------------------------------
+
+procedure TWeightedColor.Add(c: TColor32; weight: Integer);
+var
+  a: Integer;
+  argb: TARGB absolute c;
+begin
+  inc(fAddCount, weight);
+  a := weight * argb.A;
+  if a = 0 then Exit;
+  inc(fAlphaTot, a);
+  inc(fColorTotB, (a * argb.B));
+  inc(fColorTotG, (a * argb.G));
+  inc(fColorTotR, (a * argb.R));
+end;
+//------------------------------------------------------------------------------
+
+procedure TWeightedColor.Subtract(c: TColor32; weight: Integer);
+var
+  a: Integer;
+  argb: TARGB absolute c;
+begin
+  dec(fAddCount, weight);
+  a := weight * argb.A;
+  if a = 0 then Exit;
+  dec(fAlphaTot, a);
+  dec(fColorTotB, (a * argb.B));
+  dec(fColorTotG, (a * argb.G));
+  dec(fColorTotR, (a * argb.R));
+end;
+//------------------------------------------------------------------------------
+
+function DivRound(num, denom: Integer): Byte;
+begin
+  result := ClampByte((num  + (denom div 2)) div denom);
+end;
+//------------------------------------------------------------------------------
+
+function TWeightedColor.GetColor: TColor32;
+var
+  a: byte;
+  halfAlphaTot: Integer;
+  argb: TARGB absolute result;
+begin
+  result := clNone32;
+  if (fAlphaTot <= 0) or (fAddCount <= 0) then Exit;
+  a := DivRound(fAlphaTot, fAddCount);
+  if (a = 0) then Exit;
+  argb.A := a;
+  halfAlphaTot := fAlphaTot div 2;
+  //nb: alpha weighting is applied to colors when added
+  //so we now need to div by fAlphaTot (with rounding) here ...
+  argb.R := ClampByte((fColorTotR + halfAlphaTot) div fAlphaTot);
+  argb.G := ClampByte((fColorTotG + halfAlphaTot) div fAlphaTot);
+  argb.B := ClampByte((fColorTotB + halfAlphaTot) div fAlphaTot);
+end;
+//------------------------------------------------------------------------------
+
+function GetWeightedColor(const srcBits: TArrayOfColor32;
+  x256, y256, xx256, yy256, maxX: Integer): TColor32;
+var
+  i, j, xi, yi, xxi, yyi, weight: Integer;
+  xf, yf, xxf, yyf: cardinal;
+  color: TWeightedColor;
+begin
+  //This function performs 'box sampling' and differs from GetWeightedPixel
+  //(bilinear resampling) in one important aspect - it accommodates weighting
+  //any number of pixels (rather than just adjacent pixels) and this produces
+  //better image quality when significantly downsizing.
+
+  //Note: there's no range checking here, so the precondition is that the
+  //supplied boundary values are within the bounds of the srcBits array.
+
+  color.Reset;
+
+  xi := x256 shr 8; xf := x256 and $FF;
+  yi := y256 shr 8; yf := y256 and $FF;
+  xxi := xx256 shr 8; xxf := xx256 and $FF;
+  yyi := yy256 shr 8; yyf := yy256 and $FF;
+
+  //1. average the corners ...
+  weight := (($100 - xf) * ($100 - yf)) shr 8;
+  color.Add(srcBits[xi + yi * maxX], weight);
+  weight := (xxf * ($100 - yf)) shr 8;
+  if (weight <> 0) then color.Add(srcBits[xxi + yi * maxX], weight);
+  weight := (($100 - xf) * yyf) shr 8;
+  if (weight <> 0) then color.Add(srcBits[xi + yyi * maxX], weight);
+  weight := (xxf * yyf) shr 8;
+  if (weight <> 0) then color.Add(srcBits[xxi + yyi * maxX], weight);
+
+  //2. average the edges
+  if (yi +1 < yyi) then
+  begin
+    xf := $100 - xf;
+    for i := yi + 1 to yyi - 1 do
+      color.Add(srcBits[xi + i * maxX], xf);
+    if (xxf <> 0) then
+      for i := yi + 1 to yyi - 1 do
+        color.Add(srcBits[xxi + i * maxX], xxf);
+  end;
+  if (xi + 1 < xxi) then
+  begin
+    yf := $100 - yf;
+    for i := xi + 1 to xxi - 1 do
+      color.Add(srcBits[i + yi * maxX], yf);
+    if (yyf <> 0) then
+      for i := xi + 1 to xxi - 1 do
+        color.Add(srcBits[i + yyi * maxX], yyf);
+  end;
+
+  //3. average the non-fractional pixel 'internals' ...
+  for i := xi + 1 to xxi - 1 do
+    for j := yi + 1 to yyi - 1 do
+      color.Add(srcBits[i + j * maxX], $100);
+
+  //4. finally get the weighted color ...
+  if color.AddCount = 0 then
+    Result := srcBits[xi + yi * maxX] else
+    Result := color.Color;
+end;
+//------------------------------------------------------------------------------
+
+procedure ImageScaleDown(Image: TImage32; newWidth, newHeight: Integer);
+var
+  x,y, x256,y256,xx256,yy256: Integer;
+  sx,sy: double;
+  tmp: TArrayOfColor32;
+  pc: PColor32;
+  scaledX: array of Integer;
+begin
+  sx := Image.Width/newWidth * 256;
+  sy := Image.Height/newHeight * 256;
+  SetLength(tmp, newWidth * newHeight);
+
+  SetLength(scaledX, newWidth +1); //+1 for fractional overrun
+  for x := 0 to newWidth -1 do
+    scaledX[x] := Round((x+1) * sx);
+
+  y256 := 0;
+  pc := @tmp[0];
+  for y := 0 to newHeight - 1 do
+  begin
+    x256 := 0;
+    yy256 := Round((y+1) * sy);
+    for x := 0 to newWidth - 1 do
+    begin
+      xx256 := scaledX[x];
+      pc^ := GetWeightedColor(Image.Pixels,
+        x256, y256, xx256, yy256, Image.Width);
+      x256 := xx256;
+      inc(pc);
+    end;
+    y256 := yy256;
+  end;
+
+  Image.BeginUpdate;
+  Image.SetSize(newWidth, newHeight);
+  Move(tmp[0], Image.Pixels[0], newWidth * newHeight * SizeOf(TColor32));
+  Image.EndUpdate;
 end;
 //------------------------------------------------------------------------------
 

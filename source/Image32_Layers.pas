@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.20                                                            *
-* Date      :  27 March 2021                                                   *
+* Version   :  2.23                                                            *
+* Date      :  12 April 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Layer support for the Image32 library                           *

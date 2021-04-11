@@ -15,10 +15,12 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Math, Types, Image32, Image32_Vector;
+  SysUtils, Classes, Types;
 
 implementation
 
+uses
+  Image32, Image32_Vector, Image32_Transform;
 
 //------------------------------------------------------------------------------
 // NearestNeighbor resampler
