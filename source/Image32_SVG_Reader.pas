@@ -28,20 +28,20 @@ uses
   Image32, Image32_Vector, Image32_Transform;
 
 type
-
- TShapeType = (stUnknown, stPath, stSingleLine,
-   stPolyline, stPolygon, stCircle, stEllipse, stRectangle);
+ TCustomSvgFiller = class;
 
   PDrawInfo = ^TDrawInfo;
   TDrawInfo = record
   public
     fillColor   : TColor32;
+    fillRule    : TFillRule;
+    filler      : TCustomSvgFiller;
+
     strokeColor : TColor32;
     strokeWidth : double;
     //lineCap  : TEndStyle;     //stroke-linecap
     //lineJoin : TJoinStyle;    //stroke-linejoin
     //miterLim : double;        //stroke-miterlimit
-    fillRule    : TFillRule;
     matrix      : TMatrixD;
     inDefs      : Boolean;
   end;
@@ -60,6 +60,7 @@ type
   end;
   TArrayOfAttrib = array of TAttrib;
 
+  TShapeInfoClass = class of TShapeInfo;
   TShapeInfo = class
   protected
     readPos     : PAnsiChar;
@@ -67,11 +68,11 @@ type
     isClosed    : Boolean;
     path        : TPathD;
     fOwnerEl    : TElement;
-    function Get2Num(out pt: TPointD): Boolean;
+    function GetVal(out val: double): Boolean;
     function GetCount: integer; virtual;
     function GetDrawInfo: TDrawInfo;
   public
-    constructor Create(ownerEl: TElement; isClosed: Boolean); 
+    constructor Create(ownerEl: TElement; isClosed: Boolean);
     procedure LoadFromAttrib(const attrib: TAttrib); virtual;
     procedure LoadFromOwnerElement; virtual;
     function Save: AnsiString; virtual; abstract;
@@ -80,10 +81,9 @@ type
     property Count: integer read GetCount;
     property DrawInfo: TDrawInfo read GetDrawInfo;
   end;
-  TShapeInfoClass = class of TShapeInfo;
-  
+
   TDsegType = (dsMove, dsLine, dsHorz, dsVert, dsArc,
-  dsQBez, dsCBez, dsQSpline, dsCSpline, dsClose);
+    dsQBez, dsCBez, dsQSpline, dsCSpline, dsClose);
 
   PDpathSeg = ^TDpathSeg;
   TDpathSeg = record
@@ -97,7 +97,6 @@ type
     isClosed  : Boolean;
     segs      : array of TDpathSeg;
   end;
-
   TDpaths = array of TDpath;
   
   TDpathInfo = class(TShapeInfo)
@@ -115,7 +114,7 @@ type
     procedure StartNewSeg(segType: TDsegType);
     procedure AddSegValue(val: double);
     procedure AddSegPoint(const pt: TPointD);
-    procedure DoRelativeOffset(var pt: TPointD);
+    function Get2Num(var pt: TPointD; isRelative: Boolean): Boolean;
     procedure Flatten(index: integer;  out path: TPathD; out isClosed: Boolean);
   protected
     function GetCount: integer; override;
@@ -126,7 +125,7 @@ type
       out path: TPathD; out isClosed: Boolean): Boolean;  override;
   end;
 
-  TPolyInfo = class(TShapeInfo)
+  TPolyInfo = class(TShapeInfo) //can be polyline or polygon
   private
     currCap     : integer;
     currCnt     : integer;
@@ -135,7 +134,7 @@ type
     procedure LoadFromAttrib(const attrib: TAttrib); override;
   end;
 
-  TLineInfo = class(TShapeInfo)
+  TSingleLineInfo = class(TShapeInfo)
   public
     procedure LoadFromOwnerElement; override;
   end;
@@ -171,7 +170,7 @@ type
     fShapeInfo      : TShapeInfo;
     function GetChildCount: integer;
     function GetChild(index: integer): TElement;
-    function LoadAttributes(var c: PAnsiChar; 
+    function LoadAttributes(var c: PAnsiChar;
       out hasContent: Boolean): Boolean;
     function LoadElemOrAttribName(var c: PAnsiChar;
       out name: PAnsiChar; out nameLen: integer): Boolean;
@@ -181,7 +180,6 @@ type
     procedure LoadContent(var c: PAnsiChar);
     function GetAttribute(const attribName: AnsiString): PAttrib;
     procedure ProcessAttrib(const attrib: TAttrib);
-    function ElementIs(const name: AnsiString): Boolean;
   protected
      function CreateShapeInfo(shapeClass: TShapeInfoClass; isClosed: Boolean): TShapeInfo;
      property ShapeInfo : TShapeInfo read fShapeInfo;
@@ -196,13 +194,13 @@ type
 
   TSvgReader = class
   private
-    fMemStream   : TMemoryStream;
-    fEndStream   : PAnsiChar;
-    fIdList      : TStringList;
-    fShapesList  : TList;
-    fViewbox     : TRectD;
-    fRootElement : TElement;
-
+    fMemStream     : TMemoryStream;
+    fEndStream     : PAnsiChar;
+    fIdList        : TStringList;
+    fGradientsList : TStringList;
+    fShapesList    : TList;
+    fViewbox       : TRectD;
+    fRootElement   : TElement;
     function GetSvgStart(out svgStart: PAnsiChar): Boolean;
     procedure GetViewBox;
   public
@@ -210,20 +208,38 @@ type
     destructor Destroy; override;
     procedure Clear;
     procedure DrawImage(img: TImage32; scaleToImage: Boolean);
+    function LoadFromStream(stream: TStream): Boolean;
     function LoadFromFile(const filename: string): Boolean;
   end;
 
+ TCustomSvgFiller = class
+ end;
+
+ TSvgColorStop = record
+   color: TColor32;
+   offset: double;
+ end;
+ TSvgColorStops = array of TSvgColorStop;
+
+ TLinearGradientSvgFiller = class(TCustomSvgFiller)
+ public
+   fAttributeNames: array of string;
+   fAttributeValues: array of string;
+ public
+ end;
+
+
+implementation
+
+uses
+  Image32_Draw;
+
+type
   TColorConst = record
-    ColorName : string;
-    ColorValue: Cardinal;
+    ColorName : string; ColorValue: Cardinal;
   end;
 
-  function SvgArc(const p1, p2: TPointD; radii: TPointD;
-    phi_rads: double; fA, fS: boolean;
-    out startAngle, endAngle: double; out rec: TRectD): Boolean;
-
-const 
-
+const
   ColorConsts: array[0..144] of TColorConst = (
     (ColorName: 'aliceblue'; ColorValue: $FFF0F8FF),
     (ColorName: 'antiquewhite'; ColorValue: $FFFAEBD7),
@@ -370,19 +386,13 @@ const
     (ColorName: 'whitesmoke'; ColorValue: $FFF5F5F5),
     (ColorName: 'yellow'; ColorValue: $FFFFFF00),
     (ColorName: 'yellowgreen'; ColorValue: $FF9ACD32));
-     
-implementation
-
-uses
-  Image32_Draw;
-
-const
 
   buffSize = 32;
 
   defaultDrawInfo: TDrawInfo =
-    (fillColor: clBlack32; strokeColor: clNone32; strokeWidth: 1.0;
-    fillRule: frNonZero; matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)));
+    (fillColor: clBlack32; fillRule: frNonZero; filler: nil;
+    strokeColor: clNone32; strokeWidth: 1.0;
+    matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)); inDefs: false);
 
   crcTable:  ARRAY[0..255] OF DWORD =
  ($00000000, $77073096, $EE0E612C, $990951BA, $076DC419, $706AF48F, $E963A535,
@@ -423,11 +433,21 @@ const
   $CDD70693, $54DE5729, $23D967BF, $B3667A2E, $C4614AB8, $5D681B02, $2A6F2B94,
   $B40BBE37, $C30C8EA1, $5A05DF1B, $2D02EF8D);
 
+  circleHash              = $D4B76579;
+  defsHash                = $21B75A24;
+  ellipseHash             = $4C03866A;
+  idHash                  = $BF396750;
+  lineargradientHash      = $54829198;
+  lineHash                = $D114B4F6;
+  polygonHash             = $C7A42112;
+  polylineHash            = $CF285480;
+  rectHash                = $B7D63381;
+  useHash                 = $94B1CC4B;
+
 var
   ColorConstList : TStringList;
   AttribFuncList : TStringList;
   LowerCaseTable : array[#0..#255] of AnsiChar;
-  defsHash       : Cardinal;
 
 //------------------------------------------------------------------------------
 //Miscellaneous functions ...
@@ -444,7 +464,7 @@ begin
 end;
 //--------------------------------------------------------------------------
 
-function CalcCRC32Hash(p: PAnsiChar; length: integer): cardinal;
+function CalcCRC32Hash(p: PAnsiChar; length: integer): cardinal; overload;
 var
   i: integer;
 begin
@@ -456,6 +476,12 @@ begin
     inc(p);
   end;
   result := not result;
+end;
+//--------------------------------------------------------------------------
+
+function CalcCRC32Hash(const s: AnsiString): cardinal; overload;
+begin
+  Result := CalcCRC32Hash(PAnsiChar(s), Length(s));
 end;
 //--------------------------------------------------------------------------
 
@@ -494,7 +520,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function LCaseCompare(p: PAnsiChar; pLen: integer;
+function CompareNames(p: PAnsiChar; pLen: integer;
   p2: PAnsiChar; p2Len: integer): Boolean; overload;
 var
   i: integer;
@@ -514,10 +540,10 @@ end;
 //------------------------------------------------------------------------------
 
 //avoid AnsiString as much as possible as it really slow things down
-function LCaseCompare(const text: AnsiString;
+function CompareNames(const text: AnsiString;
   p: PAnsiChar; pLen: integer): Boolean; overload;
 begin
-  result := LCaseCompare(PAnsiChar(text), Length(text), p, pLen);
+  result := CompareNames(PAnsiChar(text), Length(text), p, pLen);
 end;
 //------------------------------------------------------------------------------
 
@@ -679,24 +705,6 @@ begin
 
     Result := true;
 end;
-//------------------------------------------------------------------------------
-
-function GetShapeType(element: TElement): TShapeType;
-var
-  firstChar: AnsiChar;
-begin
-  Result := stUnknown;
-  firstChar := LowerCaseTable[element.fName[0]];
-  case element.fNameLen of
-    4: if firstChar = 'p' then Result := stPath
-       else if firstChar = 'l' then Result := stSingleLine
-       else if firstChar = 'r' then Result := stRectangle;
-    6: if firstChar = 'c' then Result := stCircle;
-    7: if firstChar = 'e' then Result := stEllipse
-       else if firstChar = 'p' then Result := stPolygon;
-    8: if firstChar = 'p' then Result := stPolyline;
-  end;
-end;
 
 //------------------------------------------------------------------------------
 
@@ -852,7 +860,6 @@ end;
 
 function GetValueLen(var current: PAnsiChar; stop: PAnsiChar): integer;
 var
-  i: integer;
   c: PAnsiChar;
 begin
   Result := 0;
@@ -964,7 +971,7 @@ procedure LoadLine(el: TElement);
 begin
   with el do
   begin
-    fShapeInfo := CreateShapeInfo(TLineInfo, false);
+    fShapeInfo := CreateShapeInfo(TSingleLineInfo, false);
     fShapeInfo.LoadFromOwnerElement;
   end;
 end;
@@ -1037,10 +1044,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TShapeInfo.Get2Num(out pt: TPointD): Boolean;
+function TShapeInfo.GetVal(out val: double): Boolean;
 begin
-  Result := GetNum(readPos, readEnd, true, pt.X) and
-    GetNum(readPos, readEnd, true, pt.Y);
+  Result := GetNum(readPos, readEnd, true, val);
 end;
 //------------------------------------------------------------------------------
 
@@ -1061,11 +1067,9 @@ end;
 function TDpathInfo.GetSegType(out isRelative: Boolean): Boolean;
 var
   c: AnsiChar;
-  oldSegType: TDsegType;
 begin
   Result := false;
   if not SkipBlanks(readPos, readEnd) then Exit;
-  oldSegType := currSegType;
   c := upcase(readPos^);
   result := CharInSet(c, ['A','C','H','M','L','Q','S','T','V','Z']);
   if not result then Exit;
@@ -1159,8 +1163,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TDpathInfo.DoRelativeOffset(var pt: TPointD);
+function TDpathInfo.Get2Num(var pt: TPointD; isRelative: Boolean): Boolean;
 begin
+  Result := GetVal(pt.X) and GetVal(pt.Y);
+  if not Result or not isRelative then Exit;
   pt.X := pt.X + lastPt.X;
   pt.Y := pt.Y + lastPt.Y;
 end;
@@ -1172,35 +1178,29 @@ var
   d: double;
   currPt: TPointD;
   isRelative: Boolean;
-  oldSegType: TDsegType;
 begin
   readPos := attrib.value;
   readEnd := readPos + attrib.valueLen;
 
   isRelative := false;
   currPt := NullPointD;
-  oldSegType := dsMove;
-  
+
   while GetSegType(isRelative) do
   begin
     lastPt := currPt;
 
     if (currSegType = dsMove) then
     begin
-      if Assigned(currSeg) then 
+      if Assigned(currSeg) then
         SetLength(currSeg.vals, currSegCnt); //trim buffer
       currSeg := nil;
-      if not Get2Num(currPt) then break;
-      if isRelative then DoRelativeOffset(currPt);
+      if not Get2Num(currPt, isRelative) then break;
       self.lastPt :=  currPt;
-      oldSegType := dsMove;
 
-      //any values following a MoveTo statement are implicitly LineTo 
+      //values immediately following a Move are implicitly Line statements
       if PeekNum(readPos, readEnd, true) then 
-      begin
-        currSegType := dsLine;
-      end
-      else Continue;
+        currSegType := dsLine else
+        Continue;
     end
     else if (currSegType = dsClose) then
     begin
@@ -1211,19 +1211,16 @@ begin
       currSeg := nil;
       Continue;
     end;
-        
-    if currSegType <> oldSegType then
-    begin
-      if Assigned(currSeg) then
-        SetLength(currSeg.vals, currSegCnt); //trim buffer
-      currSeg := nil;
-    end;
-    
+
+    if Assigned(currSeg) then
+      SetLength(currSeg.vals, currSegCnt); //trim buffer
+    currSeg := nil;
+
     case currSegType of
       dsHorz:
         while PeekNum(readPos, readEnd, true) do
         begin
-          GetNum(readPos, readEnd, true, currPt.X);
+          GetVal(currPt.X);
           if isRelative then
             currPt.X := currPt.X + lastPt.X;
           AddSegValue(currPt.X);
@@ -1232,7 +1229,7 @@ begin
       dsVert:
         while PeekNum(readPos, readEnd, true) do
         begin
-          GetNum(readPos, readEnd, true, currPt.Y);
+          GetVal(currPt.Y);
           if isRelative then
             currPt.Y := currPt.Y + lastPt.Y;
           AddSegValue(currPt.Y);
@@ -1241,8 +1238,7 @@ begin
       dsLine:
         while true do
         begin
-          if not Get2Num(currPt) then break;
-          if isRelative then DoRelativeOffset(currPt);
+          if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
           lastPt := currPt;
           SkipBlanks(readPos, readEnd);
@@ -1254,8 +1250,7 @@ begin
       dsQSpline:
         while PeekNum(readPos, readEnd, true) do
         begin
-          if not Get2Num(currPt) then break;
-          if isRelative then DoRelativeOffset(currPt);
+          if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
           lastPt := currPt;
         end;
@@ -1263,11 +1258,9 @@ begin
       dsCSpline:
         while PeekNum(readPos, readEnd, true) do
         begin
-          if not Get2Num(currPt) then break;
-          if isRelative then DoRelativeOffset(currPt);
+          if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
-          if not Get2Num(currPt) then break;
-          if isRelative then DoRelativeOffset(currPt);
+          if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
           lastPt := currPt;
         end;
@@ -1275,11 +1268,9 @@ begin
       dsQBez:
         while PeekNum(readPos, readEnd, true) do
         begin
-          if not Get2Num(currPt) then break;
-          if isRelative then DoRelativeOffset(currPt);
+          if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
-          if not Get2Num(currPt) then break;
-          if isRelative then DoRelativeOffset(currPt);
+          if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
           lastPt := currPt;
         end;
@@ -1287,14 +1278,11 @@ begin
       dsCBez:
         while PeekNum(readPos, readEnd, true) do
         begin
-          if not Get2Num(currPt) then break;
-          if isRelative then DoRelativeOffset(currPt);
+          if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
-          if not Get2Num(currPt) then break;
-          if isRelative then DoRelativeOffset(currPt);
+          if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
-          if not Get2Num(currPt) then break;
-          if isRelative then DoRelativeOffset(currPt);
+          if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
           lastPt := currPt;
         end;
@@ -1302,21 +1290,19 @@ begin
       dsArc:
         while PeekNum(readPos, readEnd, true) do
         begin
-          if not Get2Num(currPt) then break;
-          AddSegPoint(currPt); //radii
-          if GetNum(readPos, readEnd, true, d)
-            then AddSegValue(d);                            //angle
+          if not GetVal(currPt.X) or
+            not GetVal(currPt.Y) then break;
+          AddSegPoint(currPt);                              //radii
+          if GetVal(d) then AddSegValue(d);                 //angle
           if not GetSingleDigit(i) then break;              //arc-flag
           AddSegValue(i);
           if not GetSingleDigit(i) then break;              //sweep-flag
           AddSegValue(i);
-          if not Get2Num(currPt) then break;
-          if isRelative then DoRelativeOffset(currPt);
+          if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
           lastPt := currPt;
         end;
     end;
-    oldSegType := currSegType;
   end;
   
   if Assigned(currSeg) then
@@ -1357,7 +1343,7 @@ end;
 procedure TDpathInfo.Flatten(index: integer; 
   out path: TPathD; out isClosed: Boolean);
 var
-  i,j,k, len, cap: integer;
+  i,j,k, pathLen, pathCap: integer;
   currPt, radii, pt1, pt2, pt3, pt4: TPointD;
   lastQCtrlPt, lastCCtrlPt: TPointD;
   arcFlag, sweepFlag: integer;
@@ -1367,19 +1353,37 @@ var
 
   procedure AddPoint(const pt: TPointD);
   begin
-    if len = cap then
+    if pathLen = pathCap then
     begin
-      cap := cap + buffSize;
-      SetLength(path, cap);
+      pathCap := pathCap + buffSize;
+      SetLength(path, pathCap);
     end;
-    path[len] := pt;
+    path[pathLen] := pt;
     currPt := pt;
-    inc(len);
+    inc(pathLen);
   end;
-  
+
+  procedure AddPath(const p: TPathD);
+  var
+    i, pLen: integer;
+  begin
+    pLen := Length(p);
+    if pathLen + pLen >= pathCap then
+    begin
+      pathCap := pathLen + pLen + buffSize;
+      SetLength(path, pathCap);
+    end;
+    for i := 0 to pLen -1 do
+    begin
+      path[pathLen] := p[i];
+      inc(pathLen);
+    end;
+    currPt := path[pathLen -1];
+  end;
+
 begin
-  len := 0; cap := 0;
-  lastQCtrlPt := InvalidPointD; 
+  pathLen := 0; pathCap := 0;
+  lastQCtrlPt := InvalidPointD;
   lastCCtrlPt := InvalidPointD;
   isClosed := dpaths[index].isClosed;
   with dpaths[index] do
@@ -1389,7 +1393,7 @@ begin
       with segs[i] do
       begin
         case segType of
-          dsLine: 
+          dsLine:
             if High(vals) > 0 then
               for j := 0 to High(vals) div 2 do
                 AddPoint(PointD(vals[j*2], vals[j*2 +1]));
@@ -1399,18 +1403,18 @@ begin
           dsVert:
             for j := 0 to High(vals) do
               AddPoint(PointD(currPt.X, vals[j]));
-          dsArc: 
+          dsArc:
             if High(vals) > 5 then
               for j := 0 to High(vals) div 7 do
               begin
-                radii.X   := vals[j*7];  
+                radii.X   := vals[j*7];
                 radii.Y   := vals[j*7 +1];
                 angle     := DegToRad(vals[j*7 +2]);
                 arcFlag   := Round(vals[j*7 +3]);
                 sweepFlag := Round(vals[j*7 +4]);
-                pt2.X := vals[j*7 +5];  
-                pt2.Y := vals[j*7 +6];  
-              
+                pt2.X := vals[j*7 +5];
+                pt2.Y := vals[j*7 +6];
+
                 SvgArc(currPt, pt2, radii, angle,
                   arcFlag <> 0, sweepFlag <> 0, arc1, arc2, rec);
                 if (sweepFlag = 0)  then
@@ -1420,75 +1424,71 @@ begin
                 end else
                   path2 := Arc(rec, arc1, arc2);
                 path2 := RotatePath(path2, rec.MidPoint, angle);
-                for k := 0 to High(path2) do 
-                  AddPoint(path2[k]);
+                AddPath(path2);
               end;
           dsQBez:
             if High(vals) > 2 then
               for j := 0 to High(vals) div 4 do
               begin
-                pt2.X := vals[j*4];  
-                pt2.Y := vals[j*4 +1];  
-                pt3.X := vals[j*4 +2];  
-                pt3.Y := vals[j*4 +3];  
+                pt2.X := vals[j*4];
+                pt2.Y := vals[j*4 +1];
+                pt3.X := vals[j*4 +2];
+                pt3.Y := vals[j*4 +3];
+                lastQCtrlPt := pt2;
                 path2 := FlattenQBezier(currPt, pt2, pt3);
-                for k := 0 to High(path2) do 
-                  AddPoint(path2[k]);  
-              end;
-          dsCBez:
-            if High(vals) > 4 then
-              for j := 0 to High(vals) div 6 do
-              begin
-                pt2.X := vals[j*6];  
-                pt2.Y := vals[j*6 +1];  
-                pt3.X := vals[j*6 +2];  
-                pt3.Y := vals[j*6 +3];  
-                pt4.X := vals[j*6 +4];  
-                pt4.Y := vals[j*6 +5];                
-                lastCCtrlPt := pt3;
-                path2 := FlattenCBezier(currPt, pt2, pt3, pt4);
-                for k := 0 to High(path2) do 
-                  AddPoint(path2[k]);  
+                AddPath(path2);
               end;
           dsQSpline:
             if High(vals) > 0 then
               for j := 0 to High(vals) div 2 do
               begin
-                if IsValid(lastCCtrlPt) then
-                  pt2 := ReflectPoint(lastCCtrlPt, currPt) else
+                if IsValid(lastQCtrlPt) then
+                  pt2 := ReflectPoint(lastQCtrlPt, currPt) else
                   pt2 := currPt;
-                pt3.X := vals[j*2];  
-                pt3.Y := vals[j*2 +1];  
-                lastCCtrlPt := pt2;
+                pt3.X := vals[j*2];
+                pt3.Y := vals[j*2 +1];
+                lastQCtrlPt := pt2;
                 path2 := FlattenQBezier(currPt, pt2, pt3);
-                for k := 0 to High(path2) do
-                  AddPoint(path2[k]);  
+                AddPath(path2);
               end;
-          dsCSpline: 
+          dsCBez:
+            if High(vals) > 4 then
+              for j := 0 to High(vals) div 6 do
+              begin
+                pt2.X := vals[j*6];
+                pt2.Y := vals[j*6 +1];
+                pt3.X := vals[j*6 +2];
+                pt3.Y := vals[j*6 +3];
+                pt4.X := vals[j*6 +4];
+                pt4.Y := vals[j*6 +5];
+                lastCCtrlPt := pt3;
+                path2 := FlattenCBezier(currPt, pt2, pt3, pt4);
+                AddPath(path2);
+              end;
+          dsCSpline:
             if High(vals) > 2 then
               for j := 0 to High(vals) div 4 do
               begin
                 if IsValid(lastCCtrlPt) then
                   pt2 := ReflectPoint(lastCCtrlPt, currPt) else
                   pt2 := currPt;
-                pt3.X := vals[j*2];  
-                pt3.Y := vals[j*2 +1];  
-                pt4.X := vals[j*2 +2];  
-                pt4.Y := vals[j*2 +3];                
+                pt3.X := vals[j*2];
+                pt3.Y := vals[j*2 +1];
+                pt4.X := vals[j*2 +2];
+                pt4.Y := vals[j*2 +3];
                 lastCCtrlPt := pt3;
                 path2 := FlattenCBezier(currPt, pt2, pt3, pt4);
-                for k := 0 to High(path2) do
-                  AddPoint(path2[k]);  
+                AddPath(path2);
               end;
         end;
       end;
   end;
-  SetLength(path, len);
+  SetLength(path, pathLen);
 end;
 //------------------------------------------------------------------------------
 
 function TDpathInfo.GetFlattenedPath(index: integer;
-  out path: TPathD; out isClosed: Boolean): Boolean; 
+  out path: TPathD; out isClosed: Boolean): Boolean;
 begin
   Result := (index >= 0) and (index < Length(dpaths));
   if not Result then Exit;
@@ -1514,15 +1514,15 @@ var
 begin
   readPos := attrib.value;
   readEnd := readPos + attrib.valueLen;
-  while Get2Num(pt) do AddPoint(pt);
+  while GetVal(pt.X) and GetVal(pt.Y) do AddPoint(pt);
   SetLength(path, currCnt);
 end;
 
 //------------------------------------------------------------------------------
-// TLineInfo
+// TSingleLineInfo
 //------------------------------------------------------------------------------
 
-procedure TLineInfo.LoadFromOwnerElement;
+procedure TSingleLineInfo.LoadFromOwnerElement;
 var
   attrib: PAttrib;
 begin
@@ -1540,11 +1540,11 @@ begin
       with attrib^ do
         GetNum(value, value + valueLen, false, path[0].Y);
     attrib := GetAttribute('x2');
-    if Assigned(attrib) then 
+    if Assigned(attrib) then
       with attrib^ do
         GetNum(value, value + valueLen, false, path[1].X);
     attrib := GetAttribute('y2');
-    if Assigned(attrib) then 
+    if Assigned(attrib) then
       with attrib^ do
         GetNum(value, value + valueLen, false, path[1].Y);
   end;
@@ -1569,13 +1569,13 @@ begin
       with attrib^ do
         GetNum(value, value + valueLen, false, centerPt.X);
     attrib := GetAttribute('cy');
-    if Assigned(attrib) then 
+    if Assigned(attrib) then
       with attrib^ do
         GetNum(value, value + valueLen, false, centerPt.Y);
     attrib := GetAttribute('r');
     if not Assigned(attrib) then Exit;
     with attrib^ do
-      GetNum(value, value + valueLen, false, radius);    
+      GetNum(value, value + valueLen, false, radius);
   end;
 
   with centerPt do
@@ -1601,19 +1601,19 @@ begin
       with attrib^ do
         GetNum(value, value + valueLen, false, centerPt.X);
     attrib := GetAttribute('cy');
-    if Assigned(attrib) then 
+    if Assigned(attrib) then
       with attrib^ do
         GetNum(value, value + valueLen, false, centerPt.Y);
-        
+
     attrib := GetAttribute('rx');
     if not Assigned(attrib) then Exit;
     with attrib^ do
-      GetNum(value, value + valueLen, false, radii.X);    
-        
+      GetNum(value, value + valueLen, false, radii.X);
+
     attrib := GetAttribute('ry');
     if not Assigned(attrib) then Exit;
     with attrib^ do
-      GetNum(value, value + valueLen, false, radii.Y);    
+      GetNum(value, value + valueLen, false, radii.Y);
   end;
 
   with centerPt do
@@ -1640,35 +1640,35 @@ begin
       with attrib^ do
         GetNum(value, value + valueLen, false, rec.Left);
     attrib := GetAttribute('y');
-    if Assigned(attrib) then 
+    if Assigned(attrib) then
       with attrib^ do
         GetNum(value, value + valueLen, false, rec.Top);
 
     attrib := GetAttribute('width');
     if not Assigned(attrib) then Exit;
     with attrib^ do
-      GetNum(value, value + valueLen, false, rec.Right); 
+      GetNum(value, value + valueLen, false, rec.Right);
 
     attrib := GetAttribute('height');
     if not Assigned(attrib) then Exit;
     with attrib^ do
-      GetNum(value, value + valueLen, false, rec.Bottom); 
+      GetNum(value, value + valueLen, false, rec.Bottom);
 
-    rec.Right := rec.Right + rec.Left;     
-    rec.Bottom := rec.Bottom + rec.Top;     
+    rec.Right := rec.Right + rec.Left;
+    rec.Bottom := rec.Bottom + rec.Top;
 
     attrib := GetAttribute('rx');
-    if Assigned(attrib) then 
+    if Assigned(attrib) then
       with attrib^ do
         GetNum(value, value + valueLen, false, radii.X);
     attrib := GetAttribute('ry');
-    if Assigned(attrib) then 
+    if Assigned(attrib) then
       with attrib^ do
         GetNum(value, value + valueLen, false, radii.Y);
   end;
   if (radii.X <> 0) or (radii.Y <> 0) then
     path := RoundRect(rec, Average(radii.X, radii.Y)) else
-    path := Rectangle(rec);  
+    path := Rectangle(rec);
 end;
 
 //------------------------------------------------------------------------------
@@ -1709,6 +1709,7 @@ end;
 constructor TElement.Create(parent: TElement; var c: PAnsiChar);
 var
   hasContent: Boolean;
+  nameHash: Cardinal;
 begin
   fChilds := TList.Create;
   if not Assigned(parent) then Exit; //svg root element
@@ -1724,18 +1725,16 @@ begin
   if not LoadElemOrAttribName(c, fName, fNameLen) then Exit;
   FDrawInfo.inDefs := 
     FDrawInfo.inDefs or (CalcCRC32Hash(fName, fNameLen) = defsHash);
-  
+
   if not LoadAttributes(c, hasContent) then Exit;
 
-  if ElementIs('use') then 
-    LoadUse;
-
-  case GetShapeType(Self) of
-    stSingleLine : LoadLine(self);
-    stCircle     : LoadCircle(self);
-    stEllipse    : LoadEllipse(self);
-    stRectangle  : LoadRectangle(self);
-    //else the remaining shapes are load via attributes
+  nameHash := CalcCRC32Hash(fName, fNameLen);
+  case nameHash of
+    useHash     : LoadUse;
+    lineHash    : LoadLine(self);
+    circleHash  : LoadCircle(self);
+    ellipseHash : LoadEllipse(self);
+    rectHash    : LoadRectangle(self);
   end;
 
   if not FDrawInfo.inDefs and Assigned(fShapeInfo) then
@@ -1802,12 +1801,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TElement.ElementIs(const name: AnsiString): Boolean;
-begin
-  Result := LCaseCompare(name, fName, fNameLen);
-end;
-//------------------------------------------------------------------------------
-
 function TElement.LoadAttributes(var c: PAnsiChar; out hasContent: Boolean): Boolean;
 var
   attribCnt: integer;
@@ -1859,7 +1852,7 @@ end;
 
 procedure TElement.LoadUse;
 var
-  i, len: integer;
+  i: integer;
   oldAttribs: TArrayOfAttrib;
   attrib: PAttrib;
   idElem: TElement;
@@ -1912,9 +1905,8 @@ begin
 
   //finally reprocess each attribute (except the ID attribute)
   for i := 0 to High(fAttribs) do
-    if (fAttribs[i].nameLen <> 2) or
-      (LowerCaseTable[fAttribs[i].aname[0]] <> 'i') or
-      (LowerCaseTable[fAttribs[i].aname[1]] <> 'd') then
+    with fAttribs[i] do
+      if not (CalcCRC32Hash(aname, nameLen) = idHash) then
         ProcessAttrib(fAttribs[i]);
 end;
 //------------------------------------------------------------------------------
@@ -1945,15 +1937,15 @@ begin
       end
       else if c^ = '/' then
       begin
-        //hopefully this is the closing element
+        //this should be the element close
         inc(c);
         LoadElemOrAttribName(c, n, nLen);
-        fIsValid := LCaseCompare(fName, fNameLen, n, nLen);
+        fIsValid := CompareNames(fName, fNameLen, n, nLen);
         if fIsValid then inc(c);
         Exit;
       end else
       begin
-        //more child elements
+        //a child element
         el := TElement.Create(self, c);
         if not el.fIsValid then break;
         fChilds.Add(el);
@@ -1967,7 +1959,7 @@ begin
       break;
     end else
     begin
-      //skip unknown content (text, scripts etc)
+      //skip unknown (probably text) content
       while (c < fSvgEnd) and (c^ <> '<') do inc(c);
     end;
   end;
@@ -1982,7 +1974,7 @@ begin
   nLen := Length(attribName);
   for i := 0 to High(fAttribs) do
     with fAttribs[i] do
-      if LCaseCompare(attribName, aname, nLen) then
+      if (nLen = nameLen) and CompareNames(attribName, aname, nLen) then
     begin
       Result := @fAttribs[i];
       Break;
@@ -1995,10 +1987,11 @@ end;
 
 constructor TSvgReader.Create;
 begin
-  fShapesList := TList.Create;
-  fMemStream   := TMemoryStream.Create;
-  fIdList   := TStringList.Create;
-  fIdList.Sorted := True;
+  fShapesList     := TList.Create;
+  fMemStream      := TMemoryStream.Create;
+  fIdList         := TStringList.Create;
+  fIdList.Sorted  := True;
+  fGradientsList  := TStringList.Create;
 end;
 //------------------------------------------------------------------------------
 
@@ -2008,6 +2001,7 @@ begin
   fMemStream.Free;
   fShapesList.Free;
   fIdList.Free;
+  fGradientsList.Free;
   inherited;
 end;
 //------------------------------------------------------------------------------
@@ -2029,7 +2023,6 @@ var
   sx, sy: double;
   p: TPathD;
   closedPP, openPP: TPathsD;
-  isClosed: Boolean;
 const
   endStyle: array[boolean] of TEndStyle = (esPolygon, esRound);
 begin
@@ -2099,14 +2092,27 @@ end;
 
 function TSvgReader.LoadFromFile(const filename: string): Boolean;
 var
+  Stream: TStream;
+begin
+  Stream := TFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
+  try
+    Result := LoadFromStream(Stream);
+  finally
+    Stream.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgReader.LoadFromStream(stream: TStream): Boolean;
+var
   svgStart, dummy: PAnsiChar;
   hasContent: Boolean;
 begin
   Result := false;
   Clear;
-  if not FileExists(filename) then Exit;
+  if not Assigned(stream) then Exit;
 
-  fMemStream.LoadFromFile(filename);
+  fMemStream.LoadFromStream(stream);
   fEndStream := PAnsiChar(fMemStream.Memory) + fMemStream.Size;
 
   fRootElement := TElement.Create(nil, dummy);
@@ -2425,6 +2431,7 @@ end;
 procedure MakeAttribFuncList;
 begin
   AttribFuncList := TStringList.Create;
+  AttribFuncList.Duplicates := dupError;
 
   RegisterAttribute('d',              D);
   RegisterAttribute('fill',           Fill);
@@ -2441,11 +2448,41 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-const
-  defs = 'defs';
+procedure MakeHashesConsts;
+var
+  sl: TStringList;
+
+  procedure AddConst(const name: AnsiString);
+  begin
+    sl.Add(Format('%-24s= $%8.8x;',[name+'Hash', CalcCRC32Hash(name)]));
+  end;
+
+begin
+  sl := TStringList.Create;
+  try
+    AddConst('id');
+    AddConst('defs');
+    AddConst('use');
+    AddConst('lineargradient');
+    AddConst('line');
+    AddConst('circle');
+    AddConst('ellipse');
+    AddConst('rect');
+    AddConst('polygon');
+    AddConst('polyline');
+
+    sl.Duplicates := dupError;
+    sl.Sorted := true;
+    sl.SaveToFile('hashConstList.txt');
+  finally
+    sl.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 initialization
-  defsHash := CalcCRC32Hash(defs, 4);
+  //MakeHashesConsts;
   MakeColorConstList;
   MakeLowerCaseTable;
   MakeAttribFuncList;
