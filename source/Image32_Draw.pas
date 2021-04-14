@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.16                                                            *
-* Date      :  18 March 2021                                                   *
+* Version   :  2.23                                                            *
+* Date      :  14 April 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -636,7 +636,7 @@ begin
       y2 := Round(polygons[i][j].Y);
       if y1 < y2 then
       begin
-        //descending (ignoring edges outside the clipping range)
+        //descending (but ignore edges outside the clipping range)
         if (y2 >= 0) and (y1 <= clipBottom) then
         begin
           if (y1 > 0) and (y1 <= clipBottom)  then
@@ -647,7 +647,7 @@ begin
         end;
       end else
       begin
-        //ascending (ignoring edges outside the clipping range)
+        //ascending (but ignore edges outside the clipping range)
         if (y1 >= 0) and (y2 <= clipBottom) then
         begin
           if (y2 > 0) then
@@ -953,6 +953,8 @@ begin
   //See also https://nothings.org/gamedev/rasterize/
   if not assigned(renderer) then Exit;
   clipRec2 := Image32_Vector.IntersectRect(clipRec, GetBounds(paths));
+  if IsEmptyRect(clipRec2) then Exit;
+
   paths2 := OffsetPath(paths, -clipRec2.Left, -clipRec2.Top);
 
   //Delphi's Round() function is *much* faster than its Trunc function, and

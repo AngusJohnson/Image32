@@ -3,7 +3,7 @@ unit Image32_Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.23                                                            *
-* Date      :  12 April 2021                                                   *
+* Date      :  14 April 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -1450,7 +1450,7 @@ begin
   begin
     if abs(delta) < ArcTolerance then Exit;
     if UseDynamicTolerances then
-      steps360 := Pi * 20 else //20 = 1/ArcCos(1-0.00125)
+      steps360 := Trunc(8 * Sqrt(abs(delta))) else
       steps360 := Pi / ArcCos(1 - ArcTolerance / abs(delta));
     stepsPerRad := steps360 / (Pi *2);
     GetSinCos(Pi*2/steps360, stepSin, stepCos);
@@ -2012,7 +2012,7 @@ begin
   begin
     if f < ArcTolerance then Exit;
     if UseDynamicTolerances then
-      steps := Trunc(Pi * 20) else //20 = 1/ArcCos(1-0.00125)
+      steps := Trunc(8 * Sqrt(f)) else
       steps := Trunc(Pi / ArcCos(1 - ArcTolerance/f));
     if steps < 3 then steps := 3;
   end;
@@ -2089,7 +2089,7 @@ begin
   //steps = (No. steps for a whole ellipse) * angle/(2*Pi)
   if radiusAvg < ArcTolerance then Exit;
   if UseDynamicTolerances then
-    steps := Trunc(Pi *20 * angle/(2*Pi)) else //20 = 1/ArcCos(1-0.00125)
+    steps := Trunc(8 * Sqrt(radiusAvg) * angle) else
     steps := Trunc(Pi/ArcCos(1 - ArcTolerance/radiusAvg) * angle/(2*Pi));
   if steps < 2 then steps := 2;
   SetLength(Result, Steps +1);
@@ -2554,7 +2554,7 @@ begin
   if UseDynamicTolerances then
   begin
     rec := GetBoundsD(MakePathD([pt1.X, pt1.Y, pt2.X, pt2.Y, pt3.X, pt3.Y]));
-    tolerance := (rec.Width + rec.Height) * 0.01;
+    tolerance := (rec.Width + rec.Height) * 0.005;
   end else
     tolerance := QBezierTolerance;
 
@@ -2674,7 +2674,7 @@ begin
   begin
     rec := GetBoundsD(MakePathD([pt1.X, pt1.Y,
       pt2.X, pt2.Y, pt3.X, pt3.Y, pt4.X, pt4.Y]));
-    tolerance := (rec.Width + rec.Height) * 0.01;
+    tolerance := (rec.Width + rec.Height) * 0.005;
   end else
     tolerance := CBezierTolerance;
 
@@ -2756,7 +2756,7 @@ begin
   begin
     rec := GetBoundsD(MakePathD([pt1.X, pt1.Y,
       pt2.X, pt2.Y, pt3.X, pt3.Y, pt4.X, pt4.Y]));
-    tolerance := (rec.Width + rec.Height) * 0.01;
+    tolerance := (rec.Width + rec.Height) * 0.005;
   end else
     tolerance := CBezierTolerance;
 
@@ -2829,7 +2829,7 @@ begin
   begin
     rec := GetBoundsD(MakePathD([pt1.X, pt1.Y,
       pt2.X, pt2.Y, pt3.X, pt3.Y]));
-    tolerance := (rec.Width + rec.Height) * 0.01;
+    tolerance := (rec.Width + rec.Height) * 0.005;
   end else
     tolerance := QBezierTolerance;
 
