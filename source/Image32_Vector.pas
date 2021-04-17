@@ -25,6 +25,19 @@ type
   TSplineType = (stQuadratic, stCubic);
   TFillRule = (frEvenOdd, frNonZero, frPositive, frNegative);
 
+  TRectWH = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
+    Left, Top, Width, Height: double;
+    function IsEmpty: Boolean;
+    function Right: double;
+    function Bottom: double;
+    function Contains(const Pt: TPoint): Boolean; overload;
+    function Contains(const Pt: TPointD): Boolean; overload;
+    function TopLeft: TPointD;
+    function BottomRight: TPointD;
+    function MidPoint: TPointD;
+    function RectD: TRectD;
+  end;
+
   function InflateRect(const rec: TRect; dx, dy: integer): TRect; overload;
   function InflateRect(const rec: TRectD; dx, dy: double): TRectD; overload;
 
@@ -165,8 +178,8 @@ type
 
   function Size(width, height: integer): TSize;
 
-  function RectWH(left, top, width, height: integer): TRect; overload;
-  function RectWH(left, top, width, height: double): TRectD; overload;
+  function RectWH(left, top, width, height: integer): TRectWH; overload;
+  function RectWH(left, top, width, height: double): TRectWH; overload;
 
   function Area(const path: TPathD): Double;
   function RectsEqual(const rec1, rec2: TRect): Boolean;
@@ -318,12 +331,99 @@ const
   BuffSize = 64;
 
 //------------------------------------------------------------------------------
+// TRectWH
 //------------------------------------------------------------------------------
+
+function TRectWH.IsEmpty: Boolean;
+begin
+  Result := (Width <= 0) or (Height <= 0);
+end;
+//------------------------------------------------------------------------------
+
+function TRectWH.Right: double;
+begin
+  Result := Left + Width;
+end;
+//------------------------------------------------------------------------------
+
+function TRectWH.Bottom: double;
+begin
+  Result := Top + Height;
+end;
+//------------------------------------------------------------------------------
+
+function TRectWH.Contains(const Pt: TPoint): Boolean;
+begin
+  Result := (pt.X >= Left) and (pt.X <= Left + Width) and
+    (pt.Y >= Top) and (pt.Y <= Top + Height)
+end;
+//------------------------------------------------------------------------------
+
+function TRectWH.Contains(const Pt: TPointD): Boolean;
+begin
+  Result := (pt.X >= Left) and (pt.X <= Left + Width) and
+    (pt.Y >= Top) and (pt.Y <= Top + Height)
+end;
+//------------------------------------------------------------------------------
+
+function TRectWH.TopLeft: TPointD;
+begin
+  Result := PointD(left, top);
+end;
+//------------------------------------------------------------------------------
+
+function TRectWH.BottomRight: TPointD;
+begin
+  Result := PointD(left + Width, top + Height);
+end;
+//------------------------------------------------------------------------------
+
+function TRectWH.MidPoint: TPointD;
+begin
+  Result := PointD(left + Width * 0.5, top + Height * 0.5);
+end;
+//------------------------------------------------------------------------------
+
+function TRectWH.RectD: TRectD;
+begin
+  Result := Image32.RectD(left, top, left + Width, top + Height);
+end;
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+function RectWH(left, top, width, height: integer): TRectWH;
+begin
+  Result.Left := left;
+  Result.Top := top;
+  Result.Width := width;
+  Result.Height := height;
+end;
+//------------------------------------------------------------------------------
+
+function RectWH(left, top, width, height: double): TRectWH;
+begin
+  Result.Left := left;
+  Result.Top := top;
+  Result.Width := width;
+  Result.Height := height;
+end;
+//------------------------------------------------------------------------------
+
 
 function RectsEqual(const rec1, rec2: TRect): Boolean;
 begin
   result := (rec1.Left = rec2.Left) and (rec1.Top = rec2.Top) and
     (rec1.Right = rec2.Right) and (rec1.Bottom = rec2.Bottom);
+end;
+//------------------------------------------------------------------------------
+
+function Rect(const left, top, right, bottom: integer): TRect;
+begin
+  Result.Left := left;
+  Result.Top := top;
+  Result.Right := right;
+  Result.Bottom := bottom;
 end;
 //------------------------------------------------------------------------------
 
@@ -341,13 +441,13 @@ end;
 
 function IsValid(const pt: TPoint): Boolean;
 begin
-  result := pt.X <> -MaxInt;
+  result := (pt.X <> -MaxInt) and (pt.Y <> -MaxInt);
 end;
 //------------------------------------------------------------------------------
 
 function IsValid(const pt: TPointD): Boolean;
 begin
-  result := pt.X <> -Infinity;
+  result := (pt.X <> -Infinity) and (pt.Y <> -Infinity);
 end;
 //------------------------------------------------------------------------------
 
@@ -423,27 +523,6 @@ function ValueAlmostOne(val: double; epsilon: double = 0.001): Boolean;
   {$IFDEF INLINE} inline; {$ENDIF}
 begin
   Result := Abs(val-1) < epsilon;
-end;
-//------------------------------------------------------------------------------
-
-function Rect(const left, top, right, bottom: integer): TRect;
-begin
-  Result.Left := left;
-  Result.Top := top;
-  Result.Right := right;
-  Result.Bottom := bottom;
-end;
-//------------------------------------------------------------------------------
-
-function RectWH(left, top, width, height: integer): TRect;
-begin
-  Result := Rect(left, top, left+width, top+height);
-end;
-//------------------------------------------------------------------------------
-
-function RectWH(left, top, width, height: double): TRectD;
-begin
-  Result := RectD(left, top, left+width, top+height);
 end;
 //------------------------------------------------------------------------------
 
@@ -1450,7 +1529,7 @@ begin
   begin
     if abs(delta) < ArcTolerance then Exit;
     if UseDynamicTolerances then
-      steps360 := Trunc(8 * Sqrt(abs(delta))) else
+      steps360 := Trunc(16*Sqrt(abs(delta))) else
       steps360 := Pi / ArcCos(1 - ArcTolerance / abs(delta));
     stepsPerRad := steps360 / (Pi *2);
     GetSinCos(Pi*2/steps360, stepSin, stepCos);
@@ -2012,9 +2091,9 @@ begin
   begin
     if f < ArcTolerance then Exit;
     if UseDynamicTolerances then
-      steps := Trunc(8 * Sqrt(f)) else
+      steps := Trunc(16*Sqrt(f)) else
       steps := Trunc(Pi / ArcCos(1 - ArcTolerance/f));
-    if steps < 3 then steps := 3;
+    if steps < 4 then steps := 4;
   end;
   GetSinCos(2 * Pi / Steps, sinA, cosA);
   delta.x := cosA; delta.y := sinA;
@@ -2089,7 +2168,7 @@ begin
   //steps = (No. steps for a whole ellipse) * angle/(2*Pi)
   if radiusAvg < ArcTolerance then Exit;
   if UseDynamicTolerances then
-    steps := Trunc(8 * Sqrt(radiusAvg) * angle) else
+    steps := Trunc(16*Sqrt(radiusAvg) * angle) else
     steps := Trunc(Pi/ArcCos(1 - ArcTolerance/radiusAvg) * angle/(2*Pi));
   if steps < 2 then steps := 2;
   SetLength(Result, Steps +1);
