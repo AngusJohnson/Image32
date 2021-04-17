@@ -17,7 +17,7 @@ unit Image32_SVG_Reader;
 *******************************************************************************)
 
 //immediate todos:
-//clipPath, url, gradients, class (for styles), style CDATA, lineCap, lineJoin
+//clipPath, lineCap, lineJoin
 
 interface
 
@@ -1201,8 +1201,13 @@ begin
     if (currSegType = dsMove) then
     begin
       if Assigned(currSeg) then
+      begin
         SetLength(currSeg.vals, currSegCnt); //trim buffer
+        currDpath.isClosed := false;
+      end;
+      currDpath := nil;
       currSeg := nil;
+
       if not Get2Num(currPt, isRelative) then break;
       self.lastPt :=  currPt;
 
@@ -1625,6 +1630,15 @@ var
 
 begin
   len := 0; cap := 0;
+  if (PeekChar = '<') and ((fCurrent+1)^ = '!') and
+    ((fCurrent+2)^ = '[') and
+    (GetHashedName(fCurrent + 3, 5) = hCDATA) then
+  begin
+    inc(fCurrent, 8);
+    if fCurrent^ <> '[' then Exit;
+    inc(fCurrent);
+  end;
+
   while PeekChar = '.' do
   begin
     //get one or more class names for each pending style
@@ -1657,9 +1671,12 @@ begin
     inc(fCurrent);
   end;
 
-  //skip any trailing unknown content
-  while (fCurrent < fCurrentEnd) and (fCurrent^ <> '<') do inc(fCurrent);
-  if (fCurrent = fCurrentEnd) or ((fCurrent +1)^ <> '/') then Exit;
+  //skip trailing unknown content
+  while (fCurrent < fCurrentEnd) and (fCurrent^ <> '>') do inc(fCurrent);
+  inc(fCurrent);
+  //we should now be at </STYLE>
+  if (PeekChar <> '<') then Exit;
+  if  ((fCurrent +1)^ <> '/') then Exit;
   inc(fCurrent, 2);
   fIsValid := GetHashedCurrentWord(hash) and (fNameHash = hash);
   if fIsValid then inc(fCurrent); //trailing '>'
@@ -2226,7 +2243,7 @@ begin
       for j := 0 to PathCount -1 do
       begin
         GetPath(j, p, isClosed);
-        if isClosed then
+        if isClosed or (DrawInfo.fillColor shr 24 > 0) then
           AppendPath(closedPP, p) else
           AppendPath(openPP, p);
       end;
