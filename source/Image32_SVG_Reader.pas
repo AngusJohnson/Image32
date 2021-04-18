@@ -45,15 +45,14 @@ type
     inDefs      : Boolean;
   end;
 
-  TAnsiStringRec = record
-    str: AnsiString;
-    obj: TObject;
+  TAnsiRec = record
+    ansi: AnsiString;
   end;
-  PAnsiStringRec = ^TAnsiStringRec;
+  PAnsiRec = ^TAnsiRec;
 
-  TStrStrList = class(TStringList)
+  TStrAnsiList = class(TStringList)
   public
-    function Add(const str1: string; const str2: AnsiString): integer; reintroduce;
+    function Add(const str: string; const ansi: AnsiString): integer; reintroduce;
     procedure Clear; override;
     procedure Delete(Index: Integer); override;
     destructor Destroy; override;
@@ -62,14 +61,12 @@ type
   TElement = class;
 
   PAttrib = ^TAttrib;
-  TAttrib = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
+  TAttrib = record
     ownerEl  : TElement;
     aname     : PAnsiChar;
     nameLen  : integer;
     value    : PAnsiChar;
     valueLen : integer;
-    function GetName: AnsiString;
-    function GetValue: AnsiString;
   end;
   TArrayOfAttrib = array of TAttrib;
 
@@ -99,13 +96,12 @@ type
       out nameLen: integer): Boolean;
     function GetAttribValue(out value: PAnsiChar; out valueLen: integer): Boolean;
     function FindRefElement(refname: PAnsiChar; refNameLen: integer): TElement;
-    function FindAttribute(const attribName: AnsiString): PAttrib; overload;
     function FindAttribute(hash: Cardinal): PAttrib; overload;
-    procedure ProcessAttrib(const attrib: TAttrib);
+    procedure ProcessAttrib(const attrib: PAttrib);
     function PeekChar: AnsiChar;
-    procedure ParseClassAttrib(const classAttrib: TAttrib);
-    procedure ParseStyle(style: AnsiString);
-    procedure ParseTransform(transform: AnsiString);
+    procedure ParseClassAttrib(classAttrib: PAttrib);
+    procedure ParseStyle(classStyle: PAnsiChar; len: integer);
+    procedure ParseTransform(transform: PAnsiChar; len: integer);
   protected
     surrogate: TElement;
     function LoadAttributes: Boolean; virtual;
@@ -116,9 +112,16 @@ type
     destructor  Destroy; override;
   end;
 
+  TDefsElement = class(TElement)
+  public
+    constructor Create(parent: TElement; hashName: Cardinal); override;
+  end;
+
   TUseElement = class(TElement)
   protected
-    procedure DoHrefClone(refEl: TElement);
+    pt: TPointD;
+    refEl: TElement;
+    function LoadAttributes: Boolean; override;
   end;
 
   TShapeElement = class(TElement)
@@ -171,7 +174,7 @@ type
     function Get2Num(var pt: TPointD; isRelative: Boolean): Boolean;
     procedure Flatten(index: integer;  out path: TPathD; out isClosed: Boolean);
   protected
-    procedure ParseD(const attrib: TAttrib);
+    procedure ParseD(attrib: PAttrib);
     function GetPathCount: integer; override;
   public
     function GetPath(index: integer; out path: TPathD;
@@ -180,9 +183,9 @@ type
 
   TPolyElement = class(TShapeElement) //polyline or polygon
   protected
-    procedure ParsePoints(const attrib: TAttrib);
+    procedure ParsePoints(attrib: PAttrib);
   public
-    constructor Create(parent: TElement; hashName: Cardinal; isClosed: Boolean); reintroduce;
+    constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
 
   TLineElement = class(TShapeElement)
@@ -254,7 +257,7 @@ end;
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
 
-  TAttribFunc = procedure (const attrib: TAttrib);
+  TAttribFunc = procedure (attrib: PAttrib);
 
   TSvgReader = class
   private
@@ -262,7 +265,7 @@ end;
     fEndStream        : PAnsiChar;
     fIdList           : TStringList;
     fShapesList       : TList;
-    fClassesList      : TStrStrList;
+    fClassesList      : TStrAnsiList;
     fLinGradRenderer  : TLinearGradientRenderer;
     fRadGradRenderer  : TSvgRadialGradientRenderer;
     fViewbox          : TRectD;
@@ -308,51 +311,48 @@ resourcestring
 // TStrStrList
 //------------------------------------------------------------------------------
 
-function TStrStrList.Add(const str1: string; const str2: AnsiString): integer;
+function TStrAnsiList.Add(const str: string; const ansi: AnsiString): integer;
 var
-  i,j: integer;
-  sr: PAnsiStringRec;
-  ps: PAnsiString;
+  i: integer;
+  sr: PAnsiRec;
 begin
-  new(sr);
-  sr.str := str2;
-  sr.obj := nil;
-  i := IndexOf(str1);
-  if (i >= 0) then
+  Result := IndexOf(str);
+  if (Result >= 0) then
   begin
-    ps := @PAnsiStringRec(Objects[i]).str;
-    j := Length(ps^);
-    if ps^[j] <> ';' then
-      ps^ := ps^ + ';' + sr.str else
-      ps^ := ps^ + sr.str;
-    Dispose(sr);
-    Result := i;
-  end
-  else
-    Result := inherited AddObject(str1, TObject(sr));
+    sr := PAnsiRec(Objects[Result]);
+    i := Length(sr.ansi);
+    if sr.ansi[i] <> ';' then
+      sr.ansi := sr.ansi + ';' + ansi else
+      sr.ansi := sr.ansi + ansi;
+  end else
+  begin
+    new(sr);
+    sr.ansi := ansi;
+    Result := inherited AddObject(str, Pointer(sr));
+  end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TStrStrList.Clear;
+procedure TStrAnsiList.Clear;
 var
   i: integer;
 begin
   for i := 0 to Count -1 do
-    Dispose(PAnsiStringRec(Objects[i]));
+    Dispose(PAnsiRec(Objects[i]));
   inherited Clear;
 end;
 //------------------------------------------------------------------------------
 
-procedure TStrStrList.Delete(Index: Integer);
+procedure TStrAnsiList.Delete(Index: Integer);
 begin
   if (index < 0) or (index >= Count) then
     Error(@rsListBoundsError, index);
-  Dispose(PAnsiStringRec(Objects[index]));
+  Dispose(PAnsiRec(Objects[index]));
   inherited Delete(Index);
 end;
 //------------------------------------------------------------------------------
 
-destructor TStrStrList.Destroy;
+destructor TStrAnsiList.Destroy;
 begin
   inherited Destroy;
 end;
@@ -387,13 +387,6 @@ begin
   inc(current);
 end;
 //------------------------------------------------------------------------------
-
-function AnsiName(pName: PAnsiChar; len: integer): AnsiString;
-begin
-  SetLength(Result, len);
-  Move(pName^, Result[1], len);
-end;
-//--------------------------------------------------------------------------
 
 function AnsiLowercase(pName: PAnsiChar; len: integer): AnsiString;
 var
@@ -443,8 +436,8 @@ const
 begin
   Result := 0;
   if not IsAlpha(c^) then Exit;
-  startC := c; inc(c); 
-  while (c < endC) and CharInSet(LowerCaseTable[c^], validChars) do inc(c);
+  startC := c; inc(c);
+  while (c < endC) and CharInSet(c^, validChars) do inc(c);
   Result := c - startC;
 end;
 //------------------------------------------------------------------------------
@@ -457,91 +450,9 @@ const
 begin
   Result := 0;
   if not IsAlpha(c^) then Exit;
-  startC := c; inc(c); 
-  while (c < endC) and CharInSet(LowerCaseTable[c^], validChars) do inc(c);
+  startC := c; inc(c);
+  while (c < endC) and CharInSet(c^, validChars) do inc(c);
   Result := c - startC;
-end;
-//------------------------------------------------------------------------------
-
-function CompareNames(p: PAnsiChar; pLen: integer;
-  p2: PAnsiChar; p2Len: integer): Boolean; overload;
-var
-  i: integer;
-begin
-  result := (p2Len = pLen);
-  if not result then Exit;
-  for i := 0 to pLen -1 do
-    if LowerCaseTable[p^] = LowerCaseTable[p2^] then
-    begin
-      inc(p); inc(p2);
-    end else
-    begin
-      Result := false;
-      Exit;
-    end;
-end;
-//------------------------------------------------------------------------------
-
-//avoid AnsiString as much as possible as it really slow things down
-function CompareNames(const text: AnsiString;
-  p: PAnsiChar; pLen: integer): Boolean; overload;
-begin
-  result := CompareNames(PAnsiChar(text), Length(text), p, pLen);
-end;
-//------------------------------------------------------------------------------
-
-function Color32ToHtml(clr: Cardinal): string;
-begin
-  result := format('#%.6x', [clr and $FFFFFF]);
-end;
-//------------------------------------------------------------------------------
-
-function TextToHtml(const s: string): string;
-var
-  i, len: integer;
-begin
-  result := s;
-  len := length(s);
-  for i := len downto 1 do
-  begin
-    case result[i] of
-      '&':
-        begin
-          len := len + 4;
-          setlength(result, len);
-          move(result[i+1], result[i+5], (len - i - 4) * sizeof(Char));
-          move('amp;', result[i+1], 4 * sizeof(Char));
-        end;
-      '<':
-        begin
-          len := len + 3;
-          setlength(result, len);
-          move(result[i+1], result[i+4], (len - i - 3) * sizeof(Char));
-          move('&lt;', result[i], 4 * sizeof(Char));
-        end;
-      '>':
-        begin
-          len := len + 3;
-          setlength(result, len);
-          move(result[i+1], result[i+4], (len - i - 3) * sizeof(Char));
-          move('&lt;', result[i], 4 * sizeof(Char));
-        end;
-      '''':
-        begin
-          len := len + 5;
-          setlength(result, len);
-          move(result[i+1], result[i+6], (len - i - 5) * sizeof(Char));
-          move('&apos;', result[i], 6 * sizeof(Char));
-        end;
-      '"':
-        begin
-          len := len + 5;
-          setlength(result, len);
-          move(result[i+1], result[i+6], (len - i - 5) * sizeof(Char));
-          move('&quot;', result[i], 6 * sizeof(Char));
-        end;
-    end;
-  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -661,7 +572,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function AttribToColor32(const attrib: TAttrib; var color: TColor32): Boolean;
+function AttribToColor32(attrib: PAttrib; var color: TColor32): Boolean;
 var
   i: integer;
   j: Cardinal;
@@ -722,7 +633,8 @@ begin
     color :=  c;
   end else
   begin
-    i := ColorConstList.IndexOf(string(attrib.GetValue));
+    with attrib^ do
+      i := ColorConstList.IndexOf(string(AnsiLowercase(value, valueLen)));
     if i < 0 then Exit;
     color := Cardinal(ColorConstList.Objects[i]);
   end;
@@ -865,7 +777,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function AttribToFloat(const attrib: TAttrib; var value: double): Boolean;
+function AttribToFloat(attrib: PAttrib; var value: double): Boolean;
 var
   c: PAnsiChar;
 begin
@@ -874,7 +786,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure AttribToOpacity(const attrib: TAttrib; var color: TColor32);
+procedure AttribToOpacity(attrib: PAttrib; var color: TColor32);
 var
   opacity: double;
 begin
@@ -908,22 +820,36 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// TDefsElement
+//------------------------------------------------------------------------------
+
+constructor TDefsElement.Create(parent: TElement; hashName: Cardinal);
+begin
+  inherited;
+  fDrawInfo.inDefs := true;
+end;
+
+//------------------------------------------------------------------------------
 // TUseElement
 //------------------------------------------------------------------------------
 
-procedure TUseElement.DoHrefClone(refEl: TElement);
+function TUseElement.LoadAttributes: Boolean;
 var
   attrib: PAttrib;
   h: Cardinal;
   i: integer;
 begin
+  Result := inherited;
+  if not Result then Exit;
 
+  surrogate := TElementClass(refEl.ClassType).Create(fParent, refEl.fNameHash);
   if refEl.fNameHash = hPolyline then
-    surrogate := TPolyElement.Create(fParent, refEl.fNameHash, false) else
-    surrogate := TElementClass(refEl.ClassType).Create(fParent, refEl.fNameHash);
+    TPolyElement(surrogate).isClosed := False;
 
-//  tmpAttribs := fAttribs;
-//  fAttribs := nil;
+  surrogate.fName := refEl.fName;
+  surrogate.fDrawInfo := refEl.fParent.fDrawInfo;
+  surrogate.fDrawInfo.matrix := IdentityMatrix;
+  surrogate.fDrawInfo.inDefs := fDrawInfo.inDefs;
 
   for i := 0 to High(refEl.fAttribs) do
     with refEl.fAttribs[i] do
@@ -938,7 +864,29 @@ begin
           attrib.nameLen := nameLen;
           attrib.value := value;
           attrib.valueLen := valueLen;
-          ProcessAttrib(attrib^);
+          ProcessAttrib(attrib);
+        end;
+      end;
+    end;
+
+  MatrixTranslate(surrogate.fDrawInfo.matrix, pt.X, pt.Y);
+  surrogate.fDrawInfo.matrix :=
+    MatrixMultiply(fDrawInfo.matrix, surrogate.fDrawInfo.matrix);
+
+  for i := 0 to High(fAttribs) do
+    with fAttribs[i] do
+    begin
+      h := GetHashedName(aname, nameLen);
+      case h of
+        hHref, hX, hY, hXlink_058_Href, hTransform: continue;
+      else
+        begin
+          attrib := surrogate.AddAttribute;
+          attrib.aname := aname;
+          attrib.nameLen := nameLen;
+          attrib.value := value;
+          attrib.valueLen := valueLen;
+          ProcessAttrib(attrib);
         end;
       end;
     end;
@@ -1036,9 +984,8 @@ end;
 constructor TShapeElement.Create(parent: TElement; hashName: Cardinal);
 begin
   inherited;
-  fReader.fShapesList.Add(Self);
   SetLength(paths, 1);
-  isClosed := true;
+  self.isClosed := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -1181,7 +1128,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPathElement.ParseD(const attrib: TAttrib);
+procedure TPathElement.ParseD(attrib: PAttrib);
 var
   i: integer;
   d: double;
@@ -1329,31 +1276,6 @@ function TPathElement.GetPathCount: integer;
 begin
   Result := Length(dpaths);
 end;
-//------------------------------------------------------------------------------
-
-
-//function TPathElement.Save: AnsiString;
-//
-//  function SegTypeToChar(st: TDsegType): AnsiChar;
-//  begin
-//    case st of
-//      dsMove:     Result := 'M';
-//      dsLine:     Result := 'L';
-//      dsHorz:     Result := 'H';
-//      dsVert:     Result := 'V';
-//      dsArc:      Result := 'A';
-//      dsQBez:     Result := 'Q';
-//      dsCBez:     Result := 'C';
-//      dsQSpline:  Result := 'T';
-//      dsCSpline:  Result := 'S';
-//      dsClose:    Result := 'Z';
-//      else Result := '?';
-//    end;
-//  end;
-//
-//begin
-//  //todo :)
-//end;
 //------------------------------------------------------------------------------
 
 procedure TPathElement.Flatten(index: integer;
@@ -1515,15 +1437,14 @@ end;
 // TPolyElement
 //------------------------------------------------------------------------------
 
-constructor TPolyElement.Create(parent: TElement;
-  hashName: Cardinal; isClosed: Boolean);
+constructor TPolyElement.Create(parent: TElement; hashName: Cardinal);
 begin
   inherited Create(parent, hashName);
-  Self.isClosed := isClosed;
+  Self.isClosed := (hashName <> hPolyline);
 end;
 //------------------------------------------------------------------------------
 
-procedure TPolyElement.ParsePoints(const attrib: TAttrib);
+procedure TPolyElement.ParsePoints(attrib: PAttrib);
 var
   currCnt, currCap: integer;
 
@@ -1557,9 +1478,9 @@ end;
 
 constructor TLineElement.Create(parent: TElement; hashName: Cardinal);
 begin
+  inherited;
   SetLength(paths[0], 2);
   paths[0][0] := NullPointD; paths[0][1] := NullPointD;
-  inherited;
 end;
 
 //------------------------------------------------------------------------------
@@ -1611,20 +1532,19 @@ end;
 
 procedure TStyleElement.LoadContent;
 var
-  i, nameLen, len, cap: integer;
+  i, nameLen, len, cap, styleLen: integer;
   hash: Cardinal;
-  pname, pstyle: PAnsiChar;
+  pClassName, pstyle: PAnsiChar;
   names: array of string;
-  style: AnsiString;
 
-  procedure AddName(const name: AnsiString);
+  procedure AddName(const name: string);
   begin
     if len = cap then
     begin
       cap := cap + buffSize;
       SetLength(names, cap);
     end;
-    names[len] := string(name);
+    names[len] := name;
     inc(len);
   end;
 
@@ -1643,8 +1563,8 @@ begin
   begin
     //get one or more class names for each pending style
     inc(fCurrent);
-    GetElemOrAttribName(pname, nameLen);
-    AddName(AnsiLowercase(pname, nameLen));
+    GetElemOrAttribName(pClassName, nameLen);
+    AddName(String(AnsiLowercase(pClassName, nameLen)));
     if PeekChar = ',' then
     begin
       inc(fCurrent);
@@ -1660,12 +1580,13 @@ begin
     while (fCurrent < fCurrentEnd) and (fCurrent^ <> '}') do
       inc(fCurrent);
     if (fCurrent = fCurrentEnd) then break;
-    style := AnsiLowerCase(pstyle, fCurrent - pstyle);
+    styleLen := fCurrent - pstyle;
 
     //finally, for each class name add this style
     //todo - check for existing classes and append styles
     for i := 0 to High(names) do
-      fReader.fClassesList.Add(string(names[i]), style);
+      fReader.fClassesList.Add(string(names[i]),
+        AnsiLowercase(pstyle, styleLen));
     names := nil;
     len := 0; cap := 0;
     inc(fCurrent);
@@ -1683,37 +1604,6 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TAttrib
-//------------------------------------------------------------------------------
-
-function TAttrib.GetName: AnsiString;
-var
-  i: integer;
-  c: PAnsiChar;
-begin
-  SetLength(Result, nameLen);
-  c := aname;
-  for i := 1 to nameLen do
-  begin
-    Result[i] := LowerCaseTable[c^]; inc(c);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function TAttrib.GetValue: AnsiString;
-var
-  i: integer;
-  c: PAnsiChar;
-begin
-  SetLength(Result, valueLen);
-  c := value;
-  for i := 1 to valueLen do
-  begin
-    Result[i] := LowerCaseTable[c^]; inc(c);
-  end;
-end;
-
-//------------------------------------------------------------------------------
 // TElement
 //------------------------------------------------------------------------------
 
@@ -1727,7 +1617,7 @@ begin
 
   if not Assigned(parent) then Exit; //svg root element
 
-  self.fParent      := parent;
+  self.fParent := parent;
   fReader      := parent.fReader;
   fCurrentEnd  := fReader.fEndStream;
   fDrawInfo    := parent.fDrawInfo;
@@ -1800,7 +1690,8 @@ end;
 function TElement.LoadAttributes: Boolean;
 var
   attrib: PAttrib;
-  savedCurrent: PAnsiChar;
+  savedNext: PAnsiChar;
+  //oldP, newP: Pointer; //debugging
 begin
   Result := false;
   fHasContent := true;
@@ -1822,14 +1713,23 @@ begin
     GetAttribValue(attrib.value, attrib.valueLen);
     if fCurrent^ <> '"' then Exit; //end of attrib. value
     inc(fCurrent);
-    savedCurrent := fCurrent;
-    ProcessAttrib(attrib^);
-    fCurrent := savedCurrent;
+
+    savedNext := attrib.value + attrib.valueLen +1;
+    //nb: ProcessAttrib below often adds additional attributes
+    //that exceeds the hidden reserved fAttrib array capacity.
+    //This precipitates memory reallocation and results in
+    //the 'attrib' pointer below becoming stale.
+    //oldP := Pointer(fAttribs);
+    ProcessAttrib(attrib);
+    //newP := Pointer(fAttribs);
+    //if newP <> oldP then
+    //  messagebeep(0); //and 'attrib' will be stale
+    fCurrent := savedNext; //this is definitely safe
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.ProcessAttrib(const attrib: TAttrib);
+procedure TElement.ProcessAttrib(const attrib: PAttrib);
 var
   i: integer;
   hash: Cardinal;
@@ -1863,6 +1763,7 @@ var
   hashedName: Cardinal;
   name, savedCurrent: PAnsiChar;
   nameLen: integer;
+  tmpEl: TElement;
 begin
   Result := nil;
   savedCurrent := fCurrent;
@@ -1871,11 +1772,14 @@ begin
   hashedName := GetHashedName(name, nameLen);
   case hashedName of
     hCircle         : Result := TCircleElement.Create(self, hashedName);
+    hDefs           : Result := TDefsElement.Create(self, hashedName);
     hEllipse        : Result := TEllipseElement.Create(self, hashedName);
+    hG              : Result := TElement.Create(self, hashedName);
+    hLine           : Result := TLineElement.Create(self, hashedName);
     hLineargradient : Result := TLinGradElement.Create(self, hashedName);
     hPath           : Result := TPathElement.Create(self, hashedName);
-    hPolyline       : Result := TPolyElement.Create(self, hashedName, false);
-    hPolygon        : Result := TPolyElement.Create(self, hashedName, true);
+    hPolyline       : Result := TPolyElement.Create(self, hashedName);
+    hPolygon        : Result := TPolyElement.Create(self, hashedName);
     hRadialgradient : Result := TRadGradElement.Create(self, hashedName);
     hRect           : Result := TRectElement.Create(self, hashedName);
     hStop           : Result := TGradStopElement.Create(self, hashedName);
@@ -1884,11 +1788,26 @@ begin
     else              Result := TElement.Create(self, hashedName);
   end;
 
-  if not Result.fIsValid then
+  if not Result.fIsValid or not Result.LoadAttributes then
   begin
     FreeAndNil(Result);
+    fIsValid := false;
     Exit;
   end;
+
+  if Assigned(Result.surrogate) then
+  begin
+    tmpEl := Result.surrogate;
+    tmpEl.fHasContent := Result.fHasContent;
+    tmpEl.fCurrent := Result.fCurrent;
+    Result.Free;
+    Result := tmpEl;
+  end;
+
+  fChilds.Add(Result);
+  if (Result is TShapeElement) and not Result.fDrawInfo.inDefs then
+    fReader.fShapesList.Add(Result);
+
   fCurrent := Result.fCurrent;
 end;
 //------------------------------------------------------------------------------
@@ -1901,58 +1820,54 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.ParseClassAttrib(const classAttrib: TAttrib);
+procedure TElement.ParseClassAttrib(classAttrib: PAttrib);
 var
   i: integer;
   className: AnsiString;
-  style: AnsiString;
+  classRec: PAnsiRec;
 begin
-  className := AnsiName(classAttrib.value, classAttrib.valueLen);
+  className := AnsiLowercase(classAttrib.value, classAttrib.valueLen);
   i := classAttrib.ownerEl.fReader.fClassesList.IndexOf(string(classname));
   if i < 0 then Exit;
-  style := PAnsiStringRec(classAttrib.ownerEl.fReader.fClassesList.objects[i]).str;
-  ParseStyle(style);
+  classRec := PAnsiRec(classAttrib.ownerEl.fReader.fClassesList.objects[i]);
+  with classRec^ do
+    ParseStyle(PAnsiChar(ansi), Length(ansi));
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.ParseStyle(style: AnsiString);
+procedure TElement.ParseStyle(classStyle: PAnsiChar; len: integer);
 var
-  attribCnt, nameLen: integer;
+  nameLen: integer;
   newAt: PAttrib;
-  current, endC, name: PAnsiChar;
+  current, endCurrent, styleName: PAnsiChar;
   c: AnsiChar;
 begin
-  attribCnt := Length(fAttribs);
-  current := @style[1];
-  endC := current + Length(style);
+  current := classStyle;
+  endCurrent := current + len;
 
-  while SkipBlanks(current, endC) do
+  while SkipBlanks(current, endCurrent) do
   begin
-    name := current;
-    nameLen := GetStyleNameLen(current, endC);
+    styleName := current;
+    nameLen := GetStyleNameLen(current, endCurrent);
     if nameLen = 0 then Break;
 
-    SetLength(fAttribs, attribCnt +1);
-    newAt := @fAttribs[attribCnt];
-    inc(attribCnt);
-
-    newAt.ownerEl := self;
-    newAt.aname := name;
+    newAt := AddAttribute;
+    newAt.aname := styleName;
     newAt.nameLen := nameLen;
 
-    if not GetChar(current, endC, c) or (c <> ':') or  //syntax check
-      not SkipBlanks(current,endC) then Break;
+    if not GetChar(current, endCurrent, c) or (c <> ':') or  //syntax check
+      not SkipBlanks(current,endCurrent) then Break;
     newAt.value := current;
     inc(current);
-    while (current < endC) and (current^ <> ';') do inc(current);
+    while (current < endCurrent) and (current^ <> ';') do inc(current);
     newAt.valueLen := current - newAt.value;
     inc(current);
-    ProcessAttrib(newAt^);
+    ProcessAttrib(newAt);
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.ParseTransform(transform: AnsiString);
+procedure TElement.ParseTransform(transform: PAnsiChar; len: integer);
 var
   i: integer;
   current, endC: PAnsiChar;
@@ -1960,7 +1875,8 @@ var
 
   word: AnsiString;
   values: array[0..5] of double;
-  mat: PMatrixD;
+  mat: TMatrixD;
+  pMat: PMatrixD;
   mats: array of TMatrixD;
 
   function NewMatrix: PMatrixD;
@@ -1974,8 +1890,8 @@ var
   end;
 
 begin
-  current := @transform[1];
-  endC := current + Length(transform);
+  current := transform;
+  endC := current + len;
 
   //surprisingly, and I think this is a bug in SVG not a feature ...
   //transform operations must be performed in reverse order
@@ -1997,51 +1913,55 @@ begin
     end;
     if not GetChar(current, endC, c) or (c <> ')') then Exit; //syntax check
 
-    mat := NewMatrix;
+    pMat := NewMatrix;
     case word[5] of
       'e' : //scalE
         if not IsValid(values[1]) then
-          MatrixScale(mat^, values[0]) else
-            MatrixScale(mat^, values[0], values[1]);
+          MatrixScale(pMat^, values[0]) else
+            MatrixScale(pMat^, values[0], values[1]);
       'i' : //matrIx
         if IsValid(values[5]) then
         begin
-          mat[0,0] :=  values[0];
-          mat[0,1] :=  values[1];
-          mat[1,0] :=  values[2];
-          mat[1,1] :=  values[3];
-          mat[2,0] :=  values[4];
-          mat[2,1] :=  values[5];
+          pMat[0,0] :=  values[0];
+          pMat[0,1] :=  values[1];
+          pMat[1,0] :=  values[2];
+          pMat[1,1] :=  values[3];
+          pMat[2,0] :=  values[4];
+          pMat[2,1] :=  values[5];
         end;
       's' : //tranSlateX, tranSlateY & tranSlate
         if Length(word) =10  then
         begin
           if LowerCaseTable[word[10]] = 'x' then
-            MatrixTranslate(mat^, values[0], 0)
+            MatrixTranslate(pMat^, values[0], 0)
           else if LowerCaseTable[word[10]] = 'y' then
-            MatrixTranslate(mat^, 0, values[0]);
+            MatrixTranslate(pMat^, 0, values[0]);
         end
         else if IsValid(values[1]) then
-          MatrixTranslate(mat^, values[0], values[1])
+          MatrixTranslate(pMat^, values[0], values[1])
         else
-          MatrixTranslate(mat^, values[0], 0);
+          MatrixTranslate(pMat^, values[0], 0);
       't' : //rotaTe
         if IsValid(values[2]) then
-          MatrixRotate(mat^, PointD(values[1],values[2]), DegToRad(values[0]))
+          MatrixRotate(pMat^, PointD(values[1],values[2]), DegToRad(values[0]))
         else
-          MatrixRotate(mat^, NullPointD, DegToRad(values[0]));
+          MatrixRotate(pMat^, NullPointD, DegToRad(values[0]));
        'x' : //skewX
          begin
-            MatrixSkew(mat^, DegToRad(values[0]), 0);
+            MatrixSkew(pMat^, DegToRad(values[0]), 0);
          end;
        'y' : //skewY
          begin
-            MatrixSkew(mat^, 0, DegToRad(values[0]));
+            MatrixSkew(pMat^, 0, DegToRad(values[0]));
          end;
     end;
   end;
-  for i := High(mats) downto 0 do
-    fDrawInfo.matrix := MatrixMultiply(mats[i], fDrawInfo.matrix);
+
+  if not assigned(mats) then Exit;
+  mat := mats[0];
+  for i := 1 to High(mats) do
+    mat := MatrixMultiply(mat, mats[i]);
+  fDrawInfo.matrix := MatrixMultiply(fDrawInfo.matrix, mat);
 end;
 //------------------------------------------------------------------------------
 
@@ -2052,7 +1972,7 @@ end;
 
 procedure TElement.LoadContent;
 var
-  el, el2: TElement;
+  el: TElement;
   hash: Cardinal;
 begin
   while SkipBlanks(fCurrent, fCurrentEnd) do
@@ -2085,25 +2005,9 @@ begin
       begin
         //load a child element
         el := LoadChild;
-        if not Assigned(el) then
-          Break
-        else if not el.LoadAttributes then
-        begin
-          if Assigned(el.surrogate) then el.surrogate.Free;
-          el.Free;
-          break;
-        end
-        else if Assigned(el.surrogate) then
-        begin
-          el2 := el.surrogate;
-          el2.fHasContent := el.fHasContent;
-          el2.fCurrent := el.fCurrent;
-          el.Free;
-          el := el2;
-        end;
-        fChilds.Add(el);
-        if el.fHasContent then
-          el.LoadContent;
+        if not Assigned(el) then Break;
+
+        if el.fHasContent then el.LoadContent;
         fCurrent := el.fCurrent;
       end;
     end
@@ -2119,22 +2023,6 @@ begin
       while (fCurrent < fCurrentEnd) and (fCurrent^ <> '<') do inc(fCurrent);
     end;
   end;
-end;
-//------------------------------------------------------------------------------
-
-function TElement.FindAttribute(const attribName: AnsiString): PAttrib;
-var
-  i, nLen: integer;
-begin
-  Result := nil;
-  nLen := Length(attribName);
-  for i := 0 to High(fAttribs) do
-    with fAttribs[i] do
-      if (nLen = nameLen) and CompareNames(attribName, aname, nLen) then
-    begin
-      Result := @fAttribs[i];
-      Break;
-    end;
 end;
 //------------------------------------------------------------------------------
 
@@ -2165,7 +2053,7 @@ begin
   fIdList.Duplicates := dupError;
   fIdList.Sorted  := True;
 
-  fClassesList    := TStrStrList.Create;
+  fClassesList    := TStrAnsiList.Create;
   fClassesList.Duplicates := dupIgnore;
   fClassesList.Sorted := True;
 
@@ -2199,7 +2087,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DeScaleMatrix(mat: TMatrixD): double;
+function ExtractScaleFromMatrix(mat: TMatrixD): double;
 begin
     Result := Sqrt(mat[0][1]*mat[0][1] + mat[1][1]*mat[1][1]);
 end;
@@ -2214,7 +2102,7 @@ var
   closedPP, openPP: TPathsD;
   pt1, pt2: TPointD;
   gradEl: TGradientElement;
-  offsetAndScaleMat, mat: TMatrixD;
+  mat: TMatrixD;
 const
   endStyle: array[boolean] of TEndStyle = (esPolygon, esRound);
 begin
@@ -2304,7 +2192,7 @@ begin
             end;
       end;
 
-      sy := DeScaleMatrix(mat);
+      sy := ExtractScaleFromMatrix(mat);
 
       if Assigned(closedPP) then
       begin
@@ -2407,7 +2295,7 @@ var
 begin
   if not Assigned(fRootElement) then Exit;
   fViewbox := NullRectD;
-  attrib := fRootElement.FindAttribute('viewbox');
+  attrib := fRootElement.FindAttribute(hViewbox);
   if Assigned(attrib) then
   begin
     c := PAnsiChar(attrib.value);
@@ -2459,15 +2347,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure GradientTransform(const attrib: TAttrib);
+procedure GradientTransform(attrib: PAttrib);
 begin
   if attrib.ownerEl is TGradientElement then
     with TGradientElement(attrib.ownerEl) do
-      ParseTransform(AnsiName(attrib.value, attrib.valueLen));
+      ParseTransform(attrib.value, attrib.valueLen);
 end;
 //------------------------------------------------------------------------------
 
-procedure Gradientunits(const attrib: TAttrib);
+procedure Gradientunits(attrib: PAttrib);
 begin
   if attrib.ownerEl is TGradientElement then
     with TGradientElement(attrib.ownerEl) do
@@ -2475,11 +2363,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Id(const attrib: TAttrib);
+procedure Id(attrib: PAttrib);
 var
   id: AnsiString;
 begin
-  with attrib do
+  with attrib^ do
   begin
     id := AnsiLowercase(value, valueLen);
     ownerEl.fReader.fIdList.AddObject(string(id), ownerEl);
@@ -2487,11 +2375,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Href(const attrib: TAttrib);
+procedure Href(attrib: PAttrib);
 var
   el, refEl: TElement;
 begin
-  with attrib do
+  with attrib^ do
   begin
     el := attrib.ownerEl;
     case el.fNameHash of
@@ -2505,87 +2393,86 @@ begin
         begin
           refEl := el.FindRefElement(value, valueLen);
           if assigned(refEl) and (el is TUseElement) then
-            TUseElement(el).DoHrefClone(refEl);
+            TUseElement(el).refEl := refEl;
         end;
     end;
-
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure Class_(const attrib: TAttrib);
+procedure Class_(attrib: PAttrib);
 begin
   if attrib.ownerEl is TShapeElement then
     TShapeElement(attrib.ownerEl).ParseClassAttrib(attrib);
 end;
 //------------------------------------------------------------------------------
 
-procedure D_(const attrib: TAttrib);
+procedure D_(attrib: PAttrib);
 begin
   if attrib.ownerEl is TPathElement then
     TPathElement(attrib.ownerEl).ParseD(attrib);
 end;
 //------------------------------------------------------------------------------
 
-procedure Fill(const attrib: TAttrib);
+procedure Fill(attrib: PAttrib);
 begin
   AttribToColor32(attrib, attrib.ownerEl.fDrawInfo.fillColor);
 end;
 //------------------------------------------------------------------------------
 
-procedure FillOpacity(const attrib: TAttrib);
+procedure FillOpacity(attrib: PAttrib);
 begin
   AttribToOpacity(attrib, attrib.ownerEl.fDrawInfo.fillColor);
 end;
 //------------------------------------------------------------------------------
 
-procedure Offset_(const attrib: TAttrib);
+procedure Offset_(attrib: PAttrib);
 begin
   if attrib.ownerEl is TGradStopElement then
     AttribToFloat(attrib, TGradStopElement(attrib.ownerEl).offset);
 end;
 //------------------------------------------------------------------------------
 
-procedure StopColor(const attrib: TAttrib);
+procedure StopColor(attrib: PAttrib);
 begin
   if attrib.ownerEl is TGradStopElement then
     AttribToColor32(attrib, TGradStopElement(attrib.ownerEl).color);
 end;
 //------------------------------------------------------------------------------
 
-procedure StopOpacity(const attrib: TAttrib);
+procedure StopOpacity(attrib: PAttrib);
 begin
   if attrib.ownerEl is TGradStopElement then
   AttribToOpacity(attrib, TGradStopElement(attrib.ownerEl).color);
 end;
 //------------------------------------------------------------------------------
 
-procedure Points(const attrib: TAttrib);
+procedure Points(attrib: PAttrib);
 begin
   if attrib.ownerEl is TPolyElement then
     TPolyElement(attrib.ownerEl).ParsePoints(attrib);
 end;
 //------------------------------------------------------------------------------
 
-procedure Stroke(const attrib: TAttrib);
+procedure Stroke(attrib: PAttrib);
 begin
   AttribToColor32(attrib, attrib.ownerEl.fDrawInfo.strokeColor);
 end;
 //------------------------------------------------------------------------------
 
-procedure StrokeOpacity(const attrib: TAttrib);
+procedure StrokeOpacity(attrib: PAttrib);
 begin
   AttribToOpacity(attrib, attrib.ownerEl.fDrawInfo.strokeColor);
 end;
 //------------------------------------------------------------------------------
 
-procedure StrokeWidth(const attrib: TAttrib);
+procedure StrokeWidth(attrib: PAttrib);
 begin
     AttribToFloat(attrib, attrib.ownerEl.fDrawInfo.strokeWidth);
 end;
 //------------------------------------------------------------------------------
 
-procedure FillRule(const attrib: TAttrib);
+procedure FillRule(attrib: PAttrib);
 begin
   if LowerCaseTable[attrib.value[0]] = 'e' then
     attrib.ownerEl.fDrawInfo.fillRule := frEvenOdd else
@@ -2593,25 +2480,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Style(const attrib: TAttrib);
-var
-  style: AnsiString;
+procedure Style(attrib: PAttrib);
 begin
-  style := AnsiName(attrib.value, attrib.valueLen);
-  attrib.ownerEl.ParseStyle(style);
+  attrib.ownerEl.ParseStyle(attrib.value, attrib.valueLen);
 end;
 //------------------------------------------------------------------------------
 
-procedure Transform(const attrib: TAttrib);
-var
-  transform: AnsiString;
+procedure Transform(attrib: PAttrib);
 begin
-  transform := AnsiName(attrib.value, attrib.valueLen);
-  attrib.ownerEl.ParseTransform(transform);
+  attrib.ownerEl.ParseTransform(attrib.value, attrib.valueLen);
 end;
 //------------------------------------------------------------------------------
 
-procedure Height_(const attrib: TAttrib);
+procedure Height_(attrib: PAttrib);
 begin
   case attrib.ownerEl.fNameHash of
     hRect:
@@ -2621,7 +2502,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Width_(const attrib: TAttrib);
+procedure Width_(attrib: PAttrib);
 begin
   case attrib.ownerEl.fNameHash of
     hRect:
@@ -2631,7 +2512,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Cx_(const attrib: TAttrib);
+procedure Cx_(attrib: PAttrib);
 begin
   case attrib.ownerEl.fNameHash of
     hCircle:
@@ -2644,7 +2525,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Cy_(const attrib: TAttrib);
+procedure Cy_(attrib: PAttrib);
 begin
   case attrib.ownerEl.fNameHash of
     hCircle:
@@ -2657,7 +2538,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Rx_(const attrib: TAttrib);
+procedure Rx_(attrib: PAttrib);
 begin
   case attrib.ownerEl.fNameHash of
     hRect:
@@ -2673,7 +2554,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Ry_(const attrib: TAttrib);
+procedure Ry_(attrib: PAttrib);
 begin
   case attrib.ownerEl.fNameHash of
     hRect:
@@ -2686,7 +2567,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure X1_(const attrib: TAttrib);
+procedure X1_(attrib: PAttrib);
 begin
   case attrib.ownerEl.fNameHash of
     hRect:
@@ -2698,11 +2579,14 @@ begin
     hLinearGradient:
       with TLinGradElement(attrib.ownerEl) do
         AttribToFloat(attrib, startPt.X);
+    hUse:
+      with TUseElement(attrib.ownerEl) do
+        AttribToFloat(attrib, pt.X);
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure X2_(const attrib: TAttrib);
+procedure X2_(attrib: PAttrib);
 begin
   case attrib.ownerEl.fNameHash of
     hLine:
@@ -2715,7 +2599,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Y1_(const attrib: TAttrib);
+procedure Y1_(attrib: PAttrib);
 begin
   case attrib.ownerEl.fNameHash of
     hRect:
@@ -2727,11 +2611,14 @@ begin
     hLinearGradient:
       with TLinGradElement(attrib.ownerEl) do
         AttribToFloat(attrib, startPt.Y);
+    hUse:
+      with TUseElement(attrib.ownerEl) do
+        AttribToFloat(attrib, pt.Y);
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure Y2_(const attrib: TAttrib);
+procedure Y2_(attrib: PAttrib);
 begin
   case attrib.ownerEl.fNameHash of
     hLine:
@@ -2764,30 +2651,30 @@ begin
   AttribFuncList := TStringList.Create;
   AttribFuncList.Duplicates := dupError;
 
-  RegisterAttribute('class',              Class_);
-  RegisterAttribute('cx',                 Cx_);
-  RegisterAttribute('cy',                 Cy_);
-  RegisterAttribute('d',                  D_);
-  RegisterAttribute('fill',               Fill);
-  RegisterAttribute('fill-opacity',       FillOpacity);
-  RegisterAttribute('fill-fule',          FillRule);
+  RegisterAttribute(hClass,               Class_);
+  RegisterAttribute(hCx,                  Cx_);
+  RegisterAttribute(hCy,                  Cy_);
+  RegisterAttribute(hD,                   D_);
+  RegisterAttribute(hFill,                Fill);
+  RegisterAttribute(hFill_045_Opacity,    FillOpacity);
+  RegisterAttribute(hFill_045_Rule,       FillRule);
   RegisterAttribute(hGradientTransform,   GradientTransform);
   RegisterAttribute(hGradientUnits,       GradientUnits);
   RegisterAttribute(hHeight,              Height_);
   RegisterAttribute(hHref,                Href);
   RegisterAttribute(hId,                  Id);
-  RegisterAttribute('offset',             Offset_);
-  RegisterAttribute('points',             Points);
-  RegisterAttribute('r',                  Rx_);
-  RegisterAttribute('rx',                 Rx_);
-  RegisterAttribute('ry',                 Ry_);
+  RegisterAttribute(hOffset,              Offset_);
+  RegisterAttribute(hPoints,              Points);
+  RegisterAttribute(hR,                   Rx_);
+  RegisterAttribute(hRx,                  Rx_);
+  RegisterAttribute(hRy,                  Ry_);
   RegisterAttribute(hStop_045_Color,      StopColor);
   RegisterAttribute(hStop_045_Opacity,    StopOpacity);
-  RegisterAttribute('stroke',             Stroke);
-  RegisterAttribute('stroke-opacity',     StrokeOpacity);
-  RegisterAttribute('stroke-width',       StrokeWidth);
-  RegisterAttribute('style',              Style);
-  RegisterAttribute('transform',          Transform);
+  RegisterAttribute(hStroke,              Stroke);
+  RegisterAttribute(hStroke_045_Opacity,  StrokeOpacity);
+  RegisterAttribute(hStroke_045_Width,    StrokeWidth);
+  RegisterAttribute(hStyle,               Style);
+  RegisterAttribute(hTransform,           Transform);
   RegisterAttribute(hWidth,               Width_);
   RegisterAttribute(hX,                   X1_);
   RegisterAttribute(hX1,                  X1_);
