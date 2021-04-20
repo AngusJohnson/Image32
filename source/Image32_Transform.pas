@@ -33,10 +33,8 @@ type
     var x, y: double); overload; {$IFDEF INLINE} inline; {$ENDIF}
   procedure MatrixApply(const matrix: TMatrixD;
     var pt: TPointD); overload; {$IFDEF INLINE} inline; {$ENDIF}
-  procedure MatrixApply(const matrix: TMatrixD;
-    var path: TPathD); overload;
-  procedure MatrixApply(const matrix: TMatrixD;
-    var paths: TPathsD); overload;
+  procedure MatrixApply(const matrix: TMatrixD; var path: TPathD); overload;
+  procedure MatrixApply(const matrix: TMatrixD; var paths: TPathsD); overload;
   function MatrixInvert(var matrix: TMatrixD): Boolean;
 
   //MatrixSkew: dx represents the delta offset of an X coordinate as a

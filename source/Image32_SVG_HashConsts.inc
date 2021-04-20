@@ -11,6 +11,7 @@
   hFill                       = $A3AAAB69;    // Fill
   hFill_045_Opacity           = $18000C02;    // Fill-Opacity
   hFill_045_Rule              = $5264679F;    // Fill-Rule
+  hFont                       = $21461EC6;    // Font
   hG                          = $3593EB0B;    // G
   hGradientTransform          = $5B6A9CF7;    // GradientTransform
   hGradientUnits              = $07DD34B6;    // GradientUnits
@@ -39,7 +40,9 @@
   hStroke_045_Width           = $AFF671ED;    // Stroke-Width
   hStyle                      = $A9473AB4;    // Style
   hSvg                        = $ED67C37E;    // Svg
+  hText                       = $7F3B51AB;    // Text
   hTransform                  = $A0930B32;    // Transform
+  hTSpan                      = $33C1F865;    // TSpan
   hUrl                        = $BC113F8C;    // Url
   hUse                        = $65736EEA;    // Use
   hUserSpaceOnUse             = $3D19F8A4;    // UserSpaceOnUse

@@ -38,6 +38,9 @@ type
     function RectD: TRectD;
   end;
 
+  function RectWH(left, top, width, height: integer): TRectWH; overload;
+  function RectWH(left, top, width, height: double ): TRectWH; overload;
+
   function InflateRect(const rec: TRect; dx, dy: integer): TRect; overload;
   function InflateRect(const rec: TRectD; dx, dy: double): TRectD; overload;
 
@@ -50,6 +53,7 @@ type
 
   function Ellipse(const rec: TRect; steps: integer = 0): TPathD; overload;
   function Ellipse(const rec: TRectD; steps: integer = 0): TPathD; overload;
+  function Ellipse(const rec: TRectD; scale: double): TPathD; overload;
 
   function Circle(const pt: TPoint; radius: double): TPathD; overload;
   function Circle(const pt: TPointD; radius: double): TPathD; overload;
@@ -57,18 +61,20 @@ type
   function Star(const focalPt: TPointD;
     innerRadius, outerRadius: double; points: integer): TPathD;
 
-  function Arc(const rec: TRectD; startAngle, endAngle: double): TPathD;
-  function Pie(const rec: TRectD; StartAngle, EndAngle: double): TPathD;
+  function Arc(const rec: TRectD;
+    startAngle, endAngle: double; scale: double = 0): TPathD;
+  function Pie(const rec: TRectD;
+    StartAngle, EndAngle: double; scale: double = 0): TPathD;
 
-  function QuadraticBezier(const a,b,c: TPointD; t: double): TPointD;
   function FlattenQBezier(const pt1, pt2, pt3: TPointD): TPathD; overload;
   function FlattenQBezier(const pts: TPathD): TPathD; overload;
   function FlattenQBezier(const pts: TPathsD): TPathsD; overload;
+  function GetPointInQuadBezier(const a,b,c: TPointD; t: double): TPointD;
 
-  function CubicBezier(const a,b,c,d: TPointD; t: double): TPointD;
   function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD): TPathD; overload;
   function FlattenCBezier(const pts: TPathD): TPathD; overload;
   function FlattenCBezier(const pts: TPathsD): TPathsD; overload;
+  function GetPointInCubicBezier(const a,b,c,d: TPointD; t: double): TPointD;
 
   //FlattenCSpline: Approximates the 'S' command inside the 'd' property of an
   //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
@@ -97,9 +103,6 @@ type
     patternOffset: PDouble; lineWidth: double;
     joinStyle: TJoinStyle; endStyle: TEndStyle): TPathsD;
 
-  //CopyPaths: Because only dynamic string arrays are copy-on-write
-  //function CopyPaths(const paths: TPathsD): TPathsD;
-
   function OffsetPoint(const pt: TPoint; dx, dy: integer): TPoint; overload;
   function OffsetPoint(const pt: TPointD; dx, dy: double): TPointD; overload;
 
@@ -110,11 +113,17 @@ type
   function OffsetPath(const ppp: TArrayOfPathsD;
     dx, dy: double): TArrayOfPathsD; overload;
 
+  //CopyPath: note that only dynamic string arrays are copy-on-write
   function Paths(const path: TPathD): TPathsD;
   {$IFDEF INLINING} inline; {$ENDIF}
   function CopyPath(const path: TPathD): TPathD;
   {$IFDEF INLINING} inline; {$ENDIF}
   function CopyPaths(const paths: TPathsD): TPathsD;
+
+  function ScalePoint(const pt: TPointD; scale: double): TPointD; overload;
+  {$IFDEF INLINING} inline; {$ENDIF}
+  function ScalePoint(const pt: TPointD; sx, sy: double): TPointD; overload;
+  {$IFDEF INLINING} inline; {$ENDIF}
 
   function ScalePath(const path: TPathD;
     sx, sy: double): TPathD; overload;
@@ -177,9 +186,6 @@ type
   function Rect(const left,top,right,bottom: integer): TRect; overload;
 
   function Size(width, height: integer): TSize;
-
-  function RectWH(left, top, width, height: integer): TRectWH; overload;
-  function RectWH(left, top, width, height: double): TRectWH; overload;
 
   function Area(const path: TPathD): Double;
   function RectsEqual(const rec1, rec2: TRect): Boolean;
@@ -315,7 +321,6 @@ var
 
   CBezierTolerance: double  = 0.25;
   QBezierTolerance: double  = 0.25;
-  ArcTolerance    : double  = 0.25;
   UseDynamicTolerances: Boolean = true;
 
 resourcestring
@@ -855,7 +860,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
 function CopyPaths(const paths: TPathsD): TPathsD;
 var
   i, len1: integer;
@@ -915,6 +919,20 @@ begin
   setLength(result, len);
   for i := 0 to len -1 do
     result[i] := OffsetPath(ppp[i], dx, dy);
+end;
+//------------------------------------------------------------------------------
+
+function ScalePoint(const pt: TPointD; scale: double): TPointD;
+begin
+  Result.X := pt.X * scale;
+  Result.Y := pt.Y * scale;
+end;
+//------------------------------------------------------------------------------
+
+function ScalePoint(const pt: TPointD; sx, sy: double): TPointD;
+begin
+  Result.X := pt.X * sx;
+  Result.Y := pt.Y * sy;
 end;
 //------------------------------------------------------------------------------
 
@@ -1527,10 +1545,8 @@ begin
 
   if joinStyle = jsRound then
   begin
-    if abs(delta) < ArcTolerance then Exit;
-    if UseDynamicTolerances then
-      steps360 := Trunc(16*Sqrt(abs(delta))) else
-      steps360 := Pi / ArcCos(1 - ArcTolerance / abs(delta));
+    if abs(delta) < 0.25 then Exit;
+    steps360 := Trunc(4 * Sqrt(abs(delta)));
     stepsPerRad := steps360 / (Pi *2);
     GetSinCos(Pi*2/steps360, stepSin, stepCos);
   end;
@@ -2064,6 +2080,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function Ellipse(const rec: TRectD; scale: double): TPathD;
+var
+  steps: integer;
+begin
+  steps := Trunc(4 * Sqrt((rec.width + rec.Height) * scale));
+  Result := Ellipse(rec, steps);
+end;
+//------------------------------------------------------------------------------
+
+
 function Ellipse(const rec: TRect; steps: integer): TPathD;
 begin
   Result := Ellipse(RectD(rec), steps);
@@ -2073,7 +2099,6 @@ end;
 function Ellipse(const rec: TRectD; steps: integer): TPathD;
 var
   i: Integer;
-  f: double;
   sinA, cosA: double;
   centre, radius, delta: TPointD;
 begin
@@ -2081,18 +2106,13 @@ begin
   if rec.IsEmpty then Exit;
   with rec do
   begin
-    centre := PointD((left+right)/2, (top+bottom)/2);
-    radius := PointD(width/2, Height/2);
+    centre := rec.MidPoint;
+    radius := PointD(Width * 0.5, Height  * 0.5);
   end;
-  f := (radius.x + radius.y)/2;
-  if f < 0.5 then Exit;
 
   if steps < 3 then
   begin
-    if f < ArcTolerance then Exit;
-    if UseDynamicTolerances then
-      steps := Trunc(16*Sqrt(f)) else
-      steps := Trunc(Pi / ArcCos(1 - ArcTolerance/f));
+    steps := Trunc(4 * Sqrt(rec.width + rec.height));
     if steps < 4 then steps := 4;
   end;
   GetSinCos(2 * Pi / Steps, sinA, cosA);
@@ -2139,16 +2159,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Arc(const rec: TRectD; startAngle, endAngle: double): TPathD;
+function Arc(const rec: TRectD;
+  startAngle, endAngle: double; scale: double): TPathD;
 var
   i, steps: Integer;
-  angle, radiusAvg: double;
+  angle, avgRadius: double;
   sinA, cosA: double;
   centre, radius: TPointD;
   deltaX, deltaX2, deltaY: double;
 begin
   Result := nil;
   if (endAngle = startAngle) or IsEmptyRect(rec) then Exit;
+  if scale = 0 then scale := 1.0;
 
   if not ClockwiseRotationIsAnglePositive then
   begin
@@ -2159,17 +2181,17 @@ begin
   NormalizeAngle(startAngle);
   NormalizeAngle(endAngle);
 
-  centre := rec.MidPoint;
-  radius := PointD(rec.Width/2, rec.Height/2);
-  radiusAvg := (radius.X + radius.Y)/2;
+  with rec do
+  begin
+    centre := rec.MidPoint;
+    radius := PointD(Width * 0.5, Height  * 0.5);
+  end;
+
   if endAngle < startAngle then
     angle := endAngle - startAngle + angle360 else
     angle := endAngle - startAngle;
   //steps = (No. steps for a whole ellipse) * angle/(2*Pi)
-  if radiusAvg < ArcTolerance then Exit;
-  if UseDynamicTolerances then
-    steps := Trunc(16*Sqrt(radiusAvg) * angle) else
-    steps := Trunc(Pi/ArcCos(1 - ArcTolerance/radiusAvg) * angle/(2*Pi));
+  steps := Trunc(angle * 4 * Sqrt((rec.width + rec.height) * scale));
   if steps < 2 then steps := 2;
   SetLength(Result, Steps +1);
   //angle of the first step ...
@@ -2189,11 +2211,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Pie(const rec: TRectD; StartAngle, EndAngle: double): TPathD;
+function Pie(const rec: TRectD;
+  StartAngle, EndAngle: double; scale: double): TPathD;
 var
   len: integer;
 begin
-  result := Arc(rec, StartAngle, EndAngle);
+  result := Arc(rec, StartAngle, EndAngle, scale);
   len := length(result);
   setLength(result, len +1);
   result[len] := PointD((rec.Left + rec.Right)/2, (rec.Top + rec.Bottom)/2);
@@ -2539,7 +2562,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function QuadraticBezier(const a,b,c: TPointD; t: double): TPointD;
+function GetPointInQuadBezier(const a,b,c: TPointD; t: double): TPointD;
 var
   omt: double;
 begin
@@ -2648,7 +2671,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function CubicBezier(const a,b,c,d: TPointD; t: double): TPointD;
+function GetPointInCubicBezier(const a,b,c,d: TPointD; t: double): TPointD;
 var
   omt: double;
 begin
