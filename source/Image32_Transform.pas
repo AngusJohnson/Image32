@@ -33,6 +33,8 @@ type
     var x, y: double); overload; {$IFDEF INLINE} inline; {$ENDIF}
   procedure MatrixApply(const matrix: TMatrixD;
     var pt: TPointD); overload; {$IFDEF INLINE} inline; {$ENDIF}
+  procedure MatrixApply(const matrix: TMatrixD; var rec: TRect); overload;
+  procedure MatrixApply(const matrix: TMatrixD; var rec: TRectD); overload;
   procedure MatrixApply(const matrix: TMatrixD; var path: TPathD); overload;
   procedure MatrixApply(const matrix: TMatrixD; var paths: TPathsD); overload;
   function MatrixInvert(var matrix: TMatrixD): Boolean;
@@ -187,6 +189,33 @@ begin
   tmpX := pt.x;
   pt.X := tmpX * matrix[0, 0] + pt.Y * matrix[1, 0] + matrix[2, 0];
   pt.Y := tmpX * matrix[0, 1] + pt.Y * matrix[1, 1] + matrix[2, 1];
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixApply(const matrix: TMatrixD; var rec: TRect);
+var
+  l,t,b,r,tmpX: double;
+begin
+  tmpX := rec.Left;
+  l := tmpX * matrix[0, 0] + rec.Top * matrix[1, 0] + matrix[2, 0];
+  t := tmpX * matrix[0, 1] + rec.Top * matrix[1, 1] + matrix[2, 1];
+  tmpX := rec.Right;
+  r := tmpX * matrix[0, 0] + rec.Bottom * matrix[1, 0] + matrix[2, 0];
+  b := tmpX * matrix[0, 1] + rec.Bottom * matrix[1, 1] + matrix[2, 1];
+  rec := Rect(RectD(l,t,r,b));
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixApply(const matrix: TMatrixD; var rec: TRectD);
+var
+  tmpX: double;
+begin
+  tmpX := rec.Left;
+  rec.Left := tmpX * matrix[0, 0] + rec.Top * matrix[1, 0] + matrix[2, 0];
+  rec.Top := tmpX * matrix[0, 1] + rec.Top * matrix[1, 1] + matrix[2, 1];
+  tmpX := rec.Right;
+  rec.Right := tmpX * matrix[0, 0] + rec.Bottom * matrix[1, 0] + matrix[2, 0];
+  rec.Bottom := tmpX * matrix[0, 1] + rec.Bottom * matrix[1, 1] + matrix[2, 1];
 end;
 //------------------------------------------------------------------------------
 

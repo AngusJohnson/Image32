@@ -27,11 +27,16 @@
   hItalic                     = $F07E7786;    // Italic
   hLine                       = $7A6D718F;    // Line
   hLinearGradient             = $C16E9BCD;    // LinearGradient
+  hMarker                     = $72660BE9;    // Marker
+  hMarker_045_End             = $B06101FD;    // Marker-End
+  hMarker_045_Mid             = $FD95C733;    // Marker-Mid
+  hMarker_045_Start           = $CF854A0E;    // Marker-Start
   hMatrix                     = $31E3AD46;    // Matrix
   hMiddle                     = $80732990;    // Middle
   hMonospace                  = $049AE941;    // Monospace
   hObjectBoundingBox          = $3D4B4519;    // ObjectBoundingBox
   hOffset                     = $A13C79EF;    // Offset
+  hOrient                     = $EFF6C65A;    // Orient
   hPath                       = $AD8A7AB5;    // Path
   hPoints                     = $87F41B44;    // Points
   hPolygon                    = $509667FD;    // Polygon
@@ -39,6 +44,8 @@
   hR                          = $26014BE2;    // R
   hRadialGradient             = $B0D7E1F9;    // RadialGradient
   hRect                       = $FA3BCBEA;    // Rect
+  hRefX                       = $00C1DE46;    // RefX
+  hRefY                       = $480CECDB;    // RefY
   hRx                         = $3ABF70F3;    // Rx
   hRy                         = $0C7D9470;    // Ry
   hSans_045_Serif             = $95106804;    // Sans-Serif
@@ -48,6 +55,8 @@
   hStop_045_Color             = $9FD6E0BE;    // Stop-Color
   hStop_045_Opacity           = $FC7751F2;    // Stop-Opacity
   hStroke                     = $E04ABDF3;    // Stroke
+  hStroke_045_DashArray       = $795F2D78;    // Stroke-DashArray
+  hStroke_045_DashOffset      = $A418B357;    // Stroke-DashOffset
   hStroke_045_Opacity         = $D237C6B5;    // Stroke-Opacity
   hStroke_045_Width           = $AFF671ED;    // Stroke-Width
   hStyle                      = $A9473AB4;    // Style

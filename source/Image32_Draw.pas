@@ -128,8 +128,8 @@ type
     fIsVert          : Boolean;
   protected
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
-  public
     function Initialize(targetImage: TImage32): Boolean; override;
+  public
     procedure SetParameters(const startPt, endPt: TPointD;
       startColor, endColor: TColor32;
       gradFillStyle: TGradientFillStyle = gfsClamp);
@@ -144,8 +144,8 @@ type
     fColors         : TArrayOfColor32;
   protected
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
-  public
     function Initialize(targetImage: TImage32): Boolean; override;
+  public
     procedure SetParameters(const focalRect: TRect;
       innerColor, outerColor: TColor32;
       gradientFillStyle: TGradientFillStyle = gfsClamp);
@@ -161,8 +161,8 @@ type
     fColors         : TArrayOfColor32;
   protected
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
-  public
     function Initialize(targetImage: TImage32): Boolean; override;
+  public
     procedure SetParameters(const ellipseRect: TRect;
       const focus: TPoint; innerColor, outerColor: TColor32);
   end;
