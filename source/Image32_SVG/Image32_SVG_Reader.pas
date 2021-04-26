@@ -3,7 +3,7 @@ unit Image32_SVG_Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.23                                                            *
-* Date      :  23 April 2021                                                   *
+* Date      :  25 April 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2021                                         *
 *                                                                              *
@@ -14,7 +14,7 @@ unit Image32_SVG_Reader;
 * http://www.boost.org/LICENSE_1_0.txt                                         *
 *******************************************************************************)
 
-//still lots to do: clipPath, filters, lineCap, lineJoin etc
+//still lots to do: filters, lineCap, lineJoin etc
 
 interface
 
@@ -27,11 +27,12 @@ interface
 
 uses
   SysUtils, Classes, Types, Math,
-  Image32, Image32_Vector, Image32_Transform, Image32_Draw, Image32_Ttf;
+  Image32, Image32_Vector, Image32_Draw, Image32_Transform, Image32_Ttf;
 
 type
   TGradientElement = class;
-  TMarkerElement    = class;
+  TMarkerElement   = class;
+  TClipPathElement = class;
 
   TFontFamily = (ffSansSerif, ffSerif, ffMonospace);
   TFontSyle = (fsBold, fsItalic);
@@ -58,6 +59,8 @@ type
     markerStart   : TMarkerElement;
     markerMiddle  : TMarkerElement;
     markerEnd     : TMarkerElement;
+    clipPathEl    : TClipPathElement;
+    opacity       : Byte;
     //lineCap       : TEndStyle;     //stroke-linecap
     //lineJoin      : TJoinStyle;    //stroke-linejoin
     //miterLim      : double;        //stroke-miterlimit
@@ -121,8 +124,8 @@ type
     procedure ParseClassAttrib(classAttrib: PAttrib);
     procedure ParseStyle(classStyle: PAnsiChar; len: integer);
     procedure ParseTransform(transform: PAnsiChar; len: integer);
+    function AddAttribute: PAttrib;
   protected
-    function AddAttribute: PAttrib; virtual;
     function LoadAttributes: Boolean; virtual;
     procedure LoadContent; virtual;
     procedure AssignTo(var other: TElement); virtual;
@@ -136,7 +139,6 @@ type
     viewbox: TRectD;
     width: double;
     height: double;
-    procedure LoadViewbox(attrib: PAnsiChar; len: integer);
   public
     constructor Create(reader: TSvgReader; hashName: Cardinal); reintroduce;
   end;
@@ -156,21 +158,24 @@ type
     pt: TPointD;
     refEl: TElement;
     surrogate: TElement;
-    function AddAttribute: PAttrib; override;
     function LoadAttributes: Boolean; override;
   end;
 
   TShapeElement = class(TElement)
   protected
+    drawPathsF: TPathsD;
+    drawPathsO: TPathsD;
+    drawPathsC: TPathsD;
     function IsFilled: Boolean;
     function IsStroked: Boolean;
     function GetVal(out val: double): Boolean;
-    function GetDrawInfo: TDrawInfo;
+
+    procedure GetDrawPaths(ArcScale: double); virtual; abstract;
+    procedure DrawFilled(img: TImage32; matrix: TMatrixD); virtual;
+    procedure DrawStroke(img: TImage32; matrix: TMatrixD; isClosed: Boolean); virtual;
+    procedure Draw(img, tmpImg: TImage32; RootMatrix: TMatrixD); virtual;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
-    function GetPaths(ellipPrec: double;
-      out fillPaths, openPaths, closedPaths: TPathsD;
-      out drawInfo: TDrawInfo): Boolean; virtual;
   end;
 
   TDsegType = (dsMove, dsLine, dsHorz, dsVert, dsArc,
@@ -210,60 +215,43 @@ type
       out path: TPathD; out isClosed: Boolean);
   protected
     procedure ParseD(attrib: PAttrib);
-  public
-    function GetPaths(ellipPrec: double;
-      out fillPaths, openPaths, closedPaths: TPathsD;
-      out drawInfo: TDrawInfo): Boolean; override;
+    procedure GetDrawPaths(ArcScale: double); override;
   end;
 
   TPolyElement = class(TShapeElement) //polyline or polygon
   protected
     path: TPathD;
     procedure ParsePoints(attrib: PAttrib);
-  public
-    function GetPaths(ellipPrec: double;
-      out fillPaths, openPaths, closedPaths: TPathsD;
-      out drawInfo: TDrawInfo): Boolean; override;
+    procedure GetDrawPaths(ArcScale: double); override;
   end;
 
   TLineElement = class(TShapeElement)
   protected
     path: TPathD;
+    procedure GetDrawPaths(ArcScale: double); override;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
-    function GetPaths(ellipPrec: double;
-      out fillPaths, openPaths, closedPaths: TPathsD;
-      out drawInfo: TDrawInfo): Boolean; override;
   end;
 
   TCircleElement = class(TShapeElement)
   protected
     centerPt  : TPointD;
     radius    : double;
-  public
-    function GetPaths(ellipPrec: double;
-      out fillPaths, openPaths, closedPaths: TPathsD;
-      out drawInfo: TDrawInfo): Boolean; override;
+    procedure GetDrawPaths(ArcScale: double); override;
   end;
 
   TEllipseElement = class(TShapeElement)
   protected
     centerPt  : TPointD;
     radius    : TPointD;
-  public
-    function GetPaths(ellipPrec: double;
-      out fillPaths, openPaths, closedPaths: TPathsD;
-      out drawInfo: TDrawInfo): Boolean; override;
+    procedure GetDrawPaths(ArcScale: double); override;
   end;
 
   TRectElement = class(TShapeElement)
   protected
-    rec     : TRectWH;
-    radius  : TPointD;
-  public
-    function GetPaths(ellipPrec: double;
-      out fillPaths, openPaths, closedPaths: TPathsD;
-      out drawInfo: TDrawInfo): Boolean; override;
+    recWH     : TRectWH;
+    radius    : TPointD;
+    procedure GetDrawPaths(ArcScale: double); override;
   end;
 
   //TTextElement: although this is a TShapeElement descendant,
@@ -274,6 +262,7 @@ type
     delta     : TPointD;
     tmpX      : double;
     fontInfo  : TFontInfo;
+    procedure GetDrawPaths(ArcScale: double); override;
     procedure AddSubtext(text: PAnsiChar; len: integer);
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
@@ -283,10 +272,7 @@ type
   protected
     text: PAnsiChar;
     textLen: integer;
-  public
-    function GetPaths(ellipPrec: double;
-      out fillPaths, openPaths, closedPaths: TPathsD;
-      out drawInfo: TDrawInfo): Boolean; override;
+    procedure GetDrawPaths(ArcScale: double); override;
   end;
 
   TTSpanElement     = class(TSubtextElement)
@@ -299,13 +285,20 @@ type
   end;
 
   TMarkerElement = class(TShapeElement)
+  private
+    points: TPathD;
   protected
     ref: TPointD;
+    width: double;
+    height: double;
+    viewbox: TRectD;
+    angle: double;
+    callerEl: TShapeElement;
+    procedure SetSoloPoint(const pt: TPointD; angle: double);
+    procedure SetPoints(const points: TPathD);
+    procedure Draw(img, tmpImg: TImage32; RootMatrix: TMatrixD); override;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
-    function GetPaths(ellipPrec: double;
-      out fillPaths, openPaths, closedPaths: TPathsD;
-      out drawInfo: TDrawInfo): Boolean; override;
   end;
 
   TSvgColorStop = record
@@ -315,22 +308,31 @@ type
   TSvgColorStops = array of TSvgColorStop;
 
   TGradientElement = class(TElement)
-  private
-    fStops: TSvgColorStops;
-    fGradientUnits: Cardinal;
   protected
+    stops: TSvgColorStops;
+    gradientUnits: Cardinal;
     procedure LoadContent; override;
     procedure AddStop(color: TColor32; offset: double);
     procedure AssignTo(var other: TElement); override;
+    function PrepareGradientRenderer(renderer: TCustomGradientRenderer;
+      matrix: TMatrixD; rec: TRect): Boolean; virtual;
   end;
 
   TRadGradElement = class(TGradientElement)
+  protected
+    F, C: TPointD;
+    function PrepareGradientRenderer(renderer: TCustomGradientRenderer;
+      matrix: TMatrixD; rec: TRect): Boolean; override;
+  public
+    constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
 
   TLinGradElement = class(TGradientElement)
   protected
     startPt, endPt: TPointD;
     procedure AssignTo(var other: TElement); override;
+    function PrepareGradientRenderer(renderer: TCustomGradientRenderer;
+      matrix: TMatrixD; rec: TRect): Boolean; override;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
@@ -339,9 +341,13 @@ type
   protected
     offset: double;
     color: TColor32;
+  public
+    constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
 
-  TClipPathElement = class(TElement)
+  TClipPathElement = class(TShapeElement)
+  protected
+    procedure GetDrawPaths(ArcScale: double); override;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
@@ -355,8 +361,9 @@ type
     fIdList           : TStringList;
     fShapesList       : TList;
     fClassStylesList  : TStrAnsiList;
+
     fLinGradRenderer  : TLinearGradientRenderer;
-    fRadGradRenderer  : TRadialGradientRenderer;
+    fRadGradRenderer  : TSvgRadialGradientRenderer;
 
     //multiple font readers
     fSansFontReader       : TFontReader;
@@ -379,6 +386,8 @@ type
     fRootElement      : TRootElement;
   protected
     function GetSvgStart(out svgStart: PAnsiChar): Boolean;
+    property RadGradRenderer: TSvgRadialGradientRenderer read fRadGradRenderer;
+    property LinGradRenderer: TLinearGradientRenderer read fLinGradRenderer;
   public
     constructor Create;
     destructor Destroy; override;
@@ -392,6 +401,9 @@ var
   defaultFontHeight: double;
 
 implementation
+
+uses
+  Image32_Extra;
 
 type
   TColorConst = record
@@ -407,6 +419,7 @@ const
     strokeColor: clNone32; strokeWidth: 1.0;
     dashArray: nil; dashOffset: 0;
     markerStart: nil; markerMiddle: nil; markerEnd: nil;
+    clipPathEl: nil; opacity: 255;
     matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)); hidden: false);
 
   defaultFontInfo: TFontInfo =
@@ -487,7 +500,34 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SkipBlanksInStyle(var current: PAnsiChar; currentEnd: PAnsiChar): Boolean;
+function TrimBlanks(var current: PAnsiChar; var length: integer): Boolean;
+var
+  endC: PAnsiChar;
+begin
+  while (length > 0) and (current^ <= #32) do
+  begin
+    inc(current); dec(length);
+  end;
+  Result := length > 0;
+  if not Result then Exit;
+  endC := current + length -1;
+  while endC^ <= #32 do
+  begin
+    dec(endC); dec(length);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function SkipBlanksIgnoreComma(var current: PAnsiChar; currentEnd: PAnsiChar): Boolean;
+begin
+  Result := SkipBlanks(current, currentEnd);
+  if not Result or (current^ <> ',') then Exit;
+  inc(current);
+  Result := SkipBlanks(current, currentEnd);
+end;
+//------------------------------------------------------------------------------
+
+function SkipStyleBlanks(var current: PAnsiChar; currentEnd: PAnsiChar): Boolean;
 var
   inComment: Boolean;
 begin
@@ -514,23 +554,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SkipBlanksIgnoreComma(var current: PAnsiChar; currentEnd: PAnsiChar): Boolean;
+function GetNextChar(var current: PAnsiChar; currentEnd: PAnsiChar): AnsiChar;
 begin
-  Result := SkipBlanks(current, currentEnd);
-  if Result and (current^ = ',') then
+  if SkipBlanks(current, currentEnd) then
   begin
+    Result := current^;
     inc(current);
-    Result := SkipBlanks(current, currentEnd);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function GetNextChar(var current: PAnsiChar; currentEnd: PAnsiChar; out c: AnsiChar): Boolean;
-begin
-  Result := SkipBlanks(current, currentEnd);
-  if not Result then Exit;
-  c := current^;
-  inc(current);
+  end
+  else Result := #0;
 end;
 //------------------------------------------------------------------------------
 
@@ -610,6 +641,7 @@ end;
 function HashToElementClass(hash: Cardinal): TElementClass;
 begin
   case hash of
+    hClippath       : Result := TClipPathElement;
     hCircle         : Result := TCircleElement;
     hDefs           : Result := TDefsElement;
     hEllipse        : Result := TEllipseElement;
@@ -778,7 +810,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetNextWord(var current: PAnsiChar; currentEnd: PAnsiChar;
+function GetNextAlphaWord(var current: PAnsiChar; currentEnd: PAnsiChar;
   out word: AnsiString): Boolean;
 var
   i: integer;
@@ -809,10 +841,10 @@ begin
   Result := nil;
   current := attrib.aValue;
   currentEnd := current + attrib.aValueLen;
-  if not SkipBlanks(current, currentEnd) or
-    (GetHashedName(current, currentEnd) <> hUrl) or
+  if (GetHashedName(current, currentEnd) <> hUrl) or
     (current^ <> '(') then Exit;
   inc(current);
+  SkipBlanks(current, currentEnd);
   startC := current;
   while (current < currentEnd) and (current^ <> ')') do inc(current);
   if (current = currentEnd) then Exit;
@@ -844,7 +876,7 @@ function GetNum(var current: PAnsiChar; currentEnd: PAnsiChar;
   skipComma: Boolean; out val: double): Boolean;
 var
   decPos,exp: integer;
-  isNeg: Boolean;
+  isNeg, expIsNeg: Boolean;
   start: PAnsiChar;
 begin
   Result := false;
@@ -858,7 +890,7 @@ begin
   while (current < currentEnd) and (current^ <= #32) do inc(current);
   if (current = currentEnd) then Exit;
 
-  decPos := -1; exp := 0;
+  decPos := -1; exp := Invalid; expIsNeg := false;
   isNeg := current^ = '-';
   if isNeg then inc(current);
 
@@ -873,18 +905,16 @@ begin
     end
     else if (LowerCaseTable[current^] = 'e') then
     begin
-      if (current +1)^ = '-' then
-      begin
-        exp := -1;
-        inc(current);
-      end else
-        exp := 1;
+      if (current +1)^ = '-' then expIsNeg := true;
+      inc(current);
+      exp := 0;
     end
     else if (current^ < '0') or (current^ > '9') then
       break
-    else if (exp <> 0) then
+    else if IsValid(exp) then
+    begin
       exp := exp * 10 + (Ord(current^) - Ord('0'))
-    else
+    end else
     begin
       val := val *10 + Ord(current^) - Ord('0');
       if decPos >= 0 then inc(decPos);
@@ -896,11 +926,16 @@ begin
 
   if decPos > 0 then val := Power10(val, -decPos);
   if isNeg then val := -val;
-  if exp <> 0 then val := Power10(val, exp);
+  if IsValid(exp) then
+  begin
+    if expIsNeg then
+      val := Power10(val, -exp) else
+      val := Power10(val, exp);
+  end;
   //convert percentages to fractions
   if (current^ = '%') then
   begin
-    val := val *0.00999;
+    val := val *0.00999; //fractionally less than 1.0
     inc(current);
   end;
   //ignore 'px'
@@ -920,7 +955,6 @@ var
   i: integer;
   j: Cardinal;
   clr: TColor32;
-  c: AnsiChar;
   alpha: Byte;
   vals: array[0..3] of double;
   p, pEnd: PAnsiChar;
@@ -937,14 +971,14 @@ begin
     pEnd := attrib.aValue + attrib.aValueLen;
     p := attrib.aValue + 3;
     if (p^ = 'a') then inc(p);
-    if not GetNextChar(p, pEnd, c) or (c <> '(') or
+    if (GetNextChar(p, pEnd) <> '(') or
       not GetNum(p, pEnd, false, vals[0]) or
       not GetNum(p, pEnd, true, vals[1]) or
       not GetNum(p, pEnd, true, vals[2]) then Exit;
     if GetNum(p, pEnd, false, vals[3]) then
       alpha := 0 else //stops further alpha adjustment
       vals[3] := 255;
-    if not GetNextChar(p, pEnd, c) or (c <> ')') then Exit;
+    if GetNextChar(p, pEnd) <> ')' then Exit;
     for i := 0 to 3 do if IsFraction(vals[i]) then
       vals[i] := vals[i] * 255;
     color := ClampByte(Round(vals[3])) shl 24 +
@@ -1053,6 +1087,23 @@ begin
     end;
   end;
 end;
+//------------------------------------------------------------------------------
+
+function MakeDashArray(const da: TArrayOfDouble; scale: double): TArrayOfInteger;
+var
+  i, len: integer;
+begin
+  len := Length(da);
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    Result[i] := Ceil(da[i] * scale);
+end;
+//------------------------------------------------------------------------------
+
+function ExtractScaleFromMatrix(mat: TMatrixD): double;
+begin
+  Result := Sqrt(mat[0][1]*mat[0][1] + mat[1][1]*mat[1][1]);
+end;
 
 //------------------------------------------------------------------------------
 // TDefsElement
@@ -1068,14 +1119,6 @@ end;
 // TUseElement
 //------------------------------------------------------------------------------
 
-function TUseElement.AddAttribute: PAttrib;
-begin
-  Result := inherited;
-  if Assigned(surrogate) then
-    Result.aOwnerEl := surrogate;
-end;
-//------------------------------------------------------------------------------
-
 function TUseElement.LoadAttributes: Boolean;
 var
   attrib: PAttrib;
@@ -1084,6 +1127,9 @@ var
 begin
   Result := inherited;
   if not Result then Exit;
+
+  //very occasionally, elements are referenced before they are declared :(
+  if not Assigned(refEl) then Exit;
 
   surrogate := TElementClass(refEl.ClassType).Create(fParent, refEl.fNameHash);
   surrogate.fName := refEl.fName;
@@ -1152,10 +1198,10 @@ procedure TGradientElement.AddStop(color: TColor32; offset: double);
 var
   len: integer;
 begin
-  len := Length(fStops);
-  setLength(fStops, len+1);
-  fStops[len].offset := Min(1,Max(0, offset));
-  fStops[len].color := color;
+  len := Length(stops);
+  setLength(stops, len+1);
+  stops[len].offset := Min(1,Max(0, offset));
+  stops[len].color := color;
 end;
 //------------------------------------------------------------------------------
 
@@ -1168,20 +1214,99 @@ begin
 
   with TGradientElement(other) do
   begin
-    if fGradientUnits = 0 then
-      fGradientUnits := Self.fGradientUnits;
+    if gradientUnits = 0 then
+      gradientUnits := Self.gradientUnits;
 
-    if Length(fStops) = 0 then
+    if Length(stops) = 0 then
     begin
-      len := Length(self.fStops);
-      SetLength(fStops, len);
+      len := Length(self.stops);
+      SetLength(stops, len);
       for i := 0 to len -1 do
-        fStops[i] := Self.fStops[i];
+        stops[i] := Self.stops[i];
     end;
 
     if IsIdentityMatrix(fDrawInfo.matrix) then
       fDrawInfo.matrix := self.fDrawInfo.matrix;
   end;
+end;
+//------------------------------------------------------------------------------
+
+function TGradientElement.PrepareGradientRenderer(
+  renderer: TCustomGradientRenderer; matrix: TMatrixD; rec: TRect): Boolean;
+var
+  i, hiStops: integer;
+begin
+  hiStops := High(stops);
+  Result := hiStops > 0;
+  if not Result then Exit;
+  //todo - make sure the stops are sorted!
+  for i := 0 to hiStops do
+    with stops[i] do renderer.InsertColorStop(offset, color);
+end;
+
+//------------------------------------------------------------------------------
+// TRadGradElement
+//------------------------------------------------------------------------------
+
+constructor TRadGradElement.Create(parent: TElement; hashName: Cardinal);
+begin
+  inherited;
+  F := InvalidPointD;
+  C := InvalidPointD;
+end;
+//------------------------------------------------------------------------------
+
+function TRadGradElement.PrepareGradientRenderer(
+  renderer: TCustomGradientRenderer; matrix: TMatrixD; rec: TRect): Boolean;
+var
+  hiStops: integer;
+  cp, fp: TPoint;
+  pt: TPointD;
+begin
+  hiStops := High(stops);
+  Result := hiStops > 0;
+  if not Result then Exit;
+
+  //nb: the 'r' attribute isn't currently supported but
+  //it can be simulated by judicious resizing of 'rec'.
+
+  //gradientUnits="userSpaceOnUse"
+  //gradientUnits="objectBoundingBox"
+
+  MatrixApply(fDrawInfo.matrix, rec);
+
+  if not IsValid(C) then
+    cp := MidPoint(rec)
+  else if (C.X <=1) and (C.Y <=1) then
+  begin
+    cp.X := rec.Left + Round(RectWidth(rec) * C.X);
+    cp.Y := rec.Top + Round(RectHeight(rec) * C.Y);
+  end else
+  begin
+    pt := C;
+    MatrixApply(matrix, pt);
+    cp := Point(pt);
+  end;
+
+  with MidPoint(rec) do
+    Image32_Vector.OffsetRect(rec, cp.X -X, cp.Y -y);
+
+  if not IsValid(F) then
+    fp := MidPoint(rec)
+  else if (F.X <=1) and (F.Y <=1) then
+  begin
+    fp.X := rec.Left + Round(RectWidth(rec) * F.X);
+    fp.Y := rec.Top + Round(RectHeight(rec) * F.Y);
+  end else
+  begin
+    pt := F;
+    MatrixApply(matrix, pt);
+    fp := Point(pt);
+  end;
+
+  with renderer as TSvgRadialGradientRenderer do
+    SetParameters(rec, fp, stops[0].color, stops[High(stops)].color);
+  inherited; //nb: must do this after SetParameters
 end;
 
 //------------------------------------------------------------------------------
@@ -1198,13 +1323,62 @@ end;
 
 procedure TLinGradElement.AssignTo(var other: TElement);
 begin
-  if not Assigned(other) or not (other is TLinGradElement) then Exit;
+  if not Assigned(other) or not (other is TGradientElement) then Exit;
   inherited;
-  with TLinGradElement(other) do
+  if other is TLinGradElement then
+    with TLinGradElement(other) do
+    begin
+      if IsValid(self.startPt) then startPt := self.startPt;
+      if IsValid(self.endPt) then endPt := self.endPt;
+    end;
+end;
+//------------------------------------------------------------------------------
+
+function TLinGradElement.PrepareGradientRenderer(
+  renderer: TCustomGradientRenderer; matrix: TMatrixD; rec: TRect): Boolean;
+var
+  pt1, pt2: TPointD;
+  hiStops: integer;
+begin
+  hiStops := High(stops);
+  Result := (hiStops > 0);
+  if not Result then Exit;
+
+  with renderer as TLinearGradientRenderer do
   begin
-    if not IsValid(self.startPt) then startPt := self.startPt;
-    if not IsValid(self.endPt) then endPt := self.endPt;
+    if IsValid(startPt) then
+      pt1 := startPt else
+      pt1 := NullPointD;
+    if IsValid(endPt) then
+      pt2 := endPt else
+      pt2 := PointD(1,0);
+
+    if gradientUnits <> hUserSpaceOnUse then
+    begin
+      matrix := fDrawInfo.matrix;
+      MatrixScale(matrix, Min(RectWidth(rec), RectHeight(rec)));
+      MatrixTranslate(matrix, rec.Left, rec.Top);
+    end else
+      matrix := MatrixMultiply(matrix, fDrawInfo.matrix);
+
+    MatrixApply(matrix, pt1);
+    MatrixApply(matrix, pt2);
+
+
+
+    SetParameters(pt1, pt2, stops[0].color, stops[High(stops)].color);
   end;
+  inherited; //nb: must do this after SetParameters
+end;
+
+//------------------------------------------------------------------------------
+// TGradStopElement
+//------------------------------------------------------------------------------
+
+constructor TGradStopElement.Create(parent: TElement; hashName: Cardinal);
+begin
+  inherited;
+  color := clBlack32;
 end;
 
 //------------------------------------------------------------------------------
@@ -1215,6 +1389,23 @@ constructor TClipPathElement.Create(parent: TElement; hashName: Cardinal);
 begin
   inherited;
   fDrawInfo.hidden := true;
+end;
+//------------------------------------------------------------------------------
+
+procedure TClipPathElement.GetDrawPaths(ArcScale: double);
+var
+  i: integer;
+begin
+  inherited;
+  for i := 0 to fChilds.Count -1 do
+    if TElement(fChilds[i]) is TShapeElement then
+      with TShapeElement(fChilds[i]) do
+      begin
+        GetDrawPaths(ArcScale);
+        AppendPath(self.drawPathsF, drawPathsF);
+        AppendPath(self.drawPathsO, drawPathsO);
+        AppendPath(self.drawPathsC, drawPathsC);
+      end;
 end;
 
 //------------------------------------------------------------------------------
@@ -1244,12 +1435,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TShapeElement.GetDrawInfo: TDrawInfo;
-begin
-    Result := fDrawInfo;
-end;
-//------------------------------------------------------------------------------
-
 function TShapeElement.IsFilled: Boolean;
 begin
   Result := fDrawInfo.hidden or //can't tell yet so default to true
@@ -1265,14 +1450,182 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
-function TShapeElement.GetPaths(ellipPrec: double;
-  out fillPaths, openPaths, closedPaths: TPathsD;
-  out drawInfo: TDrawInfo): Boolean;
+procedure TShapeElement.Draw(img, tmpImg: TImage32; RootMatrix: TMatrixD);
+var
+  stroked, filled: Boolean;
+  ArcScale: double;
+  mat: TMatrixD;
+  clipRec: TRect;
 begin
-  fillPaths := nil; openPaths := nil;  closedPaths := nil;
-  drawInfo := Self.fDrawInfo;
-  result := false;
+  filled := IsFilled; stroked := IsStroked;
+  if not (filled or stroked) then Exit;
+
+  drawPathsF := nil; drawPathsO := nil; drawPathsC := nil;
+  ArcScale := ExtractScaleFromMatrix(RootMatrix);
+  GetDrawPaths(ArcScale);
+
+  mat := MatrixMultiply(RootMatrix, fDrawInfo.matrix);
+  MatrixApply(mat, drawPathsF);
+  MatrixApply(mat, drawPathsO);
+  MatrixApply(mat, drawPathsC);
+
+  if Assigned(fDrawInfo.clipPathEl) then
+  begin
+    with fDrawInfo.clipPathEl do
+    begin
+      GetDrawPaths(ArcScale);
+      MatrixApply(mat, drawPathsF);
+      clipRec := GetBounds(drawPathsF);
+    end;
+    tmpImg.FillRect(clipRec, clNone32);
+    if filled then DrawFilled(tmpImg, mat);
+    DrawStroke(tmpImg, mat, true);
+    DrawStroke(tmpImg, mat, false);
+
+    with fDrawInfo.clipPathEl do
+      EraseInverted(tmpImg, drawPathsF, fDrawInfo.fillRule, clipRec);
+    if fDrawInfo.opacity < 255 then
+      tmpImg.ReduceOpacity(fDrawInfo.opacity, clipRec);
+
+    img.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlpha);
+  end
+  else if fDrawInfo.opacity < 255 then
+  begin
+    clipRec := Image32_Vector.UnionRect(GetBounds(drawPathsF),
+      Image32_Vector.UnionRect(GetBounds(drawPathsC), GetBounds(drawPathsO)));
+    tmpImg.FillRect(clipRec, clNone32);
+
+    if filled then DrawFilled(tmpImg, mat);
+    DrawStroke(tmpImg, mat, true);
+    DrawStroke(tmpImg, mat, false);
+
+    tmpImg.ReduceOpacity(fDrawInfo.opacity, clipRec);
+    img.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlpha);
+  end else
+  begin
+    if filled then DrawFilled(img, mat);
+    if not stroked then Exit;
+    DrawStroke(img, mat, true);
+    DrawStroke(img, mat, false);
+  end;
+
+end;
+//------------------------------------------------------------------------------
+
+procedure TShapeElement.DrawFilled(img: TImage32; matrix: TMatrixD);
+var
+  rec: TRect;
+begin
+  if not Assigned(drawPathsF) then Exit;
+
+  if Assigned(fDrawInfo.fillGradEl) then
+  begin
+    rec := GetBounds(drawPathsF);
+    if fDrawInfo.fillGradEl is TRadGradElement then
+    begin
+      with fDrawInfo.fillGradEl do
+        PrepareGradientRenderer(fReader.RadGradRenderer, matrix, rec);
+      DrawPolygon(img, drawPathsF, fDrawInfo.fillRule, fReader.RadGradRenderer);
+    end
+    else if fDrawInfo.fillGradEl is TLinGradElement then
+    begin
+      with fDrawInfo.fillGradEl do
+        PrepareGradientRenderer(fReader.LinGradRenderer, matrix, rec);
+      DrawPolygon(img, drawPathsF, fDrawInfo.fillRule, fReader.LinGradRenderer);
+    end;
+  end else
+    DrawPolygon(img, drawPathsF, fDrawInfo.fillRule, fDrawInfo.fillColor);
+end;
+//------------------------------------------------------------------------------
+
+procedure TShapeElement.DrawStroke(img: TImage32;
+  matrix: TMatrixD; isClosed: Boolean);
+var
+  i,k, dashOffset: integer;
+  dashArray: TArrayOfInteger;
+  scale: Double;
+  rec: TRect;
+  strokePaths: TPathsD;
+const
+  endStyle: array [Boolean] of TEndStyle = (esRound, esPolygon);
+begin
+  if isClosed then
+    strokePaths := drawPathsC else
+    strokePaths := drawPathsO;
+  if not Assigned(strokePaths) then Exit;
+
+  scale := ExtractScaleFromMatrix(matrix);
+
+  if Length(fDrawInfo.dashArray) > 1 then
+  begin
+    dashOffset := Round(fDrawInfo.dashOffset * scale);
+    dashArray := MakeDashArray(fDrawInfo.dashArray, scale);
+    DrawDashedLine(img, strokePaths, dashArray, @dashOffset,
+      fDrawInfo.strokeWidth * scale, fDrawInfo.strokeColor, esButt)
+  end
+  else if Assigned(fDrawInfo.strokeGradEl) then
+  begin
+    rec := GetBounds(strokePaths);
+    if fDrawInfo.strokeGradEl is TRadGradElement then
+    begin
+      with fDrawInfo.strokeGradEl do
+        PrepareGradientRenderer(fReader.RadGradRenderer, matrix, rec);
+      DrawLine(img, strokePaths, fDrawInfo.strokeWidth * scale,
+        fReader.RadGradRenderer, endStyle[isClosed]);
+    end else
+    begin
+      with fDrawInfo.strokeGradEl do
+        PrepareGradientRenderer(fReader.LinGradRenderer, matrix, rec);
+      DrawLine(img, strokePaths, fDrawInfo.strokeWidth * scale,
+        fReader.LinGradRenderer, endStyle[isClosed]);
+    end;
+  end else
+  begin
+    DrawLine(img, strokePaths, fDrawInfo.strokeWidth * scale,
+      fDrawInfo.strokeColor, endStyle[isClosed]);
+
+    if Assigned(fDrawInfo.markerStart) then
+    begin
+      fDrawInfo.markerStart.callerEl := Self;
+      for i := 0 to High(strokePaths) do
+      begin
+        if Length(strokePaths[i]) < 2 then Continue;
+        fDrawInfo.markerStart.SetSoloPoint(
+          strokePaths[i][0],
+          GetAngle(strokePaths[i][1], strokePaths[i][0]));
+        fDrawInfo.markerStart.Draw(img, nil, matrix);
+      end;
+    end;
+
+    if Assigned(fDrawInfo.markerMiddle) then
+    begin
+      fDrawInfo.markerMiddle.callerEl := Self;
+      for i := 0 to High(strokePaths) do
+      begin
+        k := High(strokePaths[i]);
+        if k < 1 then Continue;
+
+        fDrawInfo.markerMiddle.SetPoints(
+          Copy(strokePaths[i], 1, k -1));
+        fDrawInfo.markerMiddle.Draw(img, nil, matrix);
+      end;
+    end;
+
+    if Assigned(fDrawInfo.markerEnd) then
+    begin
+      fDrawInfo.markerEnd.callerEl := Self;
+      for i := 0 to High(strokePaths) do
+      begin
+        k := High(strokePaths[i]);
+        if k < 1 then Continue;
+
+        fDrawInfo.markerEnd.SetSoloPoint(
+          strokePaths[i][k],
+          GetAngle(strokePaths[i][k-1], strokePaths[i][k]));
+        fDrawInfo.markerEnd.Draw(img, nil, matrix);
+      end;
+    end;
+  end;
 end;
 
 //------------------------------------------------------------------------------
@@ -1679,27 +2032,23 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TPathElement.GetPaths(ellipPrec: double;
-  out fillPaths, openPaths, closedPaths: TPathsD;
-  out drawInfo: TDrawInfo): Boolean;
+procedure TPathElement.GetDrawPaths(ArcScale: double);
 var
   i: integer;
+  filled, stroked, isClosed: Boolean;
   path: TPathD;
-  stroked, filled, isClosed: Boolean;
 begin
-  inherited;
-  filled := IsFilled; stroked := IsStroked;
+  filled := isFilled;
+  stroked := isStroked;
 
-  Result := (Length(dpaths) > 0) and (filled or stroked);
-  if not Result then Exit;
   for i := 0 to High(dpaths) do
   begin
     Flatten(i, path, isClosed);
     if not Assigned(path) then Continue;
-    if filled then AppendPath(fillPaths, path);
+    if filled then AppendPath(drawPathsF, path);
     if not stroked then Continue;
-    if isClosed then AppendPath(closedPaths, path)
-    else AppendPath(openPaths, path);
+    if isClosed then AppendPath(drawPathsC, path)
+    else AppendPath(drawPathsO, path);
   end;
 end;
 
@@ -1707,18 +2056,14 @@ end;
 // TPolyElement
 //------------------------------------------------------------------------------
 
-function TPolyElement.GetPaths(ellipPrec: double;
-  out fillPaths, openPaths, closedPaths: TPathsD;
-  out drawInfo: TDrawInfo): Boolean;
+procedure TPolyElement.GetDrawPaths(ArcScale: double);
 begin
-  inherited;
-  Result := Assigned(path) and (IsFilled or IsStroked);
-  if not Result then Exit;
-  if IsFilled then AppendPath(fillPaths, path);
+  if not Assigned(path) then Exit;
+  if IsFilled then AppendPath(drawPathsF, path);
   if not IsStroked then Exit;
   if (fNameHash = hPolygon) then
-    AppendPath(closedPaths, path) else
-    AppendPath(openPaths, path);
+    AppendPath(drawPathsC, path) else
+    AppendPath(drawPathsO, path);
 end;
 //------------------------------------------------------------------------------
 
@@ -1762,73 +2107,59 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLineElement.GetPaths(ellipPrec: double;
-  out fillPaths, openPaths, closedPaths: TPathsD;
-  out drawInfo: TDrawInfo): Boolean;
+procedure TLineElement.GetDrawPaths(ArcScale: double);
 begin
-  inherited;
-  if IsFilled then AppendPath(fillPaths, path);
-  if IsStroked then AppendPath(openPaths, path);
-  Result := Assigned(fillPaths) or Assigned(openPaths);
+  if IsFilled then AppendPath(drawPathsF, path);
+  if IsStroked then AppendPath(drawPathsO, path);
 end;
 
 //------------------------------------------------------------------------------
 // TCircleElement
 //------------------------------------------------------------------------------
 
-function TCircleElement.GetPaths(ellipPrec: double;
-  out fillPaths, openPaths, closedPaths: TPathsD;
-  out drawInfo: TDrawInfo): Boolean;
+procedure TCircleElement.GetDrawPaths(ArcScale: double);
 var
   rec: TRectD;
   path: TPathD;
 begin
-  inherited;
-  Result := (radius > 0) and (IsFilled or IsStroked);
-  if not Result then Exit;
+  if (radius <= 0) then Exit;
   with CenterPt do
     rec := RectD(X -radius, Y -radius, X +radius, Y +radius);
-  path := Ellipse(rec, ellipPrec);
-  if IsFilled then AppendPath(fillPaths, path);
-  if IsStroked then AppendPath(closedPaths, path);
+  path := Ellipse(rec, ArcScale);
+
+  if IsFilled then AppendPath(drawPathsF, path);
+  if IsStroked then AppendPath(drawPathsC, path);
 end;
 
 //------------------------------------------------------------------------------
 // TEllipseElement
 //------------------------------------------------------------------------------
 
-function TEllipseElement.GetPaths(ellipPrec: double;
-  out fillPaths, openPaths, closedPaths: TPathsD;
-  out drawInfo: TDrawInfo): Boolean;
+procedure TEllipseElement.GetDrawPaths(ArcScale: double);
 var
   rec: TRectD;
   path: TPathD;
 begin
-  inherited;
-  Result := (radius.X > 0) and (radius.Y > 0) and (IsFilled or IsStroked);
-  if not Result then Exit;
+  if (radius.X <= 0) or (radius.Y <= 0) then Exit;
   with centerPt do
     rec := RectD(X -radius.X, Y -radius.Y, X +radius.X, Y +radius.Y);
-  path := Ellipse(rec, ellipPrec);
-  if IsFilled then AppendPath(fillPaths, path);
-  if IsStroked then AppendPath(closedPaths, path);
+  path := Ellipse(rec, ArcScale);
+
+  if IsFilled then AppendPath(drawPathsF, path);
+  if IsStroked then AppendPath(drawPathsC, path);
 end;
 
 //------------------------------------------------------------------------------
 // TRectElement
 //------------------------------------------------------------------------------
 
-function TRectElement.GetPaths(ellipPrec: double;
-  out fillPaths, openPaths, closedPaths: TPathsD;
-  out drawInfo: TDrawInfo): Boolean;
+procedure TRectElement.GetDrawPaths(ArcScale: double);
 var
   rec2: TRectD;
   path: TPathD;
 begin
-  inherited;
-  Result := (rec.width > 0) and (rec.height > 0) and (IsFilled or IsStroked);
-  if not Result then Exit;
-  rec2 := rec.RectD;
+  if (recWH.width <= 0) or (recWH.height <= 0) then Exit;
+  rec2 := recWH.RectD;
   if (radius.X > 0) or (radius.Y > 0) then
   begin
     if (radius.X <= 0) then radius.X := radius.Y
@@ -1837,8 +2168,9 @@ begin
     path := RoundRect(rec2, Average(radius.X, radius.Y))
   end else
     path := Rectangle(rec2);
-  if IsFilled then AppendPath(fillPaths, path);
-  if IsStroked then AppendPath(closedPaths, path);
+
+  if IsFilled then AppendPath(drawPathsF, path);
+  if IsStroked then AppendPath(drawPathsC, path);
 end;
 
 //------------------------------------------------------------------------------
@@ -1849,6 +2181,11 @@ constructor TTextElement.Create(parent: TElement; hashName: Cardinal);
 begin
   fontInfo := defaultFontInfo;
   inherited;
+end;
+//------------------------------------------------------------------------------
+
+procedure TTextElement.GetDrawPaths(ArcScale: double);
+begin
 end;
 //------------------------------------------------------------------------------
 
@@ -1870,9 +2207,7 @@ end;
 // TSubtextElement
 //------------------------------------------------------------------------------
 
-function TSubtextElement.GetPaths(ellipPrec: double;
-  out fillPaths, openPaths, closedPaths: TPathsD;
-  out drawInfo: TDrawInfo): Boolean;
+procedure TSubtextElement.GetDrawPaths(ArcScale: double);
 var
   outPaths: ^TPathsD;
   pt: TPointD;
@@ -1884,14 +2219,12 @@ var
   fontCache: TGlyphCache;
   width: double;
 begin
-  inherited;
-  Result := (fParent is TTextElement) and (IsFilled or IsStroked);
-  if not Result then Exit;
+  if not (fParent is TTextElement) then Exit;
   parentTextEl := TTextElement(fParent);
 
   if IsFilled then
-    outPaths := @fillPaths else
-    outPaths := @closedPaths;
+    outPaths := @drawPathsF else
+    outPaths := @drawPathsC;
 
   //if first subtext then reset X offset
   if (self = parentTextEl.fChilds[0]) then parentTextEl.tmpX := InvalidD;
@@ -1907,7 +2240,7 @@ begin
   end;
 
   //trim CRLFs and multiple spaces
-  s := Utf8ToAnsi(Utf8String_(text, textLen));
+  s := UTF8ToUnicodeString(Utf8String_(text, textLen));
   for i := 1 to Length(s) do
     if s[i] < #32 then s[i] := #32;
   i := Pos(#32#32, s);
@@ -1969,9 +2302,9 @@ begin
         outPaths^ := fontCache.GetTextGlyphs(pt.X, pt.Y, s, parentTextEl.tmpX);
       end;
   end;
-  if IsFilled and IsStroked then
-    closedPaths := CopyPaths(fillPaths);
 
+  if IsFilled and IsStroked then
+    drawPathsC := CopyPaths(drawPathsF);
 end;
 
 //------------------------------------------------------------------------------
@@ -1996,28 +2329,65 @@ constructor TMarkerElement.Create(parent: TElement; hashName: Cardinal);
 begin
   inherited;
   ref := InvalidPointD;
+  width := InvalidD;
+  height := InvalidD;
+  viewbox := NullRectD;
   fDrawInfo.hidden := true;
 end;
 //------------------------------------------------------------------------------
 
-function TMarkerElement.GetPaths(ellipPrec: double;
-  out fillPaths, openPaths, closedPaths: TPathsD;
-  out drawInfo: TDrawInfo): Boolean;
+procedure TMarkerElement.Draw(img, tmpImg: TImage32; RootMatrix: TMatrixD);
 var
-  i: integer;
-  fp, op, cp: TPathsD;
+  i,j: integer;
+  scale, sw: double;
+  mat, mat2: TMatrixD;
+  pt: TPointD;
 begin
-  inherited;
-  for i := 0 to fChilds.Count -1 do
-    if TElement(fChilds[i]) is TShapeElement then
-      with TShapeElement(fChilds[i]) do
-      begin
-        if not GetPaths(ellipPrec, fp, op, cp, drawInfo) then Continue;
-        if Assigned(fp) then AppendPath(fillPaths, fp);
-        if Assigned(op) then AppendPath(openPaths, op);
-        if Assigned(cp) then AppendPath(closedPaths, cp);
-      end;
-  Result := true;
+  if not Assigned(callerEl) then Exit;
+  scale := ExtractScaleFromMatrix(RootMatrix);
+  mat := fDrawInfo.matrix;
+  sw := callerEl.fDrawInfo.strokeWidth;
+  MatrixScale(mat, sw * scale);
+
+  //for each 'point' draw the marker
+  for i := 0 to High(points) do
+  begin
+    pt := points[i];
+
+    //for each marker shape (though very rarely more than one)
+    for j := 0 to fChilds.Count -1 do
+      if TElement(fChilds[j]) is TShapeElement then
+        with TShapeElement(fChilds[j]) do
+        begin
+          GetDrawPaths(scale);
+          mat2 := IdentityMatrix;
+          if IsValid(ref) then
+            MatrixTranslate(mat2, -ref.X, -ref.Y);
+          if not IsEmptyRect(viewbox) and
+            IsValid(width) and IsValid(height) then
+              MatrixScale(mat2, width/viewbox.Width, height/viewbox.Height);
+          MatrixScale(mat2, sw * scale);
+          MatrixRotate(mat2, NullPointD, angle);
+          MatrixTranslate(mat2, pt.X, pt.Y);
+          MatrixApply(mat2, drawPathsF);
+          with fDrawInfo do DrawPolygon(img, drawPathsF, fillRule, fillColor);
+        end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMarkerElement.SetSoloPoint(const pt: TPointD; angle: double);
+begin
+  SetLength(points, 1);
+  points[0] := pt;
+  self.angle := angle;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMarkerElement.SetPoints(const points: TPathD);
+begin
+  angle := 0;
+  Self.points := CopyPath(points);
 end;
 
 //------------------------------------------------------------------------------
@@ -2054,7 +2424,7 @@ begin
     inc(fCurrent);
   end;
 
-  while SkipBlanksInStyle(fCurrent,fCurrentEnd) and
+  while SkipStyleBlanks(fCurrent,fCurrentEnd) and
     CharInSet(LowerCaseTable[PeekNextChar], ['.', 'a'..'z']) do
   begin
     dotted := fCurrent^ = '.';
@@ -2121,23 +2491,6 @@ begin
   fCurrent := svgStart;
   fIsValid := LoadAttributes;
 end;
-//------------------------------------------------------------------------------
-
-procedure TRootElement.LoadViewbox(attrib: PAnsiChar; len: integer);
-var
-  currentEnd: PAnsiChar;
-begin
-  currentEnd := attrib + len;
-  if GetNum(attrib, currentEnd, false, viewbox.Left) and
-    GetNum(attrib, currentEnd, true, viewbox.Top) and
-    GetNum(attrib, currentEnd, true, viewbox.Right) and
-    GetNum(attrib, currentEnd, true, viewbox.Bottom) then
-  begin
-    viewbox.Right := viewbox.Right + viewbox.Left;
-    viewbox.Bottom := viewbox.Bottom + viewbox.Top;
-  end else
-    viewbox := NullRectD;
-end;
 
 //------------------------------------------------------------------------------
 // TElement
@@ -2174,7 +2527,8 @@ function TElement.GetName(out name: PAnsiChar; out nameLen: integer): Boolean;
 begin
   Result := IsAlpha(fCurrent^);
   if not Result then Exit;
-  name := fCurrent; nameLen := GetNameLength(fCurrent, fCurrentEnd);
+  name := fCurrent;
+  nameLen := GetNameLength(fCurrent, fCurrentEnd);
 end;
 //------------------------------------------------------------------------------
 
@@ -2230,12 +2584,11 @@ begin
     end;
     attrib := AddAttribute;
     GetName(attrib.aName, attrib.aNameLen);
-    if fCurrent^ <> '=' then Exit; inc(fCurrent);
+    if GetNextChar(fCurrent, fCurrentEnd) <> '=' then Exit;
+    SkipBlanks(fCurrent, fCurrentEnd);
     GetAttribValue(attrib.aValue, attrib.aValueLen);
-    if fCurrent^ <> '"' then Exit; //end of attrib. value
-    inc(fCurrent);
-
     nextCurrent := attrib.aValue + attrib.aValueLen +1;
+    TrimBlanks(attrib.aValue, attrib.aValueLen);
     //nb: ProcessAttrib() below sometimes adds additional attributes
     //which may cause the 'fAttribs' array to reallocate memory
     //(ie when its capacity is reached). Consequently, the 'attrib'
@@ -2263,6 +2616,15 @@ function TElement.FindRefElement(refname: PAnsiChar; refNameLen: integer): TElem
 var
   i: integer;
 begin
+  if (refname^ = 'u') and
+    ((refname +1)^ = 'r') and
+    ((refname +2)^ = 'l') and
+    ((refname +3)^ = '(') then
+  begin
+    inc(refname, 4);
+    dec(refNameLen, 5); //includes trailing ')'
+  end;
+
   if refname^ = '#' then
   begin
     inc(refname);
@@ -2353,7 +2715,6 @@ var
   aNameLen: integer;
   newAt: PAttrib;
   current, endCurrent, styleName: PAnsiChar;
-  c: AnsiChar;
 begin
   current := classStyle;
   endCurrent := current + len;
@@ -2368,7 +2729,7 @@ begin
     newAt.aName := styleName;
     newAt.aNameLen := aNameLen;
 
-    if not GetNextChar(current, endCurrent, c) or (c <> ':') or  //syntax check
+    if (GetNextChar(current, endCurrent) <> ':') or  //syntax check
       not SkipBlanks(current,endCurrent) then Break;
     newAt.aValue := current;
     inc(current);
@@ -2384,8 +2745,6 @@ procedure TElement.ParseTransform(transform: PAnsiChar; len: integer);
 var
   i: integer;
   current, endC: PAnsiChar;
-  c: AnsiChar;
-
   word: AnsiString;
   values: array[0..5] of double;
   mat: TMatrixD;
@@ -2408,11 +2767,11 @@ begin
 
   //surprisingly, and I think this is a bug in SVG not a feature ...
   //transform operations must be performed in reverse order
-  while GetNextWord(current, endC, word) do
+  while GetNextAlphaWord(current, endC, word) do
   begin
     if (Length(word) < 5) then Exit;
     word[5] := LowerCaseTable[word[5]];
-    if not GetNextChar(current, endC, c) or (c <> '(') then Exit; //syntax check
+    if GetNextChar(current, endC) <> '(' then Exit; //syntax check
     //reset values variables
     for i := 0 to High(values) do values[i] := InvalidD;
     //and since every transform function requires at least one value
@@ -2424,7 +2783,7 @@ begin
       GetNum(current, endC, true, values[i]);
       inc(i);
     end;
-    if not GetNextChar(current, endC, c) or (c <> ')') then Exit; //syntax check
+    if GetNextChar(current, endC) <> ')' then Exit; //syntax check
 
     pMat := NewMatrix;
     case word[5] of
@@ -2563,7 +2922,8 @@ begin
   fMemStream      := TMemoryStream.Create;
 
   fIdList         := TStringList.Create;
-  fIdList.Duplicates := dupError;
+  //fIdList.Duplicates := dupError; // I'm unsure how best to manage this, but
+  fIdList.Duplicates := dupIgnore;  // pro tem, duplicates will be ignored.
   fIdList.Sorted  := True;
 
   fClassStylesList    := TStrAnsiList.Create;
@@ -2571,7 +2931,7 @@ begin
   fClassStylesList.Sorted := True;
 
   fLinGradRenderer := TLinearGradientRenderer.Create;
-  fRadGradRenderer := TRadialGradientRenderer.Create;
+  fRadGradRenderer := TSvgRadialGradientRenderer.Create;
 
   fSansFontReader   := TFontReader.CreateFromResource('NOTO-SANS', RT_RCDATA);
   fSerifFontReader  := TFontReader.CreateFromResource('NOTO-SERIF', RT_RCDATA);
@@ -2635,80 +2995,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ExtractScaleFromMatrix(mat: TMatrixD): double;
-begin
-    Result := Sqrt(mat[0][1]*mat[0][1] + mat[1][1]*mat[1][1]);
-end;
-//------------------------------------------------------------------------------
-
-function MakeDashArray(const da: TArrayOfDouble; scale: double): TArrayOfInteger;
-var
-  i, len: integer;
-begin
-  len := Length(da);
-  SetLength(Result, len);
-  for i := 0 to len -1 do
-    Result[i] := Ceil(da[i] * scale);
-end;
-//------------------------------------------------------------------------------
-
 procedure TSvgReader.DrawImage(img: TImage32; scaleToImage: Boolean);
-
-  procedure SetupGradient(gradEl: TGradientElement; mat: TMatrixD; rec: TRect);
-  var
-    j, hiStops: integer;
-    pt1, pt2: TPointD;
-  begin
-    //GradientUnits: default = objectBoundingBox
-    //if (gradEl.fGradientUnits <> hUserSpaceOnUse) then
-
-    if (gradEl is TRadGradElement) then
-    begin
-      with TRadGradElement(gradEl) do
-        if (Length(fStops) > 1) then
-        begin
-          hiStops := High(fStops);
-          if not IsIdentityMatrix(fDrawInfo.matrix) then
-          begin
-            mat := fDrawInfo.matrix;
-            MatrixApply(mat, rec);
-          end;
-          fRadGradRenderer.SetParameters(rec,
-            fStops[0].color, fStops[hiStops].color, gfsClamp);
-          for j := 1 to hiStops -1 do
-             fRadGradRenderer.InsertColorStop(fStops[j].offset,
-               fStops[j].color);
-        end
-    end
-    else if (gradEl is TLinGradElement) then
-      with TLinGradElement(gradEl) do
-        if (Length(fStops) > 1) and
-          IsValid(startPt) and IsValid(endPt) then
-        begin
-          hiStops := High(fStops);
-          pt1 := startPt; pt2 := endPt;
-          mat := MatrixMultiply(mat, fDrawInfo.matrix);
-          MatrixApply(mat, pt1);
-          MatrixApply(mat, pt2);
-          fLinGradRenderer.SetParameters(
-            pt1, pt2, fStops[0].color, fStops[hiStops].color);
-          for j := 1 to hiStops -1 do
-             fLinGradRenderer.InsertColorStop(fStops[j].offset,
-               fStops[j].color);
-        end;
-  end;
-
 var
-  i,j, len, dashOffset: integer;
+  i: integer;
   rec: TRect;
-  angle, sx, sy: double;
-  fillPP, closedPP, openPP, dummyPP: TPathsD;
-  mat, mat2: TMatrixD;
-  isClosed: Boolean;
-  dashArray: TArrayOfInteger;
-
-  shapeEl: TShapeElement;
-  drawInfo, dummyDI: TDrawInfo;
+  sx, sy: double;
+  rootMat: TMatrixD;
+  clipImg: TImage32;
 const
   endStyle: array[boolean] of TEndStyle = (esPolygon, esRound);
 begin
@@ -2728,129 +3021,19 @@ begin
     sx := 1;
   end;
 
-  for i := 0 to fShapesList.Count -1 do
-  begin
-    shapeEl := TShapeElement(fShapesList[i]);
-    if not shapeEl.GetPaths(sx, fillPP, openPP, closedPP, drawInfo) then
-      Continue;
+  rootMat := IdentityMatrix;
+  with fRootElement.viewbox do
+    MatrixTranslate(rootMat, -Left, -Top);
+  MatrixScale(rootMat, sx, sx);
 
-    mat := DrawInfo.matrix;
-    with fRootElement.viewbox do
-      MatrixTranslate(mat, -Left, -Top);
-    MatrixScale(mat, sx, sx);
-
-    MatrixApply(mat, openPP);
-    MatrixApply(mat, closedPP);
-    MatrixApply(mat, fillPP);
-
-    sy := ExtractScaleFromMatrix(mat);
-
-    if Assigned(fillPP) then
-    begin
-      if Assigned(DrawInfo.fillGradEl) then
-      begin
-        rec := GetBounds(fillPP);
-        SetupGradient(DrawInfo.fillGradEl, mat, rec);
-        if DrawInfo.fillGradEl is TRadGradElement then
-          DrawPolygon(img, fillPP, DrawInfo.fillRule, fRadGradRenderer) else
-          DrawPolygon(img, fillPP, DrawInfo.fillRule, fLinGradRenderer);
-      end
-      else
-        DrawPolygon(img, fillPP, DrawInfo.fillRule,  DrawInfo.fillColor);
-    end;
-
-    if (DrawInfo.strokeWidth = 0) then Continue;
-
-      if Assigned(closedPP) then
-      begin
-        if Length(DrawInfo.dashArray) > 1 then
-        begin
-          dashOffset := Round(DrawInfo.dashOffset * sy);
-          dashArray :=
-            MakeDashArray(DrawInfo.dashArray, sy);
-          DrawDashedLine(img, closedPP, dashArray, @dashOffset,
-            DrawInfo.strokeWidth * sy, DrawInfo.strokeColor, esButt)
-        end
-        else if Assigned(DrawInfo.strokeGradEl) then
-        begin
-          rec := GetBounds(closedPP);
-          SetupGradient(DrawInfo.strokeGradEl, mat, rec);
-          if DrawInfo.strokeGradEl is TRadGradElement then
-            DrawLine(img, closedPP, DrawInfo.strokeWidth * sy,
-              fRadGradRenderer, esPolygon) else
-            DrawLine(img, closedPP, DrawInfo.strokeWidth * sy,
-              fLinGradRenderer, esPolygon);
-        end
-        else
-          DrawLine(img, closedPP, DrawInfo.strokeWidth * sy,
-            DrawInfo.strokeColor, esPolygon);
-      end;
-
-      if Assigned(openPP) then
-      begin
-        if Length(DrawInfo.dashArray) > 1 then
-        begin
-          dashOffset := Round(DrawInfo.dashOffset * sy);
-          dashArray :=
-            MakeDashArray(DrawInfo.dashArray, sy);
-          DrawDashedLine(img, openPP, dashArray, @dashOffset,
-            DrawInfo.strokeWidth * sy, DrawInfo.strokeColor, esButt)
-        end
-        else if Assigned(DrawInfo.strokeGradEl) then
-        begin
-          rec := GetBounds(openPP);
-          SetupGradient(DrawInfo.strokeGradEl, mat, rec);
-          if DrawInfo.strokeGradEl is TRadGradElement then
-            DrawLine(img, openPP, DrawInfo.strokeWidth * sy,
-              fRadGradRenderer, esRound) else
-            DrawLine(img, openPP, DrawInfo.strokeWidth * sy,
-              fLinGradRenderer, esRound);
-        end
-        else
-          DrawLine(img, openPP, DrawInfo.strokeWidth * sy,
-            DrawInfo.strokeColor, esRound);
-      end;
-
-      if Assigned(DrawInfo.markerStart) then
-      begin
-        DrawInfo.markerStart.GetPaths(sx, fillPP, dummyPP, closedPP, dummyDi);
-        for j := 0 to High(openPP) do
-        begin
-          len := Length(openPP[j]);
-          if len < 2 then Continue;
-          angle := GetAngle(openPP[j][1], openPP[j][0]);
-
-          mat2 := IdentityMatrix;
-          with DrawInfo.markerStart do
-            MatrixTranslate(mat2, -ref.X, -ref.Y);
-          MatrixRotate(mat2, NullPointD, angle);
-          MatrixScale(mat2, DrawInfo.strokeWidth * sy);
-          MatrixTranslate(mat2, openPP[j][0].X, openPP[j][0].Y);
-          MatrixApply(mat2, fillPP);
-          with drawInfo do DrawPolygon(img, fillPP, frEvenOdd, StrokeColor);
-        end;
-      end;
-
-      if Assigned(DrawInfo.markerEnd) then
-      begin
-        DrawInfo.markerEnd.GetPaths(sx, fillPP, dummyPP, closedPP, dummyDi);
-        for j := 0 to High(openPP) do
-        begin
-          len := Length(openPP[j]);
-          if len < 2 then Continue;
-          angle := GetAngle(openPP[j][len-2], openPP[j][len-1]);
-
-          mat2 := IdentityMatrix;
-          with DrawInfo.markerEnd do
-            MatrixTranslate(mat2, -ref.X, -ref.Y);
-          MatrixRotate(mat2, NullPointD, angle);
-          MatrixScale(mat2, DrawInfo.strokeWidth * sy);
-          MatrixTranslate(mat2, openPP[j][len-1].X, openPP[j][len-1].Y);
-          MatrixApply(mat2, fillPP);
-          with drawInfo do DrawPolygon(img, fillPP, frEvenOdd, StrokeColor);
-        end;
-      end;
-    end;
+  clipImg := TImage32.Create(img.Width, img.Height);
+  try
+    for i := 0 to fShapesList.Count -1 do
+      with TShapeElement(fShapesList[i]) do
+        Draw(img, clipImg, rootMat);
+  finally
+    clipImg.Free;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -2883,6 +3066,12 @@ begin
     begin
       if (width <= 0) or (height <= 0) then Exit;
       viewbox := RectD(0, 0, width, height);
+//    end
+//    else if (width > 0) and (height > 0) then
+//    begin
+//      MatrixScale(fDrawInfo.matrix,
+//        width / viewbox.Width,
+//        height / viewbox.Height);
     end;
     if fHasContent then LoadContent;
     Result := fIsValid;
@@ -2949,7 +3138,7 @@ procedure Gradientunits_Attrib(attrib: PAttrib);
 begin
   if attrib.aOwnerEl is TGradientElement then
     with TGradientElement(attrib.aOwnerEl) do
-      fGradientUnits := GetHashedName(attrib.aValue, attrib.aValueLen);
+      gradientUnits := GetHashedName(attrib.aValue, attrib.aValueLen);
 end;
 //------------------------------------------------------------------------------
 
@@ -2969,23 +3158,18 @@ procedure Href_Attrib(attrib: PAttrib);
 var
   el, refEl: TElement;
 begin
-  with attrib^ do
+  el := attrib.aOwnerEl;
+  if el is TGradientElement then
   begin
-    el := attrib.aOwnerEl;
-    case el.fNameHash of
-      hLinearGradient, hRadialGradient:
-        begin
-          refEl := el.FindRefElement(aValue, aValueLen);
-          if assigned(refEl) and (refEl is TGradientElement) then
-            TGradientElement(refEl).AssignTo(el);
-        end;
-      hUse:
-        begin
-          refEl := el.FindRefElement(aValue, aValueLen);
-          if assigned(refEl) and (el is TUseElement) then
-            TUseElement(el).refEl := refEl;
-        end;
-    end;
+    refEl := el.FindRefElement(attrib.aValue, attrib.aValueLen);
+    if assigned(refEl) and (refEl is TGradientElement) then
+      TGradientElement(refEl).AssignTo(el);
+  end
+  else if el is TUseElement then
+  begin
+    refEl := el.FindRefElement(attrib.aValue, attrib.aValueLen);
+    if assigned(refEl) and (el is TUseElement) then
+      TUseElement(el).refEl := refEl;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2993,6 +3177,20 @@ end;
 procedure Class_Attrib(attrib: PAttrib);
 begin
   TElement(attrib.aOwnerEl).ParseClassAttrib(attrib);
+end;
+//------------------------------------------------------------------------------
+
+procedure ClipPath_Attrib(attrib: PAttrib);
+var
+  refEl: TElement;
+begin
+  if attrib.aOwnerEl is TShapeElement then
+    with TShapeElement(attrib.aOwnerEl) do
+    begin
+      refEl := FindRefElement(attrib.aValue, attrib.aValueLen);
+      if assigned(refEl) and (refEl is TClipPathElement) then
+        fDrawInfo.clipPathEl := TClipPathElement(refEl);
+    end;
 end;
 //------------------------------------------------------------------------------
 
@@ -3064,7 +3262,8 @@ procedure FontFamily_Attrib(attrib: PAttrib);
   var
     word: AnsiString;
   begin
-    if GetNextWord(attrib.aValue, attrib.aValue + attrib.aValueLen, word) then
+    if GetNextAlphaWord(attrib.aValue,
+      attrib.aValue + attrib.aValueLen, word) then
     begin
       case GetHashedName(PAnsiChar(word), Length(word)) of
         hSerif      : fontInfo.family := ffSerif;
@@ -3081,7 +3280,6 @@ begin
     GetFamily(TTSpanElement(attrib.aOwnerEl).fontInfo);
 end;
 //------------------------------------------------------------------------------
-
 
 procedure FontSize_Attrib(attrib: PAttrib);
 var
@@ -3104,7 +3302,8 @@ procedure FontStyle_Attrib(attrib: PAttrib);
   var
     word: AnsiString;
   begin
-    if GetNextWord(attrib.aValue, attrib.aValue + attrib.aValueLen, word) then
+    if GetNextAlphaWord(attrib.aValue,
+      attrib.aValue + attrib.aValueLen, word) then
     begin
       if GetHashedName(PAnsiChar(word), Length(word)) = hItalic then
         Include(fontInfo.styles, fsItalic) else
@@ -3133,7 +3332,8 @@ procedure FontWeight_Attrib(attrib: PAttrib);
         Include(fontInfo.styles, fsBold) else
         Exclude(fontInfo.styles, fsBold);
     end
-    else if GetNextWord(attrib.aValue, attrib.aValue + attrib.aValueLen, word) then
+    else if GetNextAlphaWord(attrib.aValue,
+      attrib.aValue + attrib.aValueLen, word) then
     begin
       if GetHashedName(PAnsiChar(word), Length(word)) = hBold then
         Include(fontInfo.styles, fsBold) else
@@ -3149,13 +3349,34 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure Fx_Attrib(attrib: PAttrib);
+var
+  num: double;
+begin
+  if (attrib.aOwnerEl is TRadGradElement) and
+    AttribToFloat(attrib, num) then
+      TRadGradElement(attrib.aOwnerEl).F.X := num;
+end;
+//------------------------------------------------------------------------------
+
+procedure Fy_Attrib(attrib: PAttrib);
+var
+  num: double;
+begin
+  if (attrib.aOwnerEl is TRadGradElement) and
+    AttribToFloat(attrib, num) then
+      TRadGradElement(attrib.aOwnerEl).F.Y := num;
+end;
+//------------------------------------------------------------------------------
+
 procedure TextAlign_Attrib(attrib: PAttrib);
 
   procedure GetAlign(var fontInfo: TFontInfo);
   var
     word: AnsiString;
   begin
-    if GetNextWord(attrib.aValue, attrib.aValue + attrib.aValueLen, word) then
+    if GetNextAlphaWord(attrib.aValue,
+      attrib.aValue + attrib.aValueLen, word) then
     begin
       case GetHashedName(PAnsiChar(word), Length(word)) of
         hStart  : fontInfo.align := taLeft;
@@ -3210,6 +3431,17 @@ procedure Offset_Attrib(attrib: PAttrib);
 begin
   if attrib.aOwnerEl is TGradStopElement then
     AttribToFloat(attrib, TGradStopElement(attrib.aOwnerEl).offset);
+end;
+//------------------------------------------------------------------------------
+
+procedure Opacity_Attrib(attrib: PAttrib);
+var
+  opacity: double;
+begin
+  if not AttribToFloat(attrib, opacity) then Exit;
+  if opacity < 0 then opacity := 0
+  else if opacity > 1 then opacity := 1;
+  attrib.aOwnerEl.fDrawInfo.opacity := Round(opacity * 255);
 end;
 //------------------------------------------------------------------------------
 
@@ -3273,9 +3505,30 @@ end;
 //------------------------------------------------------------------------------
 
 procedure Viewbox_Attrib(attrib: PAttrib);
+
+  function LoadViewbox: TRectD;
+  var
+    current, currentEnd: PAnsiChar;
+  begin
+    current := attrib.aValue;
+    currentEnd := current + attrib.aValueLen;
+    with Result do
+    if GetNum(current, currentEnd, false, Left) and
+      GetNum(current, currentEnd, true, Top) and
+      GetNum(current, currentEnd, true, Right) and
+      GetNum(current, currentEnd, true, Bottom) then
+    begin
+      Right := Right + Left;
+      Bottom := Bottom + Top;
+    end else
+      Result := NullRectD;
+  end;
+
 begin
   if attrib.aOwnerEl is TRootElement then
-    TRootElement(attrib.aOwnerEl).LoadViewbox(attrib.aValue, attrib.aValueLen);
+    TRootElement(attrib.aOwnerEl).viewbox := LoadViewbox
+  else if attrib.aOwnerEl is TMarkerElement then
+    TMarkerElement(attrib.aOwnerEl).viewbox := LoadViewbox;
 end;
 //------------------------------------------------------------------------------
 
@@ -3284,9 +3537,12 @@ begin
   case attrib.aOwnerEl.fNameHash of
     hRect:
       with TRectElement(attrib.aOwnerEl) do
-        AttribToFloat(attrib, rec.Height);
+        AttribToFloat(attrib, recWH.Height);
     hSvg:
       with TRootElement(attrib.aOwnerEl) do
+        AttribToFloat(attrib, height);
+    hMarker:
+      with TMarkerElement(attrib.aOwnerEl) do
         AttribToFloat(attrib, height);
   end;
 end;
@@ -3297,9 +3553,12 @@ begin
   case attrib.aOwnerEl.fNameHash of
     hRect:
       with TRectElement(attrib.aOwnerEl) do
-        AttribToFloat(attrib, rec.Width);
+        AttribToFloat(attrib, recWH.Width);
     hSvg:
       with TRootElement(attrib.aOwnerEl) do
+        AttribToFloat(attrib, width);
+    hMarker:
+      with TMarkerElement(attrib.aOwnerEl) do
         AttribToFloat(attrib, width);
   end;
 end;
@@ -3314,6 +3573,9 @@ begin
     hEllipse:
       with TEllipseElement(attrib.aOwnerEl) do
         AttribToFloat(attrib, centerPt.X);
+    hRadialGradient:
+      with TRadGradElement(attrib.aOwnerEl) do
+        AttribToFloat(attrib, C.X);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -3327,6 +3589,9 @@ begin
     hEllipse:
       with TEllipseElement(attrib.aOwnerEl) do
         AttribToFloat(attrib, centerPt.Y);
+    hRadialGradient:
+      with TRadGradElement(attrib.aOwnerEl) do
+        AttribToFloat(attrib, C.Y);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -3371,7 +3636,7 @@ begin
   case attrib.aOwnerEl.fNameHash of
     hRect:
       with TRectElement(attrib.aOwnerEl) do
-        AttribToFloat(attrib, rec.left);
+        AttribToFloat(attrib, recWH.left);
     hLine:
       with TLineElement(attrib.aOwnerEl) do
         AttribToFloat(attrib, path[0].X);
@@ -3409,7 +3674,7 @@ begin
   case attrib.aOwnerEl.fNameHash of
     hRect:
       with TRectElement(attrib.aOwnerEl) do
-        AttribToFloat(attrib, rec.top);
+        AttribToFloat(attrib, recWH.top);
     hLine:
       with TLineElement(attrib.aOwnerEl) do
         AttribToFloat(attrib, path[0].Y);
@@ -3463,6 +3728,7 @@ begin
   AttribFuncList.Duplicates := dupError;
 
   RegisterAttribute(hClass,                 Class_Attrib);
+  RegisterAttribute(hClip_045_path,         ClipPath_Attrib);
   RegisterAttribute(hCx,                    Cx_Attrib);
   RegisterAttribute(hCy,                    Cy_Attrib);
   RegisterAttribute(hD,                     D_Attrib);
@@ -3476,15 +3742,20 @@ begin
   RegisterAttribute(hFont_045_Size,         FontSize_Attrib);
   RegisterAttribute(hFont_045_Style,        FontStyle_Attrib);
   RegisterAttribute(hFont_045_Weight,       FontWeight_Attrib);
+  RegisterAttribute(hFx,                    Fx_Attrib);
+  RegisterAttribute(hFy,                    Fy_Attrib);
   RegisterAttribute(hGradientTransform,     GradientTransform_Attrib);
   RegisterAttribute(hGradientUnits,         Gradientunits_Attrib);
   RegisterAttribute(hHeight,                Height_Attrib);
   RegisterAttribute(hHref,                  Href_Attrib);
   RegisterAttribute(hId,                    Id_Attrib);
   RegisterAttribute(hMarker_045_End,        MarkerEnd_Attrib);
+  RegisterAttribute(hMarkerHeight,          Height_Attrib);
   RegisterAttribute(hMarker_045_Mid,        MarkerMiddle_Attrib);
   RegisterAttribute(hMarker_045_Start,      MarkerStart_Attrib);
+  RegisterAttribute(hMarkerWidth,           Width_Attrib);
   RegisterAttribute(hOffset,                Offset_Attrib);
+  RegisterAttribute(hOpacity,               Opacity_Attrib);
   RegisterAttribute(hPoints,                Points_Attrib);
   RegisterAttribute(hR,                     Rx_Attrib);
   RegisterAttribute(hRefX,                  Rx_Attrib);

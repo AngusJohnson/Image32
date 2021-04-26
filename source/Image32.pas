@@ -178,8 +178,8 @@ type
     procedure Crop(const rec: TRect);
     //SetBackgroundColor: Assumes the current image is semi-transparent.
     procedure SetBackgroundColor(bgColor: TColor32);
-    //Clear: Fills the entire image with the specified color
-    procedure Clear(color: TColor32 = 0);
+    procedure Clear(color: TColor32 = 0); overload;
+    procedure Clear(const rec: TRect; color: TColor32 = 0); overload;
     procedure FillRect(rec: TRect; color: TColor32);
     procedure ConvertToBoolMask(reference: TColor32;
       tolerance: integer; colorFunc: TCompareFunction;
@@ -191,6 +191,8 @@ type
     procedure PreMultiply;
     //SetAlpha: Sets 'alpha' to the alpha byte of every pixel in the image
     procedure SetAlpha(alpha: Byte);
+    procedure ReduceOpacity(opacity: Byte); overload;
+    procedure ReduceOpacity(opacity: Byte; rec: TRect); overload;
     //SetRGB: Sets the RGB channels leaving the alpha channel unchanged
     procedure SetRGB(rgbColor: TColor32);
     //Grayscale: Only changes color channels. The alpha channel is untouched.
@@ -1486,6 +1488,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TImage32.Clear(const rec: TRect; color: TColor32 = 0);
+begin
+  FillRect(rec, color);
+end;
+//------------------------------------------------------------------------------
+
 procedure TImage32.FillRect(rec: TRect; color: TColor32);
 var
   i,j, rw: Integer;
@@ -2555,6 +2563,44 @@ begin
   begin
     c.A := alpha;
     inc(c);
+  end;
+  Changed;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.ReduceOpacity(opacity: Byte);
+var
+  i: Integer;
+  c: PARGB;
+begin
+  if opacity = 255 then Exit;
+  c := PARGB(PixelBase);
+  for i := 0 to Width * Height -1 do
+  begin
+    c.A := MulBytes(c.A, opacity);
+    inc(c);
+  end;
+  Changed;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.ReduceOpacity(opacity: Byte; rec: TRect);
+var
+  i,j, rw: Integer;
+  c: PARGB;
+begin
+  IntersectRect(rec, rec, bounds);
+  if IsEmptyRect(rec) then Exit;
+  rw := RectWidth(rec);
+  c := @Pixels[rec.Top * Width + rec.Left];
+  for i := rec.Top to rec.Bottom -1 do
+  begin
+    for j := 1 to rw do
+    begin
+      c.A := MulBytes(c.A, opacity);
+      inc(c);
+    end;
+    inc(c, Width - rw);
   end;
   Changed;
 end;

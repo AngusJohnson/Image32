@@ -69,9 +69,9 @@ type
     fColor: TColor32;
   protected
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
+    function Initialize(targetImage: TImage32): Boolean; override;
   public
     constructor Create(color: TColor32 = clNone32);
-    function Initialize(targetImage: TImage32): Boolean; override;
     procedure SetColor(value: TColor32);
   end;
 
@@ -96,11 +96,11 @@ type
     function GetFirstBrushPixel(x, y: integer): PARGB;
   protected
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
+    function Initialize(targetImage: TImage32): Boolean; override;
   public
     constructor Create(tileFillStyle: TTileFillStyle = tfsRepeat;
       brushImage: TImage32 = nil);
     destructor Destroy; override;
-    function Initialize(targetImage: TImage32): Boolean; override;
     procedure SetTileFillStyle(value: TTileFillStyle);
     property Image: TImage32 read fImage;
     property Offset: TPoint read fOffset write fOffset;
@@ -109,8 +109,6 @@ type
   //TCustomGradientRenderer is also an abstract class
   TCustomGradientRenderer = class(TCustomRenderer)
   private
-    fStartPt         : TPointD;
-    fEndPt           : TPointD;
     fColors          : TArrayOfColor32;
     fBoundsProc      : TBoundsProc;
     fGradientColors  : TArrayOfGradientColor;
@@ -119,10 +117,13 @@ type
   public
     constructor Create;
     procedure InsertColorStop(offsetFrac: double; color: TColor32);
+    procedure Clear;
   end;
 
   TLinearGradientRenderer = class(TCustomGradientRenderer)
   private
+    fStartPt         : TPointD;
+    fEndPt           : TPointD;
     fPerpendicOffsets: TArrayOfInteger;
     fEndDist         : integer;
     fIsVert          : Boolean;
@@ -1200,6 +1201,13 @@ end;
 constructor TCustomGradientRenderer.Create;
 begin
   fBoundsProc := ClampQ; //default proc
+end;
+//------------------------------------------------------------------------------
+
+procedure TCustomGradientRenderer.Clear;
+begin
+  fGradientColors := nil;
+  fColors := nil;
 end;
 //------------------------------------------------------------------------------
 

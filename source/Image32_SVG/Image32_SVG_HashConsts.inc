@@ -18,6 +18,8 @@
   hFont_045_Size              = $8BFECA77;    // Font-Size
   hFont_045_Style             = $4CBDA7BE;    // Font-Style
   hFont_045_Weight            = $EF7234B4;    // Font-Weight
+  hFx                         = $D6733A04;    // Fx
+  hFy                         = $A4AD5675;    // Fy
   hG                          = $3593EB0B;    // G
   hGradientTransform          = $5B6A9CF7;    // GradientTransform
   hGradientUnits              = $07DD34B6;    // GradientUnits
@@ -31,11 +33,14 @@
   hMarker_045_End             = $B06101FD;    // Marker-End
   hMarker_045_Mid             = $FD95C733;    // Marker-Mid
   hMarker_045_Start           = $CF854A0E;    // Marker-Start
+  hMarkerHeight               = $10360978;    // MarkerHeight
+  hMarkerWidth                = $EF8DF427;    // MarkerWidth
   hMatrix                     = $31E3AD46;    // Matrix
   hMiddle                     = $80732990;    // Middle
   hMonospace                  = $049AE941;    // Monospace
   hObjectBoundingBox          = $3D4B4519;    // ObjectBoundingBox
   hOffset                     = $A13C79EF;    // Offset
+  hOpacity                    = $D9394F28;    // Opacity
   hOrient                     = $EFF6C65A;    // Orient
   hPath                       = $AD8A7AB5;    // Path
   hPoints                     = $87F41B44;    // Points

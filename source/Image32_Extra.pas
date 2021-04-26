@@ -76,10 +76,15 @@ procedure RedEyeRemove(img: TImage32; const rect: TRect);
 procedure PencilEffect(img: TImage32; intensity: integer = 0);
 procedure TraceContours(img: TImage32; intensity: integer);
 
-procedure Erase(img: TImage32; const polygon: TPathD;
-  fillRule: TFillRule; inverted: Boolean = false); overload;
-procedure Erase(img: TImage32; const polygons: TPathsD;
-  fillRule: TFillRule; inverted: Boolean = false); overload;
+procedure Erase(img: TImage32;
+  const polygon: TPathD; fillRule: TFillRule); overload;
+procedure Erase(img: TImage32;
+  const polygons: TPathsD; fillRule: TFillRule); overload;
+
+procedure EraseInverted(img: TImage32; const polygon: TPathD;
+  fillRule: TFillRule; const bounds: TRect); overload;
+procedure EraseInverted(img: TImage32; const polygons: TPathsD;
+  fillRule: TFillRule; const bounds: TRect); overload;
 
 procedure Draw3D(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; height, blurRadius: double;
@@ -988,43 +993,53 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Erase(img: TImage32; const polygon: TPathD;
-  fillRule: TFillRule; inverted: Boolean);
-var
-  mask: TImage32;
+procedure Erase(img: TImage32; const polygon: TPathD; fillRule: TFillRule);
 begin
-  if not assigned(polygon) then Exit;
-  if inverted then
-  begin
-    mask := TImage32.Create(img.Width, img.Height);
-    try
-      DrawPolygon(mask, polygon, fillRule, clBlack32);
-      img.CopyBlend(mask, mask.Bounds, img.Bounds, BlendMask);
-    finally
-      mask.Free;
-    end;
-  end else
+  if assigned(polygon) then
     ErasePolygon(img, polygon, fillRule);
 end;
 //------------------------------------------------------------------------------
 
-procedure Erase(img: TImage32; const polygons: TPathsD;
-  fillRule: TFillRule; inverted: Boolean);
+procedure Erase(img: TImage32; const polygons: TPathsD; fillRule: TFillRule);
+begin
+  if assigned(polygons) then
+    ErasePolygon(img, polygons, fillRule);
+end;
+//------------------------------------------------------------------------------
+
+procedure EraseInverted(img: TImage32; const polygon: TPathD;
+  fillRule: TFillRule; const bounds: TRect);
 var
   mask: TImage32;
+  p: TPathD;
+begin
+  if not assigned(polygon) then Exit;
+  mask := TImage32.Create(RectWidth(bounds), RectHeight(bounds));
+  try
+    p := OffsetPath(polygon, -bounds.Left, -bounds.top);
+    DrawPolygon(mask, p, fillRule, clBlack32);
+    img.CopyBlend(mask, mask.Bounds, bounds, BlendMask);
+  finally
+    mask.Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure EraseInverted(img: TImage32; const polygons: TPathsD;
+  fillRule: TFillRule; const bounds: TRect);
+var
+  mask: TImage32;
+  pp: TPathsD;
 begin
   if not assigned(polygons) then Exit;
-  if inverted then
-  begin
-    mask := TImage32.Create(img.Width, img.Height);
-    try
-      DrawPolygon(mask, polygons, fillRule, clBlack32);
-      img.CopyBlend(mask, mask.Bounds, img.Bounds, BlendMask);
-    finally
-      mask.Free;
-    end;
-  end else
-    ErasePolygon(img, polygons, fillRule);
+  mask := TImage32.Create(RectWidth(bounds), RectHeight(bounds));
+  try
+    pp := OffsetPath(polygons, -bounds.Left, -bounds.top);
+    DrawPolygon(mask, pp, fillRule, clBlack32);
+    img.CopyBlend(mask, mask.Bounds, bounds, BlendMask);
+  finally
+    mask.Free;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1064,7 +1079,7 @@ begin
       paths2 := OffsetPath(paths, height*x, height*y);
       Erase(tmp, paths2, fillRule);
       BoxBlur(tmp, tmp.Bounds, Round(blurRadius), 2);
-      Erase(tmp, paths, fillRule, true);
+      EraseInverted(tmp, paths, fillRule, tmp.Bounds);
       img.CopyBlend(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;
 
@@ -1074,7 +1089,7 @@ begin
       paths2 := OffsetPath(paths, -height*x, -height*y);
       Erase(tmp, paths2, fillRule);
       BoxBlur(tmp, tmp.Bounds, Round(blurRadius), 2);
-      Erase(tmp, paths, fillRule, true);
+      EraseInverted(tmp, paths, fillRule, tmp.Bounds);
       img.CopyBlend(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;
   finally
