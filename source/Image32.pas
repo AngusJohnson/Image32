@@ -2,8 +2,8 @@ unit Image32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.23                                                            *
-* Date      :  12 April 2021                                                   *
+* Version   :  2.24                                                            *
+* Date      :  30 April 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -394,7 +394,8 @@ type
   function RectD(left, top, right, bottom: double): TRectD; overload;
   function RectD(const rec: TRect): TRectD; overload;
 
-  function ClampByte(val: Integer): byte;
+  function ClampByte(val: Integer): byte; overload;
+  function ClampByte(val: double): byte; overload;
   function ClampRange(val, min, max: Integer): Integer; overload;
   function ClampRange(val, min, max: double): double; overload;
   function IncPColor32(pc: Pointer; cnt: Integer): PColor32;
@@ -892,6 +893,14 @@ begin
   if val < 0 then result := 0
   else if val > 255 then result := 255
   else result := val;
+end;
+//------------------------------------------------------------------------------
+
+function ClampByte(val: double): byte;
+begin
+  if val < 0 then result := 0
+  else if val > 255 then result := 255
+  else result := Round(val);
 end;
 //------------------------------------------------------------------------------
 

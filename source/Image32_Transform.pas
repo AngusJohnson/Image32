@@ -2,8 +2,8 @@
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.23                                                            *
-* Date      :  12 April 2021                                                   *
+* Version   :  2.24                                                            *
+* Date      :  30 April 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -89,11 +89,16 @@ type
     function GetColor: TColor32;
   public
     procedure Reset;
-    procedure Add(c: TColor32; weight: Integer);
-    procedure Subtract(c: TColor32; weight: Integer);
+    procedure Add(c: TColor32; weight: Integer = 1); overload;
+    procedure Add(const other: TWeightedColor); overload;
+    procedure Subtract(c: TColor32; weight: Integer =1); overload;
+    procedure Subtract(const other: TWeightedColor); overload;
+
     procedure AddWeight(weight: Integer); //ie add clNone32
+    procedure Multiply(value: double);
     property AddCount: Integer read fAddCount;
     property Color: TColor32 read GetColor;
+    property Weight: integer read fAddCount;
   end;
   TArrayOfWeightedColor = array of TWeightedColor;
 
@@ -837,6 +842,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TWeightedColor.Multiply(value: double);
+begin
+  fAddCount := Round(fAddCount * value);
+  fAlphaTot := Round(fAlphaTot * value);
+  fColorTotR := Round(fColorTotR * value);
+  fColorTotG := Round(fColorTotG * value);
+  fColorTotB := Round(fColorTotB * value);
+end;
+//------------------------------------------------------------------------------
+
 procedure TWeightedColor.Add(c: TColor32; weight: Integer);
 var
   a: Integer;
@@ -852,6 +867,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TWeightedColor.Add(const other: TWeightedColor);
+begin
+  inc(fAddCount, other.fAddCount);
+  inc(fAlphaTot, other.fAlphaTot);
+  inc(fColorTotR, other.fColorTotR);
+  inc(fColorTotG, other.fColorTotG);
+  inc(fColorTotB, other.fColorTotB);
+end;
+//------------------------------------------------------------------------------
+
 procedure TWeightedColor.Subtract(c: TColor32; weight: Integer);
 var
   a: Integer;
@@ -864,6 +889,16 @@ begin
   dec(fColorTotB, (a * argb.B));
   dec(fColorTotG, (a * argb.G));
   dec(fColorTotR, (a * argb.R));
+end;
+//------------------------------------------------------------------------------
+
+procedure TWeightedColor.Subtract(const other: TWeightedColor);
+begin
+  dec(fAddCount, other.fAddCount);
+  dec(fAlphaTot, other.fAlphaTot);
+  dec(fColorTotR, other.fColorTotR);
+  dec(fColorTotG, other.fColorTotG);
+  dec(fColorTotB, other.fColorTotB);
 end;
 //------------------------------------------------------------------------------
 

@@ -8,11 +8,14 @@
   hCy                         = $A6DCDE14;    // Cy
   hD                          = $2350C685;    // D
   hDefs                       = $A819FE18;    // Defs
+  hDisplay                    = $17D82A47;    // Display
   hEllipse                    = $30C7994A;    // Ellipse
   hEnd                        = $B0C485D7;    // End
+  hfeGaussianBlur             = $B2225552;    // feGaussianBlur
   hFill                       = $A3AAAB69;    // Fill
   hFill_045_Opacity           = $18000C02;    // Fill-Opacity
   hFill_045_Rule              = $5264679F;    // Fill-Rule
+  hFilter                     = $49DC73B3;    // Filter
   hFont                       = $21461EC6;    // Font
   hFont_045_Family            = $371C9BE4;    // Font-Family
   hFont_045_Size              = $8BFECA77;    // Font-Size
@@ -38,6 +41,7 @@
   hMatrix                     = $31E3AD46;    // Matrix
   hMiddle                     = $80732990;    // Middle
   hMonospace                  = $049AE941;    // Monospace
+  hNone                       = $1D632BA1;    // None
   hObjectBoundingBox          = $3D4B4519;    // ObjectBoundingBox
   hOffset                     = $A13C79EF;    // Offset
   hOpacity                    = $D9394F28;    // Opacity
@@ -56,6 +60,7 @@
   hSans_045_Serif             = $95106804;    // Sans-Serif
   hSerif                      = $B88D4332;    // Serif
   hStart                      = $84DC271F;    // Start
+  hstdDeviation               = $00D13F6A;    // stdDeviation
   hStop                       = $930CA7F2;    // Stop
   hStop_045_Color             = $9FD6E0BE;    // Stop-Color
   hStop_045_Opacity           = $FC7751F2;    // Stop-Opacity

@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.23                                                            *
-* Date      :  14 April 2021                                                   *
+* Version   :  2.24                                                            *
+* Date      :  30 April 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *

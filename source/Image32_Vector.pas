@@ -2,8 +2,8 @@ unit Image32_Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.23                                                            *
-* Date      :  14 April 2021                                                   *
+* Version   :  2.24                                                            *
+* Date      :  30 April 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -26,14 +26,13 @@ type
   TFillRule = (frEvenOdd, frNonZero, frPositive, frNegative);
 
   TRectWH = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
+  public
     Left, Top, Width, Height: double;
     function IsEmpty: Boolean;
     function Right: double;
     function Bottom: double;
     function Contains(const Pt: TPoint): Boolean; overload;
     function Contains(const Pt: TPointD): Boolean; overload;
-    function TopLeft: TPointD;
-    function BottomRight: TPointD;
     function MidPoint: TPointD;
     function RectD: TRectD;
   end;
@@ -368,18 +367,6 @@ function TRectWH.Contains(const Pt: TPointD): Boolean;
 begin
   Result := (pt.X >= Left) and (pt.X <= Left + Width) and
     (pt.Y >= Top) and (pt.Y <= Top + Height)
-end;
-//------------------------------------------------------------------------------
-
-function TRectWH.TopLeft: TPointD;
-begin
-  Result := PointD(left, top);
-end;
-//------------------------------------------------------------------------------
-
-function TRectWH.BottomRight: TPointD;
-begin
-  Result := PointD(left + Width, top + Height);
 end;
 //------------------------------------------------------------------------------
 
@@ -2163,7 +2150,7 @@ function Arc(const rec: TRectD;
   startAngle, endAngle: double; scale: double): TPathD;
 var
   i, steps: Integer;
-  angle, avgRadius: double;
+  angle: double;
   sinA, cosA: double;
   centre, radius: TPointD;
   deltaX, deltaX2, deltaY: double;
@@ -2656,7 +2643,7 @@ begin
   if UseDynamicTolerances then
   begin
     rec := GetBoundsD(MakePathD([pt1.X, pt1.Y, pt2.X, pt2.Y, pt3.X, pt3.Y]));
-    tolerance := (rec.Width + rec.Height) * 0.005;
+    tolerance := (rec.Width + rec.Height) * 0.01;
   end else
     tolerance := QBezierTolerance;
 
@@ -2776,7 +2763,7 @@ begin
   begin
     rec := GetBoundsD(MakePathD([pt1.X, pt1.Y,
       pt2.X, pt2.Y, pt3.X, pt3.Y, pt4.X, pt4.Y]));
-    tolerance := (rec.Width + rec.Height) * 0.005;
+    tolerance := (rec.Width + rec.Height) * 0.01;
   end else
     tolerance := CBezierTolerance;
 
@@ -2858,7 +2845,7 @@ begin
   begin
     rec := GetBoundsD(MakePathD([pt1.X, pt1.Y,
       pt2.X, pt2.Y, pt3.X, pt3.Y, pt4.X, pt4.Y]));
-    tolerance := (rec.Width + rec.Height) * 0.005;
+    tolerance := (rec.Width + rec.Height) * 0.01;
   end else
     tolerance := CBezierTolerance;
 
@@ -2931,7 +2918,7 @@ begin
   begin
     rec := GetBoundsD(MakePathD([pt1.X, pt1.Y,
       pt2.X, pt2.Y, pt3.X, pt3.Y]));
-    tolerance := (rec.Width + rec.Height) * 0.005;
+    tolerance := (rec.Width + rec.Height) * 0.01;
   end else
     tolerance := QBezierTolerance;
 

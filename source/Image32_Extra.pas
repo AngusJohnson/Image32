@@ -2,8 +2,8 @@ unit Image32_Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.17                                                            *
-* Date      :  19 March 2021                                                   *
+* Version   :  2.24                                                            *
+* Date      :  30 April 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -41,9 +41,7 @@ procedure DrawGlow(img: TImage32; const polygons: TPathsD;
 procedure FloodFill(img: TImage32; x, y: Integer; newColor: TColor32;
   compareFunc: TCompareFunction = nil; tolerance: Integer = 0);
 
-//BoxBlur: With several repetitions and a smaller radius, BoxBlur can
-//achieve a close approximation of a GaussianBlur, and it's faster.
-procedure BoxBlur(img: TImage32; rect: TRect; radius, repeats: Integer);
+procedure FastGaussianBlur(img: TImage32; const rec: TRect; stdDev: integer);
 procedure GaussianBlur(img: TImage32; rec: TRect; radius: Integer);
 
 //Emboss: A smaller radius is sharper. Increasing depth increases contrast.
@@ -296,7 +294,7 @@ procedure DrawShadow(img: TImage32; const polygons: TPathsD;
   color: TColor32; cutoutInsideShadow: Boolean);
 var
   x, y: double;
-  blurSize, rpt: integer;
+  blurSize: integer;
   rec: TRect;
   polys, shadowPolys: TPathsD;
   shadowImg: TImage32;
@@ -308,14 +306,13 @@ begin
   x := depth * x;
   y := depth * y;
   blurSize := Max(1,Round(depth / 4));
-  if depth <= 2 then rpt :=1 else rpt := 2;
   rec := Image32_Vector.InflateRect(rec, Ceil(depth*2), Ceil(depth*2));
   polys := OffsetPath(polygons, -rec.Left, -rec.Top);
   shadowPolys := OffsetPath(polys, x, y);
   shadowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
   try
     DrawPolygon(shadowImg, shadowPolys, fillRule, color);
-    BoxBlur(shadowImg, shadowImg.Bounds, blurSize, rpt);
+    FastGaussianBlur(shadowImg, shadowImg.Bounds, blurSize);
     if cutoutInsideShadow then
       Erase(shadowImg, polys, fillRule);
     img.CopyBlend(shadowImg, shadowImg.Bounds, rec, BlendToAlpha);
@@ -350,7 +347,7 @@ begin
   glowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
   try
     DrawPolygon(glowImg, glowPolys, fillRule, color);
-    BoxBlur(glowImg, glowImg.Bounds, Ceil(blurRadius/3), 2);
+    FastGaussianBlur(glowImg, glowImg.Bounds, blurRadius);
     glowImg.ScaleAlpha(4);
     img.CopyBlend(glowImg, glowImg.Bounds, rec, BlendToAlpha);
   finally
@@ -520,8 +517,7 @@ begin
   bmpBlur := TImage32.Create(img); //clone self
   try
     pColor := PARGB(img.pixelBase);
-    //GaussianBlur(bmpBlur, bmpBlur.Bounds, radius);
-    BoxBlur(bmpBlur, bmpBlur.Bounds, Ceil(radius/4), (radius mod 4) + 1);
+    FastGaussianBlur(bmpBlur, bmpBlur.Bounds, radius);
     pBlur := PARGB(bmpBlur.pixelBase);
     for i := 1 to img.Width * img.Height do
     begin
@@ -673,124 +669,6 @@ begin
         bg.Color := clNone32;
     end;
     inc(bg);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure BlurHorizontal(img: TImage32; rect: TRect; radius: Integer);
-var
-  i, x,y, widthLess1: Integer;
-  pc0, pcB, pcF: PColor32;
-  wc: TWeightedColor;
-  buffer: TArrayOfColor32;
-begin
-  rect := Image32_Vector.IntersectRect(img.Bounds, rect);
-  if IsEmptyRect(rect) or (radius < 1) then Exit;
-  widthLess1 := RectWidth(rect) -1;
-  radius := ClampRange(radius, 1, Min(widthLess1, MaxBlur));
-  setLength(buffer, widthLess1 +1);
-
-  for y := 0 to RectHeight(rect) -1 do
-  begin
-    pc0 := @img.Pixels[(rect.Top + y) * img.Width + rect.Left];
-    //copy the row's pixels into a buffer because blurring spoils the color
-    //of pixels being removed from the kernel (especially with larger radii).
-    Move(pc0^, buffer[0], RectWidth(rect) * SizeOf(TColor32));
-
-    wc.Reset;
-    //build the horizontal kernel (wc) using the first pixel in each row ...
-    wc.Add(pc0^, 1);
-    pcB := @buffer[0]; pcF := pcB;
-    for i := 1 to radius do
-    begin
-      inc(pcF);
-      wc.Add(pcF^, 1);
-    end;
-    pc0^ := wc.Color; //updates the first pixel in the row
-
-    inc(pcF);
-    //pcB & pcF now both point to the color buffer, representing the
-    //left-most and right-most kernel pixels respectively
-
-    //process the rest of the row, updating the kernel each time - removing
-    //the old left-most pixel in the kernel and adding the new right-most one.
-    for x := 1 to widthLess1 do
-    begin
-      if x > radius then
-      begin
-        wc.Subtract(pcB^, 1);
-        inc(pcB);
-      end;
-      if x < (widthLess1 - radius) then
-      begin
-        wc.add(pcF^, 1);
-        inc(pcF)
-      end;
-      inc(pc0);
-      pc0^ := wc.Color;
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure BlurVertical(img: TImage32; rect: TRect; radius: Integer);
-var
-  i, x,y, heightLess1: Integer;
-  pc0, pcB, pcF: PColor32;
-  wc: TWeightedColor;
-  buffer: TArrayOfColor32;
-begin
-  heightLess1 := RectHeight(rect) -1;
-  radius := ClampRange(radius, 1, Min(heightLess1, MaxBlur));
-  setLength(buffer, heightLess1 +1);
-
-  for x := 0 to RectWidth(rect) -1 do
-  begin
-    pc0 := @img.Pixels[(rect.Top * img.Width) + rect.Left + x];
-    //build the vertical pixel buffer ...
-    pcF := pc0;
-    for i := 0 to heightLess1 do
-    begin
-      buffer[i] := pcF^;
-      inc(pcF, img.Width);
-    end;
-
-    wc.Reset;
-    wc.Add(pc0^, 1);
-    pcB := @buffer[0]; pcF := pcB;
-    for i := 1 to radius do
-    begin
-      inc(pcF);
-      wc.Add(pcF^, 1);
-    end;
-    pc0^ := wc.Color;
-    inc(pcF);
-    for y := 1 to heightLess1 do
-    begin
-      if y > radius then
-      begin
-        wc.Subtract(pcB^, 1);
-        inc(pcB);
-      end;
-      if y < (heightLess1 - radius) then
-      begin
-        wc.add(pcF^, 1);
-        inc(pcF);
-      end;
-      inc(pc0, img.Width);
-      pc0^ := wc.Color;
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure BoxBlur(img: TImage32; rect: TRect; radius, repeats: Integer);
-begin
-  if radius < 1 then Exit;
-  for repeats := 0 to repeats do
-  begin
-    BlurHorizontal(img, rect, radius);
-    BlurVertical(img, rect, radius);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1078,7 +956,7 @@ begin
       tmp.Clear(colorLt);
       paths2 := OffsetPath(paths, height*x, height*y);
       Erase(tmp, paths2, fillRule);
-      BoxBlur(tmp, tmp.Bounds, Round(blurRadius), 2);
+      FastGaussianBlur(tmp, tmp.Bounds, Round(blurRadius));
       EraseInverted(tmp, paths, fillRule, tmp.Bounds);
       img.CopyBlend(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;
@@ -1088,7 +966,7 @@ begin
       tmp.Clear(colorDk);
       paths2 := OffsetPath(paths, -height*x, -height*y);
       Erase(tmp, paths2, fillRule);
-      BoxBlur(tmp, tmp.Bounds, Round(blurRadius), 2);
+      FastGaussianBlur(tmp, tmp.Bounds, Round(blurRadius));
       EraseInverted(tmp, paths, fillRule, tmp.Bounds);
       img.CopyBlend(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;
@@ -1259,19 +1137,18 @@ end;
 
 procedure PencilEffect(img: TImage32; intensity: integer);
 var
-  w,h, rpt: integer;
+  w,h: integer;
   img2: TImage32;
 begin
   w := img.Width; h := img.Height;
   if w * h = 0 then Exit;
 
-  rpt := max(0, min(3, intensity));
   intensity := max(1, min(10, intensity));
   img.Grayscale;
   img2 := TImage32.Create(img);
   try
     img2.InvertColors;
-    BoxBlur(img2, img2.Bounds, intensity * 3, rpt);
+    FastGaussianBlur(img2, img2.Bounds, intensity);
     img.CopyBlend(img2, img2.Bounds, img.Bounds, BlendColorDodge);
   finally
     img2.Free;
@@ -1991,5 +1868,209 @@ begin
   rec := GetSymmetricCropTransparentRect(img);
   if (rec.Top > 0) or (rec.Left > 0) then img.Crop(rec);
 end;
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+//http://blog.ivank.net/fastest-gaussian-blur.html
+//https://www.peterkovesi.com/papers/FastGaussianSmoothing.pdf
+
+function BoxesForGauss(stdDev, boxCnt: integer): TArrayOfInteger;
+var
+  i, wl, wu, m: integer;
+  wIdeal, mIdeal: double;
+begin
+  wIdeal := Sqrt((12*stdDev*stdDev/boxCnt)+1);
+  wl := Floor(wIdeal);
+  if (wl mod 2 = 0) then dec(wl);
+  wu := wl+2;
+
+  mIdeal := (12 *stdDev*stdDev
+    -boxCnt *wl*wl - 4*boxCnt *wl - 3 *boxCnt) / (-4 *wl - 4);
+  m := Round(mIdeal);
+  SetLength(Result, boxCnt);
+  for i := 0 to boxCnt -1 do
+    if i < m then
+      Result[i] := (wl -1) div 2 else
+      Result[i] := (wu -1) div 2;
+end;
+//------------------------------------------------------------------------------
+
+procedure BoxBlurH(var src, dst: TArrayOfColor32; w,h, stdDev: integer);
+var
+  i,j, ti, li, ri: integer;
+  fv, lv, val, tmp: TWeightedColor;
+  iarr: double;
+begin
+  iarr := 1 / (stdDev *2 +1);
+
+  for i := 0 to h -1 do
+  begin
+    ti := i * w;
+    li := ti;
+    ri := ti +stdDev;
+
+    fv.Reset;
+    lv.Reset;
+    val.Reset;
+
+    fv.Add(src[ti], 1);
+    lv.Add(src[ti +w -1], 1);
+    val := fv;
+    val.Multiply(stdDev +1);
+
+    for j := 0 to stdDev -1 do
+      val.Add(src[ti + j]);
+    for j := 0 to stdDev do
+    begin
+      val.Add(src[ri]);
+      val.Subtract(fv); inc(ri);
+      tmp := val;
+      tmp.Multiply(iarr);
+      dst[ti] := tmp.Color; inc(ti);
+    end;
+    for j := stdDev +1 to w - stdDev -1 do
+    begin
+      val.Add(src[ri]);
+      val.Subtract(src[li]);
+      inc(ri); inc(li);
+      tmp := val;
+      tmp.Multiply(iarr);
+      dst[ti] := tmp.Color; inc(ti);
+    end;
+    for j := w - stdDev to w -1 do
+    begin
+      val.Add(lv);
+      val.Subtract(src[li]); inc(li);
+      tmp := val;
+      tmp.Multiply(iarr);
+      dst[ti] := tmp.Color; inc(ti);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure BoxBlurT(var src, dst: TArrayOfColor32; w, h, stdDev: integer);
+var
+  i,j, ti, li, ri: integer;
+  fv, lv, val, tmp: TWeightedColor;
+  iarr: double;
+begin
+  iarr := 1 / (stdDev *2 +1);
+  for i := 0 to w -1 do
+  begin
+    ti := i;
+    li := ti;
+    ri := ti + stdDev * w;
+
+    fv.Reset;
+    lv.Reset;
+    val.Reset;
+
+    fv.Add(src[ti]);
+    lv.Add(src[ti +w *(h-1)], 1);
+    val := fv;
+    val.Multiply(stdDev +1);
+
+    for j := 0 to stdDev -1 do
+      val.Add(src[ti + j *w]);
+    for j := 0 to stdDev do
+    begin
+      val.Add(src[ri]);
+      val.Subtract(fv);
+      tmp := val;
+      tmp.Multiply(iarr);
+      dst[ti] := tmp.Color; inc(ti, w);
+      inc(ri, w);
+    end;
+    for j := stdDev +1 to h - stdDev -1 do
+    begin
+      val.Add(src[ri]);
+      val.Subtract(src[li]);
+      tmp := val;
+      tmp.Multiply(iarr);
+      dst[ti] := tmp.Color; inc(ti, w);
+      inc(ri, w); inc(li, w);
+    end;
+    for j := h - stdDev to h -1 do
+    begin
+      val.Add(lv);
+      val.Subtract(src[li]);
+      tmp := val;
+      tmp.Multiply(iarr);
+      dst[ti] := tmp.Color; inc(ti, w);
+      inc(li, w);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure FastGaussianBlur(img: TImage32; const rec: TRect; stdDev: integer);
+var
+  i,j,len, w,h: integer;
+  rec2: TRect;
+  boxes: TArrayOfInteger;
+  src, dst: TArrayOfColor32;
+  blurFullImage: Boolean;
+  p: PColor32;
+begin
+  if not Assigned(img) then Exit;
+  rec2 := Image32_Vector.IntersectRect(rec, img.Bounds);
+  if IsEmptyRect(rec2) then Exit;
+
+  blurFullImage := RectsEqual(rec2, img.Bounds);
+
+  w := RectWidth(rec2);
+  h := RectHeight(rec2);
+  len := w * h;
+  SetLength(src, len);
+  SetLength(dst, len);
+
+  //safety check to avoid overflows
+  if stdDev >= w div 2 then
+    stdDev := w div 2 -1;
+  if stdDev >= h div 2 then
+    stdDev := h div 2 -1;
+  if stdDev < 1 then Exit;
+
+  //copy image rect into dst array
+  if blurFullImage then
+  begin
+    Move(img.PixelBase^, dst[0], len * SizeOf(TColor32));
+  end else
+  begin
+    p := @dst[0];
+    for i := rec2.Top to rec2.Bottom -1 do
+    begin
+      Move(img.Pixels[i * img.Width + rec2.Left],
+        p^, w * SizeOf(TColor32));
+      inc(p, w);
+    end;
+  end;
+
+  //do the blur
+  boxes := BoxesForGauss(stdDev, 3);
+  for j := 0 to 2 do
+    begin
+      BoxBlurH(dst, src, w, h, boxes[j]);
+      BoxBlurT(src, dst, w, h, boxes[j]);
+    end;
+  img.BeginUpdate;
+
+  //copy dst array back to image rect
+  if blurFullImage then
+  begin
+    Move(dst[0], img.PixelBase^, len * SizeOf(TColor32));
+  end else
+  begin
+    p := @dst[0];
+    for i := rec2.Top to rec2.Bottom -1 do
+    begin
+      Move(p^, img.Pixels[i * img.Width + rec2.Left], w * SizeOf(TColor32));
+      inc(p, w);
+    end;
+  end;
+  img.EndUpdate;
+end;
+//------------------------------------------------------------------------------
 
 end.

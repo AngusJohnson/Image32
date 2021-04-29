@@ -2,19 +2,24 @@ unit Image32_SVG_Reader;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.23                                                            *
-* Date      :  25 April 2021                                                   *
+* Version   :  2.24                                                            *
+* Date      :  30 April 2021                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2021                                         *
 *                                                                              *
 * Purpose   :  Read SVG files                                                  *
+*              To propery read SVG files and support all the features of the   *
+*              vers. 2 specification is a huge task. So while this unit does   *
+*              fairly decent job of reading most SVG files, it remains mostly  *
+*              a proof of concept with numerous deficiencies including:        *
+*              consistent inheritance of default values; proper handling of    *
+*              measurement units (cms, ems etc.); managing different line join *
+*              and line end styles; slow rendering of blurs etc. etc.          *
 *                                                                              *
 * License:                                                                     *
 * Use, modification & distribution is subject to Boost Software License Ver 1. *
 * http://www.boost.org/LICENSE_1_0.txt                                         *
 *******************************************************************************)
-
-//still lots to do: filters, lineCap, lineJoin etc
 
 interface
 
@@ -32,6 +37,7 @@ uses
 type
   TGradientElement = class;
   TMarkerElement   = class;
+  TFilterElement   = class;
   TClipPathElement = class;
 
   TFontFamily = (ffSansSerif, ffSerif, ffMonospace);
@@ -59,6 +65,7 @@ type
     markerStart   : TMarkerElement;
     markerMiddle  : TMarkerElement;
     markerEnd     : TMarkerElement;
+    filterEl      : TFilterElement;
     clipPathEl    : TClipPathElement;
     opacity       : Byte;
     //lineCap       : TEndStyle;     //stroke-linecap
@@ -345,6 +352,20 @@ type
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
 
+  TFilterElement = class(TElement)
+  protected
+    recWH: TRectWH;
+  public
+    constructor Create(parent: TElement; hashName: Cardinal); override;
+  end;
+
+  TGaussianElement  = class(TElement)
+  protected
+    stdDev: double;
+  public
+    constructor Create(parent: TElement; hashName: Cardinal); override;
+  end;
+
   TClipPathElement = class(TShapeElement)
   protected
     procedure GetDrawPaths(ArcScale: double); override;
@@ -419,7 +440,7 @@ const
     strokeColor: clNone32; strokeWidth: 1.0;
     dashArray: nil; dashOffset: 0;
     markerStart: nil; markerMiddle: nil; markerEnd: nil;
-    clipPathEl: nil; opacity: 255;
+    filterEl: nil;  clipPathEl: nil; opacity: 255;
     matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)); hidden: false);
 
   defaultFontInfo: TFontInfo =
@@ -606,6 +627,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+{$OVERFLOWCHECKS OFF}
 function GetHashedName(c: PAnsiChar; length: integer): cardinal; overload;
 var
   i: integer;
@@ -625,6 +647,7 @@ begin
   Result := Result + (Result shl 15);
 end;
 //------------------------------------------------------------------------------
+{$OVERFLOWCHECKS ON}
 
 function GetHashedName(var c: PAnsiChar; endC: PAnsiChar): cardinal; overload;
 var
@@ -645,6 +668,8 @@ begin
     hCircle         : Result := TCircleElement;
     hDefs           : Result := TDefsElement;
     hEllipse        : Result := TEllipseElement;
+    hFilter         : Result := TFilterElement;
+    hFeGaussianBlur : Result := TGaussianElement;
     hG              : Result := TElement;
     hLine           : Result := TLineElement;
     hLineargradient : Result := TLinGradElement;
@@ -946,7 +971,7 @@ end;
 
 function IsFraction(val: double): Boolean;
 begin
-  Result := (val > 0) and (val < 1);
+  Result := (val <> 0) and (val > -1) and (val < 1);
 end;
 //------------------------------------------------------------------------------
 
@@ -1328,8 +1353,8 @@ begin
   if other is TLinGradElement then
     with TLinGradElement(other) do
     begin
-      if IsValid(self.startPt) then startPt := self.startPt;
-      if IsValid(self.endPt) then endPt := self.endPt;
+      if not IsValid(startPt) then startPt := self.startPt;
+      if not IsValid(endPt) then endPt := self.endPt;
     end;
 end;
 //------------------------------------------------------------------------------
@@ -1346,12 +1371,18 @@ begin
 
   with renderer as TLinearGradientRenderer do
   begin
-    if IsValid(startPt) then
-      pt1 := startPt else
-      pt1 := NullPointD;
-    if IsValid(endPt) then
-      pt2 := endPt else
-      pt2 := PointD(1,0);
+    if IsValid(startPt.X) then
+      pt1.X := startPt.X else
+      pt1.X := 1;
+    if IsValid(startPt.Y) then
+      pt1.Y := startPt.Y else
+      pt1.Y := 0;
+    if IsValid(endPt.X) then
+      pt2.X := endPt.X else
+      pt2.X := 0;
+    if IsValid(endPt.Y) then
+      pt1.Y := endPt.Y else
+      pt1.Y := 0;
 
     if gradientUnits <> hUserSpaceOnUse then
     begin
@@ -1363,8 +1394,6 @@ begin
 
     MatrixApply(matrix, pt1);
     MatrixApply(matrix, pt2);
-
-
 
     SetParameters(pt1, pt2, stops[0].color, stops[High(stops)].color);
   end;
@@ -1379,6 +1408,30 @@ constructor TGradStopElement.Create(parent: TElement; hashName: Cardinal);
 begin
   inherited;
   color := clBlack32;
+end;
+
+//------------------------------------------------------------------------------
+// TFilterElement
+//------------------------------------------------------------------------------
+
+constructor TFilterElement.Create(parent: TElement; hashName: Cardinal);
+begin
+  inherited;
+  recWH.Left := InvalidD;
+  recWH.Top := InvalidD;
+  recWH.Width := InvalidD;
+  recWH.Height := InvalidD;
+  fDrawInfo.hidden := true;
+end;
+
+//------------------------------------------------------------------------------
+// TGaussianElement
+//------------------------------------------------------------------------------
+
+constructor TGaussianElement.Create(parent: TElement; hashName: Cardinal);
+begin
+  inherited;
+  stdDev := InvalidD;
 end;
 
 //------------------------------------------------------------------------------
@@ -1444,7 +1497,7 @@ end;
 
 function TShapeElement.IsStroked: Boolean;
 begin
-  Result := fDrawInfo.hidden or //can't tell yet so default to true
+  Result := //fDrawInfo.hidden or //can't tell yet so default to true
     ((fDrawInfo.strokeWidth > 0) and
     (Assigned(fDrawInfo.strokeGradEl) or (TARGB(fDrawInfo.strokeColor).A > 0)));
 end;
@@ -1452,10 +1505,12 @@ end;
 
 procedure TShapeElement.Draw(img, tmpImg: TImage32; RootMatrix: TMatrixD);
 var
+  i: integer;
   stroked, filled: Boolean;
   ArcScale: double;
   mat: TMatrixD;
-  clipRec: TRect;
+  rec, clipRec: TRect;
+  usingSpecialEffects: Boolean;
 begin
   filled := IsFilled; stroked := IsStroked;
   if not (filled or stroked) then Exit;
@@ -1469,38 +1524,61 @@ begin
   MatrixApply(mat, drawPathsO);
   MatrixApply(mat, drawPathsC);
 
-  if Assigned(fDrawInfo.clipPathEl) then
-  begin
-    with fDrawInfo.clipPathEl do
-    begin
-      GetDrawPaths(ArcScale);
-      MatrixApply(mat, drawPathsF);
-      clipRec := GetBounds(drawPathsF);
-    end;
-    tmpImg.FillRect(clipRec, clNone32);
-    if filled then DrawFilled(tmpImg, mat);
-    DrawStroke(tmpImg, mat, true);
-    DrawStroke(tmpImg, mat, false);
+  usingSpecialEffects := Assigned(fDrawInfo.clipPathEl) or
+    (fDrawInfo.opacity < 255) or Assigned(fDrawInfo.filterEl);
 
-    with fDrawInfo.clipPathEl do
-      EraseInverted(tmpImg, drawPathsF, fDrawInfo.fillRule, clipRec);
-    if fDrawInfo.opacity < 255 then
-      tmpImg.ReduceOpacity(fDrawInfo.opacity, clipRec);
-
-    img.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlpha);
-  end
-  else if fDrawInfo.opacity < 255 then
+  if usingSpecialEffects then
   begin
     clipRec := Image32_Vector.UnionRect(GetBounds(drawPathsF),
       Image32_Vector.UnionRect(GetBounds(drawPathsC), GetBounds(drawPathsO)));
-    tmpImg.FillRect(clipRec, clNone32);
 
-    if filled then DrawFilled(tmpImg, mat);
+    rec := clipRec;
+    if Assigned(fDrawInfo.filterEl) then
+      with fDrawInfo.filterEl do
+      begin
+        if IsValid(recWH.Left) and IsValid(recWH.Top) and
+          IsValid(recWH.Width) and IsValid(recWH.Height) then
+        begin
+          Image32_Vector.OffsetRect(rec,
+            Round(rec.Width * recWH.Left), Round(rec.Height * recWH.Top));
+          rec.Right := rec.Left + Round(RectWidth(rec) * recWH.Width);
+          rec.Bottom := rec.Top + Round(RectHeight(rec) * recWH.Height);
+        end
+//        else rec := Image32_Vector.InflateRect(rec,
+//          Round(RectWidth(rec) * 0.2), Round(RectHeight(rec) * 0.2));
+      end;
+
+    tmpImg.FillRect(rec, clNone32);
+
+    if Assigned(fDrawInfo.clipPathEl) then
+      with fDrawInfo.clipPathEl do
+      begin
+        GetDrawPaths(ArcScale);
+        MatrixApply(mat, drawPathsF);
+      end;
+    ArcScale := ExtractScaleFromMatrix(mat);
+
+    DrawFilled(tmpImg, mat);
     DrawStroke(tmpImg, mat, true);
     DrawStroke(tmpImg, mat, false);
 
-    tmpImg.ReduceOpacity(fDrawInfo.opacity, clipRec);
-    img.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlpha);
+    if Assigned(fDrawInfo.filterEl) then
+      with fDrawInfo.filterEl do
+        for i := 0 to fChilds.Count -1 do
+          if (TElement(fChilds[i]) is TGaussianElement) then
+            with TGaussianElement(fChilds[i]) do
+              if IsValid(stdDev) then
+                FastGaussianBlur(tmpImg, rec, Ceil(stdDev  * ArcScale));
+
+    if fDrawInfo.opacity < 255 then
+      tmpImg.ReduceOpacity(fDrawInfo.opacity, clipRec);
+
+
+    if Assigned(fDrawInfo.clipPathEl) then
+      with fDrawInfo.clipPathEl do
+        EraseInverted(tmpImg, drawPathsF, fDrawInfo.fillRule, rec);
+
+    img.CopyBlend(tmpImg, rec, rec, BlendToAlpha);
   end else
   begin
     if filled then DrawFilled(img, mat);
@@ -1508,7 +1586,6 @@ begin
     DrawStroke(img, mat, true);
     DrawStroke(img, mat, false);
   end;
-
 end;
 //------------------------------------------------------------------------------
 
@@ -3184,13 +3261,9 @@ procedure ClipPath_Attrib(attrib: PAttrib);
 var
   refEl: TElement;
 begin
-  if attrib.aOwnerEl is TShapeElement then
-    with TShapeElement(attrib.aOwnerEl) do
-    begin
-      refEl := FindRefElement(attrib.aValue, attrib.aValueLen);
-      if assigned(refEl) and (refEl is TClipPathElement) then
-        fDrawInfo.clipPathEl := TClipPathElement(refEl);
-    end;
+  refEl := attrib.aOwnerEl.FindRefElement(attrib.aValue, attrib.aValueLen);
+  if assigned(refEl) and (refEl is TClipPathElement) then
+    attrib.aOwnerEl.fDrawInfo.clipPathEl := TClipPathElement(refEl);
 end;
 //------------------------------------------------------------------------------
 
@@ -3242,6 +3315,13 @@ begin
   currentEnd := current + attrib.aValueLen;
   with attrib.aOwnerEl.fDrawInfo do
     GetNum(current, currentEnd, true, dashOffset);
+end;
+//------------------------------------------------------------------------------
+
+procedure Display_Attrib(attrib: PAttrib);
+begin
+  if GetHashedName(attrib.aValue, attrib.aValueLen) = hNone then
+    attrib.aOwnerEl.fDrawInfo.hidden := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -3427,6 +3507,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure Filter_Attrib(attrib: PAttrib);
+var
+  el: TElement;
+begin
+  if not (attrib.aOwnerEl is TShapeElement) then Exit;
+  el := GetAttribUrl(attrib);
+  if assigned(el) and (el is TFilterElement) then
+    attrib.aOwnerEl.fDrawInfo.filterEl := TFilterElement(el);
+end;
+//------------------------------------------------------------------------------
+
+
 procedure Offset_Attrib(attrib: PAttrib);
 begin
   if attrib.aOwnerEl is TGradStopElement then
@@ -3544,6 +3636,9 @@ begin
     hMarker:
       with TMarkerElement(attrib.aOwnerEl) do
         AttribToFloat(attrib, height);
+    hFilter:
+      with TFilterElement(attrib.aOwnerEl) do
+        AttribToFloat(attrib, recWH.Height);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -3560,6 +3655,9 @@ begin
     hMarker:
       with TMarkerElement(attrib.aOwnerEl) do
         AttribToFloat(attrib, width);
+    hFilter:
+      with TFilterElement(attrib.aOwnerEl) do
+        AttribToFloat(attrib, recWH.Width);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -3631,6 +3729,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure StdDev_Attrib(attrib: PAttrib);
+var
+  sd: double;
+begin
+  if (attrib.aOwnerEl is TGaussianElement) then
+    with TGaussianElement(attrib.aOwnerEl) do
+    begin
+      AttribToFloat(attrib, sd);
+      if (sd > 0) and (sd < 100) then stdDev := sd;
+    end;
+end;
+//------------------------------------------------------------------------------
+
 procedure X1_Attrib(attrib: PAttrib);
 begin
   case attrib.aOwnerEl.fNameHash of
@@ -3652,6 +3763,9 @@ begin
     hUse:
       with TUseElement(attrib.aOwnerEl) do
         AttribToFloat(attrib, pt.X);
+    hFilter:
+      with TFilterElement(attrib.aOwnerEl) do
+        AttribToFloat(attrib, recWH.Left);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -3690,6 +3804,9 @@ begin
     hUse:
       with TUseElement(attrib.aOwnerEl) do
         AttribToFloat(attrib, pt.Y);
+    hFilter:
+      with TFilterElement(attrib.aOwnerEl) do
+        AttribToFloat(attrib, recWH.Top);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -3732,11 +3849,13 @@ begin
   RegisterAttribute(hCx,                    Cx_Attrib);
   RegisterAttribute(hCy,                    Cy_Attrib);
   RegisterAttribute(hD,                     D_Attrib);
+  RegisterAttribute(hDisplay,               Display_Attrib);
   RegisterAttribute(hStroke_045_DashArray,  DashArray_Attrib);
   RegisterAttribute(hStroke_045_DashOffset, DashOffset_Attrib);
   RegisterAttribute(hFill,                  Fill_Attrib);
   RegisterAttribute(hFill_045_Opacity,      FillOpacity_Attrib);
   RegisterAttribute(hFill_045_Rule,         FillRule_Attrib);
+  RegisterAttribute(hFilter,                Filter_Attrib);
   RegisterAttribute(hFont,                  Font_Attrib);
   RegisterAttribute(hFont_045_Family,       FontFamily_Attrib);
   RegisterAttribute(hFont_045_Size,         FontSize_Attrib);
@@ -3762,6 +3881,7 @@ begin
   RegisterAttribute(hRefY,                  Ry_Attrib);
   RegisterAttribute(hRx,                    Rx_Attrib);
   RegisterAttribute(hRy,                    Ry_Attrib);
+  RegisterAttribute(hstdDeviation,          StdDev_Attrib);
   RegisterAttribute(hStop_045_Color,        StopColor_Attrib);
   RegisterAttribute(hStop_045_Opacity,      StopOpacity_Attrib);
   RegisterAttribute(hStroke,                Stroke_Attrib);
