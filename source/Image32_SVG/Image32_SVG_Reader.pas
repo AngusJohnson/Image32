@@ -1373,17 +1373,16 @@ begin
   begin
     if IsValid(startPt.X) then
       pt1.X := startPt.X else
-      pt1.X := 1;
+      pt1.X := 0;
     if IsValid(startPt.Y) then
       pt1.Y := startPt.Y else
       pt1.Y := 0;
     if IsValid(endPt.X) then
       pt2.X := endPt.X else
-      pt2.X := 0;
+      pt2.X := 1;
     if IsValid(endPt.Y) then
-      pt1.Y := endPt.Y else
-      pt1.Y := 0;
-
+      pt2.Y := endPt.Y else
+      pt2.Y := 0;
     if gradientUnits <> hUserSpaceOnUse then
     begin
       matrix := fDrawInfo.matrix;

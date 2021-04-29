@@ -1,0 +1,25 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg 
+	xmlns:dc="http://purl.org/dc/elements/1.1/"
+	xmlns:cc="http://creativecommons.org/ns#"
+	xmlns:svg="http://www.w3.org/2000/svg"
+	xmlns="http://www.w3.org/2000/svg"
+	xmlns:xlink="http://www.w3.org/1999/xlink"
+	viewBox = "0 0 1100 400" 
+	version = "1.1">
+    <defs>
+        <rect id = "r1" width = "100" height = "100" stroke = "black" stroke-width = "1"/>
+        <circle id = "r2" cx = "100" cy = "100" r = "50" stroke = "black" stroke-width = "1"/>
+        <circle id = "r3" cx = "100" cy = "100" r = "100" stroke = "black" stroke-width = "1"/>
+        <!-- note the 'fx' and 'fy' attributes -->
+        <radialGradient id = "g1" cx = "50%" cy = "50%" r = "50%" fx = "25%" fy = "25%">
+            <stop stop-color = "black" offset = "0%"/>
+            <stop stop-color = "teal" offset = "50%"/>
+            <stop stop-color = "white" offset = "100%"/>
+        </radialGradient>
+    </defs>
+    <use x = "350" y = "0" xlink:href = "#r1" fill = "url(#g1)"/>
+    <use x = "350" y = "150" xlink:href = "#r2" fill = "url(#g1)"/>
+    <use x = "580" y = "125" xlink:href = "#r3" fill = "url(#g1)"/>
+</svg>
