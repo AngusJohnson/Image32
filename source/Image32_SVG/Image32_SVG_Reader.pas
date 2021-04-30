@@ -1508,8 +1508,10 @@ var
   stroked, filled: Boolean;
   ArcScale: double;
   mat: TMatrixD;
-  rec, clipRec: TRect;
+  clipRec: TRect;
   usingSpecialEffects: Boolean;
+const
+  blurQual = 0; //0 .. 2; 0=OK (faster), 1=very good, 2=high qual. (slower)
 begin
   filled := IsFilled; stroked := IsStroked;
   if not (filled or stroked) then Exit;
@@ -1531,23 +1533,22 @@ begin
     clipRec := Image32_Vector.UnionRect(GetBounds(drawPathsF),
       Image32_Vector.UnionRect(GetBounds(drawPathsC), GetBounds(drawPathsO)));
 
-    rec := clipRec;
     if Assigned(fDrawInfo.filterEl) then
       with fDrawInfo.filterEl do
       begin
         if IsValid(recWH.Left) and IsValid(recWH.Top) and
           IsValid(recWH.Width) and IsValid(recWH.Height) then
         begin
-          Image32_Vector.OffsetRect(rec,
-            Round(rec.Width * recWH.Left), Round(rec.Height * recWH.Top));
-          rec.Right := rec.Left + Round(RectWidth(rec) * recWH.Width);
-          rec.Bottom := rec.Top + Round(RectHeight(rec) * recWH.Height);
+          Image32_Vector.OffsetRect(clipRec,
+            Round(clipRec.Width * recWH.Left), Round(clipRec.Height * recWH.Top));
+          clipRec.Right := clipRec.Left + Round(RectWidth(clipRec) * recWH.Width);
+          clipRec.Bottom := clipRec.Top + Round(RectHeight(clipRec) * recWH.Height);
         end
-//        else rec := Image32_Vector.InflateRect(rec,
-//          Round(RectWidth(rec) * 0.2), Round(RectHeight(rec) * 0.2));
+        else clipRec := Image32_Vector.InflateRect(clipRec,
+          Round(RectWidth(clipRec) * 0.2), Round(RectHeight(clipRec) * 0.2));
       end;
 
-    tmpImg.FillRect(rec, clNone32);
+    tmpImg.FillRect(clipRec, clNone32);
 
     if Assigned(fDrawInfo.clipPathEl) then
       with fDrawInfo.clipPathEl do
@@ -1567,7 +1568,8 @@ begin
           if (TElement(fChilds[i]) is TGaussianElement) then
             with TGaussianElement(fChilds[i]) do
               if IsValid(stdDev) then
-                FastGaussianBlur(tmpImg, rec, Ceil(stdDev  * ArcScale));
+                FastGaussianBlur(tmpImg,
+                  clipRec, Ceil(stdDev  * ArcScale), blurQual);
 
     if fDrawInfo.opacity < 255 then
       tmpImg.ReduceOpacity(fDrawInfo.opacity, clipRec);
@@ -1575,9 +1577,9 @@ begin
 
     if Assigned(fDrawInfo.clipPathEl) then
       with fDrawInfo.clipPathEl do
-        EraseInverted(tmpImg, drawPathsF, fDrawInfo.fillRule, rec);
+        EraseInverted(tmpImg, drawPathsF, fDrawInfo.fillRule, clipRec);
 
-    img.CopyBlend(tmpImg, rec, rec, BlendToAlpha);
+    img.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlpha);
   end else
   begin
     if filled then DrawFilled(img, mat);
@@ -2093,10 +2095,10 @@ begin
                 if IsValid(lastCCtrlPt) then
                   pt2 := ReflectPoint(lastCCtrlPt, currPt) else
                   pt2 := currPt;
-                pt3.X := vals[j*2];
-                pt3.Y := vals[j*2 +1];
-                pt4.X := vals[j*2 +2];
-                pt4.Y := vals[j*2 +3];
+                pt3.X := vals[j*4];
+                pt3.Y := vals[j*4 +1];
+                pt4.X := vals[j*4 +2];
+                pt4.Y := vals[j*4 +3];
                 lastCCtrlPt := pt3;
                 path2 := FlattenCBezier(currPt, pt2, pt3, pt4);
                 AddPath(path2);
