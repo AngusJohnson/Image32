@@ -1,11 +1,10 @@
 object Form1: TForm1
-  Left = 0
-  Top = 0
+  Left = 298
+  Top = 205
   Caption = 'Svg101'
-  ClientHeight = 423
-  ClientWidth = 459
+  ClientHeight = 428
+  ClientWidth = 544
   Color = clBtnFace
-  DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -11
@@ -20,8 +19,8 @@ object Form1: TForm1
   object ImagePanel: TImage32Panel
     Left = 0
     Top = 0
-    Width = 459
-    Height = 423
+    Width = 544
+    Height = 428
     Align = alClient
     BevelInner = bvLowered
     BorderWidth = 16
@@ -41,6 +40,8 @@ object Form1: TForm1
     ShowScrollButtons = ssbFocused
     AllowScroll = True
     AllowZoom = True
+    ExplicitWidth = 709
+    ExplicitHeight = 368
   end
   object MainMenu1: TMainMenu
     Left = 144
@@ -65,7 +66,7 @@ object Form1: TForm1
   object OpenDialog1: TOpenDialog
     Filter = 'SVG Files (*.svg)|*.svg'
     Options = [ofHideReadOnly, ofPathMustExist, ofFileMustExist, ofEnableSizing]
-    Left = 200
+    Left = 256
     Top = 104
   end
 end

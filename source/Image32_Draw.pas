@@ -48,6 +48,7 @@ type
     fPixelSize   : integer;
     fChangeProc  : TImage32ChangeProc;
   protected
+    procedure NotifyChange;
     function Initialize(imgBase: Pointer;
       imgWidth, imgHeight, pixelSize: integer): Boolean; overload; virtual;
     function Initialize(targetImage: TImage32): Boolean; overload; virtual;
@@ -59,8 +60,6 @@ type
     property ImgHeight: integer read fImgHeight;
     property ImgBase: Pointer read fImgBase;
     property PixelSize: integer read fPixelSize;
-  public
-    destructor Destroy; override;
   end;
 
   TColorRenderer = class(TCustomRenderer)
@@ -1035,13 +1034,6 @@ end;
 // TAbstractRenderer
 //------------------------------------------------------------------------------
 
-destructor TCustomRenderer.Destroy;
-begin
-  if assigned(fChangeProc) then fChangeProc;
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
 function TCustomRenderer.Initialize(imgBase: Pointer;
   imgWidth, imgHeight, pixelSize: integer): Boolean;
 begin
@@ -1056,13 +1048,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TCustomRenderer.NotifyChange;
+begin
+  if assigned(fChangeProc) then fChangeProc;
+end;
+//------------------------------------------------------------------------------
+
 type THackedImage32 = class(TImage32); //to expose protected 'Changed' method.
 
 function TCustomRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
   fChangeProc := THackedImage32(targetImage).Changed;
   with targetImage do
-    result := Initialize(PixelBase, Width, Height, 4);
+    result := Initialize(PixelBase, Width, Height, 4); //Result always true
 end;
 //------------------------------------------------------------------------------
 
@@ -1368,8 +1366,8 @@ end;
 function TRadialGradientRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
   result := inherited Initialize(targetImage) and (fMaxColors > 1);
-  if not result then Exit;
-  fColors := GetColorGradient(fGradientColors, fMaxColors);
+  if result then
+    fColors := GetColorGradient(fGradientColors, fMaxColors);
 end;
 //------------------------------------------------------------------------------
 
@@ -1434,8 +1432,8 @@ end;
 function TSvgRadialGradientRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
   result := inherited Initialize(targetImage) and (fMaxColors > 1);
-  if not result then Exit;
-  fColors := GetColorGradient(fGradientColors, fMaxColors);
+  if result then
+    fColors := GetColorGradient(fGradientColors, fMaxColors);
 end;
 //------------------------------------------------------------------------------
 
@@ -1733,7 +1731,10 @@ begin
   cr := TColorRenderer.Create(color);
   try
     if cr.Initialize(img) then
+    begin
       Rasterize(lines2, img.bounds, frNonZero, cr);
+      cr.NotifyChange;
+    end;
   finally
     cr.free;
   end;
@@ -1751,7 +1752,10 @@ begin
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
   lines2 := Outline(lines, lineWidth, joinStyle, endStyle, miterLimit);
   if renderer.Initialize(img) then
+  begin
     Rasterize(lines2, img.bounds, frNonZero, renderer);
+    renderer.NotifyChange;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1768,7 +1772,10 @@ begin
   ir := TInverseRenderer.Create;
   try
     if ir.Initialize(img) then
+    begin
       Rasterize(lines2, img.bounds, frNonZero, ir);
+      ir.NotifyChange;
+    end;
   finally
     ir.free;
   end;
@@ -1790,7 +1797,10 @@ begin
   cr := TColorRenderer.Create(color);
   try
     if cr.Initialize(img) then
+    begin
       Rasterize(lines, img.bounds, frNonZero, cr);
+      cr.NotifyChange;
+    end;
   finally
     cr.free;
   end;
@@ -1822,7 +1832,10 @@ begin
   if Length(lines) = 0 then Exit;
   lines := Outline(lines, lineWidth, joinStyle, endStyle);
   if renderer.Initialize(img) then
+  begin
     Rasterize(lines, img.bounds, frNonZero, renderer);
+    renderer.NotifyChange;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1855,7 +1868,10 @@ begin
   renderer := TInverseRenderer.Create;
   try
     if renderer.Initialize(img) then
+    begin
       Rasterize(lines, img.bounds, frNonZero, renderer);
+      renderer.NotifyChange;
+    end;
   finally
     renderer.Free;
   end;
@@ -1897,7 +1913,10 @@ begin
   setLength(polygons, 1);
   polygons[0] := polygon;
   if renderer.Initialize(img) then
+  begin
     Rasterize(polygons, img.Bounds, fillRule, renderer);
+    renderer.NotifyChange;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1910,7 +1929,10 @@ begin
   cr := TColorRenderer.Create(color);
   try
     if cr.Initialize(img) then
+    begin
       Rasterize(polygons, img.bounds, fillRule, cr);
+      cr.NotifyChange;
+    end;
   finally
     cr.free;
   end;
@@ -1922,7 +1944,10 @@ procedure DrawPolygon(img: TImage32; const polygons: TPathsD;
 begin
   if (not assigned(polygons)) or (not assigned(renderer)) then exit;
   if renderer.Initialize(img) then
+  begin
     Rasterize(polygons, img.bounds, fillRule, renderer);
+    renderer.NotifyChange;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1944,7 +1969,10 @@ begin
     cr := TColorRenderer.Create(clBlack32);
     try
       if cr.Initialize(tmpImg) then
+      begin
         Rasterize(tmpPolygons, tmpImg.bounds, fillRule, cr);
+        cr.NotifyChange;
+      end;
     finally
       cr.Free;
     end;
@@ -1976,7 +2004,10 @@ begin
   er := TEraseRenderer.Create;
   try
     if er.Initialize(img) then
+    begin
       Rasterize(polygons, img.bounds, fillRule, er);
+      er.NotifyChange;
+    end;
   finally
     er.Free;
   end;

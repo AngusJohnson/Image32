@@ -16,6 +16,8 @@
   hFill_045_Opacity           = $18000C02;    // Fill-Opacity
   hFill_045_Rule              = $5264679F;    // Fill-Rule
   hFilter                     = $49DC73B3;    // Filter
+  hFlowRegion                 = $822E901A;    // FlowRegion
+  hFlowRoot                   = $A802ADFD;    // FlowRoot
   hFont                       = $21461EC6;    // Font
   hFont_045_Family            = $371C9BE4;    // Font-Family
   hFont_045_Size              = $8BFECA77;    // Font-Size

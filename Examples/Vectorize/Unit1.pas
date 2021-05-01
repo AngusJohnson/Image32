@@ -106,7 +106,7 @@ end;
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   masterImg := TImage32.Create;
-  masterImg.LoadFromResource('sample2', 'PNG');
+  masterImg.LoadFromResource('sample2', 'BMP');
 
   workImg := TImage32.Create;
   DisplayImage;

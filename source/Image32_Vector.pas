@@ -536,7 +536,7 @@ end;
 function GetRotatedRectBounds(const rec: TRect; angle: double): TRect;
 var
   sinA, cosA: double;
-  w,h: integer;
+  w,h, recW, recH: integer;
   mp: TPoint;
 begin
   NormalizeAngle(angle);
@@ -544,8 +544,10 @@ begin
   begin
     GetSinCos(angle, sinA, cosA); //the sign of the angle isn't important
     sinA := Abs(sinA); cosA := Abs(cosA);
-    w := Ceil((rec.Width *cosA + rec.Height *sinA) /2);
-    h := Ceil((rec.Width *sinA + rec.Height *cosA) /2);
+    recW := RectWidth(rec);
+    recH := RectHeight(rec);
+    w := Ceil((recW *cosA + recH *sinA) /2);
+    h := Ceil((recW *sinA + recH *cosA) /2);
     mp := MidPoint(rec);
     Result := Rect(mp.X - w, mp.Y - h, mp.X + w, mp.Y +h);
   end
@@ -2843,8 +2845,8 @@ begin
 
   if UseDynamicTolerances then
   begin
-    rec := GetBoundsD(MakePathD([pt1.X, pt1.Y,
-      pt2.X, pt2.Y, pt3.X, pt3.Y, pt4.X, pt4.Y]));
+    rec := GetBoundsD(MakePathD([pts[0].X, pts[0].Y,
+      pts[1].X, pts[1].Y, pts[2].X, pts[2].Y, pts[3].X, pts[3].Y]));
     tolerance := (rec.Width + rec.Height) * 0.01;
   end else
     tolerance := CBezierTolerance;
@@ -2911,13 +2913,15 @@ var
   rec: TRectD;
 begin
   result := nil;
-  len := Length(pts); resultLen := 0; resultCnt := 0;
+  len := Length(pts);
   if (len < 3) then Exit;
+  resultLen := 0;
+  resultCnt := 0;
 
   if UseDynamicTolerances then
   begin
-    rec := GetBoundsD(MakePathD([pt1.X, pt1.Y,
-      pt2.X, pt2.Y, pt3.X, pt3.Y]));
+    rec := GetBoundsD(MakePathD([pts[0].X, pts[0].Y,
+      pts[1].X, pts[1].Y, pts[2].X, pts[2].Y]));
     tolerance := (rec.Width + rec.Height) * 0.01;
   end else
     tolerance := QBezierTolerance;

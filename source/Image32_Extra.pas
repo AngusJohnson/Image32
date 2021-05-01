@@ -41,7 +41,8 @@ procedure DrawGlow(img: TImage32; const polygons: TPathsD;
 procedure FloodFill(img: TImage32; x, y: Integer; newColor: TColor32;
   compareFunc: TCompareFunction = nil; tolerance: Integer = 0);
 
-procedure FastGaussianBlur(img: TImage32; const rec: TRect; stdDev: integer);
+procedure FastGaussianBlur(img: TImage32;
+  const rec: TRect; stdDev: integer; repeats: integer = 2);
 procedure GaussianBlur(img: TImage32; rec: TRect; radius: Integer);
 
 //Emboss: A smaller radius is sharper. Increasing depth increases contrast.
@@ -1874,7 +1875,7 @@ end;
 //http://blog.ivank.net/fastest-gaussian-blur.html
 //https://www.peterkovesi.com/papers/FastGaussianSmoothing.pdf
 
-function BoxesForGauss(stdDev, boxCnt: integer): TArrayOfInteger;
+function BoxesForGauss(stdDev, boxCnt, maxVal: integer): TArrayOfInteger;
 var
   i, wl, wu, m: integer;
   wIdeal, mIdeal: double;
@@ -1888,6 +1889,9 @@ begin
     -boxCnt *wl*wl - 4*boxCnt *wl - 3 *boxCnt) / (-4 *wl - 4);
   m := Round(mIdeal);
   SetLength(Result, boxCnt);
+  wl := Min(maxVal, wl);
+  wu := Min(maxVal, wu);
+
   for i := 0 to boxCnt -1 do
     if i < m then
       Result[i] := (wl -1) div 2 else
@@ -2004,9 +2008,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure FastGaussianBlur(img: TImage32; const rec: TRect; stdDev: integer);
+procedure FastGaussianBlur(img: TImage32;
+  const rec: TRect; stdDev: integer; repeats: integer);
 var
-  i,j,len, w,h: integer;
+  i,j,len, w,h, maxStdDev: integer;
   rec2: TRect;
   boxes: TArrayOfInteger;
   src, dst: TArrayOfColor32;
@@ -2026,10 +2031,9 @@ begin
   SetLength(dst, len);
 
   //safety check to avoid overflows
-  if stdDev >= w div 2 then
-    stdDev := w div 2 -1;
-  if stdDev >= h div 2 then
-    stdDev := h div 2 -1;
+  maxStdDev := Min(w, h) div 2 -1;
+  if stdDev > maxStdDev then
+    stdDev := maxStdDev;
   if stdDev < 1 then Exit;
 
   //copy image rect into dst array
@@ -2048,28 +2052,32 @@ begin
   end;
 
   //do the blur
-  boxes := BoxesForGauss(stdDev, 3);
-  for j := 0 to 2 do
+  inc(repeats);
+  boxes := BoxesForGauss(stdDev, repeats, maxStdDev);
+  for j := 0 to repeats -1 do
     begin
       BoxBlurH(dst, src, w, h, boxes[j]);
       BoxBlurT(src, dst, w, h, boxes[j]);
     end;
-  img.BeginUpdate;
 
   //copy dst array back to image rect
-  if blurFullImage then
-  begin
-    Move(dst[0], img.PixelBase^, len * SizeOf(TColor32));
-  end else
-  begin
-    p := @dst[0];
-    for i := rec2.Top to rec2.Bottom -1 do
+  img.BeginUpdate;
+  try
+    if blurFullImage then
     begin
-      Move(p^, img.Pixels[i * img.Width + rec2.Left], w * SizeOf(TColor32));
-      inc(p, w);
+      Move(dst[0], img.PixelBase^, len * SizeOf(TColor32));
+    end else
+    begin
+      p := @dst[0];
+      for i := rec2.Top to rec2.Bottom -1 do
+      begin
+        Move(p^, img.Pixels[i * img.Width + rec2.Left], w * SizeOf(TColor32));
+        inc(p, w);
+      end;
     end;
+  finally
+    img.EndUpdate;
   end;
-  img.EndUpdate;
 end;
 //------------------------------------------------------------------------------
 

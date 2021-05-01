@@ -122,14 +122,6 @@ var
 
 //------------------------------------------------------------------------------
 
-function ClampByte(val: double): byte;
-begin
-  if val <= 0 then result := 0
-  else if val >= 255 then result := 255
-  else result := Round(val);
-end;
-//------------------------------------------------------------------------------
-
 function CubicHermite(aclr: PColor32; t: Byte; bce: TBiCubicEdgeAdjust): TColor32;
 var
   a,b,c,d: PARGB;
@@ -209,24 +201,24 @@ begin
   t2 := byteFracSq[t];
   t3 := byteFracCubed[t];
 
-	aa := (-a.A + 3*b.A - 3*c.A + d.A) div 2;
-	bb := (2*a.A - 5*b.A + 4*c.A - d.A) div 2;
-	cc := (-a.A + c.A) div 2;
+	aa := Integer(-a.A + 3*b.A - 3*c.A + d.A) div 2;
+	bb := Integer(2*a.A - 5*b.A + 4*c.A - d.A) div 2;
+	cc := Integer(-a.A + c.A) div 2;
   Res.A := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.A);
 
-	aa := (-a.R + 3*b.R - 3*c.R + d.R) div 2;
-	bb := (2*a.R - 5*b.R + 4*c.R - d.R) div 2;
-	cc := (-a.R + c.R) div 2;
+	aa := Integer(-a.R + 3*b.R - 3*c.R + d.R) div 2;
+	bb := Integer(2*a.R - 5*b.R + 4*c.R - d.R) div 2;
+	cc := Integer(-a.R + c.R) div 2;
   Res.R := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.R);
 
-	aa := (-a.G + 3*b.G - 3*c.G + d.G) div 2;
-	bb := (2*a.G - 5*b.G + 4*c.G - d.G) div 2;
-	cc := (-a.G + c.G) div 2;
+	aa := Integer(-a.G + 3*b.G - 3*c.G + d.G) div 2;
+	bb := Integer(2*a.G - 5*b.G + 4*c.G - d.G) div 2;
+	cc := Integer(-a.G + c.G) div 2;
   Res.G := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.G);
 
-	aa := (-a.B + 3*b.B - 3*c.B + d.B) div 2;
-	bb := (2*a.B - 5*b.B + 4*c.B - d.B) div 2;
-	cc := (-a.B + c.B) div 2;
+	aa := Integer(-a.B + 3*b.B - 3*c.B + d.B) div 2;
+	bb := Integer(2*a.B - 5*b.B + 4*c.B - d.B) div 2;
+	cc := Integer(-a.B + c.B) div 2;
   Res.B := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.B);
 end;
 //------------------------------------------------------------------------------

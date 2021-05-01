@@ -525,7 +525,7 @@ var
   ResamplerList: TList<PResamplerRec>;     //list of resampler functions
 {$ELSE}
   ImageFormatClassList: TList;
-  CustomResamplerList: TList;
+  ResamplerList: TList;
 {$ENDIF}
 
 //------------------------------------------------------------------------------
@@ -898,8 +898,8 @@ end;
 
 function ClampByte(val: double): byte;
 begin
-  if val < 0 then result := 0
-  else if val > 255 then result := 255
+  if val <= 0 then result := 0
+  else if val >= 255 then result := 255
   else result := Round(val);
 end;
 //------------------------------------------------------------------------------
@@ -1508,7 +1508,7 @@ var
   i,j, rw: Integer;
   c: PColor32;
 begin
-  IntersectRect(rec, rec, bounds);
+  rec := Image32_Vector.IntersectRect(rec, bounds);
   if IsEmptyRect(rec) then Exit;
   rw := RectWidth(rec);
   c := @Pixels[rec.Top * Width + rec.Left];
@@ -1544,7 +1544,7 @@ begin
   setLength(result, w * h);
 
   if w * h = 0 then Exit;
-  IntersectRect(recClipped, rec, Bounds);
+  recClipped := Image32_Vector.IntersectRect(rec, Bounds);
   //if recClipped is wholely outside the bounds of the image ...
   if IsEmptyRect(recClipped) then
   begin
@@ -2125,12 +2125,12 @@ function TImage32.CopyBlend(src: TImage32; srcRec, dstRec: TRect;
   blendFunc: TBlendFunction): Boolean;
 var
   tmp: TImage32;
-  srcRecClipped, dstRecClipped, dummy: TRect;
+  srcRecClipped, dstRecClipped: TRect;
   scale, scaleSrc, scaleDst: TPointD;
 begin
   result := false;
   if IsEmptyRect(srcRec) or IsEmptyRect(dstRec) then Exit;
-  IntersectRect(srcRecClipped, srcRec, src.Bounds);
+  srcRecClipped := Image32_Vector.IntersectRect(srcRec, src.Bounds);
 
   //get the scaling amount (if any) before
   //dstRec might be adjusted due to clipping ...
@@ -2163,7 +2163,7 @@ begin
     Exit;
   end;
 
-  IntersectRect(dstRecClipped, dstRec, Bounds);
+  dstRecClipped := Image32_Vector.IntersectRect(dstRec, Bounds);
   if IsEmptyRect(dstRecClipped) then Exit;
 
   //there's no scaling if we get here, but further clipping may be needed if
@@ -2183,7 +2183,8 @@ begin
   //when copying to self and srcRec & dstRec overlap then
   //copy srcRec to a temporary image and use it as the source ...
   if (src = self) and
-    IntersectRect(dummy, srcRecClipped, dstRecClipped) then
+    not IsEmptyRect(Image32_Vector.IntersectRect(
+      srcRecClipped, dstRecClipped)) then
   begin
     tmp := TImage32.Create(self, srcRecClipped);
     try
@@ -2283,7 +2284,7 @@ var
   isTransparent: Boolean;
   bf: BLENDFUNCTION;
 begin
-  IntersectRect(rec, srcRect, Bounds);
+  rec := Image32_Vector.IntersectRect(srcRect, Bounds);
   if IsEmpty or IsEmptyRect(rec) or IsEmptyRect(dstRect) then Exit;
   wSrc := RectWidth(rec);
   hSrc := RectHeight(rec);
@@ -2598,7 +2599,7 @@ var
   i,j, rw: Integer;
   c: PARGB;
 begin
-  IntersectRect(rec, rec, bounds);
+  rec := Image32_Vector.IntersectRect(rec, bounds);
   if IsEmptyRect(rec) then Exit;
   rw := RectWidth(rec);
   c := @Pixels[rec.Top * Width + rec.Left];
@@ -3133,7 +3134,7 @@ begin
 {$IFDEF XPLAT_GENERICS}
   ResamplerList := TList<PResamplerRec>.Create;
 {$ELSE}
-  CustomResamplerList := TList.Create;
+  ResamplerList := TList.Create;
 {$ENDIF}
 end;
 //------------------------------------------------------------------------------

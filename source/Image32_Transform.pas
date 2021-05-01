@@ -1,4 +1,4 @@
-﻿unit Image32_Transform;
+unit Image32_Transform;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
@@ -67,6 +67,12 @@ type
     splineType: TSplineType; backColor: TColor32; reverseFill: Boolean;
     out offset: TPoint): Boolean;
 
+  function ExtractAngleFromMatrix(const mat: TMatrixD): double;
+  function ExtractScaleFromMatrix(const mat: TMatrixD): TPointD;
+  function ExtractAvgScaleFromMatrix(const mat: TMatrixD): double;
+  procedure DecomposeMatrix(const mat: TMatrixD;
+    out angle: double; out scale, skew, trans: TPointD);
+
   //ImageScaleDown: uses a box down-sampling algorithm that's probably better
   //than any other single resampling algorithm when scaling images down by
   //more than 50%. With significant down-sampling, algorithms such as Bilinear
@@ -89,12 +95,12 @@ type
     function GetColor: TColor32;
   public
     procedure Reset;
-    procedure Add(c: TColor32; weight: Integer = 1); overload;
+    procedure Add(c: TColor32; w: Integer = 1); overload;
     procedure Add(const other: TWeightedColor); overload;
-    procedure Subtract(c: TColor32; weight: Integer =1); overload;
+    procedure Subtract(c: TColor32; w: Integer =1); overload;
     procedure Subtract(const other: TWeightedColor); overload;
 
-    procedure AddWeight(weight: Integer); //ie add clNone32
+    procedure AddWeight(w: Integer); //ie add clNone32
     procedure Multiply(value: double);
     property AddCount: Integer read fAddCount;
     property Color: TColor32 read GetColor;
@@ -836,9 +842,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TWeightedColor.AddWeight(weight: Integer);
+procedure TWeightedColor.AddWeight(w: Integer);
 begin
-  inc(fAddCount, weight);
+  inc(fAddCount, w);
 end;
 //------------------------------------------------------------------------------
 
@@ -852,13 +858,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TWeightedColor.Add(c: TColor32; weight: Integer);
+procedure TWeightedColor.Add(c: TColor32; w: Integer);
 var
   a: Integer;
   argb: TARGB absolute c;
 begin
-  inc(fAddCount, weight);
-  a := weight * argb.A;
+  inc(fAddCount, w);
+  a := w * argb.A;
   if a = 0 then Exit;
   inc(fAlphaTot, a);
   inc(fColorTotB, (a * argb.B));
@@ -877,13 +883,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TWeightedColor.Subtract(c: TColor32; weight: Integer);
+procedure TWeightedColor.Subtract(c: TColor32; w: Integer);
 var
   a: Integer;
   argb: TARGB absolute c;
 begin
-  dec(fAddCount, weight);
-  a := weight * argb.A;
+  dec(fAddCount, w);
+  a := w * argb.A;
   if a = 0 then Exit;
   dec(fAlphaTot, a);
   dec(fColorTotB, (a * argb.B));
@@ -989,6 +995,111 @@ begin
   if color.AddCount = 0 then
     Result := srcBits[xi + yi * maxX] else
     Result := color.Color;
+end;
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+procedure DecomposeMatrix(const mat: TMatrixD; out angle: double; out scale, skew, trans: TPointD);
+var
+  a,b,c,d,e,f: double;
+  delta, r,s: double;
+begin
+  a := mat[0][0]; b := mat[1][0];
+  c := mat[0][1]; d := mat[1][1];
+  e := mat[2][0]; f := mat[2][1];
+
+  delta := a * d - b * c;
+  trans := PointD(e,f);
+  angle := 0;
+  scale := PointD(1,1);
+  skew := NullPointD;
+
+  if (a <> 0) or (b <> 0) then
+  begin
+    r := Sqrt(a * a + b * b);
+	  angle :=  ArcCos(a / r);
+	  if b < 0 then angle := -angle;
+    scale.X	:= r;
+	  scale.Y	:= delta / r;
+    skew.X	:= ArcTan((a * c + b * d) / (r * r));
+  end
+  else if (c <> 0) or (d <> 0) then
+  begin
+    s := Sqrt(c * c + d * d);
+    if d > 0 then
+      angle := Angle90 - ArcCos(-c / s) else
+	  angle := Angle90 + ArcCos(c / s);
+    scale.X := delta / s;
+    scale.Y := s;
+    skew.Y  := ArcTan((a * c + b * d) / (s * s));
+  end;
+  angle := -angle;
+  NormalizeAngle(angle);
+end;
+//------------------------------------------------------------------------------
+
+function ExtractAngleFromMatrix(const mat: TMatrixD): double;
+var
+  a,b,c,d: double;
+  r,s: double;
+begin
+  a := mat[0][0]; b := mat[1][0];
+  c := mat[0][1]; d := mat[1][1];
+
+  if (a <> 0) or (b <> 0) then
+  begin
+    r := Sqrt(a * a + b * b);
+	  Result :=  ArcCos(a / r);
+	  if b < 0 then Result := -Result;
+  end
+  else if (c <> 0) or (d <> 0) then
+  begin
+    s := Sqrt(c * c + d * d);
+    if d > 0 then
+      Result := Angle90 - ArcCos(-c / s) else
+	  Result := Angle90 + ArcCos(c / s);
+  end else
+  begin
+    Result := InvalidD; //error
+    Exit;
+  end;
+  Result := -Result;
+  NormalizeAngle(Result);
+end;
+//------------------------------------------------------------------------------
+
+function ExtractScaleFromMatrix(const mat: TMatrixD): TPointD;
+var
+  a,b,c,d: double;
+  delta, q: double;
+begin
+  a := mat[0][0]; b := mat[1][0];
+  c := mat[0][1]; d := mat[1][1];
+
+  delta := a * d - b * c;
+  if (a <> 0) or (b <> 0) then
+  begin
+    q := Sqrt(a * a + b * b);
+    Result.X	:= q;
+	  Result.Y	:= delta / q;
+  end
+  else if (c <> 0) or (d <> 0) then
+  begin
+    q := Sqrt(c * c + d * d);
+    Result.X := delta / q;
+    Result.Y := q;
+  end else
+    Result := InvalidPointD;
+end;
+//------------------------------------------------------------------------------
+
+function ExtractAvgScaleFromMatrix(const mat: TMatrixD): double;
+var
+  scale: TPointD;
+begin
+  scale := ExtractScaleFromMatrix(mat);
+  Result := Average(Abs(scale.X), Abs(scale.Y));
 end;
 //------------------------------------------------------------------------------
 

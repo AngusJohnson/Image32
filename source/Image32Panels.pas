@@ -19,6 +19,8 @@ uses
 
 {$I Image32.inc}
 
+const
+  WM_MOUSEHWHEEL = $020E;
 type
   TShowScrollBtns = (ssbFocused, ssAlways, ssNever);
 
@@ -428,7 +430,7 @@ end;
 function TBaseImgPanel.GetInnerMargin: integer;
 begin
   //nb: BorderWidth is the space between outer and inner bevels
-  Result := DpiAware(BorderWidth);
+  Result := BorderWidth;
   if BevelInner <> bvNone then inc(result, BevelWidth);
   if BevelOuter <> bvNone then inc(result, BevelWidth);
   //BorderStyle changes the OUTSIDE of the panel so won't affect InnerMargin.
@@ -758,7 +760,7 @@ begin
 
   if not fMouseDown then
   begin
-    if (DpiAware(BorderWidth) >= MinBorderWidth) and
+    if (BorderWidth >= MinBorderWidth) and
       fAllowScroll and ((fShowScrollBtns = ssAlways) or
       (focused and (fShowScrollBtns = ssbFocused))) then
     begin
@@ -915,7 +917,7 @@ begin
   //calculate un-scaled source rectangle that corresponds with dstRec
   marg := GetInnerMargin;
   innerRec := GetInnerClientRect;
-  bw := DpiAware(BorderWidth);
+  bw := BorderWidth;
   dstRec := innerRec;
   srcRec := dstRec;
   OffsetRect(srcRec, -marg, -marg);

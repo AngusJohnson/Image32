@@ -4,8 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
-  Types, Menus, ExtCtrls, ComCtrls, Image32, Image32_Layers, ImagePanels,
-  Dialogs, ClipBrd, Vcl.StdCtrls;
+  Types, Menus, ExtCtrls, ComCtrls, Image32, Image32_Layers,
+  Dialogs, ClipBrd, StdCtrls;
 
 type
   TTransformType = (ttAffineSkew, ttProjective,
@@ -121,7 +121,7 @@ begin
   //Layer 1: for the transformed image
   transformLayer := TRasterLayer32(layeredImage.AddLayer(TRasterLayer32));
   //transformLayer.MasterImage.LoadFromResource('GRADIENT', 'PNG');
-  transformLayer.MasterImage.LoadFromResource('UNION_JACK', 'PNG');
+  transformLayer.MasterImage.LoadFromResource('UNION_JACK', 'BMP');
 
   transformLayer.CursorId := crHandPoint;
   transformLayer.AutoPivot := true;
@@ -310,6 +310,8 @@ begin
   //except for rotation, use ctrlPoints to update the 'transformed' layer
   with transformLayer do
   begin
+    if (Image.Width = 0) or (Image.Height = 0) then Exit;
+
     case transformType of
       ttAffineSkew:
         begin
@@ -585,10 +587,10 @@ end;
 
 procedure TForm1.Reset1Click(Sender: TObject);
 begin
-  transformLayer.MasterImage.LoadFromResource('UNION_JACK', 'PNG');
-  transformlayer.PositionCenteredAt(PointD(ClientWidth/2, ClientHeight/2));
-  transformLayer.AutoPivot := true;
+  transformLayer.MasterImage.LoadFromResource('UNION_JACK', 'BMP');
   transformLayer.UpdateHitTestMaskTransparent;
+  transformLayer.AutoPivot := true;
+  transformlayer.PositionCenteredAt(PointD(ClientWidth/2, ClientHeight/2));
   mnuVerticalSplineClick(mnuVertSkew);
 end;
 //------------------------------------------------------------------------------
