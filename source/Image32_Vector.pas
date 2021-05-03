@@ -65,23 +65,31 @@ type
   function Pie(const rec: TRectD;
     StartAngle, EndAngle: double; scale: double = 0): TPathD;
 
-  function FlattenQBezier(const pt1, pt2, pt3: TPointD): TPathD; overload;
-  function FlattenQBezier(const pts: TPathD): TPathD; overload;
-  function FlattenQBezier(const pts: TPathsD): TPathsD; overload;
+  function FlattenQBezier(const pt1, pt2, pt3: TPointD;
+    tolerance: double = 0.0): TPathD; overload;
+  function FlattenQBezier(const pts: TPathD;
+    tolerance: double = 0.0): TPathD; overload;
+  function FlattenQBezier(const pts: TPathsD;
+    tolerance: double = 0.0): TPathsD; overload;
   function GetPointInQuadBezier(const a,b,c: TPointD; t: double): TPointD;
 
-  function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD): TPathD; overload;
-  function FlattenCBezier(const pts: TPathD): TPathD; overload;
-  function FlattenCBezier(const pts: TPathsD): TPathsD; overload;
+  function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD;
+    tolerance: double = 0.0): TPathD; overload;
+  function FlattenCBezier(const pts: TPathD;
+    tolerance: double = 0.0): TPathD; overload;
+  function FlattenCBezier(const pts: TPathsD;
+    tolerance: double = 0.0): TPathsD; overload;
   function GetPointInCubicBezier(const a,b,c,d: TPointD; t: double): TPointD;
 
   //FlattenCSpline: Approximates the 'S' command inside the 'd' property of an
   //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
-  function FlattenCSpline(const pts: TPathD): TPathD;
+  function FlattenCSpline(const pts: TPathD;
+    tolerance: double = 0.0): TPathD;
 
   //FlattenQSpline: Approximates the 'T' command inside the 'd' property of an
   //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
-  function FlattenQSpline(const pts: TPathD): TPathD;
+  function FlattenQSpline(const pts: TPathD;
+    tolerance: double = 0.0): TPathD;
 
   //ArrowHead: The ctrlPt's only function is to control the angle of the arrow.
   function ArrowHead(const arrowTip, ctrlPt: TPointD; size: double;
@@ -305,6 +313,7 @@ const
   NullRect: TRect = (left: 0; top: 0; right: 0; Bottom: 0);
   NullRectD: TRectD = (left: 0; top: 0; right: 0; Bottom: 0);
 
+  BezierTolerance: double  = 0.1;
 var
   //AutoWidthThreshold: When JoinStyle = jsAuto, this is the threshold at
   //which line joins will be rounded instead of squared. With wider strokes,
@@ -317,10 +326,6 @@ var
 
   //Miter limit avoids excessive spikes when line offsetting
   DefaultMiterLimit: double = 2.0;
-
-  CBezierTolerance: double  = 0.25;
-  QBezierTolerance: double  = 0.25;
-  UseDynamicTolerances: Boolean = true;
 
 resourcestring
   rsInvalidMatrix = 'Invalid matrix.'; //nb: always start with IdentityMatrix
@@ -335,7 +340,7 @@ const
   BuffSize = 64;
 
 //------------------------------------------------------------------------------
-// TRectWH
+// TRectWH record/object.
 //------------------------------------------------------------------------------
 
 function TRectWH.IsEmpty: Boolean;
@@ -2073,6 +2078,7 @@ function Ellipse(const rec: TRectD; scale: double): TPathD;
 var
   steps: integer;
 begin
+  if scale <= 0 then scale := 1;
   steps := Trunc(4 * Sqrt((rec.width + rec.Height) * scale));
   Result := Ellipse(rec, steps);
 end;
@@ -2159,7 +2165,7 @@ var
 begin
   Result := nil;
   if (endAngle = startAngle) or IsEmptyRect(rec) then Exit;
-  if scale = 0 then scale := 1.0;
+  if scale <= 0 then scale := 1.0;
 
   if not ClockwiseRotationIsAnglePositive then
   begin
@@ -2563,18 +2569,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenQBezier(const pts: TPathsD): TPathsD;
+function FlattenQBezier(const pts: TPathsD; tolerance: double = 0.0): TPathsD;
 var
   i, len: integer;
 begin
   len := Length(pts);
   SetLength(Result, len);
+  if tolerance <= 0.0 then tolerance := BezierTolerance;
   for i := 0 to len -1 do
-    Result[i] := FlattenQBezier(pts[i]);
+    Result[i] := FlattenQBezier(pts[i], tolerance);
 end;
 //------------------------------------------------------------------------------
 
-function FlattenQBezier(const pts: TPathD): TPathD;
+function FlattenQBezier(const pts: TPathD; tolerance: double = 0.0): TPathD;
 var
   i, highI: integer;
   p: TPathD;
@@ -2584,6 +2591,7 @@ begin
   if highI < 0 then Exit;
   if (highI < 2) or Odd(highI) then
     raise Exception.Create(rsInvalidQBezier);
+  if tolerance <= 0.0 then tolerance := BezierTolerance;
   setLength(Result, 1);
   Result[0] := pts[0];
   for i := 0 to (highI div 2) -1 do
@@ -2595,17 +2603,17 @@ begin
       AppendPoint(Result, pts[i*2 +2]);
     end else
     begin
-      p := FlattenQBezier(pts[i*2], pts[i*2+1], pts[i*2+2]);
+      p := FlattenQBezier(pts[i*2], pts[i*2+1], pts[i*2+2], tolerance);
       AppendPath(Result, Copy(p, 1, Length(p) -1));
     end;
   end;
 end;
 //------------------------------------------------------------------------------
 
-function FlattenQBezier(const pt1, pt2, pt3: TPointD): TPathD;
+function FlattenQBezier(const pt1, pt2, pt3: TPointD;
+  tolerance: double = 0.0): TPathD;
 var
   resultCnt, resultLen: integer;
-  tolerance: double;
   rec: TRectD;
 
   procedure AddPoint(const pt: TPointD);
@@ -2642,12 +2650,7 @@ var
 
 begin
   resultLen := 0; resultCnt := 0;
-  if UseDynamicTolerances then
-  begin
-    rec := GetBoundsD(MakePathD([pt1.X, pt1.Y, pt2.X, pt2.Y, pt3.X, pt3.Y]));
-    tolerance := (rec.Width + rec.Height) * 0.01;
-  end else
-    tolerance := QBezierTolerance;
+  if tolerance <= 0.0 then tolerance := BezierTolerance;
 
   AddPoint(pt1);
   if ((pt1.X = pt2.X) and (pt1.Y = pt2.Y)) or
@@ -2672,18 +2675,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenCBezier(const pts: TPathsD): TPathsD;
+function FlattenCBezier(const pts: TPathsD;
+  tolerance: double = 0.0): TPathsD;
 var
   i, len: integer;
 begin
   len := Length(pts);
   SetLength(Result, len);
+  if tolerance <= 0.0 then tolerance := BezierTolerance;
   for i := 0 to len -1 do
-    Result[i] := FlattenCBezier(pts[i]);
+    Result[i] := FlattenCBezier(pts[i], tolerance);
 end;
 //------------------------------------------------------------------------------
 
-function FlattenCBezier(const pts: TPathD): TPathD;
+function FlattenCBezier(const pts: TPathD;
+    tolerance: double = 0.0): TPathD;
 var
   i, len: integer;
   p: TPathD;
@@ -2693,6 +2699,7 @@ begin
   if len < 0 then Exit;
   if (len < 3) or (len mod 3 <> 0) then
     raise Exception.Create(rsInvalidCBezier);
+  if tolerance <= 0.0 then tolerance := BezierTolerance;
   setLength(Result, 1);
   Result[0] := pts[0];
   for i := 0 to (len div 3) -1 do
@@ -2704,17 +2711,18 @@ begin
       AppendPoint(Result, pts[i*3 +3]);
     end else
     begin
-      p := FlattenCBezier(pts[i*3], pts[i*3+1], pts[i*3+2], pts[i*3+3]);
+      p := FlattenCBezier(pts[i*3], pts[i*3+1],
+        pts[i*3+2], pts[i*3+3], tolerance);
       AppendPath(Result, Copy(p, 1, Length(p) -1));
     end;
   end;
 end;
 //------------------------------------------------------------------------------
 
-function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD): TPathD;
+function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD;
+  tolerance: double = 0.0): TPathD;
 var
   resultCnt, resultLen: integer;
-  tolerance: double;
   rec: TRectD;
 
   procedure AddPoint(const pt: TPointD);
@@ -2761,13 +2769,7 @@ var
 begin
   result := nil;
   resultLen := 0; resultCnt := 0;
-  if UseDynamicTolerances then
-  begin
-    rec := GetBoundsD(MakePathD([pt1.X, pt1.Y,
-      pt2.X, pt2.Y, pt3.X, pt3.Y, pt4.X, pt4.Y]));
-    tolerance := (rec.Width + rec.Height) * 0.01;
-  end else
-    tolerance := CBezierTolerance;
+  if tolerance <= 0.0 then tolerance := BezierTolerance;
 
   AddPoint(pt1);
   if (pt1.X = pt2.X) and (pt1.Y = pt2.Y) and
@@ -2787,10 +2789,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenCSpline(const pts: TPathD): TPathD;
+function FlattenCSpline(const pts: TPathD;
+  tolerance: double = 0.0): TPathD;
 var
   resultCnt, resultLen: integer;
-  tolerance: double;
 
   procedure AddPoint(const pt: TPointD);
   begin
@@ -2843,13 +2845,7 @@ begin
   len := Length(pts); resultLen := 0; resultCnt := 0;
   if (len < 4) then Exit;
 
-  if UseDynamicTolerances then
-  begin
-    rec := GetBoundsD(MakePathD([pts[0].X, pts[0].Y,
-      pts[1].X, pts[1].Y, pts[2].X, pts[2].Y, pts[3].X, pts[3].Y]));
-    tolerance := (rec.Width + rec.Height) * 0.01;
-  end else
-    tolerance := CBezierTolerance;
+  if tolerance <= 0.0 then tolerance := BezierTolerance;
 
   //ignore incomplete trailing control points
   if Odd(len) then dec(len);
@@ -2869,10 +2865,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenQSpline(const pts: TPathD): TPathD;
+function FlattenQSpline(const pts: TPathD;
+  tolerance: double = 0.0): TPathD;
 var
   resultCnt, resultLen: integer;
-  tolerance: double;
 
   procedure AddPoint(const pt: TPointD);
   begin
@@ -2917,14 +2913,7 @@ begin
   if (len < 3) then Exit;
   resultLen := 0;
   resultCnt := 0;
-
-  if UseDynamicTolerances then
-  begin
-    rec := GetBoundsD(MakePathD([pts[0].X, pts[0].Y,
-      pts[1].X, pts[1].Y, pts[2].X, pts[2].Y]));
-    tolerance := (rec.Width + rec.Height) * 0.01;
-  end else
-    tolerance := QBezierTolerance;
+  if tolerance <= 0.0 then tolerance := BezierTolerance;
 
   p := @pts[0];
   AddPoint(p^);

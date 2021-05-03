@@ -430,7 +430,7 @@ end;
 function TBaseImgPanel.GetInnerMargin: integer;
 begin
   //nb: BorderWidth is the space between outer and inner bevels
-  Result := BorderWidth;
+  Result := DpiAware(BorderWidth);
   if BevelInner <> bvNone then inc(result, BevelWidth);
   if BevelOuter <> bvNone then inc(result, BevelWidth);
   //BorderStyle changes the OUTSIDE of the panel so won't affect InnerMargin.
@@ -909,7 +909,7 @@ procedure TBaseImgPanel.Paint;
   end;
 
 var
-  marg, btnMin, bw: integer;
+  marg, btnMin, dpiAwareBW: integer;
   tmpRec, innerRec, srcRec, dstRec: TRect;
   backgroundPainted: Boolean;
   pt: TPoint;
@@ -917,7 +917,7 @@ begin
   //calculate un-scaled source rectangle that corresponds with dstRec
   marg := GetInnerMargin;
   innerRec := GetInnerClientRect;
-  bw := BorderWidth;
+  dpiAwareBW := DpiAware(BorderWidth);
   dstRec := innerRec;
   srcRec := dstRec;
   OffsetRect(srcRec, -marg, -marg);
@@ -984,10 +984,10 @@ begin
   //paint the border
   InflateRect(tmpRec, -BevelWidth, -BevelWidth);
   if Focused then
-    DrawFrame(tmpRec, fFocusedColor, fFocusedColor, bw)
+    DrawFrame(tmpRec, fFocusedColor, fFocusedColor, dpiAwareBW)
   else
-    DrawFrame(tmpRec, fUnfocusedColor, fUnfocusedColor, bw);
-  InflateRect(tmpRec, -bw, -bw);
+    DrawFrame(tmpRec, fUnfocusedColor, fUnfocusedColor, dpiAwareBW);
+  InflateRect(tmpRec, -dpiAwareBW, -dpiAwareBW);
 
   //paint the inner bevel
   case BevelInner of

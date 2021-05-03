@@ -3,7 +3,7 @@ unit Image32_Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  30 April 2021                                                   *
+* Date      :  1 May 2021                                                      *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -313,9 +313,8 @@ begin
   shadowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
   try
     DrawPolygon(shadowImg, shadowPolys, fillRule, color);
-    FastGaussianBlur(shadowImg, shadowImg.Bounds, blurSize);
-    if cutoutInsideShadow then
-      Erase(shadowImg, polys, fillRule);
+    FastGaussianBlur(shadowImg, shadowImg.Bounds, blurSize, 1);
+    if cutoutInsideShadow then Erase(shadowImg, polys, fillRule);
     img.CopyBlend(shadowImg, shadowImg.Bounds, rec, BlendToAlpha);
   finally
     shadowImg.Free;
@@ -957,7 +956,7 @@ begin
       tmp.Clear(colorLt);
       paths2 := OffsetPath(paths, height*x, height*y);
       Erase(tmp, paths2, fillRule);
-      FastGaussianBlur(tmp, tmp.Bounds, Round(blurRadius));
+      FastGaussianBlur(tmp, tmp.Bounds, Round(blurRadius), 0);
       EraseInverted(tmp, paths, fillRule, tmp.Bounds);
       img.CopyBlend(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;
@@ -967,7 +966,7 @@ begin
       tmp.Clear(colorDk);
       paths2 := OffsetPath(paths, -height*x, -height*y);
       Erase(tmp, paths2, fillRule);
-      FastGaussianBlur(tmp, tmp.Bounds, Round(blurRadius));
+      FastGaussianBlur(tmp, tmp.Bounds, Round(blurRadius), 0);
       EraseInverted(tmp, paths, fillRule, tmp.Bounds);
       img.CopyBlend(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;

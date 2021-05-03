@@ -3,18 +3,18 @@ unit Image32_SVG_Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  30 April 2021                                                   *
+* Date      :  4 May 2021                                                      *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2021                                         *
 *                                                                              *
 * Purpose   :  Read SVG files                                                  *
 *              To propery read SVG files and support all the features of the   *
-*              vers. 2 specification is a huge task. So while this unit does   *
-*              fairly decent job of reading most SVG files, it remains mostly  *
-*              a proof of concept with numerous deficiencies including:        *
-*              consistent inheritance of default values; proper handling of    *
-*              measurement units (cms, ems etc.); managing different line join *
-*              and line end styles; slow rendering of blurs etc. etc.          *
+*              vers. 2 specification is a huge task. So while this unit does a *
+*              pretty decent job of reading most SVG files, it remains mostly  *
+*              a proof of concept. Numerous deficiencies include: consistent   *
+*              inheritance of default values; proper handling of measurement   *
+*              units (cms, ems, rad, deg etc.); managing different line join   *
+*              and line end styles; animation; etc. etc.                       *
 *                                                                              *
 * License:                                                                     *
 * Use, modification & distribution is subject to Boost Software License Ver 1. *
@@ -170,9 +170,9 @@ type
 
   TShapeElement = class(TElement)
   protected
-    drawPathsF: TPathsD;
-    drawPathsO: TPathsD;
-    drawPathsC: TPathsD;
+    drawPathsF  : TPathsD;
+    drawPathsO  : TPathsD;
+    drawPathsC  : TPathsD;
     function IsFilled: Boolean;
     function IsStroked: Boolean;
     function GetVal(out val: double): Boolean;
@@ -180,7 +180,7 @@ type
     procedure GetDrawPaths(ArcScale: double); virtual; abstract;
     procedure DrawFilled(img: TImage32; matrix: TMatrixD); virtual;
     procedure DrawStroke(img: TImage32; matrix: TMatrixD; isClosed: Boolean); virtual;
-    procedure Draw(img, tmpImg: TImage32; RootMatrix: TMatrixD); virtual;
+    procedure Draw(img, tmpImg: TImage32; const RootMatrix: TMatrixD); virtual;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
@@ -211,6 +211,7 @@ type
     currDpath   : PDpath;
     dpaths      : TDpaths;
     lastPt      : TPointD;
+    arcScale    : double;
     function GetSegType(out isRelative: Boolean): Boolean;
     function GetSingleDigit(out digit: integer): Boolean;
     procedure StartNewDpath;
@@ -269,24 +270,24 @@ type
     delta     : TPointD;
     tmpPt     : TPointD;
     fontInfo  : TFontInfo;
+    procedure ResetTmpPt;
     procedure GetDrawPaths(ArcScale: double); override;
     function AddSubtext(atext: PAnsiChar; len: integer): TElement;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
 
-  TSubtextElement   = class(TShapeElement)
+  TSubtextElement   = class(TTextElement)
   protected
-    pt  : TPointD;
     text: PAnsiChar;
     textLen: integer;
+    function GetTextElement: TTextElement;
     procedure GetDrawPaths(ArcScale: double); override;
   end;
 
-  TTSpanElement     = class(TSubtextElement)
+  TTSpanElement = class(TSubtextElement)
   protected
     delta     : TPointD;
-    fontInfo  : TFontInfo;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
@@ -300,10 +301,11 @@ type
     height: double;
     viewbox: TRectD;
     angle: double;
+    autoStartReverse: Boolean;
     callerEl: TShapeElement;
     procedure SetSoloPoint(const pt: TPointD; angle: double);
     procedure SetPoints(const points: TPathD);
-    procedure Draw(img, tmpImg: TImage32; RootMatrix: TMatrixD); override;
+    procedure Draw(img, tmpImg: TImage32; const RootMatrix: TMatrixD); override;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
@@ -386,7 +388,9 @@ type
     fLinGradRenderer  : TLinearGradientRenderer;
     fRadGradRenderer  : TSvgRadialGradientRenderer;
 
-    //multiple font readers
+    //multiple font readers (todo: convert to a list of font readers)
+    //fFontReaders      : TList;
+
     fSansFontReader       : TFontReader;
     fSerifFontReader      : TFontReader;
     fMonoFontReader       : TFontReader;
@@ -418,8 +422,7 @@ type
     function LoadFromFile(const filename: string): Boolean;
   end;
 
-var
-  defaultFontHeight: double;
+  function HtmlDecode(const s: ansiString): ansiString; ////////////
 
 implementation
 
@@ -447,7 +450,7 @@ const
     (family: ffSansSerif; size: 10; styles: []; align: taLeft);
 
   //include lots of color constants
-  {$I Image32_SVG_ColorConsts.inc}
+  {$I html_color_consts.inc}
 
   //include many string hash constants
   {$I Image32_SVG_HashConsts.inc}
@@ -455,7 +458,9 @@ const
 var
   ColorConstList : TStringList;
   AttribFuncList : TStringList;
+
   LowerCaseTable : array[#0..#255] of AnsiChar;
+  defaultFontHeight: double;
 
 resourcestring
   rsListBoundsError     = 'List index out of bounds (%d)';
@@ -658,9 +663,41 @@ begin
   Result := Result + (Result shl 15);
 end;
 //------------------------------------------------------------------------------
+
+function GetHashedNameCaseSens(c: PAnsiChar; length: integer): cardinal; overload;
+var
+  i: integer;
+begin
+  //Bob Jenkins' "One at A Time" hash
+  //https://en.wikipedia.org/wiki/Jenkins_hash_function
+  Result := 0;
+  for i := 1 to length do
+  begin
+    Result := (Result + Ord(c^));
+    Result := Result + (Result shl 10);
+    Result := Result xor (Result shr 6);
+    inc(c);
+  end;
+  Result := Result + (Result shl 3);
+  Result := Result xor (Result shr 11);
+  Result := Result + (Result shl 15);
+end;
+//------------------------------------------------------------------------------
 {$OVERFLOWCHECKS ON}
 
 function GetHashedName(var c: PAnsiChar; endC: PAnsiChar): cardinal; overload;
+var
+  len: integer;
+  startC: PAnsiChar;
+begin
+  startC := c;
+  len := GetNameLength(c, endC);
+  if len = 0 then Result := 0
+  else Result := GetHashedName(startC, len);
+end;
+//------------------------------------------------------------------------------
+
+function GetHashedNameCaseSens(var c: PAnsiChar; endC: PAnsiChar): cardinal; overload;
 var
   len: integer;
   startC: PAnsiChar;
@@ -717,6 +754,117 @@ begin
   startC := c; inc(c);
   while (c < endC) and CharInSet(c^, validNonFirstChars) do inc(c);
   Result := c - startC;
+end;
+//------------------------------------------------------------------------------
+
+function HtmlDecode(const s: ansiString): ansistring;
+var
+  val, len: integer;
+  c,ce,endC: PAnsiChar;
+begin
+  len := Length(s);
+  SetLength(Result, len*3);
+  c := PAnsiChar(s);
+  endC := c + len;
+  ce := c;
+  len := 1;
+  while (ce < endC) and (ce^ <> '&') do
+    inc(ce);
+
+  while (ce < endC) do
+  begin
+    if ce > c then
+    begin
+      Move(c^, Result[len], ce - c);
+      inc(len, ce - c);
+    end;
+    c := ce; inc(ce);
+    while (ce < endC) and (ce^ <> ';') do inc(ce);
+    if ce = endC then break;
+
+    val := -1; //assume error
+    if (c +1)^ = '#' then
+    begin
+      val := 0;
+      //decode unicode value
+      if (c +2)^ = 'x' then
+      begin
+        inc(c, 3);
+        while c < ce do
+        begin
+          if (c^ >= 'a') and (c^ <= 'f') then
+            val := val * 16 + Ord(c^) - 87
+          else if (c^ >= 'A') and (c^ <= 'F') then
+            val := val * 16 + Ord(c^) - 55
+          else if (c^ >= '0') and (c^ <= '9') then
+            val := val * 16 + Ord(c^) - 48
+          else
+          begin
+            val := -1;
+            break;
+          end;
+          inc(c);
+        end;
+      end else
+      begin
+        inc(c, 2);
+        while c < ce do
+        begin
+          val := val * 10 + Ord(c^) - 48;
+          inc(c);
+        end;
+      end;
+    end else
+    begin
+      //decode html entity ...
+      case GetHashedNameCaseSens(c, ce - c) of
+        {$I html_entities.inc}
+      end;
+    end;
+
+    //convert unicode value to utf8 chars
+    //this saves the overhead of multiple ansistring<-->string conversions.
+    case val of
+      0 .. $7F:
+        result[len] := AnsiChar(val);
+      $80 .. $7FF:
+        begin
+          Result[len] := AnsiChar($C0 or (val shr 6));
+          Result[len+1] := AnsiChar($80 or (val and $3f));
+          inc(len, 2);
+        end;
+      $800 .. $7FFF:
+        begin
+          Result[len] := AnsiChar($E0 or (val shr 12));
+          Result[len+1] := AnsiChar($80 or ((val shr 6) and $3f));
+          Result[len+2] := AnsiChar($80 or (val and $3f));
+          inc(len, 3);
+        end;
+      $10000 .. $10FFFF:
+        begin
+          Result[len] := AnsiChar($F0 or (val shr 18));
+          Result[len+1] := AnsiChar($80 or ((val shr 12) and $3f));
+          Result[len+2] := AnsiChar($80 or ((val shr 6) and $3f));
+          Result[len+3] := AnsiChar($80 or (val and $3f));
+          inc(len, 4);
+        end;
+      else
+      begin
+        //ie: error
+        Move(c^, Result[len], ce- c +1);
+        inc(len, ce - c +1);
+      end;
+    end;
+    inc(ce);
+    c := ce;
+    while (ce < endC) and (ce^ <> '&') do inc(ce);
+  end;
+  if (c < endC) and (ce > c) then
+  begin
+    Move(c^, Result[len], (ce - c));
+    inc(len, ce - c);
+  end;
+  setLength(Result, len -1);
 end;
 //------------------------------------------------------------------------------
 
@@ -972,15 +1120,26 @@ begin
       val := val * Power(10, -exp) else
       val := val * Power(10, exp);
   end;
-  //convert percentages to fractions
-  if (current^ = '%') then
-  begin
-    val := val *0.00999; //fractionally less than 1.0
-    inc(current);
+
+  //https://oreillymedia.github.io/Using_SVG/guide/units.html
+  case current^ of
+    '%':
+      begin
+        val := val *0.00999; //fractionally less than 1.0
+        inc(current);
+      end;
+    'd': //ignore deg
+      if ((current+1)^ = 'e') and ((current+2)^ = 'g') then
+        inc(current, 3);
+    'p': //ignore px
+      if (current+1)^ = 'x' then inc(current, 2);
+    'r': //convert radian angles to degrees
+      if ((current+1)^ = 'a') and ((current+2)^ = 'd') then
+      begin
+        val := val * 180/PI;
+        inc(current, 3);
+      end;
   end;
-  //ignore 'px'
-  if (current^ = 'p') and  ((current+1)^ = 'x') then
-    inc(current, 2);
 end;
 //------------------------------------------------------------------------------
 
@@ -1273,7 +1432,7 @@ begin
   hiStops := High(stops);
   Result := hiStops > 0;
   if not Result then Exit;
-  //todo - make sure the stops are sorted!
+  //todo: make sure stops are sorted!
   for i := 0 to hiStops do
     with stops[i] do renderer.InsertColorStop(offset, color);
 end;
@@ -1513,7 +1672,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TShapeElement.Draw(img, tmpImg: TImage32; RootMatrix: TMatrixD);
+procedure TShapeElement.Draw(img, tmpImg: TImage32; const RootMatrix: TMatrixD);
 var
   i, crWidth, crHeight: integer;
   stroked, filled: Boolean;
@@ -1528,10 +1687,10 @@ begin
   if not (filled or stroked) then Exit;
 
   drawPathsF := nil; drawPathsO := nil; drawPathsC := nil;
-  ArcScale := ExtractAvgScaleFromMatrix(RootMatrix);
+  mat := MatrixMultiply(RootMatrix, fDrawInfo.matrix);
+  ArcScale := ExtractAvgScaleFromMatrix(mat);
   GetDrawPaths(ArcScale);
 
-  mat := MatrixMultiply(RootMatrix, fDrawInfo.matrix);
   MatrixApply(mat, drawPathsF);
   MatrixApply(mat, drawPathsO);
   MatrixApply(mat, drawPathsC);
@@ -1640,6 +1799,7 @@ var
   strokePaths: TPathsD;
 const
   endStyle: array [Boolean] of TEndStyle = (esRound, esPolygon);
+  endStyle2: array [Boolean] of TEndStyle = (esButt, esPolygon);
 begin
   if isClosed then
     strokePaths := drawPathsC else
@@ -1653,7 +1813,7 @@ begin
     dashOffset := Round(fDrawInfo.dashOffset * scale);
     dashArray := MakeDashArray(fDrawInfo.dashArray, scale);
     DrawDashedLine(img, strokePaths, dashArray, @dashOffset,
-      fDrawInfo.strokeWidth * scale, fDrawInfo.strokeColor, esButt)
+      fDrawInfo.strokeWidth * scale, fDrawInfo.strokeColor, endStyle2[isClosed])
   end
   else if Assigned(fDrawInfo.strokeGradEl) then
   begin
@@ -1685,7 +1845,9 @@ begin
 
         pt1 := strokePaths[i][0];
         pt2 := strokePaths[i][1];
-        fDrawInfo.markerStart.SetSoloPoint(pt1, GetAngle(pt2, pt1));
+        if fDrawInfo.markerStart.autoStartReverse then
+          fDrawInfo.markerStart.SetSoloPoint(pt1, GetAngle(pt2, pt1)) else
+          fDrawInfo.markerStart.SetSoloPoint(pt1, GetAngle(pt1, pt2));
         fDrawInfo.markerStart.Draw(img, nil, matrix);
       end;
     end;
@@ -1985,7 +2147,7 @@ var
   currPt, radii, pt2, pt3, pt4: TPointD;
   lastQCtrlPt, lastCCtrlPt: TPointD;
   arcFlag, sweepFlag: integer;
-  angle, arc1, arc2: double;
+  angle, arc1, arc2, bezTolerance: double;
   rec: TRectD;
   path2: TPathD;
 
@@ -2021,6 +2183,7 @@ var
   end;
 
 begin
+  bezTolerance := BezierTolerance/arcScale;
   pathLen := 0; pathCap := 0;
   lastQCtrlPt := InvalidPointD;
   lastCCtrlPt := InvalidPointD;
@@ -2058,10 +2221,10 @@ begin
                   arcFlag <> 0, sweepFlag <> 0, arc1, arc2, rec);
                 if (sweepFlag = 0)  then
                 begin
-                  path2 := Arc(rec, arc2, arc1);
+                  path2 := Arc(rec, arc2, arc1, arcScale);
                   path2 := ReversePath(path2);
                 end else
-                  path2 := Arc(rec, arc1, arc2);
+                  path2 := Arc(rec, arc1, arc2, arcScale);
                 path2 := RotatePath(path2, rec.MidPoint, angle);
                 AddPath(path2);
               end;
@@ -2074,7 +2237,7 @@ begin
                 pt3.X := vals[j*4 +2];
                 pt3.Y := vals[j*4 +3];
                 lastQCtrlPt := pt2;
-                path2 := FlattenQBezier(currPt, pt2, pt3);
+                path2 := FlattenQBezier(currPt, pt2, pt3, bezTolerance);
                 AddPath(path2);
               end;
           dsQSpline:
@@ -2087,7 +2250,7 @@ begin
                 pt3.X := vals[j*2];
                 pt3.Y := vals[j*2 +1];
                 lastQCtrlPt := pt2;
-                path2 := FlattenQBezier(currPt, pt2, pt3);
+                path2 := FlattenQBezier(currPt, pt2, pt3, bezTolerance);
                 AddPath(path2);
               end;
           dsCBez:
@@ -2101,7 +2264,7 @@ begin
                 pt4.X := vals[j*6 +4];
                 pt4.Y := vals[j*6 +5];
                 lastCCtrlPt := pt3;
-                path2 := FlattenCBezier(currPt, pt2, pt3, pt4);
+                path2 := FlattenCBezier(currPt, pt2, pt3, pt4, bezTolerance);
                 AddPath(path2);
               end;
           dsCSpline:
@@ -2116,7 +2279,7 @@ begin
                 pt4.X := vals[j*4 +2];
                 pt4.Y := vals[j*4 +3];
                 lastCCtrlPt := pt3;
-                path2 := FlattenCBezier(currPt, pt2, pt3, pt4);
+                path2 := FlattenCBezier(currPt, pt2, pt3, pt4, bezTolerance);
                 AddPath(path2);
               end;
         end;
@@ -2134,6 +2297,9 @@ var
 begin
   filled := isFilled;
   stroked := isStroked;
+
+  if ArcScale <= 0 then ArcScale := 1;
+  self.arcScale := ArcScale;
 
   for i := 0 to High(dpaths) do
   begin
@@ -2283,6 +2449,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TTextElement.ResetTmpPt;
+begin
+  tmpPt.Y := pt.Y;
+  tmpPt.X := InvalidD;
+end;
+//------------------------------------------------------------------------------
+
 function TTextElement.AddSubtext(atext: PAnsiChar; len: integer): TElement;
 begin
   Result := TSubtextElement.Create(self, 0);
@@ -2295,7 +2468,7 @@ begin
     pt := InvalidPointD;
   end;
   fChilds.add(Result);
-  if not Result.fDrawInfo.hidden then
+  if not fDrawInfo.hidden then
     fReader.fShapesList.Add(Result);
 end;
 
@@ -2303,24 +2476,30 @@ end;
 // TSubtextElement
 //------------------------------------------------------------------------------
 
+function TSubtextElement.GetTextElement: TTextElement;
+var
+  el: TElement;
+begin
+  el := fParent;
+  while el is TSubtextElement do el := el.fParent;
+  Result := TTextElement(el);
+end;
+//------------------------------------------------------------------------------
+
 procedure TSubtextElement.GetDrawPaths(ArcScale: double);
 var
   outPaths: ^TPathsD;
-  pt: TPointD;
+  tmpPt: TPointD;
   parentTextEl: TTextElement;
   s: string;
   i: integer;
   fontInfo: TFontInfo;
   fontReader: TFontReader;
   fontCache: TGlyphCache;
-  width: double;
-  el: TElement;
+  tmpX, offsetX, scale: double;
+  mat: TMatrixD;
 begin
-  el := self;
-  while Assigned(el.fParent) and not (el.fParent is TTextElement) do
-    el := el.fParent;
-  if not (el.fParent is TTextElement) then Exit;
-  parentTextEl := TTextElement(el.fParent);
+  parentTextEl := GetTextElement;
 
   if IsFilled then
     outPaths := @drawPathsF else
@@ -2328,27 +2507,24 @@ begin
 
   //if first subtext then reset X offset
   if (parentTextEl = fParent) and (self = fParent.fChilds[0]) then
-    parentTextEl.tmpPt := InvalidPointD;
+    parentTextEl.ResetTmpPt;
+
+  //get the text offset
+  if IsValid(self.pt) then
+    tmpPt := self.pt
+  else if IsValid(parentTextEl.tmpPt.X) then
+    tmpPt := parentTextEl.tmpPt
+  else
+    tmpPt := parentTextEl.Pt;
+  parentTextEl.tmpPt := tmpPt;
 
   if textLen = 0 then Exit;
 
-  //get the text offset
-  if (self is TSubtextElement) and IsValid(TSubtextElement(self).pt) then
-  begin
-      pt := TTSpanElement(self).pt;
-      TTextElement(fParent).tmpPt := pt;
-  end else
-  begin
-    pt := TTextElement(fParent).pt;
-    if IsValid(parentTextEl.tmpPt) then
-      pt := parentTextEl.tmpPt;
-  end;
-
   //trim CRLFs and multiple spaces
   {$IFDEF UNICODE}
-  s := UTF8ToUnicodeString(Utf8String_(text, textLen));
+  s := UTF8ToUnicodeString(HtmlDecode(Utf8String_(text, textLen)));
   {$ELSE}
-  s := Utf8String_(text, textLen);
+  s := HtmlDecode(Utf8String_(text, textLen));
   {$ENDIF}
   for i := 1 to Length(s) do
     if s[i] < #32 then s[i] := #32;
@@ -2359,10 +2535,7 @@ begin
     i := PosEx(#32#32, s, i);
   end;
 
-  if Self is TTSpanElement then
-    fontInfo := TTSpanElement(self).fontInfo else
-    fontInfo := parentTextEl.fontInfo;
-
+  fontInfo := TTextElement(fParent).fontInfo;
   case fontInfo.family of
     ffSansSerif :
       begin
@@ -2393,24 +2566,37 @@ begin
 
   fontCache.FontReader := fontReader;
 
-  if fontInfo.size > 2 then
-    fontCache.FontHeight := fontInfo.size;
-  width := fontCache.GetTextWidth(s);
-  case fontInfo.align of
-    taLeft:
-      outPaths^ := fontCache.GetTextGlyphs(pt.X, pt.Y, s, parentTextEl.tmpPt.X);
-    taRight:
-      begin
-        pt.X := pt.X - width;
-        outPaths^ := fontCache.GetTextGlyphs(pt.X, pt.Y, s, parentTextEl.tmpPt.X);
-        parentTextEl.tmpPt.X := pt.X;
-      end;
-    taMiddle:
-      begin
-        pt.X := pt.X - width/2;
-        outPaths^ := fontCache.GetTextGlyphs(pt.X, pt.Y, s, parentTextEl.tmpPt.X);
-      end;
-  end;
+  if fontInfo.size < 2 then Exit;
+
+  outPaths^ := fontCache.GetTextGlyphs(0, 0, s, tmpX);
+  //by not changing the fontCache.FontHeight, the quality of
+  //small font render improves very significantly (though of course
+  //this requires additional glyph scaling and offsetting).
+  scale := fontInfo.size/fontCache.FontHeight;
+  mat := IdentityMatrix;
+  MatrixScale(mat, scale);
+
+  with parentTextEl.tmpPt do
+    case fontInfo.align of
+      taLeft:
+        begin
+          offsetX := X;
+          X := X + tmpX * scale;
+        end;
+      taRight:
+        begin
+          offsetX := X - tmpX * scale;
+          X := offsetX;
+        end;
+      else //taMiddle:
+        begin
+          offsetX := X - tmpX * scale /2;
+          X := X + tmpX * scale/2;
+        end;
+    end;
+
+  MatrixTranslate(mat, offsetX, tmpPt.Y);
+  MatrixApply(mat, outPaths^);
 
   if IsFilled and IsStroked then
     drawPathsC := CopyPaths(drawPathsF);
@@ -2422,6 +2608,7 @@ end;
 
 constructor TTSpanElement.Create(parent: TElement; hashName: Cardinal);
 begin
+  inherited;
   if parent is TTextElement then
     fontInfo := TTextElement(parent).fontInfo
   else if parent is TTSpanElement then
@@ -2430,7 +2617,6 @@ begin
     fontInfo := defaultFontInfo; //should never get here
   pt := InvalidPointD;
   delta := InvalidPointD;
-  inherited;
 end;
 
 //------------------------------------------------------------------------------
@@ -2448,7 +2634,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMarkerElement.Draw(img, tmpImg: TImage32; RootMatrix: TMatrixD);
+procedure TMarkerElement.Draw(img, tmpImg: TImage32;
+  const RootMatrix: TMatrixD);
 var
   i,j: integer;
   scale: double;
@@ -2558,7 +2745,6 @@ begin
     styleLen := fCurrent - pstyle;
 
     //finally, for each class name add this style
-    //todo - check for existing classes and append styles
     for i := 0 to High(names) do
       fReader.fClassStylesList.Add(names[i], LowercaseAnsi(pstyle, styleLen));
     names := nil;
@@ -3010,29 +3196,6 @@ begin
       c := fCurrent;
       while (fCurrent < fCurrentEnd) and (fCurrent^ <> '<') do inc(fCurrent);
       TTextElement(self).AddSubtext(c, fCurrent - c);
-    end
-    else if (self is TTSpanElement) then
-    begin
-      while (fCurrent -1)^ = #32 do dec(fCurrent);
-      c := fCurrent;
-      while (fCurrent < fCurrentEnd) and (fCurrent^ <> '<') do
-        inc(fCurrent);
-      el := self.fParent;
-      while Assigned(el) and not (el is TTextElement) do
-        el := el.fParent;
-      if not Assigned(el) then
-      begin
-        fIsValid := false;
-        Exit;
-      end;
-
-      el := TTextElement(el).AddSubtext(c, fCurrent - c);
-      with TTSpanElement(self) do
-        if IsValid(pt) then
-        begin
-          (el as TSubtextElement).pt := pt;
-          pt := InvalidPointD;
-        end;
     end else
     begin
       //skip unknown content
@@ -3047,6 +3210,7 @@ end;
 
 constructor TSvgReader.Create;
 begin
+  //fFontReaders    := TList.Create;
   fShapesList     := TList.Create;
   fMemStream      := TMemoryStream.Create;
 
@@ -3062,21 +3226,30 @@ begin
   fLinGradRenderer := TLinearGradientRenderer.Create;
   fRadGradRenderer := TSvgRadialGradientRenderer.Create;
 
-  fSansFontReader   := TFontReader.CreateFromResource('NOTO-SANS', RT_RCDATA);
-  fSerifFontReader  := TFontReader.CreateFromResource('NOTO-SERIF', RT_RCDATA);
-  fMonoFontReader   := TFontReader.CreateFromResource('NOTO-MONO', RT_RCDATA);
+//  //Alternative fonts (Windows only)
+//  fSansFontReader   := TFontReader.Create('Arial');
+//  fSansBoldReader     := TFontReader.Create('Arial Bold');
+//  fSansItalicReader   := TFontReader.Create('Arial Italic');
+//  fSansBoldItalReader := TFontReader.Create('Arial Bold Italic');
+//  fSerifFontReader      := TFontReader.Create('Times New Roman');
+//  fSerifBoldReader      := TFontReader.Create('Times New Roman Bold');
+//  fSerifItalicReader    := TFontReader.Create('Times New Roman Italic');
+//  fSerifBoldItalReader  := TFontReader.Create('Times New Roman Bold Italic');
 
-  fSansBoldReader     := TFontReader.CreateFromResource('NOTO-SANS-BOLD', RT_RCDATA);
-  fSansItalicReader   := TFontReader.CreateFromResource('NOTO-SANS-ITALIC', RT_RCDATA);
-  fSansBoldItalReader := TFontReader.CreateFromResource('NOTO-SANS-BOLDITALIC', RT_RCDATA);
-
+  fSansFontReader       := TFontReader.CreateFromResource('NOTO-SANS', RT_RCDATA);
+  fSansBoldReader       := TFontReader.CreateFromResource('NOTO-SANS-BOLD', RT_RCDATA);
+  fSansItalicReader     := TFontReader.CreateFromResource('NOTO-SANS-ITALIC', RT_RCDATA);
+  fSansBoldItalReader   := TFontReader.CreateFromResource('NOTO-SANS-BOLDITALIC', RT_RCDATA);
+  fSerifFontReader      := TFontReader.CreateFromResource('NOTO-SERIF', RT_RCDATA);
   fSerifBoldReader      := TFontReader.CreateFromResource('NOTO-SERIF-BOLD', RT_RCDATA);
   fSerifItalicReader    := TFontReader.CreateFromResource('NOTO-SERIF-ITALIC', RT_RCDATA);
   fSerifBoldItalReader  := TFontReader.CreateFromResource('NOTO-SERIF-BOLDITALIC', RT_RCDATA);
 
-  fSansFontCache    := TGlyphCache.Create(fSansFontReader, defaultFontHeight);
-  fSerifFontCache   := TGlyphCache.Create(fSerifFontReader, defaultFontHeight);
-  fMonoFontCache    := TGlyphCache.Create(fMonoFontReader, defaultFontHeight);
+  fMonoFontReader       := TFontReader.CreateFromResource('NOTO-MONO', RT_RCDATA);
+
+  fSansFontCache        := TGlyphCache.Create(fSansFontReader, defaultFontHeight);
+  fSerifFontCache       := TGlyphCache.Create(fSerifFontReader, defaultFontHeight);
+  fMonoFontCache        := TGlyphCache.Create(fMonoFontReader, defaultFontHeight);
 
 end;
 //------------------------------------------------------------------------------
@@ -3088,6 +3261,7 @@ begin
   fShapesList.Free;
   fIdList.Free;
   fClassStylesList.Free;
+  //fFontReaders.Free;
 
   fLinGradRenderer.Free;
   fRadGradRenderer.Free;
@@ -3386,8 +3560,8 @@ begin
   if attrib.aOwnerEl is TTextElement then
     with TTextElement(attrib.aOwnerEl) do
       AttribToFontInfo(attrib, fontInfo)
-  else if attrib.aOwnerEl is TTSpanElement then
-    with TTSpanElement(attrib.aOwnerEl) do
+  else if attrib.aOwnerEl is TSubtextElement then
+    with TSubtextElement(attrib.aOwnerEl) do
       AttribToFontInfo(attrib, fontInfo);
 end;
 //------------------------------------------------------------------------------
@@ -3412,8 +3586,8 @@ procedure FontFamily_Attrib(attrib: PAttrib);
 begin
   if attrib.aOwnerEl is TTextElement then
     GetFamily(TTextElement(attrib.aOwnerEl).fontInfo)
-  else if attrib.aOwnerEl is TTSpanElement then
-    GetFamily(TTSpanElement(attrib.aOwnerEl).fontInfo);
+  else if attrib.aOwnerEl is TSubtextElement then
+    GetFamily(TSubtextElement(attrib.aOwnerEl).fontInfo);
 end;
 //------------------------------------------------------------------------------
 
@@ -3426,9 +3600,9 @@ begin
     if GetNum(attrib.aValue, attrib.aValue + attrib.aValueLen,
       false, num) then TTextElement(attrib.aOwnerEl).fontInfo.size := num;
   end
-  else if (attrib.aOwnerEl is TTSpanElement) and
+  else if (attrib.aOwnerEl is TSubtextElement) and
     GetNum(attrib.aValue, attrib.aValue + attrib.aValueLen, false, num) then
-      TTSpanElement(attrib.aOwnerEl).fontInfo.size := num
+      TSubtextElement(attrib.aOwnerEl).fontInfo.size := num
 end;
 //------------------------------------------------------------------------------
 
@@ -3449,8 +3623,8 @@ procedure FontStyle_Attrib(attrib: PAttrib);
 begin
   if attrib.aOwnerEl is TTextElement then
     GetStyle(TTextElement(attrib.aOwnerEl).fontInfo)
-  else if attrib.aOwnerEl is TTSpanElement then
-    GetStyle(TTSpanElement(attrib.aOwnerEl).fontInfo);
+  else if attrib.aOwnerEl is TSubtextElement then
+    GetStyle(TSubtextElement(attrib.aOwnerEl).fontInfo);
 end;
 //------------------------------------------------------------------------------
 
@@ -3480,8 +3654,8 @@ procedure FontWeight_Attrib(attrib: PAttrib);
 begin
   if attrib.aOwnerEl is TTextElement then
     GetWeight(TTextElement(attrib.aOwnerEl).fontInfo)
-  else if attrib.aOwnerEl is TTSpanElement then
-    GetWeight(TTSpanElement(attrib.aOwnerEl).fontInfo);
+  else if attrib.aOwnerEl is TSubtextElement then
+    GetWeight(TSubtextElement(attrib.aOwnerEl).fontInfo);
 end;
 //------------------------------------------------------------------------------
 
@@ -3525,8 +3699,8 @@ procedure TextAlign_Attrib(attrib: PAttrib);
 begin
   if attrib.aOwnerEl is TTextElement then
     GetAlign(TTextElement(attrib.aOwnerEl).fontInfo)
-  else if attrib.aOwnerEl is TTSpanElement then
-    GetAlign(TTSpanElement(attrib.aOwnerEl).fontInfo);
+  else if attrib.aOwnerEl is TSubtextElement then
+    GetAlign(TSubtextElement(attrib.aOwnerEl).fontInfo);
 end;
 //------------------------------------------------------------------------------
 
@@ -3592,6 +3766,16 @@ begin
   attrib.aOwnerEl.fDrawInfo.opacity := Round(opacity * 255);
 end;
 //------------------------------------------------------------------------------
+
+procedure Orient_Attrib(attrib: PAttrib);
+begin
+  if (attrib.aOwnerEl is TMarkerElement) and
+    (GetHashedName(attrib.aValue, attrib.aValueLen) =
+      hauto_045_start_045_reverse) then
+        TMarkerElement(attrib.aOwnerEl).autoStartReverse := true;
+end;
+//------------------------------------------------------------------------------
+
 
 procedure StopColor_Attrib(attrib: PAttrib);
 begin
@@ -3935,6 +4119,7 @@ begin
   RegisterAttribute(hMarkerWidth,           Width_Attrib);
   RegisterAttribute(hOffset,                Offset_Attrib);
   RegisterAttribute(hOpacity,               Opacity_Attrib);
+  RegisterAttribute(hOrient,                Orient_Attrib);
   RegisterAttribute(hPoints,                Points_Attrib);
   RegisterAttribute(hR,                     Rx_Attrib);
   RegisterAttribute(hRefX,                  Rx_Attrib);
@@ -3968,7 +4153,7 @@ end;
 //------------------------------------------------------------------------------
 
 initialization
-  defaultFontHeight := DPIAware(9);
+  defaultFontHeight := DPIAware(12);
   MakeLowerCaseTable;
   MakeAttribFuncList;
   MakeColorConstList;
