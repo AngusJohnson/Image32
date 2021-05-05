@@ -3,7 +3,7 @@ unit Image32_SVG_Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  4 May 2021                                                      *
+* Date      :  6 May 2021                                                      *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2021                                         *
 *                                                                              *
@@ -135,7 +135,6 @@ type
   protected
     function LoadAttributes: Boolean; virtual;
     procedure LoadContent; virtual;
-    procedure AssignTo(var other: TElement); virtual;
   public
     constructor Create(parent: TElement; hashName: Cardinal); virtual;
     destructor  Destroy; override;
@@ -175,12 +174,13 @@ type
     drawPathsC  : TPathsD;
     function IsFilled: Boolean;
     function IsStroked: Boolean;
+    function HasMarkers: Boolean;
     function GetVal(out val: double): Boolean;
 
-    procedure GetDrawPaths(ArcScale: double); virtual; abstract;
-    procedure DrawFilled(img: TImage32; matrix: TMatrixD); virtual;
-    procedure DrawStroke(img: TImage32; matrix: TMatrixD; isClosed: Boolean); virtual;
-    procedure Draw(img, tmpImg: TImage32; const RootMatrix: TMatrixD); virtual;
+    procedure GetDrawPaths(ArcScale: double); virtual;
+    procedure DrawFilled(img: TImage32; const matrix: TMatrixD); virtual;
+    procedure DrawStroke(img: TImage32; const matrix: TMatrixD; isClosed: Boolean); virtual;
+    procedure Draw(img, tmpImg: TImage32; const drawMatrix: TMatrixD); virtual;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
@@ -305,7 +305,7 @@ type
     callerEl: TShapeElement;
     procedure SetSoloPoint(const pt: TPointD; angle: double);
     procedure SetPoints(const points: TPathD);
-    procedure Draw(img, tmpImg: TImage32; const RootMatrix: TMatrixD); override;
+    procedure Draw(img, tmpImg: TImage32; const matrix: TMatrixD); override;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
@@ -322,7 +322,7 @@ type
     gradientUnits: Cardinal;
     procedure LoadContent; override;
     procedure AddStop(color: TColor32; offset: double);
-    procedure AssignTo(var other: TElement); override;
+    procedure AssignTo(var other: TElement);  virtual;
     function PrepareGradientRenderer(renderer: TCustomGradientRenderer;
       matrix: TMatrixD; rec: TRect): Boolean; virtual;
   end;
@@ -356,7 +356,7 @@ type
 
   TFilterElement = class(TElement)
   protected
-    recWH: TRectWH;
+    filterRecWH: TRectWH;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
@@ -1128,9 +1128,27 @@ begin
         val := val *0.00999; //fractionally less than 1.0
         inc(current);
       end;
+    'c': //convert cm to pixels
+      if ((current+1)^ = 'm') then
+      begin
+        val := val * 96 / 2.54;
+        inc(current, 2);
+      end;
     'd': //ignore deg
       if ((current+1)^ = 'e') and ((current+2)^ = 'g') then
         inc(current, 3);
+    'i': //convert inchs to pixels
+      if ((current+1)^ = 'n') then
+      begin
+        val := val * 96;
+        inc(current, 2);
+      end;
+    'm': //convert mm to pixels
+      if ((current+1)^ = 'm') then
+      begin
+        val := val * 96 / 25.4;
+        inc(current, 2);
+      end;
     'p': //ignore px
       if (current+1)^ = 'x' then inc(current, 2);
     'r': //convert radian angles to degrees
@@ -1389,10 +1407,21 @@ end;
 
 procedure TGradientElement.AddStop(color: TColor32; offset: double);
 var
-  len: integer;
+  i, len: integer;
 begin
   len := Length(stops);
   setLength(stops, len+1);
+
+  //make sure stops are in ascending offset order
+  for i := 0 to len -1 do
+    if offset < stops[i].offset then
+    begin
+      Move(stops[i], stops[i+1], (len -i) * SizeOf(TSvgColorStop));
+      stops[i].offset := Min(1,Max(0, offset));
+      stops[i].color := color;
+      Exit;
+    end;
+
   stops[len].offset := Min(1,Max(0, offset));
   stops[len].color := color;
 end;
@@ -1586,10 +1615,10 @@ end;
 constructor TFilterElement.Create(parent: TElement; hashName: Cardinal);
 begin
   inherited;
-  recWH.Left := InvalidD;
-  recWH.Top := InvalidD;
-  recWH.Width := InvalidD;
-  recWH.Height := InvalidD;
+  filterRecWH.Left := InvalidD;
+  filterRecWH.Top := InvalidD;
+  filterRecWH.Width := InvalidD;
+  filterRecWH.Height := InvalidD;
   fDrawInfo.hidden := true;
 end;
 
@@ -1672,13 +1701,22 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TShapeElement.Draw(img, tmpImg: TImage32; const RootMatrix: TMatrixD);
+function TShapeElement.HasMarkers: Boolean;
+begin
+  Result := IsStroked and (Assigned(fDrawInfo.markerStart) or
+    Assigned(fDrawInfo.markerMiddle) or Assigned(fDrawInfo.markerEnd));
+end;
+//------------------------------------------------------------------------------
+
+procedure TShapeElement.Draw(img, tmpImg: TImage32; const drawMatrix: TMatrixD);
 var
-  i, crWidth, crHeight: integer;
+  i,j, crWidth, crHeight: integer;
   stroked, filled: Boolean;
   ArcScale: double;
   mat: TMatrixD;
   clipRec: TRect;
+  strokePaths: TPathsD;
+  pt1, pt2: TPointD;
   usingSpecialEffects: Boolean;
 const
   blurQual = 0; //0 .. 2; 0=OK (faster), 1=very good, 2=high qual. (slower)
@@ -1686,8 +1724,7 @@ begin
   filled := IsFilled; stroked := IsStroked;
   if not (filled or stroked) then Exit;
 
-  drawPathsF := nil; drawPathsO := nil; drawPathsC := nil;
-  mat := MatrixMultiply(RootMatrix, fDrawInfo.matrix);
+  mat := MatrixMultiply(drawMatrix, fDrawInfo.matrix);
   ArcScale := ExtractAvgScaleFromMatrix(mat);
   GetDrawPaths(ArcScale);
 
@@ -1700,21 +1737,33 @@ begin
 
   if usingSpecialEffects then
   begin
-    clipRec := Image32_Vector.UnionRect(GetBounds(drawPathsF),
-      Image32_Vector.UnionRect(GetBounds(drawPathsC), GetBounds(drawPathsO)));
+    if Assigned(fDrawInfo.clipPathEl) then
+    begin
+      with fDrawInfo.clipPathEl do
+      begin
+        GetDrawPaths(ArcScale);
+        MatrixApply(mat, drawPathsF);
+        clipRec := GetBounds(drawPathsF);
+      end;
+    end else
+    begin
+      clipRec := Image32_Vector.UnionRect(GetBounds(drawPathsF),
+        Image32_Vector.UnionRect(GetBounds(drawPathsC), GetBounds(drawPathsO)));
+    end;
     crWidth := RectWidth(clipRec);
     crHeight := RectHeight(clipRec);
 
     if Assigned(fDrawInfo.filterEl) then
       with fDrawInfo.filterEl do
       begin
-        if IsValid(recWH.Left) and IsValid(recWH.Top) and
-          IsValid(recWH.Width) and IsValid(recWH.Height) then
+        if IsValid(filterRecWH.Left) and IsValid(filterRecWH.Top) and
+          IsValid(filterRecWH.Width) and IsValid(filterRecWH.Height) then
         begin
+          //assume % of path bounds
           Image32_Vector.OffsetRect(clipRec,
-            Round(crWidth * recWH.Left), Round(crHeight * recWH.Top));
-          clipRec.Right := clipRec.Left + Round(crWidth * recWH.Width);
-          clipRec.Bottom := clipRec.Top + Round(crHeight * recWH.Height);
+            Round(crWidth * filterRecWH.Left), Round(crHeight * filterRecWH.Top));
+          clipRec.Right := clipRec.Left + Round(crWidth * filterRecWH.Width);
+          clipRec.Bottom := clipRec.Top + Round(crHeight * filterRecWH.Height);
         end
         else clipRec := Image32_Vector.InflateRect(clipRec,
           Round(crWidth * 0.2), Round(crHeight * 0.2));
@@ -1722,18 +1771,11 @@ begin
 
     tmpImg.FillRect(clipRec, clNone32);
 
-    if Assigned(fDrawInfo.clipPathEl) then
-      with fDrawInfo.clipPathEl do
-      begin
-        GetDrawPaths(ArcScale);
-        MatrixApply(mat, drawPathsF);
-      end;
-
     DrawFilled(tmpImg, mat);
     DrawStroke(tmpImg, mat, true);
     DrawStroke(tmpImg, mat, false);
-
     ArcScale := ExtractAvgScaleFromMatrix(mat);
+
     if Assigned(fDrawInfo.filterEl) then
       with fDrawInfo.filterEl do
         for i := 0 to fChilds.Count -1 do
@@ -1759,10 +1801,72 @@ begin
     DrawStroke(img, mat, true);
     DrawStroke(img, mat, false);
   end;
+
+  if not HasMarkers then Exit;
+
+  //currently we'll assume markers are scaled according to strokewidth
+  mat := drawMatrix;
+  MatrixScale(mat, fDrawInfo.strokeWidth);
+
+  if Assigned(fDrawInfo.markerStart) and
+    Assigned(drawPathsO) then
+  begin
+    fDrawInfo.markerStart.callerEl := Self;
+    for i := 0 to High(drawPathsO) do
+    begin
+      if Length(drawPathsO[i]) < 2 then Continue;
+      pt1 := drawPathsO[i][0];
+      pt2 := drawPathsO[i][1];
+      if fDrawInfo.markerStart.autoStartReverse then
+        fDrawInfo.markerStart.SetSoloPoint(pt1, GetAngle(pt2, pt1)) else
+        fDrawInfo.markerStart.SetSoloPoint(pt1, GetAngle(pt1, pt2));
+      fDrawInfo.markerStart.Draw(img, nil, mat);
+    end;
+  end;
+
+  if Assigned(fDrawInfo.markerMiddle) then
+  begin
+    fDrawInfo.markerMiddle.callerEl := Self;
+    if Assigned(drawPathsO) then
+      strokePaths := drawPathsO else
+      strokePaths := drawPathsC;
+    for i := 0 to High(strokePaths) do
+    begin
+      j := High(strokePaths[i]);
+      if j < 1 then Continue;
+
+      fDrawInfo.markerMiddle.SetPoints(
+        Copy(strokePaths[i], 1, j -1));
+      fDrawInfo.markerMiddle.Draw(img, nil, mat);
+    end;
+  end;
+
+  if Assigned(fDrawInfo.markerEnd) and
+    Assigned(drawPathsO) then
+  begin
+    fDrawInfo.markerEnd.callerEl := Self;
+    for i := 0 to High(drawPathsO) do
+    begin
+      j := High(drawPathsO[i]);
+      if j < 1 then Continue;
+
+      pt1 := drawPathsO[i][j];
+      pt2 := drawPathsO[i][j-1];
+
+      fDrawInfo.markerEnd.SetSoloPoint(pt1, GetAngle(pt2, pt1));
+      fDrawInfo.markerEnd.Draw(img, nil, mat);
+    end;
+  end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TShapeElement.DrawFilled(img: TImage32; matrix: TMatrixD);
+procedure TShapeElement.GetDrawPaths(ArcScale: double);
+begin
+  drawPathsF := nil; drawPathsO := nil; drawPathsC := nil;
+end;
+//------------------------------------------------------------------------------
+
+procedure TShapeElement.DrawFilled(img: TImage32; const matrix: TMatrixD);
 var
   rec: TRect;
 begin
@@ -1789,13 +1893,12 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TShapeElement.DrawStroke(img: TImage32;
-  matrix: TMatrixD; isClosed: Boolean);
+  const matrix: TMatrixD; isClosed: Boolean);
 var
-  i,k, dashOffset: integer;
+  dashOffset: integer;
   dashArray: TArrayOfInteger;
   scale: Double;
   rec: TRect;
-  pt1, pt2: TPointD;
   strokePaths: TPathsD;
 const
   endStyle: array [Boolean] of TEndStyle = (esRound, esPolygon);
@@ -1823,64 +1926,18 @@ begin
       with fDrawInfo.strokeGradEl do
         PrepareGradientRenderer(fReader.RadGradRenderer, matrix, rec);
       DrawLine(img, strokePaths, fDrawInfo.strokeWidth * scale,
-        fReader.RadGradRenderer, endStyle[isClosed]);
+        fReader.RadGradRenderer, endStyle[isClosed], jsAuto, scale);
     end else
     begin
       with fDrawInfo.strokeGradEl do
         PrepareGradientRenderer(fReader.LinGradRenderer, matrix, rec);
       DrawLine(img, strokePaths, fDrawInfo.strokeWidth * scale,
-        fReader.LinGradRenderer, endStyle[isClosed]);
+        fReader.LinGradRenderer, endStyle[isClosed], jsAuto, scale);
     end;
   end else
   begin
     DrawLine(img, strokePaths, fDrawInfo.strokeWidth * scale,
-      fDrawInfo.strokeColor, endStyle[isClosed]);
-
-    if Assigned(fDrawInfo.markerStart) then
-    begin
-      fDrawInfo.markerStart.callerEl := Self;
-      for i := 0 to High(strokePaths) do
-      begin
-        if Length(strokePaths[i]) < 2 then Continue;
-
-        pt1 := strokePaths[i][0];
-        pt2 := strokePaths[i][1];
-        if fDrawInfo.markerStart.autoStartReverse then
-          fDrawInfo.markerStart.SetSoloPoint(pt1, GetAngle(pt2, pt1)) else
-          fDrawInfo.markerStart.SetSoloPoint(pt1, GetAngle(pt1, pt2));
-        fDrawInfo.markerStart.Draw(img, nil, matrix);
-      end;
-    end;
-
-    if Assigned(fDrawInfo.markerMiddle) then
-    begin
-      fDrawInfo.markerMiddle.callerEl := Self;
-      for i := 0 to High(strokePaths) do
-      begin
-        k := High(strokePaths[i]);
-        if k < 1 then Continue;
-
-        fDrawInfo.markerMiddle.SetPoints(
-          Copy(strokePaths[i], 1, k -1));
-        fDrawInfo.markerMiddle.Draw(img, nil, matrix);
-      end;
-    end;
-
-    if Assigned(fDrawInfo.markerEnd) then
-    begin
-      fDrawInfo.markerEnd.callerEl := Self;
-      for i := 0 to High(strokePaths) do
-      begin
-        k := High(strokePaths[i]);
-        if k < 1 then Continue;
-
-        pt1 := strokePaths[i][k];
-        pt2 := strokePaths[i][k-1];
-
-        fDrawInfo.markerEnd.SetSoloPoint(pt1, GetAngle(pt2, pt1));
-        fDrawInfo.markerEnd.Draw(img, nil, matrix);
-      end;
-    end;
+      fDrawInfo.strokeColor, endStyle[isClosed], jsAuto, scale);
   end;
 end;
 
@@ -2295,6 +2352,7 @@ var
   filled, stroked, isClosed: Boolean;
   path: TPathD;
 begin
+  inherited;
   filled := isFilled;
   stroked := isStroked;
 
@@ -2318,6 +2376,7 @@ end;
 
 procedure TPolyElement.GetDrawPaths(ArcScale: double);
 begin
+  inherited;
   if not Assigned(path) then Exit;
   if IsFilled then AppendPath(drawPathsF, path);
   if not IsStroked then Exit;
@@ -2369,6 +2428,7 @@ end;
 
 procedure TLineElement.GetDrawPaths(ArcScale: double);
 begin
+  inherited;
   if IsFilled then AppendPath(drawPathsF, path);
   if IsStroked then AppendPath(drawPathsO, path);
 end;
@@ -2382,6 +2442,7 @@ var
   rec: TRectD;
   path: TPathD;
 begin
+  inherited;
   if (radius <= 0) then Exit;
   with CenterPt do
     rec := RectD(X -radius, Y -radius, X +radius, Y +radius);
@@ -2400,6 +2461,7 @@ var
   rec: TRectD;
   path: TPathD;
 begin
+  inherited;
   if (radius.X <= 0) or (radius.Y <= 0) then Exit;
   with centerPt do
     rec := RectD(X -radius.X, Y -radius.Y, X +radius.X, Y +radius.Y);
@@ -2418,6 +2480,7 @@ var
   rec2: TRectD;
   path: TPathD;
 begin
+  inherited;
   if (recWH.width <= 0) or (recWH.height <= 0) then Exit;
   rec2 := recWH.RectD;
   if (radius.X > 0) or (radius.Y > 0) then
@@ -2499,6 +2562,7 @@ var
   tmpX, offsetX, scale: double;
   mat: TMatrixD;
 begin
+  inherited;
   parentTextEl := GetTextElement;
 
   if IsFilled then
@@ -2634,20 +2698,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMarkerElement.Draw(img, tmpImg: TImage32;
-  const RootMatrix: TMatrixD);
+procedure TMarkerElement.Draw(img, tmpImg: TImage32; const matrix: TMatrixD);
 var
   i,j: integer;
-  scale: double;
   mat, mat2: TMatrixD;
 begin
   if not Assigned(callerEl) then Exit;
 
-  mat := fDrawInfo.matrix;
+  mat := IdentityMatrix;
   if IsValid(ref) then
     MatrixTranslate(mat, -ref.X, -ref.Y);
-  scale := ExtractAvgScaleFromMatrix(RootMatrix);
-  MatrixScale(mat, callerEl.fDrawInfo.strokeWidth * scale);
+  mat := MatrixMultiply(matrix, mat);
 
   if not IsEmptyRect(viewbox) and
     IsValid(width) and IsValid(height) then
@@ -2770,9 +2831,10 @@ constructor TRootElement.Create(reader: TSvgReader; hashName: Cardinal);
 var
   svgStart: PAnsiChar;
 begin
-  fChilds    := TList.Create;
-  fNameHash  := hashName;
+  inherited Create(nil, hashName);
   fReader    := reader;
+  width       := InvalidD;
+  height      := InvalidD;
 
   fCurrentEnd := fReader.fEndStream;
   fDrawInfo :=  defaultDrawInfo;
@@ -2794,6 +2856,8 @@ begin
   fNameHash  := hashName;
   fIsValid   := false;
   fStyleAttribIdx := -1;
+  if not Assigned(parent) then Exit;
+  
 
   self.fParent := parent;
   fReader      := parent.fReader;
@@ -3137,11 +3201,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.AssignTo(var other: TElement);
-begin
-end;
-//------------------------------------------------------------------------------
-
 procedure TElement.LoadContent;
 var
   c: PAnsiChar;
@@ -3304,7 +3363,7 @@ var
   i: integer;
   rec: TRect;
   sx, sy: double;
-  rootMat: TMatrixD;
+  drawMatrix: TMatrixD;
   clipImg: TImage32;
 const
   endStyle: array[boolean] of TEndStyle = (esPolygon, esRound);
@@ -3312,29 +3371,38 @@ begin
   if not Assigned(fRootElement) or
     fRootElement.viewbox.IsEmpty then Exit;
 
-  rec := Rect(fRootElement.viewbox);
+    with fRootElement do
+    begin
+      if (width > 0) and (height > 0) then
+      begin
+        MatrixScale(fDrawInfo.matrix,
+          (width/viewbox.Width), (height/viewbox.Height));
+        viewbox := RectD(0, 0, width, height);
+      end;
 
-  if scaleToImage and not img.IsEmpty then
-  begin
-    sx := img.width / fRootElement.viewbox.Width;
-    sy := img.height / fRootElement.viewbox.Height;
-    if sy < sx then sx := sy;
-  end else
-  begin
-    img.SetSize(RectWidth(rec), RectHeight(rec));
-    sx := 1;
-  end;
+      //the rootElement's matrix may have been modified by
+      //the svg element's height/width and viewbox settings
+      drawMatrix := fDrawInfo.matrix;
+      if scaleToImage and not img.IsEmpty then
+      begin
+        sx := img.width / (viewbox.Width);
+        sy := img.height / (viewbox.Height);
+        if sy < sx then sx := sy;
+        MatrixScale(drawMatrix, sx);
+      end else
+      begin
+        rec := Rect(viewbox);
+        img.SetSize(RectWidth(rec), RectHeight(rec));
+      end;
 
-  rootMat := IdentityMatrix;
-  with fRootElement.viewbox do
-    MatrixTranslate(rootMat, -Left, -Top);
-  MatrixScale(rootMat, sx, sx);
+      MatrixTranslate(drawMatrix, -viewbox.Left, -viewbox.Top);
+    end;
 
   clipImg := TImage32.Create(img.Width, img.Height);
   try
     for i := 0 to fShapesList.Count -1 do
       with TShapeElement(fShapesList[i]) do
-        Draw(img, clipImg, rootMat);
+        Draw(img, clipImg, drawMatrix);
   finally
     clipImg.Free;
   end;
@@ -3377,9 +3445,12 @@ begin
 //    else if (width > 0) and (height > 0) then
 //    begin
 //      MatrixScale(fDrawInfo.matrix,
-//        width / viewbox.Width,
-//        height / viewbox.Height);
+//        (width/viewbox.Width), (height/viewbox.Height));
+//      MatrixScale(fDrawInfo.matrix,
+//        (width/viewbox.Width), (height/viewbox.Height));
+//      viewbox := RectD(0, 0, width, height);
     end;
+
     if fHasContent then LoadContent;
     Result := fIsValid;
   end;
@@ -3882,7 +3953,7 @@ begin
         AttribToFloat(attrib, height);
     hFilter:
       with TFilterElement(attrib.aOwnerEl) do
-        AttribToFloat(attrib, recWH.Height);
+        AttribToFloat(attrib, filterRecWH.Height);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -3901,7 +3972,7 @@ begin
         AttribToFloat(attrib, width);
     hFilter:
       with TFilterElement(attrib.aOwnerEl) do
-        AttribToFloat(attrib, recWH.Width);
+        AttribToFloat(attrib, filterRecWH.Width);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -4009,7 +4080,7 @@ begin
         AttribToFloat(attrib, pt.X);
     hFilter:
       with TFilterElement(attrib.aOwnerEl) do
-        AttribToFloat(attrib, recWH.Left);
+        AttribToFloat(attrib, filterRecWH.Left);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -4050,7 +4121,7 @@ begin
         AttribToFloat(attrib, pt.Y);
     hFilter:
       with TFilterElement(attrib.aOwnerEl) do
-        AttribToFloat(attrib, recWH.Top);
+        AttribToFloat(attrib, filterRecWH.Top);
   end;
 end;
 //------------------------------------------------------------------------------
