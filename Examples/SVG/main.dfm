@@ -2,8 +2,8 @@ object Form1: TForm1
   Left = 298
   Top = 205
   Caption = 'Svg101'
-  ClientHeight = 428
-  ClientWidth = 544
+  ClientHeight = 484
+  ClientWidth = 556
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -19,8 +19,8 @@ object Form1: TForm1
   object ImagePanel: TImage32Panel
     Left = 0
     Top = 0
-    Width = 544
-    Height = 428
+    Width = 556
+    Height = 484
     Align = alClient
     BevelInner = bvLowered
     BorderWidth = 16
@@ -40,8 +40,7 @@ object Form1: TForm1
     ShowScrollButtons = ssbFocused
     AllowScroll = True
     AllowZoom = True
-    ExplicitWidth = 709
-    ExplicitHeight = 368
+    ExplicitWidth = 662
   end
   object MainMenu1: TMainMenu
     Left = 144

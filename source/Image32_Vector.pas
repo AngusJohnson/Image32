@@ -3,7 +3,7 @@ unit Image32_Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  30 April 2021                                                   *
+* Date      :  12 May 2021                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Vector drawing for TImage32                                     *
@@ -226,7 +226,7 @@ type
   function Average(val1, val2: double): double; overload;
 
   function ReflectPoint(const pt, pivot: TPointD): TPointD;
-
+  {$IFDEF INLINING} inline; {$ENDIF}
   function IntersectRect(const rec1, rec2: TRect): TRect; overload;
   function IntersectRect(const rec1, rec2: TRectD): TRectD; overload;
   function UnionRect(const rec1, rec2: TRect): TRect; overload;
@@ -287,17 +287,17 @@ type
 
   function Outline(const line: TPathD; lineWidth: double;
     joinStyle: TJoinStyle; endStyle: TEndStyle;
-    miterLimit: double = 0): TPathsD; overload;
+    miterLimOrRndScale: double = 0): TPathsD; overload;
   function Outline(const lines: TPathsD; lineWidth: double;
     joinStyle: TJoinStyle; endStyle: TEndStyle;
-    miterLimit: double = 0): TPathsD; overload;
+    miterLimOrRndScale: double = 0): TPathsD; overload;
 
    //Grow: Offsets a closed path by 'delta' amount toward the left of the path.
    //Hence clockwise paths expand and counter-clockwise paths contract.<br>
    //No consideration is given to overlapping joins as these only very rarely
    //cause artifacts when paths are rendered.
   function Grow(const path, normals: TPathD; delta: double;
-    joinStyle: TJoinStyle; miterLimit: double): TPathD;
+    joinStyle: TJoinStyle; miterLimOrRndScale: double): TPathD;
 
   function ValueAlmostZero(val: double; epsilon: double = 0.001): Boolean;
   function ValueAlmostOne(val: double; epsilon: double = 0.001): Boolean;
@@ -313,7 +313,7 @@ const
   NullRect: TRect = (left: 0; top: 0; right: 0; Bottom: 0);
   NullRectD: TRectD = (left: 0; top: 0; right: 0; Bottom: 0);
 
-  BezierTolerance: double  = 0.1;
+  BezierTolerance: double  = 0.25;
 var
   //AutoWidthThreshold: When JoinStyle = jsAuto, this is the threshold at
   //which line joins will be rounded instead of squared. With wider strokes,
@@ -1456,7 +1456,7 @@ end;
 //------------------------------------------------------------------------------
 
 function Grow(const path, normals: TPathD; delta: double;
-  joinStyle: TJoinStyle; miterLimit: double): TPathD;
+  joinStyle: TJoinStyle; miterLimOrRndScale: double): TPathD;
 var
   i,prevI, highI: cardinal;
   buffLen, resultLen: cardinal;
@@ -1540,14 +1540,15 @@ begin
   if joinStyle = jsRound then
   begin
     if abs(delta) < 0.25 then Exit;
-    steps360 := Trunc(4 * Sqrt(abs(delta)));
+    if miterLimOrRndScale <= 0 then miterLimOrRndScale := 1;
+    steps360 := 4 * Max(1, Sqrt(delta * miterLimOrRndScale));
     stepsPerRad := steps360 / (Pi *2);
     GetSinCos(Pi*2/steps360, stepSin, stepCos);
   end;
 
   result := nil; resultLen := 0; buffLen := 0;
-  if miterLimit < 1 then miterLimit := DefaultMiterLimit
-  else miterLimit := 2/(sqr(miterLimit));
+  if miterLimOrRndScale < 1 then miterLimOrRndScale := DefaultMiterLimit
+  else miterLimOrRndScale := 2 /(sqr(miterLimOrRndScale));
 
   norms := normals;
   if not assigned(norms) then
@@ -1568,7 +1569,7 @@ begin
         if cosA > 0 then AddMiter(normalA, normalB, cosA +1)
         else AddBevel(normalA, normalB);
       jsMiter:
-        if (1 + cosA < miterLimit) then AddBevel(normalA, normalB)
+        if (1 + cosA < miterLimOrRndScale) then AddBevel(normalA, normalB)
         else AddMiter(normalA, normalB, cosA +1);
     end;
     PrevI := i;
@@ -1822,7 +1823,7 @@ end;
 
 function GrowOpenLine(const line: TPathD; width: double;
   joinStyle: TJoinStyle; endStyle: TEndStyle;
-  miterLimit: double): TPathsD;
+  miterLimOrRndScale: double): TPathsD;
 var
   len, x,y, wDiv2: integer;
   wd2: double;
@@ -1873,7 +1874,7 @@ begin
     line2 := OpenPathToFlatPolygon(line1);
   end;
   SetLength(result, 1);
-  Result[0] := Grow(line2, nil, width/2, joinStyle, miterLimit);
+  Result[0] := Grow(line2, nil, width/2, joinStyle, miterLimOrRndScale);
 end;
 //------------------------------------------------------------------------------
 
@@ -1894,7 +1895,7 @@ end;
 //------------------------------------------------------------------------------
 
 function GrowClosedLine(const line: TPathD; width: double;
-  joinStyle: TJoinStyle; miterLimit: double): TPathsD;
+  joinStyle: TJoinStyle; miterLimOrRndScale: double): TPathsD;
 var
   len: integer;
   line2, norms: TPathD;
@@ -1902,7 +1903,8 @@ begin
   len := length(line);
   if len < 3 then
   begin
-    result := GrowOpenLine(line, width, joinStyle, esPolygon, miterLimit);
+    result := GrowOpenLine(line, width,
+      joinStyle, esPolygon, miterLimOrRndScale);
     Exit;
   end;
 
@@ -1915,30 +1917,32 @@ begin
   end;
   SetLength(Result, 2);
   norms := GetNormals(line);
-  Result[0] := Grow(line, norms, width/2, joinStyle, miterLimit);
+  Result[0] := Grow(line, norms, width/2, joinStyle, miterLimOrRndScale);
   line2 := ReversePath(line);
   norms := ReverseNormals(norms);
-  Result[1] := Grow(line2, norms, width/2, joinStyle, miterLimit);
+  Result[1] := Grow(line2, norms, width/2, joinStyle, miterLimOrRndScale);
 end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
 function Outline(const line: TPathD; lineWidth: double;
   joinStyle: TJoinStyle; endStyle: TEndStyle;
-  miterLimit: double): TPathsD;
+  miterLimOrRndScale: double): TPathsD;
 begin
   if not assigned(line) then
     Result := nil
   else if endStyle = esPolygon then
-    result := GrowClosedLine(line, lineWidth, joinStyle, miterLimit)
+    result := GrowClosedLine(line,
+      lineWidth, joinStyle, miterLimOrRndScale)
   else
-    result := GrowOpenLine(line, lineWidth, joinStyle, endStyle, miterLimit);
+    result := GrowOpenLine(line,
+      lineWidth, joinStyle, endStyle, miterLimOrRndScale);
 end;
 //------------------------------------------------------------------------------
 
 function Outline(const lines: TPathsD; lineWidth: double;
   joinStyle: TJoinStyle; endStyle: TEndStyle;
-  miterLimit: double): TPathsD;
+  miterLimOrRndScale: double): TPathsD;
 var
   i: integer;
 
@@ -1965,11 +1969,11 @@ begin
   if endStyle in [esPolygon, esClosed] then
     for i := 0 to high(lines) do
       AddPaths(GrowClosedLine(lines[i],
-        lineWidth, joinStyle, miterLimit))
+        lineWidth, joinStyle, miterLimOrRndScale))
   else
     for i := 0 to high(lines) do
       AddPaths(GrowOpenLine(lines[i],
-        lineWidth, joinStyle, endStyle, miterLimit));
+        lineWidth, joinStyle, endStyle, miterLimOrRndScale));
 end;
 //------------------------------------------------------------------------------
 
@@ -2079,7 +2083,7 @@ var
   steps: integer;
 begin
   if scale <= 0 then scale := 1;
-  steps := Trunc(4 * Sqrt((rec.width + rec.Height) * scale));
+  steps := 4 * Max(1, Trunc(Sqrt((rec.width + rec.Height) * scale)));
   Result := Ellipse(rec, steps);
 end;
 //------------------------------------------------------------------------------
@@ -2105,10 +2109,9 @@ begin
     radius := PointD(Width * 0.5, Height  * 0.5);
   end;
 
-  if steps < 3 then
+  if steps < 4 then
   begin
-    steps := Trunc(4 * Sqrt(rec.width + rec.height));
-    if steps < 4 then steps := 4;
+    steps := 4 * Max(1, Trunc(Sqrt(rec.width + rec.height)));
   end;
   GetSinCos(2 * Pi / Steps, sinA, cosA);
   delta.x := cosA; delta.y := sinA;
@@ -2165,7 +2168,7 @@ var
 begin
   Result := nil;
   if (endAngle = startAngle) or IsEmptyRect(rec) then Exit;
-  if scale <= 0 then scale := 1.0;
+  if scale <= 0 then scale := 4.0;
 
   if not ClockwiseRotationIsAnglePositive then
   begin
@@ -2186,7 +2189,7 @@ begin
     angle := endAngle - startAngle + angle360 else
     angle := endAngle - startAngle;
   //steps = (No. steps for a whole ellipse) * angle/(2*Pi)
-  steps := Trunc(angle * 4 * Sqrt((rec.width + rec.height) * scale));
+  steps := 4 * Trunc(angle * Sqrt((rec.width + rec.height) * scale));
   if steps < 2 then steps := 2;
   SetLength(Result, Steps +1);
   //angle of the first step ...
@@ -2614,7 +2617,6 @@ function FlattenQBezier(const pt1, pt2, pt3: TPointD;
   tolerance: double = 0.0): TPathD;
 var
   resultCnt, resultLen: integer;
-  rec: TRectD;
 
   procedure AddPoint(const pt: TPointD);
   begin
@@ -2675,8 +2677,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenCBezier(const pts: TPathsD;
-  tolerance: double = 0.0): TPathsD;
+function FlattenCBezier(const pts: TPathsD; tolerance: double = 0.0): TPathsD;
 var
   i, len: integer;
 begin
@@ -2688,8 +2689,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenCBezier(const pts: TPathD;
-    tolerance: double = 0.0): TPathD;
+function FlattenCBezier(const pts: TPathD; tolerance: double = 0.0): TPathD;
 var
   i, len: integer;
   p: TPathD;
@@ -2723,7 +2723,6 @@ function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD;
   tolerance: double = 0.0): TPathD;
 var
   resultCnt, resultLen: integer;
-  rec: TRectD;
 
   procedure AddPoint(const pt: TPointD);
   begin
@@ -2839,7 +2838,6 @@ var
   i, len: integer;
   p: PPointD;
   pt1,pt2,pt3,pt4: TPointD;
-  rec: TRectD;
 begin
   result := nil;
   len := Length(pts); resultLen := 0; resultCnt := 0;
@@ -2906,7 +2904,6 @@ var
   i, len: integer;
   p: PPointD;
   pt1, pt2, pt3: TPointD;
-  rec: TRectD;
 begin
   result := nil;
   len := Length(pts);

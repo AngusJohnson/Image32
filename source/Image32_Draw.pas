@@ -3,7 +3,7 @@ unit Image32_Draw;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  30 April 2021                                                   *
+* Date      :  12 May 2021                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Polygon renderer for TImage32                                   *
@@ -197,19 +197,19 @@ type
   procedure DrawLine(img: TImage32;
     const line: TPathD; lineWidth: double; color: TColor32;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto;
-    miterLimit: double = 2); overload;
+    miterLimOrRndScale: double = 2); overload;
   procedure DrawLine(img: TImage32;
     const line: TPathD; lineWidth: double; renderer: TCustomRenderer;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto;
-    miterLimit: double = 2); overload;
+    miterLimOrRndScale: double = 2); overload;
   procedure DrawLine(img: TImage32; const lines: TPathsD;
     lineWidth: double; color: TColor32;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto;
-    miterLimit: double = 2); overload;
+    miterLimOrRndScale: double = 2); overload;
   procedure DrawLine(img: TImage32; const lines: TPathsD;
     lineWidth: double; renderer: TCustomRenderer;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto;
-    miterLimit: double = 2); overload;
+    miterLimOrRndScale: double = 2); overload;
 
    procedure DrawInvertedLine(img: TImage32;
      const line: TPathD; lineWidth: double;
@@ -998,7 +998,7 @@ begin
       case fillRule of
         frEvenOdd:
           begin
-            aa := Round(Abs(accum) * 1275) mod 2550; //(255 * 5) shr 2.
+            aa := Round(Abs(accum) * 1275) mod 2550; //255 * 5/4 (see below)
             if aa > 1275 then
               byteBuffer[j] := Min(255, (2550 - aa) shr 2) else
               byteBuffer[j] := Min(255, aa shr 2);
@@ -1684,25 +1684,25 @@ end;
 
 procedure DrawLine(img: TImage32; const line: TPathD; lineWidth: double;
   color: TColor32; endStyle: TEndStyle; joinStyle: TJoinStyle;
-  miterLimit: double);
+  miterLimOrRndScale: double);
 var
   lines: TPathsD;
 begin
   setLength(lines, 1);
   lines[0] := line;
-  DrawLine(img, lines, lineWidth, color, endStyle, joinStyle, miterLimit);
+  DrawLine(img, lines, lineWidth, color, endStyle, joinStyle, miterLimOrRndScale);
 end;
 //------------------------------------------------------------------------------
 
 procedure DrawLine(img: TImage32; const line: TPathD; lineWidth: double;
   renderer: TCustomRenderer; endStyle: TEndStyle; joinStyle: TJoinStyle;
-  miterLimit: double);
+  miterLimOrRndScale: double);
 var
   lines: TPathsD;
 begin
   setLength(lines, 1);
   lines[0] := line;
-  DrawLine(img, lines, lineWidth, renderer, endStyle, joinStyle, miterLimit);
+  DrawLine(img, lines, lineWidth, renderer, endStyle, joinStyle, miterLimOrRndScale);
 end;
 //------------------------------------------------------------------------------
 
@@ -1720,14 +1720,14 @@ end;
 procedure DrawLine(img: TImage32; const lines: TPathsD;
   lineWidth: double; color: TColor32;
   endStyle: TEndStyle; joinStyle: TJoinStyle;
-  miterLimit: double);
+  miterLimOrRndScale: double);
 var
   lines2: TPathsD;
   cr: TColorRenderer;
 begin
   if not assigned(lines) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
-  lines2 := Outline(lines, lineWidth, joinStyle, endStyle, miterLimit);
+  lines2 := Outline(lines, lineWidth, joinStyle, endStyle, miterLimOrRndScale);
   cr := TColorRenderer.Create(color);
   try
     if cr.Initialize(img) then
@@ -1744,13 +1744,13 @@ end;
 procedure DrawLine(img: TImage32; const lines: TPathsD;
   lineWidth: double; renderer: TCustomRenderer;
   endStyle: TEndStyle; joinStyle: TJoinStyle;
-  miterLimit: double);
+  miterLimOrRndScale: double);
 var
   lines2: TPathsD;
 begin
   if (not assigned(lines)) or (not assigned(renderer)) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
-  lines2 := Outline(lines, lineWidth, joinStyle, endStyle, miterLimit);
+  lines2 := Outline(lines, lineWidth, joinStyle, endStyle, miterLimOrRndScale);
   if renderer.Initialize(img) then
   begin
     Rasterize(lines2, img.bounds, frNonZero, renderer);

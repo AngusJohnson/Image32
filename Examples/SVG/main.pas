@@ -6,13 +6,12 @@ uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls, ShellApi,
   Image32, Image32_Draw, Image32_PNG, Image32_SVG_Reader,
-  Image32_Vector, Image32Panels, Dialogs;
+  Image32_Vector, Image32_Ttf, Image32Panels, Dialogs;
 
   //This sample app presumes that the TImage32Panel component
   //has been installed into your Delphi compiler's IDE.
 
 type
-
   TForm1 = class(TForm)
     MainMenu1: TMainMenu;
     File1: TMenuItem;
@@ -39,7 +38,15 @@ implementation
 {$R *.dfm}
 {$R image.res}
 
+//https://www.google.com/get/noto/
+{.$R Image32_SVG_Reader_Noto-Fonts.res}
+{.$R Image32_SVG_Reader_Noto-Sans-Extra.res}
+{.$R Image32_SVG_Reader_Noto-Serif-Extra.res}
+
 uses Image32_Transform, Image32_Extra;
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 
 procedure TForm1.FormCreate(Sender: TObject);
 var
@@ -53,6 +60,11 @@ begin
   ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
 
   svgReader := TSvgReader.Create;
+  //svgReader.BackgroundColor := clWhite32;
+  svgReader.AddFont('Arial');
+  svgReader.AddFont('Arial Bold');
+  svgReader.AddFont('Arial Italic');
+  svgReader.AddFont('Arial Bold Italic');
 
   rs := TResourceStream.Create(hInstance, 'TIGER', 'SVG');
   try
@@ -82,7 +94,7 @@ begin
     ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
     Caption := 'Svg101 - ' + OpenDialog1.FileName;
     ImagePanel.Image.Clear();
-    svgReader.DrawImage(ImagePanel.Image, True);
+    svgReader.DrawImage(ImagePanel.Image, true);
   end;
 end;
 //------------------------------------------------------------------------------

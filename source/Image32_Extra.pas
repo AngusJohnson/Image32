@@ -3,7 +3,7 @@ unit Image32_Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  1 May 2021                                                      *
+* Date      :  12 May 2021                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -75,15 +75,15 @@ procedure RedEyeRemove(img: TImage32; const rect: TRect);
 procedure PencilEffect(img: TImage32; intensity: integer = 0);
 procedure TraceContours(img: TImage32; intensity: integer);
 
-procedure Erase(img: TImage32;
-  const polygon: TPathD; fillRule: TFillRule); overload;
-procedure Erase(img: TImage32;
-  const polygons: TPathsD; fillRule: TFillRule); overload;
+procedure EraseInsidePath(img: TImage32;
+  const path: TPathD; fillRule: TFillRule);
+procedure EraseInsidePaths(img: TImage32;
+  const paths: TPathsD; fillRule: TFillRule);
 
-procedure EraseInverted(img: TImage32; const polygon: TPathD;
-  fillRule: TFillRule; const bounds: TRect); overload;
-procedure EraseInverted(img: TImage32; const polygons: TPathsD;
-  fillRule: TFillRule; const bounds: TRect); overload;
+procedure EraseOutsidePath(img: TImage32; const path: TPathD;
+  fillRule: TFillRule; const outsideBounds: TRect);
+procedure EraseOutsidePaths(img: TImage32; const paths: TPathsD;
+  fillRule: TFillRule; const outsideBounds: TRect);
 
 procedure Draw3D(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; height, blurRadius: double;
@@ -314,7 +314,7 @@ begin
   try
     DrawPolygon(shadowImg, shadowPolys, fillRule, color);
     FastGaussianBlur(shadowImg, shadowImg.Bounds, blurSize, 1);
-    if cutoutInsideShadow then Erase(shadowImg, polys, fillRule);
+    if cutoutInsideShadow then EraseInsidePaths(shadowImg, polys, fillRule);
     img.CopyBlend(shadowImg, shadowImg.Bounds, rec, BlendToAlpha);
   finally
     shadowImg.Free;
@@ -871,50 +871,50 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Erase(img: TImage32; const polygon: TPathD; fillRule: TFillRule);
+procedure EraseInsidePath(img: TImage32; const path: TPathD; fillRule: TFillRule);
 begin
-  if assigned(polygon) then
-    ErasePolygon(img, polygon, fillRule);
+  if assigned(path) then
+    ErasePolygon(img, path, fillRule);
 end;
 //------------------------------------------------------------------------------
 
-procedure Erase(img: TImage32; const polygons: TPathsD; fillRule: TFillRule);
+procedure EraseInsidePaths(img: TImage32; const paths: TPathsD; fillRule: TFillRule);
 begin
-  if assigned(polygons) then
-    ErasePolygon(img, polygons, fillRule);
+  if assigned(paths) then
+    ErasePolygon(img, paths, fillRule);
 end;
 //------------------------------------------------------------------------------
 
-procedure EraseInverted(img: TImage32; const polygon: TPathD;
-  fillRule: TFillRule; const bounds: TRect);
+procedure EraseOutsidePath(img: TImage32; const path: TPathD;
+  fillRule: TFillRule; const outsideBounds: TRect);
 var
   mask: TImage32;
   p: TPathD;
 begin
-  if not assigned(polygon) then Exit;
-  mask := TImage32.Create(RectWidth(bounds), RectHeight(bounds));
+  if not assigned(path) then Exit;
+  mask := TImage32.Create(RectWidth(outsideBounds), RectHeight(outsideBounds));
   try
-    p := OffsetPath(polygon, -bounds.Left, -bounds.top);
+    p := OffsetPath(path, -outsideBounds.Left, -outsideBounds.top);
     DrawPolygon(mask, p, fillRule, clBlack32);
-    img.CopyBlend(mask, mask.Bounds, bounds, BlendMask);
+    img.CopyBlend(mask, mask.Bounds, outsideBounds, BlendMask);
   finally
     mask.Free;
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure EraseInverted(img: TImage32; const polygons: TPathsD;
-  fillRule: TFillRule; const bounds: TRect);
+procedure EraseOutsidePaths(img: TImage32; const paths: TPathsD;
+  fillRule: TFillRule; const outsideBounds: TRect);
 var
   mask: TImage32;
   pp: TPathsD;
 begin
-  if not assigned(polygons) then Exit;
-  mask := TImage32.Create(RectWidth(bounds), RectHeight(bounds));
+  if not assigned(paths) then Exit;
+  mask := TImage32.Create(RectWidth(outsideBounds), RectHeight(outsideBounds));
   try
-    pp := OffsetPath(polygons, -bounds.Left, -bounds.top);
+    pp := OffsetPath(paths, -outsideBounds.Left, -outsideBounds.top);
     DrawPolygon(mask, pp, fillRule, clBlack32);
-    img.CopyBlend(mask, mask.Bounds, bounds, BlendMask);
+    img.CopyBlend(mask, mask.Bounds, outsideBounds, BlendMask);
   finally
     mask.Free;
   end;
@@ -955,9 +955,9 @@ begin
     begin
       tmp.Clear(colorLt);
       paths2 := OffsetPath(paths, height*x, height*y);
-      Erase(tmp, paths2, fillRule);
+      EraseInsidePaths(tmp, paths2, fillRule);
       FastGaussianBlur(tmp, tmp.Bounds, Round(blurRadius), 0);
-      EraseInverted(tmp, paths, fillRule, tmp.Bounds);
+      EraseOutsidePaths(tmp, paths, fillRule, tmp.Bounds);
       img.CopyBlend(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;
 
@@ -965,9 +965,9 @@ begin
     begin
       tmp.Clear(colorDk);
       paths2 := OffsetPath(paths, -height*x, -height*y);
-      Erase(tmp, paths2, fillRule);
+      EraseInsidePaths(tmp, paths2, fillRule);
       FastGaussianBlur(tmp, tmp.Bounds, Round(blurRadius), 0);
-      EraseInverted(tmp, paths, fillRule, tmp.Bounds);
+      EraseOutsidePaths(tmp, paths, fillRule, tmp.Bounds);
       img.CopyBlend(tmp, tmp.Bounds, recI, BlendToAlpha);
     end;
   finally

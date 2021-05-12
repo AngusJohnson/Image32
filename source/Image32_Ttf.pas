@@ -2,8 +2,8 @@ unit Image32_Ttf;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.17                                                            *
-* Date      :  19 March 2021                                                   *
+* Version   :  2.24                                                            *
+* Date      :  12 May 2021                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -24,6 +24,7 @@ type
   TFixed = type single;
   Int16 = type SmallInt;
   TFontFormat = (ffInvalid, ffTrueType, ffCompact);
+  TTtfFontFamily = (ttfUnknown, ttfSerif, ttfSansSerif, ttfMonospace);
 
   {$IFNDEF Unicode}
   UnicodeString = WideString;
@@ -190,6 +191,19 @@ type
     leftSideBearing : Int16;
   end;
 
+  TFontTable_Post = record
+    majorVersion   : Word;
+    minorVersion   : Word;
+    italicAngle    : TFixed;
+    underlinePos   : Int16;
+    underlineWidth : Int16;
+    isFixedPitch   : UInt32;
+    //minMemType42   : UInt32;
+    //maxMemType42   : UInt32;
+    //minMemType1   : UInt32;
+    //maxMemType1   : UInt32;
+  end;
+
   TFontInfo = record                  //a custom summary record
     fontFormat     : TFontFormat;
     faceName       : UnicodeString;
@@ -241,7 +255,7 @@ type
   TPathsEx = array of TPathEx;
 
   TTableName = (tblName, tblHead, tblHhea,
-    tblCmap, tblMaxp, tblLoca, tblGlyf, tblHmtx, tblKern);
+    tblCmap, tblMaxp, tblLoca, tblGlyf, tblHmtx, tblKern, tblPost);
 
   //The TNotifySender and TNotifyRecipient classes below provide a mechanism
   //for an object to notify others of changes. This mechanism is necessary for
@@ -288,6 +302,7 @@ type
     fTbl_maxp          : TFontTable_Maxp;
     fTbl_glyf          : TFontTable_Glyf;
     fTbl_hmtx          : TFontTable_Hmtx;
+    fTbl_post          : TFontTable_Post;
     fTbl_loca2         : TArrayOfWord;
     fTbl_loca4         : TArrayOfCardinal;
     fCmapTblRecs       : TArrayOfCmapTblRec;
@@ -307,6 +322,7 @@ type
     function GetTable_loca: Boolean;
     function GetTable_hhea: Boolean;
     procedure GetTable_kern;
+    procedure GetTable_post;
 
     function GetGlyphPaths(glyphIdx: integer): TPathsEx;
     function GetGlyphIdxFromCmapIdx(idx: Word): integer;
@@ -319,6 +335,9 @@ type
     function GetGlyphKernList(glyphIdx: integer): TArrayOfTKern;
     function GetGlyphMetrics(glyphIdx: integer): TGlyphMetrics;
     function GetWeight: integer;
+    function GetFontFamily: TTtfFontFamily;
+  protected
+    property PostTable: TFontTable_Post read fTbl_post;
   public
     constructor Create; overload;
     constructor CreateFromResource(const resName: string; resType: PChar);
@@ -337,6 +356,7 @@ type
 {$ENDIF}
     function GetGlyphInfo(unicode: Word; out paths: TPathsD;
       out nextX: integer; out glyphMetrics: TGlyphMetrics): Boolean;
+    property FontFamily: TTtfFontFamily read GetFontFamily;
     property FontInfo: TFontInfo read GetFontInfo;
     property Weight: integer read GetWeight; //range 100-900
   end;
@@ -406,6 +426,7 @@ type
 
     property Ascent: double read GetAscent;
     property Descent: double read GetDescent;
+
     property FontHeight: double read fFontHeight write SetFontHeight;
     property FontReader: TFontReader read
       fFontReader write SetFontReader;
@@ -799,6 +820,7 @@ begin
   fFormat4Offset        := 0;
   fFormat4EndCodes      := nil;
   fKernTable            := nil;
+  FillChar(fTbl_post, SizeOf(fTbl_post), 0);
   fTbl_glyf.numContours := 0;
   fFontInfo.fontFormat  := ffInvalid;
   fFontWeight           := 0;
@@ -962,6 +984,7 @@ begin
         $68686561: fTblIdxes[tblHhea] := i;
         $686D7478: fTblIdxes[tblHmtx] := i;
         $6B65726E: fTblIdxes[tblKern] := i;
+        $706F7374: fTblIdxes[tblPost] := i;
     end;
   end;
 
@@ -979,6 +1002,7 @@ begin
 
   if not Result then Exit;
   if (fTblIdxes[tblKern] >= 0) then GetTable_kern;
+  if (fTblIdxes[tblPost] >= 0) then GetTable_post;
 
 end;
 //------------------------------------------------------------------------------
@@ -1325,6 +1349,24 @@ begin
     GetWord(fStream, fKernTable[i].right);
     GetInt16(fStream, fKernTable[i].value);
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TFontReader.GetTable_post;
+var
+  tbl: TFontTable;
+begin
+  if fTblIdxes[tblPost] < 0 then Exit;
+  tbl := fTables[fTblIdxes[tblPost]];
+  if (fStream.Size < tbl.offset + tbl.length) then Exit;
+  fStream.Position := Integer(tbl.offset);
+
+  GetWord(fStream,      fTbl_post.majorVersion);
+  GetWord(fStream,      fTbl_post.minorVersion);
+  GetFixed(fStream,     fTbl_post.italicAngle);
+  GetInt16(fStream,     fTbl_post.underlinePos);
+  GetInt16(fStream,     fTbl_post.underlineWidth);
+  GetCardinal(fStream,  fTbl_post.isFixedPitch);
 end;
 //------------------------------------------------------------------------------
 
@@ -1854,6 +1896,28 @@ begin
   fFontWeight := Max(100, Min(900,
     Round(k * accum / (imgSize * imgSize * 100)) * 100));
   Result := fFontWeight;
+end;
+//------------------------------------------------------------------------------
+
+function TFontReader.GetFontFamily: TTtfFontFamily;
+var
+  dummy: integer;
+  paths: TPathsD;
+  gm: TGlyphMetrics;
+begin
+  result := ttfUnknown;
+  if fTbl_post.isFixedPitch <> 0 then
+  begin
+    result := ttfMonospace;
+    Exit;
+  end else
+  begin
+    if not GetGlyphInfo(Ord('T'), paths, dummy, gm) or
+      not Assigned(paths) then Exit;
+    if Length(paths[0]) <= 12 then //probably <= 8 is fine too.
+      Result := ttfSansSerif else
+      Result := ttfSerif;
+  end;
 end;
 
 //------------------------------------------------------------------------------
