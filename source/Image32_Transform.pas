@@ -68,9 +68,9 @@ type
     out offset: TPoint): Boolean;
 
   function ExtractAngleFromMatrix(const mat: TMatrixD): double;
-  function ExtractScaleFromMatrix(const mat: TMatrixD): TPointD;
+  function ExtractScaleFromMatrix(const mat: TMatrixD): TSizeD;
   function ExtractAvgScaleFromMatrix(const mat: TMatrixD): double;
-  procedure DecomposeMatrix(const mat: TMatrixD;
+  procedure ExtractAllFromMatrix(const mat: TMatrixD;
     out angle: double; out scale, skew, trans: TPointD);
 
   //ImageScaleDown: uses a box down-sampling algorithm that's probably better
@@ -1000,7 +1000,7 @@ end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-procedure DecomposeMatrix(const mat: TMatrixD; out angle: double; out scale, skew, trans: TPointD);
+procedure ExtractAllFromMatrix(const mat: TMatrixD; out angle: double; out scale, skew, trans: TPointD);
 var
   a,b,c,d,e,f: double;
   delta, r,s: double;
@@ -1069,7 +1069,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ExtractScaleFromMatrix(const mat: TMatrixD): TPointD;
+function ExtractScaleFromMatrix(const mat: TMatrixD): TSizeD;
 var
   a,b,c,d: double;
   delta, q: double;
@@ -1081,25 +1081,25 @@ begin
   if (a <> 0) or (b <> 0) then
   begin
     q := Sqrt(a * a + b * b);
-    Result.X	:= q;
-	  Result.Y	:= delta / q;
+    Result.sx	:= q;
+	  Result.sy	:= delta / q;
   end
   else if (c <> 0) or (d <> 0) then
   begin
     q := Sqrt(c * c + d * d);
-    Result.X := delta / q;
-    Result.Y := q;
+    Result.sx := delta / q;
+    Result.sy := q;
   end else
-    Result := InvalidPointD;
+    Result := Size(0.0, 0.0);
 end;
 //------------------------------------------------------------------------------
 
 function ExtractAvgScaleFromMatrix(const mat: TMatrixD): double;
 var
-  scale: TPointD;
+  scale: TSizeD;
 begin
   scale := ExtractScaleFromMatrix(mat);
-  Result := Average(Abs(scale.X), Abs(scale.Y));
+  Result := Average(Abs(scale.sx), Abs(scale.sy));
 end;
 //------------------------------------------------------------------------------
 

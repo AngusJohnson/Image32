@@ -279,7 +279,8 @@ type
     destructor Destroy; override;
     procedure Clear;
     function Count: integer;
-    procedure Add(image: TImage32);
+    procedure Add(image: TImage32); overload;
+    function Add(width, height: integer): TImage32; overload;
     procedure Insert(index: integer; image: TImage32);
     procedure Move(currentIndex, newIndex: integer);
     procedure Delete(index: integer);
@@ -3013,6 +3014,13 @@ end;
 procedure TImageList32.Add(image: TImage32);
 begin
   fList.Add(image);
+end;
+//------------------------------------------------------------------------------
+
+function TImageList32.Add(width, height: integer): TImage32;
+begin
+  Result := TImage32.create(width, height);
+  fList.Add(Result);
 end;
 //------------------------------------------------------------------------------
 

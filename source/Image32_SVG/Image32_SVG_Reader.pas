@@ -40,17 +40,17 @@ type
   TDrawInfo = record
     fillColor     : TColor32;
     fillRule      : TFillRule;
-    fillEl        : PAnsiChar;
+    fillEl        : TAnsiName;
     strokeColor   : TColor32;
     strokeWidth   : double;
-    strokeEl      : PAnsiChar;
+    strokeEl      : TAnsiName;
     dashArray     : TArrayOfDouble;
     dashOffset    : double;
-    markerStart   : PAnsiChar;
-    markerMiddle  : PAnsiChar;
-    markerEnd     : PAnsiChar;
-    filterEl      : PAnsiChar;
-    clipPathEl    : PAnsiChar;
+    markerStart   : TAnsiName;
+    markerMiddle  : TAnsiName;
+    markerEnd     : TAnsiName;
+    filterEl      : TAnsiName;
+    clipPathEl    : TAnsiName;
     opacity       : Byte;
     //lineCap       : TEndStyle;     //stroke-linecap
     //lineJoin      : TJoinStyle;    //stroke-linejoin
@@ -63,10 +63,8 @@ type
   PAttrib = ^TAttrib;
   TAttrib = record
     aOwnerEl  : TElement;
-    aName     : PAnsiChar;
-    aNameLen  : integer;
-    aValue    : PAnsiChar;
-    aValueLen : integer;
+    aName     : TAnsiName;
+    aValue    : TAnsiName;
   end;
   TArrayOfAttrib = array of TAttrib;
 
@@ -85,31 +83,29 @@ type
 {$ENDIF}
     fHasContent     : Boolean;
     fStyleAttribIdx : integer;
-    fName           : PAnsiChar;
-    fNameLen        : integer;
+    fName           : TAnsiName;
     fNameHash       : Cardinal;
     fAttribs        : TArrayOfAttrib;
     fDrawInfo       : TDrawInfo;
     fCurrent        : PAnsiChar;
     fCurrentEnd     : PAnsiChar;
-    function LoadChild: TElement;
-    function HashCurrentWord(out hash: Cardinal): Boolean;
-    function GetName(out name: PAnsiChar;
-      out nameLen: integer): Boolean;
-    function SetAttribValue(attrib: PAttrib): Boolean;
-    function FindRefElement(refname: PAnsiChar): TElement;
+    function  LoadChild: TElement;
+    function  HashCurrentWord(out hash: Cardinal): Boolean;
+    function  GetName(out name: TAnsiName): Boolean;
+    function  SetAttribValue(attrib: PAttrib): Boolean;
+    function  FindRefElement(refname: TAnsiName): TElement;
     procedure ProcessAttrib(const attrib: PAttrib);
-    function PeekNextChar: AnsiChar;
+    function  PeekNextChar: AnsiChar;
     procedure ParseClassAttrib(classAttrib: PAttrib);
     procedure ParseStyle(classStyle: PAnsiChar; len: integer);
-    procedure ParseTransform(transform: PAnsiChar; len: integer);
-    function AddAttribute: PAttrib;
+    procedure ParseTransform(const transform: TAnsiName);
+    function  AddAttribute: PAttrib;
     //function GetSvgElement: TSvgElement;
   protected
     measureUnit : TElementMeasureUnit;
     elRectWH    : TValueRecWH;
-    function LoadAttributes: Boolean; virtual;
-    function LoadContent: Boolean; virtual;
+    function  LoadAttributes: Boolean; virtual;
+    function  LoadContent: Boolean; virtual;
     procedure Draw(img: TImage32; drawInfo: TDrawInfo); virtual;
   public
     constructor Create(parent: TElement; hashName: Cardinal); virtual;
@@ -151,7 +147,7 @@ type
 
   TUseElement = class(TShapeElement)
   protected
-    refEl: PAnsiChar;
+    refEl: TAnsiName;
     procedure GetDrawPaths(const drawInfo: TDrawInfo); override;
     procedure Draw(img: TImage32; drawInfo: TDrawInfo); override;
   end;
@@ -267,7 +263,7 @@ type
 
   TFillElement = class(TElement)
   protected
-    refEl     : PAnsiChar;
+    refEl     : TAnsiName;
   end;
 
   TPatternElement = class(TFillElement)
@@ -318,15 +314,33 @@ type
   end;
 
   TFilterElement = class(TElement)
+  private
+    fSrcImg : TImage32;
+    fBounds : TRect;
+    fImages : array of TImage32;
+    fNames  : TArrayOfString;
   protected
+    in2: TImage32;
+    procedure Clear;
     function GetAdjustedBounds(const bounds: TRectD): TRectD;
+    function AddNamedImage(const name: string): TImage32;
+    function GetNamedImage(const name: string): TImage32;
     procedure Apply(img: TImage32;
       const adjustedRect: TRect; const matrix: TMatrixD);
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
+    destructor Destroy; override;
   end;
 
-  TGaussianElement  = class(TElement)
+  TFeElement = class(TElement)
+  protected
+    in1: TAnsiName;
+    in2: TAnsiName;
+    res: TAnsiName;
+    function GetImage1: TImage32;
+  end;
+
+  TGaussianElement  = class(TFeElement)
   protected
     stdDev: double;
   public
@@ -349,7 +363,7 @@ type
     fBackgroundColor  : TColor32;
     fTempImage        : TImage32;
     fIdList           : TStringList;
-    fClassStylesList  : TStrAnsiList;
+    fClassStyles      : TClassStylesList;
     fLinGradRenderer  : TLinearGradientRenderer;
     fRadGradRenderer  : TSvgRadialGradientRenderer;
     fImgRenderer      : TImageRenderer;
@@ -397,19 +411,19 @@ const
   {$I Image32_SVG_HashConsts.inc}
 
   defaultDrawInfo: TDrawInfo =
-    (fillColor: clBlack32; fillRule: frNonZero; fillEl: nil;
+    (fillColor: clBlack32; fillRule: frNonZero; fillEl: (name: nil; len: 0);
     strokeColor: clInvalid; strokeWidth: 1.0;
-    dashArray: nil; dashOffset: 0;
-    markerStart: nil; markerMiddle: nil; markerEnd: nil;
-    filterEl: nil;  clipPathEl: nil; opacity: 255;
+    dashArray: nil; dashOffset: 0; markerStart: (name: nil; len: 0);
+    markerMiddle: (name: nil; len: 0); markerEnd: (name: nil; len: 0);
+    filterEl: (name: nil; len: 0);clipPathEl: (name: nil; len: 0); opacity: 255;
     matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)); visible: true; using: false);
 
   emptyDrawInfo: TDrawInfo =
-    (fillColor: clInvalid; fillRule: frNonZero; fillEl: nil;
+    (fillColor: clInvalid; fillRule: frNonZero; fillEl: (name: nil; len: 0);
     strokeColor: clInvalid; strokeWidth: -Infinity;
-    dashArray: nil; dashOffset: 0;
-    markerStart: nil; markerMiddle: nil; markerEnd: nil;
-    filterEl: nil;  clipPathEl: nil; opacity: 255;
+    dashArray: nil; dashOffset: 0; markerStart: (name: nil; len: 0);
+    markerMiddle: (name: nil; len: 0);markerEnd: (name: nil; len: 0);
+    filterEl: (name: nil; len: 0);clipPathEl: (name: nil; len: 0);opacity: 255;
     matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)); visible: true; using: false);
 
   defaultFontInfo: TSVGFontInfo =
@@ -417,10 +431,7 @@ const
 
 var
   AttribFuncList : TStringList;
-  defaultFontHeight: double;
-
-resourcestring
-  rsListBoundsError     = 'List index out of bounds (%d)';
+  defaultFontHeight: double = 12.0;
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions ...
@@ -461,7 +472,7 @@ begin
   begin
     if fillColor <> clInvalid then
       drawInfo.fillColor := fillColor;
-    if Assigned(fillEl) then
+    if Assigned(fillEl.name) then
       drawInfo.fillEl := fillEl;
     if strokeColor <> clInvalid then
       drawInfo.strokeColor := strokeColor;
@@ -469,11 +480,11 @@ begin
       drawInfo.strokeWidth := strokeWidth;
     if Assigned(dashArray) then
       drawInfo.dashArray := Copy(dashArray, 0, Length(dashArray));
-    if Assigned(strokeEl) then
+    if Assigned(strokeEl.name) then
       drawInfo.strokeEl := strokeEl;
     if opacity < 255 then
       drawInfo.opacity := opacity;
-    if Assigned(filterEl) then
+    if Assigned(filterEl.name) then
       drawInfo.filterEl := filterEl;
     if not IsIdentityMatrix(matrix) then
       drawInfo.matrix := MatrixMultiply(drawInfo.matrix, matrix);
@@ -485,7 +496,7 @@ function IsFilled(const drawInfo: TDrawInfo): Boolean;
 begin
   Result := not drawInfo.visible or //can't tell yet so default to true
     (drawInfo.fillColor = clInvalid) or
-    Assigned(drawInfo.fillEl) or (TARGB(drawInfo.fillColor).A > 0);
+    Assigned(drawInfo.fillEl.name) or (TARGB(drawInfo.fillColor).A > 0);
 end;
 //------------------------------------------------------------------------------
 
@@ -493,20 +504,20 @@ function IsStroked(const drawInfo: TDrawInfo): Boolean;
 begin
   Result := not drawInfo.visible or //can't tell yet so default to true
     ((drawInfo.strokeWidth > 0) and
-    (Assigned(drawInfo.strokeEl) or (TARGB(drawInfo.strokeColor).A > 0)));
+    (Assigned(drawInfo.strokeEl.name) or (TARGB(drawInfo.strokeColor).A > 0)));
 end;
 //------------------------------------------------------------------------------
 
 function AttribToColor32(attrib: PAttrib; var color: TColor32): Boolean;
 begin
-  if ColorIsURL(attrib.aValue) then
+  if ColorIsURL(attrib.aValue.name) then
   begin
     Result := true;
-    if GetHashedName(attrib.aName, attrib.aNameLen) = hFill then
-      attrib.aOwnerEl.fDrawInfo.fillEl := GetRefName(attrib.aValue) else
-      attrib.aOwnerEl.fDrawInfo.strokeEl := GetRefName(attrib.aValue);
+    if GetHashedName(attrib.aName) = hFill then
+      attrib.aOwnerEl.fDrawInfo.fillEl := ExtractRefFromValue(attrib.aValue) else
+      attrib.aOwnerEl.fDrawInfo.strokeEl := ExtractRefFromValue(attrib.aValue);
   end else
-    Result := PCharToColor32(attrib.aValue, attrib.aValueLen, color);
+    Result := ValueToColor32(attrib.aValue, color);
 end;
 //------------------------------------------------------------------------------
 
@@ -514,8 +525,8 @@ function AttribToFloat(attrib: PAttrib; var value: double): Boolean; overload;
 var
   c: PAnsiChar;
 begin
-  c := attrib.aValue;
-  Result := ParseNum(c, attrib.aValue + attrib.aValueLen, false, value);
+  c := attrib.aValue.name;
+  Result := ParseNextNum(c, c + attrib.aValue.len, false, value);
 end;
 //------------------------------------------------------------------------------
 
@@ -524,9 +535,8 @@ function AttribToFloat(attrib: PAttrib;
 var
   c: PAnsiChar;
 begin
-  c := attrib.aValue;
-  Result := ParseNum(c, attrib.aValue + attrib.aValueLen,
-    false, value, measureUnit);
+  c := attrib.aValue.name;
+  Result := ParseNextNum(c, c + attrib.aValue.len, false, value, measureUnit);
 end;
 //------------------------------------------------------------------------------
 
@@ -546,17 +556,17 @@ var
   c, endC: PAnsiChar;
   hash: Cardinal;
 begin
-  c := attrib.aValue;
-  endC := c + attrib.aValueLen;
+  c := attrib.aValue.name;
+  endC := c + attrib.aValue.len;
   while (c < endC) and SkipBlanks(c, endC) do
   begin
     if c = ';' then
       break
-    else if NumPending(c, endC, true) then
-      ParseNum(c, endC, true, fontInfo.size)
+    else if IsNumPending(c, endC, true) then
+      ParseNextNum(c, endC, true, fontInfo.size)
     else
     begin
-      hash := ParseHashedName(c, endC);
+      hash := ParseNextWordHashed(c, endC);
       case hash of
         hSans_045_Serif : fontInfo.family := ttfSansSerif;
         hSerif          : fontInfo.family := ttfSerif;
@@ -593,7 +603,7 @@ var
 begin
   inherited;
   if Assigned(drawPathsC) or assigned(drawPathsO) or
-    not Assigned(refEl) then Exit;
+    not Assigned(refEl.name) then Exit;
   el := FindRefElement(refEl);
   if not Assigned(el) or not (el is TShapeElement) then Exit;
 
@@ -722,7 +732,7 @@ var
   i, hiStops: integer;
   el: TElement;
 begin
-  if Assigned(refEl) then
+  if Assigned(refEl.name) then
   begin
     el := FindRefElement(refEl);
     if Assigned(el) and (el is TGradientElement) then
@@ -753,7 +763,6 @@ function TRadGradElement.PrepareRenderer(
 var
   hiStops: integer;
   cp, fp: TPointD;
-
 begin
   inherited;
   hiStops := High(stops);
@@ -885,6 +894,24 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+destructor TFilterElement.Destroy;
+begin
+  Clear;
+  inherited;
+end;
+//------------------------------------------------------------------------------
+
+procedure TFilterElement.Clear;
+var
+  i: integer;
+begin
+  for i := 0 to High(fImages) do
+    fImages[i].Free;
+  fImages := nil;
+  fNames := nil;
+end;
+//------------------------------------------------------------------------------
+
 function TFilterElement.GetAdjustedBounds(const bounds: TRectD): TRectD;
 var
   recWH: TRectWH;
@@ -902,6 +929,34 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TFilterElement.AddNamedImage(const name: string): TImage32;
+var
+  len: integer;
+begin
+  len := Length(fNames);
+  SetLength(fNames, len+1);
+  SetLength(fImages, len+1);
+  Result := TImage32.Create(fBounds.Width, fBounds.Height);
+  fImages[len] := Result;
+  fNames[len] := name;
+end;
+//------------------------------------------------------------------------------
+
+function TFilterElement.GetNamedImage(const name: string): TImage32;
+var
+  i, len: integer;
+begin
+  Result := nil;
+  len := Length(fNames);
+  for i := 0 to len -1 do
+    if name = fNames[i] then
+    begin
+      Result := fImages[i];
+      Break;
+    end;
+end;
+//------------------------------------------------------------------------------
+
 procedure TFilterElement.Apply(img: TImage32;
   const adjustedRect: TRect; const matrix: TMatrixD);
 var
@@ -910,19 +965,43 @@ var
 const
   blurQual = 0; //0=Quite OK (faster); 1=very good; 2=best qualty (slow)
 begin
+  fBounds := adjustedRect;
+  fSrcImg := img;
   scale := ExtractAvgScaleFromMatrix(matrix);
-  for i := 0 to fChilds.Count -1 do
-    case TElement(fChilds[i]).fNameHash of
+  try
+    for i := 0 to fChilds.Count -1 do
+      case TElement(fChilds[i]).fNameHash of
 
-      hFeGaussianBlur:
-        //nb: FastGaussianBlur's stddev is adjusted empirically by 0.75.
-        with TGaussianElement(fChilds[i]) do
-          if IsValid(stdDev) then
-            FastGaussianBlur(img, adjustedRect,
-              Ceil(stdDev * 0.75 * scale) , blurQual);
+        hFeGaussianBlur:
+          //nb: FastGaussianBlur's stddev is adjusted empirically by 0.75.
+          with TGaussianElement(fChilds[i]) do
+            if IsValid(stdDev) then
+              FastGaussianBlur(img, adjustedRect,
+                Ceil(stdDev * 0.75 * scale) , blurQual);
 
-    end;
+      end;
+  finally
+    Clear;
+  end;
 end;
+
+//------------------------------------------------------------------------------
+// TFeElement
+//------------------------------------------------------------------------------
+
+function TFeElement.GetImage1: TImage32;
+//var
+//  p: PAnsiChar;
+begin
+//  if Assigned(in1) then
+//  begin
+//    p := in1;
+//    len := ParseNameLength(p, fCurrentEnd);
+//
+//  end else
+    Result := TFilterElement(fParent).fSrcImg;
+end;
+//------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
 // TGaussianElement
@@ -966,31 +1045,28 @@ end;
 
 constructor TShapeElement.Create(parent: TElement; hashName: Cardinal);
 var
-  i: integer;
   className: AnsiString;
-  classRec: PAnsiRec;
+  style: AnsiString;
 begin
   inherited;
   //load any class styles
-  className := LowercaseAnsi(fName, fNameLen);
-  i := fReader.fClassStylesList.IndexOf(string(classname));
-  if i < 0 then Exit;
-  classRec := PAnsiRec(fReader.fClassStylesList.objects[i]);
-  with classRec^ do
-    ParseStyle(PAnsiChar(ansi), Length(ansi));
+  className := LowercaseAnsi(fName);
+  style := fReader.fClassStyles.GetStyle(classname);
+  if style <> '' then
+    ParseStyle(PAnsiChar(style), Length(style));
 end;
 //------------------------------------------------------------------------------
 
 function TShapeElement.GetVal(out val: double): Boolean;
 begin
-  Result := ParseNum(fCurrent, fCurrentEnd, true, val);
+  Result := ParseNextNum(fCurrent, fCurrentEnd, true, val);
 end;
 //------------------------------------------------------------------------------
 
 function TShapeElement.HasMarkers: Boolean;
 begin
-  Result := IsStroked(fDrawInfo) and (Assigned(fDrawInfo.markerStart) or
-    Assigned(fDrawInfo.markerMiddle) or Assigned(fDrawInfo.markerEnd));
+  Result := IsStroked(fDrawInfo) and (Assigned(fDrawInfo.markerStart.name) or
+    Assigned(fDrawInfo.markerMiddle.name) or Assigned(fDrawInfo.markerEnd.name));
 end;
 //------------------------------------------------------------------------------
 
@@ -1023,7 +1099,7 @@ begin
   MatrixApply(drawInfo.matrix, drawPathsO);
   MatrixApply(drawInfo.matrix, drawPathsC);
 
-  if Assigned(DrawInfo.fillEl) then
+  if Assigned(DrawInfo.fillEl.name) then
   begin
    //check fill-opacity and update
    i := DrawInfo.fillColor shr 24;
@@ -1031,9 +1107,9 @@ begin
   end;
 
   usingSpecialEffects :=
-    Assigned(fDrawInfo.clipPathEl) or   //clippath or
-    (DrawInfo.opacity < 255) or         //reduced opacity or
-    Assigned(fDrawInfo.filterEl);       //filter effect
+    Assigned(fDrawInfo.clipPathEl.name) or  //clippath or
+    (DrawInfo.opacity < 255) or             //reduced opacity or
+    Assigned(fDrawInfo.filterEl.name);      //filter effect
 
   if usingSpecialEffects then
   begin
@@ -1119,7 +1195,7 @@ begin
   //todo: currently markers are always scaled according to strokewidth
   MatrixScale(drawInfo.matrix, fDrawInfo.strokeWidth);
 
-  if Assigned(fDrawInfo.markerStart) and Assigned(drawPathsO) then
+  if Assigned(fDrawInfo.markerStart.name) and Assigned(drawPathsO) then
   begin
     strokePaths := drawPathsO;
     markerEl := FindRefElement(fDrawInfo.markerStart);
@@ -1139,7 +1215,7 @@ begin
       end;
   end;
 
-  if Assigned(fDrawInfo.markerMiddle) then
+  if Assigned(fDrawInfo.markerMiddle.name) then
   begin
     if Assigned(drawPathsO) then
       strokePaths := drawPathsO else
@@ -1153,7 +1229,7 @@ begin
             Draw(img, drawInfo);
   end;
 
-  if Assigned(fDrawInfo.markerEnd) and Assigned(drawPathsO) then
+  if Assigned(fDrawInfo.markerEnd.name) and Assigned(drawPathsO) then
   begin
     strokePaths := drawPathsO;
     markerEl := FindRefElement(fDrawInfo.markerEnd);
@@ -1197,7 +1273,7 @@ begin
     if not Assigned(paths) then Exit;
   end;
 
-  if Assigned(drawInfo.fillEl) then
+  if Assigned(drawInfo.fillEl.name) then
   begin
     refEl := FindRefElement(drawInfo.fillEl);
     if Assigned(refEl) and (refEl is TFillElement) then
@@ -1205,29 +1281,28 @@ begin
       rec := GetBoundsD(paths);
       if refEl is TRadGradElement then
       begin
-        with TRadGradElement(refEl) do
-          PrepareRenderer(fReader.RadGradRenderer, drawInfo.matrix, rec);
-        DrawPolygon(img, paths, drawInfo.fillRule, fReader.RadGradRenderer);
+        if TRadGradElement(refEl).PrepareRenderer(
+          fReader.RadGradRenderer, drawInfo.matrix, rec) then
+            DrawPolygon(img, paths, drawInfo.fillRule, fReader.RadGradRenderer);
       end
       else if refEl is TLinGradElement then
       begin
         with TLinGradElement(refEl) do
-          PrepareRenderer(fReader.LinGradRenderer, drawInfo.matrix, rec);
-        DrawPolygon(img, paths, drawInfo.fillRule, fReader.LinGradRenderer);
+          if PrepareRenderer(fReader.LinGradRenderer, drawInfo.matrix, rec) then
+            DrawPolygon(img, paths, drawInfo.fillRule, fReader.LinGradRenderer);
       end
       else if refEl is TPatternElement then
       begin
         with TPatternElement(refEl) do
-          PrepareRenderer(fReader.ImageRenderer, drawInfo.matrix, rec);
-        DrawPolygon(img, paths, drawInfo.fillRule, fReader.ImageRenderer);
+          if PrepareRenderer(fReader.ImageRenderer, drawInfo.matrix, rec) then
+            DrawPolygon(img, paths, drawInfo.fillRule, fReader.ImageRenderer);
       end;
     end;
-  end else
-  begin
-    if drawInfo.fillColor = clInvalid then
-      DrawPolygon(img, paths, drawInfo.fillRule, clBlack32) else
-      DrawPolygon(img, paths, drawInfo.fillRule, drawInfo.fillColor);
-  end;
+  end
+  else if drawInfo.fillColor = clInvalid then
+    DrawPolygon(img, paths, drawInfo.fillRule, clBlack32)
+  else
+    DrawPolygon(img, paths, drawInfo.fillRule, drawInfo.fillColor);
 end;
 //------------------------------------------------------------------------------
 
@@ -1258,7 +1333,7 @@ begin
     DrawDashedLine(img, strokePaths, dashArray, @dashOffset,
       drawInfo.strokeWidth * scale, drawInfo.strokeColor, endStyle2[isClosed])
   end
-  else if Assigned(drawInfo.strokeEl) then
+  else if Assigned(drawInfo.strokeEl.name) then
   begin
     refEl := FindRefElement(drawInfo.strokeEl);
     if not Assigned(refEl) then Exit;
@@ -1411,8 +1486,8 @@ var
   currPt: TPointD;
   isRelative: Boolean;
 begin
-  fCurrent := attrib.aValue;
-  fCurrentEnd := fCurrent + attrib.aValueLen;
+  fCurrent := attrib.aValue.name;
+  fCurrentEnd := fCurrent + attrib.aValue.len;
 
   isRelative := false;
   currPt := NullPointD;
@@ -1435,7 +1510,7 @@ begin
       self.fLastPt :=  currPt;
 
       //values immediately following a Move are implicitly Line statements
-      if NumPending(fCurrent, fCurrentEnd, true) then
+      if IsNumPending(fCurrent, fCurrentEnd, true) then
         fCurrSegType := dsLine else
         Continue;
     end
@@ -1455,7 +1530,7 @@ begin
 
     case fCurrSegType of
       dsHorz:
-        while NumPending(fCurrent, fCurrentEnd, true) do
+        while IsNumPending(fCurrent, fCurrentEnd, true) do
         begin
           GetVal(currPt.X);
           if isRelative then
@@ -1464,7 +1539,7 @@ begin
         end;
 
       dsVert:
-        while NumPending(fCurrent, fCurrentEnd, true) do
+        while IsNumPending(fCurrent, fCurrentEnd, true) do
         begin
           GetVal(currPt.Y);
           if isRelative then
@@ -1479,13 +1554,13 @@ begin
           AddSegPoint(currPt);
           fLastPt := currPt;
           SkipBlanks(fCurrent, fCurrentEnd);
-          if NumPending(fCurrent, fCurrentEnd, true) then Continue;
+          if IsNumPending(fCurrent, fCurrentEnd, true) then Continue;
           if LowerCaseTable[fCurrent^] = 'l' then GetSegType(isRelative)
           else break;
         end;
 
       dsQSpline:
-        while NumPending(fCurrent, fCurrentEnd, true) do
+        while IsNumPending(fCurrent, fCurrentEnd, true) do
         begin
           if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
@@ -1493,7 +1568,7 @@ begin
         end;
 
       dsCSpline:
-        while NumPending(fCurrent, fCurrentEnd, true) do
+        while IsNumPending(fCurrent, fCurrentEnd, true) do
         begin
           if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
@@ -1503,7 +1578,7 @@ begin
         end;
 
       dsQBez:
-        while NumPending(fCurrent, fCurrentEnd, true) do
+        while IsNumPending(fCurrent, fCurrentEnd, true) do
         begin
           if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
@@ -1513,7 +1588,7 @@ begin
         end;
 
       dsCBez:
-        while NumPending(fCurrent, fCurrentEnd, true) do
+        while IsNumPending(fCurrent, fCurrentEnd, true) do
         begin
           if not Get2Num(currPt, isRelative) then break;
           AddSegPoint(currPt);
@@ -1525,7 +1600,7 @@ begin
         end;
 
       dsArc:
-        while NumPending(fCurrent, fCurrentEnd, true) do
+        while IsNumPending(fCurrent, fCurrentEnd, true) do
         begin
           if not GetVal(currPt.X) or
             not GetVal(currPt.Y) then break;
@@ -1609,9 +1684,9 @@ var
 begin
   currCnt     := 0;
   currCap     := buffSize;
-  fCurrent := attrib.aValue;
+  fCurrent := attrib.aValue.name;
   SetLength(path, currCap);
-  while NumPending(fCurrent, fCurrentEnd, true) and
+  while IsNumPending(fCurrent, fCurrentEnd, true) and
     GetVal(pt.X) and GetVal(pt.Y) do
       AddPoint(pt);
   SetLength(path, currCnt);
@@ -1736,8 +1811,8 @@ begin
   Result := TSubtextElement.Create(self, 0);
   with TSubtextElement(Result) do
   begin
-    fName := text;
-    fNameLen := 0;
+    fName.name := text; //todo: check this
+    fName.len := 0;
     text := atext;
     textLen := len;
     elRectWH.left.Init;
@@ -1999,10 +2074,11 @@ begin
   end else
     Exit;
 
+  Result := true;
   closedPaths := nil;
   openPaths   := nil;
 
-  if Assigned(refEl) then
+  if Assigned(refEl.name) then
   begin
     el := FindRefElement(refEl);
     if Assigned(el) and (el is TShapeElement) then
@@ -2029,10 +2105,11 @@ end;
 
 function TStyleElement.LoadContent: Boolean;
 var
-  i, aNameLen, len, cap, styleLen: integer;
+  i, len, cap: integer;
   hash: Cardinal;
   dotted: Boolean;
-  pClassName, pstyle: PAnsiChar;
+  aclassName: TAnsiName;
+  aStyle: TAnsiName;
   names: array of string;
 
   procedure AddName(const name: string);
@@ -2050,11 +2127,12 @@ begin
   Result := false;
   len := 0; cap := 0;
   if (PeekNextChar = '<') and ((fCurrent+1)^ = '!') and
-    ((fCurrent+2)^ = '[') and (GetHashedName(fCurrent + 3, 5) = hCDATA) then
+    ((fCurrent+2)^ = '[') and ((fCurrent+8)^ = '[') then
   begin
-    inc(fCurrent, 8);
-    if fCurrent^ <> '[' then Exit;
-    inc(fCurrent);
+    aclassName.name := fCurrent + 3;
+    aclassName.len := 5;
+    if (GetHashedName(aclassName) <> hCDATA) then Exit;
+    inc(fCurrent, 9);
   end;
 
   while SkipStyleBlanks(fCurrent,fCurrentEnd) and
@@ -2063,10 +2141,14 @@ begin
     dotted := fCurrent^ = '.';
     //get one or more class names for each pending style
     if dotted then inc(fCurrent);
-    GetName(pClassName, aNameLen);
+    GetName(aclassName);
     if dotted then
-      AddName(String(LowercaseAnsi((pClassName -1), aNameLen +1))) else
-      AddName(String(LowercaseAnsi(pClassName, aNameLen)));
+    begin
+      Dec(aclassName.name);
+      inc(aclassName.len);
+    end;
+
+    AddName(String(LowercaseAnsi(aclassName)));
     if PeekNextChar = ',' then
     begin
       inc(fCurrent);
@@ -2078,15 +2160,15 @@ begin
     //now get the style
     if PeekNextChar <> '{' then Break;
     inc(fCurrent);
-    pstyle := fCurrent;
+    aStyle.name := fCurrent;
     while (fCurrent < fCurrentEnd) and (fCurrent^ <> '}') do
       inc(fCurrent);
     if (fCurrent = fCurrentEnd) then break;
-    styleLen := fCurrent - pstyle;
+    aStyle.len := fCurrent - aStyle.name;
 
-    //finally, for each class name add this style
+    //finally, for each class name add (or append) this style
     for i := 0 to High(names) do
-      fReader.fClassStylesList.Add(names[i], LowercaseAnsi(pstyle, styleLen));
+      fReader.fClassStyles.AddAppendStyle(names[i], LowercaseAnsi(aStyle));
     names := nil;
     len := 0; cap := 0;
     inc(fCurrent);
@@ -2117,7 +2199,8 @@ begin
   fDrawInfo :=  defaultDrawInfo;
 
   if not fReader.GetSvgStart(svgStart) then Exit;
-  fName := svgStart;
+  fName.name := svgStart;
+  fName.len := 3;
   inc(svgStart, 3);
   fCurrent := svgStart;
 end;
@@ -2142,10 +2225,9 @@ begin
   fCurrentEnd  := fReader.fEndStream;
   fDrawInfo    := parent.fDrawInfo;
   fDrawInfo.matrix := IdentityMatrix;
-  fDrawInfo.clipPathEl := nil;
+  fDrawInfo.clipPathEl.name := nil;
   fCurrent     := parent.fCurrent;
-  if not SkipBlanks(fCurrent, fCurrentEnd) or
-    not GetName(fName, fNameLen) then fName := nil;
+  if SkipBlanks(fCurrent, fCurrentEnd) then GetName(fName);
   elRectWH.Init;
 end;
 //------------------------------------------------------------------------------
@@ -2161,13 +2243,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TElement.GetName(out name: PAnsiChar; out nameLen: integer): Boolean;
+function TElement.GetName(out name: TAnsiName): Boolean;
 begin
-  nameLen := 0;
+  name.len := 0;
   Result := IsAlpha(fCurrent^);
   if not Result then Exit;
-  name := fCurrent;
-  nameLen := ParseNameLength(fCurrent, fCurrentEnd);
+  name.name := fCurrent;
+  name.len := ParseNameLength(fCurrent, fCurrentEnd);
 end;
 //------------------------------------------------------------------------------
 
@@ -2175,7 +2257,7 @@ function TElement.HashCurrentWord(out hash: Cardinal): Boolean;
 begin
   Result := IsAlpha(fCurrent^);
   if not Result then Exit;
-  hash := ParseHashedName(fCurrent, fCurrentEnd);
+  hash := ParseNextWordHashed(fCurrent, fCurrentEnd);
 end;
 //------------------------------------------------------------------------------
 
@@ -2184,10 +2266,10 @@ begin
   Result := fCurrent^ = '"';
   if not Result then Exit;
   inc(fCurrent);
-  attrib.aValue := fCurrent;
+  attrib.aValue.name := fCurrent;
   while (fCurrent < fCurrentEnd) and (fCurrent^ <> '"')  do inc(fCurrent);
-  attrib.avalueLen := fCurrent - attrib.aValue;
-  TrimBlanks(attrib.aValue, attrib.aValueLen);
+  attrib.avalue.len := fCurrent - attrib.aValue.name;
+  TrimBlanks(attrib.aValue);
 end;
 //------------------------------------------------------------------------------
 
@@ -2221,7 +2303,7 @@ begin
       break;
     end;
     attrib := AddAttribute;
-    GetName(attrib.aName, attrib.aNameLen);
+    GetName(attrib.aName);
     if ParseNextChar(fCurrent, fCurrentEnd) <> '=' then Exit;
     SkipBlanks(fCurrent, fCurrentEnd);
     SetAttribValue(attrib);
@@ -2240,7 +2322,7 @@ var
   i: integer;
   hash: Cardinal;
 begin
-  hash := GetHashedName(attrib.aName, attrib.aNameLen);
+  hash := GetHashedName(attrib.aName);
   i := AttribFuncList.IndexOf(inttohex(hash, 8));
   if i >= 0 then
     TAttribFunc(AttribFuncList.Objects[i])(attrib);
@@ -2259,33 +2341,29 @@ end;
 //end;
 //------------------------------------------------------------------------------
 
-function TElement.FindRefElement(refname: PAnsiChar): TElement;
+function TElement.FindRefElement(refname: TAnsiName): TElement;
 var
-  i, refNameLen: integer;
-  c: PAnsiChar;
+  i: integer;
 begin
   result := nil;
-  if not Assigned(refname) then Exit;
-  
-  c := refname;
-  refNameLen := ParseNameLength(c);
+  if not Assigned(refname.name) then Exit;
 
-  if (refname^ = 'u') and
-    ((refname +1)^ = 'r') and
-    ((refname +2)^ = 'l') and
-    ((refname +3)^ = '(') then
+  if (refname.name^ = 'u') and
+    ((refname.name +1)^ = 'r') and
+    ((refname.name +2)^ = 'l') and
+    ((refname.name +3)^ = '(') then
   begin
-    inc(refname, 4);
-    dec(refNameLen, 5); //includes trailing ')'
+    inc(refname.name, 4);
+    dec(refName.len, 5); //removes trailing ')'
   end;
 
-  if refname^ = '#' then
+  if refname.name^ = '#' then
   begin
-    inc(refname);
-    dec(refNameLen);
+    inc(refname.name);
+    dec(refName.len);
   end;
 
-  i := fReader.fIdList.IndexOf(string(LowercaseAnsi(refname, refNameLen)));
+  i := fReader.fIdList.IndexOf(string(LowercaseAnsi(refname)));
   if i >= 0 then
     Result := TElement(fReader.fIdList.Objects[i]) else
     Result := nil;
@@ -2295,20 +2373,20 @@ end;
 function TElement.LoadChild: TElement;
 var
   hashedName: Cardinal;
-  name, savedCurrent: PAnsiChar;
-  nameLen: integer;
+  name: TAnsiName;
+  savedCurrent: PAnsiChar;
   elClass: TElementClass;
 begin
   Result := nil;
   savedCurrent := fCurrent;
-  if not GetName(name, nameLen) then Exit;
+  if not GetName(name) then Exit;
   fCurrent := savedCurrent;
-  hashedName := GetHashedName(name, nameLen);
+  hashedName := GetHashedName(name);
 
   elClass := HashToElementClass(hashedName);
   Result := elClass.Create(self, hashedName);
 
-  if not Assigned(Result.fName) or
+  if not Assigned(Result.fName.name) or
     not Result.LoadAttributes then
   begin
     FreeAndNil(Result);
@@ -2320,7 +2398,7 @@ begin
   with Result do
     if fStyleAttribIdx >= 0 then
       with fAttribs[fStyleAttribIdx] do
-        ParseStyle(aValue, aValueLen);
+        ParseStyle(aValue.name, aValue.len);
 
   fChilds.Add(Result);
   fCurrent := Result.fCurrent;
@@ -2337,61 +2415,54 @@ end;
 
 procedure TElement.ParseClassAttrib(classAttrib: PAttrib);
 var
-  i: integer;
-  aClassName: AnsiString;
-  classRec: PAnsiRec;
+  style, aClassName: AnsiString;
 begin
-
   with classAttrib^ do
-      aClassName := '.' + LowercaseAnsi(aValue, aValueLen);
-
+      aClassName := '.' + LowercaseAnsi(aValue);
   with classAttrib.aOwnerEl.fReader do
-  begin
-    i := fClassStylesList.IndexOf(string(aClassName));
-    if i < 0 then Exit;
-    classRec := PAnsiRec(fClassStylesList.objects[i]);
-  end;
-
-  ParseStyle(PAnsiChar(classRec.ansi), Length(classRec.ansi));
+    style := fClassStyles.GetStyle(aClassName);
+  if style <> '' then
+    ParseStyle(PAnsiChar(style), Length(style));
 end;
 //------------------------------------------------------------------------------
 
 procedure TElement.ParseStyle(classStyle: PAnsiChar; len: integer);
 var
-  aNameLen: integer;
   newAt: PAttrib;
-  current, endCurrent, styleName: PAnsiChar;
+  styleName, styleVal: TAnsiName;
+  current, endCurrent: PAnsiChar;
 begin
   current := classStyle;
   endCurrent := current + len;
 
   while SkipBlanks(current, endCurrent) do
   begin
-    styleName := current;
-    aNameLen := ParseStyleNameLen(current, endCurrent);
-    if aNameLen = 0 then Break;
+    styleName.name := current;
+    styleName.len := ParseStyleNameLen(current, endCurrent);
+    if styleName.len = 0 then Break;
 
     newAt := AddAttribute;
     newAt.aName := styleName;
-    newAt.aNameLen := aNameLen;
 
     if (ParseNextChar(current, endCurrent) <> ':') or  //syntax check
       not SkipBlanks(current,endCurrent) then Break;
-    newAt.aValue := current;
+    styleVal.name := current;
     inc(current);
     while (current < endCurrent) and (current^ <> ';') do inc(current);
-    newAt.aValueLen := current - newAt.aValue;
+    styleVal.len := current - styleVal.name;
+    newAt.aValue := styleVal;
     inc(current);
     ProcessAttrib(newAt);
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.ParseTransform(transform: PAnsiChar; len: integer);
+procedure TElement.ParseTransform(const transform: TAnsiName);
 var
   i: integer;
   current, endC: PAnsiChar;
-  word: AnsiString;
+  c: AnsiChar;
+  word: TAnsiName;
   values: array[0..5] of double;
   mat: TMatrixD;
   pMat: PMatrixD;
@@ -2408,31 +2479,31 @@ var
   end;
 
 begin
-  current := transform;
-  endC := current + len;
+  current := transform.name;
+  endC := current + transform.len;
 
   //surprisingly, and I think this is a bug in SVG not a feature ...
   //transform operations must be performed in reverse order
-  while ParseNextAlphaWord(current, endC, word) do
+  while ParseNextWord(current, endC, word) do
   begin
-    if (Length(word) < 5) then Exit;
-    word[5] := LowerCaseTable[word[5]];
+    if (word.len < 5) then Exit;
+    c := LowerCaseTable[(word.name +4)^];
     if ParseNextChar(current, endC) <> '(' then Exit; //syntax check
     //reset values variables
     for i := 0 to High(values) do values[i] := InvalidD;
     //and since every transform function requires at least one value
-    if not ParseNum(current, endC, false, values[0]) then Exit;
+    if not ParseNextNum(current, endC, false, values[0]) then Exit;
     //now get additional variables
     i := 1;
-    while (i < 6) and NumPending(current, endC, true) do
+    while (i < 6) and IsNumPending(current, endC, true) do
     begin
-      ParseNum(current, endC, true, values[i]);
+      ParseNextNum(current, endC, true, values[i]);
       inc(i);
     end;
     if ParseNextChar(current, endC) <> ')' then Exit; //syntax check
 
     pMat := NewMatrix;
-    case word[5] of
+    case c of
       'e' : //scalE
         if not IsValid(values[1]) then
           MatrixScale(pMat^, values[0]) else
@@ -2448,11 +2519,11 @@ begin
           pMat[2,1] :=  values[5];
         end;
       's' : //tranSlateX, tranSlateY & tranSlate
-        if Length(word) =10  then
+        if word.len =10  then
         begin
-          if LowerCaseTable[word[10]] = 'x' then
+          if LowerCaseTable[(word.name +9)^] = 'x' then
             MatrixTranslate(pMat^, values[0], 0)
-          else if LowerCaseTable[word[10]] = 'y' then
+          else if LowerCaseTable[(word.name +9)^] = 'y' then
             MatrixTranslate(pMat^, 0, values[0]);
         end
         else if IsValid(values[1]) then
@@ -2610,9 +2681,7 @@ begin
   fIdList.Duplicates := dupIgnore;  // pro tem, duplicates will be ignored.
   fIdList.Sorted    := True;
 
-  fClassStylesList  := TStrAnsiList.Create;
-  fClassStylesList.Duplicates := dupIgnore;
-  fClassStylesList.Sorted := True;
+  fClassStyles  := TClassStylesList.Create;
 
   fLinGradRenderer  := TLinearGradientRenderer.Create;
   fRadGradRenderer  := TSvgRadialGradientRenderer.Create;
@@ -2633,7 +2702,7 @@ begin
   Clear;
   fMemStream.Free;
   fIdList.Free;
-  fClassStylesList.Free;
+  fClassStyles.Free;
   for i := 0 to fFontList.Count -1 do
     TFontReader(fFontList[i]).Free;
   fFontList.Free;
@@ -2651,7 +2720,7 @@ begin
   FreeAndNil(fRootElement);
   fMemStream.clear;
   fIdList.Clear;
-  fClassStylesList.Clear;
+  fClassStyles.Clear;
   fEndStream := nil;
   fLinGradRenderer.Clear;
   fRadGradRenderer.Clear;
@@ -2874,7 +2943,7 @@ procedure GradientTransform_Attrib(attrib: PAttrib);
 begin
   if attrib.aOwnerEl is TGradientElement then
     with TGradientElement(attrib.aOwnerEl) do
-      ParseTransform(attrib.aValue, attrib.aValueLen);
+      ParseTransform(attrib.aValue);
 end;
 //------------------------------------------------------------------------------
 
@@ -2882,7 +2951,7 @@ procedure Gradientunits_Attrib(attrib: PAttrib);
 begin
   if attrib.aOwnerEl is TGradientElement then
     with TGradientElement(attrib.aOwnerEl) do
-      gradientUnits := GetHashedName(attrib.aValue, attrib.aValueLen);
+      gradientUnits := GetHashedName(attrib.aValue);
 end;
 //------------------------------------------------------------------------------
 
@@ -2892,9 +2961,23 @@ var
 begin
   with attrib^ do
   begin
-    id := LowercaseAnsi(aValue, aValueLen);
+    id := LowercaseAnsi(aValue);
     aOwnerEl.fReader.fIdList.AddObject(string(id), aOwnerEl);
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure In_Attrib(attrib: PAttrib);
+begin
+  if attrib.aOwnerEl is TFeElement then
+    TFeElement(attrib.aOwnerEl).in1 := attrib.aValue;
+end;
+//------------------------------------------------------------------------------
+
+procedure In2_Attrib(attrib: PAttrib);
+begin
+  if attrib.aOwnerEl is TFeElement then
+    TFeElement(attrib.aOwnerEl).in2 := attrib.aValue;
 end;
 //------------------------------------------------------------------------------
 
@@ -2905,9 +2988,9 @@ begin
   el := attrib.aOwnerEl;
   if el is TFillElement then
   begin
-    TFillElement(el).refEl := GetRefName(attrib.aValue)
+    TFillElement(el).refEl := ExtractRefFromValue(attrib.aValue)
   end else if el is TUseElement then
-    TUseElement(el).refEl := GetRefName(attrib.aValue);
+    TUseElement(el).refEl := ExtractRefFromValue(attrib.aValue);
 end;
 //------------------------------------------------------------------------------
 
@@ -2919,7 +3002,7 @@ end;
 
 procedure ClipPath_Attrib(attrib: PAttrib);
 begin
-  attrib.aOwnerEl.fDrawInfo.clipPathEl := GetRefName(attrib.aValue);
+  attrib.aOwnerEl.fDrawInfo.clipPathEl := ExtractRefFromValue(attrib.aValue);
 end;
 //------------------------------------------------------------------------------
 
@@ -2948,12 +3031,12 @@ var
   val: double;
   len: integer;
 begin
-  current := attrib.aValue;
-  currentEnd := current + attrib.aValueLen;
+  current := attrib.aValue.name;
+  currentEnd := current + attrib.aValue.len;
   with attrib.aOwnerEl.fDrawInfo do
   begin
     len := Length(dashArray);
-    while ParseNum(current, currentEnd, true, val) do
+    while ParseNextNum(current, currentEnd, true, val) do
     begin
       SetLength(dashArray, len +1);
       dashArray[len] := val;
@@ -2967,16 +3050,16 @@ procedure DashOffset_Attrib(attrib: PAttrib);
 var
   current, currentEnd: PAnsiChar;
 begin
-  current := attrib.aValue;
-  currentEnd := current + attrib.aValueLen;
+  current := attrib.aValue.name;
+  currentEnd := current + attrib.aValue.len;
   with attrib.aOwnerEl.fDrawInfo do
-    ParseNum(current, currentEnd, true, dashOffset);
+    ParseNextNum(current, currentEnd, true, dashOffset);
 end;
 //------------------------------------------------------------------------------
 
 procedure Display_Attrib(attrib: PAttrib);
 begin
-  if GetHashedName(attrib.aValue, attrib.aValueLen) = hNone then
+  if GetHashedName(attrib.aValue) = hNone then
     attrib.aOwnerEl.fDrawInfo.visible := false;
 end;
 //------------------------------------------------------------------------------
@@ -2995,17 +3078,11 @@ end;
 procedure FontFamily_Attrib(attrib: PAttrib);
 
   procedure GetFamily(var fontInfo: TSVGFontInfo);
-  var
-    word: AnsiString;
   begin
-    if ParseNextAlphaWord(attrib.aValue,
-      attrib.aValue + attrib.aValueLen, word) then
-    begin
-      case GetHashedName(PAnsiChar(word), Length(word)) of
-        hSerif      : fontInfo.family := ttfSerif;
-        hMonospace  : fontInfo.family := ttfMonospace;
-        else          fontInfo.family := ttfSansSerif;
-      end;
+    case GetHashedName(attrib.aValue) of
+      hSerif      : fontInfo.family := ttfSerif;
+      hMonospace  : fontInfo.family := ttfMonospace;
+      else          fontInfo.family := ttfSansSerif;
     end;
   end;
 
@@ -3021,30 +3098,22 @@ procedure FontSize_Attrib(attrib: PAttrib);
 var
   num: double;
 begin
+  with attrib.aValue do
+    if not ParseNextNum(name, name + len, false, num) then Exit;
   if attrib.aOwnerEl is TTextElement then
-  begin
-    if ParseNum(attrib.aValue, attrib.aValue + attrib.aValueLen,
-      false, num) then TTextElement(attrib.aOwnerEl).fontInfo.size := num;
-  end
-  else if (attrib.aOwnerEl is TSubtextElement) and
-    ParseNum(attrib.aValue, attrib.aValue + attrib.aValueLen, false, num) then
-      TSubtextElement(attrib.aOwnerEl).fontInfo.size := num
+    TTextElement(attrib.aOwnerEl).fontInfo.size := num
+  else if (attrib.aOwnerEl is TSubtextElement) then
+    TSubtextElement(attrib.aOwnerEl).fontInfo.size := num;
 end;
 //------------------------------------------------------------------------------
 
 procedure FontStyle_Attrib(attrib: PAttrib);
 
   procedure GetStyle(var fontInfo: TSVGFontInfo);
-  var
-    word: AnsiString;
   begin
-    if ParseNextAlphaWord(attrib.aValue,
-      attrib.aValue + attrib.aValueLen, word) then
-    begin
-      if GetHashedName(PAnsiChar(word), Length(word)) = hItalic then
-        Include(fontInfo.styles, fsItalic) else
-        Exclude(fontInfo.styles, fsItalic);
-    end;
+    if GetHashedName(attrib.aValue) = hItalic then
+      Include(fontInfo.styles, fsItalic) else
+      Exclude(fontInfo.styles, fsItalic);
   end;
 begin
   if attrib.aOwnerEl is TTextElement then
@@ -3059,19 +3128,19 @@ procedure FontWeight_Attrib(attrib: PAttrib);
   procedure GetWeight(var fontInfo: TSVGFontInfo);
   var
     num: double;
-    word: AnsiString;
+    word: TAnsiName;
+    c, endC: PAnsiChar;
   begin
-    if NumPending(attrib.aValue, attrib.aValue + attrib.aValueLen, false) and
-      ParseNum(attrib.aValue, attrib.aValue + attrib.aValueLen, false, num) then
+    c := attrib.aValue.name; endC := c + attrib.aValue.len;
+    if IsNumPending(c, endC, false) and ParseNextNum(c, endC, false, num) then
     begin
       if num >= 600 then
         Include(fontInfo.styles, fsBold) else
         Exclude(fontInfo.styles, fsBold);
     end
-    else if ParseNextAlphaWord(attrib.aValue,
-      attrib.aValue + attrib.aValueLen, word) then
+    else if ExtractWordFromValue(attrib.aValue, word) then
     begin
-      if GetHashedName(PAnsiChar(word), Length(word)) = hBold then
+      if GetHashedName(word) = hBold then
         Include(fontInfo.styles, fsBold) else
         Exclude(fontInfo.styles, fsBold);
     end;
@@ -3114,17 +3183,11 @@ end;
 procedure TextAlign_Attrib(attrib: PAttrib);
 
   procedure GetAlign(var fontInfo: TSVGFontInfo);
-  var
-    word: AnsiString;
   begin
-    if ParseNextAlphaWord(attrib.aValue,
-      attrib.aValue + attrib.aValueLen, word) then
-    begin
-      case GetHashedName(PAnsiChar(word), Length(word)) of
-        hStart  : fontInfo.align := taLeft;
-        hMiddle : fontInfo.align := taCenter;
-        hEnd    : fontInfo.align := taRight;
-      end;
+    case GetHashedName(attrib.aValue) of
+      hStart  : fontInfo.align := taLeft;
+      hMiddle : fontInfo.align := taCenter;
+      hEnd    : fontInfo.align := taRight;
     end;
   end;
 
@@ -3139,28 +3202,28 @@ end;
 procedure MarkerStart_Attrib(attrib: PAttrib);
 begin
   if not (attrib.aOwnerEl is TShapeElement) then Exit;
-  attrib.aOwnerEl.fDrawInfo.markerStart := GetRefName(attrib.aValue);
+  attrib.aOwnerEl.fDrawInfo.markerStart := ExtractRefFromValue(attrib.aValue);
 end;
 //------------------------------------------------------------------------------
 
 procedure MarkerMiddle_Attrib(attrib: PAttrib);
 begin
   if not (attrib.aOwnerEl is TShapeElement) then Exit;
-  attrib.aOwnerEl.fDrawInfo.markerMiddle := GetRefName(attrib.aValue);
+  attrib.aOwnerEl.fDrawInfo.markerMiddle := ExtractRefFromValue(attrib.aValue);
 end;
 //------------------------------------------------------------------------------
 
 procedure MarkerEnd_Attrib(attrib: PAttrib);
 begin
   if not (attrib.aOwnerEl is TShapeElement) then Exit;
-  attrib.aOwnerEl.fDrawInfo.markerEnd := GetRefName(attrib.aValue);
+  attrib.aOwnerEl.fDrawInfo.markerEnd := ExtractRefFromValue(attrib.aValue);
 end;
 //------------------------------------------------------------------------------
 
 procedure Filter_Attrib(attrib: PAttrib);
 begin
   if (attrib.aOwnerEl is TShapeElement) then
-    attrib.aOwnerEl.fDrawInfo.filterEl := GetRefName(attrib.aValue);
+    attrib.aOwnerEl.fDrawInfo.filterEl := ExtractRefFromValue(attrib.aValue);
 end;
 //------------------------------------------------------------------------------
 
@@ -3193,8 +3256,7 @@ end;
 procedure Orient_Attrib(attrib: PAttrib);
 begin
   if (attrib.aOwnerEl is TMarkerElement) and
-    (GetHashedName(attrib.aValue, attrib.aValueLen) =
-      hauto_045_start_045_reverse) then
+    (GetHashedName(attrib.aValue) = hauto_045_start_045_reverse) then
         TMarkerElement(attrib.aOwnerEl).autoStartReverse := true;
 end;
 //------------------------------------------------------------------------------
@@ -3241,7 +3303,7 @@ end;
 
 procedure FillRule_Attrib(attrib: PAttrib);
 begin
-  if LowerCaseTable[attrib.aValue[0]] = 'e' then
+  if LowerCaseTable[attrib.aValue.name[0]] = 'e' then
     attrib.aOwnerEl.fDrawInfo.fillRule := frEvenOdd else
     attrib.aOwnerEl.fDrawInfo.fillRule := frNonZero;
 end;
@@ -3259,7 +3321,7 @@ end;
 
 procedure Transform_Attrib(attrib: PAttrib);
 begin
-  attrib.aOwnerEl.ParseTransform(attrib.aValue, attrib.aValueLen);
+  attrib.aOwnerEl.ParseTransform(attrib.aValue);
 end;
 //------------------------------------------------------------------------------
 
@@ -3269,13 +3331,13 @@ procedure Viewbox_Attrib(attrib: PAttrib);
   var
     current, currentEnd: PAnsiChar;
   begin
-    current := attrib.aValue;
-    currentEnd := current + attrib.aValueLen;
+    current := attrib.aValue.name;
+    currentEnd := current + attrib.aValue.len;
     with Result do
-    if not ParseNum(current, currentEnd, false, Left) or
-      not ParseNum(current, currentEnd, true, Top) or
-      not ParseNum(current, currentEnd, true, Width) or
-      not ParseNum(current, currentEnd, true, Height) then
+    if not ParseNextNum(current, currentEnd, false, Left) or
+      not ParseNextNum(current, currentEnd, true, Top) or
+      not ParseNextNum(current, currentEnd, true, Width) or
+      not ParseNextNum(current, currentEnd, true, Height) then
         Result := RectWH(0,0,0,0);
   end;
 
@@ -3515,6 +3577,8 @@ begin
   RegisterAttribute(hHeight,                Height_Attrib);
   RegisterAttribute(hHref,                  Href_Attrib);
   RegisterAttribute(hId,                    Id_Attrib);
+  RegisterAttribute(hIn,                    In_Attrib);
+  RegisterAttribute(hIn2,                   In2_Attrib);
   RegisterAttribute(hMarker_045_End,        MarkerEnd_Attrib);
   RegisterAttribute(hMarkerHeight,          Height_Attrib);
   RegisterAttribute(hMarker_045_Mid,        MarkerMiddle_Attrib);
@@ -3556,7 +3620,6 @@ end;
 //------------------------------------------------------------------------------
 
 initialization
-  defaultFontHeight := DPIAware(12);
   MakeAttribFuncList;
 
 finalization

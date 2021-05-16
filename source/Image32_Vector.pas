@@ -25,6 +25,12 @@ type
   TSplineType = (stQuadratic, stCubic);
   TFillRule = (frEvenOdd, frNonZero, frPositive, frNegative);
 
+  TSizeD = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
+    sx  : double;
+    sy  : double;
+    function average: double;
+  end;
+
   TRectWH = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
   public
     Left, Top, Width, Height: double;
@@ -192,7 +198,8 @@ type
   function Rect(const recD: TRectD): TRect; overload;
   function Rect(const left,top,right,bottom: integer): TRect; overload;
 
-  function Size(width, height: integer): TSize;
+  function Size(sx, sy: integer): TSize; overload;
+  function Size(sx, sy: double): TSizeD; overload;
 
   function Area(const path: TPathD): Double;
   function RectsEqual(const rec1, rec2: TRect): Boolean;
@@ -338,6 +345,15 @@ resourcestring
 
 const
   BuffSize = 64;
+
+//------------------------------------------------------------------------------
+// TSizeD
+//------------------------------------------------------------------------------
+
+function TSizeD.average: double;
+begin
+  Result := (sx + sy) * 0.5;
+end;
 
 //------------------------------------------------------------------------------
 // TRectWH record/object.
@@ -591,10 +607,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Size(width, height: integer): TSize;
+function Size(sx, sy: integer): TSize;
 begin
-  Result.cx := width;
-  Result.cy := height;
+  Result.cx := sx;
+  Result.cy := sy;
+end;
+//------------------------------------------------------------------------------
+
+function Size(sx, sy: double): TSizeD;
+begin
+  Result.sx := sx;
+  Result.sy := sy;
 end;
 //------------------------------------------------------------------------------
 

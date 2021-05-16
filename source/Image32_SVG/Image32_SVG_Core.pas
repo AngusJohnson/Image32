@@ -26,42 +26,35 @@ type
   TFontSyles = set of TFontSyle;
 
   TSVGFontInfo = record
-    family: TTtfFontFamily;
-    size: double;
-    styles: TFontSyles;
-    align: TTextAlign;
+    family  : TTtfFontFamily;
+    size    : double;
+    styles  : TFontSyles;
+    align   : TTextAlign;
   end;
 
   TElementMeasureUnit = (emuBoundingBox, emuUserSpace);
-
-  TMeasureUnit = (muPixel, muPercent, muDegree, muRadian,
-    muInch, muCm, muMm, muEm, muEn);
+  TMeasureUnit = (muPixel, muPercent,
+    muDegree, muRadian, muInch, muCm, muMm, muEm, muEn);
 
   TSizeType = (stAverage, stWidth, stHeight);
-
-  TSizeD = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
-    sx  : double;
-    sy  : double;
-    function average: double;
-  end;
 
   TValue = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
     rawVal  : double;
     mu      : TMeasureUnit;
     procedure Init;
     procedure SetValue(val: double; measureUnit: TMeasureUnit = muPixel);
-    function GetValue: double;
-    function GetValueX(const scaleRect: TRectD): double;
-    function GetValueY(const scaleRect: TRectD): double;
-    function IsValid: Boolean;
+    function  GetValue: double;
+    function  GetValueX(const scaleRect: TRectD): double;
+    function  GetValueY(const scaleRect: TRectD): double;
+    function  IsValid: Boolean;
   end;
 
   TValuePt = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
     X       : TValue;
     Y       : TValue;
     procedure Init;
-    function GetPoint(const scaleRect: TRectD): TPointD;
-    function IsValid: Boolean;
+    function  GetPoint(const scaleRect: TRectD): TPointD;
+    function  IsValid: Boolean;
   end;
 
   TValueRecWH = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
@@ -70,24 +63,28 @@ type
     width   : TValue;
     height  : TValue;
     procedure Init;
-    function GetRect(const scaleRect: TRectD): TRectD;
-    function GetRectWH(const scaleRect: TRectD): TRectWH;
-    function GetRectWHForcePercent(const scaleRect: TRectD): TRectWH;
-    function IsValid: Boolean;
-    function IsEmpty: Boolean;
+    function  GetRect(const scaleRect: TRectD): TRectD;
+    function  GetRectWH(const scaleRect: TRectD): TRectWH;
+    function  GetRectWHForcePercent(const scaleRect: TRectD): TRectWH;
+    function  IsValid: Boolean;
+    function  IsEmpty: Boolean;
   end;
 
   TAnsiRec = record
-    ansi: AnsiString;
+    ansi  : AnsiString;
   end;
   PAnsiRec = ^TAnsiRec;
 
-  TStrAnsiList = class(TStringList)
+  TClassStylesList = class
+  private
+    fList : TStringList;
   public
-    function Add(const str: string; const ansi: AnsiString): integer; reintroduce;
-    procedure Clear; override;
-    procedure Delete(Index: Integer); override;
+    constructor Create;
     destructor Destroy; override;
+    function  AddAppendStyle(const str: string; const ansi: AnsiString): integer;
+    function  GetStyle(const classname: AnsiString): AnsiString;
+    procedure Clear;
+    procedure Delete(Index: Integer);
   end;
 
   TDsegType = (dsMove, dsLine, dsHorz, dsVert, dsArc,
@@ -104,43 +101,46 @@ type
     firstPt   : TPointD;
     isClosed  : Boolean;
     segs      : array of TDpathSeg;
-    //scalePending parameter: the SVG will be scaled later by this amount,
-    //so make sure that curves are flattened to an appropriate precision
-    function GetFlattened(scalePending: double): TPathD;
+    //scalePending parameter: if the SVG will be scaled later by this amount,
+    //then make sure that curves are flattened to an appropriate precision
+    function GetFlattened(scalePending: double = 1.0): TPathD;
   end;
   TDpaths = array of TDpath;
 
+  TAnsiName = record
+    name: PAnsiChar;
+    len : integer;
+  end;
 
-function HtmlDecode(const s: ansiString): ansistring;
 function SkipBlanks(var current: PAnsiChar; currentEnd: PAnsiChar): Boolean;
-function TrimBlanks(var current: PAnsiChar; var length: integer): Boolean;
 function SkipBlanksAndComma(var current: PAnsiChar; currentEnd: PAnsiChar): Boolean;
 function SkipStyleBlanks(var current: PAnsiChar; currentEnd: PAnsiChar): Boolean;
-function ParseNextChar(var current: PAnsiChar; currentEnd: PAnsiChar): AnsiChar;
-function GetUtf8String(pName: PAnsiChar; len: integer): AnsiString;
-function LowercaseAnsi(pName: PAnsiChar; len: integer): AnsiString;
-function IsAlpha(c: AnsiChar): Boolean; {$IFDEF INLINE} inline; {$ENDIF}
-function ParseNameLength(var c: PAnsiChar): integer; overload;
-function ParseNameLength(var c: PAnsiChar; endC: PAnsiChar): integer; overload;
-function GetHashedName(c: PAnsiChar; length: integer): cardinal;
-function GetHashedNameCaseSens(c: PAnsiChar; length: integer): cardinal;
-function ParseHashedName(var c: PAnsiChar; endC: PAnsiChar): cardinal;
-function GetRefName(href: PAnsiChar): PAnsiChar; {$IFDEF INLINE} inline; {$ENDIF}
+function ParseNameLength(var c: PAnsiChar; endC: PAnsiChar): integer;
 function ParseStyleNameLen(var c: PAnsiChar; endC: PAnsiChar): integer;
+function ParseNextChar(var current: PAnsiChar; currentEnd: PAnsiChar): AnsiChar;
+function ParseNextWord(var current: PAnsiChar; currentEnd: PAnsiChar;
+  out word: TAnsiName): Boolean;
+function ParseNextWordHashed(var c: PAnsiChar; endC: PAnsiChar): cardinal;
+function ParseNextNum(var current: PAnsiChar; currentEnd: PAnsiChar;
+  skipComma: Boolean; out val: double; out measureUnit: TMeasureUnit): Boolean; overload;
+function ParseNextNum(var current: PAnsiChar; currentEnd: PAnsiChar;
+  skipComma: Boolean; out val: double): Boolean; overload;
+function TrimBlanks(var name: TAnsiName): Boolean;
+
+function GetHashedName(const name: TAnsiName): cardinal;
+function ExtractRefFromValue(const href: TAnsiName): TAnsiName;
+function ExtractWordFromValue(value: TAnsiName; out word: TAnsiName): Boolean;
+function IsNumPending(current, currentEnd: PAnsiChar; ignoreComma: Boolean): Boolean;
+
+function GetUtf8String(pName: PAnsiChar; len: integer): AnsiString;
+function LowercaseAnsi(const name: TAnsiName): AnsiString;
+function IsAlpha(c: AnsiChar): Boolean; {$IFDEF INLINE} inline; {$ENDIF}
 function SvgArc(const p1, p2: TPointD; radii: TPointD; phi_rads: double;
   fA, fS: boolean; out startAngle, endAngle: double; out rec: TRectD): Boolean;
-function HexByteToInt(h: AnsiChar): Cardinal; {$IFDEF INLINE} inline; {$ENDIF}
-function ParseNextAlphaWord(var current: PAnsiChar; currentEnd: PAnsiChar;
-  out word: AnsiString): Boolean;
-function NumPending(current, currentEnd: PAnsiChar; ignoreComma: Boolean): Boolean;
-function ParseNum(var current: PAnsiChar; currentEnd: PAnsiChar;
-  skipComma: Boolean; out val: double; out measureUnit: TMeasureUnit): Boolean; overload;
-function ParseNum(var current: PAnsiChar; currentEnd: PAnsiChar;
-  skipComma: Boolean; out val: double): Boolean; overload;
-function IsFraction(val: double): Boolean;
-function ColorIsURL(p: PAnsiChar): Boolean;
-function PCharToColor32(p: PAnsiChar; pLen: integer; var color: TColor32): Boolean;
-function MakeDashArray(const da: TArrayOfDouble; scale: double): TArrayOfInteger;
+function HtmlDecode(const html: ansiString): ansistring;
+function ColorIsURL(pColor: PAnsiChar): Boolean;
+function ValueToColor32(const value: TAnsiName; var color: TColor32): Boolean;
+function MakeDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfInteger;
 
 {$IF COMPILERVERSION < 17}
 type
@@ -229,6 +229,8 @@ var
   end;
 
 begin
+  if scalePending <= 0 then scalePending := 1.0;
+
   bezTolerance := BezierTolerance / scalePending;
   pathLen := 0; pathCap := 0;
   lastQCtrlPt := InvalidPointD;
@@ -328,15 +330,6 @@ begin
       end;
     end;
   SetLength(Result, pathLen);
-end;
-
-//------------------------------------------------------------------------------
-// TSizeD
-//------------------------------------------------------------------------------
-
-function TSizeD.average: double;
-begin
-  Result := (sx + sy) * 0.5;
 end;
 
 //------------------------------------------------------------------------------
@@ -485,8 +478,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
-
 function TValueRecWH.IsValid: Boolean;
 begin
   Result := width.IsValid and height.IsValid;
@@ -499,18 +490,34 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TStrStrList
+// TAnsiClassList
 //------------------------------------------------------------------------------
 
-function TStrAnsiList.Add(const str: string; const ansi: AnsiString): integer;
+constructor TClassStylesList.Create;
+begin
+  fList := TStringList.Create;
+  fList.Duplicates := dupIgnore;
+  fList.Sorted := True;
+end;
+//------------------------------------------------------------------------------
+
+destructor TClassStylesList.Destroy;
+begin
+  Clear;
+  fList.Free;
+  inherited Destroy;
+end;
+//------------------------------------------------------------------------------
+
+function TClassStylesList.AddAppendStyle(const str: string; const ansi: AnsiString): integer;
 var
   i: integer;
   sr: PAnsiRec;
 begin
-  Result := IndexOf(str);
+  Result := fList.IndexOf(str);
   if (Result >= 0) then
   begin
-    sr := PAnsiRec(Objects[Result]);
+    sr := PAnsiRec(fList.Objects[Result]);
     i := Length(sr.ansi);
     if sr.ansi[i] <> ';' then
       sr.ansi := sr.ansi + ';' + ansi else
@@ -519,33 +526,36 @@ begin
   begin
     new(sr);
     sr.ansi := ansi;
-    Result := inherited AddObject(str, Pointer(sr));
+    Result := fList.AddObject(str, Pointer(sr));
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TStrAnsiList.Clear;
+function TClassStylesList.GetStyle(const classname: AnsiString): AnsiString;
 var
   i: integer;
 begin
-  for i := 0 to Count -1 do
-    Dispose(PAnsiRec(Objects[i]));
-  inherited Clear;
+  SetLength(Result, 0);
+  i := fList.IndexOf(string(className));
+  if i >= 0 then
+    Result := PAnsiRec(fList.objects[i]).ansi;
 end;
 //------------------------------------------------------------------------------
 
-procedure TStrAnsiList.Delete(Index: Integer);
+procedure TClassStylesList.Clear;
+var
+  i: integer;
 begin
-  if (index < 0) or (index >= Count) then
-    Error(@rsListBoundsError, index);
-  Dispose(PAnsiRec(Objects[index]));
-  inherited Delete(Index);
+  for i := 0 to fList.Count -1 do
+    Dispose(PAnsiRec(fList.Objects[i]));
+  fList.Clear;
 end;
 //------------------------------------------------------------------------------
 
-destructor TStrAnsiList.Destroy;
+procedure TClassStylesList.Delete(Index: Integer);
 begin
-  inherited Destroy;
+  Dispose(PAnsiRec(fList.Objects[index]));
+  fList.Delete(Index);
 end;
 
 //------------------------------------------------------------------------------
@@ -556,24 +566,6 @@ function SkipBlanks(var current: PAnsiChar; currentEnd: PAnsiChar): Boolean;
 begin
   while (current < currentEnd) and (current^ <= #32) do inc(current);
   Result := (current < currentEnd);
-end;
-//------------------------------------------------------------------------------
-
-function TrimBlanks(var current: PAnsiChar; var length: integer): Boolean;
-var
-  endC: PAnsiChar;
-begin
-  while (length > 0) and (current^ <= #32) do
-  begin
-    inc(current); dec(length);
-  end;
-  Result := length > 0;
-  if not Result then Exit;
-  endC := current + length -1;
-  while endC^ <= #32 do
-  begin
-    dec(endC); dec(length);
-  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -613,58 +605,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ParseNextChar(var current: PAnsiChar; currentEnd: PAnsiChar): AnsiChar;
-begin
-  if SkipBlanks(current, currentEnd) then
-  begin
-    Result := current^;
-    inc(current);
-  end
-  else Result := #0;
-end;
-//------------------------------------------------------------------------------
-
-function GetUtf8String(pName: PAnsiChar; len: integer): AnsiString;
-begin
-  SetLength(Result, len);
-  if len = 0 then Exit;
-  Move(pName^, Result[1], len);
-end;
-//--------------------------------------------------------------------------
-
-function LowercaseAnsi(pName: PAnsiChar; len: integer): AnsiString;
-var
-  i: integer;
-begin
-  SetLength(Result, len);
-  for i := 1 to len do
-  begin
-    Result[i] := LowerCaseTable[pName^];
-    inc(pName);
-  end;
-end;
-//--------------------------------------------------------------------------
-
-function IsAlpha(c: AnsiChar): Boolean; {$IFDEF INLINE} inline; {$ENDIF}
-begin
-  Result := CharInSet(c, ['A'..'Z','a'..'z']);
-end;
-//------------------------------------------------------------------------------
-
-function ParseNameLength(var c: PAnsiChar): integer; overload;
-var
-  startC: PAnsiChar;
-const
-  validNonFirstChars =  ['0'..'9','A'..'Z','a'..'z','_',':','-'];
-begin
-  Result := 0;
-  if not IsAlpha(c^) then Exit;
-  startC := c; inc(c);
-  while CharInSet(c^, validNonFirstChars) do inc(c);
-  Result := c - startC;
-end;
-//------------------------------------------------------------------------------
-
 function ParseNameLength(var c: PAnsiChar; endC: PAnsiChar): integer; overload;
 var
   startC: PAnsiChar;
@@ -676,70 +616,6 @@ begin
   startC := c; inc(c);
   while (c < endC) and CharInSet(c^, validNonFirstChars) do inc(c);
   Result := c - startC;
-end;
-//------------------------------------------------------------------------------
-
-{$OVERFLOWCHECKS OFF}
-function GetHashedName(c: PAnsiChar; length: integer): cardinal;
-var
-  i: integer;
-begin
-  //https://en.wikipedia.org/wiki/Jenkins_hash_function
-  Result := 0;
-  for i := 1 to length do
-  begin
-    Result := (Result + Ord(LowerCaseTable[c^]));
-    Result := Result + (Result shl 10);
-    Result := Result xor (Result shr 6);
-    inc(c);
-  end;
-  Result := Result + (Result shl 3);
-  Result := Result xor (Result shr 11);
-  Result := Result + (Result shl 15);
-end;
-//------------------------------------------------------------------------------
-
-function GetHashedNameCaseSens(c: PAnsiChar; length: integer): cardinal;
-var
-  i: integer;
-begin
-  //https://en.wikipedia.org/wiki/Jenkins_hash_function
-  Result := 0;
-  for i := 1 to length do
-  begin
-    Result := (Result + Ord(c^));
-    Result := Result + (Result shl 10);
-    Result := Result xor (Result shr 6);
-    inc(c);
-  end;
-  Result := Result + (Result shl 3);
-  Result := Result xor (Result shr 11);
-  Result := Result + (Result shl 15);
-end;
-//------------------------------------------------------------------------------
-{$OVERFLOWCHECKS ON}
-
-function ParseHashedName(var c: PAnsiChar; endC: PAnsiChar): cardinal;
-var
-  len: integer;
-  startC: PAnsiChar;
-begin
-  startC := c;
-  len := ParseNameLength(c, endC);
-  if len = 0 then Result := 0
-  else Result := GetHashedName(startC, len);
-end;
-//------------------------------------------------------------------------------
-
-function GetRefName(href: PAnsiChar): PAnsiChar; {$IFDEF INLINE} inline; {$ENDIF}
-begin
-  if (href^ = 'u') and
-    ((href +1)^ = 'r') and
-    ((href +2)^ = 'l') and
-    ((href +3)^ = '(') then
-      inc(href, 4);
-  if href^ = '#' then inc(href);
-  Result := href;
 end;
 //------------------------------------------------------------------------------
 
@@ -763,117 +639,302 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function HtmlDecode(const s: ansiString): ansistring;
-var
-  val, len: integer;
-  c,ce,endC: PAnsiChar;
+function ParseNextChar(var current: PAnsiChar; currentEnd: PAnsiChar): AnsiChar;
 begin
-  len := Length(s);
-  SetLength(Result, len*3);
-  c := PAnsiChar(s);
-  endC := c + len;
-  ce := c;
-  len := 1;
-  while (ce < endC) and (ce^ <> '&') do
-    inc(ce);
-
-  while (ce < endC) do
+  if SkipBlanks(current, currentEnd) then
   begin
-    if ce > c then
-    begin
-      Move(c^, Result[len], ce - c);
-      inc(len, ce - c);
-    end;
-    c := ce; inc(ce);
-    while (ce < endC) and (ce^ <> ';') do inc(ce);
-    if ce = endC then break;
+    Result := current^;
+    inc(current);
+  end
+  else Result := #0;
+end;
+//------------------------------------------------------------------------------
 
-    val := -1; //assume error
-    if (c +1)^ = '#' then
+function ParseNextWord(var current: PAnsiChar;
+  currentEnd: PAnsiChar; out word: TAnsiName): Boolean;
+begin
+  Result := SkipBlanks(current, currentEnd);
+  if not Result then Exit;
+
+  word.len := 0; word.name := current;
+  while (current < currentEnd) and
+    (LowerCaseTable[current^] >= 'a') and
+    (LowerCaseTable[current^] <= 'z') do
+  begin
+    inc(word.len);
+    inc(current);
+  end;
+  Result := word.len > 0;
+end;
+//------------------------------------------------------------------------------
+
+function ParseNextWordHashed(var c: PAnsiChar; endC: PAnsiChar): cardinal;
+var
+  name: TAnsiName;
+begin
+  name.name := c;
+  name.len := ParseNameLength(c, endC);
+  if name.len = 0 then Result := 0
+  else Result := GetHashedName(name);
+end;
+//------------------------------------------------------------------------------
+
+function ParseNextNum(var current: PAnsiChar; currentEnd: PAnsiChar;
+  skipComma: Boolean; out val: double; out measureUnit: TMeasureUnit): Boolean; overload;
+var
+  decPos,exp: integer;
+  isNeg, expIsNeg: Boolean;
+  start: PAnsiChar;
+begin
+  Result := false;
+  measureUnit := muPixel;
+
+  //skip white space +/- single comma
+  if skipComma then
+  begin
+    while (current < currentEnd) and (current^ <= #32) do inc(current);
+    if (current^ = ',') then inc(current);
+  end;
+  while (current < currentEnd) and (current^ <= #32) do inc(current);
+  if (current = currentEnd) then Exit;
+
+  decPos := -1; exp := Invalid; expIsNeg := false;
+  isNeg := current^ = '-';
+  if isNeg then inc(current);
+
+  val := 0;
+  start := current;
+  while current < currentEnd do
+  begin
+{$IF COMPILERVERSION >= 17}
+    if Ord(current^) = Ord(FormatSettings.DecimalSeparator) then
+{$ELSE}
+    if Ord(current^) = Ord(DecimalSeparator) then
+{$IFEND}
     begin
-      val := 0;
-      //decode unicode value
-      if (c +2)^ = 'x' then
-      begin
-        inc(c, 3);
-        while c < ce do
-        begin
-          if (c^ >= 'a') and (c^ <= 'f') then
-            val := val * 16 + Ord(c^) - 87
-          else if (c^ >= 'A') and (c^ <= 'F') then
-            val := val * 16 + Ord(c^) - 55
-          else if (c^ >= '0') and (c^ <= '9') then
-            val := val * 16 + Ord(c^) - 48
-          else
-          begin
-            val := -1;
-            break;
-          end;
-          inc(c);
-        end;
-      end else
-      begin
-        inc(c, 2);
-        while c < ce do
-        begin
-          val := val * 10 + Ord(c^) - 48;
-          inc(c);
-        end;
-      end;
+      if decPos >= 0 then break;
+      decPos := 0;
+    end
+    else if (LowerCaseTable[current^] = 'e') then
+    begin
+      if (current +1)^ = '-' then expIsNeg := true;
+      inc(current);
+      exp := 0;
+    end
+    else if (current^ < '0') or (current^ > '9') then
+      break
+    else if IsValid(exp) then
+    begin
+      exp := exp * 10 + (Ord(current^) - Ord('0'))
     end else
     begin
-      //decode html entity ...
-      case GetHashedNameCaseSens(c, ce - c) of
-        {$I html_entity_hash_values.inc}
-      end;
+      val := val *10 + Ord(current^) - Ord('0');
+      if decPos >= 0 then inc(decPos);
     end;
+    inc(current);
+  end;
+  Result := current > start;
+  if not Result then Exit;
 
-    //convert unicode value to utf8 chars
-    //this saves the overhead of multiple ansistring<-->string conversions.
-    case val of
-      0 .. $7F:
-        begin
-          result[len] := AnsiChar(val);
-          inc(len);
-        end;
-      $80 .. $7FF:
-        begin
-          Result[len] := AnsiChar($C0 or (val shr 6));
-          Result[len+1] := AnsiChar($80 or (val and $3f));
-          inc(len, 2);
-        end;
-      $800 .. $7FFF:
-        begin
-          Result[len] := AnsiChar($E0 or (val shr 12));
-          Result[len+1] := AnsiChar($80 or ((val shr 6) and $3f));
-          Result[len+2] := AnsiChar($80 or (val and $3f));
-          inc(len, 3);
-        end;
-      $10000 .. $10FFFF:
-        begin
-          Result[len] := AnsiChar($F0 or (val shr 18));
-          Result[len+1] := AnsiChar($80 or ((val shr 12) and $3f));
-          Result[len+2] := AnsiChar($80 or ((val shr 6) and $3f));
-          Result[len+3] := AnsiChar($80 or (val and $3f));
-          inc(len, 4);
-        end;
-      else
-      begin
-        //ie: error
-        Move(c^, Result[len], ce- c +1);
-        inc(len, ce - c +1);
-      end;
-    end;
-    inc(ce);
-    c := ce;
-    while (ce < endC) and (ce^ <> '&') do inc(ce);
-  end;
-  if (c < endC) and (ce > c) then
+  if decPos > 0 then val := val * Power(10, -decPos);
+  if isNeg then val := -val;
+  if IsValid(exp) then
   begin
-    Move(c^, Result[len], (ce - c));
-    inc(len, ce - c);
+    if expIsNeg then
+      val := val * Power(10, -exp) else
+      val := val * Power(10, exp);
   end;
-  setLength(Result, len -1);
+
+  //https://oreillymedia.github.io/Using_SVG/guide/units.html
+  case current^ of
+    '%':
+      begin
+        inc(current);
+        measureUnit := muPercent;
+      end;
+    'c': //convert cm to pixels
+      if ((current+1)^ = 'm') then
+      begin
+        inc(current, 2);
+        measureUnit := muCm;
+      end;
+    'd': //ignore deg
+      if ((current+1)^ = 'e') and ((current+2)^ = 'g') then
+      begin
+        inc(current, 3);
+        measureUnit := muDegree;
+      end;
+    'i': //convert inchs to pixels
+      if ((current+1)^ = 'n') then
+      begin
+        inc(current, 2);
+        measureUnit := muInch;
+      end;
+    'm': //convert mm to pixels
+      if ((current+1)^ = 'm') then
+      begin
+        inc(current, 2);
+        measureUnit := muMm;
+      end;
+    'p': //ignore px
+      if (current+1)^ = 'x' then inc(current, 2);
+    'r': //convert radian angles to degrees
+      if ((current+1)^ = 'a') and ((current+2)^ = 'd') then
+      begin
+        inc(current, 3);
+        measureUnit := muRadian;
+      end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function ParseNextNum(var current: PAnsiChar; currentEnd: PAnsiChar;
+  skipComma: Boolean; out val: double): Boolean; overload;
+var
+  mu: TMeasureUnit;
+begin
+  Result := ParseNextNum(current, currentEnd, skipComma, val, mu);
+  case mu of
+    muPercent: val := val/100;
+    muRadian: val := val * 180/PI;
+    muInch    : val := val * 96;
+    muCm      : val := val * 96 / 2.54;
+    muMm      : val := val * 96 / 25.4;
+    muEm      : val := val * 16;
+    muEn      : val := val * 8;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TrimBlanks(var name: TAnsiName): Boolean;
+var
+  endC: PAnsiChar;
+begin
+  while (name.len > 0) and (name.name^ <= #32) do
+  begin
+    inc(name.name); dec(name.len);
+  end;
+  Result := name.len > 0;
+  if not Result then Exit;
+  endC := name.name + name.len -1;
+  while endC^ <= #32 do
+  begin
+    dec(endC); dec(name.len);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+{$OVERFLOWCHECKS OFF}
+function GetHashedName(const name: TAnsiName): cardinal;
+var
+  i: integer;
+  c: PAnsiChar;
+begin
+  //https://en.wikipedia.org/wiki/Jenkins_hash_function
+  c := name.name;
+  Result := 0;
+  for i := 1 to name.len do
+  begin
+    Result := (Result + Ord(LowerCaseTable[c^]));
+    Result := Result + (Result shl 10);
+    Result := Result xor (Result shr 6);
+    inc(c);
+  end;
+  Result := Result + (Result shl 3);
+  Result := Result xor (Result shr 11);
+  Result := Result + (Result shl 15);
+end;
+//------------------------------------------------------------------------------
+
+function GetHashedNameCaseSens(name: PAnsiChar; nameLen: integer): cardinal;
+var
+  i: integer;
+begin
+  Result := 0;
+  for i := 1 to nameLen do
+  begin
+    Result := (Result + Ord(name^));
+    Result := Result + (Result shl 10);
+    Result := Result xor (Result shr 6);
+    inc(name);
+  end;
+  Result := Result + (Result shl 3);
+  Result := Result xor (Result shr 11);
+  Result := Result + (Result shl 15);
+end;
+//------------------------------------------------------------------------------
+{$OVERFLOWCHECKS ON}
+
+function ExtractRefFromValue(const href: TAnsiName): TAnsiName; {$IFDEF INLINE} inline; {$ENDIF}
+var
+  endR: PAnsiChar;
+begin
+  Result := href;
+  endR := Result.name + href.len;
+  if (Result.name^ = 'u') and
+    ((Result.name +1)^ = 'r') and
+    ((Result.name +2)^ = 'l') and
+    ((Result.name +3)^ = '(') then
+  begin
+    inc(Result.name, 4);
+    dec(endR); // avoid trailing ')'
+  end;
+  if Result.name^ = '#' then inc(Result.name);
+  Result.len := endR - Result.name;
+end;
+//------------------------------------------------------------------------------
+
+function ExtractWordFromValue(value: TAnsiName; out word: TAnsiName): Boolean;
+begin
+  Result := ParseNextWord(value.name, value.name + value.len, word);
+end;
+//------------------------------------------------------------------------------
+
+function IsNumPending(current, currentEnd: PAnsiChar; ignoreComma: Boolean): Boolean;
+begin
+  Result := false;
+
+  //skip white space +/- single comma
+  if ignoreComma then
+  begin
+    while (current < currentEnd) and (current^ <= #32) do inc(current);
+    if (current^ = ',') then inc(current);
+  end;
+  while (current < currentEnd) and (current^ <= ' ') do inc(current);
+  if (current = currentEnd) then Exit;
+
+  if (current^ = '-') then inc(current);
+  if (current^ = '.') then inc(current);
+  Result := (current < currentEnd) and (current^ >= '0') and (current^ <= '9');
+end;
+//------------------------------------------------------------------------------
+
+function GetUtf8String(pName: PAnsiChar; len: integer): AnsiString;
+begin
+  SetLength(Result, len);
+  if len = 0 then Exit;
+  Move(pName^, Result[1], len);
+end;
+//--------------------------------------------------------------------------
+
+function LowercaseAnsi(const name: TAnsiName): AnsiString;
+var
+  i: integer;
+  p: PAnsiChar;
+begin
+  SetLength(Result, name.len);
+  p := name.name;
+  for i := 1 to name.len do
+  begin
+    Result[i] := LowerCaseTable[p^];
+    inc(p);
+  end;
+end;
+//--------------------------------------------------------------------------
+
+function IsAlpha(c: AnsiChar): Boolean; {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result := CharInSet(c, ['A'..'Z','a'..'z']);
 end;
 //------------------------------------------------------------------------------
 
@@ -983,6 +1044,126 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function HtmlDecode(const html: ansiString): ansistring;
+var
+  val, len: integer;
+  c,ce,endC: PAnsiChar;
+begin
+  len := Length(html);
+  SetLength(Result, len*3);
+  c := PAnsiChar(html);
+  endC := c + len;
+  ce := c;
+  len := 1;
+  while (ce < endC) and (ce^ <> '&') do
+    inc(ce);
+
+  while (ce < endC) do
+  begin
+    if ce > c then
+    begin
+      Move(c^, Result[len], ce - c);
+      inc(len, ce - c);
+    end;
+    c := ce; inc(ce);
+    while (ce < endC) and (ce^ <> ';') do inc(ce);
+    if ce = endC then break;
+
+    val := -1; //assume error
+    if (c +1)^ = '#' then
+    begin
+      val := 0;
+      //decode unicode value
+      if (c +2)^ = 'x' then
+      begin
+        inc(c, 3);
+        while c < ce do
+        begin
+          if (c^ >= 'a') and (c^ <= 'f') then
+            val := val * 16 + Ord(c^) - 87
+          else if (c^ >= 'A') and (c^ <= 'F') then
+            val := val * 16 + Ord(c^) - 55
+          else if (c^ >= '0') and (c^ <= '9') then
+            val := val * 16 + Ord(c^) - 48
+          else
+          begin
+            val := -1;
+            break;
+          end;
+          inc(c);
+        end;
+      end else
+      begin
+        inc(c, 2);
+        while c < ce do
+        begin
+          val := val * 10 + Ord(c^) - 48;
+          inc(c);
+        end;
+      end;
+    end else
+    begin
+      //decode html entity ...
+      case GetHashedNameCaseSens(c, ce - c) of
+        {$I html_entity_values.inc}
+      end;
+    end;
+
+    //convert unicode value to utf8 chars
+    //this saves the overhead of multiple ansistring<-->string conversions.
+    case val of
+      0 .. $7F:
+        begin
+          result[len] := AnsiChar(val);
+          inc(len);
+        end;
+      $80 .. $7FF:
+        begin
+          Result[len] := AnsiChar($C0 or (val shr 6));
+          Result[len+1] := AnsiChar($80 or (val and $3f));
+          inc(len, 2);
+        end;
+      $800 .. $7FFF:
+        begin
+          Result[len] := AnsiChar($E0 or (val shr 12));
+          Result[len+1] := AnsiChar($80 or ((val shr 6) and $3f));
+          Result[len+2] := AnsiChar($80 or (val and $3f));
+          inc(len, 3);
+        end;
+      $10000 .. $10FFFF:
+        begin
+          Result[len] := AnsiChar($F0 or (val shr 18));
+          Result[len+1] := AnsiChar($80 or ((val shr 12) and $3f));
+          Result[len+2] := AnsiChar($80 or ((val shr 6) and $3f));
+          Result[len+3] := AnsiChar($80 or (val and $3f));
+          inc(len, 4);
+        end;
+      else
+      begin
+        //ie: error
+        Move(c^, Result[len], ce- c +1);
+        inc(len, ce - c +1);
+      end;
+    end;
+    inc(ce);
+    c := ce;
+    while (ce < endC) and (ce^ <> '&') do inc(ce);
+  end;
+  if (c < endC) and (ce > c) then
+  begin
+    Move(c^, Result[len], (ce - c));
+    inc(len, ce - c);
+  end;
+  setLength(Result, len -1);
+end;
+//------------------------------------------------------------------------------
+
+function ColorIsURL(pColor: PAnsiChar): Boolean;
+begin
+  Result := (pColor^ = 'u') and ((pColor+1)^ = 'r') and ((pColor+2)^ = 'l');
+end;
+//------------------------------------------------------------------------------
+
 function HexByteToInt(h: AnsiChar): Cardinal;
 begin
   case h of
@@ -994,214 +1175,38 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ParseNextAlphaWord(var current: PAnsiChar; currentEnd: PAnsiChar;
-  out word: AnsiString): Boolean;
-var
-  i: integer;
-  c: PAnsiChar;
-begin
-  Result := SkipBlanks(current, currentEnd);
-  if not Result then Exit;
-
-  i := 0; c := current;
-  while (current < currentEnd) and
-    (LowerCaseTable[current^] >= 'a') and
-    (LowerCaseTable[current^] <= 'z') do
-  begin
-    inc(i);
-    inc(current);
-  end;
-  Result := i > 0;
-  if not Result then Exit;
-  SetLength(word, i);
-  Move(c^, word[1], i);
-end;
-//------------------------------------------------------------------------------
-
-function NumPending(current, currentEnd: PAnsiChar; ignoreComma: Boolean): Boolean;
-begin
-  Result := false;
-
-  //skip white space +/- single comma
-  if ignoreComma then
-  begin
-    while (current < currentEnd) and (current^ <= #32) do inc(current);
-    if (current^ = ',') then inc(current);
-  end;
-  while (current < currentEnd) and (current^ <= ' ') do inc(current);
-  if (current = currentEnd) then Exit;
-
-  if (current^ = '-') then inc(current);
-  if (current^ = '.') then inc(current);
-  Result := (current < currentEnd) and (current^ >= '0') and (current^ <= '9');
-end;
-//------------------------------------------------------------------------------
-
-function ParseNum(var current: PAnsiChar; currentEnd: PAnsiChar;
-  skipComma: Boolean; out val: double; out measureUnit: TMeasureUnit): Boolean; overload;
-var
-  decPos,exp: integer;
-  isNeg, expIsNeg: Boolean;
-  start: PAnsiChar;
-begin
-  Result := false;
-  measureUnit := muPixel;
-
-  //skip white space +/- single comma
-  if skipComma then
-  begin
-    while (current < currentEnd) and (current^ <= #32) do inc(current);
-    if (current^ = ',') then inc(current);
-  end;
-  while (current < currentEnd) and (current^ <= #32) do inc(current);
-  if (current = currentEnd) then Exit;
-
-  decPos := -1; exp := Invalid; expIsNeg := false;
-  isNeg := current^ = '-';
-  if isNeg then inc(current);
-
-  val := 0;
-  start := current;
-  while current < currentEnd do
-  begin
-{$IF COMPILERVERSION >= 17}
-    if Ord(current^) = Ord(FormatSettings.DecimalSeparator) then
-{$ELSE}
-    if Ord(current^) = Ord(DecimalSeparator) then
-{$IFEND}
-    begin
-      if decPos >= 0 then break;
-      decPos := 0;
-    end
-    else if (LowerCaseTable[current^] = 'e') then
-    begin
-      if (current +1)^ = '-' then expIsNeg := true;
-      inc(current);
-      exp := 0;
-    end
-    else if (current^ < '0') or (current^ > '9') then
-      break
-    else if IsValid(exp) then
-    begin
-      exp := exp * 10 + (Ord(current^) - Ord('0'))
-    end else
-    begin
-      val := val *10 + Ord(current^) - Ord('0');
-      if decPos >= 0 then inc(decPos);
-    end;
-    inc(current);
-  end;
-  Result := current > start;
-  if not Result then Exit;
-
-  if decPos > 0 then val := val * Power(10, -decPos);
-  if isNeg then val := -val;
-  if IsValid(exp) then
-  begin
-    if expIsNeg then
-      val := val * Power(10, -exp) else
-      val := val * Power(10, exp);
-  end;
-
-  //https://oreillymedia.github.io/Using_SVG/guide/units.html
-  case current^ of
-    '%':
-      begin
-        inc(current);
-        measureUnit := muPercent;
-      end;
-    'c': //convert cm to pixels
-      if ((current+1)^ = 'm') then
-      begin
-        inc(current, 2);
-        measureUnit := muCm;
-      end;
-    'd': //ignore deg
-      if ((current+1)^ = 'e') and ((current+2)^ = 'g') then
-      begin
-        inc(current, 3);
-        measureUnit := muDegree;
-      end;
-    'i': //convert inchs to pixels
-      if ((current+1)^ = 'n') then
-      begin
-        inc(current, 2);
-        measureUnit := muInch;
-      end;
-    'm': //convert mm to pixels
-      if ((current+1)^ = 'm') then
-      begin
-        inc(current, 2);
-        measureUnit := muMm;
-      end;
-    'p': //ignore px
-      if (current+1)^ = 'x' then inc(current, 2);
-    'r': //convert radian angles to degrees
-      if ((current+1)^ = 'a') and ((current+2)^ = 'd') then
-      begin
-        inc(current, 3);
-        measureUnit := muRadian;
-      end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function ParseNum(var current: PAnsiChar; currentEnd: PAnsiChar;
-  skipComma: Boolean; out val: double): Boolean; overload;
-var
-  mu: TMeasureUnit;
-begin
-  Result := ParseNum(current, currentEnd, skipComma, val, mu);
-  case mu of
-    muPercent: val := val/100;
-    muRadian: val := val * 180/PI;
-    muInch    : val := val * 96;
-    muCm      : val := val * 96 / 2.54;
-    muMm      : val := val * 96 / 25.4;
-    muEm      : val := val * 16;
-    muEn      : val := val * 8;
-  end;
-end;
-//------------------------------------------------------------------------------
-
 function IsFraction(val: double): Boolean;
 begin
   Result := (val <> 0) and (val > -1) and (val < 1);
 end;
 //------------------------------------------------------------------------------
 
-function ColorIsURL(p: PAnsiChar): Boolean;
-begin
-  Result := (p^ = 'u') and ((p+1)^ = 'r') and ((p+2)^ = 'l');
-end;
-//------------------------------------------------------------------------------
-
-function PCharToColor32(p: PAnsiChar; pLen: integer;
-  var color: TColor32): Boolean;
+function ValueToColor32(const value: TAnsiName; var color: TColor32): Boolean;
 var
   i: integer;
   j: Cardinal;
   clr: TColor32;
   alpha: Byte;
   vals: array[0..3] of double;
-  pEnd: PAnsiChar;
+  p, pEnd: PAnsiChar;
 begin
   Result := false;
-  if (pLen < 3) then Exit;
+  p := value.name;
+  if (value.len < 3) then Exit;
   alpha := color shr 24;
 
   if (p^    = 'r') and                 //RGB / RGBA
     ((p+1)^ = 'g') and
     ((p+2)^ = 'b') then
   begin
-    pEnd := p + pLen;
+    pEnd := p + value.len;
     inc(p, 3);
     if (p^ = 'a') then inc(p);
     if (ParseNextChar(p, pEnd) <> '(') or
-      not ParseNum(p, pEnd, false, vals[0]) or
-      not ParseNum(p, pEnd, true, vals[1]) or
-      not ParseNum(p, pEnd, true, vals[2]) then Exit;
-    if ParseNum(p, pEnd, false, vals[3]) then
+      not ParseNextNum(p, pEnd, false, vals[0]) or
+      not ParseNextNum(p, pEnd, true, vals[1]) or
+      not ParseNextNum(p, pEnd, true, vals[2]) then Exit;
+    if ParseNextNum(p, pEnd, false, vals[3]) then
       alpha := 0 else //stops further alpha adjustment
       vals[3] := 255;
     if ParseNextChar(p, pEnd) <> ')' then Exit;
@@ -1214,7 +1219,7 @@ begin
   end
   else if (p^ = '#') then           //#RRGGBB or #RGB
   begin
-    if (pLen = 7) then
+    if (value.len = 7) then
     begin
       clr := $0;
       for i := 1 to 6 do
@@ -1224,7 +1229,7 @@ begin
       end;
       clr := clr or $FF000000;
     end
-    else if (pLen = 4) then
+    else if (value.len = 4) then
     begin
       clr := $0;
       for i := 1 to 3 do
@@ -1241,7 +1246,7 @@ begin
     color :=  clr;
   end else                                        //color name lookup
   begin
-    i := ColorConstList.IndexOf(string(LowercaseAnsi(p, pLen)));
+    i := ColorConstList.IndexOf(string(LowercaseAnsi(value)));
     if i < 0 then Exit;
     color := Cardinal(ColorConstList.Objects[i]);
   end;
@@ -1253,14 +1258,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function MakeDashArray(const da: TArrayOfDouble; scale: double): TArrayOfInteger;
+function MakeDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfInteger;
 var
   i, len: integer;
 begin
-  len := Length(da);
+  len := Length(dblArray);
   SetLength(Result, len);
   for i := 0 to len -1 do
-    Result[i] := Ceil(da[i] * scale);
+    Result[i] := Ceil(dblArray[i] * scale);
 end;
 
 //------------------------------------------------------------------------------

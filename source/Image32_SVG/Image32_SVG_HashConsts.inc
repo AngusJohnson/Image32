@@ -33,6 +33,8 @@
   hHeight                     = $52FDF336;    // Height
   hHref                       = $8E926F4B;    // Href
   hId                         = $1B60404D;    // Id
+  hIn                         = $4D5FA44B;    // In
+  hIn2                        = $FBFE02B1;    // In2
   hItalic                     = $F07E7786;    // Italic
   hLine                       = $7A6D718F;    // Line
   hLinearGradient             = $C16E9BCD;    // LinearGradient
@@ -63,6 +65,7 @@
   hRect                       = $FA3BCBEA;    // Rect
   hRefX                       = $00C1DE46;    // RefX
   hRefY                       = $480CECDB;    // RefY
+  hResult                     = $47CD519F;    // Result
   hRx                         = $3ABF70F3;    // Rx
   hRy                         = $0C7D9470;    // Ry
   hSans_045_Serif             = $95106804;    // Sans-Serif
