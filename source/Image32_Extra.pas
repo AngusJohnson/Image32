@@ -1900,11 +1900,10 @@ end;
 
 procedure BoxBlurH(var src, dst: TArrayOfColor32; w,h, stdDev: integer);
 var
-  i,j, ti, li, ri: integer;
+  i,j, ti, li, ri, iarr: integer;
   fv, lv, val, tmp: TWeightedColor;
-  iarr: double;
 begin
-  iarr := 1 / (stdDev *2 +1);
+  iarr := Ceil(1 / (stdDev *2 +1));
 
   for i := 0 to h -1 do
   begin
@@ -1918,8 +1917,7 @@ begin
 
     fv.Add(src[ti], 1);
     lv.Add(src[ti +w -1], 1);
-    val := fv;
-    val.Multiply(stdDev +1);
+    val.Add(fv.Color, stdDev +1);
 
     for j := 0 to stdDev -1 do
       val.Add(src[ti + j]);
@@ -1927,8 +1925,8 @@ begin
     begin
       val.Add(src[ri]);
       val.Subtract(fv); inc(ri);
-      tmp := val;
-      tmp.Multiply(iarr);
+      tmp.Reset;
+      tmp.Add(val.Color, iarr);
       dst[ti] := tmp.Color; inc(ti);
     end;
     for j := stdDev +1 to w - stdDev -1 do
@@ -1936,16 +1934,16 @@ begin
       val.Add(src[ri]);
       val.Subtract(src[li]);
       inc(ri); inc(li);
-      tmp := val;
-      tmp.Multiply(iarr);
+      tmp.Reset;
+      tmp.Add(val.Color, iarr);
       dst[ti] := tmp.Color; inc(ti);
     end;
     for j := w - stdDev to w -1 do
     begin
       val.Add(lv);
       val.Subtract(src[li]); inc(li);
-      tmp := val;
-      tmp.Multiply(iarr);
+      tmp.Reset;
+      tmp.Add(val.Color, iarr);
       dst[ti] := tmp.Color; inc(ti);
     end;
   end;
@@ -1954,11 +1952,10 @@ end;
 
 procedure BoxBlurT(var src, dst: TArrayOfColor32; w, h, stdDev: integer);
 var
-  i,j, ti, li, ri: integer;
+  i,j, ti, li, ri, iarr: integer;
   fv, lv, val, tmp: TWeightedColor;
-  iarr: double;
 begin
-  iarr := 1 / (stdDev *2 +1);
+  iarr := Ceil(1 / (stdDev *2 +1));
   for i := 0 to w -1 do
   begin
     ti := i;
@@ -1971,8 +1968,7 @@ begin
 
     fv.Add(src[ti]);
     lv.Add(src[ti +w *(h-1)], 1);
-    val := fv;
-    val.Multiply(stdDev +1);
+    val.Add(fv.Color, stdDev +1);
 
     for j := 0 to stdDev -1 do
       val.Add(src[ti + j *w]);
@@ -1980,8 +1976,8 @@ begin
     begin
       val.Add(src[ri]);
       val.Subtract(fv);
-      tmp := val;
-      tmp.Multiply(iarr);
+      tmp.Reset;
+      tmp.Add(val.Color, iarr);
       dst[ti] := tmp.Color; inc(ti, w);
       inc(ri, w);
     end;
@@ -1989,8 +1985,8 @@ begin
     begin
       val.Add(src[ri]);
       val.Subtract(src[li]);
-      tmp := val;
-      tmp.Multiply(iarr);
+      tmp.Reset;
+      tmp.Add(val.Color, iarr);
       dst[ti] := tmp.Color; inc(ti, w);
       inc(ri, w); inc(li, w);
     end;
@@ -1998,8 +1994,8 @@ begin
     begin
       val.Add(lv);
       val.Subtract(src[li]);
-      tmp := val;
-      tmp.Multiply(iarr);
+      tmp.Reset;
+      tmp.Add(val.Color, iarr);
       dst[ti] := tmp.Color; inc(ti, w);
       inc(li, w);
     end;

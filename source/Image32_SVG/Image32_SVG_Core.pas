@@ -54,6 +54,7 @@ type
     Y       : TValue;
     procedure Init;
     function  GetPoint(const scaleRect: TRectD): TPointD;
+    function  GetPointForcePercent(const scaleRect: TRectD): TPointD;
     function  IsValid: Boolean;
   end;
 
@@ -81,10 +82,9 @@ type
   public
     constructor Create;
     destructor Destroy; override;
-    function  AddAppendStyle(const str: string; const ansi: AnsiString): integer;
+    function  AddAppendStyle(const classname: string; const ansi: AnsiString): integer;
     function  GetStyle(const classname: AnsiString): AnsiString;
     procedure Clear;
-    procedure Delete(Index: Integer);
   end;
 
   TDsegType = (dsMove, dsLine, dsHorz, dsVert, dsArc,
@@ -107,10 +107,13 @@ type
   end;
   TDpaths = array of TDpath;
 
-  TAnsiName = record
+  TAnsiName = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
     name: PAnsiChar;
     len : integer;
+    function AsAnsiString: AnsiString;
+    function Equals(const othername: TAnsiName): Boolean;
   end;
+  TArrayOfAnsiName = array of TAnsiName;
 
 function SkipBlanks(var current: PAnsiChar; currentEnd: PAnsiChar): Boolean;
 function SkipBlanksAndComma(var current: PAnsiChar; currentEnd: PAnsiChar): Boolean;
@@ -128,6 +131,7 @@ function ParseNextNum(var current: PAnsiChar; currentEnd: PAnsiChar;
 function TrimBlanks(var name: TAnsiName): Boolean;
 
 function GetHashedName(const name: TAnsiName): cardinal;
+function GetHashedNameCaseSens(name: PAnsiChar; nameLen: integer): cardinal;
 function ExtractRefFromValue(const href: TAnsiName): TAnsiName;
 function ExtractWordFromValue(value: TAnsiName; out word: TAnsiName): Boolean;
 function IsNumPending(current, currentEnd: PAnsiChar; ignoreComma: Boolean): Boolean;
@@ -166,7 +170,6 @@ type
 
 //include lots of color constants
 {$I html_color_consts.inc}
-
 
 var
   ColorConstList : TStringList;
@@ -351,14 +354,17 @@ end;
 //------------------------------------------------------------------------------
 
 function TValue.GetValue: double;
+const
+  mm  = 96 / 25.4;
+  cm  = 96 / 2.54;
+  rad = 180 / PI;
 begin
   case mu of
     muPercent : Result := rawVal * 0.01;
-    muDegree  : Result := rawVal;
-    muRadian  : Result := rawVal * 180/PI; //convert to degrees pro. tem.
+    muRadian  : Result := rawVal * rad; //convert to degree
     muInch    : Result := rawVal * 96;
-    muCm      : Result := rawVal * 96 / 2.54;
-    muMm      : Result := rawVal * 96 / 25.4;
+    muCm      : Result := rawVal * cm;
+    muMm      : Result := rawVal * mm;
     muEm      : Result := rawVal * 16;
     muEn      : Result := rawVal * 8;
     else Result := rawVal;
@@ -421,6 +427,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function  TValuePt.GetPointForcePercent(const scaleRect: TRectD): TPointD;
+begin
+  if X.mu = muPercent then
+    Result.X := X.GetValueX(scaleRect) else
+    Result.X := X.GetValueX(scaleRect) * scaleRect.Width;
+  if Y.mu = muPercent then
+    Result.Y := Y.GetValueY(scaleRect) else
+    Result.Y := Y.GetValueY(scaleRect) * scaleRect.Height;
+end;
+//------------------------------------------------------------------------------
+
 function TValuePt.IsValid: Boolean;
 begin
   Result := X.IsValid and Y.IsValid;
@@ -463,18 +480,35 @@ end;
 
 function TValueRecWH.GetRectWHForcePercent(const scaleRect: TRectD): TRectWH;
 begin
-  if left.mu = muPercent then
-    Result.Left := left.GetValueX(scaleRect) else
-    Result.Left := left.GetValueX(scaleRect) * scaleRect.Width;
+  //this method is a workaround for incorrect measure units
+
+  if (left.mu = muPercent) then
+    Result.Left := left.GetValueX(scaleRect)
+  else if Abs(left.rawVal) > 2.5 then
+    Result.Left := left.GetValueX(scaleRect) * scaleRect.Width *0.01
+  else
+    Result.Left := left.rawVal * scaleRect.Width;
+
   if top.mu = muPercent then
-    Result.Top := top.GetValueY(scaleRect) else
-    Result.Top := top.GetValueY(scaleRect) * scaleRect.Height;
+    Result.Top := top.GetValueY(scaleRect)
+  else if Abs(top.rawVal) > 2.5 then
+    Result.Top := top.GetValueY(scaleRect) * scaleRect.Height *0.01
+  else
+    Result.Top := top.rawVal * scaleRect.Height;
+
   if width.mu = muPercent then
-    Result.Width := width.GetValueX(scaleRect) else
-    Result.Width := width.GetValueX(scaleRect) * scaleRect.Width;
+    Result.Width := width.GetValueX(scaleRect)
+  else if Abs(width.rawVal) > 2.5 then
+    Result.Width := width.GetValueX(scaleRect) * scaleRect.Width *0.01
+  else
+    Result.Width := width.rawVal * scaleRect.Width;
+
   if height.mu = muPercent then
-    Result.Height := height.GetValueY(scaleRect) else
-    Result.Height := height.GetValueY(scaleRect) * scaleRect.Height;
+    Result.Height := height.GetValueY(scaleRect)
+  else if Abs(height.rawVal) > 2.5 then
+    Result.Height := height.GetValueY(scaleRect) * scaleRect.Height *0.01
+  else
+    Result.Height := height.rawVal * scaleRect.Height;
 end;
 //------------------------------------------------------------------------------
 
@@ -509,12 +543,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TClassStylesList.AddAppendStyle(const str: string; const ansi: AnsiString): integer;
+function TClassStylesList.AddAppendStyle(const classname: string; const ansi: AnsiString): integer;
 var
   i: integer;
   sr: PAnsiRec;
 begin
-  Result := fList.IndexOf(str);
+  Result := fList.IndexOf(classname);
   if (Result >= 0) then
   begin
     sr := PAnsiRec(fList.Objects[Result]);
@@ -526,7 +560,7 @@ begin
   begin
     new(sr);
     sr.ansi := ansi;
-    Result := fList.AddObject(str, Pointer(sr));
+    Result := fList.AddObject(classname, Pointer(sr));
   end;
 end;
 //------------------------------------------------------------------------------
@@ -550,12 +584,31 @@ begin
     Dispose(PAnsiRec(fList.Objects[i]));
   fList.Clear;
 end;
+
+//------------------------------------------------------------------------------
+// TAnsiName
 //------------------------------------------------------------------------------
 
-procedure TClassStylesList.Delete(Index: Integer);
+function TAnsiName.AsAnsiString: AnsiString;
 begin
-  Dispose(PAnsiRec(fList.Objects[index]));
-  fList.Delete(Index);
+  SetLength(Result, len);
+  Move(name^, Result[1], len);
+end;
+//------------------------------------------------------------------------------
+
+function TAnsiName.Equals(const othername: TAnsiName): Boolean;
+var
+  i: integer;
+  p1, p2: PAnsiChar;
+begin
+  Result := len = othername.len;
+  if not Result or (len = 0) then Exit;
+  p1 := name; p2 := othername.name;
+  for i := 1 to len do
+  begin
+    if LowerCaseTable[p1^] <> LowerCaseTable[p2^] then Exit(false);
+    inc(p1); inc(p2);
+  end;
 end;
 
 //------------------------------------------------------------------------------
@@ -833,6 +886,7 @@ begin
   //https://en.wikipedia.org/wiki/Jenkins_hash_function
   c := name.name;
   Result := 0;
+  if c = nil then Exit;
   for i := 1 to name.len do
   begin
     Result := (Result + Ord(LowerCaseTable[c^]));

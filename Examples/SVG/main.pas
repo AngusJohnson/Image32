@@ -39,9 +39,7 @@ implementation
 {$R image.res}
 
 //https://www.google.com/get/noto/
-{.$R Image32_SVG_Reader_Noto-Fonts.res}
-{.$R Image32_SVG_Reader_Noto-Sans-Extra.res}
-{.$R Image32_SVG_Reader_Noto-Serif-Extra.res}
+{$R Font_Liberation_Sans}
 
 uses Image32_Transform, Image32_Extra;
 
@@ -60,11 +58,23 @@ begin
   ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
 
   svgReader := TSvgReader.Create;
-  //svgReader.BackgroundColor := clWhite32;
-  svgReader.AddFont('Arial');
-  svgReader.AddFont('Arial Bold');
-  svgReader.AddFont('Arial Italic');
-  svgReader.AddFont('Arial Bold Italic');
+  svgReader.BackgroundColor := clWhite32;
+//  svgReader.AddFont('Arial');
+//  svgReader.AddFont('Arial Bold');
+//  svgReader.AddFont('Arial Italic');
+//  svgReader.AddFont('Arial Bold Italic');
+//  svgReader.AddFont('Times New Roman');
+//  svgReader.AddFont('Times New Roman Bold');
+//  svgReader.AddFont('Times New Roman Italic');
+//  svgReader.AddFont('Times New Roman Bold Italic');
+  svgReader.AddFontFromResource('LIBERATION_SANS_REGULAR', RT_RCDATA);
+  svgReader.AddFontFromResource('LIBERATION_SANS_BOLD', RT_RCDATA);
+  svgReader.AddFontFromResource('LIBERATION_SANS_ITALIC', RT_RCDATA);
+  svgReader.AddFontFromResource('LIBERATION_SANS_BOLDITALIC', RT_RCDATA);
+  svgReader.AddFontFromResource('LIBERATION_SERIF_REGULAR', RT_RCDATA);
+  svgReader.AddFontFromResource('LIBERATION_SERIF_BOLD', RT_RCDATA);
+  svgReader.AddFontFromResource('LIBERATION_SERIF_ITALIC', RT_RCDATA);
+  svgReader.AddFontFromResource('LIBERATION_SERIF_BOLDITALIC', RT_RCDATA);
 
   rs := TResourceStream.Create(hInstance, 'TIGER', 'SVG');
   try
@@ -72,7 +82,8 @@ begin
   finally
     rs.Free;
   end;
-  svgReader.DrawImage(ImagePanel.Image, true);
+
+  svgReader.DrawImage(ImagePanel.Image, True);
 end;
 //------------------------------------------------------------------------------
 

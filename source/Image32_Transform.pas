@@ -101,7 +101,6 @@ type
     procedure Subtract(const other: TWeightedColor); overload;
 
     procedure AddWeight(w: Integer); //ie add clNone32
-    procedure Multiply(value: double);
     property AddCount: Integer read fAddCount;
     property Color: TColor32 read GetColor;
     property Weight: integer read fAddCount;
@@ -845,16 +844,6 @@ end;
 procedure TWeightedColor.AddWeight(w: Integer);
 begin
   inc(fAddCount, w);
-end;
-//------------------------------------------------------------------------------
-
-procedure TWeightedColor.Multiply(value: double);
-begin
-  fAddCount := Round(fAddCount * value);
-  fAlphaTot := Round(fAlphaTot * value);
-  fColorTotR := Round(fColorTotR * value);
-  fColorTotG := Round(fColorTotG * value);
-  fColorTotB := Round(fColorTotB * value);
 end;
 //------------------------------------------------------------------------------
 

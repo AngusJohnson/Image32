@@ -40,7 +40,6 @@ object Form1: TForm1
     ShowScrollButtons = ssbFocused
     AllowScroll = True
     AllowZoom = True
-    ExplicitWidth = 662
   end
   object MainMenu1: TMainMenu
     Left = 144
