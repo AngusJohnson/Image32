@@ -198,8 +198,8 @@ type
   function Rect(const recD: TRectD): TRect; overload;
   function Rect(const left,top,right,bottom: integer): TRect; overload;
 
-  function Size(sx, sy: integer): TSize; overload;
-  function Size(sx, sy: double): TSizeD; overload;
+  function Size(sx, sy: integer): TSize;
+  function SizeD(sx, sy: double): TSizeD;
 
   function Area(const path: TPathD): Double;
   function RectsEqual(const rec1, rec2: TRect): Boolean;
@@ -614,7 +614,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Size(sx, sy: double): TSizeD;
+function SizeD(sx, sy: double): TSizeD;
 begin
   Result.sx := sx;
   Result.sy := sy;

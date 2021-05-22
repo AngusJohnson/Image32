@@ -1079,7 +1079,7 @@ begin
     Result.sx := delta / q;
     Result.sy := q;
   end else
-    Result := Size(0.0, 0.0);
+    Result := SizeD(0.0, 0.0);
 end;
 //------------------------------------------------------------------------------
 

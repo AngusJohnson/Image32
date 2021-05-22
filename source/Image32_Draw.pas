@@ -590,10 +590,12 @@ begin
   lenC := length(gradColors);
   if (len = 0) or (lenC < 2) then Exit;
   SetLength(result, len);
-  step := 1/len;
 
   color2 := gradColors[0].color;
   result[0] := color2;
+  if len = 1 then Exit;
+
+  step := 1/(len-1);
   pos := step;
   offset2 := 0;
   i := 1; j := 1;
@@ -612,6 +614,7 @@ begin
     pos := pos - dist;
     inc(i);
   until i = lenC;
+  if j < len then result[j] := result[j-1];
 end;
 
 //------------------------------------------------------------------------------
@@ -1297,7 +1300,7 @@ begin
     dxdy := dx/dy;
 
     fEndDist := Ceil(dy + dxdy * (fEndPt.X - fStartPt.X));
-    fColors := GetColorGradient(fGradientColors, fEndDist +1);
+    fColors := GetColorGradient(fGradientColors, fEndDist);
     //get a list of perpendicular offsets for each
     SetLength(fPerpendicOffsets, ImgWidth);
     //from an imaginary line that's through fStartPt and perpendicular to
@@ -1323,7 +1326,7 @@ begin
     dydx := dy/dx; //perpendicular slope
 
     fEndDist := Ceil(dx + dydx * (fEndPt.Y - fStartPt.Y));
-    fColors := GetColorGradient(fGradientColors, fEndDist +1);
+    fColors := GetColorGradient(fGradientColors, fEndDist);
     SetLength(fPerpendicOffsets, ImgHeight);
     //from an imaginary line that's through fStartPt and perpendicular to
     //the gradient line, get a list of X offsets for each Y in image height

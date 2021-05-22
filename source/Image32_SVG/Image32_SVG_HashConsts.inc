@@ -1,8 +1,10 @@
   //nb: hash identifiers with appended underscores are case sensitive.
   hAmplitude                  = $DA119D26;    // Amplitude
+  hArial                      = $EC47D4A0;    // Arial
   hAtop                       = $7655315D;    // Atop
   hauto_045_start_045_reverse = $EE4545A2;    // auto-start-reverse
   hBold                       = $2F420533;    // Bold
+  hBolder                     = $9C928BF1;    // Bolder
   hCDATA                      = $FF50BB67;    // CDATA
   hCircle                     = $C6AE4953;    // Circle
   hClass                      = $E45C07DD;    // Class
@@ -19,6 +21,7 @@
   hDy                         = $776B7DEA;    // Dy
   hEllipse                    = $30C7994A;    // Ellipse
   hEnd                        = $B0C485D7;    // End
+  hEntity                     = $395039A9;    // Entity
   hExponent                   = $D8013FFD;    // Exponent
   hfeBlend                    = $751904B9;    // feBlend
   hfeColorMatrix              = $C0C4CF02;    // feColorMatrix
@@ -60,8 +63,11 @@
   hIn2                        = $FBFE02B1;    // In2
   hIntercept                  = $7CBB607F;    // Intercept
   hItalic                     = $F07E7786;    // Italic
+  hletter_045_spacing         = $5130BCF5;    // letter-spacing
   hLighten                    = $85E826DE;    // Lighten
+  hLighter                    = $CCEDB4E8;    // Lighter
   hLine                       = $7A6D718F;    // Line
+  hline_045_through           = $1C703CCD;    // line-through
   hLinear                     = $39327DA3;    // Linear
   hLinearGradient             = $C16E9BCD;    // LinearGradient
   hMarker                     = $72660BE9;    // Marker
@@ -101,6 +107,7 @@
   hResult                     = $47CD519F;    // Result
   hRx                         = $3ABF70F3;    // Rx
   hRy                         = $0C7D9470;    // Ry
+  hSans                       = $DE5518F6;    // Sans
   hSans_045_Serif             = $95106804;    // Sans-Serif
   hScreen                     = $207A08BB;    // Screen
   hSerif                      = $B88D4332;    // Serif
@@ -119,13 +126,18 @@
   hStroke_045_Width           = $AFF671ED;    // Stroke-Width
   hStyle                      = $A9473AB4;    // Style
   hSvg                        = $ED67C37E;    // Svg
+  hSwitch                     = $D60E64BB;    // Switch
   hTable                      = $AB55E184;    // Table
   hTableValues                = $2F999AD9;    // TableValues
   hText                       = $7F3B51AB;    // Text
   hText_045_Anchor            = $D0D82FE8;    // Text-Anchor
+  hText_045_Decoration        = $3BC20862;    // Text-Decoration
+  hTextPath                   = $18F2748E;    // TextPath
+  hTimes                      = $FF0E1FBE;    // Times
   hTransform                  = $A0930B32;    // Transform
   hTSpan                      = $33C1F865;    // TSpan
   hType                       = $3165B05D;    // Type
+  hUnderline                  = $70D1B303;    // Underline
   hUrl                        = $BC113F8C;    // Url
   hUse                        = $65736EEA;    // Use
   hUserSpaceOnUse             = $3D19F8A4;    // UserSpaceOnUse

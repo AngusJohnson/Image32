@@ -24,17 +24,19 @@ uses
 type
   TFontSyle = (fsBold, fsItalic);
   TFontSyles = set of TFontSyle;
+  TFontDecoration = (fdNone, fdUnderline, fdStrikeThrough);
 
   TSVGFontInfo = record
-    family  : TTtfFontFamily;
-    size    : double;
-    styles  : TFontSyles;
-    align   : TTextAlign;
+    family      : TTtfFontFamily;
+    size        : double;
+    styles      : TFontSyles;
+    align       : TTextAlign;
+    decoration  : TFontDecoration;
   end;
 
   TElementMeasureUnit = (emuBoundingBox, emuUserSpace);
-  TMeasureUnit = (muPixel, muPercent,
-    muDegree, muRadian, muInch, muCm, muMm, muEm, muEn);
+  TMeasureUnit = (muUndefined, muPixel, muPercent,
+    muDegree, muRadian, muInch, muCm, muMm, muEm, muEn, muPt);
 
   TSizeType = (stAverage, stWidth, stHeight);
 
@@ -42,10 +44,11 @@ type
     rawVal  : double;
     mu      : TMeasureUnit;
     procedure Init;
-    procedure SetValue(val: double; measureUnit: TMeasureUnit = muPixel);
+    procedure SetValue(val: double; measureUnit: TMeasureUnit = muUndefined);
     function  GetValue: double;
     function  GetValueX(const scaleRect: TRectD): double;
     function  GetValueY(const scaleRect: TRectD): double;
+    function  GetValueXY(const scaleRect: TRectD): double;
     function  IsValid: Boolean;
   end;
 
@@ -66,7 +69,6 @@ type
     procedure Init;
     function  GetRect(const scaleRect: TRectD): TRectD;
     function  GetRectWH(const scaleRect: TRectD): TRectWH;
-    function  GetRectWHForcePercent(const scaleRect: TRectD): TRectWH;
     function  IsValid: Boolean;
     function  IsEmpty: Boolean;
   end;
@@ -146,6 +148,8 @@ function ColorIsURL(pColor: PAnsiChar): Boolean;
 function ValueToColor32(const value: TAnsiName; var color: TColor32): Boolean;
 function MakeDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfInteger;
 
+procedure ConvertValueUnits(var value: TValue; percentTol: double);
+
 {$IF COMPILERVERSION < 17}
 type
   TSetOfChar = set of Char;
@@ -154,6 +158,7 @@ function CharInSet(chr: Char; chrs: TSetOfChar): Boolean;
 
 const
   clInvalid = $00010001;
+  sqrt2     = 1.4142135623731;
 var
   LowerCaseTable : array[#0..#255] of AnsiChar;
 
@@ -342,7 +347,7 @@ end;
 procedure TValue.Init;
 begin
   rawVal  := InvalidD;
-  mu      := muPixel;
+  mu      := muUndefined;
 end;
 //------------------------------------------------------------------------------
 
@@ -367,6 +372,7 @@ begin
     muMm      : Result := rawVal * mm;
     muEm      : Result := rawVal * 16;
     muEn      : Result := rawVal * 8;
+    muPt      : Result := rawVal * 1.3281472327365;
     else Result := rawVal;
   end;
 end;
@@ -383,6 +389,7 @@ begin
     muMm      : Result := rawVal * 96 / 25.4;
     muEm      : Result := rawVal * 16;
     muEn      : Result := rawVal * 8;
+    muPt      : Result := rawVal * 1.3281472327365;
     else Result := rawVal;
   end;
 end;
@@ -399,6 +406,26 @@ begin
     muMm      : Result := rawVal * 96 / 25.4;
     muEm      : Result := rawVal * 16;
     muEn      : Result := rawVal * 8;
+    muPt      : Result := rawVal * 1.3281472327365;
+    else Result := rawVal;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TValue.GetValueXY(const scaleRect: TRectD): double;
+begin
+  case mu of
+    muPercent :
+      //https://oreillymedia.github.io/Using_SVG/extras/ch05-percentages.html
+      Result := Hypot(scaleRect.Width, scaleRect.Height)/sqrt2 * rawVal * 0.01;
+    muDegree  : Result := rawVal;
+    muRadian  : Result := rawVal * 180/PI; //convert to degrees pro. tem.
+    muInch    : Result := rawVal * 96;
+    muCm      : Result := rawVal * 96 / 2.54;
+    muMm      : Result := rawVal * 96 / 25.4;
+    muEm      : Result := rawVal * 154;
+    muEn      : Result := rawVal * 77;
+    muPt      : Result := rawVal * 1.3281472327365;
     else Result := rawVal;
   end;
 end;
@@ -478,40 +505,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TValueRecWH.GetRectWHForcePercent(const scaleRect: TRectD): TRectWH;
-begin
-  //this method is a workaround for incorrect measure units
-
-  if (left.mu = muPercent) then
-    Result.Left := left.GetValueX(scaleRect)
-  else if Abs(left.rawVal) > 2.5 then
-    Result.Left := left.GetValueX(scaleRect) * scaleRect.Width *0.01
-  else
-    Result.Left := left.rawVal * scaleRect.Width;
-
-  if top.mu = muPercent then
-    Result.Top := top.GetValueY(scaleRect)
-  else if Abs(top.rawVal) > 2.5 then
-    Result.Top := top.GetValueY(scaleRect) * scaleRect.Height *0.01
-  else
-    Result.Top := top.rawVal * scaleRect.Height;
-
-  if width.mu = muPercent then
-    Result.Width := width.GetValueX(scaleRect)
-  else if Abs(width.rawVal) > 2.5 then
-    Result.Width := width.GetValueX(scaleRect) * scaleRect.Width *0.01
-  else
-    Result.Width := width.rawVal * scaleRect.Width;
-
-  if height.mu = muPercent then
-    Result.Height := height.GetValueY(scaleRect)
-  else if Abs(height.rawVal) > 2.5 then
-    Result.Height := height.GetValueY(scaleRect) * scaleRect.Height *0.01
-  else
-    Result.Height := height.rawVal * scaleRect.Height;
-end;
-//------------------------------------------------------------------------------
-
 function TValueRecWH.IsValid: Boolean;
 begin
   Result := width.IsValid and height.IsValid;
@@ -521,6 +514,61 @@ end;
 function TValueRecWH.IsEmpty: Boolean;
 begin
   Result := (width.rawVal <= 0) or (height.rawVal <= 0);
+end;
+//------------------------------------------------------------------------------
+
+procedure ConvertValueUnits(var value: TValue; percentTol: double);
+begin
+  with value do
+    case mu of
+      muUndefined:
+        if (rawVal = 0) or (Abs(rawVal) >= percentTol) then
+        begin
+          mu := muPixel
+        end else
+        begin
+          rawVal := rawVal * 100;
+          mu := muPercent;
+        end;
+      muPercent: ;
+      muDegree: ;
+      muRadian:
+        begin
+          mu := muDegree;
+          rawVal := rawVal * 180/PI;
+        end;
+      muInch:
+        begin
+          mu := muPixel;
+          rawVal := rawVal * 96;
+        end;
+      muCm:
+        begin
+          mu := muPixel;
+          rawVal := rawVal * 96 / 2.54;
+        end;
+      muMm:
+        begin
+          mu := muPixel;
+          rawVal := rawVal * 96 / 25.4;
+        end;
+      muEm:
+        begin
+          mu := muPixel;
+          rawVal := rawVal * 154;
+        end;
+      muEn:
+        begin
+          mu := muPixel;
+          rawVal := rawVal * 77;
+        end;
+      muPt:
+        begin
+          mu := muPixel;
+          rawVal := rawVal * 1.3281472327365;
+        end;
+      else mu := muPixel;
+    end;
 end;
 
 //------------------------------------------------------------------------------
@@ -740,7 +788,7 @@ var
   start: PAnsiChar;
 begin
   Result := false;
-  measureUnit := muPixel;
+  measureUnit := muUndefined;
 
   //skip white space +/- single comma
   if skipComma then
@@ -768,7 +816,8 @@ begin
       if decPos >= 0 then break;
       decPos := 0;
     end
-    else if (LowerCaseTable[current^] = 'e') then
+    else if (LowerCaseTable[current^] = 'e') and
+      (CharInSet((current+1)^, ['-','0'..'9'])) then
     begin
       if (current +1)^ = '-' then expIsNeg := true;
       inc(current);
@@ -817,6 +866,17 @@ begin
         inc(current, 3);
         measureUnit := muDegree;
       end;
+    'e': //convert cm to pixels
+      if ((current+1)^ = 'm') then
+      begin
+        inc(current, 2);
+        measureUnit := muEm;
+      end
+      else if ((current+1)^ = 'n') then
+      begin
+        inc(current, 2);
+        measureUnit := muEn;
+      end;
     'i': //convert inchs to pixels
       if ((current+1)^ = 'n') then
       begin
@@ -830,7 +890,16 @@ begin
         measureUnit := muMm;
       end;
     'p': //ignore px
-      if (current+1)^ = 'x' then inc(current, 2);
+      if (current+1)^ = 'x' then
+      begin
+        inc(current, 2);
+        measureUnit := muPixel;
+      end
+      else if (current+1)^ = 't' then
+      begin
+        inc(current, 2);
+        measureUnit := muPt;
+      end;
     'r': //convert radian angles to degrees
       if ((current+1)^ = 'a') and ((current+2)^ = 'd') then
       begin
@@ -853,8 +922,8 @@ begin
     muInch    : val := val * 96;
     muCm      : val := val * 96 / 2.54;
     muMm      : val := val * 96 / 25.4;
-    muEm      : val := val * 16;
-    muEn      : val := val * 8;
+    muEm      : val := val * 154;
+    muEn      : val := val * 77;
   end;
 end;
 //------------------------------------------------------------------------------

@@ -421,7 +421,8 @@ type
       angleRadians: double; const rotatePt: TPointD;
       out nextPt: TPointD): TPathsD;
 
-    function GetCharOffsets(const text: UnicodeString): TArrayOfDouble;
+    function GetCharOffsets(const text: UnicodeString;
+      interCharSpace: double = 0): TArrayOfDouble;
     function GetTextWidth(const text: UnicodeString): double;
 
     property Ascent: double read GetAscent;
@@ -470,7 +471,12 @@ type
 
   function GetTextGlyphsOnPath(const text: UnicodeString;
     const path: TPathD; glyphCache: TGlyphCache; textAlign: TTextAlign;
-    perpendicOffset: integer = 0; charSpacing: double = 0): TPathsD;
+    perpendicOffset: integer = 0; charSpacing: double = 0): TPathsD; overload;
+
+  function GetTextGlyphsOnPath(const text: UnicodeString;
+    const path: TPathD; glyphCache: TGlyphCache; textAlign: TTextAlign;
+    perpendicOffset: integer; charSpacing: double;
+    out charsThatFit: integer): TPathsD; overload;
 
   {$IFDEF MSWINDOWS}
   function PointHeightToPixelHeight(pt: double): double;
@@ -2105,7 +2111,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TGlyphCache.GetCharOffsets(const text: UnicodeString): TArrayOfDouble;
+function TGlyphCache.GetCharOffsets(const text: UnicodeString;
+  interCharSpace: double): TArrayOfDouble;
 var
   i,j, len: integer;
   ordinals: TArrayOfWord;
@@ -2132,10 +2139,10 @@ begin
     begin
       j := FindInKernList(glyphInfo.metrics.glyphIdx, prevGlyphKernList);
       if (j >= 0) then
-        thisX := thisX + prevGlyphKernList[j].kernValue * fScale;
+        thisX := thisX + prevGlyphKernList[j].kernValue*fScale +interCharSpace;
     end;
     Result[i] := thisX;
-    thisX := thisX + glyphInfo.metrics.hmtx.advanceWidth * fScale;
+    thisX := thisX + glyphInfo.metrics.hmtx.advanceWidth*fScale +interCharSpace;
     prevGlyphKernList := glyphInfo.metrics.kernList;
   end;
   Result[len] := thisX;
@@ -2718,10 +2725,22 @@ type
   TPathInfos = array of TPathInfo;
 
 function GetTextGlyphsOnPath(const text: UnicodeString;
-    const path: TPathD; glyphCache: TGlyphCache; textAlign: TTextAlign;
-    perpendicOffset: integer = 0; charSpacing: double = 0): TPathsD;
+  const path: TPathD; glyphCache: TGlyphCache; textAlign: TTextAlign;
+  perpendicOffset: integer = 0; charSpacing: double = 0): TPathsD;
 var
-  i, textLen, pathLen, pathInfoIdx: integer;
+  dummy: integer;
+begin
+  Result := GetTextGlyphsOnPath(text, path, glyphCache, textAlign,
+    perpendicOffset, charSpacing, dummy);
+end;
+//------------------------------------------------------------------------------
+
+function GetTextGlyphsOnPath(const text: UnicodeString;
+  const path: TPathD; glyphCache: TGlyphCache; textAlign: TTextAlign;
+  perpendicOffset: integer; charSpacing: double;
+  out charsThatFit: integer): TPathsD; overload;
+var
+  i, pathLen, pathInfoIdx: integer;
   textWidth, left, center, center2, scale, dist, dx: double;
   glyph: PGlyphInfo;
   offsets: TArrayOfDouble;
@@ -2732,37 +2751,49 @@ var
 
   function GetPathInfo(var startIdx: integer; offset: double): TPathInfo;
   begin
-    while startIdx < pathLen do
+    while startIdx <= pathLen do
     begin
       if pathInfos[startIdx].dist > offset then break;
       inc(startIdx);
     end;
     Result := pathInfos[startIdx -1];
     if Result.angle >= 0 then Exit; //ie already initialized
-    Result.angle  := -GetAngle(path[startIdx-1], path[startIdx]);
+    Result.angle  := GetAngle(path[startIdx-1], path[startIdx]);
     Result.vector := GetUnitVector(path[startIdx-1], path[startIdx]);
     Result.pt     := path[startIdx -1];
   end;
 
 begin
   Result := nil;
-  pathLen := Length(path) +1;
-  textLen := Length(text);
+  pathLen := Length(path);
+  charsThatFit := Length(text);
 
-  offsets := glyphCache.GetCharOffsets(text);
-  textWidth := offsets[textLen] + charSpacing * (textLen -1);
+  offsets := glyphCache.GetCharOffsets(text, charSpacing);
+  textWidth := offsets[charsThatFit];
 
-  setLength(pathInfos, pathLen);
-  if (pathLen < 3) or (textLen = 0) then Exit;
+  setLength(pathInfos, pathLen +1);
+  if (pathLen < 2) or (charsThatFit = 0) then Exit;
 
   dist := 0;
   pathInfos[0].angle := -1;
   pathInfos[0].dist := 0;
-  for i:= 1 to pathLen -2 do
+  for i:= 1 to pathLen -1 do
   begin
-    pathInfos[i].angle := -1; //flag uninitialized
+    pathInfos[i].angle := -1; //flag uninitialized.
     dist := dist + Distance(path[i-1], path[i]);
     pathInfos[i].dist := dist;
+  end;
+
+  //truncate text that doesn't fit ...
+  if offsets[charsThatFit] > dist then
+  begin
+    repeat
+      dec(charsThatFit);
+    until offsets[charsThatFit] <= dist;
+    //break text word boundaries
+    while (charsThatFit > 1) and (text[charsThatFit] <> #32) do
+      dec(charsThatFit);
+    if charsThatFit = 0 then charsThatFit := 1;
   end;
 
   case textAlign of
@@ -2774,12 +2805,13 @@ begin
   scale := glyphCache.Scale;
   Result := nil;
   pathInfoIdx := 1;
-  for i := 1 to textLen do
+  for i := 1 to charsThatFit do
   begin
     glyph :=  glyphCache.GetCharInfo(Ord(text[i]));
     with glyph.metrics do
       center := (glyf.xMax - glyf.xMin) * scale * 0.5;
     center2 := left + center;
+    left := left + glyph.metrics.hmtx.advanceWidth * scale + charSpacing;
     pathInfo := GetPathInfo(pathInfoIdx, center2);
     rotatePt := PointD(center, -perpendicOffset);
     tmpPaths := RotatePath(glyph.contours, rotatePt, pathInfo.angle);
@@ -2789,7 +2821,6 @@ begin
 
     tmpPaths := OffsetPath(tmpPaths, pt.X, pt.Y);
     AppendPath(Result, tmpPaths);
-    left := left + glyph.metrics.hmtx.advanceWidth * scale + charSpacing;
   end;
 end;
 //------------------------------------------------------------------------------
