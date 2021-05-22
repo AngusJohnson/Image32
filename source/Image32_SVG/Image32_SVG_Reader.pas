@@ -101,10 +101,12 @@ type
     procedure ParseStyle(classStyle: PAnsiChar; len: integer);
     procedure ParseTransform(const transform: TAnsiName);
     function  AddAttribute: PAttrib;
+    procedure ConvertValueUnits(var value: TValue; percentTol: double);
     //function GetSvgElement: TSvgElement;
   protected
-    measureUnit : TElementMeasureUnit;
+    elementUnit : TElementMeasureUnit;
     elRectWH    : TValueRecWH;
+    function  GetBoundsWH: TRectWH; virtual;
     function  LoadAttributes: Boolean; virtual;
     function  LoadContent: Boolean; virtual;
     procedure Draw(img: TImage32; drawInfo: TDrawInfo); virtual;
@@ -146,6 +148,7 @@ type
     procedure DrawStroke(img: TImage32; const drawInfo: TDrawInfo; isClosed: Boolean);
     procedure Draw(img: TImage32; drawInfo: TDrawInfo); override;
     procedure DrawMarkers(img: TImage32; drawInfo: TDrawInfo);
+    function  GetBoundsWH: TRectWH; override;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
@@ -1524,6 +1527,21 @@ end;
 function TShapeElement.GetVal(out val: double): Boolean;
 begin
   Result := ParseNextNum(fCurrent, fCurrentEnd, true, val);
+end;
+//------------------------------------------------------------------------------
+
+function TShapeElement.GetBoundsWH: TRectWH;
+var
+  rec: TRectD;
+begin
+  rec := GetBoundsD(fillPaths);
+  with Result do
+  begin
+    left := rec.Left;
+    top := rec.Top;
+    width := rec.Right - rec.Left;
+    height := rec.Bottom - rec.Top;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -3254,6 +3272,72 @@ begin
         end;
   end;
 end;
+//------------------------------------------------------------------------------
+
+function TElement.GetBoundsWH: TRectWH;
+begin
+  Result := fReader.fRootElement.viewboxWH;
+end;
+//------------------------------------------------------------------------------
+
+procedure TElement.ConvertValueUnits(var value: TValue; percentTol: double);
+begin
+  with value do
+    case mu of
+      muUndefined:
+        if (rawVal = 0) or (Abs(rawVal) >= percentTol) then
+        begin
+          mu := muPixel
+        end else
+        begin
+          rawVal := rawVal * 100;
+          mu := muPercent;
+        end;
+      muPercent:
+        begin
+          with GetBoundsWH do
+            if not IsEmpty then
+              rawVal := rawVal * Hypot(width, Height)/sqrt2 *0.01;
+        end;
+      muDegree: ;
+      muRadian:
+        begin
+          mu := muDegree;
+          rawVal := rawVal * 180/PI;
+        end;
+      muInch:
+        begin
+          mu := muPixel;
+          rawVal := rawVal * 96;
+        end;
+      muCm:
+        begin
+          mu := muPixel;
+          rawVal := rawVal * 96 / 2.54;
+        end;
+      muMm:
+        begin
+          mu := muPixel;
+          rawVal := rawVal * 96 / 25.4;
+        end;
+      muEm:
+        begin
+          mu := muPixel;
+          rawVal := rawVal * fFontInfo.size;
+        end;
+      muEn:
+        begin
+          mu := muPixel;
+          rawVal := rawVal * fFontInfo.size *0.5;
+        end;
+      muPt:
+        begin
+          mu := muPixel;
+          rawVal := rawVal * 1.3333333;
+        end;
+      else mu := muPixel;
+    end;
+end;
 
 //------------------------------------------------------------------------------
 // TSvgReader
@@ -3961,8 +4045,16 @@ end;
 //------------------------------------------------------------------------------
 
 procedure StrokeWidth_Attrib(attrib: PAttrib);
+var
+  mu: TMeasureUnit;
+  val: TValue;
 begin
-    AttribToFloat(attrib, attrib.aOwnerEl.fDrawInfo.strokeWidth);
+  with attrib.aOwnerEl do
+  begin
+    AttribToFloat(attrib, val.rawVal, val.mu);
+    ConvertValueUnits(val, 0.1);
+    fDrawInfo.strokewidth := val.rawVal;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -4042,12 +4134,12 @@ var
   val: double;
 begin
   AttribToFloat(attrib, val, mu);
-  with attrib.aOwnerEl.elRectWH do
+  with attrib.aOwnerEl do
   begin
-    height.SetValue(val, mu);
+    elRectWH.height.SetValue(val, mu);
     if attrib.aOwnerEl is TFilterElement then
-      ConvertValueUnits(height, 2.5) else
-      ConvertValueUnits(height, 1);
+      ConvertValueUnits(elRectWH.height, 2.5) else
+      ConvertValueUnits(elRectWH.height, 1);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -4058,12 +4150,12 @@ var
   val: double;
 begin
   AttribToFloat(attrib, val, mu);
-  with attrib.aOwnerEl.elRectWH do
+  with attrib.aOwnerEl do
   begin
-    width.SetValue(val, mu);
+    elRectWH.width.SetValue(val, mu);
     if attrib.aOwnerEl is TFilterElement then
-      ConvertValueUnits(width, 2.5) else
-      ConvertValueUnits(width, 1);
+      ConvertValueUnits(elRectWH.width, 2.5) else
+      ConvertValueUnits(elRectWH.width, 1);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -4208,9 +4300,10 @@ begin
         ConvertValueUnits(startPt.X, 2.5);
       end;
     hFilter:
+      with attrib.aOwnerEl do
       begin
-        attrib.aOwnerEl.elRectWH.left.SetValue(val, mu);
-        ConvertValueUnits(attrib.aOwnerEl.elRectWH.left, 2.5);
+        elRectWH.left.SetValue(val, mu);
+        ConvertValueUnits(elRectWH.left, 2.5);
       end;
     else
       attrib.aOwnerEl.elRectWH.left.SetValue(val, mu);
@@ -4253,9 +4346,10 @@ begin
         ConvertValueUnits(startPt.Y, 1);
       end;
     hFilter:
+      with attrib.aOwnerEl do
       begin
-        attrib.aOwnerEl.elRectWH.top.SetValue(val, mu);
-        ConvertValueUnits(attrib.aOwnerEl.elRectWH.top, 2.5);
+        elRectWH.top.SetValue(val, mu);
+        ConvertValueUnits(elRectWH.top, 2.5);
       end;
     else
       attrib.aOwnerEl.elRectWH.top.SetValue(val, mu);

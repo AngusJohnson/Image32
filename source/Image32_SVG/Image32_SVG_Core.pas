@@ -29,6 +29,7 @@ type
   TSVGFontInfo = record
     family      : TTtfFontFamily;
     size        : double;
+    spacing     : double;
     styles      : TFontSyles;
     align       : TTextAlign;
     decoration  : TFontDecoration;
@@ -147,8 +148,6 @@ function HtmlDecode(const html: ansiString): ansistring;
 function ColorIsURL(pColor: PAnsiChar): Boolean;
 function ValueToColor32(const value: TAnsiName; var color: TColor32): Boolean;
 function MakeDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfInteger;
-
-procedure ConvertValueUnits(var value: TValue; percentTol: double);
 
 {$IF COMPILERVERSION < 17}
 type
@@ -370,9 +369,7 @@ begin
     muInch    : Result := rawVal * 96;
     muCm      : Result := rawVal * cm;
     muMm      : Result := rawVal * mm;
-    muEm      : Result := rawVal * 16;
-    muEn      : Result := rawVal * 8;
-    muPt      : Result := rawVal * 1.3281472327365;
+    muPt      : Result := rawVal * 1.3333333;
     else Result := rawVal;
   end;
 end;
@@ -380,54 +377,26 @@ end;
 
 function TValue.GetValueX(const scaleRect: TRectD): double;
 begin
-  case mu of
-    muPercent : Result := (scaleRect.Right - scaleRect.Left) * rawVal * 0.01;
-    muDegree  : Result := rawVal;
-    muRadian  : Result := rawVal * 180/PI; //convert to degrees pro. tem.
-    muInch    : Result := rawVal * 96;
-    muCm      : Result := rawVal * 96 / 2.54;
-    muMm      : Result := rawVal * 96 / 25.4;
-    muEm      : Result := rawVal * 16;
-    muEn      : Result := rawVal * 8;
-    muPt      : Result := rawVal * 1.3281472327365;
-    else Result := rawVal;
-  end;
+  if mu = muPercent then
+    Result := (scaleRect.Right - scaleRect.Left) * rawVal * 0.01 else
+    Result := GetValue;
 end;
 //------------------------------------------------------------------------------
 
 function TValue.GetValueY(const scaleRect: TRectD): double;
 begin
-  case mu of
-    muPercent : Result := (scaleRect.Bottom - scaleRect.Top) * rawVal * 0.01;
-    muDegree  : Result := rawVal;
-    muRadian  : Result := rawVal * 180/PI; //convert to degrees pro. tem.
-    muInch    : Result := rawVal * 96;
-    muCm      : Result := rawVal * 96 / 2.54;
-    muMm      : Result := rawVal * 96 / 25.4;
-    muEm      : Result := rawVal * 16;
-    muEn      : Result := rawVal * 8;
-    muPt      : Result := rawVal * 1.3281472327365;
-    else Result := rawVal;
-  end;
+  if mu = muPercent then
+    Result := (scaleRect.Bottom - scaleRect.Top) * rawVal * 0.01 else
+    Result := GetValue;
 end;
 //------------------------------------------------------------------------------
 
 function TValue.GetValueXY(const scaleRect: TRectD): double;
 begin
-  case mu of
-    muPercent :
-      //https://oreillymedia.github.io/Using_SVG/extras/ch05-percentages.html
-      Result := Hypot(scaleRect.Width, scaleRect.Height)/sqrt2 * rawVal * 0.01;
-    muDegree  : Result := rawVal;
-    muRadian  : Result := rawVal * 180/PI; //convert to degrees pro. tem.
-    muInch    : Result := rawVal * 96;
-    muCm      : Result := rawVal * 96 / 2.54;
-    muMm      : Result := rawVal * 96 / 25.4;
-    muEm      : Result := rawVal * 154;
-    muEn      : Result := rawVal * 77;
-    muPt      : Result := rawVal * 1.3281472327365;
-    else Result := rawVal;
-  end;
+  if mu = muPercent then
+    //see https://oreillymedia.github.io/Using_SVG/extras/ch05-percentages.html
+    Result := Hypot(scaleRect.Width, scaleRect.Height)/sqrt2 *rawVal *0.01 else
+    Result := GetValue;
 end;
 //------------------------------------------------------------------------------
 
@@ -514,61 +483,6 @@ end;
 function TValueRecWH.IsEmpty: Boolean;
 begin
   Result := (width.rawVal <= 0) or (height.rawVal <= 0);
-end;
-//------------------------------------------------------------------------------
-
-procedure ConvertValueUnits(var value: TValue; percentTol: double);
-begin
-  with value do
-    case mu of
-      muUndefined:
-        if (rawVal = 0) or (Abs(rawVal) >= percentTol) then
-        begin
-          mu := muPixel
-        end else
-        begin
-          rawVal := rawVal * 100;
-          mu := muPercent;
-        end;
-      muPercent: ;
-      muDegree: ;
-      muRadian:
-        begin
-          mu := muDegree;
-          rawVal := rawVal * 180/PI;
-        end;
-      muInch:
-        begin
-          mu := muPixel;
-          rawVal := rawVal * 96;
-        end;
-      muCm:
-        begin
-          mu := muPixel;
-          rawVal := rawVal * 96 / 2.54;
-        end;
-      muMm:
-        begin
-          mu := muPixel;
-          rawVal := rawVal * 96 / 25.4;
-        end;
-      muEm:
-        begin
-          mu := muPixel;
-          rawVal := rawVal * 154;
-        end;
-      muEn:
-        begin
-          mu := muPixel;
-          rawVal := rawVal * 77;
-        end;
-      muPt:
-        begin
-          mu := muPixel;
-          rawVal := rawVal * 1.3281472327365;
-        end;
-      else mu := muPixel;
-    end;
 end;
 
 //------------------------------------------------------------------------------
@@ -913,18 +827,11 @@ end;
 function ParseNextNum(var current: PAnsiChar; currentEnd: PAnsiChar;
   skipComma: Boolean; out val: double): Boolean; overload;
 var
+  tmp: TValue;
   mu: TMeasureUnit;
 begin
-  Result := ParseNextNum(current, currentEnd, skipComma, val, mu);
-  case mu of
-    muPercent: val := val/100;
-    muRadian: val := val * 180/PI;
-    muInch    : val := val * 96;
-    muCm      : val := val * 96 / 2.54;
-    muMm      : val := val * 96 / 25.4;
-    muEm      : val := val * 154;
-    muEn      : val := val * 77;
-  end;
+  Result := ParseNextNum(current, currentEnd, skipComma, tmp.rawVal, tmp.mu);
+  val := tmp.GetValue;
 end;
 //------------------------------------------------------------------------------
 
