@@ -42,6 +42,8 @@ type
     fillEl        : TAnsiName;
     strokeColor   : TColor32;
     strokeWidth   : double;
+    strokeLineCap : TEndStyle;
+    strokeLineJoin: TJoinStyle;
     strokeEl      : TAnsiName;
     dashArray     : TArrayOfDouble;
     dashOffset    : double;
@@ -491,23 +493,26 @@ const
 
   defaultDrawInfo: TDrawInfo =
     (fillColor: clBlack32; fillRule: frNonZero; fillEl: (name: nil; len: 0);
-    strokeColor: clInvalid; strokeWidth: 1.0;
-    dashArray: nil; dashOffset: 0; markerStart: (name: nil; len: 0);
-    markerMiddle: (name: nil; len: 0); markerEnd: (name: nil; len: 0);
-    filterEl: (name: nil; len: 0);clipPathEl: (name: nil; len: 0); opacity: 255;
+    strokeColor: clInvalid; strokeWidth: 1.0; strokeLineCap: esButt;
+    strokeLineJoin: jsMiter; dashArray: nil; dashOffset: 0;
+    markerStart: (name: nil; len: 0); markerMiddle: (name: nil; len: 0);
+    markerEnd: (name: nil; len: 0); filterEl: (name: nil; len: 0);
+    clipPathEl: (name: nil; len: 0); opacity: 255;
     matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)); visible: true; using: false);
 
   emptyDrawInfo: TDrawInfo =
     (fillColor: clInvalid; fillRule: frNonZero; fillEl: (name: nil; len: 0);
-    strokeColor: clInvalid; strokeWidth: -Infinity;
-    dashArray: nil; dashOffset: 0; markerStart: (name: nil; len: 0);
-    markerMiddle: (name: nil; len: 0);markerEnd: (name: nil; len: 0);
-    filterEl: (name: nil; len: 0);clipPathEl: (name: nil; len: 0);opacity: 255;
+    strokeColor: clInvalid; strokeWidth: -Infinity; strokeLineCap: esButt;
+    strokeLineJoin: jsMiter; dashArray: nil; dashOffset: 0;
+    markerStart: (name: nil; len: 0); markerMiddle: (name: nil; len: 0);
+    markerEnd: (name: nil; len: 0); filterEl: (name: nil; len: 0);
+    clipPathEl: (name: nil; len: 0);opacity: 255;
     matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)); visible: true; using: false);
 
   defaultFontInfo: TSVGFontInfo =
     (family: ttfSansSerif; size: 10; spacing: 0.0;
-    styles: []; align: taLeft; decoration: fdNone);
+    styles: []; align: taLeft; decoration:
+    fdNone; baseShift: (rawVal: 0; mu: muUndefined));
 
 var
   AttribFuncList : TStringList;
@@ -1370,7 +1375,7 @@ var
 begin
   if not GetSrcAndDst then Exit;
   if elRectWH.IsValid then
-    rec := Rect(elRectWH.GetRect(RectD(srcRec))) else
+    rec := Rect(elRectWH.GetRectD(RectD(srcRec))) else
     rec := srcRec;
   dstImg.FillRect(rec, floodColor);
 end;
@@ -1535,13 +1540,7 @@ var
   rec: TRectD;
 begin
   rec := GetBoundsD(fillPaths);
-  with Result do
-  begin
-    left := rec.Left;
-    top := rec.Top;
-    width := rec.Right - rec.Left;
-    height := rec.Bottom - rec.Top;
-  end;
+  Result := RectWH(rec);
 end;
 //------------------------------------------------------------------------------
 
@@ -1796,14 +1795,20 @@ var
   rec: TRectD;
   strokePaths: TPathsD;
   refEl: TElement;
-const
-  endStyle: array [Boolean] of TEndStyle = (esRound, esPolygon);
-  endStyle2: array [Boolean] of TEndStyle = (esButt, esPolygon);
+  endStyle: TEndStyle;
+  joinStyle: TJoinStyle;
 begin
   if isClosed then
-    strokePaths := drawPathsC else
+  begin
+    strokePaths := drawPathsC;
+    endStyle := esPolygon;
+  end else
+  begin
+    endStyle := fDrawInfo.strokeLineCap;
     strokePaths := drawPathsO;
+  end;
   if not Assigned(strokePaths) then Exit;
+  joinStyle := fDrawInfo.strokeLineJoin;
 
   scale := ExtractAvgScaleFromMatrix(drawInfo.matrix);
 
@@ -1812,7 +1817,7 @@ begin
     dashOffset := Round(drawInfo.dashOffset * scale);
     dashArray := MakeDashArray(drawInfo.dashArray, scale);
     DrawDashedLine(img, strokePaths, dashArray, @dashOffset,
-      drawInfo.strokeWidth * scale, drawInfo.strokeColor, endStyle2[isClosed])
+      drawInfo.strokeWidth * scale, drawInfo.strokeColor, endStyle)
   end
   else if Assigned(drawInfo.strokeEl.name) then
   begin
@@ -1825,27 +1830,28 @@ begin
       with TRadGradElement(refEl) do
         PrepareRenderer(fReader.RadGradRenderer, drawInfo.matrix, rec);
       DrawLine(img, strokePaths, drawInfo.strokeWidth * scale,
-        fReader.RadGradRenderer, endStyle[isClosed], jsAuto, scale);
+        fReader.RadGradRenderer, endStyle, joinStyle, scale);
     end
     else if refEl is TLinGradElement then
     begin
       with TLinGradElement(refEl) do
         PrepareRenderer(fReader.LinGradRenderer, drawInfo.matrix, rec);
       DrawLine(img, strokePaths, drawInfo.strokeWidth * scale,
-        fReader.LinGradRenderer, endStyle[isClosed], jsAuto, scale);
+        fReader.LinGradRenderer, endStyle, joinStyle, scale);
     end
     else if refEl is TPatternElement then
     begin
       with TPatternElement(refEl) do
         PrepareRenderer(fReader.ImageRenderer, drawInfo.matrix, rec);
       DrawLine(img, strokePaths, drawInfo.strokeWidth * scale,
-        fReader.ImageRenderer, endStyle[isClosed], jsAuto, scale);
+        fReader.ImageRenderer, endStyle, joinStyle, scale);
     end;
-  end else
-  begin
+  end else if (joinStyle = jsMiter) then
     DrawLine(img, strokePaths, drawInfo.strokeWidth * scale,
-      drawInfo.strokeColor, endStyle[isClosed], jsAuto, scale);
-  end;
+      drawInfo.strokeColor, endStyle, joinStyle, DefaultMiterLimit)
+  else
+    DrawLine(img, strokePaths, drawInfo.strokeWidth * scale,
+      drawInfo.strokeColor, endStyle, joinStyle, scale);
 end;
 
 //------------------------------------------------------------------------------
@@ -2246,7 +2252,7 @@ var
   path: TPathD;
 begin
   inherited;
-  rec := elRectWH.GetRect(fReader.rawRect);
+  rec := elRectWH.GetRectD(fReader.rawRect);
   if rec.IsEmpty then Exit;
 
   rad := radius.GetPoint(rec);
@@ -2329,7 +2335,7 @@ var
   isFirst: Boolean;
   s: string;
   i: integer;
-  tmpX, offsetX, scale: double;
+  tmpX, offsetX, scale, baseShift: double;
   mat: TMatrixD;
 begin
   inherited;
@@ -2373,6 +2379,14 @@ begin
       tmpPt.Y := 0;
   end;
 
+
+  if fFontInfo.baseShift.rawVal <> 0 then
+  begin
+    baseShift := fFontInfo.baseShift.GetValue;
+    if fFontInfo.baseShift.mu = muPercent then
+      baseShift := baseShift * fFontInfo.size;
+  end else
+    baseShift := 0;
   topTextEl.tmpPt := tmpPt;
 
   if textLen = 0 then
@@ -2420,7 +2434,7 @@ begin
         end;
     end;
 
-  MatrixTranslate(mat, offsetX, tmpPt.Y);
+  MatrixTranslate(mat, offsetX, tmpPt.Y - baseShift);
   MatrixApply(mat, drawPathsC);
 end;
 
@@ -2431,6 +2445,9 @@ end;
 constructor TTSpanElement.Create(parent: TElement; hashName: Cardinal);
 begin
   inherited;
+  fFontInfo.decoration := fdNone; //decoration is not inherited;
+  fFontInfo.baseShift.SetValue(0);
+
   elRectWH.Init;
   tmpPt := InvalidPointD;
   delta := InvalidPointD;
@@ -2442,17 +2459,15 @@ end;
 
 procedure TTextPathElement.GetUnscaledPaths(const drawInfo: TDrawInfo);
 var
-  tmpPt: TPointD;
   parentTextEl, topTextEl: TTextElement;
   el: TElement;
   isFirst: Boolean;
   s: string;
   i, charsThatFit: integer;
-  tmpX, offsetX, scale, spacing, fh: double;
+  scale, spacing: double;
   utf8String: AnsiString;
   mat: TMatrixD;
   path: TPathD;
-  tmpPaths: TPathsD;
   isClosed: Boolean;
 begin
   drawPathsO := nil; drawPathsC := nil; fillPaths := nil;
@@ -3282,6 +3297,8 @@ end;
 
 procedure TElement.ConvertValueUnits(var value: TValue; percentTol: double);
 begin
+  //https://oreillymedia.github.io/Using_SVG/guide/units.html
+  //todo: lots of units still unsupported.
   with value do
     case mu of
       muUndefined:
@@ -3325,7 +3342,7 @@ begin
           mu := muPixel;
           rawVal := rawVal * fFontInfo.size;
         end;
-      muEn:
+      muEx:
         begin
           mu := muPixel;
           rawVal := rawVal * fFontInfo.size *0.5;
@@ -3435,8 +3452,6 @@ procedure TSvgReader.DrawImage(img: TImage32; scaleToImage: Boolean);
 var
   rawScale, sx, sy, w,h: double;
   di: TDrawInfo;
-const
-  endStyle: array[boolean] of TEndStyle = (esPolygon, esRound);
 begin
   if not Assigned(fRootElement) then Exit;
 
@@ -3680,6 +3695,29 @@ begin
       TTextPathElement(el).pathEl := ExtractRefFromValue(attrib.aValue);
     else if el is TFillElement then
       TFillElement(el).refEl := ExtractRefFromValue(attrib.aValue);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure BaselineShift_Attrib(attrib: PAttrib);
+var
+  mu: TMeasureUnit;
+  val: double;
+  word: TAnsiName;
+  c, endC: PAnsiChar;
+begin
+  c := attrib.aValue.name;
+  endC := c + attrib.aValue.len;
+  ParseNextWord(c, endC, word);
+  case GetHashedName(word) of
+    hSuper: attrib.aOwnerEl.fFontInfo.baseShift.SetValue(50, muPercent);
+    hSub: attrib.aOwnerEl.fFontInfo.baseShift.SetValue(-50, muPercent);
+    hBaseline: attrib.aOwnerEl.fFontInfo.baseShift.SetValue(0, muPixel);
+    else
+    begin
+      AttribToFloat(attrib, val, mu);
+      attrib.aOwnerEl.fFontInfo.baseShift.SetValue(val, mu);
+    end;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -4038,6 +4076,46 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure StrokeLineCap_Attrib(attrib: PAttrib);
+var
+  word: TAnsiName;
+  c, endC: PAnsiChar;
+begin
+  c := attrib.aValue.name;
+  endC := c + attrib.aValue.len;
+  ParseNextWord(c, endC, word);
+  with attrib.aOwnerEl.fDrawInfo do
+    case GetHashedName(word) of
+      hButt   : strokeLineCap := esButt;
+      hRound  : strokeLineCap := esRound;
+      hSquare : strokeLineCap := esSquare;
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure StrokeLineJoin_Attrib(attrib: PAttrib);
+var
+  word: TAnsiName;
+  c, endC: PAnsiChar;
+begin
+  c := attrib.aValue.name;
+  endC := c + attrib.aValue.len;
+  ParseNextWord(c, endC, word);
+  with attrib.aOwnerEl.fDrawInfo do
+    case GetHashedName(word) of
+      hMiter  : strokeLineJoin := jsMiter;
+      hRound  : strokeLineJoin := jsRound;
+      hBevel  : strokeLineJoin := jsSquare;
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure StrokeMiterLimit_Attrib(attrib: PAttrib);
+begin
+
+end;
+//------------------------------------------------------------------------------
+
 procedure StrokeOpacity_Attrib(attrib: PAttrib);
 begin
   AttribToOpacity(attrib, attrib.aOwnerEl.fDrawInfo.strokeColor);
@@ -4046,7 +4124,6 @@ end;
 
 procedure StrokeWidth_Attrib(attrib: PAttrib);
 var
-  mu: TMeasureUnit;
   val: TValue;
 begin
   with attrib.aOwnerEl do
@@ -4383,6 +4460,7 @@ begin
   AttribFuncList := TStringList.Create;
   AttribFuncList.Duplicates := dupError;
 
+  RegisterAttribute(hbaseline_045_shift,    BaselineShift_Attrib);
   RegisterAttribute(hClass,                 Class_Attrib);
   RegisterAttribute(hClip_045_path,         ClipPath_Attrib);
   RegisterAttribute(hCx,                    Cx_Attrib);
@@ -4434,6 +4512,9 @@ begin
   RegisterAttribute(hStop_045_Color,        StopColor_Attrib);
   RegisterAttribute(hStop_045_Opacity,      StopOpacity_Attrib);
   RegisterAttribute(hStroke,                Stroke_Attrib);
+  RegisterAttribute(hstroke_045_linecap,    StrokeLineCap_Attrib);
+  RegisterAttribute(hstroke_045_linejoin,   StrokeLineJoin_Attrib);
+  RegisterAttribute(hstroke_045_miterlimit, StrokeMiterLimit_Attrib);
   RegisterAttribute(hStroke_045_Opacity,    StrokeOpacity_Attrib);
   RegisterAttribute(hStroke_045_Width,      StrokeWidth_Attrib);
   RegisterAttribute(hStyle,                 Style_Attrib);

@@ -22,24 +22,9 @@ uses
   SysUtils, Classes, Types, Math, Image32, Image32_Vector, Image32_Ttf;
 
 type
-  TFontSyle = (fsBold, fsItalic);
-  TFontSyles = set of TFontSyle;
-  TFontDecoration = (fdNone, fdUnderline, fdStrikeThrough);
-
-  TSVGFontInfo = record
-    family      : TTtfFontFamily;
-    size        : double;
-    spacing     : double;
-    styles      : TFontSyles;
-    align       : TTextAlign;
-    decoration  : TFontDecoration;
-  end;
-
   TElementMeasureUnit = (emuBoundingBox, emuUserSpace);
   TMeasureUnit = (muUndefined, muPixel, muPercent,
-    muDegree, muRadian, muInch, muCm, muMm, muEm, muEn, muPt);
-
-  TSizeType = (stAverage, stWidth, stHeight);
+    muDegree, muRadian, muInch, muCm, muMm, muEm, muEx, muPt);
 
   TValue = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
     rawVal  : double;
@@ -58,7 +43,6 @@ type
     Y       : TValue;
     procedure Init;
     function  GetPoint(const scaleRect: TRectD): TPointD;
-    function  GetPointForcePercent(const scaleRect: TRectD): TPointD;
     function  IsValid: Boolean;
   end;
 
@@ -68,7 +52,7 @@ type
     width   : TValue;
     height  : TValue;
     procedure Init;
-    function  GetRect(const scaleRect: TRectD): TRectD;
+    function  GetRectD(const scaleRect: TRectD): TRectD;
     function  GetRectWH(const scaleRect: TRectD): TRectWH;
     function  IsValid: Boolean;
     function  IsEmpty: Boolean;
@@ -89,6 +73,22 @@ type
     function  GetStyle(const classname: AnsiString): AnsiString;
     procedure Clear;
   end;
+
+  TFontSyle = (fsBold, fsItalic);
+  TFontSyles = set of TFontSyle;
+  TFontDecoration = (fdNone, fdUnderline, fdStrikeThrough);
+
+  TSVGFontInfo = record
+    family      : TTtfFontFamily;
+    size        : double;
+    spacing     : double;
+    styles      : TFontSyles;
+    align       : TTextAlign;
+    decoration  : TFontDecoration;
+    baseShift   : TValue;
+  end;
+
+  TSizeType = (stAverage, stWidth, stHeight);
 
   TDsegType = (dsMove, dsLine, dsHorz, dsVert, dsArc,
     dsQBez, dsCBez, dsQSpline, dsCSpline, dsClose);
@@ -423,17 +423,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function  TValuePt.GetPointForcePercent(const scaleRect: TRectD): TPointD;
-begin
-  if X.mu = muPercent then
-    Result.X := X.GetValueX(scaleRect) else
-    Result.X := X.GetValueX(scaleRect) * scaleRect.Width;
-  if Y.mu = muPercent then
-    Result.Y := Y.GetValueY(scaleRect) else
-    Result.Y := Y.GetValueY(scaleRect) * scaleRect.Height;
-end;
-//------------------------------------------------------------------------------
-
 function TValuePt.IsValid: Boolean;
 begin
   Result := X.IsValid and Y.IsValid;
@@ -452,7 +441,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TValueRecWH.GetRect(const scaleRect: TRectD): TRectD;
+function TValueRecWH.GetRectD(const scaleRect: TRectD): TRectD;
 begin
   if not left.IsValid then
     Result.Left := 0 else
@@ -786,10 +775,10 @@ begin
         inc(current, 2);
         measureUnit := muEm;
       end
-      else if ((current+1)^ = 'n') then
+      else if ((current+1)^ = 'x') then
       begin
         inc(current, 2);
-        measureUnit := muEn;
+        measureUnit := muEx;
       end;
     'i': //convert inchs to pixels
       if ((current+1)^ = 'n') then

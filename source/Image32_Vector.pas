@@ -45,6 +45,7 @@ type
 
   function RectWH(left, top, width, height: integer): TRectWH; overload;
   function RectWH(left, top, width, height: double ): TRectWH; overload;
+  function RectWH(const rec: TRectD): TRectWH; overload;
 
   function InflateRect(const rec: TRect; dx, dy: integer): TRect; overload;
   function InflateRect(const rec: TRectD; dx, dy: double): TRectD; overload;
@@ -423,6 +424,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function RectWH(const rec: TRectD): TRectWH;
+begin
+  Result.Left := rec.left;
+  Result.Top := rec.top;
+  Result.Width := rec.width;
+  Result.Height := rec.height;
+end;
+//------------------------------------------------------------------------------
 
 function RectsEqual(const rec1, rec2: TRect): Boolean;
 begin
@@ -848,7 +857,7 @@ function GetUnitNormal(const pt1, pt2: TPointD): TPointD;
 var
   dx, dy, inverseHypot: Double;
 begin
-  if (pt1.x = pt2.x) and (pt1.y = pt2.y) then
+  if PointsNearEqual(pt1, pt2, 0.001) then
   begin
     Result.X := 0;
     Result.Y := 0;
@@ -1127,8 +1136,7 @@ begin
   pt := path[0];
   //skip duplicates
   i := len -1;
-  while (i > 0) and
-    (path[i].X = pt.X) and (path[i].Y = pt.Y) do dec(i);
+  while (i > 0) and PointsNearEqual(path[i], pt, 0.001) do dec(i);
   if (i = 0) then
   begin
     //all points are equal!
@@ -1567,12 +1575,13 @@ begin
     steps360 := 4 * Max(1, Sqrt(delta * miterLimOrRndScale));
     stepsPerRad := steps360 / (Pi *2);
     GetSinCos(Pi*2/steps360, stepSin, stepCos);
+  end else
+  begin
+    if miterLimOrRndScale < 1 then miterLimOrRndScale := DefaultMiterLimit;
+    miterLimOrRndScale := 2 /(sqr(miterLimOrRndScale));
   end;
 
   result := nil; resultLen := 0; buffLen := 0;
-  if miterLimOrRndScale < 1 then miterLimOrRndScale := DefaultMiterLimit
-  else miterLimOrRndScale := 2 /(sqr(miterLimOrRndScale));
-
   norms := normals;
   if not assigned(norms) then
     norms := GetNormals(path);
@@ -1877,25 +1886,21 @@ begin
       joinStyle := jsSquare;
   end;
 
-  if joinStyle = jsRound then
-  begin
-    line2 := OpenPathToFlatPolygon(line);
-  end else
+  if endStyle = esSquare then
   begin
     line1 := Copy(line, 0, len);
-    if endStyle = esSquare then
-    begin
-      //extend both ends of the line by 1/2 lineWidth
-      wd2 := width/2;
-      vec1 := GetUnitVector(line1[1], line1[0]);
-      vec2 := GetUnitVector(line1[len-2], line1[len-1]);
-      with line1[0] do
-        line1[0] := PointD(X + vec1.X * wd2, Y + vec1.y * wd2);
-      with line1[len-1] do
-        line1[len-1] := PointD(X + vec2.X * wd2, Y + vec2.y * wd2);
-    end;
+    //extend both ends of the line by 1/2 lineWidth
+    wd2 := width/2;
+    vec1 := GetUnitVector(line1[1], line1[0]);
+    vec2 := GetUnitVector(line1[len-2], line1[len-1]);
+    with line1[0] do
+      line1[0] := PointD(X + vec1.X * wd2, Y + vec1.y * wd2);
+    with line1[len-1] do
+      line1[len-1] := PointD(X + vec2.X * wd2, Y + vec2.y * wd2);
     line2 := OpenPathToFlatPolygon(line1);
-  end;
+  end else
+    line2 := OpenPathToFlatPolygon(line);
+
   SetLength(result, 1);
   Result[0] := Grow(line2, nil, width/2, joinStyle, miterLimOrRndScale);
 end;

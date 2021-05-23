@@ -3,8 +3,12 @@
   hArial                      = $EC47D4A0;    // Arial
   hAtop                       = $7655315D;    // Atop
   hauto_045_start_045_reverse = $EE4545A2;    // auto-start-reverse
+  hBaseline                   = $C7461648;    // Baseline
+  hbaseline_045_shift         = $56FA5107;    // baseline-shift
+  hBevel                      = $BF36E150;    // Bevel
   hBold                       = $2F420533;    // Bold
   hBolder                     = $9C928BF1;    // Bolder
+  hButt                       = $B619E60B;    // Butt
   hCDATA                      = $FF50BB67;    // CDATA
   hCircle                     = $C6AE4953;    // Circle
   hClass                      = $E45C07DD;    // Class
@@ -78,6 +82,7 @@
   hMarkerWidth                = $EF8DF427;    // MarkerWidth
   hMatrix                     = $31E3AD46;    // Matrix
   hMiddle                     = $80732990;    // Middle
+  hMiter                      = $33868A3B;    // Miter
   hMode                       = $68155C83;    // Mode
   hMonospace                  = $049AE941;    // Monospace
   hMultiply                   = $9110BAC4;    // Multiply
@@ -105,6 +110,7 @@
   hRefX                       = $00C1DE46;    // RefX
   hRefY                       = $480CECDB;    // RefY
   hResult                     = $47CD519F;    // Result
+  hRound                      = $323B0E24;    // Round
   hRx                         = $3ABF70F3;    // Rx
   hRy                         = $0C7D9470;    // Ry
   hSans                       = $DE5518F6;    // Sans
@@ -114,6 +120,7 @@
   hSlope                      = $4774735C;    // Slope
   hSourceAlpha                = $F891B958;    // SourceAlpha
   hSourceGraphic              = $A4DB1DC2;    // SourceGraphic
+  hSquare                     = $20E48144;    // Square
   hStart                      = $84DC271F;    // Start
   hstdDeviation               = $00D13F6A;    // stdDeviation
   hStop                       = $930CA7F2;    // Stop
@@ -122,9 +129,14 @@
   hStroke                     = $E04ABDF3;    // Stroke
   hStroke_045_DashArray       = $795F2D78;    // Stroke-DashArray
   hStroke_045_DashOffset      = $A418B357;    // Stroke-DashOffset
+  hstroke_045_linecap         = $29D0178F;    // stroke-linecap
+  hstroke_045_linejoin        = $79642287;    // stroke-linejoin
+  hstroke_045_miterlimit      = $16C29890;    // stroke-miterlimit
   hStroke_045_Opacity         = $D237C6B5;    // Stroke-Opacity
   hStroke_045_Width           = $AFF671ED;    // Stroke-Width
   hStyle                      = $A9473AB4;    // Style
+  hSub                        = $1B3C1FFA;    // Sub
+  hSuper                      = $9C5EE034;    // Super
   hSvg                        = $ED67C37E;    // Svg
   hSwitch                     = $D60E64BB;    // Switch
   hTable                      = $AB55E184;    // Table

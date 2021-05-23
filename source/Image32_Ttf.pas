@@ -501,8 +501,8 @@ procedure GetMeaningfulDateTime(const secsSince1904: Uint64;
   out yy,mo,dd, hh,mi,ss: cardinal);
 const
   dim: array[boolean, 0..12] of cardinal =
-    ((0,31,59,90,120,151,181,212,243,273,304,334,365),
-    (0,31,60,91,121,152,182,213,244,274,305,335,366));
+    ((0,31,59,90,120,151,181,212,243,273,304,334,365), //non-leap year
+    (0,31,60,91,121,152,182,213,244,274,305,335,366)); //leap year
 var
   isLeapYr: Boolean;
 const
