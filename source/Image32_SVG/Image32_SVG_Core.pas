@@ -106,7 +106,8 @@ type
     segs      : array of TDpathSeg;
     //scalePending parameter: if the SVG will be scaled later by this amount,
     //then make sure that curves are flattened to an appropriate precision
-    function GetFlattened(scalePending: double = 1.0): TPathD;
+    function GetFlattenedPath(scalePending: double = 1.0): TPathD;
+    function GetUncurvedPath: TPathD; //only needed for markers
   end;
   TDpaths = array of TDpath;
 
@@ -192,7 +193,7 @@ end;
 // TDpath
 //------------------------------------------------------------------------------
 
-function TDpath.GetFlattened(scalePending: double): TPathD;
+function TDpath.GetFlattenedPath(scalePending: double): TPathD;
 const
   buffSize = 32;
 var
@@ -338,6 +339,76 @@ begin
     end;
   SetLength(Result, pathLen);
 end;
+//------------------------------------------------------------------------------
+
+function TDpath.GetUncurvedPath: TPathD;
+const
+  buffSize = 32;
+var
+  i,j, pathLen, pathCap: integer;
+  currPt, radii, pt2, pt3, pt4: TPointD;
+  arcFlag, sweepFlag: integer;
+  angle, arc1, arc2, bezTolerance: double;
+  rec: TRectD;
+  path2: TPathD;
+
+  procedure AddPoint(const pt: TPointD);
+  begin
+    if pathLen = pathCap then
+    begin
+      pathCap := pathCap + buffSize;
+      SetLength(Result, pathCap);
+    end;
+    Result[pathLen] := pt;
+    currPt := pt;
+    inc(pathLen);
+  end;
+
+begin
+  pathLen := 0; pathCap := 0;
+  AddPoint(firstPt);
+  for i := 0 to High(segs) do
+    with segs[i] do
+    begin
+      case segType of
+        dsLine:
+          if High(vals) > 0 then
+            for j := 0 to High(vals) div 2 do
+              AddPoint(PointD(vals[j*2], vals[j*2 +1]));
+        dsHorz:
+          for j := 0 to High(vals) do
+            AddPoint(PointD(vals[j], currPt.Y));
+        dsVert:
+          for j := 0 to High(vals) do
+            AddPoint(PointD(currPt.X, vals[j]));
+        dsArc:
+          if High(vals) > 5 then
+            for j := 0 to High(vals) div 7 do
+              AddPoint(PointD(vals[j*7 +5], vals[j*7 +6]));
+        dsQBez:
+          if High(vals) > 2 then
+            for j := 0 to High(vals) div 4 do
+            begin
+              pt2.X := vals[j*4];
+              pt2.Y := vals[j*4 +1];
+              AddPoint(PointD(vals[j*4 +2], vals[j*4 +3]));
+            end;
+        dsQSpline:
+          if High(vals) > 0 then
+            for j := 0 to High(vals) div 2 do
+              AddPoint(PointD(vals[j*2 +1], vals[j*2 +1]));
+        dsCBez:
+          if High(vals) > 4 then
+            for j := 0 to High(vals) div 6 do
+              AddPoint(PointD(vals[j*6 +4], vals[j*6 +5]));
+        dsCSpline:
+          if High(vals) > 2 then
+            for j := 0 to High(vals) div 4 do
+              AddPoint(PointD(vals[j*4 +2], vals[j*4 +3]));
+      end;
+    end;
+  SetLength(Result, pathLen);
+end;
 
 //------------------------------------------------------------------------------
 // TValue
@@ -378,7 +449,7 @@ end;
 function TValue.GetValueX(const scaleRect: TRectD): double;
 begin
   if mu = muPercent then
-    Result := (scaleRect.Right - scaleRect.Left) * rawVal * 0.01 else
+    Result := scaleRect.Width * rawVal * 0.01 else
     Result := GetValue;
 end;
 //------------------------------------------------------------------------------
@@ -386,7 +457,7 @@ end;
 function TValue.GetValueY(const scaleRect: TRectD): double;
 begin
   if mu = muPercent then
-    Result := (scaleRect.Bottom - scaleRect.Top) * rawVal * 0.01 else
+    Result := scaleRect.Height * rawVal * 0.01 else
     Result := GetValue;
 end;
 //------------------------------------------------------------------------------

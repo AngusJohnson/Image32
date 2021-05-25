@@ -194,7 +194,8 @@ type
     procedure ReduceOpacity(opacity: Byte); overload;
     procedure ReduceOpacity(opacity: Byte; rec: TRect); overload;
     //SetRGB: Sets the RGB channels leaving the alpha channel unchanged
-    procedure SetRGB(rgbColor: TColor32);
+    procedure SetRGB(rgbColor: TColor32); overload;
+    procedure SetRGB(rgbColor: TColor32; rec: TRect); overload;
     //Grayscale: Only changes color channels. The alpha channel is untouched.
     procedure Grayscale;
     procedure InvertColors;
@@ -395,8 +396,8 @@ type
   function RectD(left, top, right, bottom: double): TRectD; overload;
   function RectD(const rec: TRect): TRectD; overload;
 
-  function ClampByte(val: Integer): byte; overload;
-  function ClampByte(val: double): byte; overload;
+  function ClampByte(val: Integer): byte; overload; {$IFDEF INLINE} inline; {$ENDIF}
+  function ClampByte(val: double): byte; overload; {$IFDEF INLINE} inline; {$ENDIF}
   function ClampRange(val, min, max: Integer): Integer; overload;
   function ClampRange(val, min, max: double): double; overload;
   function IncPColor32(pc: Pointer; cnt: Integer): PColor32;
@@ -2557,6 +2558,34 @@ begin
     pc.G := g;
     pc.B := b;
     inc(pc);
+  end;
+  Changed;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.SetRGB(rgbColor: TColor32; rec: TRect);
+var
+  rgb: TARGB absolute rgbColor;
+  r,g,b: Byte;
+  i,j, dx: Integer;
+  pc: PARGB;
+begin
+  rec := Image32_Vector.IntersectRect(rec, bounds);
+  if IsEmptyRect(rec) then Exit;
+  r := rgb.R; g := rgb.G; b := rgb.B;
+  pc := PARGB(PixelBase);
+  inc(pc, rec.Left);
+  dx := Width - RectWidth(rec);
+  for i := rec.Top to rec.Bottom -1 do
+  begin
+    for j := rec.Left to rec.Right -1 do
+    begin
+      pc.R := r;
+      pc.G := g;
+      pc.B := b;
+      inc(pc);
+    end;
+    inc(pc, dx);
   end;
   Changed;
 end;

@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 2.22
-Released: 2 April 2021
+Latest version: 2.24
+Released: 25 May 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -12,19 +12,21 @@ Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
-Version 2.23 (preliminary)
+Version 2.24 (preliminary)
   Image32_SVG_Reader
-	New unit added (beta - and still much to do)
+    New unit added
+  Image32_Vector
+    DefaultMiterLimit changed to 4 (to match SVG)
   Image32_Transform
     Changed MatrixSkew parameters
-	Added ImageScaleDown procedure
-  Image32_Vector
-    Added UseDynamicTolerances variable (default = true)
-	  for flattening bezier curves and all rounding
+    Added ImageScaleDown procedure
   Image32Panels
     Renamed CenterImagePoint function to GetImageCenter
   Examples
     Added a new SVG example app.
+  Numerous minor bugfixes
+
+Version 2.23 :)
 	
 Version 2.22
   Image32_Resamplers

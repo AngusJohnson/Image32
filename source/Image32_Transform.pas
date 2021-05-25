@@ -218,14 +218,11 @@ end;
 
 procedure MatrixApply(const matrix: TMatrixD; var rec: TRectD);
 var
-  tmpX: double;
+  path: TPathD;
 begin
-  tmpX := rec.Left;
-  rec.Left := tmpX * matrix[0, 0] + rec.Top * matrix[1, 0] + matrix[2, 0];
-  rec.Top := tmpX * matrix[0, 1] + rec.Top * matrix[1, 1] + matrix[2, 1];
-  tmpX := rec.Right;
-  rec.Right := tmpX * matrix[0, 0] + rec.Bottom * matrix[1, 0] + matrix[2, 0];
-  rec.Bottom := tmpX * matrix[0, 1] + rec.Bottom * matrix[1, 1] + matrix[2, 1];
+  path := Rectangle(rec);
+  MatrixApply(matrix, path);
+  rec := GetBoundsD(path);
 end;
 //------------------------------------------------------------------------------
 
@@ -906,20 +903,20 @@ end;
 function TWeightedColor.GetColor: TColor32;
 var
   a: byte;
-  halfAlphaTot: Integer;
-  argb: TARGB absolute result;
+  invAt: double;
+  argb: TARGB absolute Result;
 begin
   result := clNone32;
   if (fAlphaTot <= 0) or (fAddCount <= 0) then Exit;
   a := DivRound(fAlphaTot, fAddCount);
   if (a = 0) then Exit;
   argb.A := a;
-  halfAlphaTot := fAlphaTot div 2;
-  //nb: alpha weighting is applied to colors when added
-  //so we now need to div by fAlphaTot (with rounding) here ...
-  argb.R := ClampByte((fColorTotR + halfAlphaTot) div fAlphaTot);
-  argb.G := ClampByte((fColorTotG + halfAlphaTot) div fAlphaTot);
-  argb.B := ClampByte((fColorTotB + halfAlphaTot) div fAlphaTot);
+  //nb: alpha weighting is applied to colors when added,
+  //so we now need to div by fAlphaTot here ...
+  invAt := 1/fAlphaTot;
+  argb.R := ClampByte(fColorTotR * invAt);
+  argb.G := ClampByte(fColorTotG * invAt);
+  argb.B := ClampByte(fColorTotB * invAt);
 end;
 //------------------------------------------------------------------------------
 

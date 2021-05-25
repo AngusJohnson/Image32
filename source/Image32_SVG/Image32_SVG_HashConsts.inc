@@ -96,6 +96,7 @@
   hOut                        = $12067E90;    // Out
   hOver                       = $C9B82D21;    // Over
   hOverlay                    = $383BEA5E;    // Overlay
+  hPad                        = $4A0CAD48;    // Pad
   hPath                       = $AD8A7AB5;    // Path
   hPattern                    = $FF0BFA79;    // Pattern
   hPatternContentUnits        = $C6D9BCA5;    // PatternContentUnits
@@ -107,8 +108,10 @@
   hR                          = $26014BE2;    // R
   hRadialGradient             = $B0D7E1F9;    // RadialGradient
   hRect                       = $FA3BCBEA;    // Rect
+  hReflect                    = $98BC393E;    // Reflect
   hRefX                       = $00C1DE46;    // RefX
   hRefY                       = $480CECDB;    // RefY
+  hRepeat                     = $FF80069D;    // Repeat
   hResult                     = $47CD519F;    // Result
   hRound                      = $323B0E24;    // Round
   hRx                         = $3ABF70F3;    // Rx
@@ -120,6 +123,7 @@
   hSlope                      = $4774735C;    // Slope
   hSourceAlpha                = $F891B958;    // SourceAlpha
   hSourceGraphic              = $A4DB1DC2;    // SourceGraphic
+  hSpreadMethod               = $A08CEB57;    // SpreadMethod
   hSquare                     = $20E48144;    // Square
   hStart                      = $84DC271F;    // Start
   hstdDeviation               = $00D13F6A;    // stdDeviation
@@ -139,6 +143,7 @@
   hSuper                      = $9C5EE034;    // Super
   hSvg                        = $ED67C37E;    // Svg
   hSwitch                     = $D60E64BB;    // Switch
+  hSymbol                     = $07754611;    // Symbol
   hTable                      = $AB55E184;    // Table
   hTableValues                = $2F999AD9;    // TableValues
   hText                       = $7F3B51AB;    // Text

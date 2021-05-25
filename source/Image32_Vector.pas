@@ -333,7 +333,7 @@ var
   MinStrokeWidth: double = 0.5;
 
   //Miter limit avoids excessive spikes when line offsetting
-  DefaultMiterLimit: double = 2.0;
+  DefaultMiterLimit: double = 4.0;
 
 resourcestring
   rsInvalidMatrix = 'Invalid matrix.'; //nb: always start with IdentityMatrix
