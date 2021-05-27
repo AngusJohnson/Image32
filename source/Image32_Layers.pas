@@ -2,8 +2,8 @@ unit Image32_Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.23                                                            *
-* Date      :  12 April 2021                                                   *
+* Version   :  2.24                                                            *
+* Date      :  27 May 2021                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Layer support for the Image32 library                           *
@@ -412,6 +412,11 @@ const
 
 implementation
 
+{$IFNDEF MSWINDOWS}
+uses
+  Image32_FMX;
+{$ENDIF}
+
 resourcestring
   rsRoot                   = 'root';
   rsCreateLayerError       = 'TLayer32 error - no group owner defined.';
@@ -421,7 +426,6 @@ resourcestring
   rsChildIndexRangeError   = 'TGroupLayer32 - child index error';
   rsCreateButtonGroupError = 'CreateButtonGroup - invalid target layer';
   rsUpdateRotateGroupError = 'UpdateRotateGroup - invalid group';
-
 
 //------------------------------------------------------------------------------
 // TLayerNotifyImage32
@@ -1200,7 +1204,7 @@ constructor TVectorLayer32.Create(groupOwner: TGroupLayer32;
   const name: string = '');
 begin
   inherited;
-  fMargin := DpiAware(2);
+  fMargin := DpiAwareI *2;
   fCursorId := crHandPoint;
 end;
 //------------------------------------------------------------------------------
@@ -1557,7 +1561,7 @@ begin
   with AddChild(TDesignerLayer32) do     //Layer 0 - design layer
   begin
     SetBounds(Rect(rec2));
-    i := DPIAware(2);
+    i := DpiAwareI*2;
     r := InflateRect(rec2, -i,-i);
     OffsetRect(r, -Left, -Top);
     DrawDashedLine(Image, Ellipse(r), dashes, nil, i, clRed32, esPolygon);
@@ -2142,7 +2146,7 @@ begin
     radius := Round(Distance(mp, pt2));
     rec := Rect(RectD(mp.X -radius, mp.Y -radius, mp.X +radius,mp.Y +radius));
     DesignLayer.SetBounds(rec);
-    i :=  DPIAware(2);
+    i :=  DpiAwareI *2;
     DrawDashedLine(Child[0].Image, Ellipse(Rect(i,i,radius*2 -i, radius*2 -i)),
       dashes, nil, i, clRed32, esPolygon);
     Result := Angle;
@@ -2178,16 +2182,13 @@ end;
 //------------------------------------------------------------------------------
 
 procedure InitDashes;
-var
-  i: integer;
 begin
-  i := DPIAware(2);
   setLength(dashes, 2);
-  dashes[0] := i; dashes[1] := i*2;
+  dashes[0] := DpiAwareI *2; dashes[1] := DpiAwareI *4;
 end;
 
 initialization
   InitDashes;
-  DefaultButtonSize := DPIAware(10);
+  DefaultButtonSize := DpiAwareI *10;
 
 end.

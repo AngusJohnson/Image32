@@ -2,8 +2,8 @@ unit Image32_SmoothPath;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.19                                                            *
-* Date      :  21 March 2021                                                   *
+* Version   :  2.24                                                            *
+* Date      :  27 May 2021                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Supports paths with multiple sub-curves                         *
@@ -163,6 +163,9 @@ var
 implementation
 
 uses
+  {$IFNDEF MSWINDOWS}
+  Image32_FMX,
+  {$ENDIF}
   Image32_Extra, Image32_Draw;
 
 resourcestring
@@ -723,10 +726,10 @@ begin
   fColorCtrlBtn   := defaultSmoothBtnColor2;
   fColorActiveBtn := clLime32;
 
-  fButtonSize1    := DefaultButtonSize + DpiAware(1);
+  fButtonSize1    := DefaultButtonSize + dpiAwareI;
   fButtonSize2    := DefaultButtonSize;
   fPenColor       := clBlack32;
-  fPenWidth       := DPIAware(3);
+  fPenWidth       := DPIAwareD *3;
   fBrushColor     := clWhite32;
   fIsClosedPath   := false;
 end;
@@ -942,7 +945,7 @@ begin
       OffsetRect(rec, -dx, -dy);
       tmpPath := Ellipse(rec);
       DrawDashedLine(Image, tmpPath,
-        dashes, nil, DPIAware(1), clRed32, esPolygon);
+        dashes, nil, DPIAwareD, clRed32, esPolygon);
     end;
 
     SetLength(ctrlLine, 2);
@@ -958,7 +961,7 @@ begin
         ctrlLine[1] := smoothPath[i+1];
         ctrlLine := OffsetPath(ctrlLine, -dx, -dy);
         DrawDashedLine(Image, ctrlLine,
-          dashes, nil, DPIAware(1), clRed32, esSquare);
+          dashes, nil, DPIAwareD, clRed32, esSquare);
       end;
 
       if i >= pathLen -1 then break;
@@ -968,7 +971,7 @@ begin
         ctrlLine[1] := smoothPath[i+3];
         ctrlLine := OffsetPath(ctrlLine, -dx, -dy);
         DrawDashedLine(Image, ctrlLine,
-          dashes, nil, DPIAware(1), clRed32, esSquare);
+          dashes, nil, DPIAwareD, clRed32, esSquare);
       end;
       inc(i, 3);
     end;

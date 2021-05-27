@@ -3,7 +3,7 @@ unit Image32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  30 April 2021                                                   *
+* Date      :  27 May 2021                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -474,6 +474,11 @@ var
 
   //ScreenScale: Useful for DPIAware sizing of images and controls.
   ScreenScale: double = 1.0;
+
+  {$IFDEF MSWINDOWS}
+  dpiAwareI   : integer;
+  DpiAwareD   : double;
+  {$ENDIF}
 
   //AND BECAUSE OLDER DELPHI COMPILERS (OLDER THAN D2006)
   //DON'T SUPPORT RECORD METHODS
@@ -3151,6 +3156,13 @@ begin
     ReleaseDC(0, dc);
   end;
 end;
+
+procedure InitDpiVars;
+begin
+  dpiAwareI   := DPIAware(1);
+  DpiAwareD  := DPIAware(1.0);
+end;
+
 {$ENDIF}
 //------------------------------------------------------------------------------
 
@@ -3233,9 +3245,9 @@ end;
 initialization
   CreateImageFormatList;
   MakeBlendTables;
-
 {$IFDEF MSWINDOWS}
   GetScreenScale;
+  InitDpiVars;
 {$ENDIF}
 
 finalization

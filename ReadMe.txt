@@ -24,6 +24,7 @@ Version 2.24 (preliminary)
     Renamed CenterImagePoint function to GetImageCenter
   Examples
     Added a new SVG example app.
+  Fixed broken FMX support
   Numerous minor bugfixes
 
 Version 2.23 :)

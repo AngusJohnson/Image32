@@ -43,6 +43,11 @@ const
 var
   screenScale: double;
 
+  {$IFNDEF MSWINDOWS}
+  dpiAwareI: integer;
+  DpiAwareD: double;
+  {$ENDIF}
+
 implementation
 
 //------------------------------------------------------------------------------
@@ -203,6 +208,16 @@ begin
       screenScale := 1.0;
 end;
 //------------------------------------------------------------------------------
+
+{$IFNDEF MSWINDOWS}
+procedure InitDpiVars;
+begin
+  dpiAwareI := DPIAwareFMX(1);
+  DpiAwareD := DPIAwareFMX(1.0);
+end;
+{$ENDIF}
+
+//------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
 initialization
@@ -211,6 +226,9 @@ initialization
   TImage32.RegisterImageFormatClass('JPG', TImageFormat_FMX, cpLow);
   TImage32.RegisterImageFormatClass('GIF', TImageFormat_FMX, cpLow);
   CheckScreenScale;
+{$IFNDEF MSWINDOWS}
+  InitDpiVars;
+{$ENDIF}
 
 end.
 

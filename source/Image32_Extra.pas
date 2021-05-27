@@ -3,7 +3,7 @@ unit Image32_Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  12 May 2021                                                     *
+* Date      :  27 May 2021                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
@@ -133,6 +133,9 @@ function BlendColorDodge(bgColor, fgColor: TColor32): TColor32;
 implementation
 
 uses
+  {$IFNDEF MSWINDOWS}
+  Image32_FMX,
+  {$ENDIF}
   Image32_Transform;
 
 const
@@ -1078,7 +1081,7 @@ begin
     if ba3D in buttonAttributes then
       Draw3D(img, Result, frNonZero, shadowSize*2,
         Ceil(shadowSize), $CCFFFFFF, $AA000000, shadowAngle);
-    DrawLine(img, Result, DpiAware(1.0), clBlack32, esPolygon);
+    DrawLine(img, Result, DpiAwareI, clBlack32, esPolygon);
   finally
     img.EndUpdate;
   end;

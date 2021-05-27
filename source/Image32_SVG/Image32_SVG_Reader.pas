@@ -36,6 +36,22 @@ type
   TClipPathElement  = class;
   TSvgElement       = class;
 
+//  TDrawFill = record
+//    Color       : TColor32;
+//    Rule        : TFillRule;
+//    Element     : TAnsiName;      //name of a TFillElement
+//  end;
+//
+//  TDrawStroke = record
+//    Color       : TColor32;
+//    Width       : double;
+//    LineCap     : TEndStyle;
+//    LineJoin    : TJoinStyle;
+//    Element     : TAnsiName;      //name of a TFillElement
+//    DashArray   : TArrayOfDouble;
+//    DashOffset  : double;
+//  end;
+
   TDrawInfo = record
     fillColor     : TColor32;
     fillRule      : TFillRule;
@@ -52,7 +68,7 @@ type
     markerEnd     : TAnsiName;
     filterEl      : TAnsiName;
     clipPathEl    : TAnsiName;
-    opacity       : Byte;
+    opacity       : integer;
     matrix        : TMatrixD;
     visible       : Boolean;
     using         : Boolean; //<USE> element attributes have precedence
@@ -108,7 +124,8 @@ type
     function  IsFirstChild: Boolean;
     function  LoadAttributes: Boolean; virtual;
     function  LoadContent: Boolean; virtual;
-    procedure Draw(img: TImage32; drawInfo: TDrawInfo); virtual;
+    procedure Draw(image: TImage32; drawInfo: TDrawInfo); virtual;
+    procedure DrawChildren(image: TImage32; drawInfo: TDrawInfo);
   public
     constructor Create(parent: TElement; hashName: Cardinal); virtual;
     destructor  Destroy; override;
@@ -126,13 +143,12 @@ type
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
 
-  TStyleElement = class(TElement)
+  TStyleElement = class(TDefsElement)
   protected
     function LoadContent: Boolean; override;
   end;
 
-  TSwitchElement = class(TElement)
-  end;
+  //-------------------------------------
 
   TShapeElement = class(TElement)
   protected
@@ -146,10 +162,20 @@ type
     function  GetUncurvedPath: TPathsD; virtual;
     procedure DrawFilled(img: TImage32; const drawInfo: TDrawInfo);
     procedure DrawStroke(img: TImage32; const drawInfo: TDrawInfo; isClosed: Boolean);
-    procedure Draw(image: TImage32; drawInfo: TDrawInfo); override;
     procedure DrawMarkers(img: TImage32; drawInfo: TDrawInfo);
+    procedure Draw(image: TImage32; drawInfo: TDrawInfo); override;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
+  end;
+
+  TGroupElement = class(TShapeElement)
+  protected
+    procedure Draw(image: TImage32; drawInfo: TDrawInfo); override;
+  end;
+
+  TSwitchElement = class(TShapeElement)
+  protected
+    procedure Draw(image: TImage32; drawInfo: TDrawInfo); override;
   end;
 
   TUseElement = class(TShapeElement)
@@ -161,9 +187,10 @@ type
 
   TSymbolElement = class(TShapeElement)
   protected
-    viewbox: TValueRecWH;
-    procedure Draw(img: TImage32; drawInfo: TDrawInfo); override;
+    viewboxWH: TRectWH;
   end;
+
+  //-------------------------------------
 
   TPathElement = class(TShapeElement)
   private
@@ -254,6 +281,8 @@ type
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
+
+  //-------------------------------------
 
   TTextPathElement = class(TSubtextElement)
   protected
@@ -441,6 +470,8 @@ type
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
 
+  //-------------------------------------
+
   TAttribFunc = procedure (attrib: PAttrib);
 
   TSvgReader = class
@@ -500,22 +531,13 @@ const
 
   {$I Image32_SVG_HashConsts.inc}
 
-  defaultDrawInfo: TDrawInfo =
-    (fillColor: clBlack32; fillRule: frNonZero; fillEl: (name: nil; len: 0);
+  emptyDrawInfo: TDrawInfo =
+    (fillColor: clInvalid; fillRule: frNonZero; fillEl: (name: nil; len: 0);
     strokeColor: clInvalid; strokeWidth: 1.0; strokeLineCap: esButt;
     strokeLineJoin: jsMiter; dashArray: nil; dashOffset: 0;
     markerStart: (name: nil; len: 0); markerMiddle: (name: nil; len: 0);
     markerEnd: (name: nil; len: 0); filterEl: (name: nil; len: 0);
-    clipPathEl: (name: nil; len: 0); opacity: 255;
-    matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)); visible: true; using: false);
-
-  emptyDrawInfo: TDrawInfo =
-    (fillColor: clInvalid; fillRule: frNonZero; fillEl: (name: nil; len: 0);
-    strokeColor: clInvalid; strokeWidth: -Infinity; strokeLineCap: esButt;
-    strokeLineJoin: jsMiter; dashArray: nil; dashOffset: 0;
-    markerStart: (name: nil; len: 0); markerMiddle: (name: nil; len: 0);
-    markerEnd: (name: nil; len: 0); filterEl: (name: nil; len: 0);
-    clipPathEl: (name: nil; len: 0);opacity: 255;
+    clipPathEl: (name: nil; len: 0); opacity: MaxInt;
     matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)); visible: true; using: false);
 
   defaultFontInfo: TSVGFontInfo =
@@ -548,7 +570,7 @@ begin
     hfeMerge        : Result := TFeMergeElement;
     hfeMergeNode    : Result := TFeMergeNodeElement;
     hfeOffset       : Result := TFeOffsetElement;
-    hG              : Result := TElement;
+    hG              : Result := TGroupElement;
     hLine           : Result := TLineElement;
     hLineargradient : Result := TLinGradElement;
     hMarker         : Result := TMarkerElement;
@@ -560,6 +582,7 @@ begin
     hRect           : Result := TRectElement;
     hStop           : Result := TGradStopElement;
     hStyle          : Result := TStyleElement;
+    hSvg            : Result := TSvgElement;
     hSwitch         : Result := TSwitchElement;
     hSymbol         : Result := TSymbolElement;
     hText           : Result := TTextElement;
@@ -588,7 +611,7 @@ begin
       drawInfo.dashArray := Copy(dashArray, 0, Length(dashArray));
     if Assigned(strokeEl.name) then
       drawInfo.strokeEl := strokeEl;
-    if opacity < 255 then
+    if opacity < MaxInt then
       drawInfo.opacity := opacity;
     if Assigned(filterEl.name) then
       drawInfo.filterEl := filterEl;
@@ -598,10 +621,38 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure UpdateDrawInfo2(var drawInfo: TDrawInfo; const secondaryDI: TDrawInfo);
+begin
+  with drawInfo do
+  begin
+    fillRule := secondaryDI.fillRule;
+    if fillColor = clInvalid then
+      fillColor := secondaryDI.fillColor;
+    if not Assigned(fillEl.name) then
+      fillEl := secondaryDI.fillEl;
+    if strokeColor = clInvalid then
+      strokeColor := secondaryDI.strokeColor;
+    if strokeWidth = 0 then
+      strokeWidth := secondaryDI.strokeWidth;
+    if not Assigned(dashArray) then
+      dashArray := Copy(secondaryDI.dashArray, 0,
+        Length(secondaryDI.dashArray));
+    if not Assigned(strokeEl.name) then
+      strokeEl := secondaryDI.strokeEl;
+    if opacity = MaxInt then
+      opacity := secondaryDI.opacity;
+    if not Assigned(filterEl.name) then
+      filterEl := secondaryDI.filterEl;
+    if not IsIdentityMatrix(secondaryDI.matrix) then
+      matrix := MatrixMultiply(matrix, secondaryDI.matrix);
+  end;
+end;
+//------------------------------------------------------------------------------
+
 function IsFilled(const drawInfo: TDrawInfo): Boolean;
 begin
-  Result := drawInfo.visible and
-    (Assigned(drawInfo.fillEl.name) or (TARGB(drawInfo.fillColor).A > 0));
+  Result := drawInfo.visible and ((drawInfo.fillColor = clInvalid) or
+    Assigned(drawInfo.fillEl.name) or (TARGB(drawInfo.fillColor).A > 0));
 end;
 //------------------------------------------------------------------------------
 
@@ -698,6 +749,64 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// TGroupElement
+//------------------------------------------------------------------------------
+
+procedure TGroupElement.Draw(image: TImage32; drawInfo: TDrawInfo);
+var
+  clipEl  : TElement;
+  tmpImg  : TImage32;
+  clipRec : TRect;
+begin
+  if fChilds.Count = 0 then Exit;
+
+  if not IsIdentityMatrix(fDrawInfo.matrix) then
+    drawInfo.matrix := MatrixMultiply(drawInfo.matrix, fDrawInfo.matrix);
+
+  clipEl := FindRefElement(fDrawInfo.clipPathEl);
+  if Assigned(clipEl) then
+  begin
+    with TClipPathElement(clipEl) do
+    begin
+      GetPaths(drawInfo);
+      MatrixApply(drawInfo.matrix, drawPathsC);
+      MatrixApply(drawInfo.matrix, drawPathsO);
+      fillPaths := CopyPaths(drawPathsC);
+      AppendPath(fillPaths, drawPathsO);
+      clipRec := GetBounds(fillPaths);
+    end;
+    if IsEmptyRect(clipRec) then Exit;
+
+    tmpImg := fReader.TempImage;
+    tmpImg.Clear(clipRec);
+    DrawChildren(tmpImg, drawInfo);
+
+    with TClipPathElement(clipEl) do
+      EraseOutsidePaths(tmpImg, fillPaths, fDrawInfo.fillRule, clipRec);
+    image.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlpha);
+
+  end else
+    DrawChildren(image, drawInfo);
+end;
+
+//------------------------------------------------------------------------------
+// TSwitchElement
+//------------------------------------------------------------------------------
+
+procedure TSwitchElement.Draw(image: TImage32; drawInfo: TDrawInfo);
+var
+  i: integer;
+begin
+  for i := 0 to fChilds.Count -1 do
+    if TElement(fChilds[i]) is TShapeElement then
+      with TShapeElement(fChilds[i]) do
+      begin
+        Draw(image, drawInfo);
+        break;
+      end;
+end;
+
+//------------------------------------------------------------------------------
 // TUseElement
 //------------------------------------------------------------------------------
 
@@ -733,52 +842,57 @@ end;
 procedure TUseElement.Draw(img: TImage32; drawInfo: TDrawInfo);
 var
   i: integer;
+  sx,sy: double;
   el: TElement;
-  scale, dx, dy: double;
-  di: TDrawInfo;
+  symEl: TSymbolElement;
+  dx, dy: double;
+  scale,scale2: TSizeD;
 begin
   el := FindRefElement(refEl);
   if not Assigned(el) then Exit;
+
+  UpdateDrawInfo(drawInfo, el.fDrawInfo);
+  UpdateDrawInfo(drawInfo, fDrawInfo); //<use> element has precedence
+  scale := ExtractScaleFromMatrix(drawInfo.matrix);
+
   if elRectWH.left.IsValid then dx := elRectWH.left.rawVal else dx := 0;
   if elRectWH.top.IsValid  then dy := elRectWH.top.rawVal  else dy := 0;
 
-  if el.fNameHash = hG then //<g> element
+  if el is TSymbolElement then
   begin
-    UpdateDrawInfo(drawInfo, el.fDrawInfo);
-    for i := 0 to el.fChilds.Count -1 do
-      with el.fChilds[i] do
+    symEl := TSymbolElement(el);
+    sx := 0; sy := 0;
+    with symEl do
+      if not viewboxWH.IsEmpty then
       begin
-        di := drawInfo;
-        UpdateDrawInfo(di, fDrawInfo);
-        di.using := true;
-        scale := ExtractAvgScaleFromMatrix(di.matrix);
-        MatrixTranslate(di.matrix, dx * scale, dy * scale);
-        Draw(img, di);
+        if elRectWH.width.IsValid then
+          scale2.sx := elRectWH.width.rawVal / viewboxWH.Width else
+          scale2.sx := 1;
+        if elRectWH.height.IsValid then
+          scale2.sy := elRectWH.height.rawVal / viewboxWH.Height else
+          scale2.sy := 1;
+
+        if self.elRectWH.width.IsValid then
+          scale2.sx := scale2.sx * self.elRectWH.width.rawVal/viewboxWH.Width;
+        if self.elRectWH.height.IsValid then
+          scale2.sy := scale2.sy * self.elRectWH.height.rawVal/viewboxWH.Height;
+        MatrixScale(drawInfo.matrix, scale2.sx, scale2.sy);
+
+        //todo: empirically the following seems to work, but why???
+        MatrixTranslate(drawInfo.matrix,
+          (dx * scale.sx) +
+            ((viewboxWH.Width - self.elRectWH.width.rawVal)/4)  * scale.sx  * scale2.sx,
+          (dy * scale.sy) +
+            ((viewboxWH.Height - self.elRectWH.height.rawVal)/4) * scale.sy  * scale2.sy);
       end;
+    symEl.DrawChildren(img, drawInfo);
   end
   else if el is TShapeElement then
   begin
-    UpdateDrawInfo(drawInfo, el.fDrawInfo);
-    UpdateDrawInfo(drawInfo, fDrawInfo);
-    drawInfo.using := true;
-    scale := ExtractAvgScaleFromMatrix(drawInfo.matrix);
-    MatrixTranslate(drawInfo.matrix, dx * scale, dy * scale);
-    TShapeElement(el).Draw(img, drawInfo);
+    drawInfo.using := true;              //and flag <use> precedence
+    MatrixTranslate(drawInfo.matrix, dx * scale.sx, dy * scale.sy);
+    el.Draw(img, drawInfo);
   end;
-end;
-
-
-//------------------------------------------------------------------------------
-// TSymbolElement
-//------------------------------------------------------------------------------
-
-procedure TSymbolElement.Draw(img: TImage32; drawInfo: TDrawInfo);
-var
-  i: integer;
-begin
-  drawInfo.using := false;
-  for i := 0 to fChilds.Count -1 do
-    TElement(fChilds[i]).Draw(img, drawInfo);
 end;
 
 //------------------------------------------------------------------------------
@@ -1576,19 +1690,19 @@ var
   clipPathEl  : TElement;
   filterEl    : TElement;
   clipPaths   : TPathsD;
+  di          : TDrawInfo;
   usingSpecialEffects: Boolean;
 begin
-  if not drawInfo.using then
+
+  if drawInfo.using then
+    UpdateDrawInfo2(drawInfo, fDrawInfo) else
     UpdateDrawInfo(drawInfo, fDrawInfo);
+
   filled := IsFilled(drawInfo);
   stroked := IsStroked(drawInfo);
   GetPaths(drawInfo);
 
-  if not (filled or stroked) or not hasPaths then
-  begin
-    inherited;
-    Exit;
-  end;
+  if not (filled or stroked) or not hasPaths then Exit;
 
   img := image;
   clipRec2 := NullRect;
@@ -1695,7 +1809,9 @@ begin
   if not Assigned(markerPaths) then Exit;
   MatrixApply(drawInfo.matrix, markerPaths);
 
-  di := defaultDrawInfo;
+  di := emptyDrawInfo;
+  di.fillColor := clBlack32;
+
   MatrixScale(di.matrix,
     fDrawInfo.strokeWidth * ExtractAvgScaleFromMatrix(drawInfo.matrix));
 
@@ -1775,21 +1891,21 @@ begin
       rec := GetBoundsD(fillPaths);
       if refEl is TRadGradElement then
       begin
-        if TRadGradElement(refEl).PrepareRenderer(
-          fReader.RadGradRenderer, drawInfo.matrix, rec) then
-            DrawPolygon(img, fillPaths, drawInfo.fillRule, fReader.RadGradRenderer);
+        with TRadGradElement(refEl), fReader do
+          if PrepareRenderer(RadGradRenderer, drawInfo.matrix, rec) then
+            DrawPolygon(img, fillPaths, drawInfo.fillRule, RadGradRenderer);
       end
       else if refEl is TLinGradElement then
       begin
-        with TLinGradElement(refEl) do
-          if PrepareRenderer(fReader.LinGradRenderer, drawInfo.matrix, rec) then
-            DrawPolygon(img, fillPaths, drawInfo.fillRule, fReader.LinGradRenderer);
+        with TLinGradElement(refEl), fReader do
+          if PrepareRenderer(LinGradRenderer, drawInfo.matrix, rec) then
+            DrawPolygon(img, fillPaths, drawInfo.fillRule, LinGradRenderer);
       end
       else if refEl is TPatternElement then
       begin
-        with TPatternElement(refEl) do
-          if PrepareRenderer(fReader.ImageRenderer, drawInfo.matrix, rec) then
-            DrawPolygon(img, fillPaths, drawInfo.fillRule, fReader.ImageRenderer);
+        with TPatternElement(refEl), fReader do
+          if PrepareRenderer(ImageRenderer, drawInfo.matrix, rec) then
+            DrawPolygon(img, fillPaths, drawInfo.fillRule, ImageRenderer);
       end;
     end;
   end
@@ -2363,7 +2479,6 @@ end;
 
 procedure TTextElement.Draw(img: TImage32; drawInfo: TDrawInfo);
 var
-  i         : integer;
   el        : TElement;
   topTextEl : TTextElement;
 begin
@@ -2392,9 +2507,7 @@ begin
 
   if not IsIdentityMatrix(fDrawInfo.matrix) then
     drawInfo.matrix := MatrixMultiply(drawInfo.matrix, fDrawInfo.matrix);
-  for i := 0 to fChilds.Count -1 do
-    with TElement(fChilds[i]) do
-      if fDrawInfo.visible then Draw(img, drawInfo);
+  DrawChildren(img, drawInfo);
 end;
 
 //------------------------------------------------------------------------------
@@ -2595,12 +2708,11 @@ end;
 
 procedure TMarkerElement.Draw(img: TImage32; drawInfo: TDrawInfo);
 var
-  i,j, len: integer;
+  i, len: integer;
   l,t,w,h,scale, a, a2: double;
   mat: TMatrixD;
   angles: TArrayOfDouble;
 begin
-
   mat := drawInfo.matrix;
 
   if elRectWH.width.IsValid and elRectWH.height.IsValid and
@@ -2633,19 +2745,13 @@ begin
   if len > 1 then
     angles[len -1] := Average(a, angle2);
 
-
   //for each 'point' draw the marker
   for i := 0 to len -1 do
   begin
     drawInfo.matrix := mat;
     MatrixRotate(drawInfo.matrix, NullPointD, angles[i]);
     MatrixTranslate(drawInfo.matrix, fPoints[i].X, fPoints[i].Y);
-
-    //for each marker shape (though there's rarely more than one)
-    for j := 0 to fChilds.Count -1 do
-      if TElement(fChilds[j]) is TShapeElement then
-        with TShapeElement(fChilds[j]) do
-          Draw(img, drawInfo);
+    DrawChildren(img, drawInfo);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2739,12 +2845,13 @@ begin
   end;
 
   for i := 0 to fChilds.Count -1 do
-    with TElement(fChilds[i]) do
-    begin
-      drawinfo := fDrawInfo;
-      MatrixScale(drawinfo.matrix, scalePending*sx, scalePending*sy);
-      Draw(renderer.Image, drawinfo);
-    end;
+    if TElement(fChilds[i]) is TShapeElement then
+      with TShapeElement(fChilds[i]) do
+      begin
+        drawinfo := fDrawInfo;
+        MatrixScale(drawinfo.matrix, scalePending*sx, scalePending*sy);
+        Draw(renderer.Image, drawinfo);
+      end;
 end;
 
 //------------------------------------------------------------------------------
@@ -2855,7 +2962,7 @@ begin
   inc(svgStart, 3);
   fCurrent := svgStart;
   fCurrentEnd := fReader.fEndStream;
-  fDrawInfo :=  defaultDrawInfo;
+  fDrawInfo :=  emptyDrawInfo;
 end;
 
 //------------------------------------------------------------------------------
@@ -2902,6 +3009,22 @@ end;
 function  TElement.IsFirstChild: Boolean;
 begin
   Result := not Assigned(fParent) or (self = fParent.fChilds[0]);
+end;
+//------------------------------------------------------------------------------
+
+procedure TElement.Draw(image: TImage32; drawInfo: TDrawInfo);
+begin
+  DrawChildren(image, drawInfo);
+end;
+//------------------------------------------------------------------------------
+
+procedure TElement.DrawChildren(image: TImage32; drawInfo: TDrawInfo);
+var
+  i: integer;
+begin
+  for i := 0 to fChilds.Count -1 do
+    with TElement(fChilds[i]) do
+      if fDrawInfo.visible then Draw(image, drawInfo);
 end;
 //------------------------------------------------------------------------------
 
@@ -3303,57 +3426,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.Draw(img: TImage32; drawInfo: TDrawInfo);
-var
-  i: integer;
-  clipEl  : TElement;
-  tmpImg  : TImage32;
-  clipRec : TRect;
-begin
-  if fChilds.Count = 0 then
-    Exit; //only 'shape' elements are drawn.
-
-  if not IsIdentityMatrix(fDrawInfo.matrix) then
-    drawInfo.matrix := MatrixMultiply(drawInfo.matrix, fDrawInfo.matrix);
-
-  clipEl := FindRefElement(fDrawInfo.clipPathEl);
-  if Assigned(clipEl) then
-  begin
-    with TClipPathElement(clipEl) do
-    begin
-      GetPaths(drawInfo);
-      MatrixApply(drawInfo.matrix, drawPathsC);
-      MatrixApply(drawInfo.matrix, drawPathsO);
-      fillPaths := CopyPaths(drawPathsC);
-      AppendPath(fillPaths, drawPathsO);
-      clipRec := GetBounds(fillPaths);
-    end;
-    if IsEmptyRect(clipRec) then Exit;
-
-    tmpImg := fReader.TempImage;
-    tmpImg.Clear(clipRec);
-    for i := 0 to fChilds.Count -1 do
-      with TElement(fChilds[i]) do
-        if fDrawInfo.visible then
-          Draw(tmpImg, drawInfo);
-
-    with TClipPathElement(clipEl) do
-      EraseOutsidePaths(tmpImg, fillPaths, fDrawInfo.fillRule, clipRec);
-    img.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlpha);
-
-  end else
-  begin
-    for i := 0 to fChilds.Count -1 do
-      with TElement(fChilds[i]) do
-        if fDrawInfo.visible then
-        begin
-          Draw(img, drawInfo);
-          if Self is TSwitchElement then break;
-        end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
 procedure TElement.ConvertValueUnits(var value: TValue; percentTol: double);
 begin
   //https://oreillymedia.github.io/Using_SVG/guide/units.html
@@ -3520,8 +3592,9 @@ begin
     if viewboxWH.IsEmpty then
     begin
       fRootElement.viewboxWH := RectWH(0, 0, w, h);
+      if fRootElement.viewboxWH.IsEmpty then
+        fRootElement.viewboxWH := RectWH(0, 0, img.Width, img.Height);
       rawRect  := viewboxWH.RectD;
-      if fRootElement.viewboxWH.IsEmpty then Exit;
     end
     else if (w > 0) or (h > 0) then
     begin
@@ -4250,12 +4323,13 @@ procedure Viewbox_Attrib(attrib: PAttrib);
   end;
 
 begin
-  if attrib.aOwnerEl is TSvgElement then
-    TSvgElement(attrib.aOwnerEl).viewboxWH := LoadViewbox
-  else if attrib.aOwnerEl is TMarkerElement then
-    TMarkerElement(attrib.aOwnerEl).markerBoxWH := LoadViewbox
-  else if attrib.aOwnerEl is TPatternElement then
-    TPatternElement(attrib.aOwnerEl).pattBoxWH := LoadViewbox;
+  case attrib.aOwnerEl.fNameHash of
+    hSvg    : TSvgElement(attrib.aOwnerEl).viewboxWH := LoadViewbox;
+    hMarker : TMarkerElement(attrib.aOwnerEl).markerBoxWH := LoadViewbox;
+    hSymbol : TSymbolElement(attrib.aOwnerEl).viewboxWH := LoadViewbox;
+    else if attrib.aOwnerEl is TPatternElement then
+      TPatternElement(attrib.aOwnerEl).pattBoxWH := LoadViewbox;
+  end;
 end;
 //------------------------------------------------------------------------------
 
