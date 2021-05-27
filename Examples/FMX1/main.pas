@@ -98,7 +98,7 @@ begin
     if fontReader.IsValidFontFormat then
       bigTextGlyphs := fontCache.GetTextGlyphs(0, 0, rsBigText);
 
-    bigTextGlyphs := InflatePaths(bigTextGlyphs,1.5,jsAuto,esPolygon); //bolder
+    bigTextGlyphs := InflatePaths(bigTextGlyphs, 1.5, jsAuto,esPolygon); //bolder
     matrix := IdentityMatrix;
     MatrixScale(matrix, 1, 1.75); //stretched vertically
     MatrixSkew(matrix, -0.25, 0); //and italicized too.
@@ -191,7 +191,7 @@ begin
       if i = 0 then
       begin
         DrawLine(Image, mainGlyphs, 1.5, clBlack32, esClosed);
-        Draw3D(Image, mainGlyphs, frNonZero, Round(textRec.Height/15), 3);
+        Draw3D(Image, mainGlyphs, frNonZero, Round(textRec.Height/30), 3);
       end;
       mainGlyphs := ScalePath(mainGlyphs, 0.9, 0.9);
       textRec := Image32_Vector.GetBounds(mainGlyphs);
