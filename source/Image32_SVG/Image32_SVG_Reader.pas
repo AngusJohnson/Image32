@@ -3,7 +3,7 @@ unit Image32_SVG_Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  25 May 2021                                                     *
+* Date      :  28 May 2021                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2021                                         *
 *                                                                              *
@@ -71,7 +71,7 @@ type
     opacity       : integer;
     matrix        : TMatrixD;
     visible       : Boolean;
-    using         : Boolean; //<USE> element attributes have precedence
+    InUse         : Boolean; //<USE> attribs override ref element attribs.
   end;
 
   PAttrib = ^TAttrib;
@@ -158,7 +158,7 @@ type
     fillPaths   : TPathsD;
     function HasMarkers: Boolean;
     function GetVal(out val: double): Boolean;
-    procedure GetPaths(var drawInfo: TDrawInfo); virtual;
+    procedure GetPaths(const drawInfo: TDrawInfo); virtual;
     function  GetUncurvedPath: TPathsD; virtual;
     procedure DrawFilled(img: TImage32; const drawInfo: TDrawInfo);
     procedure DrawStroke(img: TImage32; const drawInfo: TDrawInfo; isClosed: Boolean);
@@ -181,13 +181,15 @@ type
   TUseElement = class(TShapeElement)
   protected
     refEl: TAnsiName;
-    procedure GetPaths(var drawInfo: TDrawInfo); override;
+    procedure GetPaths(const drawInfo: TDrawInfo); override;
     procedure Draw(img: TImage32; drawInfo: TDrawInfo); override;
   end;
 
   TSymbolElement = class(TShapeElement)
   protected
     viewboxWH: TRectWH;
+  public
+    constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
 
   //-------------------------------------
@@ -212,7 +214,7 @@ type
       out path: TPathD; out isClosed: Boolean);
   protected
     procedure ParseD(attrib: PAttrib);
-    procedure GetPaths(var drawInfo: TDrawInfo); override;
+    procedure GetPaths(const drawInfo: TDrawInfo); override;
     function  GetUncurvedPath: TPathsD; override;
   end;
 
@@ -220,14 +222,14 @@ type
   protected
     path      : TPathD;
     procedure ParsePoints(attrib: PAttrib);
-    procedure GetPaths(var drawInfo: TDrawInfo); override;
+    procedure GetPaths(const drawInfo: TDrawInfo); override;
     function  GetUncurvedPath: TPathsD; override;
   end;
 
   TLineElement = class(TShapeElement)
   protected
     path      : TPathD;
-    procedure GetPaths(var drawInfo: TDrawInfo); override;
+    procedure GetPaths(const drawInfo: TDrawInfo); override;
     function  GetUncurvedPath: TPathsD; override;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
@@ -237,20 +239,20 @@ type
   protected
     centerPt  : TValuePt;
     radius    : TValue;
-    procedure GetPaths(var drawInfo: TDrawInfo); override;
+    procedure GetPaths(const drawInfo: TDrawInfo); override;
   end;
 
   TEllipseElement = class(TShapeElement)
   protected
     centerPt  : TValuePt;
     radius    : TValuePt;
-    procedure GetPaths(var drawInfo: TDrawInfo); override;
+    procedure GetPaths(const drawInfo: TDrawInfo); override;
   end;
 
   TRectElement = class(TShapeElement)
   protected
     radius    : TValuePt;
-    procedure GetPaths(var drawInfo: TDrawInfo); override;
+    procedure GetPaths(const drawInfo: TDrawInfo); override;
     function  GetUncurvedPath: TPathsD; override;
   end;
 
@@ -261,7 +263,7 @@ type
     delta     : TPointD;
     tmpPt     : TPointD;
     procedure ResetTmpPt;
-    procedure GetPaths(var drawInfo: TDrawInfo); override;
+    procedure GetPaths(const drawInfo: TDrawInfo); override;
     function AddSubtext(atext: PAnsiChar; len: integer): TElement;
     procedure Draw(img: TImage32; drawInfo: TDrawInfo); override;
   public
@@ -277,7 +279,7 @@ type
   protected
     text      : PAnsiChar;
     textLen   : integer;
-    procedure GetPaths(var drawInfo: TDrawInfo); override;
+    procedure GetPaths(const drawInfo: TDrawInfo); override;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
@@ -287,7 +289,7 @@ type
   TTextPathElement = class(TSubtextElement)
   protected
     pathEl: TAnsiName;
-    procedure GetPaths(var drawInfo: TDrawInfo); override;
+    procedure GetPaths(const drawInfo: TDrawInfo); override;
   end;
 
   TMarkerElement = class(TShapeElement)
@@ -465,7 +467,7 @@ type
 
   TClipPathElement = class(TShapeElement)
   protected
-    procedure GetPaths(var drawInfo: TDrawInfo); override;
+    procedure GetPaths(const drawInfo: TDrawInfo); override;
   public
     constructor Create(parent: TElement; hashName: Cardinal); override;
   end;
@@ -485,7 +487,6 @@ type
     fLinGradRenderer  : TLinearGradientRenderer;
     fRadGradRenderer  : TSvgRadialGradientRenderer;
     fImgRenderer      : TImageRenderer;
-    fViewMatrix       : TMatrixD;
     fRootElement      : TSvgElement;
 {$IFDEF XPLAT_GENERICS}
     fFontList   : TList<TFontReader>;
@@ -538,7 +539,7 @@ const
     markerStart: (name: nil; len: 0); markerMiddle: (name: nil; len: 0);
     markerEnd: (name: nil; len: 0); filterEl: (name: nil; len: 0);
     clipPathEl: (name: nil; len: 0); opacity: MaxInt;
-    matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)); visible: true; using: false);
+    matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)); visible: true; InUse: false);
 
   defaultFontInfo: TSVGFontInfo =
     (family: ttfSansSerif; size: 10; spacing: 0.0;
@@ -810,7 +811,7 @@ end;
 // TUseElement
 //------------------------------------------------------------------------------
 
-procedure TUseElement.GetPaths(var drawInfo: TDrawInfo);
+procedure TUseElement.GetPaths(const drawInfo: TDrawInfo);
 var
   el: TElement;
   scale, dx, dy: double;
@@ -821,13 +822,14 @@ begin
   el := FindRefElement(refEl);
   if not Assigned(el) or not (el is TShapeElement) then Exit;
 
-  if elRectWH.left.IsValid then dx := elRectWH.left.rawVal else dx := 0;
-  if elRectWH.top.IsValid  then dy := elRectWH.top.rawVal  else dy := 0;
   di := drawInfo;
   UpdateDrawInfo(di, fDrawInfo);
   UpdateDrawInfo(di, el.fDrawInfo);
-  di.using := true;
+  di.InUse := true;
+
   scale := ExtractAvgScaleFromMatrix(di.matrix);
+  if elRectWH.left.IsValid then dx := elRectWH.left.rawVal else dx := 0;
+  if elRectWH.top.IsValid  then dy := elRectWH.top.rawVal  else dy := 0;
   MatrixTranslate(di.matrix, dx * scale, dy * scale);
 
   with TShapeElement(el) do
@@ -841,58 +843,85 @@ end;
 
 procedure TUseElement.Draw(img: TImage32; drawInfo: TDrawInfo);
 var
-  i: integer;
-  sx,sy: double;
   el: TElement;
-  symEl: TSymbolElement;
-  dx, dy: double;
-  scale,scale2: TSizeD;
+  s, dx, dy: double;
+  scale, scale2: TSizeD;
+  mat: TMatrixD;
 begin
   el := FindRefElement(refEl);
   if not Assigned(el) then Exit;
 
   UpdateDrawInfo(drawInfo, el.fDrawInfo);
-  UpdateDrawInfo(drawInfo, fDrawInfo); //<use> element has precedence
+  UpdateDrawInfo(drawInfo, fDrawInfo); //nb: <use> attribs override el's.
   scale := ExtractScaleFromMatrix(drawInfo.matrix);
 
   if elRectWH.left.IsValid then dx := elRectWH.left.rawVal else dx := 0;
   if elRectWH.top.IsValid  then dy := elRectWH.top.rawVal  else dy := 0;
+  MatrixTranslate(drawInfo.matrix, dx * scale.sx, dy  * scale.sy);
 
   if el is TSymbolElement then
   begin
-    symEl := TSymbolElement(el);
-    sx := 0; sy := 0;
-    with symEl do
+    with TSymbolElement(el) do
+    begin
       if not viewboxWH.IsEmpty then
       begin
-        if elRectWH.width.IsValid then
-          scale2.sx := elRectWH.width.rawVal / viewboxWH.Width else
-          scale2.sx := 1;
-        if elRectWH.height.IsValid then
-          scale2.sy := elRectWH.height.rawVal / viewboxWH.Height else
-          scale2.sy := 1;
+        //scale the symbol according to its width and height attributes
+        if elRectWH.width.IsValid and elRectWH.height.IsValid then
+        begin
+          scale2.sx := elRectWH.width.rawVal / viewboxWH.Width;
+          scale2.sy := elRectWH.height.rawVal / viewboxWH.Height;
+          if scale2.sy < scale2.sx then s := scale2.sy else s := scale2.sx;
+          //the following 3 lines will scale without translating
+          mat := IdentityMatrix;
+          MatrixScale(mat, s, s);
+          drawInfo.matrix := MatrixMultiply(drawInfo.matrix, mat);
+        end;
 
-        if self.elRectWH.width.IsValid then
-          scale2.sx := scale2.sx * self.elRectWH.width.rawVal/viewboxWH.Width;
-        if self.elRectWH.height.IsValid then
-          scale2.sy := scale2.sy * self.elRectWH.height.rawVal/viewboxWH.Height;
-        MatrixScale(drawInfo.matrix, scale2.sx, scale2.sy);
+        if self.elRectWH.width.IsValid and
+          self.elRectWH.height.IsValid then
+        begin
+          //scale <symbol> proportionally to fill the <use> element
+          scale2.sx := self.elRectWH.width.rawVal / viewboxWH.Width;
+          scale2.sy := self.elRectWH.height.rawVal / viewboxWH.Height;
+          if scale2.sy < scale2.sx then s := scale2.sy else s := scale2.sx;
+          //again, scale without translating
+          mat := IdentityMatrix;
+          MatrixScale(mat, s, s);
+          drawInfo.matrix := MatrixMultiply(drawInfo.matrix, mat);
 
-        //todo: empirically the following seems to work, but why???
-        MatrixTranslate(drawInfo.matrix,
-          (dx * scale.sx) +
-            ((viewboxWH.Width - self.elRectWH.width.rawVal)/4)  * scale.sx  * scale2.sx,
-          (dy * scale.sy) +
-            ((viewboxWH.Height - self.elRectWH.height.rawVal)/4) * scale.sy  * scale2.sy);
+          //now center after scaling
+          if scale2.sx > scale2.sy then
+          begin
+            if scale2.sx > 1 then
+            begin
+              s := (self.elRectWH.width.rawVal - viewboxWH.Width) * 0.5;
+              MatrixTranslate(drawInfo.matrix, s * scale.sx, 0);
+            end;
+          end else if scale2.sy > 1 then
+          begin
+            s := (self.elRectWH.height.rawVal - viewboxWH.Height) * 0.5;
+            MatrixTranslate(drawInfo.matrix, 0, s * scale.sy);
+          end;
+        end;
       end;
-    symEl.DrawChildren(img, drawInfo);
+      DrawChildren(img, drawInfo);
+    end;
   end
   else if el is TShapeElement then
   begin
-    drawInfo.using := true;              //and flag <use> precedence
-    MatrixTranslate(drawInfo.matrix, dx * scale.sx, dy * scale.sy);
+    drawInfo.InUse := true;              //flag <use> precedence
     el.Draw(img, drawInfo);
   end;
+end;
+
+//------------------------------------------------------------------------------
+// TSymbolElement
+//------------------------------------------------------------------------------
+
+constructor TSymbolElement.Create(parent: TElement; hashName: Cardinal);
+begin
+  inherited;
+  fDrawInfo.visible := false;
 end;
 
 //------------------------------------------------------------------------------
@@ -1631,7 +1660,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TClipPathElement.GetPaths(var drawInfo: TDrawInfo);
+procedure TClipPathElement.GetPaths(const drawInfo: TDrawInfo);
 var
   i: integer;
 begin
@@ -1690,11 +1719,10 @@ var
   clipPathEl  : TElement;
   filterEl    : TElement;
   clipPaths   : TPathsD;
-  di          : TDrawInfo;
   usingSpecialEffects: Boolean;
 begin
 
-  if drawInfo.using then
+  if drawInfo.InUse then
     UpdateDrawInfo2(drawInfo, fDrawInfo) else
     UpdateDrawInfo(drawInfo, fDrawInfo);
 
@@ -1864,7 +1892,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TShapeElement.GetPaths(var drawInfo: TDrawInfo);
+procedure TShapeElement.GetPaths(const drawInfo: TDrawInfo);
 begin
   drawPathsO := nil; drawPathsC := nil; fillPaths := nil;
 end;
@@ -2248,7 +2276,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPathElement.GetPaths(var drawInfo: TDrawInfo);
+procedure TPathElement.GetPaths(const drawInfo: TDrawInfo);
 var
   i: integer;
   scalePending: double;
@@ -2286,7 +2314,7 @@ end;
 // TPolyElement
 //------------------------------------------------------------------------------
 
-procedure TPolyElement.GetPaths(var drawInfo: TDrawInfo);
+procedure TPolyElement.GetPaths(const drawInfo: TDrawInfo);
 begin
   inherited;
   if not Assigned(path) then Exit;
@@ -2344,7 +2372,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TLineElement.GetPaths(var drawInfo: TDrawInfo);
+procedure TLineElement.GetPaths(const drawInfo: TDrawInfo);
 begin
   inherited;
   AppendPath(drawPathsO, path);
@@ -2361,7 +2389,7 @@ end;
 // TCircleElement
 //------------------------------------------------------------------------------
 
-procedure TCircleElement.GetPaths(var drawInfo: TDrawInfo);
+procedure TCircleElement.GetPaths(const drawInfo: TDrawInfo);
 var
   scalePending : double;
   rec   : TRectD;
@@ -2383,7 +2411,7 @@ end;
 // TEllipseElement
 //------------------------------------------------------------------------------
 
-procedure TEllipseElement.GetPaths(var drawInfo: TDrawInfo);
+procedure TEllipseElement.GetPaths(const drawInfo: TDrawInfo);
 var
   scalePending  : double;
   rec       : TRectD;
@@ -2405,7 +2433,7 @@ end;
 // TRectElement
 //------------------------------------------------------------------------------
 
-procedure TRectElement.GetPaths(var drawInfo: TDrawInfo);
+procedure TRectElement.GetPaths(const drawInfo: TDrawInfo);
 var
   rad: TPointD;
   rec: TRectD;
@@ -2449,7 +2477,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TTextElement.GetPaths(var drawInfo: TDrawInfo);
+procedure TTextElement.GetPaths(const drawInfo: TDrawInfo);
 begin
   //deferred to TSubtextElement.GetDrawPaths
 end;
@@ -2521,7 +2549,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSubtextElement.GetPaths(var drawInfo: TDrawInfo);
+procedure TSubtextElement.GetPaths(const drawInfo: TDrawInfo);
 var
   el : TElement;
   topTextEl : TTextElement;
@@ -2613,7 +2641,7 @@ end;
 // TTextPathElement
 //------------------------------------------------------------------------------
 
-procedure TTextPathElement.GetPaths(var drawInfo: TDrawInfo);
+procedure TTextPathElement.GetPaths(const drawInfo: TDrawInfo);
 var
   parentTextEl, topTextEl: TTextElement;
   el: TElement;
@@ -3632,7 +3660,6 @@ begin
   if fBackgroundColor <> clNone32 then
     img.Clear(fBackgroundColor);
 
-  fViewMatrix := di.matrix;
   fTempImage := TImage32.Create(img.Width, img.Height);
   try
     fRootElement.Draw(img, di);
