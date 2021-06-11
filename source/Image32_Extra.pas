@@ -3,12 +3,16 @@ unit Image32_Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  27 May 2021                                                     *
+* Date      :  11 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
-* Purpose   :  Miscellaneous routines for TImage32 that don't obviously        *
-*           :  belong in other modules.                                        *
-* License   :  http://www.boost.org/LICENSE_1_0.txt                            *
+*                                                                              *
+* Purpose   :  Miscellaneous routines for TImage32 that                        *
+*           :  don't obviously belong in other modules.                        *
+*                                                                              *
+* License   :  Use, modification & distribution is subject to                  *
+*              Boost Software License Ver 1                                    *
+*              http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
 interface
@@ -2019,7 +2023,6 @@ begin
   if not Assigned(img) then Exit;
   rec2 := Image32_Vector.IntersectRect(rec, img.Bounds);
   if IsEmptyRect(rec2) then Exit;
-
   blurFullImage := RectsEqual(rec2, img.Bounds);
 
   w := RectWidth(rec2);

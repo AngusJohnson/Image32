@@ -3,11 +3,15 @@ unit Image32_Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  12 May 2021                                                     *
+* Date      :  11 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
+*                                                                              *
 * Purpose   :  Vector drawing for TImage32                                     *
-* License   :  http://www.boost.org/LICENSE_1_0.txt                            *
+*                                                                              *
+* License   :  Use, modification & distribution is subject to                  *
+*              Boost Software License Ver 1                                    *
+*              http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
 interface
@@ -20,7 +24,7 @@ uses
 type
   TArrowStyle = (asNone, asSimple, asFancy, asDiamond, asCircle, asTail);
   TJoinStyle  = (jsAuto, jsSquare, jsMiter, jsRound);
-  TEndStyle   = (esPolygon, esButt, esSquare, esRound, esClosed);
+  TEndStyle   = (esPolygon, esButt, esSquare, esRound);
   TPathEnd    = (peStart, peEnd, peBothEnds);
   TSplineType = (stQuadratic, stCubic);
   TFillRule = (frEvenOdd, frNonZero, frPositive, frNegative);
@@ -56,6 +60,8 @@ type
 
   function RoundRect(const rec: TRect; radius: integer): TPathD; overload;
   function RoundRect(const rec: TRectD; radius: double): TPathD; overload;
+  function RoundRect(const rec: TRect; radius: TPoint): TPathD; overload;
+  function RoundRect(const rec: TRectD; radius: TPointD): TPathD; overload;
 
   function Ellipse(const rec: TRect; steps: integer = 0): TPathD; overload;
   function Ellipse(const rec: TRectD; steps: integer = 0): TPathD; overload;
@@ -311,8 +317,8 @@ type
   function ValueAlmostOne(val: double; epsilon: double = 0.001): Boolean;
 
 const
-  Invalid       : integer = -MaxInt;
-  InvalidD      : double = -Infinity;
+  Invalid       = -MaxInt;
+  InvalidD      = -Infinity;
   NullPoint     : TPoint  = (X: 0; Y: 0);
   NullPointD    : TPointD = (X: 0; Y: 0);
   InvalidPoint  : TPoint  = (X: -MaxInt; Y: -MaxInt);
@@ -457,13 +463,13 @@ end;
 
 function IsValid(value: double): Boolean;
 begin
-  Result := value <> -Infinity;
+  Result := value <> InvalidD;
 end;
 //------------------------------------------------------------------------------
 
 function IsValid(const pt: TPoint): Boolean;
 begin
-  result := (pt.X <> -MaxInt) and (pt.Y <> -MaxInt);
+  result := (pt.X <> Invalid) and (pt.Y <> Invalid);
 end;
 //------------------------------------------------------------------------------
 
@@ -1568,6 +1574,16 @@ begin
       joinStyle := jsRound;
   end;
 
+  //nb: miterLimOrRndScale performs a dual function depending on joinStyle.
+  //When joinStyle = jsRound, the miterLimOrRndScale parameter indicates any
+  //anticipated post Grow scaling. When polygons produced by Grow are later
+  //scaled up considerably (eg SVG polygons), then rounded joins can look very
+  //crude unless this is anticipated. So when polygons produced by Grow are
+  //expected to be scaled up by X amount, then set miterLimOrRndScale to X.
+  //When joinStyle = jsMiter, then the miterLimOrRndScale parameter indicates
+  //the distance (relative to 'delta') at which convex mitering will be
+  //truncated to avoid excessive spiking at narrow angled joins.
+
   if joinStyle = jsRound then
   begin
     if abs(delta) < 0.25 then Exit;
@@ -1927,6 +1943,8 @@ function GrowClosedLine(const line: TPathD; width: double;
 var
   len: integer;
   line2, norms: TPathD;
+  rec: TRectD;
+  skipHole: Boolean;
 begin
   len := length(line);
   if len < 3 then
@@ -1943,9 +1961,16 @@ begin
       joinStyle := jsSquare else
       joinStyle := jsRound;
   end;
-  SetLength(Result, 2);
+
+  rec := GetBoundsD(line);
+  skipHole := (rec.Width <= width) or (rec.Height <= width);
+  if skipHole then
+    SetLength(Result, 1) else
+    SetLength(Result, 2);
   norms := GetNormals(line);
   Result[0] := Grow(line, norms, width/2, joinStyle, miterLimOrRndScale);
+
+  if skipHole then Exit;
   line2 := ReversePath(line);
   norms := ReverseNormals(norms);
   Result[1] := Grow(line2, norms, width/2, joinStyle, miterLimOrRndScale);
@@ -1994,7 +2019,7 @@ begin
       joinStyle := jsRound else
       joinStyle := jsSquare;
   end;
-  if endStyle in [esPolygon, esClosed] then
+  if endStyle = esPolygon then
     for i := 0 to high(lines) do
       AddPaths(GrowClosedLine(lines[i],
         lineWidth, joinStyle, miterLimOrRndScale))
@@ -2060,25 +2085,93 @@ end;
 //------------------------------------------------------------------------------
 
 function RoundRect(const rec: TRect; radius: integer): TPathD;
-var
-  rec2: TRectD;
 begin
-  rec2 := RectD(rec);
-  InflateRect(rec2, -radius, -radius);
-  if IsEmptyRect(rec2) then
-    result := nil else
-    result := Grow(Rectangle(rec2), nil, radius, jsRound, 2);
+  Result := RoundRect(RectD(rec), PointD(radius, radius));
+end;
+//------------------------------------------------------------------------------
+
+function RoundRect(const rec: TRect; radius: TPoint): TPathD;
+begin
+  Result := RoundRect(RectD(rec), PointD(radius));
 end;
 //------------------------------------------------------------------------------
 
 function RoundRect(const rec: TRectD; radius: double): TPathD;
-var
-  rec2: TRectD;
 begin
-  rec2 := InflateRect(rec, -radius, -radius);
-  if rec2.IsEmpty then
-    result := Rectangle(rec) else
-    result := Grow(Rectangle(rec2), nil, radius, jsRound, 2);
+  Result := RoundRect(rec, PointD(radius, radius));
+end;
+//------------------------------------------------------------------------------
+
+function RoundRect(const rec: TRectD; radius: TPointD): TPathD;
+var
+  i,j     : integer;
+  corners : TPathD;
+  bezPts  : TPathD;
+  magic   : TPointD;
+const
+  magicC: double = 0.55228475; // =4/3 * (sqrt(2)-1)
+begin
+  Result := nil;
+  if rec.IsEmpty then Exit;
+  radius.X := Min(radius.X, rec.Width/2);
+  radius.Y := Min(radius.Y, rec.Height/2);
+  if (radius.X < 1) and (radius.Y < 1) then
+  begin
+    Result := Rectangle(rec);
+    Exit;
+  end;
+
+  magic.X := radius.X * magicC;
+  magic.Y := radius.Y * magicC;
+
+  SetLength(Corners, 4);
+  with rec do
+  begin
+    corners[0] := PointD(Right, Top);
+    corners[1] := BottomRight;
+    corners[2] := PointD(Left, Bottom);
+    corners[3] := TopLeft;
+  end;
+  SetLength(Result, 1);
+  Result[0].X := corners[3].X + radius.X;
+  Result[0].Y := corners[3].Y;
+
+  SetLength(bezPts, 4);
+  for i := 0 to High(corners) do
+  begin
+    for j := 0 to 3 do bezPts[j] := corners[i];
+    case i of
+      3:
+        begin
+          bezPts[0].Y := bezPts[0].Y + radius.Y;
+          bezPts[1].Y := bezPts[0].Y - magic.Y;
+          bezPts[3].X := bezPts[3].X + radius.X;
+          bezPts[2].X := bezPts[3].X - magic.X;
+        end;
+      0:
+        begin
+          bezPts[0].X := bezPts[0].X - radius.X;
+          bezPts[1].X := bezPts[0].X + magic.X;
+          bezPts[3].Y := bezPts[3].Y + radius.Y;
+          bezPts[2].Y := bezPts[3].Y - magic.Y;
+        end;
+      1:
+        begin
+          bezPts[0].Y := bezPts[0].Y - radius.Y;
+          bezPts[1].Y := bezPts[0].Y + magic.Y;
+          bezPts[3].X := bezPts[3].X - radius.X;
+          bezPts[2].X := bezPts[3].X + magic.X;
+        end;
+      2:
+        begin
+          bezPts[0].X := bezPts[0].X + radius.X;
+          bezPts[1].X := bezPts[0].X - magic.X;
+          bezPts[3].Y := bezPts[3].Y - radius.Y;
+          bezPts[2].Y := bezPts[3].Y + magic.Y;
+        end;
+    end;
+    AppendPath(Result, FlattenCBezier(bezPts));
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -2441,13 +2534,18 @@ begin
     patOff := 0 else
     patOff := patternOffset^;
 
+  patLen := 0;
+  for i := 0 to patCnt -1 do
+    inc(patLen, pattern[i]);
+
   if patOff < 0 then
   begin
-    patLen := 0;
-    for i := 0 to patCnt -1 do inc(patLen, pattern[i]);
-    patOff := patLen - patOff;
-  end;
-  paIdx := paIdx mod patCnt;
+    patOff := patLen + patOff;
+    while patOff < 0 do
+      patOff := patOff + patLen;
+  end
+  else while patOff > patLen do
+    patOff := patOff - patLen;
 
   //nb: each dash is made up of 2 or more pts
   dashCnt := 0;

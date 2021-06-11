@@ -1,4 +1,4 @@
-  //nb: hash identifiers with appended underscores are case sensitive.
+const
   hAmplitude                  = $DA119D26;    // Amplitude
   hArial                      = $EC47D4A0;    // Arial
   hAtop                       = $7655315D;    // Atop
@@ -14,6 +14,8 @@
   hClass                      = $E45C07DD;    // Class
   hClip_045_path              = $B6C7D97A;    // Clip-path
   hClippath                   = $241B0E0D;    // Clippath
+  hColor                      = $E953FD29;    // Color
+  hCurrentColor               = $5B8F31B0;    // CurrentColor
   hCx                         = $B5177A89;    // Cx
   hCy                         = $A6DCDE14;    // Cy
   hD                          = $2350C685;    // D
@@ -149,6 +151,7 @@
   hText                       = $7F3B51AB;    // Text
   hText_045_Anchor            = $D0D82FE8;    // Text-Anchor
   hText_045_Decoration        = $3BC20862;    // Text-Decoration
+  hTextLength                 = $DA75EDC0;    // TextLength
   hTextPath                   = $18F2748E;    // TextPath
   hTimes                      = $FF0E1FBE;    // Times
   hTransform                  = $A0930B32;    // Transform

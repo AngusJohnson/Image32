@@ -24,25 +24,27 @@ uses
 type
   TElementMeasureUnit = (emuBoundingBox, emuUserSpace);
   TMeasureUnit = (muUndefined, muPixel, muPercent,
-    muDegree, muRadian, muInch, muCm, muMm, muEm, muEx, muPt);
+    muDegree, muRadian, muInch, muCm, muMm, muEm, muEx, muPt, muPica);
 
   TValue = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
     rawVal  : double;
     mu      : TMeasureUnit;
-    procedure Init;
+    pcBelow : double; //manages % vs frac. ambiguity with untyped values
+    procedure Init(asPercentBelow: double);
     procedure SetValue(val: double; measureUnit: TMeasureUnit = muUndefined);
-    function  GetValue: double;
-    function  GetValueX(const scaleRect: TRectD): double;
-    function  GetValueY(const scaleRect: TRectD): double;
-    function  GetValueXY(const scaleRect: TRectD): double;
+    function  GetValue(scale: double; fontSize: double = 16.0): double;
+    function  GetValueX(const scale: double; fontSize: double): double;
+    function  GetValueY(const scale: double; fontSize: double): double;
+    function  GetValueXY(const scaleRec: TRectD; fontSize: double): double;
     function  IsValid: Boolean;
+    function  IsPercent: Boolean;
   end;
 
   TValuePt = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
     X       : TValue;
     Y       : TValue;
-    procedure Init;
-    function  GetPoint(const scaleRect: TRectD): TPointD;
+    procedure Init(asPercentBelow: double);
+    function  GetPoint(const scaleRec: TRectD; fontSize: double): TPointD;
     function  IsValid: Boolean;
   end;
 
@@ -51,9 +53,9 @@ type
     top     : TValue;
     width   : TValue;
     height  : TValue;
-    procedure Init;
-    function  GetRectD(const scaleRect: TRectD): TRectD;
-    function  GetRectWH(const scaleRect: TRectD): TRectWH;
+    procedure Init(asPercentBelow: double);
+    function  GetRectD(const scaleRec: TRectD; fontSize: double): TRectD;
+    function  GetRectWH(const scaleRec: TRectD; fontSize: double): TRectWH;
     function  IsValid: Boolean;
     function  IsEmpty: Boolean;
   end;
@@ -74,16 +76,17 @@ type
     procedure Clear;
   end;
 
-  TFontSyle = (fsBold, fsItalic);
-  TFontSyles = set of TFontSyle;
-  TFontDecoration = (fdNone, fdUnderline, fdStrikeThrough);
+  TSvgFontSyles = (sfsUndefined, sfsNone, sfsBold, sfsItalic, sfsBoldItalic);
+  TFontDecoration = (fdUndefined, fdNone, fdUnderline, fdStrikeThrough);
+  TSvgTextAlign = (staUndefined, staLeft, staCenter, staRight);
 
   TSVGFontInfo = record
     family      : TTtfFontFamily;
     size        : double;
     spacing     : double;
-    styles      : TFontSyles;
-    align       : TTextAlign;
+    textLength  : double;
+    styles      : TSvgFontSyles;
+    align       : TSvgTextAlign;
     decoration  : TFontDecoration;
     baseShift   : TValue;
   end;
@@ -104,6 +107,7 @@ type
     firstPt   : TPointD;
     isClosed  : Boolean;
     segs      : array of TDpathSeg;
+    function GetBounds: TRectD;
     //scalePending parameter: if the SVG will be scaled later by this amount,
     //then make sure that curves are flattened to an appropriate precision
     function GetFlattenedPath(scalePending: double = 1.0): TPathD;
@@ -126,6 +130,8 @@ function ParseNameLength(var c: PAnsiChar; endC: PAnsiChar): integer;
 function ParseStyleNameLen(var c: PAnsiChar; endC: PAnsiChar): integer;
 function ParseNextChar(var current: PAnsiChar; currentEnd: PAnsiChar): AnsiChar;
 function ParseNextWord(var current: PAnsiChar; currentEnd: PAnsiChar;
+  out word: TAnsiName): Boolean;
+function ParseNextWordEx(var current: PAnsiChar; currentEnd: PAnsiChar;
   out word: TAnsiName): Boolean;
 function ParseNextWordHashed(var c: PAnsiChar; endC: PAnsiChar): cardinal;
 function ParseNextNum(var current: PAnsiChar; currentEnd: PAnsiChar;
@@ -157,8 +163,13 @@ function CharInSet(chr: Char; chrs: TSetOfChar): Boolean;
 {$IFEND}
 
 const
-  clInvalid = $00010001;
-  sqrt2     = 1.4142135623731;
+  clInvalid   = $00010001;
+  clCurrent   = $00010002;
+  sqrt2       = 1.4142135623731;
+  quote       = '''';
+  dquote      = '"';
+  space       = #32;
+
 var
   LowerCaseTable : array[#0..#255] of AnsiChar;
 
@@ -409,15 +420,208 @@ begin
     end;
   SetLength(Result, pathLen);
 end;
+//------------------------------------------------------------------------------
+
+function TDpath.GetBounds: TRectD;
+const
+  buffSize = 32;
+var
+  i,j, pathLen, pathCap: integer;
+  currPt, radii, pt2, pt3, pt4: TPointD;
+  lastQCtrlPt, lastCCtrlPt: TPointD;
+  arcFlag, sweepFlag: integer;
+  angle, arc1, arc2: double;
+  rec: TRectD;
+  path2, path3: TPathD;
+
+  procedure AddPoint(const pt: TPointD);
+  begin
+    if pathLen = pathCap then
+    begin
+      pathCap := pathCap + buffSize;
+      SetLength(path2, pathCap);
+    end;
+    path2[pathLen] := pt;
+    currPt := pt;
+    inc(pathLen);
+  end;
+
+  procedure AddPath(const p: TPathD);
+  var
+    i, pLen: integer;
+  begin
+    pLen := Length(p);
+    if pLen = 0 then Exit;
+    currPt := p[pLen -1];
+    if pathLen + pLen >= pathCap then
+    begin
+      pathCap := pathLen + pLen + buffSize;
+      SetLength(path2, pathCap);
+    end;
+    for i := 0 to pLen -1 do
+    begin
+      path2[pathLen] := p[i];
+      inc(pathLen);
+    end;
+  end;
+
+begin
+  path2 := nil;
+  pathLen := 0; pathCap := 0;
+  lastQCtrlPt := InvalidPointD;
+  lastCCtrlPt := InvalidPointD;
+  AddPoint(firstPt);
+  for i := 0 to High(segs) do
+    with segs[i] do
+    begin
+      case segType of
+        dsLine:
+          if High(vals) > 0 then
+            for j := 0 to High(vals) div 2 do
+              AddPoint(PointD(vals[j*2], vals[j*2 +1]));
+        dsHorz:
+          for j := 0 to High(vals) do
+            AddPoint(PointD(vals[j], currPt.Y));
+        dsVert:
+          for j := 0 to High(vals) do
+            AddPoint(PointD(currPt.X, vals[j]));
+        dsArc:
+          if High(vals) > 5 then
+            for j := 0 to High(vals) div 7 do
+            begin
+              radii.X   := vals[j*7];
+              radii.Y   := vals[j*7 +1];
+              angle     := DegToRad(vals[j*7 +2]);
+              arcFlag   := Round(vals[j*7 +3]);
+              sweepFlag := Round(vals[j*7 +4]);
+              pt2.X := vals[j*7 +5];
+              pt2.Y := vals[j*7 +6];
+
+              SvgArc(currPt, pt2, radii, angle,
+                arcFlag <> 0, sweepFlag <> 0, arc1, arc2, rec);
+              if (sweepFlag = 0)  then
+              begin
+                path3 := Arc(rec, arc2, arc1, 1);
+                path3 := ReversePath(path3);
+              end else
+                path3 := Arc(rec, arc1, arc2, 1);
+              path3 := RotatePath(path3, rec.MidPoint, angle);
+              AddPath(path3);
+            end;
+        dsQBez:
+          if High(vals) > 2 then
+            for j := 0 to High(vals) div 4 do
+            begin
+              pt2.X := vals[j*4];
+              pt2.Y := vals[j*4 +1];
+              pt3.X := vals[j*4 +2];
+              pt3.Y := vals[j*4 +3];
+              lastQCtrlPt := pt2;
+              path3 := FlattenQBezier(currPt, pt2, pt3, 1);
+              AddPath(path3);
+            end;
+        dsQSpline:
+          if High(vals) > 0 then
+            for j := 0 to High(vals) div 2 do
+            begin
+              if IsValid(lastQCtrlPt) then
+                pt2 := ReflectPoint(lastQCtrlPt, currPt) else
+                pt2 := currPt;
+              pt3.X := vals[j*2];
+              pt3.Y := vals[j*2 +1];
+              lastQCtrlPt := pt2;
+              path3 := FlattenQBezier(currPt, pt2, pt3, 1);
+              AddPath(path3);
+            end;
+        dsCBez:
+          if High(vals) > 4 then
+            for j := 0 to High(vals) div 6 do
+            begin
+              pt2.X := vals[j*6];
+              pt2.Y := vals[j*6 +1];
+              pt3.X := vals[j*6 +2];
+              pt3.Y := vals[j*6 +3];
+              pt4.X := vals[j*6 +4];
+              pt4.Y := vals[j*6 +5];
+              lastCCtrlPt := pt3;
+              path3 := FlattenCBezier(currPt, pt2, pt3, pt4, 1);
+              AddPath(path3);
+            end;
+        dsCSpline:
+          if High(vals) > 2 then
+            for j := 0 to High(vals) div 4 do
+            begin
+              if IsValid(lastCCtrlPt) then
+                pt2 := ReflectPoint(lastCCtrlPt, currPt) else
+                pt2 := currPt;
+              pt3.X := vals[j*4];
+              pt3.Y := vals[j*4 +1];
+              pt4.X := vals[j*4 +2];
+              pt4.Y := vals[j*4 +3];
+              lastCCtrlPt := pt3;
+              path3 := FlattenCBezier(currPt, pt2, pt3, pt4, 1);
+              AddPath(path3);
+            end;
+      end;
+    end;
+  SetLength(path2, pathLen);
+  Result := GetBoundsD(path2);
+end;
+//------------------------------------------------------------------------------
+
+function ConvertValue(const value: TValue;
+  scale: double; fontSize: double): double;
+const
+  mm  = 96 / 25.4;
+  cm  = 96 / 2.54;
+  rad = 180 / PI;
+  pt  = 4 / 3;
+begin
+  if fontSize = 0 then fontSize := 96;
+
+  //https://oreillymedia.github.io/Using_SVG/guide/units.html
+  //todo: still lots of units to support (eg times for animation)
+  with value do
+    if not IsValid or (rawVal = 0) then
+      Result := 0
+    else
+      case value.mu of
+        muUndefined:
+          if (Abs(rawVal) < pcBelow) then
+            Result := rawVal * scale else
+            Result := rawVal;
+        muPercent:
+          Result := rawVal * 0.01 * scale;
+        muRadian:
+          Result := rawVal * rad;
+        muInch:
+          Result := rawVal * 96;
+        muCm:
+          Result := rawVal * cm;
+        muMm:
+          Result := rawVal * mm;
+        muEm:
+          Result := rawVal * fontSize;
+        muEx:
+          Result := rawVal * fontSize * 0.5;
+        muPica:
+          Result := rawVal * 16;
+        muPt:
+          Result := rawVal * pt;
+        else
+          Result := rawVal;
+      end;
+end;
 
 //------------------------------------------------------------------------------
 // TValue
 //------------------------------------------------------------------------------
 
-procedure TValue.Init;
+procedure TValue.Init(asPercentBelow: double);
 begin
   rawVal  := InvalidD;
   mu      := muUndefined;
+  pcBelow := asPercentBelow;
 end;
 //------------------------------------------------------------------------------
 
@@ -428,46 +632,29 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TValue.GetValue: double;
-const
-  mm  = 96 / 25.4;
-  cm  = 96 / 2.54;
-  rad = 180 / PI;
+function TValue.GetValue(scale: double; fontSize: double): double;
 begin
-  case mu of
-    muPercent : Result := rawVal * 0.01;
-    muRadian  : Result := rawVal * rad; //convert to degree
-    muInch    : Result := rawVal * 96;
-    muCm      : Result := rawVal * cm;
-    muMm      : Result := rawVal * mm;
-    muPt      : Result := rawVal * 1.3333333;
-    else Result := rawVal;
-  end;
+  Result := ConvertValue(self, scale, fontSize);
 end;
 //------------------------------------------------------------------------------
 
-function TValue.GetValueX(const scaleRect: TRectD): double;
+function TValue.GetValueX(const scale: double; fontSize: double): double;
 begin
-  if mu = muPercent then
-    Result := scaleRect.Width * rawVal * 0.01 else
-    Result := GetValue;
+  Result := ConvertValue(self, scale, fontSize);
 end;
 //------------------------------------------------------------------------------
 
-function TValue.GetValueY(const scaleRect: TRectD): double;
+function TValue.GetValueY(const scale: double; fontSize: double): double;
 begin
-  if mu = muPercent then
-    Result := scaleRect.Height * rawVal * 0.01 else
-    Result := GetValue;
+  Result := ConvertValue(self, scale, fontSize);
 end;
 //------------------------------------------------------------------------------
 
-function TValue.GetValueXY(const scaleRect: TRectD): double;
+function TValue.GetValueXY(const scaleRec: TRectD; fontSize: double): double;
 begin
-  if mu = muPercent then
-    //see https://oreillymedia.github.io/Using_SVG/extras/ch05-percentages.html
-    Result := Hypot(scaleRect.Width, scaleRect.Height)/sqrt2 *rawVal *0.01 else
-    Result := GetValue;
+  //https://www.w3.org/TR/SVG11/coords.html#Units
+  Result := ConvertValue(self,
+    Hypot(scaleRec.Width, scaleRec.Height)/sqrt2, fontSize);
 end;
 //------------------------------------------------------------------------------
 
@@ -475,22 +662,32 @@ function TValue.IsValid: Boolean;
 begin
   Result := Image32_Vector.IsValid(rawVal);
 end;
+//------------------------------------------------------------------------------
+
+function TValue.IsPercent: Boolean;
+begin
+  case mu of
+    muUndefined: Result := Abs(rawVal) < pcBelow;
+    muPercent: Result := True;
+    else Result := False;
+  end;
+end;
 
 //------------------------------------------------------------------------------
 // TValuePt
 //------------------------------------------------------------------------------
 
-procedure TValuePt.Init;
+procedure TValuePt.Init(asPercentBelow: double);
 begin
-  X.Init;
-  Y.Init;
+  X.Init(asPercentBelow);
+  Y.Init(asPercentBelow);
 end;
 //------------------------------------------------------------------------------
 
-function TValuePt.GetPoint(const scaleRect: TRectD): TPointD;
+function TValuePt.GetPoint(const scaleRec: TRectD; fontSize: double): TPointD;
 begin
-  Result.X := X.GetValueX(scaleRect);
-  Result.Y := Y.GetValueY(scaleRect);
+  Result.X := X.GetValueX(scaleRec.Width, fontSize);
+  Result.Y := Y.GetValueY(scaleRec.Height, fontSize);
 end;
 //------------------------------------------------------------------------------
 
@@ -503,34 +700,39 @@ end;
 // TValueRec
 //------------------------------------------------------------------------------
 
-procedure TValueRecWH.Init;
+procedure TValueRecWH.Init(asPercentBelow: double);
 begin
-  left.Init;
-  top.Init;
-  width.Init;
-  height.Init;
+  left.Init(asPercentBelow);
+  top.Init(asPercentBelow);
+  width.Init(asPercentBelow);
+  height.Init(asPercentBelow);
 end;
 //------------------------------------------------------------------------------
 
-function TValueRecWH.GetRectD(const scaleRect: TRectD): TRectD;
+function TValueRecWH.GetRectD(const scaleRec: TRectD; fontSize: double): TRectD;
+begin
+  with GetRectWH(scaleRec, fontSize) do
+  begin
+    Result.Left :=Left;
+    Result.Top := Top;
+    Result.Right := Left + Width;
+    Result.Bottom := Top + Height;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TValueRecWH.GetRectWH(const scaleRec: TRectD; fontSize: double): TRectWH;
 begin
   if not left.IsValid then
     Result.Left := 0 else
-    Result.Left := left.GetValueX(scaleRect);
+    Result.Left := left.GetValueX(scaleRec.Width, fontSize);
+
   if not top.IsValid then
     Result.Top := 0 else
-    Result.Top := top.GetValueY(scaleRect);
-  Result.Right := Result.Left + width.GetValueX(scaleRect);
-  Result.Bottom := Result.Top + height.GetValueY(scaleRect);
-end;
-//------------------------------------------------------------------------------
+    Result.Top := top.GetValueY(scaleRec.Height, fontSize);
 
-function TValueRecWH.GetRectWH(const scaleRect: TRectD): TRectWH;
-begin
-  Result.Left := left.GetValueX(scaleRect);
-  Result.Top := top.GetValueY(scaleRect);
-  Result.Width := width.GetValueX(scaleRect);
-  Result.Height := height.GetValueY(scaleRect);
+  Result.Width := width.GetValueX(scaleRec.Width, fontSize);
+  Result.Height := height.GetValueY(scaleRec.Height, fontSize);
 end;
 //------------------------------------------------------------------------------
 
@@ -728,7 +930,7 @@ end;
 function ParseNextWord(var current: PAnsiChar;
   currentEnd: PAnsiChar; out word: TAnsiName): Boolean;
 begin
-  Result := SkipBlanks(current, currentEnd);
+  Result := SkipBlanksAndComma(current, currentEnd);
   if not Result then Exit;
 
   word.len := 0; word.name := current;
@@ -740,6 +942,40 @@ begin
     inc(current);
   end;
   Result := word.len > 0;
+end;
+//------------------------------------------------------------------------------
+
+function ParseNextWordEx(var current: PAnsiChar;
+  currentEnd: PAnsiChar; out word: TAnsiName): Boolean;
+var
+  isQuoted: Boolean;
+begin
+  Result := SkipBlanksAndComma(current, currentEnd);
+  if not Result then Exit;
+  isQuoted := (current^) = quote;
+  if isQuoted then
+  begin
+    inc(current);
+    word.name := current;
+    while (current < currentEnd) and (current^ <> quote) do inc(current);
+    Result := current < currentEnd;
+    if not Result then Exit;
+    word.len := current - word.name;
+    inc(current);
+  end else
+  begin
+
+    Result := CharInSet(LowerCaseTable[current^], ['A'..'Z', 'a'..'z']);
+    if not Result then Exit;
+    word.len := 1; word.name := current;
+    inc(current);
+    while (current < currentEnd) and
+      CharInSet(LowerCaseTable[current^], ['A'..'Z', 'a'..'z', '-', '_']) do
+    begin
+      inc(word.len);
+      inc(current);
+    end;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -772,6 +1008,16 @@ begin
   end;
   while (current < currentEnd) and (current^ <= #32) do inc(current);
   if (current = currentEnd) then Exit;
+
+//  if (current^ = 'n') and
+//    (ParseNextWordHashed(current, current +4) = hNone) then
+//  begin
+//    inc(current, 4);
+//    Result := true;
+//    val := 0;
+//    measureUnit := muUndefined;
+//    Exit;
+//  end;
 
   decPos := -1; exp := Invalid; expIsNeg := false;
   isNeg := current^ = '-';
@@ -863,16 +1109,23 @@ begin
         inc(current, 2);
         measureUnit := muMm;
       end;
-    'p': //ignore px
-      if (current+1)^ = 'x' then
-      begin
-        inc(current, 2);
-        measureUnit := muPixel;
-      end
-      else if (current+1)^ = 't' then
-      begin
-        inc(current, 2);
-        measureUnit := muPt;
+    'p':
+      case (current+1)^ of
+        'c':
+          begin
+            inc(current, 2);
+            measureUnit := muPica;
+          end;
+        't':
+          begin
+            inc(current, 2);
+            measureUnit := muPt;
+          end;
+        'x':
+          begin
+            inc(current, 2);
+            measureUnit := muPixel;
+          end;
       end;
     'r': //convert radian angles to degrees
       if ((current+1)^ = 'a') and ((current+2)^ = 'd') then
@@ -888,10 +1141,9 @@ function ParseNextNum(var current: PAnsiChar; currentEnd: PAnsiChar;
   skipComma: Boolean; out val: double): Boolean; overload;
 var
   tmp: TValue;
-  mu: TMeasureUnit;
 begin
   Result := ParseNextNum(current, currentEnd, skipComma, tmp.rawVal, tmp.mu);
-  val := tmp.GetValue;
+  val := tmp.GetValue(1);
 end;
 //------------------------------------------------------------------------------
 
@@ -957,7 +1209,7 @@ end;
 
 function ExtractRefFromValue(const href: TAnsiName): TAnsiName; {$IFDEF INLINE} inline; {$ENDIF}
 var
-  endR: PAnsiChar;
+  curr, endR: PAnsiChar;
 begin
   Result := href;
   endR := Result.name + href.len;
@@ -970,7 +1222,13 @@ begin
     dec(endR); // avoid trailing ')'
   end;
   if Result.name^ = '#' then inc(Result.name);
-  Result.len := endR - Result.name;
+  Result.len := 0;
+  curr := Result.name;
+  while (curr < endR) and (curr^ <> ')') do
+  begin
+    inc(Result.len);
+    inc(curr);
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1273,17 +1531,22 @@ end;
 
 function ValueToColor32(const value: TAnsiName; var color: TColor32): Boolean;
 var
-  i: integer;
-  j: Cardinal;
-  clr: TColor32;
-  alpha: Byte;
-  vals: array[0..3] of double;
-  p, pEnd: PAnsiChar;
+  i     : integer;
+  j     : Cardinal;
+  clr   : TColor32;
+  alpha : Byte;
+  vals  : array[0..3] of double;
+  mus   :  array[0..3] of TMeasureUnit;
+  p     : PAnsiChar;
+  pEnd  : PAnsiChar;
 begin
   Result := false;
   p := value.name;
   if (value.len < 3) then Exit;
-  alpha := color shr 24;
+
+  if (color = clInvalid) or (color = clCurrent) or (color = clNone32) then
+    alpha := 255 else
+    alpha := color shr 24;
 
   if (p^    = 'r') and                 //RGB / RGBA
     ((p+1)^ = 'g') and
@@ -1293,11 +1556,15 @@ begin
     inc(p, 3);
     if (p^ = 'a') then inc(p);
     if (ParseNextChar(p, pEnd) <> '(') or
-      not ParseNextNum(p, pEnd, false, vals[0]) or
-      not ParseNextNum(p, pEnd, true, vals[1]) or
-      not ParseNextNum(p, pEnd, true, vals[2]) then Exit;
-    if ParseNextNum(p, pEnd, false, vals[3]) then
-      alpha := 0 else //stops further alpha adjustment
+      not ParseNextNum(p, pEnd, false, vals[0], mus[0]) or
+      not ParseNextNum(p, pEnd, true, vals[1], mus[1]) or
+      not ParseNextNum(p, pEnd, true, vals[2], mus[2]) then Exit;
+    for i := 0 to 2 do
+      if mus[i] = muPercent then
+        vals[i] := vals[i] * 255 / 100;
+
+    if ParseNextNum(p, pEnd, true, vals[3], mus[3]) then
+      alpha := 255 else //stops further alpha adjustment
       vals[3] := 255;
     if ParseNextChar(p, pEnd) <> ')' then Exit;
     for i := 0 to 3 do if IsFraction(vals[i]) then
@@ -1342,7 +1609,7 @@ begin
   end;
 
   //and in case the opacity has been set before the color
-  if (alpha > 0) and (alpha < 255) then
+  if (alpha < 255) then
     color := (color and $FFFFFF) or alpha shl 24;
   Result := true;
 end;
@@ -1351,11 +1618,23 @@ end;
 function MakeDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfInteger;
 var
   i, len: integer;
+  dist: double;
 begin
+  dist := 0;
   len := Length(dblArray);
   SetLength(Result, len);
   for i := 0 to len -1 do
+  begin
     Result[i] := Ceil(dblArray[i] * scale);
+    dist := Result[i] + dist;
+  end;
+  if dist = 0 then
+    Result := nil
+  else if len = 1 then
+  begin
+    SetLength(Result, 2);
+    Result[1] := Result[0];
+  end;
 end;
 
 //------------------------------------------------------------------------------

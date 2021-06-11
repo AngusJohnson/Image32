@@ -3,11 +3,15 @@ unit Image32_Ttf;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  12 May 2021                                                     *
+* Date      :  11 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
+*                                                                              *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
-* License   :  http://www.boost.org/LICENSE_1_0.txt                            *
+*                                                                              *
+* License   :  Use, modification & distribution is subject to                  *
+*              Boost Software License Ver 1                                    *
+*              http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
 interface
@@ -138,7 +142,7 @@ type
     minorVersion   : Word;
     fontRevision   : TFixed;
     checkSumAdjust : Cardinal;
-    magicNumber    : Cardinal; // $5F0F3CF5
+    magicNumber    : Cardinal;  //$5F0F3CF5
     flags          : Word;
     unitsPerEm     : Word;
     dateCreated    : UInt64;
@@ -147,9 +151,9 @@ type
     yMin           : Int16;
     xMax           : Int16;
     yMax           : Int16;
-    macStyle       : Word;
+    macStyle       : Word;      //see TMacStyles
     lowestRecPPEM  : Word;
-    fontDirHint    : Int16;
+    fontDirHint    : Int16;     //ltr, rtl
     indexToLocFmt  : Int16;
     glyphDataFmt   : Int16;
   end;
@@ -1908,19 +1912,25 @@ end;
 function TFontReader.GetFontFamily: TTtfFontFamily;
 var
   dummy: integer;
-  paths: TPathsD;
-  gm: TGlyphMetrics;
+  glyphsT, glyphsI, glyphsM: TPathsD;
+  gmT, gmI, gmM: TGlyphMetrics;
 begin
   result := ttfUnknown;
-  if fTbl_post.isFixedPitch <> 0 then
+  if (fTbl_post.majorVersion > 0) and
+    (fTbl_post.isFixedPitch <> 0) then
   begin
     result := ttfMonospace;
     Exit;
   end else
   begin
-    if not GetGlyphInfo(Ord('T'), paths, dummy, gm) or
-      not Assigned(paths) then Exit;
-    if Length(paths[0]) <= 12 then //probably <= 8 is fine too.
+    if not GetGlyphInfo(Ord('T'), glyphsT, dummy, gmT) or
+      not Assigned(glyphsT) or
+      not GetGlyphInfo(Ord('i'), glyphsI, dummy, gmI) or
+      not GetGlyphInfo(Ord('m'), glyphsM, dummy, gmM) then
+        Exit;
+    if gmi.hmtx.advanceWidth = gmm.hmtx.advanceWidth then
+      Result := ttfMonospace
+    else if Length(glyphsT[0]) <= 12 then //probably <= 8 is fine too.
       Result := ttfSansSerif else
       Result := ttfSerif;
   end;
@@ -2139,13 +2149,13 @@ begin
     begin
       j := FindInKernList(glyphInfo.metrics.glyphIdx, prevGlyphKernList);
       if (j >= 0) then
-        thisX := thisX + prevGlyphKernList[j].kernValue*fScale +interCharSpace;
+        thisX := thisX + prevGlyphKernList[j].kernValue*fScale;
     end;
     Result[i] := thisX;
     thisX := thisX + glyphInfo.metrics.hmtx.advanceWidth*fScale +interCharSpace;
     prevGlyphKernList := glyphInfo.metrics.kernList;
   end;
-  Result[len] := thisX;
+  Result[len] := thisX - interCharSpace;
 end;
 //------------------------------------------------------------------------------
 
@@ -2740,14 +2750,8 @@ function GetTextGlyphsOnPath(const text: UnicodeString;
   perpendicOffset: integer; charSpacing: double;
   out charsThatFit: integer): TPathsD; overload;
 var
-  i, pathLen, pathInfoIdx: integer;
-  textWidth, left, center, center2, scale, dist, dx: double;
-  glyph: PGlyphInfo;
-  offsets: TArrayOfDouble;
-  pathInfo: TPathInfo;
+  pathLen: integer;
   pathInfos: TPathInfos;
-  pt, rotatePt: TPointD;
-  tmpPaths: TPathsD;
 
   function GetPathInfo(var startIdx: integer; offset: double): TPathInfo;
   begin
@@ -2763,6 +2767,14 @@ var
     Result.pt     := path[startIdx -1];
   end;
 
+var
+  i, pathInfoIdx: integer;
+  textWidth, left, center, center2, scale, dist, dx: double;
+  glyph: PGlyphInfo;
+  offsets: TArrayOfDouble;
+  pathInfo: TPathInfo;
+  pt, rotatePt: TPointD;
+  tmpPaths: TPathsD;
 begin
   Result := nil;
   pathLen := Length(path);
@@ -2785,7 +2797,8 @@ begin
   end;
 
   //truncate text that doesn't fit ...
-  if offsets[charsThatFit] > dist then
+  if offsets[charsThatFit] -
+    ((offsets[charsThatFit] - offsets[charsThatFit-1])*0.5) > dist then
   begin
     repeat
       dec(charsThatFit);

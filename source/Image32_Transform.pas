@@ -3,11 +3,15 @@ unit Image32_Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  30 April 2021                                                   *
+* Date      :  11 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
+*                                                                              *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
-* License   :  http://www.boost.org/LICENSE_1_0.txt                            *
+*                                                                              *
+* License   :  Use, modification & distribution is subject to                  *
+*              Boost Software License Ver 1                                    *
+*              http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
 interface
@@ -35,9 +39,10 @@ type
     var pt: TPointD); overload; {$IFDEF INLINE} inline; {$ENDIF}
   procedure MatrixApply(const matrix: TMatrixD; var rec: TRect); overload;
   procedure MatrixApply(const matrix: TMatrixD; var rec: TRectD); overload;
+  procedure MatrixApply(const matrix: TMatrixD; var rec: TRectWH); overload;
   procedure MatrixApply(const matrix: TMatrixD; var path: TPathD); overload;
   procedure MatrixApply(const matrix: TMatrixD; var paths: TPathsD); overload;
-  function MatrixInvert(var matrix: TMatrixD): Boolean;
+  function  MatrixInvert(var matrix: TMatrixD): Boolean;
 
   //MatrixSkew: dx represents the delta offset of an X coordinate as a
   //fraction of its Y coordinate, and likewise for dy. For example, if dx = 0.1
@@ -226,6 +231,27 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure MatrixApply(const matrix: TMatrixD; var rec: TRectWH);
+var
+  path: TPathD;
+  rec2: TRectD;
+begin
+  with rec do
+  begin
+    SetLength(path, 2);
+    path[0] := PointD(Left, Top);
+    path[1] := PointD(Left + Width, Top + Height);
+  end;
+  MatrixApply(matrix, path);
+  rec2 := GetBoundsD(path);
+
+  rec.Left    := rec2.Left;
+  rec.Top     := rec2.Top;
+  rec.Width   := rec2.Right - rec2.Left;
+  rec.Height  := rec2.Bottom - rec2.Top;
+end;
+//------------------------------------------------------------------------------
+
 procedure MatrixApply(const matrix: TMatrixD; var path: TPathD);
 var
   i, len: integer;
@@ -300,6 +326,7 @@ end;
 
 procedure MatrixScale(var matrix: TMatrixD; scale: double);
 begin
+  if (scale = 0) or (scale = 1) then Exit;
   MatrixScale(matrix, scale, scale);
 end;
 //------------------------------------------------------------------------------
@@ -986,7 +1013,8 @@ end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-procedure ExtractAllFromMatrix(const mat: TMatrixD; out angle: double; out scale, skew, trans: TPointD);
+procedure ExtractAllFromMatrix(const mat: TMatrixD; out angle: double;
+  out scale, skew, trans: TPointD);
 var
   a,b,c,d,e,f: double;
   delta, r,s: double;
