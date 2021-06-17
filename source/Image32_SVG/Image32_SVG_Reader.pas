@@ -3,9 +3,9 @@ unit Image32_SVG_Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  11 June 2021                                                    *
+* Date      :  17 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2021                                         *
+* Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
 * Purpose   :  Read SVG ver 2 files                                            *
 *                                                                              *
@@ -22,6 +22,10 @@ unit Image32_SVG_Reader;
 *              Boost Software License Ver 1                                    *
 *              http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
+
+//immediate todos: move XML parsing into a separate unit; ENTITY support;
+//fix 'middle' and 'end' <text> alignment where it contains <tspan> elements
+//add support for masks and animation
 
 interface
 
@@ -45,36 +49,28 @@ type
     currentColor  : TColor32;
     fillColor     : TColor32;
     fillRule      : TFillRule;
-    fillEl        : TAnsiName;
+    fillEl        : AnsiString;
 
     strokeColor   : TColor32;
     strokeWidth   : TValue;
     strokeCap     : TEndStyle;
     strokeJoin    : TJoinStyle;
     strokeMitLim  : double;
-    strokeEl      : TAnsiName;
+    strokeEl      : AnsiString;
     dashArray     : TArrayOfDouble;
     dashOffset    : double;
     fontInfo      : TSVGFontInfo;
-    markerStart   : TAnsiName;
-    markerMiddle  : TAnsiName;
-    markerEnd     : TAnsiName;
-    filterEl      : TAnsiName;
-    clipPathEl    : TAnsiName;
+    markerStart   : AnsiString;
+    markerMiddle  : AnsiString;
+    markerEnd     : AnsiString;
+    filterEl      : AnsiString;
+    clipPathEl    : AnsiString;
     opacity       : integer;
     matrix        : TMatrixD;
     visible       : Boolean;
     InUse         : Boolean; //avoids <USE> recursion
     bounds        : TRectD;
   end;
-
-  PAttrib = ^TAttrib;
-  TAttrib = record
-    aOwnerEl  : TElement;
-    aName     : TAnsiName;
-    aValue    : TAnsiName;
-  end;
-  TArrayOfAttrib = array of TAttrib;
 
   TSvgReader = class;
 
@@ -83,43 +79,26 @@ type
   TElement = class
   private
     fParent         : TElement;
+    fParserEl       : TSvgEl;
     fReader         : TSvgReader;
 {$IFDEF XPLAT_GENERICS}
     fChilds         : TList<TElement>;
 {$ELSE}
     fChilds         : TList;
 {$ENDIF}
-    fHasContent     : Boolean;
-    fIdAttribIdx    : integer;        //delayed loading
-    fStyleAttribIdx : integer;        //delayed loading
-    fName           : TAnsiName;
-    fNameHash       : Cardinal;
-    fAttribs        : TArrayOfAttrib;
-    fCurrent        : PAnsiChar;
-    fCurrentEnd     : PAnsiChar;
-    function  LoadChild: TElement;
-    function  HashCurrentWord(out hash: Cardinal): Boolean;
-    function  GetName(out name: TAnsiName): Boolean;
-    function  SetAttribValue(attrib: PAttrib): Boolean;
-    function  FindRefElement(refname: TAnsiName): TElement;
-    procedure ProcessAttrib(const attrib: PAttrib);
-    function  PeekNextChar: AnsiChar;
-    procedure ParseClassAttrib(classAttrib: PAttrib);
-    procedure ParseStyle(classStyle: PAnsiChar; len: integer);
-    procedure ParseTransform(const transform: TAnsiName);
-    function  AddAttribute: PAttrib;
-    //function GetSvgElement: TSvgElement;
+    function  FindRefElement(refname: AnsiString): TElement;
   protected
     fPcBelow  : double;         //assume percentage values below this value
     fDrawInfo : TDrawInfo;      //currently both static and dynamic vars
-    elRectWH  : TValueRecWH;          //multifunction variable
+    elRectWH  : TValueRecWH;    //multifunction variable
     function  IsFirstChild: Boolean;
-    function  LoadAttributes: Boolean; virtual;
+    procedure LoadAttributes;
+    procedure LoadAttribute(attrib: PAttrib);
     function  LoadContent: Boolean; virtual;
     procedure Draw(image: TImage32; drawInfo: TDrawInfo); virtual;
     procedure DrawChildren(image: TImage32; drawInfo: TDrawInfo); virtual;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); virtual;
+    constructor Create(parent: TElement; svgEl: TSvgEl); virtual;
     destructor  Destroy; override;
   end;
 
@@ -127,17 +106,12 @@ type
   protected
     viewboxWH : TRectWH;
   public
-    constructor Create(reader: TSvgReader; hashName: Cardinal); reintroduce;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TDefsElement = class(TElement)
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
-  end;
-
-  TStyleElement = class(TDefsElement)
-  protected
-    function LoadContent: Boolean; override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   //-------------------------------------
@@ -150,7 +124,6 @@ type
     drawPathsF  : TPathsD; //both open and closed (for filling)
     function  GetBounds: TRectD; virtual;
     function  HasMarkers: Boolean;
-    function  ParseVal(out val: double): Boolean;
     procedure GetPaths(const drawInfo: TDrawInfo); virtual;
     function  GetUncurvedPath(const drawInfo: TDrawInfo): TPathsD; virtual;
     procedure DrawFilled(img: TImage32; drawInfo: TDrawInfo);
@@ -158,7 +131,7 @@ type
     procedure DrawMarkers(img: TImage32; drawInfo: TDrawInfo);
     procedure Draw(image: TImage32; drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TGroupElement = class(TShapeElement)
@@ -173,7 +146,7 @@ type
 
   TUseElement = class(TShapeElement)
   protected
-    refEl: TAnsiName;
+    refEl: AnsiString;
     procedure GetPaths(const drawInfo: TDrawInfo); override;
     procedure Draw(img: TImage32; drawInfo: TDrawInfo); override;
   end;
@@ -182,7 +155,7 @@ type
   protected
     viewboxWH: TRectWH;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   //-------------------------------------
@@ -196,18 +169,11 @@ type
     fCurrDpath    : PDpath;
     fDpaths       : TDpaths;
     fLastPt       : TPointD;
-    function  GetSegType(out isRelative: Boolean): Boolean;
-    function  GetSingleDigit(out digit: integer): Boolean;
-    procedure StartNewDpath;
-    procedure StartNewSeg(segType: TDsegType);
-    procedure AddSegValue(val: double);
-    procedure AddSegPoint(const pt: TPointD);
-    function  Parse2Num(var pt: TPointD; isRelative: Boolean): Boolean;
     procedure Flatten(index: integer; scalePending: double;
       out path: TPathD; out isClosed: Boolean);
   protected
     function  GetBounds: TRectD; override;
-    procedure ParseD(attrib: PAttrib);
+    procedure ParseD(const value: AnsiString);
     procedure GetPaths(const drawInfo: TDrawInfo); override;
     function  GetUncurvedPath(const drawInfo: TDrawInfo): TPathsD; override;
   end;
@@ -216,7 +182,7 @@ type
   protected
     path      : TPathD;
     function  GetBounds: TRectD; override;
-    procedure ParsePoints(attrib: PAttrib);
+    procedure ParsePoints(const value: AnsiString);
     procedure GetPaths(const drawInfo: TDrawInfo); override;
     function  GetUncurvedPath(const drawInfo: TDrawInfo): TPathsD; override;
   end;
@@ -228,7 +194,7 @@ type
     procedure GetPaths(const drawInfo: TDrawInfo); override;
     function  GetUncurvedPath(const drawInfo: TDrawInfo): TPathsD; override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TCircleElement = class(TShapeElement)
@@ -238,7 +204,7 @@ type
     function  GetBounds: TRectD; override;
     procedure GetPaths(const drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TEllipseElement = class(TShapeElement)
@@ -248,7 +214,7 @@ type
     function  GetBounds: TRectD; override;
     procedure GetPaths(const drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TRectElement = class(TShapeElement)
@@ -258,7 +224,7 @@ type
     procedure GetPaths(const drawInfo: TDrawInfo); override;
     function  GetUncurvedPath(const drawInfo: TDrawInfo): TPathsD; override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   //TTextElement: although this is a TShapeElement descendant, it's really
@@ -266,34 +232,33 @@ type
   TTextElement = class(TShapeElement)
   protected
     delta     : TPointD;
-    tmpPt     : TPointD;
+    currentPt : TPointD;
     procedure ResetTmpPt;
     procedure GetPaths(const drawInfo: TDrawInfo); override;
-    function AddSubtext(atext: PAnsiChar; len: integer): TElement;
+    function  LoadContent: Boolean; override;
     procedure Draw(img: TImage32; drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TTSpanElement = class(TTextElement)
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TSubtextElement = class(TShapeElement)
   protected
-    text      : PAnsiChar;
-    textLen   : integer;
+    text      : AnsiString;
     procedure GetPaths(const drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   //-------------------------------------
 
   TTextPathElement = class(TSubtextElement)
   protected
-    pathEl: TAnsiName;
+    pathEl: AnsiString;
     procedure GetPaths(const drawInfo: TDrawInfo); override;
   end;
 
@@ -310,7 +275,7 @@ type
     function SetMiddlePoints(const points: TPathD): Boolean;
     procedure Draw(img: TImage32; drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TSvgColorStop = record
@@ -321,7 +286,7 @@ type
 
   TFillElement = class(TElement)
   protected
-    refEl : TAnsiName;
+    refEl : AnsiString;
     units : Cardinal;
   end;
 
@@ -331,7 +296,7 @@ type
     function PrepareRenderer(renderer: TImageRenderer;
       drawInfo: TDrawInfo): Boolean; virtual;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   //nb: gradients with objectBoundingBox should not be applied to
@@ -355,7 +320,7 @@ type
     function PrepareRenderer(renderer: TCustomGradientRenderer;
       drawInfo: TDrawInfo): Boolean; override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TLinGradElement = class(TGradientElement)
@@ -365,7 +330,7 @@ type
     function PrepareRenderer(renderer: TCustomGradientRenderer;
       drawInfo: TDrawInfo): Boolean; override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TGradStopElement = class(TElement)
@@ -373,7 +338,7 @@ type
     offset: double;
     color: TColor32;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TFilterElement = class(TElement)
@@ -384,17 +349,17 @@ type
     fFilterBounds : TRect;
     fObjectBounds : TRect;
     fImages       : array of TImage32;
-    fNames        : TArrayOfAnsiName;
+    fNames        : array of AnsiString;
   protected
     procedure Clear;
     function GetAdjustedBounds(const bounds: TRectD): TRectD;
-    function FindNamedImage(const name: TAnsiName): TImage32;
-    function AddNamedImage(const name: TAnsiName): TImage32;
-    function GetNamedImage(const name: TAnsiName): TImage32;
+    function FindNamedImage(const name: AnsiString): TImage32;
+    function AddNamedImage(const name: AnsiString): TImage32;
+    function GetNamedImage(const name: AnsiString): TImage32;
     procedure Apply(img: TImage32;
       const filterBounds: TRect; const matrix: TMatrixD);
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
     destructor Destroy; override;
   end;
 
@@ -402,9 +367,9 @@ type
   private
     function GetParentAsFilterEl: TFilterElement;
   protected
-    in1: TAnsiName;
-    in2: TAnsiName;
-    res: TAnsiName;
+    in1: AnsiString;
+    in2: AnsiString;
+    res: AnsiString;
     srcImg, dstImg: TImage32;
     srcRec, dstRec: TRect;
     function GetSrcAndDst: Boolean;
@@ -439,7 +404,7 @@ type
     floodColor  : TColor32;
     procedure Apply; override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TFeFloodElement  = class(TFeBaseElement)
@@ -447,7 +412,7 @@ type
     floodColor  : TColor32;
     procedure Apply; override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TFeGaussElement  = class(TFeBaseElement)
@@ -455,7 +420,7 @@ type
     stdDev: double;
     procedure Apply; override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   TFeMergeElement  = class(TFeBaseElement)
@@ -478,17 +443,14 @@ type
   protected
     procedure GetPaths(const drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; hashName: Cardinal); override;
+    constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
 
   //-------------------------------------
 
-  TAttribFunc = procedure (attrib: PAttrib);
-
   TSvgReader = class
   private
-    fMemStream        : TMemoryStream;
-    fEndStream        : PAnsiChar;
+    fSvgParser        : TSvgParser;
     fBackgroundColor  : TColor32;
     fTempImage        : TImage32;
     fBlurQuality      : integer;
@@ -504,11 +466,12 @@ type
     fFontList     : TList;
 {$ENDIF}
     fFontCache    : TGlyphCache;
+    function  LoadInternal: Boolean;
     procedure SetBlurQuality(value: integer);
+    function GetIsEmpty: Boolean;
   protected
     rawRect       : TRectD;
     currentColor  : TColor32;
-    function  GetSvgStart(out svgStart: PAnsiChar): Boolean;
     procedure GetBestFont(const svgFontInfo: TSVGFontInfo);
     property  RadGradRenderer: TSvgRadialGradientRenderer read fRadGradRenderer;
     property  LinGradRenderer: TLinearGradientRenderer read fLinGradRenderer;
@@ -531,6 +494,7 @@ type
     //BlurQuality: high quality blurring can really slow down rendering.
     //Range 0..2 (0: OK & reasonably fast; 1: very good; 2: excellent but slow)
     property BlurQuality: integer read fBlurQuality write SetBlurQuality;
+    property IsEmpty: Boolean read GetIsEmpty;
   end;
 
 implementation
@@ -541,30 +505,25 @@ uses
 const
   buffSize    = 32;
   clAlphaSet  = $00010101;
-  SourceImage   : TAnsiName = (name: 'SourceGraphic'; len: 13);
-  SourceAlpha   : TAnsiName = (name: 'SourceAlpha'; len: 11);
-  tmpFilterImg  : TAnsiName = (name: 'tmp'; len: 3);
-
-  {$I Image32_SVG_Hash_Consts.inc}
+  SourceImage   : AnsiString = 'SourceGraphic';
+  SourceAlpha   : AnsiString = 'SourceAlpha';
+  tmpFilterImg  : AnsiString = 'tmp';
 
   //https://www.w3.org/TR/css-fonts-3/#font-family-prop
   emptyDrawInfo: TDrawInfo =
     (currentColor: clInvalid; fillColor: clInvalid; fillRule: frNonZero;
-    fillEl: (name: nil; len: 0); strokeColor: clInvalid;
+    fillEl: ''; strokeColor: clInvalid;
     strokeWidth: (rawVal: InvalidD; mu: muUndefined; pcBelow: 0);
     strokeCap: esButt; strokeJoin: jsMiter; strokeMitLim: 0.0;
-    dashArray:nil; dashOffset:0;
-    fontInfo: (family: ttfUnknown; size: 0; spacing: 0.0; textLength: 0;
-    styles: sfsUndefined; align: staUndefined; decoration: fdUndefined;
+    dashArray:nil; dashOffset:0; fontInfo: (family: ttfUnknown; size: 0;
+    spacing: 0.0; textLength: 0; italic: sfsUndefined; weight: -1;
+    align: staUndefined; decoration: fdUndefined;
     baseShift: (rawVal: InvalidD; mu: muUndefined; pcBelow: 0));
-    markerStart: (name: nil; len: 0); markerMiddle: (name: nil; len: 0);
-    markerEnd: (name: nil; len: 0); filterEl: (name: nil; len: 0);
-    clipPathEl: (name: nil; len: 0); opacity: MaxInt;
-    matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)); visible: true;
-    InUse: false; bounds: (Left:0; Top:0; Right:0; Bottom:0));
+    markerStart: ''; markerMiddle: ''; markerEnd: ''; filterEl: '';
+    clipPathEl: ''; opacity: MaxInt; matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1));
+    visible: true; InUse: false; bounds: (Left:0; Top:0; Right:0; Bottom:0));
 
 var
-  AttribFuncList : TStringList;
   //defaultFontHeight: this size will be used to retrieve all glyph contours
   //(and later scaled as necessary). This relatively large default ensures
   //that contours will have adequate detail.
@@ -602,7 +561,6 @@ begin
     hRadialgradient : Result := TRadGradElement;
     hRect           : Result := TRectElement;
     hStop           : Result := TGradStopElement;
-    hStyle          : Result := TStyleElement;
     hSvg            : Result := TSvgElement;
     hSwitch         : Result := TSwitchElement;
     hSymbol         : Result := TSymbolElement;
@@ -610,7 +568,7 @@ begin
     hTextPath       : Result := TTextPathElement;
     hTSpan          : Result := TTSpanElement;
     hUse            : Result := TUseElement;
-    else              Result := TElement;
+    else              Result := TElement; //use generic class
   end;
 end;
 //------------------------------------------------------------------------------
@@ -636,9 +594,9 @@ begin
       drawInfo.fillColor := thisElement.fReader.currentColor
     else if (fillColor <> clInvalid) then
       drawInfo.fillColor := fillColor;
-    if Assigned(fillEl.name) then
+    if (fillEl <> '') then
       drawInfo.fillEl := fillEl;
-    if Assigned(clipPathEl.name) then
+    if (clipPathEl <> '') then
       drawInfo.clipPathEl := clipPathEl;
     if (strokeColor <> clInvalid) then
     begin
@@ -656,11 +614,11 @@ begin
       drawInfo.dashArray := Copy(dashArray, 0, Length(dashArray));
     if dashOffset <> 0 then
       drawInfo.dashOffset := dashOffset;
-    if Assigned(strokeEl.name) then
+    if (strokeEl <> '') then
       drawInfo.strokeEl := strokeEl;
     if opacity < MaxInt then
       drawInfo.opacity := opacity;
-    if Assigned(filterEl.name) then
+    if (filterEl <> '') then
       drawInfo.filterEl := filterEl;
 
     if fontInfo.family <> ttfUnknown then
@@ -672,8 +630,11 @@ begin
     if fontInfo.textLength > 0 then
       drawInfo.fontInfo.textLength := fontInfo.textLength;
 
-    if (fontInfo.styles <> sfsUndefined) then
-      drawInfo.fontInfo.styles := fontInfo.styles;
+    if (fontInfo.italic <> sfsUndefined) then
+      drawInfo.fontInfo.italic := fontInfo.italic;
+    if (fontInfo.weight <> -1) then
+      drawInfo.fontInfo.weight := fontInfo.weight;
+
     if fontInfo.align <> staUndefined then
       drawInfo.fontInfo.align := fontInfo.align;
 
@@ -692,7 +653,7 @@ function IsFilled(const drawInfo: TDrawInfo): Boolean;
 begin
   Result :=
     (drawInfo.fillColor = clInvalid) or (drawInfo.fillColor = clCurrent) or
-    Assigned(drawInfo.fillEl.name) or (TARGB(drawInfo.fillColor).A > 0);
+    (drawInfo.fillEl <> '') or (TARGB(drawInfo.fillColor).A > 0);
 end;
 //------------------------------------------------------------------------------
 
@@ -700,63 +661,34 @@ function IsStroked(const drawInfo: TDrawInfo): Boolean;
 begin
   if (drawInfo.strokeColor = clInvalid) or
     (drawInfo.strokeColor = clCurrent) or
-    Assigned(drawInfo.strokeEl.name) then
+    (drawInfo.strokeEl <> '') then
       Result := (drawInfo.strokeWidth.rawVal > 0)
   else
       Result := TARGB(drawInfo.strokeColor).A > 0;
 end;
 //------------------------------------------------------------------------------
 
-function AttribToColor32(attrib: PAttrib; var color: TColor32): Boolean;
-var
-  tmp: TAnsiName;
-begin
-  if ColorIsURL(attrib.aValue.name) then
-  begin
-    Result := true;
-    if GetHashedName(attrib.aName) = hFill then
-      attrib.aOwnerEl.fDrawInfo.fillEl := ExtractRefFromValue(attrib.aValue) else
-      attrib.aOwnerEl.fDrawInfo.strokeEl := ExtractRefFromValue(attrib.aValue);
-
-    //and check for a fallback color ...
-    tmp := attrib.aValue;
-    inc(tmp.name, 5);
-    dec(tmp.len, 5);
-    while (tmp.len > 1) and (tmp.name^ > #32) do
-    begin
-      inc(tmp.name);
-      dec(tmp.len);
-    end;
-    if (tmp.len > 5) then
-    begin
-      inc(tmp.name); dec(tmp.len); //skip blank
-      ValueToColor32(tmp, color);
-    end;
-  end else
-    Result := ValueToColor32(attrib.aValue, color);
-end;
-//------------------------------------------------------------------------------
-
-function AttribToFloat(attrib: PAttrib; var value: double): Boolean; overload;
+function AnsiStringToFloat(const ansiValue: AnsiString;
+  var value: double): Boolean;
 var
   c: PAnsiChar;
 begin
-  c := attrib.aValue.name;
-  Result := ParseNextNum(c, c + attrib.aValue.len, false, value);
+  c := PAnsiChar(ansiValue);
+  Result := ParseNextNum(c, c + Length(ansiValue), false, value);
 end;
 //------------------------------------------------------------------------------
 
-function AttribToFloat(attrib: PAttrib;
-  var value: double; out measureUnit: TMeasureUnit): Boolean; overload;
+function AnsiStringToFloatEx(const ansiValue: AnsiString;
+  var value: double; out measureUnit: TMeasureUnit): Boolean;
 var
   c: PAnsiChar;
 begin
-  c := attrib.aValue.name;
-  Result := ParseNextNum(c, c + attrib.aValue.len, false, value, measureUnit);
+  c := PAnsiChar(ansiValue);
+  Result := ParseNextNumEx(c, c + Length(ansiValue), false, value, measureUnit);
 end;
 //------------------------------------------------------------------------------
 
-procedure AttribToOpacity(attrib: PAttrib; var color: TColor32);
+procedure AnsiStringToOpacity(const ansiValue: AnsiString; var color: TColor32);
 var
   opacity: double;
 begin
@@ -767,7 +699,7 @@ begin
   end;
 
   if color = clInvalid then color := clNone32;
-  if not AttribToFloat(attrib, opacity) then Exit;
+  if not AnsiStringToFloat(ansiValue, opacity) then Exit;
   with TARGB(color) do
     if (opacity <= 0) then
     begin
@@ -776,46 +708,6 @@ begin
     end
     else if (opacity >= 1) then A := 255
     else A := Round(255 * opacity);
-end;
-//------------------------------------------------------------------------------
-
-procedure AttribToFontInfo(attrib: PAttrib; var fontInfo: TSVGFontInfo);
-var
-  c, endC: PAnsiChar;
-  hash: Cardinal;
-begin
-  c := attrib.aValue.name;
-  endC := c + attrib.aValue.len;
-  while (c < endC) and SkipBlanks(c, endC) do
-  begin
-    if c = ';' then
-      break
-    else if IsNumPending(c, endC, true) then
-      ParseNextNum(c, endC, true, fontInfo.size)
-    else
-    begin
-      hash := ParseNextWordHashed(c, endC);
-      case hash of
-        hSans_045_Serif   : fontInfo.family := ttfSansSerif;
-        hSerif            : fontInfo.family := ttfSerif;
-        hMonospace        : fontInfo.family := ttfMonospace;
-        hBold             :
-          if fontInfo.styles = sfsItalic then
-            fontInfo.styles := sfsBoldItalic else
-            fontInfo.styles := sfsBold;
-        hItalic           :
-          if fontInfo.styles = sfsBold then
-            fontInfo.styles := sfsBoldItalic else
-            fontInfo.styles := sfsItalic;
-        hNormal           : fontInfo.styles := sfsNone;
-        hStart            : fontInfo.align := staLeft;
-        hMiddle           : fontInfo.align := staCenter;
-        hEnd              : fontInfo.align := staRight;
-        hline_045_through : fontInfo.decoration := fdStrikeThrough;
-        hUnderline        : fontInfo.decoration := fdUnderline;
-      end;
-    end;
-  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -853,7 +745,7 @@ end;
 // TDefsElement
 //------------------------------------------------------------------------------
 
-constructor TDefsElement.Create(parent: TElement; hashName: Cardinal);
+constructor TDefsElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   fDrawInfo.visible := false;
@@ -880,7 +772,7 @@ begin
   clipEl := FindRefElement(drawInfo.clipPathEl);
   if Assigned(clipEl) then
   begin
-    drawInfo.clipPathEl.name := nil; //avoids propagation
+    drawInfo.clipPathEl := ''; //avoids propagation
     with TClipPathElement(clipEl) do
     begin
       GetPaths(drawInfo);
@@ -946,7 +838,7 @@ var
   el: TElement;
   dx, dy: double;
 begin
-  if Assigned(drawPathsF) or not Assigned(refEl.name) then Exit;
+  if Assigned(drawPathsF) or (refEl = '') then Exit;
 
   el := FindRefElement(refEl);
   if not Assigned(el) or not (el is TShapeElement) then Exit;
@@ -1057,7 +949,7 @@ end;
 // TSymbolElement
 //------------------------------------------------------------------------------
 
-constructor TSymbolElement.Create(parent: TElement; hashName: Cardinal);
+constructor TSymbolElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   fPcBelow := 1.0;
@@ -1126,7 +1018,7 @@ function TGradientElement.PrepareRenderer(
 var
   el: TElement;
 begin
-  if Assigned(refEl.name) then
+  if (refEl <> '') then
   begin
     el := FindRefElement(refEl);
     if Assigned(el) and (el is TGradientElement) then
@@ -1139,7 +1031,7 @@ end;
 // TRadGradElement
 //------------------------------------------------------------------------------
 
-constructor TRadGradElement.Create(parent: TElement; hashName: Cardinal);
+constructor TRadGradElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   radius.Init(1.0);
@@ -1227,7 +1119,7 @@ end;
 // TLinGradElement
 //------------------------------------------------------------------------------
 
-constructor TLinGradElement.Create(parent: TElement; hashName: Cardinal);
+constructor TLinGradElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   startPt.Init(2.5);
@@ -1316,7 +1208,7 @@ end;
 // TGradStopElement
 //------------------------------------------------------------------------------
 
-constructor TGradStopElement.Create(parent: TElement; hashName: Cardinal);
+constructor TGradStopElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   color := clBlack32;
@@ -1326,7 +1218,7 @@ end;
 // TFilterElement
 //------------------------------------------------------------------------------
 
-constructor TFilterElement.Create(parent: TElement; hashName: Cardinal);
+constructor TFilterElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   fDrawInfo.visible := false;
@@ -1372,14 +1264,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFilterElement.FindNamedImage(const name: TAnsiName): TImage32;
+function TFilterElement.FindNamedImage(const name: AnsiString): TImage32;
 var
   i, len: integer;
 begin
   Result := nil;
   len := Length(fNames);
   for i := 0 to len -1 do
-    if name.Equals(fNames[i]) then
+    if name = fNames[i] then
     begin
       Result := fImages[i];
       Break;
@@ -1387,7 +1279,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFilterElement.AddNamedImage(const name: TAnsiName): TImage32;
+function TFilterElement.AddNamedImage(const name: AnsiString): TImage32;
 var
   len: integer;
 begin
@@ -1401,12 +1293,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFilterElement.GetNamedImage(const name: TAnsiName): TImage32;
+function TFilterElement.GetNamedImage(const name: AnsiString): TImage32;
 var
   i, len: integer;
   hash: Cardinal;
 begin
-  hash := GetHashedName(name);
+  hash := GetHash(name);
   case hash of
     hSourceGraphic, hSourceAlpha:
       begin
@@ -1424,7 +1316,7 @@ begin
 
   len := Length(fNames);
   for i := 0 to len -1 do
-    if name.Equals(fNames[i]) then
+    if name = fNames[i] then
     begin
       Result := fImages[i];
       Exit;
@@ -1445,7 +1337,7 @@ begin
   try
     for i := 0 to fChilds.Count -1 do
     begin
-      case TElement(fChilds[i]).fNameHash of
+      case TElement(fChilds[i]).fParserEl.hash of
         hfeBlend        : TFeBlendElement(fChilds[i]).Apply;
         hfeColorMatrix  : TFeColorMatrixElement(fChilds[i]).Apply;
         hfeComposite    : TFeCompositeElement(fChilds[i]).Apply;
@@ -1461,8 +1353,6 @@ begin
   finally
     Clear;
   end;
-
-
 end;
 
 //------------------------------------------------------------------------------
@@ -1498,14 +1388,14 @@ var
   pfe: TFilterElement;
 begin
   pfe := ParentFilterEl;
-  if Assigned(in1.name) then
+  if (in1 <> '') then
     srcImg := pfe.GetNamedImage(in1)
   else if Assigned(pfe.fLastImg) then
     srcImg := pfe.fLastImg
   else
     srcImg := pfe.GetNamedImage(SourceImage);
 
-  if Assigned(res.name) then
+  if (res <> '') then
     dstImg := pfe.GetNamedImage(res) else
     dstImg := pfe.fSrcImg;
 
@@ -1528,7 +1418,7 @@ var
 begin
   if not GetSrcAndDst then Exit;
   pfe := ParentFilterEl;
-  if not Assigned(in2.name) then Exit;
+  if (in2 = '') then Exit;
   if dstImg = srcImg then
     dstImg2 := pfe.AddNamedImage(tmpFilterImg) else
     dstImg2 := dstImg;
@@ -1554,7 +1444,7 @@ var
 begin
   if not GetSrcAndDst then Exit;
   pfe := ParentFilterEl;
-  if not Assigned(in2.name) then Exit;
+  if (in2 = '') then Exit;
   if dstImg = srcImg then
     dstImg2 := pfe.AddNamedImage(tmpFilterImg) else
     dstImg2 := dstImg;
@@ -1639,7 +1529,7 @@ end;
 // TFeDropShadowElement
 //------------------------------------------------------------------------------
 
-constructor TFeDropShadowElement.Create(parent: TElement; hashName: Cardinal);
+constructor TFeDropShadowElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   stdDev := InvalidD;
@@ -1681,7 +1571,7 @@ end;
 // TFeFloodElement
 //------------------------------------------------------------------------------
 
-constructor TFeFloodElement.Create(parent: TElement; hashName: Cardinal);
+constructor TFeFloodElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   floodColor := clInvalid;
@@ -1704,7 +1594,7 @@ end;
 // TFeGaussElement
 //------------------------------------------------------------------------------
 
-constructor TFeGaussElement.Create(parent: TElement; hashName: Cardinal);
+constructor TFeGaussElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   stdDev := InvalidD;
@@ -1805,7 +1695,7 @@ end;
 // TClipPathElement
 //------------------------------------------------------------------------------
 
-constructor TClipPathElement.Create(parent: TElement; hashName: Cardinal);
+constructor TClipPathElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   fDrawInfo.visible := false;
@@ -1833,7 +1723,7 @@ end;
 // TShapeElement
 //------------------------------------------------------------------------------
 
-constructor TShapeElement.Create(parent: TElement; hashName: Cardinal);
+constructor TShapeElement.Create(parent: TElement; svgEl: TSvgEl);
 var
   className: AnsiString;
   style: AnsiString;
@@ -1842,17 +1732,12 @@ begin
   elRectWH.Init(fPcBelow);
   hasPaths := true;
   fDrawInfo.visible := true;
-  //load any class styles
-  className := LowercaseAnsi(fName);
-  style := fReader.fClassStyles.GetStyle(classname);
-  if style <> '' then
-    ParseStyle(PAnsiChar(style), Length(style));
-end;
-//------------------------------------------------------------------------------
+  if fParserEl.name.text = nil then Exit;
 
-function TShapeElement.ParseVal(out val: double): Boolean;
-begin
-  Result := ParseNextNum(fCurrent, fCurrentEnd, true, val);
+//  //load the class's style (ie undotted style) if found.
+//  className := fParserEl.name.AsAnsiString;
+//  style := fReader.fClassStyles.GetStyle(classname);
+//  if style <> '' then LoadStyles(style);
 end;
 //------------------------------------------------------------------------------
 
@@ -1869,8 +1754,8 @@ end;
 
 function TShapeElement.HasMarkers: Boolean;
 begin
-  Result := IsStroked(fDrawInfo) and (Assigned(fDrawInfo.markerStart.name) or
-    Assigned(fDrawInfo.markerMiddle.name) or Assigned(fDrawInfo.markerEnd.name));
+  Result := IsStroked(fDrawInfo) and ((fDrawInfo.markerStart <> '') or
+    (fDrawInfo.markerMiddle <> '') or (fDrawInfo.markerEnd <> ''));
 end;
 //------------------------------------------------------------------------------
 
@@ -1900,11 +1785,11 @@ begin
   img := image;
   clipRec2 := NullRect;
   clipPathEl := nil; filterEl := nil;
-  if Assigned(drawInfo.clipPathEl.name) then
+  if (drawInfo.clipPathEl <> '') then
     clipPathEl := FindRefElement(drawInfo.clipPathEl);
-  if Assigned(drawInfo.filterEl.name) then
+  if (drawInfo.filterEl <> '') then
     filterEl := FindRefElement(drawInfo.filterEl);
-  if Assigned(drawInfo.fillEl.name) then
+  if (drawInfo.fillEl <> '') then
     with TARGB(drawInfo.fillColor) do
       if (A > 0) and (A < 255) then DrawInfo.opacity := A;
 
@@ -1945,6 +1830,9 @@ begin
     if clipRec2.IsEmpty then Exit;
     img.Clear(clipRec2);
   end;
+
+  if not IsValidMatrix(drawInfo.matrix) then
+    raise Exception.Create('Invalid matrix found when drawing element');
 
   if filled then
     DrawFilled(img, drawInfo);
@@ -2002,7 +1890,7 @@ begin
       sw := 1;
   MatrixScale(di.matrix, sw * ExtractAvgScaleFromMatrix(drawInfo.matrix));
 
-  if Assigned(fDrawInfo.markerStart.name) then
+  if (fDrawInfo.markerStart <> '') then
   begin
     markerEl := FindRefElement(fDrawInfo.markerStart);
     if Assigned(markerEl) and (markerEl is TMarkerElement) then
@@ -2021,7 +1909,7 @@ begin
       end;
   end;
 
-  if Assigned(fDrawInfo.markerMiddle.name) then
+  if (fDrawInfo.markerMiddle <> '') then
   begin
     markerEl := FindRefElement(fDrawInfo.markerMiddle);
     if Assigned(markerEl) and (markerEl is TMarkerElement) then
@@ -2031,7 +1919,7 @@ begin
             Draw(img, di);
   end;
 
-  if Assigned(fDrawInfo.markerEnd.name) then
+  if (fDrawInfo.markerEnd <> '') then
   begin
     markerEl := FindRefElement(fDrawInfo.markerEnd);
     if Assigned(markerEl) and (markerEl is TMarkerElement) then
@@ -2071,7 +1959,7 @@ begin
   if not assigned(drawPathsF) then Exit;
 
   fillPaths := MatrixApply(drawPathsF, drawInfo.matrix);
-  if Assigned(drawInfo.fillEl.name) then
+  if (drawInfo.fillEl <> '') then
   begin
     refEl := FindRefElement(drawInfo.fillEl);
     if Assigned(refEl) and (refEl is TFillElement) then
@@ -2143,7 +2031,7 @@ begin
     DrawDashedLine(img, strokePaths, dashArray, @dashOffset,
       scaledStrokeWidth, drawInfo.strokeColor, endStyle)
   end
-  else if Assigned(drawInfo.strokeEl.name) then
+  else if (drawInfo.strokeEl <> '') then
   begin
     refEl := FindRefElement(drawInfo.strokeEl);
     if not Assigned(refEl) then Exit;
@@ -2178,116 +2066,9 @@ begin
       drawInfo.strokeColor, endStyle, joinStyle, roundingScale);
 end;
 
+
 //------------------------------------------------------------------------------
 // TPathElement
-//------------------------------------------------------------------------------
-
-function TPathElement.GetSegType(out isRelative: Boolean): Boolean;
-var
-  c: AnsiChar;
-begin
-  Result := false;
-  if not SkipBlanks(fCurrent, fCurrentEnd) then Exit;
-  c := upcase(fCurrent^);
-  result := CharInSet(c, ['A','C','H','M','L','Q','S','T','V','Z']);
-  if not result then Exit;
-  case c of
-    'M': fCurrSegType := dsMove;
-    'L': fCurrSegType := dsLine;
-    'H': fCurrSegType := dsHorz;
-    'V': fCurrSegType := dsVert;
-    'A': fCurrSegType := dsArc;
-    'Q': fCurrSegType := dsQBez;
-    'C': fCurrSegType := dsCBez;
-    'T': fCurrSegType := dsQSpline;
-    'S': fCurrSegType := dsCSpline;
-    'Z': fCurrSegType := dsClose;
-  end;
-  isRelative := fCurrent^ >= 'a';
-  inc(fCurrent);
-end;
-//------------------------------------------------------------------------------
-
-function TPathElement.GetSingleDigit(out digit: integer): Boolean;
-begin
-  Result := SkipBlanksAndComma(fCurrent, fCurrentEnd) and
-    (fCurrent^ >= '0') and (fCurrent^ <= '9');
-  if not Result then Exit;
-  digit := Ord(fCurrent^) - Ord('0');
-  inc(fCurrent);
-end;
-//------------------------------------------------------------------------------
-
-procedure TPathElement.StartNewDpath;
-var
-  cnt: integer;
-begin
-  if Assigned(fCurrDpath) then
-  begin
-    if not Assigned(fCurrDpath.segs) then Exit;
-    SetLength(fCurrSeg.vals, fCurrSegCnt); //trim the last segment;
-  end;
-
-  cnt := Length(fDpaths);
-  SetLength(fDpaths, cnt +1);
-
-  fCurrDpath := @fDpaths[cnt];
-  fCurrDpath.firstPt := fLastPt;
-  fCurrDpath.isClosed := False;
-  fCurrDpath.segs := nil;
-  fCurrSeg := nil;
-end;
-//------------------------------------------------------------------------------
-
-procedure TPathElement.StartNewSeg(segType: TDsegType);
-var
-  cnt: integer;
-begin
-  if Assigned(fCurrSeg) then
-    SetLength(fCurrSeg.vals, fCurrSegCnt)
-  else if not Assigned(fCurrDpath) then
-    StartNewDpath;
-
-  fCurrSegType := segType;
-  cnt := Length(fCurrDpath.segs);
-  SetLength(fCurrDpath.segs, cnt +1);
-  fCurrSeg := @fCurrDpath.segs[cnt];
-  fCurrSeg.segType := segType;
-
-  fCurrSegCap := buffSize;
-  SetLength(fCurrSeg.vals, fCurrSegCap);
-  fCurrSegCnt := 0;
-end;
-//------------------------------------------------------------------------------
-
-procedure TPathElement.AddSegValue(val: double);
-begin
-  if not Assigned(fCurrSeg) then
-    StartNewSeg(fCurrSegType);
-  
-  if fCurrSegCnt = fCurrSegCap then
-  begin
-    inc(fCurrSegCap, buffSize);
-    SetLength(fCurrSeg.vals, fCurrSegCap);
-  end;
-  fCurrSeg.vals[fCurrSegCnt] := val;
-  inc(fCurrSegCnt);
-end;
-//------------------------------------------------------------------------------
-
-procedure TPathElement.AddSegPoint(const pt: TPointD);
-begin
-  AddSegValue(pt.X); AddSegValue(pt.Y);
-end;
-//------------------------------------------------------------------------------
-
-function TPathElement.Parse2Num(var pt: TPointD; isRelative: Boolean): Boolean;
-begin
-  Result := ParseVal(pt.X) and ParseVal(pt.Y);
-  if not Result or not isRelative then Exit;
-  pt.X := pt.X + fLastPt.X;
-  pt.Y := pt.Y + fLastPt.Y;
-end;
 //------------------------------------------------------------------------------
 
 function TPathElement.GetBounds: TRectD;
@@ -2300,158 +2081,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPathElement.ParseD(attrib: PAttrib);
-var
-  i: integer;
-  d: double;
-  currPt: TPointD;
-  isRelative: Boolean;
+procedure TPathElement.ParseD(const value: AnsiString);
 begin
-  fCurrent := attrib.aValue.name;
-  fCurrentEnd := fCurrent + attrib.aValue.len;
-
-  isRelative := false;
-  currPt := NullPointD;
-
-  while GetSegType(isRelative) do
-  begin
-    fLastPt := currPt;
-
-    if (fCurrSegType = dsMove) then
-    begin
-
-      if not Assigned(fCurrSeg) and not PointsEqual(currPt, NullPointD) then
-        AddSegPoint(currPt);
-
-      if Assigned(fCurrSeg) then
-      begin
-        SetLength(fCurrSeg.vals, fCurrSegCnt); //trim buffer
-        fCurrDpath.isClosed := false;
-      end;
-      fCurrDpath := nil;
-      fCurrSeg := nil;
-
-      if not Parse2Num(currPt, isRelative) then break;
-      self.fLastPt :=  currPt;
-
-      //values immediately following a Move are implicitly Line statements
-      if IsNumPending(fCurrent, fCurrentEnd, true) then
-        fCurrSegType := dsLine else
-        Continue;
-    end
-    else if (fCurrSegType = dsClose) then
-    begin
-      if not Assigned(fCurrSeg) and not PointsEqual(currPt, NullPointD) then
-        AddSegPoint(currPt);
-
-      if Assigned(fCurrSeg) then
-      begin
-        SetLength(fCurrSeg.vals, fCurrSegCnt); //trim buffer
-        fCurrDpath.isClosed := true;
-        fCurrDpath := nil;
-        fCurrSeg := nil;
-      end;
-      Continue;
-    end;
-
-    if Assigned(fCurrSeg) then
-      SetLength(fCurrSeg.vals, fCurrSegCnt); //trim buffer
-    fCurrSeg := nil;
-
-    case fCurrSegType of
-      dsHorz:
-        while IsNumPending(fCurrent, fCurrentEnd, true) do
-        begin
-          ParseVal(currPt.X);
-          if isRelative then
-            currPt.X := currPt.X + fLastPt.X;
-          AddSegValue(currPt.X);
-          fLastPt := currPt;
-        end;
-
-      dsVert:
-        while IsNumPending(fCurrent, fCurrentEnd, true) do
-        begin
-          ParseVal(currPt.Y);
-          if isRelative then
-            currPt.Y := currPt.Y + fLastPt.Y;
-          AddSegValue(currPt.Y);
-          fLastPt := currPt;
-        end;
-
-      dsLine:
-        while true do
-        begin
-          if not Parse2Num(currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          fLastPt := currPt;
-          SkipBlanks(fCurrent, fCurrentEnd);
-          if IsNumPending(fCurrent, fCurrentEnd, true) then Continue;
-          if LowerCaseTable[fCurrent^] = 'l' then GetSegType(isRelative)
-          else break;
-        end;
-
-      dsQSpline:
-        while IsNumPending(fCurrent, fCurrentEnd, true) do
-        begin
-          if not Parse2Num(currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          fLastPt := currPt;
-        end;
-
-      dsCSpline:
-        while IsNumPending(fCurrent, fCurrentEnd, true) do
-        begin
-          if not Parse2Num(currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          if not Parse2Num(currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          fLastPt := currPt;
-        end;
-
-      dsQBez:
-        while IsNumPending(fCurrent, fCurrentEnd, true) do
-        begin
-          if not Parse2Num(currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          if not Parse2Num(currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          fLastPt := currPt;
-        end;
-
-      dsCBez:
-        while IsNumPending(fCurrent, fCurrentEnd, true) do
-        begin
-          if not Parse2Num(currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          if not Parse2Num(currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          if not Parse2Num(currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          fLastPt := currPt;
-        end;
-
-      dsArc:
-        while IsNumPending(fCurrent, fCurrentEnd, true) do
-        begin
-          if not ParseVal(currPt.X) or
-            not ParseVal(currPt.Y) then break;
-          AddSegPoint(currPt);                              //radii
-          if ParseVal(d) then AddSegValue(d);                 //angle
-          if not GetSingleDigit(i) then break;              //arc-flag
-          AddSegValue(i);
-          if not GetSingleDigit(i) then break;              //sweep-flag
-          AddSegValue(i);
-          if not Parse2Num(currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          fLastPt := currPt;
-        end;
-    end;
-  end;
-  if Assigned(fCurrSeg) then
-    SetLength(fCurrSeg.vals, fCurrSegCnt); //trim buffer
-  fCurrent    := fCurrentEnd +1;
-  fCurrentEnd := fReader.fEndStream;
+  fDpaths := Image32_SVG_Core.ParsePathDAttribute(value);
 end;
 //------------------------------------------------------------------------------
 
@@ -2493,7 +2125,7 @@ begin
   len := Length(fDpaths);
   SetLength(Result, len);
   for i := 0 to High(fDpaths) do
-    Result[i] := fDpaths[i].GetUncurvedPath;
+    Result[i] := fDpaths[i].GetSimplePath;
 end;
 
 //------------------------------------------------------------------------------
@@ -2510,7 +2142,7 @@ procedure TPolyElement.GetPaths(const drawInfo: TDrawInfo);
 begin
   if Assigned(drawPathsC) or Assigned(drawPathsO) then Exit;
   if not Assigned(path) then Exit;
-  if (fNameHash = hPolygon) then
+  if (fParserEl.hash = hPolygon) then
   begin
     AppendPath(drawPathsC, path);                    //hPolygon
     drawPathsF := drawPathsC;
@@ -2529,7 +2161,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPolyElement.ParsePoints(attrib: PAttrib);
+procedure TPolyElement.ParsePoints(const value: AnsiString);
 var
   currCnt, currCap: integer;
 
@@ -2546,13 +2178,16 @@ var
 
 var
   pt: TPointD;
+  c, endC: PAnsiChar;
 begin
   currCnt     := 0;
   currCap     := buffSize;
-  fCurrent := attrib.aValue.name;
+  c := PAnsiChar(value);
+  endC := c + Length(value);
   SetLength(path, currCap);
-  while IsNumPending(fCurrent, fCurrentEnd, true) and
-    ParseVal(pt.X) and ParseVal(pt.Y) do
+  while IsNumPending(c, endC, true) and
+    ParseNextNum(c, endC, true, pt.X) and
+    ParseNextNum(c, endC, true, pt.Y) do
       AddPoint(pt);
   SetLength(path, currCnt);
 end;
@@ -2561,7 +2196,7 @@ end;
 // TLineElement
 //------------------------------------------------------------------------------
 
-constructor TLineElement.Create(parent: TElement; hashName: Cardinal);
+constructor TLineElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   SetLength(path, 2);
@@ -2593,7 +2228,7 @@ end;
 // TCircleElement
 //------------------------------------------------------------------------------
 
-constructor TCircleElement.Create(parent: TElement; hashName: Cardinal);
+constructor TCircleElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   centerPt.Init(1.0);
@@ -2639,7 +2274,7 @@ end;
 // TEllipseElement
 //------------------------------------------------------------------------------
 
-constructor TEllipseElement.Create(parent: TElement; hashName: Cardinal);
+constructor TEllipseElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   centerPt.Init(1.0);
@@ -2686,7 +2321,7 @@ end;
 // TRectElement
 //------------------------------------------------------------------------------
 
-constructor TRectElement.Create(parent: TElement; hashName: Cardinal);
+constructor TRectElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   radius.Init(1.0);
@@ -2738,10 +2373,40 @@ end;
 // TTextElement
 //------------------------------------------------------------------------------
 
-constructor TTextElement.Create(parent: TElement; hashName: Cardinal);
+constructor TTextElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   hasPaths := false;
+end;
+//------------------------------------------------------------------------------
+
+function  TTextElement.LoadContent: Boolean;
+var
+  i       : integer;
+  svgEl   : TSvgEl;
+  elClass : TElementClass;
+  el      : TElement;
+begin
+  Result := false;
+  for i := 0 to fParserEl.childs.Count -1 do
+  begin
+    svgEl := TSvgEl(fParserEl.childs[i]);
+    if svgEl.hash = 0 then
+    begin
+      el := TSubtextElement.Create(self, svgEl);
+      Self.fChilds.Add(el);
+      if assigned(svgEl.text.text) then
+        TSubtextElement(el).text := svgEl.text.AsAnsiString;
+    end else
+    begin
+      elClass := HashToElementClass(svgEl.hash);
+      el := elClass.Create(self, svgEl);
+      Self.fChilds.Add(el);
+      el.LoadAttributes;
+      if not el.LoadContent then Exit; //error
+    end;
+  end;
+  Result := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -2753,22 +2418,7 @@ end;
 
 procedure TTextElement.ResetTmpPt;
 begin
-  tmpPt := InvalidPointD;
-end;
-//------------------------------------------------------------------------------
-
-function TTextElement.AddSubtext(atext: PAnsiChar; len: integer): TElement;
-begin
-  Result := TSubtextElement.Create(self, 0);
-  with TSubtextElement(Result) do
-  begin
-    fName.name := text; //todo: check this
-    fName.len := 0;
-    text := atext;
-    textLen := len;
-    elRectWH.Init(0.0);
-  end;
-  fChilds.add(Result);
+  currentPt := InvalidPointD;
 end;
 //------------------------------------------------------------------------------
 
@@ -2781,23 +2431,24 @@ begin
   begin
     el := fParent;
     while (el is TTSpanElement) do el := el.fParent;
-    if not (el is TTextElement) then Exit; //error
+    if not (el is TTextElement) then Exit; //ie error
     topTextEl := TTextElement(el);
+
     if elRectWH.left.IsValid then
-      tmpPt.X := elRectWH.left.rawVal else
-      tmpPt.X := topTextEl.tmpPt.X;
+      currentPt.X := elRectWH.left.rawVal else
+      currentPt.X := topTextEl.currentPt.X;
     if elRectWH.top.IsValid then
-      tmpPt.Y := elRectWH.top.rawVal else
-      tmpPt.Y := topTextEl.tmpPt.Y;
-    topTextEl.tmpPt := tmpPt;
+      currentPt.Y := elRectWH.top.rawVal else
+      currentPt.Y := topTextEl.currentPt.Y;
+    topTextEl.currentPt := currentPt;
   end else
   begin
     if elRectWH.left.IsValid then
-      tmpPt.X := elRectWH.left.rawVal else
-      tmpPt.X := 0;
+      currentPt.X := elRectWH.left.rawVal else
+      currentPt.X := 0;
     if elRectWH.top.IsValid then
-      tmpPt.Y := elRectWH.top.rawVal else
-      tmpPt.Y := 0;
+      currentPt.Y := elRectWH.top.rawVal else
+      currentPt.Y := 0;
   end;
 
   UpdateDrawInfo(drawInfo, self);
@@ -2808,12 +2459,43 @@ end;
 // TSubtextElement
 //------------------------------------------------------------------------------
 
-constructor TSubtextElement.Create(parent: TElement; hashName: Cardinal);
+constructor TSubtextElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   hasPaths := true;
   fDrawInfo := fParent.fDrawInfo;
   fDrawInfo.matrix := IdentityMatrix;
+end;
+//------------------------------------------------------------------------------
+
+function FixSpaces(const text: string): string;
+var
+  i,j, len: integer;
+begin
+  //changes \r\n\t chars to spaces
+  //and trims consecutive spaces
+
+  len  := Length(text);
+  SetLength(Result, len);
+  if len = 0 then Exit;
+
+  if text[1] <= #32 then
+    Result[1] := #32 else
+    Result[1] := text[1];
+
+  j := 1;
+  for i := 2 to len do
+  begin
+    if text[i] <= #32 then
+    begin
+      if Result[j] = #32 then Continue
+      else Result[j+1] := #32;
+    end
+    else
+      Result[j+1] := text[i];
+    inc(j);
+  end;
+  SetLength(Result, j);
 end;
 //------------------------------------------------------------------------------
 
@@ -2831,28 +2513,30 @@ begin
   if drawInfo.FontInfo.size = 0 then
     fontSize := 16 else
     fontSize := drawInfo.FontInfo.size;
-  if (textLen = 0) or (fontSize < 2) or
+  if (Length(text) = 0) or (fontSize < 2) or
     not Assigned(fReader.fFontCache) then Exit;
 
-  el := fParent;
-  while el is TTSpanElement do el := el.fParent;
+  el := self;
+  while (el.fParent is TTextElement) do
+    el := el.fParent;
   if not (el is TTextElement) then Exit;
   topTextEl := TTextElement(el);
 
   //trim CRLFs and multiple spaces
   {$IFDEF UNICODE}
-  s := UTF8ToUnicodeString(HtmlDecode(GetUtf8String(text, textLen)));
+  s := UTF8ToUnicodeString(HtmlDecode(text));
   {$ELSE}
-  s := HtmlDecode(GetUtf8String(text, textLen));
+  s := HtmlDecode(text);
   {$ENDIF}
-  for i := 1 to Length(s) do
-    if s[i] < #32 then s[i] := #32;
-  i := Pos(#32#32, s);
-  while i > 0 do
-  begin
-    Delete(s, i, 1);
-    i := PosEx(#32#32, s, i);
-  end;
+  s := FixSpaces(s);
+//  for i := 1 to Length(s) do
+//    if s[i] < #32 then s[i] := #32;
+//  i := Pos(#32#32, s);
+//  while i > 0 do
+//  begin
+//    Delete(s, i, 1);
+//    i := PosEx(#32#32, s, i);
+//  end;
 
   drawPathsC := fReader.fFontCache.GetTextGlyphs(0, 0, s, tmpX);
   //by not changing the fontCache.FontHeight, the quality of
@@ -2860,7 +2544,7 @@ begin
   //this requires additional glyph scaling and offsetting).
   scale := fontSize /fReader.fFontCache.FontHeight;
 
-  with topTextEl.tmpPt do
+  with topTextEl.currentPt do
     case drawInfo.FontInfo.align of
       staCenter:
         begin
@@ -2886,7 +2570,7 @@ begin
 
   mat := IdentityMatrix;
   MatrixScale(mat, scale);
-  MatrixTranslate(mat, offsetX, topTextEl.tmpPt.Y - bs);
+  MatrixTranslate(mat, offsetX, topTextEl.currentPt.Y - bs);
   MatrixApply(mat, drawPathsC);
   drawPathsF := drawPathsC;
 end;
@@ -2895,14 +2579,14 @@ end;
 // TTSpanElement
 //------------------------------------------------------------------------------
 
-constructor TTSpanElement.Create(parent: TElement; hashName: Cardinal);
+constructor TTSpanElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   fDrawInfo.FontInfo.decoration := fdUndefined;
   fDrawInfo.FontInfo.baseShift.SetValue(0);
 
   elRectWH.Init(0.0);
-  tmpPt := InvalidPointD;
+  currentPt := InvalidPointD;
   delta := InvalidPointD;
 end;
 
@@ -2931,7 +2615,7 @@ begin
   parentTextEl := TTextElement(fParent);
   topTextEl := parentTextEl;
   isFirst := IsFirstChild;
-  while topTextEl.fNameHash <> hText do
+  while topTextEl.fParserEl.hash <> hText do
   begin
     isFirst := isFirst and topTextEl.IsFirstChild;
     topTextEl := TTextElement(topTextEl.fParent);
@@ -2943,7 +2627,7 @@ begin
   utf8String := '';
 
   //nb: only exit AFTER setting parentTextEl.tmpPt.
-  if textLen = 0 then
+  if (fParserEl.text.len = 0) then
   begin
     if (fChilds.Count = 0) or
       not (TElement(fChilds[0]) is TTSpanElement) then
@@ -2954,12 +2638,12 @@ begin
         Exit;
     with TSubtextElement(el.fChilds[0]) do
     begin
-      utf8String := GetUtf8String(text, textLen);
+      utf8String := text;
       spacing := fDrawInfo.FontInfo.spacing;
     end;
   end else
   begin
-    utf8String := GetUtf8String(text, textLen);
+    utf8String := fParserEl.text.AsAnsiString;
     spacing := drawInfo.FontInfo.spacing;
   end;
 
@@ -3018,7 +2702,7 @@ end;
 // TMarkerElement
 //------------------------------------------------------------------------------
 
-constructor TMarkerElement.Create(parent: TElement; hashName: Cardinal);
+constructor TMarkerElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   fDrawInfo.visible := false;
@@ -3104,7 +2788,7 @@ end;
 // TPatternElement
 //------------------------------------------------------------------------------
 
-constructor TPatternElement.Create(parent: TElement; hashName: Cardinal);
+constructor TPatternElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
   fPcBelow := 1.0;
@@ -3170,7 +2854,7 @@ begin
   MatrixScale(mat, scale.sx * sx, scale.sy * sy);
 
   //recWH.Left := 0; recWH.Top := 0;
-  if Assigned(refEl.name) then
+  if (refEl <> '') then
   begin
     el := FindRefElement(refEl);
     if Assigned(el) and (el is TShapeElement) then
@@ -3195,142 +2879,33 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TStyleElement
-//------------------------------------------------------------------------------
-
-function TStyleElement.LoadContent: Boolean;
-var
-  i, len, cap: integer;
-  hash: Cardinal;
-  dotted: Boolean;
-  aclassName: TAnsiName;
-  aStyle: TAnsiName;
-  names: array of string;
-
-  procedure AddName(const name: string);
-  begin
-    if len = cap then
-    begin
-      cap := cap + buffSize;
-      SetLength(names, cap);
-    end;
-    names[len] := name;
-    inc(len);
-  end;
-
-begin
-  Result := false;
-  len := 0; cap := 0;
-  if (PeekNextChar = '<') and ((fCurrent+1)^ = '!') and
-    ((fCurrent+2)^ = '[') and ((fCurrent+8)^ = '[') then
-  begin
-    aclassName.name := fCurrent + 3;
-    aclassName.len := 5;
-    if (GetHashedName(aclassName) <> hCDATA) then Exit;
-    inc(fCurrent, 9);
-  end;
-
-  while SkipStyleBlanks(fCurrent,fCurrentEnd) and
-    CharInSet(LowerCaseTable[PeekNextChar], ['.', '#', 'a'..'z']) do
-  begin
-    dotted := (fCurrent^ < 'a');  // ie '.' or '#'
-    //get one or more class names for each pending style
-    if dotted then inc(fCurrent);
-    GetName(aclassName);
-    if dotted then
-    begin
-      Dec(aclassName.name);
-      inc(aclassName.len);
-    end;
-
-    AddName(String(LowercaseAnsi(aclassName)));
-    if PeekNextChar = ',' then
-    begin
-      inc(fCurrent);
-      Continue;
-    end;
-    if len = 0 then break;
-    SetLength(names, len); //ie no more comma separated names
-
-    //now get the style
-    if PeekNextChar <> '{' then Break;
-    inc(fCurrent);
-    aStyle.name := fCurrent;
-    while (fCurrent < fCurrentEnd) and (fCurrent^ <> '}') do
-      inc(fCurrent);
-    if (fCurrent = fCurrentEnd) then break;
-    aStyle.len := fCurrent - aStyle.name;
-
-    //finally, for each class name add (or append) this style
-    for i := 0 to High(names) do
-      fReader.fClassStyles.AddAppendStyle(names[i], LowercaseAnsi(aStyle));
-    names := nil;
-    len := 0; cap := 0;
-    inc(fCurrent);
-  end;
-
-  //skip trailing unknown content
-  while (fCurrent < fCurrentEnd) and (fCurrent^ <> '<') do inc(fCurrent);
-  //we should now be at </STYLE>
-  if (PeekNextChar <> '<') then Exit;
-  if ((fCurrent +1)^ <> '/') then Exit;
-  inc(fCurrent, 2);
-  Result := HashCurrentWord(hash) and (fNameHash = hash);
-  if Result then inc(fCurrent); //trailing '>'
-end;
-
-//------------------------------------------------------------------------------
 // TSvgElement
 //------------------------------------------------------------------------------
 
-constructor TSvgElement.Create(reader: TSvgReader; hashName: Cardinal);
-var
-  svgStart: PAnsiChar;
+constructor TSvgElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
-  inherited Create(nil, hashName);
-
-  fReader    := reader;
-  with fReader do
-    if not GetSvgStart(svgStart) then
-    begin
-      fCurrentEnd := PAnsiChar(fMemStream.Memory);
-      Exit;
-    end;
-
-  fName.name := svgStart;
-  fName.len := 3;
-  inc(svgStart, 3);
-  fCurrent := svgStart;
-  fCurrentEnd := fReader.fEndStream;
-  fDrawInfo :=  emptyDrawInfo;
+  inherited Create(parent, svgEl);
 end;
 
 //------------------------------------------------------------------------------
 // TElement
 //------------------------------------------------------------------------------
 
-constructor TElement.Create(parent: TElement; hashName: Cardinal);
+constructor TElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
 {$IFDEF XPLAT_GENERICS}
   fChilds         := TList<TElement>.create;
 {$ELSE}
   fChilds         := TList.Create;
 {$ENDIF}
-  fNameHash       := hashName;
-  fIdAttribIdx    := -1;
-  fStyleAttribIdx := -1;
+  fParserEl          := svgEl;
+  self.fParent    := parent;
   if not Assigned(parent) then Exit;
 
-  fPcBelow     := parent.fPcBelow;
+  fReader         := parent.fReader;
+  fDrawInfo       := emptyDrawInfo;
+  fPcBelow        := parent.fPcBelow;
   elRectWH.Init(fPcBelow);
-  self.fParent := parent;
-  fReader      := parent.fReader;
-  fCurrentEnd  := fReader.fEndStream;
-  fDrawInfo    := emptyDrawInfo;
-
-  fCurrent     := parent.fCurrent;
-  if SkipBlanks(fCurrent, fCurrentEnd) then
-    GetName(fName);
 end;
 //------------------------------------------------------------------------------
 
@@ -3367,102 +2942,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TElement.GetName(out name: TAnsiName): Boolean;
-begin
-  name.len := 0;
-  Result := IsAlpha(fCurrent^);
-  if not Result then Exit;
-  name.name := fCurrent;
-  name.len := ParseNameLength(fCurrent, fCurrentEnd);
-end;
-//------------------------------------------------------------------------------
-
-function TElement.HashCurrentWord(out hash: Cardinal): Boolean;
-begin
-  Result := IsAlpha(fCurrent^);
-  if not Result then Exit;
-  hash := ParseNextWordHashed(fCurrent, fCurrentEnd);
-end;
-//------------------------------------------------------------------------------
-
-function TElement.SetAttribValue(attrib: PAttrib): Boolean;
-var
-  q: AnsiChar;
-begin
-  Result := (fCurrent^ = '"') or (fCurrent^ = quote);
-  if not Result then Exit;
-  q := fCurrent^;
-  inc(fCurrent);
-  attrib.aValue.name := fCurrent;
-  while (fCurrent < fCurrentEnd) and (fCurrent^ <> q)  do inc(fCurrent);
-  attrib.avalue.len := fCurrent - attrib.aValue.name;
-  TrimBlanks(attrib.aValue);
-end;
-//------------------------------------------------------------------------------
-
-function TElement.AddAttribute: PAttrib;
-var
-  len: integer;
-begin
-  len := Length(fAttribs);
-  setLength(fAttribs, len +1);
-  Result := @fAttribs[len];
-  Result.aOwnerEl := self;
-end;
-//------------------------------------------------------------------------------
-
-function TElement.LoadAttributes: Boolean;
-var
-  attrib: PAttrib;
-  nextCurrent: PAnsiChar;
-begin
-  Result := false;
-  fHasContent := true;
-  while SkipBlanks(fCurrent, fCurrentEnd) do
-  begin
-    case fCurrent^ of
-      '/', '>': //end of attributes
-        begin
-          fHasContent := (fCurrent^ <> '/');
-          if fHasContent then
-            inc(fCurrent) else
-            inc(fCurrent, 2);
-          Result := true;
-          break;
-        end;
-      'x':  //ignore xml namespace prfix
-        if ((fCurrent +1)^ = 'm') and
-          ((fCurrent +2)^ = 'l') and
-          ((fCurrent +3)^ = ':') then
-            inc(fCurrent, 4);
-    end;
-    attrib := AddAttribute;
-    GetName(attrib.aName);
-    if ParseNextChar(fCurrent, fCurrentEnd) <> '=' then Exit;
-    SkipBlanks(fCurrent, fCurrentEnd);
-    SetAttribValue(attrib);
-    nextCurrent := fCurrent +1;
-    //nb: ProcessAttrib() below sometimes adds additional attributes
-    //which may cause the 'fAttribs' array to reallocate memory.
-    //So the 'attrib' pointer isn't safe to use after calling ProcessAttrib().
-    ProcessAttrib(attrib);
-    fCurrent := nextCurrent;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TElement.ProcessAttrib(const attrib: PAttrib);
-var
-  i: integer;
-  hash: Cardinal;
-begin
-  hash := GetHashedName(attrib.aName);
-  i := AttribFuncList.IndexOf(inttohex(hash, 8));
-  if i >= 0 then
-    TAttribFunc(AttribFuncList.Objects[i])(attrib);
-end;
-//------------------------------------------------------------------------------
-
 //function TElement.GetSvgElement: TSvgElement;
 //var
 //  el: TElement;
@@ -3475,305 +2954,979 @@ end;
 //end;
 //------------------------------------------------------------------------------
 
-function TElement.FindRefElement(refname: TAnsiName): TElement;
+function TElement.FindRefElement(refname: AnsiString): TElement;
 var
-  i: integer;
+  i, len: integer;
+  c, endC: PAnsiChar;
+  ref: AnsiString;
 begin
   result := nil;
-  if not Assigned(refname.name) then Exit;
-
-  if (refname.name^ = 'u') and
-    ((refname.name +1)^ = 'r') and
-    ((refname.name +2)^ = 'l') and
-    ((refname.name +3)^ = '(') then
+  len := Length(refname);
+  if len = 0 then Exit;
+  c := PAnsiChar(refname);
+  endC := c + len;
+  if Match(c, 'url(') then
   begin
-    inc(refname.name, 4);
-    dec(refName.len, 5); //removes trailing ')'
+    inc(c, 4);
+    dec(endC); //removes trailing ')'
   end;
-
-  if refname.name^ = '#' then
-  begin
-    inc(refname.name);
-    dec(refName.len);
-  end;
-
-  i := fReader.fIdList.IndexOf(string(LowercaseAnsi(refname)));
+  if c^ = '#' then inc(c);
+  PAnsiCharToAnsiString(c, endC, ref);
+  i := fReader.fIdList.IndexOf(string(ref));
   if i >= 0 then
     Result := TElement(fReader.fIdList.Objects[i]) else
     Result := nil;
 end;
+
+//------------------------------------------------------------------------------
+// dozens of function to process various element attributes
 //------------------------------------------------------------------------------
 
-function TElement.LoadChild: TElement;
-var
-  hashedName: Cardinal;
-  name: TAnsiName;
-  savedCurrent: PAnsiChar;
-  aClassName, style: AnsiString;
-  elClass: TElementClass;
+procedure Id_Attrib(aOwnerEl: TElement; const value: AnsiString);
 begin
-  Result := nil;
-  savedCurrent := fCurrent;
-  if not GetName(name) then Exit;
-  fCurrent := savedCurrent;
-  hashedName := GetHashedName(name);
+  aOwnerEl.fReader.fIdList.AddObject(string(value), aOwnerEl);
+end;
+//------------------------------------------------------------------------------
 
-  elClass := HashToElementClass(hashedName);
-  Result := elClass.Create(self, hashedName);
+procedure In_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if aOwnerEl is TFeBaseElement then
+    TFeBaseElement(aOwnerEl).in1 := value;
+end;
+//------------------------------------------------------------------------------
 
-  if not Assigned(Result.fName.name) or
-    not Result.LoadAttributes then
-  begin
-    FreeAndNil(Result);
-    Exit;
+procedure In2_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if aOwnerEl is TFeBaseElement then
+    TFeBaseElement(aOwnerEl).in2 := value;
+end;
+//------------------------------------------------------------------------------
+
+procedure LetterSpacing_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  with TTextElement(aOwnerEl) do
+    AnsiStringToFloat(value, fDrawInfo.FontInfo.spacing);
+end;
+//------------------------------------------------------------------------------
+
+
+procedure Href_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  el: TElement;
+begin
+  el := aOwnerEl;
+  case el.fParserEl.Hash of
+    hUse:
+      TUseElement(el).refEl := ExtractRef(value);
+    hTextPath:
+      TTextPathElement(el).pathEl := ExtractRef(value);
+    else if el is TFillElement then
+      TFillElement(el).refEl := ExtractRef(value);
   end;
+end;
+//------------------------------------------------------------------------------
 
-  //parse 'style' attribute AFTER other attributes
-  //have been set since style attributes have precedence.
-  with Result do
-  begin
-    if fStyleAttribIdx >= 0 then
-      with fAttribs[fStyleAttribIdx] do
-        ParseStyle(aValue.name, aValue.len);
-
-    //likewise parse class styles too
-    if fIdAttribIdx >= 0 then
-      with fAttribs[fIdAttribIdx] do
+procedure BaselineShift_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mu: TMeasureUnit;
+  val: double;
+  word: AnsiString;
+  c, endC: PAnsiChar;
+begin
+  c := PAnsiChar(value);
+  endC := c + Length(value);
+  ParseNextWord(c, endC, word);
+  with aOwnerEl.fDrawInfo.FontInfo do
+    case GetHash(word) of
+      hSuper: baseShift.SetValue(50, muPercent);
+      hSub: baseShift.SetValue(-50, muPercent);
+      hBaseline: baseShift.SetValue(0, muPixel);
+      else
       begin
-        aClassName := '#' + LowercaseAnsi(aValue);
-        style := fReader.fClassStyles.GetStyle(aClassname);
-        if style <> '' then
-          ParseStyle(PAnsiChar(style), Length(style));
+        AnsiStringToFloatEx(value, val, mu);
+        baseShift.SetValue(val, mu);
+      end;
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Color_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  color: TColor32;
+begin
+  color := clInvalid;
+  AnsiStringToColor32(value, color);
+  //for setting currentcolor when drawing (eg drawing shapes)
+  aOwnerEl.fDrawInfo.currentColor := color;
+  //for setting currentcolor during element creation (eg gradient colors)
+  aOwnerEl.fReader.currentColor := color;
+end;
+//------------------------------------------------------------------------------
+
+procedure ClipPath_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  aOwnerEl.fDrawInfo.clipPathEl := ExtractRef(value);
+end;
+//------------------------------------------------------------------------------
+
+procedure D_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if aOwnerEl is TPathElement then
+    TPathElement(aOwnerEl).ParseD(value);
+end;
+//------------------------------------------------------------------------------
+
+procedure Fill_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  case aOwnerEl.fParserEl.Hash of
+    hfeDropShadow:
+      AnsiStringToColor32(value, TFeDropShadowElement(aOwnerEl).floodColor);
+    hfeFlood:
+      AnsiStringToColor32(value, TFeFloodElement(aOwnerEl).floodColor);
+    else
+    begin
+      if Match(PAnsiChar(value), 'url(') then
+        aOwnerEl.fDrawInfo.fillEl := ExtractRef(value)
+      else
+        AnsiStringToColor32(value, aOwnerEl.fDrawInfo.fillColor);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure FillOpacity_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  case aOwnerEl.fParserEl.Hash of
+    hfeDropShadow:
+      AnsiStringToOpacity(value, TFeDropShadowElement(aOwnerEl).floodColor);
+    hfeFlood:
+      AnsiStringToOpacity(value, TFeFloodElement(aOwnerEl).floodColor);
+    else
+      AnsiStringToOpacity(value, aOwnerEl.fDrawInfo.fillColor);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure DashArray_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  c, endC: PAnsiChar;
+  val: double;
+  len: integer;
+begin
+  c := PAnsiChar(value);
+  endC := c + Length(value);
+  with aOwnerEl.fDrawInfo do
+  begin
+    len := Length(dashArray);
+    while ParseNextNum(c, endC, true, val) do
+    begin
+      SetLength(dashArray, len +1);
+      dashArray[len] := val;
+      inc(len);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure DashOffset_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  c, endC: PAnsiChar;
+begin
+  c := PAnsiChar(value);
+  endC := c + Length(value);
+  with aOwnerEl.fDrawInfo do
+    ParseNextNum(c, endC, true, dashOffset);
+end;
+//------------------------------------------------------------------------------
+
+procedure Display_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if GetHash(value) = hNone then
+    aOwnerEl.fDrawInfo.visible := false;
+end;
+//------------------------------------------------------------------------------
+
+procedure Font_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  GetSvgFontInfo(value, aOwnerEl.fDrawInfo.FontInfo);
+end;
+//------------------------------------------------------------------------------
+
+procedure FontFamily_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  word: AnsiString;
+  c, endC: PAnsiChar;
+begin
+  with aOwnerEl.fDrawInfo.FontInfo do
+  begin
+    family := ttfUnknown;
+    c := PAnsiChar(value);
+    endC := c + Length(value);
+    while ParseNextWordEx(c, endC, word) do
+    begin
+      case GetHash(word) of
+        hSans_045_Serif, hArial  : family := ttfSansSerif;
+        hSerif, hTimes: family := ttfSerif;
+        hMonospace: family := ttfMonospace;
+        else Continue;
+      end;
+      break;
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure FontSize_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  num: double;
+  c, endC: PAnsiChar;
+begin
+  c := PAnsiChar(value); endC := c + Length(value);
+  if not ParseNextNum(c, endC, false, num) then Exit;
+  aOwnerEl.fDrawInfo.FontInfo.size := num;
+end;
+//------------------------------------------------------------------------------
+
+procedure FontStyle_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  with aOwnerEl.fDrawInfo.FontInfo do
+    if GetHash(value) = hItalic then
+      italic := sfsItalic else
+      italic := sfsNone;
+end;
+//------------------------------------------------------------------------------
+
+procedure FontWeight_Attrib(aOwnerEl: TElement; const value: AnsiString);
+
+var
+  num: double;
+  word: AnsiString;
+  c, endC: PAnsiChar;
+begin
+  c := PAnsiChar(value);
+  endC := c + Length(value);
+  with aOwnerEl.fDrawInfo.FontInfo do
+  begin
+    if IsNumPending(c, endC, false) and
+      ParseNextNum(c, endC, false, num) then
+        weight := Round(num)
+    else if ParseNextWord(c, endC, word) then
+      case GetHash(word) of
+        hBold   : weight := 600;
+        hNormal : weight := 400;
+        hBolder : if weight >= 0 then weight := Min(900, weight + 200)
+                  else weight := 600;
+        hLighter: if weight >= 0 then weight := Max(0, weight - 200)
+                  else weight := 200;
+
       end;
   end;
-
-  fChilds.Add(Result);
-  fCurrent := Result.fCurrent;
 end;
 //------------------------------------------------------------------------------
 
-function TElement.PeekNextChar: AnsiChar;
+procedure Fx_Attrib(aOwnerEl: TElement; const value: AnsiString);
 begin
-  if not SkipBlanks(fCurrent, fCurrentEnd) then
-    Result := #0 else
-    Result := fCurrent^;
+  if (aOwnerEl is TRadGradElement) then
+    with TRadGradElement(aOwnerEl) do
+    begin
+      AnsiStringToFloatEx(value, F.X.rawVal, F.X.mu);
+    end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.ParseClassAttrib(classAttrib: PAttrib);
+procedure Fy_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if (aOwnerEl is TRadGradElement) then
+    with TRadGradElement(aOwnerEl) do
+    begin
+      AnsiStringToFloatEx(value, F.Y.rawVal, F.Y.mu);
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TextAlign_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  with aOwnerEl.fDrawInfo.FontInfo do
+    case GetHash(value) of
+      hMiddle : align := staCenter;
+      hEnd    : align := staRight;
+      else align := staLeft;
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TextDecoration_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  with aOwnerEl.fDrawInfo.FontInfo do
+    case GetHash(value) of
+      hUnderline        : decoration := fdUnderline;
+      hline_045_through : decoration := fdStrikeThrough;
+      else                decoration := fdNone;
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TextLength_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  AnsiStringToFloat(value, aOwnerEl.fDrawInfo.FontInfo.textLength);
+end;
+//------------------------------------------------------------------------------
+
+
+procedure MarkerStart_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if not (aOwnerEl is TShapeElement) then Exit;
+  aOwnerEl.fDrawInfo.markerStart := ExtractRef(value);
+end;
+//------------------------------------------------------------------------------
+
+procedure MarkerMiddle_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if not (aOwnerEl is TShapeElement) then Exit;
+  aOwnerEl.fDrawInfo.markerMiddle := ExtractRef(value);
+end;
+//------------------------------------------------------------------------------
+
+procedure MarkerEnd_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if not (aOwnerEl is TShapeElement) then Exit;
+  aOwnerEl.fDrawInfo.markerEnd := ExtractRef(value);
+end;
+//------------------------------------------------------------------------------
+
+procedure Filter_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if (aOwnerEl is TShapeElement) then
+    aOwnerEl.fDrawInfo.filterEl := ExtractRef(value);
+end;
+//------------------------------------------------------------------------------
+
+procedure Offset_Attrib(aOwnerEl: TElement; const value: AnsiString);
 var
-  style, aClassName: AnsiString;
+  val: TValue;
 begin
-  with classAttrib^ do
-      aClassName := '.' + LowercaseAnsi(aValue);
-  with classAttrib.aOwnerEl.fReader do
-    style := fClassStyles.GetStyle(aClassName);
-  if style <> '' then
-    ParseStyle(PAnsiChar(style), Length(style));
+  if (aOwnerEl is TGradStopElement) then
+    with TGradStopElement(aOwnerEl) do
+    begin
+      val.Init(0);
+      AnsiStringToFloatEx(value, val.rawVal, val.mu);
+      offset := val.GetValue(1);
+    end
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.ParseStyle(classStyle: PAnsiChar; len: integer);
+procedure Opacity_Attrib(aOwnerEl: TElement; const value: AnsiString);
 var
-  newAt: PAttrib;
-  styleName, styleVal: TAnsiName;
-  current, endCurrent: PAnsiChar;
+  opacity: double;
 begin
-  current := classStyle;
-  endCurrent := current + len;
+  if not AnsiStringToFloat(value, opacity) then Exit;
+  if opacity < 0 then opacity := 0
+  else if opacity > 1 then opacity := 1;
+  aOwnerEl.fDrawInfo.opacity := Round(opacity * 255);
+end;
+//------------------------------------------------------------------------------
 
-  while SkipStyleBlanks(current, endCurrent) do
+procedure Operator_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if (aOwnerEl is TFeCompositeElement) then
+    with TFeCompositeElement(aOwnerEl) do
+      case GetHash(value) of
+        hAtop : compositeOp := coAtop;
+        hIn   : compositeOp := coIn;
+        hOut  : compositeOp := coOut;
+        hOver : compositeOp := coOver;
+        hXor  : compositeOp := coXor;
+      end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Orient_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if (aOwnerEl is TMarkerElement) and
+    (GetHash(value) = hauto_045_start_045_reverse) then
+        TMarkerElement(aOwnerEl).autoStartReverse := true;
+end;
+//------------------------------------------------------------------------------
+
+procedure StopColor_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  acolor: TColor32;
+begin
+  if aOwnerEl is TGradStopElement then
   begin
-    styleName.name := current;
-    styleName.len := ParseStyleNameLen(current, endCurrent);
-    if styleName.len = 0 then Break;
-
-    newAt := AddAttribute;
-    newAt.aName := styleName;
-
-    if (ParseNextChar(current, endCurrent) <> ':') or  //syntax check
-      not SkipBlanks(current,endCurrent) then Break;
-    styleVal.name := current;
-    inc(current);
-    while (current < endCurrent) and (current^ <> ';') do inc(current);
-    styleVal.len := current - styleVal.name;
-    newAt.aValue := styleVal;
-    TrimBlanks(newAt.aValue);
-    inc(current);
-    ProcessAttrib(newAt);
+    acolor := clInvalid;
+    AnsiStringToColor32(value, acolor);
+    with TGradStopElement(aOwnerEl) do
+      if acolor = clCurrent then
+        color := aOwnerEl.fReader.currentColor else
+        color := acolor;
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.ParseTransform(const transform: TAnsiName);
+procedure StopOpacity_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if aOwnerEl is TGradStopElement then
+  AnsiStringToOpacity(value, TGradStopElement(aOwnerEl).color);
+end;
+//------------------------------------------------------------------------------
+
+procedure Points_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if aOwnerEl is TPolyElement then
+    TPolyElement(aOwnerEl).ParsePoints(value);
+end;
+//------------------------------------------------------------------------------
+
+procedure Stroke_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if Match(PAnsiChar(value), 'url(') then
+    aOwnerEl.fDrawInfo.strokeEl := ExtractRef(value)
+  else
+    AnsiStringToColor32(value, aOwnerEl.fDrawInfo.strokeColor);
+end;
+//------------------------------------------------------------------------------
+
+procedure StrokeLineCap_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  word: AnsiString;
+  c, endC: PAnsiChar;
+begin
+  c := PAnsiChar(value);
+  endC := c + Length(value);
+  ParseNextWord(c, endC, word);
+  with aOwnerEl.fDrawInfo do
+    case GetHash(word) of
+      hButt   : strokeCap := esButt;
+      hRound  : strokeCap := esRound;
+      hSquare : strokeCap := esSquare;
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure StrokeLineJoin_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  word: AnsiString;
+  c, endC: PAnsiChar;
+begin
+  c := PAnsiChar(value);
+  endC := c + Length(value);
+  ParseNextWord(c, endC, word);
+  with aOwnerEl.fDrawInfo do
+    case GetHash(word) of
+      hMiter  : strokeJoin := jsMiter;
+      hRound  : strokeJoin := jsRound;
+      hBevel  : strokeJoin := jsSquare;
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure StrokeMiterLimit_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  AnsiStringToFloat(value, aOwnerEl.fDrawInfo.strokeMitLim);
+end;
+//------------------------------------------------------------------------------
+
+procedure StrokeOpacity_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  AnsiStringToOpacity(value, aOwnerEl.fDrawInfo.strokeColor);
+end;
+//------------------------------------------------------------------------------
+
+procedure StrokeWidth_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  with aOwnerEl do
+  begin
+    AnsiStringToFloatEx(value, fDrawInfo.strokewidth.rawVal,
+      fDrawInfo.strokewidth.mu);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure FillRule_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if LowerCaseTable[value[1]] = 'e' then
+    aOwnerEl.fDrawInfo.fillRule := frEvenOdd else
+    aOwnerEl.fDrawInfo.fillRule := frNonZero;
+end;
+//------------------------------------------------------------------------------
+
+procedure Style_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  with aOwnerEl do
+    case fParserEl.Hash of
+      hFlowRegion, hFlowRoot: fDrawInfo.fillColor := clNone32;
+      //else fStyleAttribIdx := High(fAttribs);
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Transform_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  with aOwnerEl.fDrawInfo do
+    matrix := MatrixMultiply(matrix, ParseTransform(value));
+end;
+//------------------------------------------------------------------------------
+
+procedure Values_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  cnt: integer;
+  c, endC: PAnsiChar;
+begin
+  if aOwnerEl is TFeColorMatrixElement then
+    with TFeColorMatrixElement(aOwnerEl) do
+    begin
+      SetLength(values, 20);
+      c := PAnsiChar(value);
+      endC := c + Length(value);
+      cnt := 0;
+      while (cnt < 20) and ParseNextNum(c, endC, true, values[cnt]) do
+        inc(cnt);
+      if cnt < 20 then values := nil;
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure GradientTransform_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mat: TMatrixD;
+begin
+  if not (aOwnerEl is TGradientElement) then Exit;
+  mat := ParseTransform(value);
+  with aOwnerEl.fDrawInfo do
+    matrix := MatrixMultiply(matrix, mat);
+end;
+//------------------------------------------------------------------------------
+
+procedure GradientUnits_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if aOwnerEl is TFillElement then
+    with TFillElement(aOwnerEl) do
+      units := GetHash(value);
+end;
+//------------------------------------------------------------------------------
+
+procedure Viewbox_Attrib(aOwnerEl: TElement; const value: AnsiString);
+
+  function LoadViewbox: TRectWH;
+  var
+    c, endC: PAnsiChar;
+  begin
+    c := PAnsiChar(value);
+    endC := c + Length(value);
+    with Result do
+      if not ParseNextNum(c, endC, false, Left) or
+        not ParseNextNum(c, endC, true, Top) or
+        not ParseNextNum(c, endC, true, Width) or
+        not ParseNextNum(c, endC, true, Height) then
+          Result := RectWH(0,0,0,0);
+  end;
+
+begin
+  case aOwnerEl.fParserEl.Hash of
+    hSvg    : TSvgElement(aOwnerEl).viewboxWH := LoadViewbox;
+    hMarker : TMarkerElement(aOwnerEl).markerBoxWH := LoadViewbox;
+    hSymbol : TSymbolElement(aOwnerEl).viewboxWH := LoadViewbox;
+    else if aOwnerEl is TPatternElement then
+      TPatternElement(aOwnerEl).pattBoxWH := LoadViewbox;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Height_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mu: TMeasureUnit;
+  val: double;
+begin
+  AnsiStringToFloatEx(value, val, mu);
+  with aOwnerEl do
+  begin
+    elRectWH.height.SetValue(val, mu);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Width_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mu: TMeasureUnit;
+  val: double;
+begin
+  AnsiStringToFloatEx(value, val, mu);
+  with aOwnerEl do
+  begin
+    elRectWH.width.SetValue(val, mu);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Cx_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mu: TMeasureUnit;
+  val: double;
+begin
+  AnsiStringToFloatEx(value, val, mu);
+  case aOwnerEl.fParserEl.Hash of
+    hCircle:
+      with TCircleElement(aOwnerEl) do centerPt.X.SetValue(val, mu);
+    hEllipse:
+      with TEllipseElement(aOwnerEl) do centerPt.X.SetValue(val, mu);
+    hRadialGradient:
+      with TRadGradElement(aOwnerEl) do
+      begin
+        C.X.SetValue(val, mu);
+      end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Cy_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mu: TMeasureUnit;
+  val: double;
+begin
+  AnsiStringToFloatEx(value, val, mu);
+  case aOwnerEl.fParserEl.Hash of
+    hCircle:
+      with TCircleElement(aOwnerEl) do centerPt.Y.SetValue(val, mu);
+    hEllipse:
+      with TEllipseElement(aOwnerEl) do centerPt.Y.SetValue(val, mu);
+    hRadialGradient:
+      with TRadGradElement(aOwnerEl) do
+      begin
+        C.Y.SetValue(val, mu);
+      end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Dx_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mu: TMeasureUnit;
+  val: double;
+begin
+  AnsiStringToFloatEx(value, val, mu);
+  case aOwnerEl.fParserEl.Hash of
+    hfeDropShadow:
+      TFeDropShadowElement(aOwnerEl).dxdy.X.SetValue(val, mu);
+    hfeOffset:
+      TFeOffsetElement(aOwnerEl).dxdy.X.SetValue(val, mu);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Dy_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mu: TMeasureUnit;
+  val: double;
+begin
+  AnsiStringToFloatEx(value, val, mu);
+  case aOwnerEl.fParserEl.Hash of
+    hfeDropShadow:
+      TFeDropShadowElement(aOwnerEl).dxdy.Y.SetValue(val, mu);
+    hfeOffset:
+      TFeOffsetElement(aOwnerEl).dxdy.Y.SetValue(val, mu);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Result_Attrib(aOwnerEl: TElement; const value: AnsiString);
+begin
+  if (aOwnerEl is TFeBaseElement) then
+    TFeBaseElement(aOwnerEl).res := ExtractRef(value);
+end;
+//------------------------------------------------------------------------------
+
+procedure Rx_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mu: TMeasureUnit;
+  val: double;
+begin
+  AnsiStringToFloatEx(value, val, mu);
+  case aOwnerEl.fParserEl.Hash of
+    hRect:
+      with TRectElement(aOwnerEl) do
+      begin
+        radius.X.SetValue(val, mu);
+      end;
+    hCircle:
+      with TCircleElement(aOwnerEl) do
+      begin
+        radius.SetValue(val, mu);
+      end;
+    hEllipse:
+      with TEllipseElement(aOwnerEl) do
+      begin
+        radius.X.SetValue(val, mu);
+      end;
+    hRadialGradient:
+      with TRadGradElement(aOwnerEl) do
+      begin
+        radius.X. SetValue(val, mu);
+        radius.Y. SetValue(val, mu);
+      end;
+    hMarker:
+      with TMarkerElement(aOwnerEl) do
+        refPt.X.SetValue(val, mu);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Ry_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mu: TMeasureUnit;
+  val: double;
+begin
+  AnsiStringToFloatEx(value, val, mu);
+  case aOwnerEl.fParserEl.Hash of
+    hRect:
+      with TRectElement(aOwnerEl) do
+      begin
+        radius.Y.SetValue(val, mu);
+      end;
+    hEllipse:
+      with TEllipseElement(aOwnerEl) do
+      begin
+        radius.Y.SetValue(val, mu);
+      end;
+    hMarker:
+      with TMarkerElement(aOwnerEl) do refPt.Y.SetValue(val, mu);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure SpreadMethod_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  word: AnsiString;
+  c, endC: PAnsiChar;
+begin
+  if not (aOwnerEl is TGradientElement) then Exit;
+  c := PAnsiChar(value);
+  endC := c + Length(value);
+  ParseNextWord(c, endC, word);
+  with TGradientElement(aOwnerEl) do
+    case GetHash(word) of
+      hPad      : spreadMethod := gfsClamp;
+      hReflect  : spreadMethod := gfsMirror;
+      hRepeat   : spreadMethod := gfsRepeat;
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure StdDev_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  sd: double;
+begin
+  AnsiStringToFloat(value, sd);
+  if (sd < 0) and (sd > 100) then Exit;
+  case aOwnerEl.fParserEl.Hash of
+    hfeGaussianBlur:
+      TFeGaussElement(aOwnerEl).stdDev := sd;
+    hfeDropShadow:
+      TFeDropShadowElement(aOwnerEl).stdDev := sd;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure X1_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mu: TMeasureUnit;
+  val: double;
+begin
+  AnsiStringToFloatEx(value, val, mu);
+  case aOwnerEl.fParserEl.Hash of
+    hLine:
+      TLineElement(aOwnerEl).path[0].X := val;
+    hLinearGradient:
+      with TLinGradElement(aOwnerEl) do
+      begin
+        startPt.X.SetValue(val, mu);
+      end;
+    hFilter:
+      with aOwnerEl do
+      begin
+        elRectWH.left.SetValue(val, mu);
+      end;
+    else
+      aOwnerEl.elRectWH.left.SetValue(val, mu);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure X2_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mu: TMeasureUnit;
+  val: double;
+begin
+  AnsiStringToFloatEx(value, val, mu);
+  case aOwnerEl.fParserEl.Hash of
+    hLine:
+      TLineElement(aOwnerEl).path[1].X := val;
+    hLinearGradient:
+      with TLinGradElement(aOwnerEl) do
+      begin
+        endPt.X.SetValue(val, mu);
+      end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Y1_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mu: TMeasureUnit;
+  val: double;
+begin
+  AnsiStringToFloatEx(value, val, mu);
+  case aOwnerEl.fParserEl.Hash of
+    hLine:
+      TLineElement(aOwnerEl).path[0].Y := val;
+    hLinearGradient:
+      with TLinGradElement(aOwnerEl) do
+      begin
+        startPt.Y.SetValue(val, mu);
+      end;
+    hFilter:
+      with aOwnerEl do
+      begin
+        elRectWH.top.SetValue(val, mu);
+      end;
+    else
+      aOwnerEl.elRectWH.top.SetValue(val, mu);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Y2_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  mu: TMeasureUnit;
+  val: double;
+begin
+  AnsiStringToFloatEx(value, val, mu);
+  case aOwnerEl.fParserEl.Hash of
+    hLine:
+      TLineElement(aOwnerEl).path[1].Y := val;
+    hLinearGradient:
+      with TLinGradElement(aOwnerEl) do
+      begin
+        endPt.Y.SetValue(val, mu);
+      end;
+  end;
+end;
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+procedure TElement.LoadAttribute(attrib: PAttrib);
+begin
+  with attrib^ do
+  case hash of
+    hbaseline_045_shift:    BaselineShift_Attrib(self, value);
+    hColor:                 Color_Attrib(self, value);
+    hClip_045_path:         ClipPath_Attrib(self, value);
+    hCx:                    Cx_Attrib(self, value);
+    hCy:                    Cy_Attrib(self, value);
+    hD:                     D_Attrib(self, value);
+    hDisplay:               Display_Attrib(self, value);
+    hDx:                    Dx_Attrib(self, value);
+    hDy:                    Dy_Attrib(self, value);
+    hStroke_045_DashArray:  DashArray_Attrib(self, value);
+    hStroke_045_DashOffset: DashOffset_Attrib(self, value);
+    hFill:                  Fill_Attrib(self, value);
+    hFill_045_Opacity:      FillOpacity_Attrib(self, value);
+    hFill_045_Rule:         FillRule_Attrib(self, value);
+    hFilter:                Filter_Attrib(self, value);
+    hflood_045_color:       Fill_Attrib(self, value);
+    hflood_045_opacity:     FillOpacity_Attrib(self, value);
+    hFont:                  Font_Attrib(self, value);
+    hFont_045_Family:       FontFamily_Attrib(self, value);
+    hFont_045_Size:         FontSize_Attrib(self, value);
+    hFont_045_Style:        FontStyle_Attrib(self, value);
+    hFont_045_Weight:       FontWeight_Attrib(self, value);
+    hFx:                    Fx_Attrib(self, value);
+    hFy:                    Fy_Attrib(self, value);
+    hGradientTransform:     GradientTransform_Attrib(self, value);
+    hGradientUnits:         GradientUnits_Attrib(self, value);
+    hHeight:                Height_Attrib(self, value);
+    hHref:                  Href_Attrib(self, value);
+    hId:                    Id_Attrib(self, value);
+    hIn:                    In_Attrib(self, value);
+    hIn2:                   In2_Attrib(self, value);
+    hletter_045_spacing:    LetterSpacing_Attrib(self, value);
+    hMarker_045_End:        MarkerEnd_Attrib(self, value);
+    hMarkerHeight:          Height_Attrib(self, value);
+    hMarker_045_Mid:        MarkerMiddle_Attrib(self, value);
+    hMarker_045_Start:      MarkerStart_Attrib(self, value);
+    hMarkerWidth:           Width_Attrib(self, value);
+    hOffset:                Offset_Attrib(self, value);
+    hOpacity:               Opacity_Attrib(self, value);
+    hOperator:              Operator_Attrib(self, value);
+    hOrient:                Orient_Attrib(self, value);
+    hPatternUnits:          GradientUnits_Attrib(self, value);
+    hPatternTransform:      Transform_Attrib(self, value);
+    hPoints:                Points_Attrib(self, value);
+    hR:                     Rx_Attrib(self, value);
+    hRefX:                  Rx_Attrib(self, value);
+    hRefY:                  Ry_Attrib(self, value);
+    hResult:                Result_Attrib(self, value);
+    hRx:                    Rx_Attrib(self, value);
+    hRy:                    Ry_Attrib(self, value);
+    hSpreadMethod:          SpreadMethod_Attrib(self, value);
+    hstdDeviation:          StdDev_Attrib(self, value);
+    hStop_045_Color:        StopColor_Attrib(self, value);
+    hStop_045_Opacity:      StopOpacity_Attrib(self, value);
+    hStroke:                Stroke_Attrib(self, value);
+    hstroke_045_linecap:    StrokeLineCap_Attrib(self, value);
+    hstroke_045_linejoin:   StrokeLineJoin_Attrib(self, value);
+    hstroke_045_miterlimit: StrokeMiterLimit_Attrib(self, value);
+    hStroke_045_Opacity:    StrokeOpacity_Attrib(self, value);
+    hStroke_045_Width:      StrokeWidth_Attrib(self, value);
+    hText_045_Anchor:       TextAlign_Attrib(self, value);
+    hText_045_Decoration:   TextDecoration_Attrib(self, value);
+    hTextLength:            TextLength_Attrib(self, value);
+    hTransform:             Transform_Attrib(self, value);
+    hValues:                Values_Attrib(self, value);
+    hViewbox:               Viewbox_Attrib(self, value);
+    hWidth:                 Width_Attrib(self, value);
+    hX:                     X1_Attrib(self, value);
+    hX1:                    X1_Attrib(self, value);
+    hX2:                    X2_Attrib(self, value);
+    hXlink_058_Href:        Href_Attrib(self, value);
+    hY:                     Y1_Attrib(self, value);
+    hY1:                    Y1_Attrib(self, value);
+    hY2:                    Y2_Attrib(self, value);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TElement.LoadAttributes;
 var
   i: integer;
-  current, endC: PAnsiChar;
-  c: AnsiChar;
-  word: TAnsiName;
-  values: array[0..5] of double;
-  mat: TMatrixD;
-  pMat: PMatrixD;
-  mats: array of TMatrixD;
-
-  function NewMatrix: PMatrixD;
-  var
-    len: integer;
-  begin
-    len := length(mats);
-    setLength(mats, len +1);
-    mats[len] := IdentityMatrix;
-    Result := @mats[len];
-  end;
-
 begin
-  current := transform.name;
-  endC := current + transform.len;
-
-  //surprisingly, and I think this is a bug in SVG not a feature ...
-  //transform operations must be performed in reverse order
-  while ParseNextWord(current, endC, word) do
-  begin
-    if (word.len < 5) then Exit;
-    c := LowerCaseTable[(word.name +4)^];
-    if ParseNextChar(current, endC) <> '(' then Exit; //syntax check
-    //reset values variables
-    for i := 0 to High(values) do values[i] := InvalidD;
-    //and since every transform function requires at least one value
-    if not ParseNextNum(current, endC, false, values[0]) then Exit;
-    //now get additional variables
-    i := 1;
-    while (i < 6) and IsNumPending(current, endC, true) do
-    begin
-      ParseNextNum(current, endC, true, values[i]);
-      inc(i);
-    end;
-    if ParseNextChar(current, endC) <> ')' then Exit; //syntax check
-
-    pMat := NewMatrix;
-    case c of
-      'e' : //scalE
-        if not IsValid(values[1]) then
-          MatrixScale(pMat^, values[0]) else
-            MatrixScale(pMat^, values[0], values[1]);
-      'i' : //matrIx
-        if IsValid(values[5]) then
-        begin
-          pMat[0,0] :=  values[0];
-          pMat[0,1] :=  values[1];
-          pMat[1,0] :=  values[2];
-          pMat[1,1] :=  values[3];
-          pMat[2,0] :=  values[4];
-          pMat[2,1] :=  values[5];
-        end;
-      's' : //tranSlateX, tranSlateY & tranSlate
-        if word.len =10  then
-        begin
-          if LowerCaseTable[(word.name +9)^] = 'x' then
-            MatrixTranslate(pMat^, values[0], 0)
-          else if LowerCaseTable[(word.name +9)^] = 'y' then
-            MatrixTranslate(pMat^, 0, values[0]);
-        end
-        else if IsValid(values[1]) then
-          MatrixTranslate(pMat^, values[0], values[1])
-        else
-          MatrixTranslate(pMat^, values[0], 0);
-      't' : //rotaTe
-        if IsValid(values[2]) then
-          MatrixRotate(pMat^, PointD(values[1],values[2]), DegToRad(values[0]))
-        else
-          MatrixRotate(pMat^, NullPointD, DegToRad(values[0]));
-       'x' : //skewX
-         begin
-            MatrixSkew(pMat^, DegToRad(values[0]), 0);
-         end;
-       'y' : //skewY
-         begin
-            MatrixSkew(pMat^, 0, DegToRad(values[0]));
-         end;
-    end;
-  end;
-
-  if not assigned(mats) then Exit;
-  mat := mats[0];
-  for i := 1 to High(mats) do
-    mat := MatrixMultiply(mat, mats[i]);
-  fDrawInfo.matrix := MatrixMultiply(fDrawInfo.matrix, mat);
+  for i := 0 to fParserEl.attribs.Count -1 do
+    LoadAttribute(PAttrib(fParserEl.attribs[i]));
 end;
 //------------------------------------------------------------------------------
 
 function TElement.LoadContent: Boolean;
 var
-  c: PAnsiChar;
-  el: TElement;
-  hash: Cardinal;
+  i       : integer;
+  svgEl   : TSvgEl;
+  elClass : TElementClass;
+  el      : TElement;
 begin
   Result := false;
-  while SkipBlanks(fCurrent, fCurrentEnd) do
+  for i := 0 to fParserEl.childs.Count -1 do
   begin
-    if (fCurrent^ = '<') then
-    begin
-      inc(fCurrent);
-      if fCurrent^ = '!' then
-      begin
-        //a comment section
-        while (fCurrent < fCurrentEnd) do
-        begin
-          if (fCurrent^ = '>') and
-            ((fCurrent -1)^ = '-') and
-            ((fCurrent -2)^ = '-') then
-          begin
-            inc(fCurrent);
-            break; //break out of inner comment loop
-          end;
-          inc(fCurrent);
-        end;
-      end
-      else if fCurrent^ = '/' then
-      begin
-        //this should be the element close
-        inc(fCurrent);
-        Result := HashCurrentWord(hash) and (fNameHash = hash);
-        if Result then
-        begin
-          SkipBlanks(fCurrent, fCurrentEnd);
-          Result := fCurrent^ = '>';
-          inc(fCurrent);
-        end;
-        Exit;
-      end else
-      begin
-        //load a child element
-        el := LoadChild;
-        if not Assigned(el) then Break;
-        if el.fHasContent then el.LoadContent;
-        fCurrent := el.fCurrent;
-      end;
-    end
-    else if fCurrent^ = '>' then
-    begin
-      //oops! something's wrong
-      inc(fCurrent);
-      break;
-    end
-    else if (self is TTextElement) or (self is TTextPathElement) then
-    begin
-      if (fCurrent -1)^ = #32 then dec(fCurrent);
-      c := fCurrent;
-      while (fCurrent < fCurrentEnd) and (fCurrent^ <> '<') do inc(fCurrent);
-      if (self is TTextElement) then
-        TTextElement(self).AddSubtext(c, fCurrent - c)
-      else
-      begin
-        TTextPathElement(self).text := c;
-        TTextPathElement(self).textLen := fCurrent - c;
-      end;
-    end else
-    begin
-      //skip unknown content
-      while (fCurrent < fCurrentEnd) and (fCurrent^ <> '<') do inc(fCurrent);
-    end;
+    svgEl := TSvgEl(fParserEl.childs[i]);
+    if svgEl.hash = 0 then
+      Continue;
+    elClass := HashToElementClass(svgEl.hash);
+    el := elClass.Create(self, svgEl);
+    Self.fChilds.Add(el);
+    el.LoadAttributes;
+    if not el.LoadContent then //ie recursive
+      Exit; //error
   end;
+  Result := true;
 end;
 
 //------------------------------------------------------------------------------
@@ -3782,12 +3935,12 @@ end;
 
 constructor TSvgReader.Create;
 begin
-  fMemStream          := TMemoryStream.Create;
+  fSvgParser        := TSvgParser.Create;
   fIdList             := TStringList.Create;
-  //fIdList.Duplicates := dupError; // I'm unsure how best to manage this, but
-  fIdList.Duplicates  := dupIgnore;  // pro tem, duplicates will be ignored.
+  fIdList.Duplicates  := dupIgnore;
+  fIdList.CaseSensitive := false;
   fIdList.Sorted      := True;
-  fBlurQuality        := 1; //0..2: 0=OK (fast); 2=Great (slow)
+  fBlurQuality        := 1; //0..2: 0=OK (reasonably fast); 2=Excellent (slow)
   currentColor        := clBlack32;
   fClassStyles        := TClassStylesList.Create;
 
@@ -3808,7 +3961,7 @@ var
   i: integer;
 begin
   Clear;
-  fMemStream.Free;
+  fSvgParser.Free;
   fIdList.Free;
   fClassStyles.Free;
   for i := 0 to fFontList.Count -1 do
@@ -3826,10 +3979,9 @@ end;
 procedure TSvgReader.Clear;
 begin
   FreeAndNil(fRootElement);
-  fMemStream.clear;
+  fSvgParser.Clear;
   fIdList.Clear;
   fClassStyles.Clear;
-  fEndStream := nil;
   fLinGradRenderer.Clear;
   fRadGradRenderer.Clear;
   fImgRenderer.Image.Clear;
@@ -3944,77 +4096,31 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgReader.LoadFromFile(const filename: string): Boolean;
-var
-  Stream: TStream;
+function TSvgReader.LoadInternal: Boolean;
 begin
-  Result := FileExists(filename);
-  if not Result then Exit;
+  Result := false;
+  if not Assigned(fSvgParser.svgTree) or
+    (fSvgParser.svgTree.hash <> hSvg) then Exit;
+  fRootElement := TSvgElement.Create(nil, fSvgParser.svgTree);
+  fRootElement.fReader := self;
+  fRootElement.LoadAttributes;
+  Result := fRootElement.LoadContent;
+end;
+//------------------------------------------------------------------------------
 
-  Stream := TFileStream.Create(FileName, fmOpenRead or fmShareDenyWrite);
-  try
-    Result := LoadFromStream(Stream);
-  finally
-    Stream.Free;
-  end;
+function TSvgReader.LoadFromFile(const filename: string): Boolean;
+begin
+  Clear;
+  Result := fSvgParser.LoadFromFile(filename);
+  if Result then LoadInternal;
 end;
 //------------------------------------------------------------------------------
 
 function TSvgReader.LoadFromStream(stream: TStream): Boolean;
 begin
-  Result := false;
   Clear;
-  if not Assigned(stream) then Exit;
-
-  fMemStream.LoadFromStream(stream);
-  fEndStream := PAnsiChar(fMemStream.Memory) + fMemStream.Size;
-
-  fRootElement := TSvgElement.Create(self, hSvg);
-  with fRootElement do
-  begin
-    if not Assigned(fName.name) then Exit;
-    result := fRootElement.LoadAttributes;
-    if not Result then Exit;
-    Result := not fHasContent or LoadContent;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function TSvgReader.GetSvgStart(out svgStart: PAnsiChar): Boolean;
-var
-  svgEnd: PAnsiChar;
-begin
-  Result := false;
-  svgStart := fMemStream.Memory;
-  svgEnd := svgStart + fMemStream.Size -3;
-  while (svgStart < svgEnd) do
-  begin
-    if (svgStart^ = '<') and
-      (LowerCaseTable[(svgStart+1)^] = 's') and
-      (LowerCaseTable[(svgStart+2)^] = 'v') and
-      (LowerCaseTable[(svgStart+3)^] = 'g') then
-    begin
-      Result := true;
-      inc(svgStart);
-      Exit;
-    end;
-    inc(svgStart);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function MacStylesToFontStyles(macStyles: TMacStyles): TSvgFontSyles;
-begin
-  if msBold in macStyles then
-  begin
-    if msItalic in macStyles then
-      Result := sfsBoldItalic else
-      Result := sfsBold;
-  end
-  else if msItalic in macStyles then
-    Result := sfsItalic
-  else
-    Result := sfsNone;
+  Result := fSvgParser.LoadFromStream(stream);
+  if Result then LoadInternal;
 end;
 //------------------------------------------------------------------------------
 
@@ -4023,7 +4129,13 @@ procedure TSvgReader.GetBestFont(const svgFontInfo: TSVGFontInfo);
   function GetStyleInt(fontReaderIdx: integer): integer;
   begin
     with TFontReader(fFontList[fontReaderIdx]) do
-      Result := Max(1, Ord(MacStylesToFontStyles(FontInfo.macStyles)));
+    begin
+      if msBold in FontInfo.macStyles then
+        Result := 1 else
+        Result := 0;
+      if msItalic in FontInfo.macStyles then
+        inc(Result, 2);
+    end;
   end;
 
   function GetFamilyInt(fontReaderIdx: integer): integer;
@@ -4034,7 +4146,6 @@ procedure TSvgReader.GetBestFont(const svgFontInfo: TSVGFontInfo);
 
   function CompareStyleInts(int1, int2: integer): integer;
   begin
-    //sfsNone, sfsBold, sfsItalic, sfsBoldItalic
     Result := Abs(int1 - int2);
     if Result = 2 then Dec(Result);
   end;
@@ -4042,8 +4153,9 @@ procedure TSvgReader.GetBestFont(const svgFontInfo: TSVGFontInfo);
   function CompareFamilyInts(int1, int2: integer): integer;
   begin
     //ttfUnknown, ttfSerif, ttfSansSerif, ttfMonospace
-    Result := Min(1, Abs(int1 - int2));
-    if (int1 = 0) or (int2 = 0) then Result := 0;
+    if (int1 = 0) or (int2 = 0) or (int1 = int2) then
+      Result := 0 else
+      Result := 1;
   end;
 
 var
@@ -4051,7 +4163,16 @@ var
   bestFontReader: TFontReader;
 begin
   if fFontList.Count = 0 then Exit;
-  thisStyle := Max(1, Ord(svgFontInfo.styles));
+
+  //convert bold/italic into a comparision integer
+  with svgFontInfo do
+  begin
+    if weight >= 600 then
+      thisStyle := 1 else
+      thisStyle := 0;
+    if italic = sfsItalic then inc(thisStyle, 2);
+  end;
+
   if svgFontInfo.family = ttfUnknown then
     thisFamily := Ord(ttfSansSerif) else    //default to sans-serif
     thisFamily := Ord(svgFontInfo.family);
@@ -4086,966 +4207,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TSvgReader.GetIsEmpty: Boolean;
+begin
+  Result := not Assigned(fRootElement);
+end;
+//------------------------------------------------------------------------------
+
 procedure TSvgReader.SetBlurQuality(value: integer);
 begin
   if value <= 0 then fBlurQuality := 0
   else if value >= 2 then fBlurQuality := 2
   else fBlurQuality := 1;
 end;
-//------------------------------------------------------------------------------
-
-procedure RegisterAttribute(hashedName: Cardinal; func: TAttribFunc);
-begin
-  AttribFuncList.AddObject(InttoHex(hashedName, 8), @func) ;
-end;
-//------------------------------------------------------------------------------
-
-procedure GradientTransform_Attrib(attrib: PAttrib);
-begin
-  if attrib.aOwnerEl is TGradientElement then
-    with TGradientElement(attrib.aOwnerEl) do
-      ParseTransform(attrib.aValue);
-end;
-//------------------------------------------------------------------------------
-
-procedure GradientUnits_Attrib(attrib: PAttrib);
-begin
-  if attrib.aOwnerEl is TFillElement then
-    with TFillElement(attrib.aOwnerEl) do
-      units := GetHashedName(attrib.aValue);
-end;
-//------------------------------------------------------------------------------
-
-procedure Id_Attrib(attrib: PAttrib);
-var
-  id: AnsiString;
-begin
-  with attrib^ do
-  begin
-    id := LowercaseAnsi(aValue);
-    aOwnerEl.fReader.fIdList.AddObject(string(id), aOwnerEl);
-    aOwnerEl.fIdAttribIdx := High(aOwnerEl.fAttribs);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure In_Attrib(attrib: PAttrib);
-begin
-  if attrib.aOwnerEl is TFeBaseElement then
-    TFeBaseElement(attrib.aOwnerEl).in1 := attrib.aValue;
-end;
-//------------------------------------------------------------------------------
-
-procedure In2_Attrib(attrib: PAttrib);
-begin
-  if attrib.aOwnerEl is TFeBaseElement then
-    TFeBaseElement(attrib.aOwnerEl).in2 := attrib.aValue;
-end;
-//------------------------------------------------------------------------------
-
-procedure LetterSpacing_Attrib(attrib: PAttrib);
-begin
-  with TTextElement(attrib.aOwnerEl) do
-    AttribToFloat(attrib, fDrawInfo.FontInfo.spacing);
-end;
-//------------------------------------------------------------------------------
-
-
-procedure Href_Attrib(attrib: PAttrib);
-var
-  el: TElement;
-begin
-  el := attrib.aOwnerEl;
-  case el.fNameHash of
-    hUse:
-      TUseElement(el).refEl := ExtractRefFromValue(attrib.aValue);
-    hTextPath:
-      TTextPathElement(el).pathEl := ExtractRefFromValue(attrib.aValue);
-    else if el is TFillElement then
-      TFillElement(el).refEl := ExtractRefFromValue(attrib.aValue);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure BaselineShift_Attrib(attrib: PAttrib);
-var
-  mu: TMeasureUnit;
-  val: double;
-  word: TAnsiName;
-  c, endC: PAnsiChar;
-begin
-  c := attrib.aValue.name;
-  endC := c + attrib.aValue.len;
-  ParseNextWord(c, endC, word);
-  with attrib.aOwnerEl.fDrawInfo.FontInfo do
-    case GetHashedName(word) of
-      hSuper: baseShift.SetValue(50, muPercent);
-      hSub: baseShift.SetValue(-50, muPercent);
-      hBaseline: baseShift.SetValue(0, muPixel);
-      else
-      begin
-        AttribToFloat(attrib, val, mu);
-        baseShift.SetValue(val, mu);
-      end;
-    end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Class_Attrib(attrib: PAttrib);
-begin
-  TElement(attrib.aOwnerEl).ParseClassAttrib(attrib);
-end;
-//------------------------------------------------------------------------------
-
-procedure Color_Attrib(attrib: PAttrib);
-var
-  color: TColor32;
-begin
-  color := clInvalid;
-  AttribToColor32(attrib, color);
-  //for setting currentcolor when drawing (eg drawing shapes)
-  attrib.aOwnerEl.fDrawInfo.currentColor := color;
-  //for setting currentcolor during element creation (eg gradient colors)
-  attrib.aOwnerEl.fReader.currentColor := color;
-end;
-//------------------------------------------------------------------------------
-
-procedure ClipPath_Attrib(attrib: PAttrib);
-begin
-  attrib.aOwnerEl.fDrawInfo.clipPathEl := ExtractRefFromValue(attrib.aValue);
-end;
-//------------------------------------------------------------------------------
-
-procedure D_Attrib(attrib: PAttrib);
-begin
-  if attrib.aOwnerEl is TPathElement then
-    TPathElement(attrib.aOwnerEl).ParseD(attrib);
-end;
-//------------------------------------------------------------------------------
-
-procedure Fill_Attrib(attrib: PAttrib);
-begin
-  case attrib.aOwnerEl.fNameHash of
-    hfeDropShadow:
-      AttribToColor32(attrib, TFeDropShadowElement(attrib.aOwnerEl).floodColor);
-    hfeFlood:
-      AttribToColor32(attrib, TFeFloodElement(attrib.aOwnerEl).floodColor);
-    else
-      AttribToColor32(attrib, attrib.aOwnerEl.fDrawInfo.fillColor);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure FillOpacity_Attrib(attrib: PAttrib);
-begin
-  case attrib.aOwnerEl.fNameHash of
-    hfeDropShadow:
-      AttribToOpacity(attrib, TFeDropShadowElement(attrib.aOwnerEl).floodColor);
-    hfeFlood:
-      AttribToOpacity(attrib, TFeFloodElement(attrib.aOwnerEl).floodColor);
-    else
-      AttribToOpacity(attrib, attrib.aOwnerEl.fDrawInfo.fillColor);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure DashArray_Attrib(attrib: PAttrib);
-var
-  current, currentEnd: PAnsiChar;
-  val: double;
-  len: integer;
-begin
-  current := attrib.aValue.name;
-  currentEnd := current + attrib.aValue.len;
-  with attrib.aOwnerEl.fDrawInfo do
-  begin
-    len := Length(dashArray);
-    while ParseNextNum(current, currentEnd, true, val) do
-    begin
-      SetLength(dashArray, len +1);
-      dashArray[len] := val;
-      inc(len);
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure DashOffset_Attrib(attrib: PAttrib);
-var
-  current, currentEnd: PAnsiChar;
-begin
-  current := attrib.aValue.name;
-  currentEnd := current + attrib.aValue.len;
-  with attrib.aOwnerEl.fDrawInfo do
-    ParseNextNum(current, currentEnd, true, dashOffset);
-end;
-//------------------------------------------------------------------------------
-
-procedure Display_Attrib(attrib: PAttrib);
-begin
-  if GetHashedName(attrib.aValue) = hNone then
-    attrib.aOwnerEl.fDrawInfo.visible := false;
-end;
-//------------------------------------------------------------------------------
-
-procedure Font_Attrib(attrib: PAttrib);
-begin
-  AttribToFontInfo(attrib, attrib.aOwnerEl.fDrawInfo.FontInfo);
-end;
-//------------------------------------------------------------------------------
-
-procedure FontFamily_Attrib(attrib: PAttrib);
-var
-  word: TAnsiName;
-  c, endC: PAnsiChar;
-begin
-  c :=  attrib.aValue.name;
-  with attrib.aOwnerEl.fDrawInfo.FontInfo do
-  begin
-    family := ttfUnknown;
-    endC := c + attrib.aValue.len;
-    while ParseNextWordEx(c, endC, word) do
-    begin
-      case GetHashedName(word) of
-        hSans_045_Serif, hArial  : family := ttfSansSerif;
-        hSerif, hTimes: family := ttfSerif;
-        hMonospace: family := ttfMonospace;
-        else Continue;
-      end;
-      break;
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure FontSize_Attrib(attrib: PAttrib);
-var
-  num: double;
-begin
-  with attrib.aValue do
-    if not ParseNextNum(name, name + len, false, num) then Exit;
-  attrib.aOwnerEl.fDrawInfo.FontInfo.size := num;
-end;
-//------------------------------------------------------------------------------
-
-procedure FontStyle_Attrib(attrib: PAttrib);
-begin
-  with attrib.aOwnerEl.fDrawInfo.FontInfo do
-    if GetHashedName(attrib.aValue) = hItalic then
-      if styles = sfsBoldItalic then
-        styles := sfsBold else
-        styles := sfsNone;
-end;
-//------------------------------------------------------------------------------
-
-procedure FontWeight_Attrib(attrib: PAttrib);
-
-  procedure IncludeBold;
-  begin
-    with attrib.aOwnerEl.fDrawInfo.FontInfo do
-      if styles = sfsItalic then
-        styles := sfsBoldItalic else
-        styles := sfsBold;
-  end;
-
-  procedure ExcludeBold;
-  begin
-    with attrib.aOwnerEl.fDrawInfo.FontInfo do
-      if styles = sfsBoldItalic then
-        styles := sfsItalic else
-        styles := sfsNone;
-  end;
-
-var
-  num: double;
-  word: TAnsiName;
-  c, endC: PAnsiChar;
-begin
-  c := attrib.aValue.name;
-  endC := c + attrib.aValue.len;
-  begin
-    if IsNumPending(c, endC, false) and
-      ParseNextNum(c, endC, false, num) then
-    begin
-      if num >= 600 then
-        IncludeBold else
-        ExcludeBold;
-    end
-    else if ExtractWordFromValue(attrib.aValue, word) then
-    begin
-      case GetHashedName(word) of
-        hBold, hBolder: IncludeBold
-        else ExcludeBold;
-      end;
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Fx_Attrib(attrib: PAttrib);
-begin
-  if (attrib.aOwnerEl is TRadGradElement) then
-    with TRadGradElement(attrib.aOwnerEl) do
-    begin
-      AttribToFloat(attrib, F.X.rawVal, F.X.mu);
-    end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Fy_Attrib(attrib: PAttrib);
-begin
-  if (attrib.aOwnerEl is TRadGradElement) then
-    with TRadGradElement(attrib.aOwnerEl) do
-    begin
-      AttribToFloat(attrib, F.Y.rawVal, F.Y.mu);
-    end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TextAlign_Attrib(attrib: PAttrib);
-begin
-  with attrib.aOwnerEl.fDrawInfo.FontInfo do
-    case GetHashedName(attrib.aValue) of
-      hMiddle : align := staCenter;
-      hEnd    : align := staRight;
-      else align := staLeft;
-    end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TextDecoration_Attrib(attrib: PAttrib);
-begin
-  with attrib.aOwnerEl.fDrawInfo.FontInfo do
-    case GetHashedName(attrib.aValue) of
-      hUnderline        : decoration := fdUnderline;
-      hline_045_through : decoration := fdStrikeThrough;
-      else                decoration := fdNone;
-    end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TextLength_Attrib(attrib: PAttrib);
-begin
-  AttribToFloat(attrib, attrib.aOwnerEl.fDrawInfo.FontInfo.textLength);
-end;
-//------------------------------------------------------------------------------
-
-
-procedure MarkerStart_Attrib(attrib: PAttrib);
-begin
-  if not (attrib.aOwnerEl is TShapeElement) then Exit;
-  attrib.aOwnerEl.fDrawInfo.markerStart := ExtractRefFromValue(attrib.aValue);
-end;
-//------------------------------------------------------------------------------
-
-procedure MarkerMiddle_Attrib(attrib: PAttrib);
-begin
-  if not (attrib.aOwnerEl is TShapeElement) then Exit;
-  attrib.aOwnerEl.fDrawInfo.markerMiddle := ExtractRefFromValue(attrib.aValue);
-end;
-//------------------------------------------------------------------------------
-
-procedure MarkerEnd_Attrib(attrib: PAttrib);
-begin
-  if not (attrib.aOwnerEl is TShapeElement) then Exit;
-  attrib.aOwnerEl.fDrawInfo.markerEnd := ExtractRefFromValue(attrib.aValue);
-end;
-//------------------------------------------------------------------------------
-
-procedure Filter_Attrib(attrib: PAttrib);
-begin
-  if (attrib.aOwnerEl is TShapeElement) then
-    attrib.aOwnerEl.fDrawInfo.filterEl := ExtractRefFromValue(attrib.aValue);
-end;
-//------------------------------------------------------------------------------
-
-
-procedure Offset_Attrib(attrib: PAttrib);
-var
-  val: TValue;
-begin
-  if (attrib.aOwnerEl is TGradStopElement) then
-    with TGradStopElement(attrib.aOwnerEl) do
-    begin
-      val.Init(0);
-      AttribToFloat(attrib, val.rawVal, val.mu);
-      offset := val.GetValue(1);
-    end
-end;
-//------------------------------------------------------------------------------
-
-procedure Opacity_Attrib(attrib: PAttrib);
-var
-  opacity: double;
-begin
-  if not AttribToFloat(attrib, opacity) then Exit;
-  if opacity < 0 then opacity := 0
-  else if opacity > 1 then opacity := 1;
-  attrib.aOwnerEl.fDrawInfo.opacity := Round(opacity * 255);
-end;
-//------------------------------------------------------------------------------
-
-procedure Operator_Attrib(attrib: PAttrib);
-begin
-  if (attrib.aOwnerEl is TFeCompositeElement) then
-    with TFeCompositeElement(attrib.aOwnerEl) do
-      case GetHashedName(attrib.aValue) of
-        hAtop : compositeOp := coAtop;
-        hIn   : compositeOp := coIn;
-        hOut  : compositeOp := coOut;
-        hOver : compositeOp := coOver;
-        hXor  : compositeOp := coXor;
-      end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Orient_Attrib(attrib: PAttrib);
-begin
-  if (attrib.aOwnerEl is TMarkerElement) and
-    (GetHashedName(attrib.aValue) = hauto_045_start_045_reverse) then
-        TMarkerElement(attrib.aOwnerEl).autoStartReverse := true;
-end;
-//------------------------------------------------------------------------------
-
-procedure StopColor_Attrib(attrib: PAttrib);
-var
-  acolor: TColor32;
-begin
-  if attrib.aOwnerEl is TGradStopElement then
-  begin
-    acolor := clInvalid;
-    AttribToColor32(attrib, acolor);
-    with TGradStopElement(attrib.aOwnerEl) do
-      if acolor = clCurrent then
-        color := attrib.aOwnerEl.fReader.currentColor else
-        color := acolor;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure StopOpacity_Attrib(attrib: PAttrib);
-begin
-  if attrib.aOwnerEl is TGradStopElement then
-  AttribToOpacity(attrib, TGradStopElement(attrib.aOwnerEl).color);
-end;
-//------------------------------------------------------------------------------
-
-procedure Points_Attrib(attrib: PAttrib);
-begin
-  if attrib.aOwnerEl is TPolyElement then
-    TPolyElement(attrib.aOwnerEl).ParsePoints(attrib);
-end;
-//------------------------------------------------------------------------------
-
-procedure Stroke_Attrib(attrib: PAttrib);
-begin
-  AttribToColor32(attrib, attrib.aOwnerEl.fDrawInfo.strokeColor);
-end;
-//------------------------------------------------------------------------------
-
-procedure StrokeLineCap_Attrib(attrib: PAttrib);
-var
-  word: TAnsiName;
-  c, endC: PAnsiChar;
-begin
-  c := attrib.aValue.name;
-  endC := c + attrib.aValue.len;
-  ParseNextWord(c, endC, word);
-  with attrib.aOwnerEl.fDrawInfo do
-    case GetHashedName(word) of
-      hButt   : strokeCap := esButt;
-      hRound  : strokeCap := esRound;
-      hSquare : strokeCap := esSquare;
-    end;
-end;
-//------------------------------------------------------------------------------
-
-procedure StrokeLineJoin_Attrib(attrib: PAttrib);
-var
-  word: TAnsiName;
-  c, endC: PAnsiChar;
-begin
-  c := attrib.aValue.name;
-  endC := c + attrib.aValue.len;
-  ParseNextWord(c, endC, word);
-  with attrib.aOwnerEl.fDrawInfo do
-    case GetHashedName(word) of
-      hMiter  : strokeJoin := jsMiter;
-      hRound  : strokeJoin := jsRound;
-      hBevel  : strokeJoin := jsSquare;
-    end;
-end;
-//------------------------------------------------------------------------------
-
-procedure StrokeMiterLimit_Attrib(attrib: PAttrib);
-begin
-  AttribToFloat(attrib, attrib.aOwnerEl.fDrawInfo.strokeMitLim);
-end;
-//------------------------------------------------------------------------------
-
-procedure StrokeOpacity_Attrib(attrib: PAttrib);
-begin
-  AttribToOpacity(attrib, attrib.aOwnerEl.fDrawInfo.strokeColor);
-end;
-//------------------------------------------------------------------------------
-
-procedure StrokeWidth_Attrib(attrib: PAttrib);
-begin
-  with attrib.aOwnerEl do
-  begin
-    AttribToFloat(attrib,
-      fDrawInfo.strokewidth.rawVal, fDrawInfo.strokewidth.mu);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure FillRule_Attrib(attrib: PAttrib);
-begin
-  if LowerCaseTable[attrib.aValue.name[0]] = 'e' then
-    attrib.aOwnerEl.fDrawInfo.fillRule := frEvenOdd else
-    attrib.aOwnerEl.fDrawInfo.fillRule := frNonZero;
-end;
-//------------------------------------------------------------------------------
-
-procedure Style_Attrib(attrib: PAttrib);
-begin
-  with attrib.aOwnerEl do
-    case fNameHash of
-      hFlowRegion, hFlowRoot: fDrawInfo.fillColor := clNone32;
-      else fStyleAttribIdx := High(fAttribs);
-    end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Transform_Attrib(attrib: PAttrib);
-begin
-  attrib.aOwnerEl.ParseTransform(attrib.aValue);
-end;
-//------------------------------------------------------------------------------
-
-procedure Values_Attrib(attrib: PAttrib);
-var
-  cnt: integer;
-  c, endC: PAnsiChar;
-begin
-  if attrib.aOwnerEl is TFeColorMatrixElement then
-    with TFeColorMatrixElement(attrib.aOwnerEl) do
-    begin
-      SetLength(values, 20);
-      c := attrib.aValue.name;
-      endC := c + attrib.aValue.len;
-      cnt := 0;
-      while (cnt < 20) and ParseNextNum(c, endC, true, values[cnt]) do
-        inc(cnt);
-      if cnt < 20 then values := nil;
-    end;
-end;
-//------------------------------------------------------------------------------
-
-
-procedure Viewbox_Attrib(attrib: PAttrib);
-
-  function LoadViewbox: TRectWH;
-  var
-    current, currentEnd: PAnsiChar;
-  begin
-    current := attrib.aValue.name;
-    currentEnd := current + attrib.aValue.len;
-    with Result do
-    if not ParseNextNum(current, currentEnd, false, Left) or
-      not ParseNextNum(current, currentEnd, true, Top) or
-      not ParseNextNum(current, currentEnd, true, Width) or
-      not ParseNextNum(current, currentEnd, true, Height) then
-        Result := RectWH(0,0,0,0);
-  end;
-
-begin
-  case attrib.aOwnerEl.fNameHash of
-    hSvg    : TSvgElement(attrib.aOwnerEl).viewboxWH := LoadViewbox;
-    hMarker : TMarkerElement(attrib.aOwnerEl).markerBoxWH := LoadViewbox;
-    hSymbol : TSymbolElement(attrib.aOwnerEl).viewboxWH := LoadViewbox;
-    else if attrib.aOwnerEl is TPatternElement then
-      TPatternElement(attrib.aOwnerEl).pattBoxWH := LoadViewbox;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Height_Attrib(attrib: PAttrib);
-var
-  mu: TMeasureUnit;
-  val: double;
-begin
-  AttribToFloat(attrib, val, mu);
-  with attrib.aOwnerEl do
-  begin
-    elRectWH.height.SetValue(val, mu);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Width_Attrib(attrib: PAttrib);
-var
-  mu: TMeasureUnit;
-  val: double;
-begin
-  AttribToFloat(attrib, val, mu);
-  with attrib.aOwnerEl do
-  begin
-    elRectWH.width.SetValue(val, mu);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Cx_Attrib(attrib: PAttrib);
-var
-  mu: TMeasureUnit;
-  val: double;
-begin
-  AttribToFloat(attrib, val, mu);
-  case attrib.aOwnerEl.fNameHash of
-    hCircle:
-      with TCircleElement(attrib.aOwnerEl) do centerPt.X.SetValue(val, mu);
-    hEllipse:
-      with TEllipseElement(attrib.aOwnerEl) do centerPt.X.SetValue(val, mu);
-    hRadialGradient:
-      with TRadGradElement(attrib.aOwnerEl) do
-      begin
-        C.X.SetValue(val, mu);
-      end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Cy_Attrib(attrib: PAttrib);
-var
-  mu: TMeasureUnit;
-  val: double;
-begin
-  AttribToFloat(attrib, val, mu);
-  case attrib.aOwnerEl.fNameHash of
-    hCircle:
-      with TCircleElement(attrib.aOwnerEl) do centerPt.Y.SetValue(val, mu);
-    hEllipse:
-      with TEllipseElement(attrib.aOwnerEl) do centerPt.Y.SetValue(val, mu);
-    hRadialGradient:
-      with TRadGradElement(attrib.aOwnerEl) do
-      begin
-        C.Y.SetValue(val, mu);
-      end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Dx_Attrib(attrib: PAttrib);
-var
-  mu: TMeasureUnit;
-  val: double;
-begin
-  AttribToFloat(attrib, val, mu);
-  case attrib.aOwnerEl.fNameHash of
-    hfeDropShadow:
-      TFeDropShadowElement(attrib.aOwnerEl).dxdy.X.SetValue(val, mu);
-    hfeOffset:
-      TFeOffsetElement(attrib.aOwnerEl).dxdy.X.SetValue(val, mu);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Dy_Attrib(attrib: PAttrib);
-var
-  mu: TMeasureUnit;
-  val: double;
-begin
-  AttribToFloat(attrib, val, mu);
-  case attrib.aOwnerEl.fNameHash of
-    hfeDropShadow:
-      TFeDropShadowElement(attrib.aOwnerEl).dxdy.Y.SetValue(val, mu);
-    hfeOffset:
-      TFeOffsetElement(attrib.aOwnerEl).dxdy.Y.SetValue(val, mu);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Result_Attrib(attrib: PAttrib);
-begin
-  if (attrib.aOwnerEl is TFeBaseElement) then
-    TFeBaseElement(attrib.aOwnerEl).res := ExtractRefFromValue(attrib.aValue);
-end;
-//------------------------------------------------------------------------------
-
-procedure Rx_Attrib(attrib: PAttrib);
-var
-  mu: TMeasureUnit;
-  val: double;
-begin
-  AttribToFloat(attrib, val, mu);
-  case attrib.aOwnerEl.fNameHash of
-    hRect:
-      with TRectElement(attrib.aOwnerEl) do
-      begin
-        radius.X.SetValue(val, mu);
-      end;
-    hCircle:
-      with TCircleElement(attrib.aOwnerEl) do
-      begin
-        radius.SetValue(val, mu);
-      end;
-    hEllipse:
-      with TEllipseElement(attrib.aOwnerEl) do
-      begin
-        radius.X.SetValue(val, mu);
-      end;
-    hRadialGradient:
-      with TRadGradElement(attrib.aOwnerEl) do
-      begin
-        radius.X. SetValue(val, mu);
-        radius.Y. SetValue(val, mu);
-      end;
-    hMarker:
-      with TMarkerElement(attrib.aOwnerEl) do
-        refPt.X.SetValue(val, mu);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Ry_Attrib(attrib: PAttrib);
-var
-  mu: TMeasureUnit;
-  val: double;
-begin
-  AttribToFloat(attrib, val, mu);
-  case attrib.aOwnerEl.fNameHash of
-    hRect:
-      with TRectElement(attrib.aOwnerEl) do
-      begin
-        radius.Y.SetValue(val, mu);
-      end;
-    hEllipse:
-      with TEllipseElement(attrib.aOwnerEl) do
-      begin
-        radius.Y.SetValue(val, mu);
-      end;
-    hMarker:
-      with TMarkerElement(attrib.aOwnerEl) do refPt.Y.SetValue(val, mu);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure SpreadMethod_Attrib(attrib: PAttrib);
-var
-  word: TAnsiName;
-  c, endC: PAnsiChar;
-begin
-  if not (attrib.aOwnerEl is TGradientElement) then Exit;
-  c := attrib.aValue.name;
-  endC := c + attrib.aValue.len;
-  ParseNextWord(c, endC, word);
-  with TGradientElement(attrib.aOwnerEl) do
-    case GetHashedName(word) of
-      hPad      : spreadMethod := gfsClamp;
-      hReflect  : spreadMethod := gfsMirror;
-      hRepeat   : spreadMethod := gfsRepeat;
-    end;
-end;
-//------------------------------------------------------------------------------
-
-procedure StdDev_Attrib(attrib: PAttrib);
-var
-  sd: double;
-begin
-  AttribToFloat(attrib, sd);
-  if (sd < 0) and (sd > 100) then Exit;
-  case attrib.aOwnerEl.fNameHash of
-    hfeGaussianBlur:
-      TFeGaussElement(attrib.aOwnerEl).stdDev := sd;
-    hfeDropShadow:
-      TFeDropShadowElement(attrib.aOwnerEl).stdDev := sd;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure X1_Attrib(attrib: PAttrib);
-var
-  mu: TMeasureUnit;
-  val: double;
-begin
-  AttribToFloat(attrib, val, mu);
-  case attrib.aOwnerEl.fNameHash of
-    hLine:
-      TLineElement(attrib.aOwnerEl).path[0].X := val;
-    hLinearGradient:
-      with TLinGradElement(attrib.aOwnerEl) do
-      begin
-        startPt.X.SetValue(val, mu);
-      end;
-    hFilter:
-      with attrib.aOwnerEl do
-      begin
-        elRectWH.left.SetValue(val, mu);
-      end;
-    else
-      attrib.aOwnerEl.elRectWH.left.SetValue(val, mu);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure X2_Attrib(attrib: PAttrib);
-var
-  mu: TMeasureUnit;
-  val: double;
-begin
-  AttribToFloat(attrib, val, mu);
-  case attrib.aOwnerEl.fNameHash of
-    hLine:
-      TLineElement(attrib.aOwnerEl).path[1].X := val;
-    hLinearGradient:
-      with TLinGradElement(attrib.aOwnerEl) do
-      begin
-        endPt.X.SetValue(val, mu);
-      end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure Y1_Attrib(attrib: PAttrib);
-var
-  mu: TMeasureUnit;
-  val: double;
-begin
-  AttribToFloat(attrib, val, mu);
-  case attrib.aOwnerEl.fNameHash of
-    hLine:
-      TLineElement(attrib.aOwnerEl).path[0].Y := val;
-    hLinearGradient:
-      with TLinGradElement(attrib.aOwnerEl) do
-      begin
-        startPt.Y.SetValue(val, mu);
-      end;
-    hFilter:
-      with attrib.aOwnerEl do
-      begin
-        elRectWH.top.SetValue(val, mu);
-      end;
-    else
-      attrib.aOwnerEl.elRectWH.top.SetValue(val, mu);
-  end;
-end;
-//------------------------------------------------------------------------------
 
-procedure Y2_Attrib(attrib: PAttrib);
-var
-  mu: TMeasureUnit;
-  val: double;
-begin
-  AttribToFloat(attrib, val, mu);
-  case attrib.aOwnerEl.fNameHash of
-    hLine:
-      TLineElement(attrib.aOwnerEl).path[1].Y := val;
-    hLinearGradient:
-      with TLinGradElement(attrib.aOwnerEl) do
-      begin
-        endPt.Y.SetValue(val, mu);
-      end;
-  end;
-end;
-
-//------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-
-//https://oreillymedia.github.io/Using_SVG/guide/style.html
-
-procedure MakeAttribFuncList;
-begin
-  AttribFuncList := TStringList.Create;
-  AttribFuncList.Duplicates := dupError;
-
-  RegisterAttribute(hbaseline_045_shift,    BaselineShift_Attrib);
-  RegisterAttribute(hClass,                 Class_Attrib);
-  RegisterAttribute(hColor,                 Color_Attrib);
-  RegisterAttribute(hClip_045_path,         ClipPath_Attrib);
-  RegisterAttribute(hCx,                    Cx_Attrib);
-  RegisterAttribute(hCy,                    Cy_Attrib);
-  RegisterAttribute(hD,                     D_Attrib);
-  RegisterAttribute(hDisplay,               Display_Attrib);
-  RegisterAttribute(hDx,                    Dx_Attrib);
-  RegisterAttribute(hDy,                    Dy_Attrib);
-  RegisterAttribute(hStroke_045_DashArray,  DashArray_Attrib);
-  RegisterAttribute(hStroke_045_DashOffset, DashOffset_Attrib);
-  RegisterAttribute(hFill,                  Fill_Attrib);
-  RegisterAttribute(hFill_045_Opacity,      FillOpacity_Attrib);
-  RegisterAttribute(hFill_045_Rule,         FillRule_Attrib);
-  RegisterAttribute(hFilter,                Filter_Attrib);
-  RegisterAttribute(hflood_045_color,       Fill_Attrib);
-  RegisterAttribute(hflood_045_opacity,     FillOpacity_Attrib);
-  RegisterAttribute(hFont,                  Font_Attrib);
-  RegisterAttribute(hFont_045_Family,       FontFamily_Attrib);
-  RegisterAttribute(hFont_045_Size,         FontSize_Attrib);
-  RegisterAttribute(hFont_045_Style,        FontStyle_Attrib);
-  RegisterAttribute(hFont_045_Weight,       FontWeight_Attrib);
-  RegisterAttribute(hFx,                    Fx_Attrib);
-  RegisterAttribute(hFy,                    Fy_Attrib);
-  RegisterAttribute(hGradientTransform,     GradientTransform_Attrib);
-  RegisterAttribute(hGradientUnits,         GradientUnits_Attrib);
-  RegisterAttribute(hHeight,                Height_Attrib);
-  RegisterAttribute(hHref,                  Href_Attrib);
-  RegisterAttribute(hId,                    Id_Attrib);
-  RegisterAttribute(hIn,                    In_Attrib);
-  RegisterAttribute(hIn2,                   In2_Attrib);
-  RegisterAttribute(hletter_045_spacing,    LetterSpacing_Attrib);
-  RegisterAttribute(hMarker_045_End,        MarkerEnd_Attrib);
-  RegisterAttribute(hMarkerHeight,          Height_Attrib);
-  RegisterAttribute(hMarker_045_Mid,        MarkerMiddle_Attrib);
-  RegisterAttribute(hMarker_045_Start,      MarkerStart_Attrib);
-  RegisterAttribute(hMarkerWidth,           Width_Attrib);
-  RegisterAttribute(hOffset,                Offset_Attrib);
-  RegisterAttribute(hOpacity,               Opacity_Attrib);
-  RegisterAttribute(hOperator,              Operator_Attrib);
-  RegisterAttribute(hOrient,                Orient_Attrib);
-  RegisterAttribute(hPatternUnits,          GradientUnits_Attrib);
-  RegisterAttribute(hPatternTransform,      Transform_Attrib);
-  RegisterAttribute(hPoints,                Points_Attrib);
-  RegisterAttribute(hR,                     Rx_Attrib);
-  RegisterAttribute(hRefX,                  Rx_Attrib);
-  RegisterAttribute(hRefY,                  Ry_Attrib);
-  RegisterAttribute(hResult,                Result_Attrib);
-  RegisterAttribute(hRx,                    Rx_Attrib);
-  RegisterAttribute(hRy,                    Ry_Attrib);
-  RegisterAttribute(hSpreadMethod,          SpreadMethod_Attrib);
-  RegisterAttribute(hstdDeviation,          StdDev_Attrib);
-  RegisterAttribute(hStop_045_Color,        StopColor_Attrib);
-  RegisterAttribute(hStop_045_Opacity,      StopOpacity_Attrib);
-  RegisterAttribute(hStroke,                Stroke_Attrib);
-  RegisterAttribute(hstroke_045_linecap,    StrokeLineCap_Attrib);
-  RegisterAttribute(hstroke_045_linejoin,   StrokeLineJoin_Attrib);
-  RegisterAttribute(hstroke_045_miterlimit, StrokeMiterLimit_Attrib);
-  RegisterAttribute(hStroke_045_Opacity,    StrokeOpacity_Attrib);
-  RegisterAttribute(hStroke_045_Width,      StrokeWidth_Attrib);
-  RegisterAttribute(hStyle,                 Style_Attrib);
-  RegisterAttribute(hText_045_Anchor,       TextAlign_Attrib);
-  RegisterAttribute(hText_045_Decoration,   TextDecoration_Attrib);
-  RegisterAttribute(hTextLength,            TextLength_Attrib);
-  RegisterAttribute(hTransform,             Transform_Attrib);
-  RegisterAttribute(hValues,                Values_Attrib);
-  RegisterAttribute(hViewbox,               Viewbox_Attrib);
-  RegisterAttribute(hWidth,                 Width_Attrib);
-  RegisterAttribute(hX,                     X1_Attrib);
-  RegisterAttribute(hX1,                    X1_Attrib);
-  RegisterAttribute(hX2,                    X2_Attrib);
-  RegisterAttribute(hXlink_058_Href,        Href_Attrib);
-  RegisterAttribute(hY,                     Y1_Attrib);
-  RegisterAttribute(hY1,                    Y1_Attrib);
-  RegisterAttribute(hY2,                    Y2_Attrib);
-
-  AttribFuncList.Sorted := true;
-end;
 //------------------------------------------------------------------------------
-
 //------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-
-initialization
-  MakeAttribFuncList;
 
-finalization
-  AttribFuncList.Free;
 end.

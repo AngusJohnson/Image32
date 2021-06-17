@@ -28,6 +28,7 @@ type
 
   //Matrix functions
   function IsIdentityMatrix(const matrix: TMatrixD): Boolean;
+  function IsValidMatrix(const matrix: TMatrixD): Boolean;
   function Matrix(const m00, m01, m02, m10, m11, m12, m20, m21, m22: double): TMatrixD;
   function MatrixDeterminant(const matrix: TMatrixD): double;
   function MatrixAdjugate(const matrix: TMatrixD): TMatrixD;
@@ -135,6 +136,12 @@ begin
     for j := 0 to 2 do
       if matrix[i][j] <> matVal[j=i] then Exit;
   Result := true;
+end;
+//------------------------------------------------------------------------------
+
+function IsValidMatrix(const matrix: TMatrixD): Boolean;
+begin
+  result := matrix[2][2] = 1.0;
 end;
 //------------------------------------------------------------------------------
 

@@ -1,5 +1,4 @@
 const
-
   ColorConsts: array[0..145] of TColorConst = (
     (ColorName: 'aliceblue'; ColorValue: $FFF0F8FF),
     (ColorName: 'antiquewhite'; ColorValue: $FFFAEBD7),
