@@ -82,7 +82,6 @@ begin
     esButt: et := etButt;
     esSquare: et := etSquare;
     esRound: et := etRound;
-    esClosed: et := etJoined;
     else et := etPolygon;
   end;
   Result := TPathsD(ClipperOffset.InflatePaths(

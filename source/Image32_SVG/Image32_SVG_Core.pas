@@ -24,14 +24,13 @@ uses
   Image32, Image32_Vector, Image32_Ttf, Image32_Transform;
 
 type
-  TElementMeasureUnit = (emuBoundingBox, emuUserSpace);
   TMeasureUnit = (muUndefined, muPixel, muPercent,
     muDegree, muRadian, muInch, muCm, muMm, muEm, muEx, muPt, muPica);
 
   //////////////////////////////////////////////////////////////////////
   // TValue - Structure to store numerics with measurement units.
   //          Includes methods to scale percent units depending on the 
-  //          supplied bounding width/height/area etc. 
+  //          supplied bounding width/height/rectangle etc.
   //////////////////////////////////////////////////////////////////////
 
   TValue = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
@@ -69,7 +68,7 @@ type
   end;
 
   //////////////////////////////////////////////////////////////////////
-  // TAnsi - alternative to AnsiString with a little less overhead.
+  // TAnsi - alternative to AnsiString with less overhead.
   //////////////////////////////////////////////////////////////////////
   
   TAnsi = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
@@ -121,8 +120,8 @@ type
   // TSvgParser and associated classes - a simple parser for SVG xml
   //////////////////////////////////////////////////////////////////////
 
-  PAttrib = ^TAttrib;         //element attribute
-  TAttrib = record
+  PSvgAttrib = ^TSvgAttrib;   //element attribute
+  TSvgAttrib = record
     hash      : Cardinal;     //hashed name
     name      : AnsiString;
     value     : AnsiString;
@@ -134,7 +133,7 @@ type
   public
     name        : TAnsi;
     {$IFDEF XPLAT_GENERICS}
-    attribs     : TList <PAttrib>;
+    attribs     : TList <PSvgAttrib>;
     {$ELSE}
     attribs     : TList;
     {$ENDIF}
@@ -144,8 +143,8 @@ type
     destructor  Destroy; override;
     procedure   Clear; virtual;
     function    ParseHeader(var c: PAnsiChar; endC: PAnsiChar): Boolean; virtual;
-    function    ParseAttribName(var c: PAnsiChar; endC: PAnsiChar; attrib: PAttrib): Boolean;
-    function    ParseAttribValue(var c: PAnsiChar; endC: PAnsiChar; attrib: PAttrib): Boolean;
+    function    ParseAttribName(var c: PAnsiChar; endC: PAnsiChar; attrib: PSvgAttrib): Boolean;
+    function    ParseAttribValue(var c: PAnsiChar; endC: PAnsiChar; attrib: PSvgAttrib): Boolean;
     function    ParseAttributes(var c: PAnsiChar; endC: PAnsiChar): Boolean; virtual;
     procedure   ParseStyleAttribute(const style: AnsiString);
   end;
@@ -191,26 +190,26 @@ type
     constructor Create;
     destructor  Destroy; override;
     procedure   Clear;
-    function    FindEntity(hash: Cardinal): PAttrib;
+    function    FindEntity(hash: Cardinal): PSvgAttrib;
     function LoadFromFile(const filename: string): Boolean;
     function LoadFromStream(stream: TStream): Boolean;
   end;
 
   //////////////////////////////////////////////////////////////////////
-  //TDpath structures
+  //TSvgPath structures
   //////////////////////////////////////////////////////////////////////
 
-  TDsegType = (dsMove, dsLine, dsHorz, dsVert, dsArc,
+  TSvgPathSegType = (dsMove, dsLine, dsHorz, dsVert, dsArc,
     dsQBez, dsCBez, dsQSpline, dsCSpline, dsClose);
 
   PDpathSeg = ^TDpathSeg;
   TDpathSeg = record
-    segType : TDsegType;
+    segType : TSvgPathSegType;
     vals    : TArrayOfDouble;
   end;
 
-  PDpath = ^TDpath;
-  TDpath = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
+  PSvgPath = ^TSvgPath;
+  TSvgPath = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
     firstPt   : TPointD;
     isClosed  : Boolean;
     segs      : array of TDpathSeg;
@@ -221,7 +220,7 @@ type
     //GetSimplePath - ignores curves and is only used with markers
     function GetSimplePath: TPathD;
   end;
-  TDpaths = array of TDpath;
+  TSvgPaths = array of TSvgPath;
 
   //////////////////////////////////////////////////////////////////////
   // Miscellaneous SVG functions
@@ -247,7 +246,7 @@ type
   procedure PAnsiCharToAnsiString(var c: PAnsiChar; endC: PAnsiChar; out value: AnsiString);
 
   //special parsing functions //////////////////////////////////////////
-  function ParsePathDAttribute(const value: AnsiString): TDpaths;
+  function ParsePathDAttribute(const value: AnsiString): TSvgPaths;
   procedure ParseStyleElementContent(const value: TAnsi; stylesList: TClassStylesList);
   function ParseTransform(const transform: AnsiString): TMatrixD;
 
@@ -751,7 +750,7 @@ end;
 //------------------------------------------------------------------------------
 
 function IsKnownEntity(owner: TSvgParser;
-  var c: PAnsiChar; endC: PAnsiChar; out entity: PAttrib): boolean;
+  var c: PAnsiChar; endC: PAnsiChar; out entity: PSvgAttrib): boolean;
 var
   c2, c3: PAnsiChar;
   entityName: AnsiString;
@@ -1066,7 +1065,6 @@ begin
   len := Length(value);
   if len < 3 then Exit;
   c := PAnsiChar(value);
-  endC := c + len;
 
   if (color = clInvalid) or (color = clCurrent) or (color = clNone32) then
     alpha := 255 else
@@ -1243,7 +1241,7 @@ end;
 constructor TParserBaseEl.Create(owner: TSvgParser);
 begin
 {$IFDEF XPLAT_GENERICS}
-  attribs := TList<PAttrib>.Create;
+  attribs := TList<PSvgAttrib>.Create;
 {$ELSE}
   attribs := TList.Create;
 {$ENDIF}
@@ -1265,7 +1263,7 @@ var
   i: integer;
 begin
   for i := 0 to attribs.Count -1 do
-    Dispose(PAttrib(attribs[i]));
+    Dispose(PSvgAttrib(attribs[i]));
   attribs.Clear;
 end;
 //------------------------------------------------------------------------------
@@ -1288,7 +1286,7 @@ end;
 //------------------------------------------------------------------------------
 
 function TParserBaseEl.ParseAttribName(var c: PAnsiChar;
-  endC: PAnsiChar; attrib: PAttrib): Boolean;
+  endC: PAnsiChar; attrib: PSvgAttrib): Boolean;
 var
   c2: PAnsiChar;
   //attribName: AnsiString;
@@ -1303,7 +1301,7 @@ end;
 //------------------------------------------------------------------------------
 
 function TParserBaseEl.ParseAttribValue(var c: PAnsiChar;
-  endC: PAnsiChar; attrib: PAttrib): Boolean;
+  endC: PAnsiChar; attrib: PSvgAttrib): Boolean;
 var
   quoteChar : AnsiChar;
   c2, c3: PAnsiChar;
@@ -1326,9 +1324,8 @@ end;
 
 function TParserBaseEl.ParseAttributes(var c: PAnsiChar; endC: PAnsiChar): Boolean;
 var
-  attrib, styleAttrib, classAttrib, idAttrib: PAttrib;
+  attrib, styleAttrib, classAttrib, idAttrib: PSvgAttrib;
   ansi: AnsiString;
-  sc: Boolean;
 begin
   Result := false;
   styleAttrib := nil;  classAttrib := nil;  idAttrib := nil;
@@ -1397,7 +1394,7 @@ procedure TParserBaseEl.ParseStyleAttribute(const style: AnsiString);
 var
   styleName, styleVal: TAnsi;
   c, endC: PAnsiChar;
-  attrib: PAttrib;
+  attrib: PSvgAttrib;
 begin
   //there are 4 ways to load styles (in ascending precedence) -
   //1. a class element style (called during element contruction)
@@ -1441,7 +1438,7 @@ end;
 
 function TDocTypeEl.ParseEntities(var c, endC: PAnsiChar): Boolean;
 var
-  attrib: PAttrib;
+  attrib: PSvgAttrib;
 begin
   attrib := nil;
   inc(c); //skip opening '['
@@ -1531,7 +1528,7 @@ end;
 function TSvgEl.ParseContent(var c: PAnsiChar; endC: PAnsiChar): Boolean;
 var
   child: TSvgEl;
-  entity: PAttrib;
+  entity: PSvgAttrib;
   tmpC, tmpEndC: PAnsiChar;
 begin
   Result := false;
@@ -1667,15 +1664,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgParser.FindEntity(hash: Cardinal): PAttrib;
+function TSvgParser.FindEntity(hash: Cardinal): PSvgAttrib;
 var
   i: integer;
 begin
   //there are usually so few, that there seems little point sorting etc.
   for i := 0 to docType.attribs.Count -1 do
-    if PAttrib(docType.attribs[i]).hash = hash then
+    if PSvgAttrib(docType.attribs[i]).hash = hash then
     begin
-      Result := PAttrib(docType.attribs[i]);
+      Result := PSvgAttrib(docType.attribs[i]);
       Exit;
     end;
   Result := nil;
@@ -1743,7 +1740,7 @@ end;
 // TDpath
 //------------------------------------------------------------------------------
 
-function TDpath.GetFlattenedPath(scalePending: double): TPathD;
+function TSvgPath.GetFlattenedPath(scalePending: double): TPathD;
 var
   i,j, pathLen, pathCap: integer;
   currPt, radii, pt2, pt3, pt4: TPointD;
@@ -1889,7 +1886,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TDpath.GetSimplePath: TPathD;
+function TSvgPath.GetSimplePath: TPathD;
 var
   i,j, pathLen, pathCap: integer;
   currPt, radii, pt2, pt3, pt4: TPointD;
@@ -1957,7 +1954,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TDpath.GetBounds: TRectD;
+function TSvgPath.GetBounds: TRectD;
 var
   i,j, pathLen, pathCap: integer;
   currPt, radii, pt2, pt3, pt4: TPointD;
@@ -2350,12 +2347,12 @@ end;
 function TAnsi.AsAnsiString: AnsiString;
 begin
   SetLength(Result, len);
-  if len > 0 then  
+  if len > 0 then
     Move(text^, Result[1], len);
 end;
 
 //------------------------------------------------------------------------------
-// SvgArc and support functions
+// GetSvgArcInfo - and support functions
 //------------------------------------------------------------------------------
 
 function TrigClampVal(val: double): double; {$IFDEF INLINE} inline; {$ENDIF}
@@ -2467,14 +2464,16 @@ end;
 // DParse and support functions
 //------------------------------------------------------------------------------
 
-function GetSegType(var c, endC: PAnsiChar; out isRelative: Boolean): TDsegType;
+function GetSegType(var c, endC: PAnsiChar;
+  out isRelative: Boolean): TSvgPathSegType;
 var
   ch: AnsiChar;
 begin
   Result := dsMove;
   if not SkipBlanks(c, endC) then Exit;
   ch := upcase(c^);
-  if not CharInSet(ch, ['A','C','H','M','L','Q','S','T','V','Z']) then Exit;
+  if not CharInSet(ch,
+    ['A','C','H','M','L','Q','S','T','V','Z']) then Exit;
   case ch of
     'M': Result := dsMove;
     'L': Result := dsLine;
@@ -2492,13 +2491,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ParsePathDAttribute(const value: AnsiString): TDpaths;
+function ParsePathDAttribute(const value: AnsiString): TSvgPaths;
 var
   currSeg     : PDpathSeg;
-  currDpath   : PDpath;
+  currDpath   : PSvgPath;
   currSegCnt  : integer;
   currSegCap  : integer;
-  currSegType : TDsegType;
+  currSegType : TSvgPathSegType;
   lastPt      : TPointD;
 
   procedure StartNewDpath;

@@ -33,7 +33,6 @@ interface
 
 uses
   SysUtils, Classes, Types, Math,
-  {$IFDEF MSWINDOWS}Windows, {$ENDIF}
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults,{$ENDIF}
   Image32, Image32_SVG_Core, Image32_Vector, Image32_Draw,
   Image32_Transform, Image32_Ttf;
@@ -93,7 +92,7 @@ type
     elRectWH  : TValueRecWH;    //multifunction variable
     function  IsFirstChild: Boolean;
     procedure LoadAttributes;
-    procedure LoadAttribute(attrib: PAttrib);
+    procedure LoadAttribute(attrib: PSvgAttrib);
     function  LoadContent: Boolean; virtual;
     procedure Draw(image: TImage32; drawInfo: TDrawInfo); virtual;
     procedure DrawChildren(image: TImage32; drawInfo: TDrawInfo); virtual;
@@ -162,18 +161,12 @@ type
 
   TPathElement = class(TShapeElement)
   private
-    fCurrSeg      : PDpathSeg;
-    fCurrSegCap   : integer;
-    fCurrSegCnt   : integer;
-    fCurrSegType  : TDsegType;
-    fCurrDpath    : PDpath;
-    fDpaths       : TDpaths;
-    fLastPt       : TPointD;
+    fSvgPaths : TSvgPaths;
     procedure Flatten(index: integer; scalePending: double;
       out path: TPathD; out isClosed: Boolean);
   protected
     function  GetBounds: TRectD; override;
-    procedure ParseD(const value: AnsiString);
+    procedure ParseDAttrib(const value: AnsiString);
     procedure GetPaths(const drawInfo: TDrawInfo); override;
     function  GetUncurvedPath(const drawInfo: TDrawInfo): TPathsD; override;
   end;
@@ -231,7 +224,7 @@ type
   //only a container for 'tspan' and 'subtext' elements. (See Draw method.)
   TTextElement = class(TShapeElement)
   protected
-    delta     : TPointD;
+    offset    : TValuePt;
     currentPt : TPointD;
     procedure ResetTmpPt;
     procedure GetPaths(const drawInfo: TDrawInfo); override;
@@ -400,7 +393,7 @@ type
   TFeDropShadowElement = class(TFeBaseElement)
   protected
     stdDev      : double;
-    dxdy        : TValuePt;
+    offset        : TValuePt;
     floodColor  : TColor32;
     procedure Apply; override;
   public
@@ -435,7 +428,7 @@ type
 
   TFeOffsetElement = class(TFeBaseElement)
   protected
-    dxdy        : TValuePt;
+    offset        : TValuePt;
     procedure Apply; override;
   end;
 
@@ -1534,8 +1527,8 @@ begin
   inherited;
   stdDev := InvalidD;
   floodColor := clInvalid;
-  dxdy.X.SetValue(0);
-  dxdy.Y.SetValue(0);
+  offset.X.SetValue(0);
+  offset.Y.SetValue(0);
 end;
 //------------------------------------------------------------------------------
 
@@ -1552,10 +1545,10 @@ begin
   dropShadImg := pfe.GetNamedImage(tmpFilterImg);
   dropShadImg.Copy(srcImg, srcRec, dropShadImg.Bounds);
 
-  off := dxdy.GetPoint(RectD(pfe.fObjectBounds), fDrawInfo.fontInfo.size);
+  off := offset.GetPoint(RectD(pfe.fObjectBounds), fDrawInfo.fontInfo.size);
   off := ScalePoint(off, pfe.fScale);
   dstOffRec := dstRec;
-  with Point(off) do OffsetRect(dstOffRec, X, Y);
+  with Point(off) do Image32_Vector.OffsetRect(dstOffRec, X, Y);
   dstImg.Copy(srcImg, srcRec, dstOffRec);
   dstImg.SetRGB(floodColor);
   alpha := floodColor shr 24;
@@ -1673,10 +1666,10 @@ var
 begin
   if not GetSrcAndDst then Exit;
   pfe := ParentFilterEl;
-  off := dxdy.GetPoint(RectD(pfe.fObjectBounds), fDrawInfo.fontInfo.size);
+  off := offset.GetPoint(RectD(pfe.fObjectBounds), fDrawInfo.fontInfo.size);
   off := ScalePoint(off, pfe.fScale);
   dstOffRec := dstRec;
-  with Point(off) do OffsetRect(dstOffRec, X, Y);
+  with Point(off) do Image32_Vector.OffsetRect(dstOffRec, X, Y);
 
   if srcImg = dstImg then
   begin
@@ -1724,20 +1717,12 @@ end;
 //------------------------------------------------------------------------------
 
 constructor TShapeElement.Create(parent: TElement; svgEl: TSvgEl);
-var
-  className: AnsiString;
-  style: AnsiString;
 begin
   inherited;
   elRectWH.Init(fPcBelow);
   hasPaths := true;
   fDrawInfo.visible := true;
   if fParserEl.name.text = nil then Exit;
-
-//  //load the class's style (ie undotted style) if found.
-//  className := fParserEl.name.AsAnsiString;
-//  style := fReader.fClassStyles.GetStyle(classname);
-//  if style <> '' then LoadStyles(style);
 end;
 //------------------------------------------------------------------------------
 
@@ -1826,7 +1811,7 @@ begin
       MatrixApply(drawInfo.matrix, clipRec);
     end;
     clipRec2 := Rect(clipRec);
-    clipRec2 := IntersectRect(clipRec2, img.Bounds);
+    clipRec2 := Image32_Vector.IntersectRect(clipRec2, img.Bounds);
     if clipRec2.IsEmpty then Exit;
     img.Clear(clipRec2);
   end;
@@ -2076,22 +2061,22 @@ var
   i: integer;
 begin
   Result := NullRectD;
-  for i := 0 to High(fDpaths) do
-    Result := UnionRect(Result, fDpaths[i].GetBounds);
+  for i := 0 to High(fSvgPaths) do
+    Result := UnionRect(Result, fSvgPaths[i].GetBounds);
 end;
 //------------------------------------------------------------------------------
 
-procedure TPathElement.ParseD(const value: AnsiString);
+procedure TPathElement.ParseDAttrib(const value: AnsiString);
 begin
-  fDpaths := Image32_SVG_Core.ParsePathDAttribute(value);
+  fSvgPaths := Image32_SVG_Core.ParseSvgPath(value);
 end;
 //------------------------------------------------------------------------------
 
 procedure TPathElement.Flatten(index: integer; scalePending: double;
   out path: TPathD; out isClosed: Boolean);
 begin
-  isClosed := fDpaths[index].isClosed;
-  path := fDpaths[index].GetFlattenedPath(scalePending);
+  isClosed := fSvgPaths[index].isClosed;
+  path := fSvgPaths[index].GetFlattenedPath(scalePending);
 end;
 //------------------------------------------------------------------------------
 
@@ -2104,7 +2089,7 @@ var
 begin
   if Assigned(drawPathsC) or Assigned(drawPathsO) then Exit;
   scalePending := ExtractAvgScaleFromMatrix(drawInfo.matrix);
-  for i := 0 to High(fDpaths) do
+  for i := 0 to High(fSvgPaths) do
   begin
     Flatten(i, scalePending, path, isClosed);
     if not Assigned(path) then Continue;
@@ -2122,10 +2107,10 @@ function TPathElement.GetUncurvedPath(const drawInfo: TDrawInfo): TPathsD;
 var
   i, len: integer;
 begin
-  len := Length(fDpaths);
+  len := Length(fSvgPaths);
   SetLength(Result, len);
-  for i := 0 to High(fDpaths) do
-    Result[i] := fDpaths[i].GetSimplePath;
+  for i := 0 to High(fSvgPaths) do
+    Result[i] := fSvgPaths[i].GetSimplePath;
 end;
 
 //------------------------------------------------------------------------------
@@ -2376,6 +2361,7 @@ end;
 constructor TTextElement.Create(parent: TElement; svgEl: TSvgEl);
 begin
   inherited;
+  offset.Init(fPcBelow);
   hasPaths := false;
 end;
 //------------------------------------------------------------------------------
@@ -2440,6 +2426,14 @@ begin
     if elRectWH.top.IsValid then
       currentPt.Y := elRectWH.top.rawVal else
       currentPt.Y := topTextEl.currentPt.Y;
+
+    if offset.X.IsValid then
+      currentPt.X := currentPt.X +
+        offset.X.GetValue(0, drawInfo.fontInfo.size);
+    if offset.Y.IsValid then
+      currentPt.Y := currentPt.Y +
+        offset.Y.GetValue(0, drawInfo.fontInfo.size);
+
     topTextEl.currentPt := currentPt;
   end else
   begin
@@ -2504,7 +2498,6 @@ var
   el : TElement;
   topTextEl : TTextElement;
   s: string;
-  i: integer;
   tmpX, offsetX, scale, fontSize, bs: double;
   mat: TMatrixD;
 begin
@@ -2529,14 +2522,6 @@ begin
   s := HtmlDecode(text);
   {$ENDIF}
   s := FixSpaces(s);
-//  for i := 1 to Length(s) do
-//    if s[i] < #32 then s[i] := #32;
-//  i := Pos(#32#32, s);
-//  while i > 0 do
-//  begin
-//    Delete(s, i, 1);
-//    i := PosEx(#32#32, s, i);
-//  end;
 
   drawPathsC := fReader.fFontCache.GetTextGlyphs(0, 0, s, tmpX);
   //by not changing the fontCache.FontHeight, the quality of
@@ -2587,7 +2572,6 @@ begin
 
   elRectWH.Init(0.0);
   currentPt := InvalidPointD;
-  delta := InvalidPointD;
 end;
 
 //------------------------------------------------------------------------------
@@ -2681,7 +2665,7 @@ begin
   begin
     mat := fDrawInfo.matrix;
     MatrixScale(mat, 1/fontScale);
-    for i := 0 to High(fDpaths) do
+    for i := 0 to High(fSvgPaths) do
     begin
       Flatten(i, fontScale, tmpPath, isClosed);
       //'path' is temporarily scaled to accommodate fReader.fFontCache's
@@ -3009,7 +2993,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
 procedure Href_Attrib(aOwnerEl: TElement; const value: AnsiString);
 var
   el: TElement;
@@ -3072,7 +3055,7 @@ end;
 procedure D_Attrib(aOwnerEl: TElement; const value: AnsiString);
 begin
   if aOwnerEl is TPathElement then
-    TPathElement(aOwnerEl).ParseD(value);
+    TPathElement(aOwnerEl).ParseDAttrib(value);
 end;
 //------------------------------------------------------------------------------
 
@@ -3607,9 +3590,11 @@ begin
   AnsiStringToFloatEx(value, val, mu);
   case aOwnerEl.fParserEl.Hash of
     hfeDropShadow:
-      TFeDropShadowElement(aOwnerEl).dxdy.X.SetValue(val, mu);
+      TFeDropShadowElement(aOwnerEl).offset.X.SetValue(val, mu);
     hfeOffset:
-      TFeOffsetElement(aOwnerEl).dxdy.X.SetValue(val, mu);
+      TFeOffsetElement(aOwnerEl).offset.X.SetValue(val, mu);
+    hText, hTSpan:
+      TTextElement(aOwnerEl).offset.X.SetValue(val, mu);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -3622,9 +3607,11 @@ begin
   AnsiStringToFloatEx(value, val, mu);
   case aOwnerEl.fParserEl.Hash of
     hfeDropShadow:
-      TFeDropShadowElement(aOwnerEl).dxdy.Y.SetValue(val, mu);
+      TFeDropShadowElement(aOwnerEl).offset.Y.SetValue(val, mu);
     hfeOffset:
-      TFeOffsetElement(aOwnerEl).dxdy.Y.SetValue(val, mu);
+      TFeOffsetElement(aOwnerEl).offset.Y.SetValue(val, mu);
+    hText, hTSpan:
+      TTextElement(aOwnerEl).offset.Y.SetValue(val, mu);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -3815,7 +3802,7 @@ end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-procedure TElement.LoadAttribute(attrib: PAttrib);
+procedure TElement.LoadAttribute(attrib: PSvgAttrib);
 begin
   with attrib^ do
   case hash of
@@ -3902,7 +3889,7 @@ var
   i: integer;
 begin
   for i := 0 to fParserEl.attribs.Count -1 do
-    LoadAttribute(PAttrib(fParserEl.attribs[i]));
+    LoadAttribute(PSvgAttrib(fParserEl.attribs[i]));
 end;
 //------------------------------------------------------------------------------
 

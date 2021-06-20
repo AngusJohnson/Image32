@@ -3,7 +3,7 @@ unit Image32_Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  11 June 2021                                                    *
+* Date      :  17 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -78,15 +78,6 @@ type
   function ExtractAvgScaleFromMatrix(const mat: TMatrixD): double;
   procedure ExtractAllFromMatrix(const mat: TMatrixD;
     out angle: double; out scale, skew, trans: TPointD);
-
-  //ImageScaleDown: uses a box down-sampling algorithm that's probably better
-  //than any other single resampling algorithm when scaling images down by
-  //more than 50%. With significant down-sampling, algorithms such as Bilinear
-  //and Bicubic lose too much detail, whereas this algorithm tends to lose
-  //contrast. For optimal downsizing results, the user will need to combine
-  //algorithms (eg by averaging the results of this and the Bicubic resampling
-  //function) and after that applying a sharpening filter.
-  procedure ImageScaleDown(Image: TImage32; newWidth, newHeight: Integer);
 
 
 type
@@ -1121,46 +1112,6 @@ var
 begin
   scale := ExtractScaleFromMatrix(mat);
   Result := Average(Abs(scale.sx), Abs(scale.sy));
-end;
-//------------------------------------------------------------------------------
-
-procedure ImageScaleDown(Image: TImage32; newWidth, newHeight: Integer);
-var
-  x,y, x256,y256,xx256,yy256: Integer;
-  sx,sy: double;
-  tmp: TArrayOfColor32;
-  pc: PColor32;
-  scaledX: array of Integer;
-begin
-  sx := Image.Width/newWidth * 256;
-  sy := Image.Height/newHeight * 256;
-  SetLength(tmp, newWidth * newHeight);
-
-  SetLength(scaledX, newWidth +1); //+1 for fractional overrun
-  for x := 0 to newWidth -1 do
-    scaledX[x] := Round((x+1) * sx);
-
-  y256 := 0;
-  pc := @tmp[0];
-  for y := 0 to newHeight - 1 do
-  begin
-    x256 := 0;
-    yy256 := Round((y+1) * sy);
-    for x := 0 to newWidth - 1 do
-    begin
-      xx256 := scaledX[x];
-      pc^ := GetWeightedColor(Image.Pixels,
-        x256, y256, xx256, yy256, Image.Width);
-      x256 := xx256;
-      inc(pc);
-    end;
-    y256 := yy256;
-  end;
-
-  Image.BeginUpdate;
-  Image.SetSize(newWidth, newHeight);
-  Move(tmp[0], Image.Pixels[0], newWidth * newHeight * SizeOf(TColor32));
-  Image.EndUpdate;
 end;
 //------------------------------------------------------------------------------
 

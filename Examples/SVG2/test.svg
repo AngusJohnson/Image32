@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="250px" height="300px" viewBox="0 0 250 300" version="1.1" xmlns="http://www.w3.org/2000/svg" > 
+  <g transform="matrix( 0.97 -0.26 0.26 0.97 -15.40 47.04 )" > 
+    <text font-family="sans-serif" font-size="12" x="30" y="230" >This is <tspan fill="rgb(153, 0, 0)" font-size="20" font-weight="600" dy="5" >BIG</tspan> text.</text>
+    <rect fill="rgba(255, 51, 0, 0.06)" stroke="maroon" stroke-width="3" x="10" y="10" width="180" height="240" rx="20" ry="30" />
+    <path fill="rgba(0, 127, 127, 0.06)" stroke="teal" stroke-width="3" transform="matrix( 1.41 0.71 0 0.71 -55.56 -20.56 )" d="  M 110,80 C 145,80 145,30 110,30 H 70 V 10 L 110,10 C 160,10 160,100 110,100 S 60,190 110,190 L 150,190 V 170 H 110 C 75,170 75,120 110,120 "/>
+  </g>
+</svg>

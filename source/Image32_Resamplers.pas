@@ -2,8 +2,8 @@ unit Image32_Resamplers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.22                                                            *
-* Date      :  2 April 2021                                                    *
+* Version   :  2.24                                                            *
+* Date      :  17 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  For image transformations (scaling, rotating etc.)              *
@@ -15,12 +15,26 @@ interface
 {$I Image32.inc}
 
 uses
-  SysUtils, Classes, Types;
+  SysUtils, Classes, Types, Image32;
+
+//BoxDownSampling: As the name implies, this routine is only intended for
+//image down-sampling (ie when shrinking images) where it generally performs
+//better than other resamplers which tend to lose too much detail. However,
+//because this routine is inferior to other resamplers when performing other
+//transformations (ie when enlarging, rotating, and skewing images), it's not
+//intended as a general purpose resampler.
+procedure BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer);
+
+(* The following functions are registered in the initialization section below
+function NearestResampler(img: TImage32; x256, y256: Integer): TColor32;
+function BilinearResample(img: TImage32; x256, y256: Integer): TColor32;
+function BicubicResample(img: TImage32; x256, y256: Integer): TColor32;
+*)
 
 implementation
 
 uses
-  Image32, Image32_Vector, Image32_Transform;
+  Image32_Vector, Image32_Transform;
 
 //------------------------------------------------------------------------------
 // NearestNeighbor resampler
@@ -273,6 +287,46 @@ begin
   Result := CubicHermite(@c[dy], y256 and $FF, bceY);
 end;
 
+//------------------------------------------------------------------------------
+
+procedure BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer);
+var
+  x,y, x256,y256,xx256,yy256: Integer;
+  sx,sy: double;
+  tmp: TArrayOfColor32;
+  pc: PColor32;
+  scaledX: array of Integer;
+begin
+  sx := Image.Width/newWidth * 256;
+  sy := Image.Height/newHeight * 256;
+  SetLength(tmp, newWidth * newHeight);
+
+  SetLength(scaledX, newWidth +1); //+1 for fractional overrun
+  for x := 0 to newWidth -1 do
+    scaledX[x] := Round((x+1) * sx);
+
+  y256 := 0;
+  pc := @tmp[0];
+  for y := 0 to newHeight - 1 do
+  begin
+    x256 := 0;
+    yy256 := Round((y+1) * sy);
+    for x := 0 to newWidth - 1 do
+    begin
+      xx256 := scaledX[x];
+      pc^ := GetWeightedColor(Image.Pixels,
+        x256, y256, xx256, yy256, Image.Width);
+      x256 := xx256;
+      inc(pc);
+    end;
+    y256 := yy256;
+  end;
+
+  Image.BeginUpdate;
+  Image.SetSize(newWidth, newHeight);
+  Move(tmp[0], Image.Pixels[0], newWidth * newHeight * SizeOf(TColor32));
+  Image.EndUpdate;
+end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 

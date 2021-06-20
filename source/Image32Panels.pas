@@ -2,8 +2,8 @@ unit Image32Panels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.20                                                            *
-* Date      :  30 March 2021                                                   *
+* Version   :  2.24                                                            *
+* Date      :  17 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Component that displays images on a TPanel descendant           *
@@ -378,7 +378,7 @@ begin
   Width  := 200;
 
   BevelWidth := 1;
-  BorderWidth := 16;
+  BorderWidth := 12;
   BevelInner := bvLowered;
   DoubleBuffered := true;
   TabStop := true;
