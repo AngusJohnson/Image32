@@ -57,26 +57,33 @@ type
   end;
 
   TSvgElWriter = class(TBaseElWriter)
+  private
+    fwidth: integer;
+    fheight: integer;
   protected
     function WriteHeader: string; override;
   public
-    width: integer;
-    height: integer;
     constructor Create(parent: TBaseElWriter); override;
+    property width: integer read fwidth write fwidth;
+    property height: integer read fheight write fheight;
   end;
 
   TExBaseElWriter = class(TBaseElWriter)
   protected
+    fFillClr     : TColor32;
+    fStrokeClr   : TColor32;
+    fStrokeWidth : double;
+    fMatrix      : TMatrixD;
     function WriteHeader: string; override;
   public
-    fillClr     : TColor32;
-    strokeClr   : TColor32;
-    strokeWidth : double;
-    Matrix      : TMatrixD;
     constructor Create(parent: TBaseElWriter); override;
-    procedure Rotate(angleRad: double; const pivotPt: TPointD);
+    procedure Rotate(const pivotPt: TPointD; angleRad: double);
     procedure Translate(dx, dy: double);
     procedure Skew(dx, dy: double);
+    property Matrix: TMatrixD read fMatrix;
+    property FillColor: TColor32 read fFillClr write fFillClr;
+    property StrokeColor: TColor32 read fStrokeClr write fStrokeClr;
+    property StrokeWidth: double read fStrokeWidth write fStrokeWidth;
   end;
 
   TSvgGroupWriter = class(TExBaseElWriter)
@@ -407,10 +414,10 @@ end;
 constructor TExBaseElWriter.Create(parent: TBaseElWriter);
 begin
   inherited;
-  Matrix      := IdentityMatrix;
-  fillClr     := clInvalid;
-  strokeClr   := clInvalid;
-  strokeWidth := 1.0;
+  fMatrix      := IdentityMatrix;
+  fFillClr     := clInvalid;
+  fStrokeClr   := clInvalid;
+  fStrokeWidth := 1.0;
 end;
 //------------------------------------------------------------------------------
 
@@ -419,43 +426,43 @@ var
   i,j: integer;
 begin
   Result := inherited WriteHeader;
-  if fillClr <> clInvalid then
-    AppendColorAttrib(Result, 'fill', fillClr);
+  if fFillClr <> clInvalid then
+    AppendColorAttrib(Result, 'fill', fFillClr);
 
-  if strokeClr <> clInvalid then
+  if fStrokeClr <> clInvalid then
   begin
-    AppendColorAttrib(Result, 'stroke', strokeClr);
-    AppendFloatAttrib(Result, 'stroke-width', strokeWidth);
+    AppendColorAttrib(Result, 'stroke', fStrokeClr);
+    AppendFloatAttrib(Result, 'stroke-width', fStrokeWidth);
   end;
 
-  if not IsIdentityMatrix(Matrix) then
+  if not IsIdentityMatrix(fMatrix) then
   begin
     AppendStr(Result, 'transform="matrix(');
 
     for i := 0 to 1 do for j := 0 to 1 do
-      AppendFloat(Result, Matrix[i][j]);
-    AppendFloat(Result, Matrix[2][0]);
-    AppendFloat(Result, Matrix[2][1]);
+      AppendFloat(Result, fMatrix[i][j]);
+    AppendFloat(Result, fMatrix[2][0]);
+    AppendFloat(Result, fMatrix[2][1]);
     AppendStr(Result, ')"');
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TExBaseElWriter.Rotate(angleRad: double; const pivotPt: TPointD);
+procedure TExBaseElWriter.Rotate(const pivotPt: TPointD; angleRad: double);
 begin
-  MatrixRotate(Matrix, pivotPt, angleRad);
+  MatrixRotate(fMatrix, pivotPt, angleRad);
 end;
 //------------------------------------------------------------------------------
 
 procedure TExBaseElWriter.Translate(dx, dy: double);
 begin
-  MatrixTranslate(Matrix, dx, dy);
+  MatrixTranslate(fMatrix, dx, dy);
 end;
 //------------------------------------------------------------------------------
 
 procedure TExBaseElWriter.Skew(dx, dy: double);
 begin
-  MatrixSkew(Matrix, dx, dy);
+  MatrixSkew(fMatrix, dx, dy);
 end;
 
 //------------------------------------------------------------------------------
@@ -497,7 +504,7 @@ constructor TSvgPathWriter.Create(parent: TBaseElWriter);
 begin
   inherited;
   fElStr := 'path';
-  fillClr := clBlack32;
+  fFillClr := clBlack32;
 end;
 //------------------------------------------------------------------------------
 

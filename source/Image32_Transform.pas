@@ -79,7 +79,6 @@ type
   procedure ExtractAllFromMatrix(const mat: TMatrixD;
     out angle: double; out scale, skew, trans: TPointD);
 
-
 type
   PWeightedColor = ^TWeightedColor;
   TWeightedColor = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
@@ -942,70 +941,6 @@ begin
   argb.R := ClampByte(fColorTotR * invAt);
   argb.G := ClampByte(fColorTotG * invAt);
   argb.B := ClampByte(fColorTotB * invAt);
-end;
-//------------------------------------------------------------------------------
-
-function GetWeightedColor(const srcBits: TArrayOfColor32;
-  x256, y256, xx256, yy256, maxX: Integer): TColor32;
-var
-  i, j, xi, yi, xxi, yyi, weight: Integer;
-  xf, yf, xxf, yyf: cardinal;
-  color: TWeightedColor;
-begin
-  //This function performs 'box sampling' and differs from GetWeightedPixel
-  //(bilinear resampling) in one important aspect - it accommodates weighting
-  //any number of pixels (rather than just adjacent pixels) and this produces
-  //better image quality when significantly downsizing.
-
-  //Note: there's no range checking here, so the precondition is that the
-  //supplied boundary values are within the bounds of the srcBits array.
-
-  color.Reset;
-
-  xi := x256 shr 8; xf := x256 and $FF;
-  yi := y256 shr 8; yf := y256 and $FF;
-  xxi := xx256 shr 8; xxf := xx256 and $FF;
-  yyi := yy256 shr 8; yyf := yy256 and $FF;
-
-  //1. average the corners ...
-  weight := (($100 - xf) * ($100 - yf)) shr 8;
-  color.Add(srcBits[xi + yi * maxX], weight);
-  weight := (xxf * ($100 - yf)) shr 8;
-  if (weight <> 0) then color.Add(srcBits[xxi + yi * maxX], weight);
-  weight := (($100 - xf) * yyf) shr 8;
-  if (weight <> 0) then color.Add(srcBits[xi + yyi * maxX], weight);
-  weight := (xxf * yyf) shr 8;
-  if (weight <> 0) then color.Add(srcBits[xxi + yyi * maxX], weight);
-
-  //2. average the edges
-  if (yi +1 < yyi) then
-  begin
-    xf := $100 - xf;
-    for i := yi + 1 to yyi - 1 do
-      color.Add(srcBits[xi + i * maxX], xf);
-    if (xxf <> 0) then
-      for i := yi + 1 to yyi - 1 do
-        color.Add(srcBits[xxi + i * maxX], xxf);
-  end;
-  if (xi + 1 < xxi) then
-  begin
-    yf := $100 - yf;
-    for i := xi + 1 to xxi - 1 do
-      color.Add(srcBits[i + yi * maxX], yf);
-    if (yyf <> 0) then
-      for i := xi + 1 to xxi - 1 do
-        color.Add(srcBits[i + yyi * maxX], yyf);
-  end;
-
-  //3. average the non-fractional pixel 'internals' ...
-  for i := xi + 1 to xxi - 1 do
-    for j := yi + 1 to yyi - 1 do
-      color.Add(srcBits[i + j * maxX], $100);
-
-  //4. finally get the weighted color ...
-  if color.AddCount = 0 then
-    Result := srcBits[xi + yi * maxX] else
-    Result := color.Color;
 end;
 
 //------------------------------------------------------------------------------

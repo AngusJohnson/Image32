@@ -39,10 +39,6 @@ uses
 
 type
   TElement          = class;
-  TMarkerElement    = class;
-  TFilterElement    = class;
-  TClipPathElement  = class;
-  TSvgElement       = class;
 
   TDrawInfo = record
     currentColor  : TColor32;
@@ -74,7 +70,6 @@ type
   TSvgReader = class;
 
   TElementClass = class of TElement;
-
   TElement = class
   private
     fParent         : TElement;
@@ -101,6 +96,61 @@ type
     destructor  Destroy; override;
   end;
 
+  TSvgReader = class
+  private
+    fSvgParser        : TSvgParser;
+    fBackgroundColor  : TColor32;
+    fTempImage        : TImage32;
+    fBlurQuality      : integer;
+    fIdList           : TStringList;
+    fClassStyles      : TClassStylesList;
+    fLinGradRenderer  : TLinearGradientRenderer;
+    fRadGradRenderer  : TSvgRadialGradientRenderer;
+    fImgRenderer      : TImageRenderer;
+    fRootElement      : TElement;
+{$IFDEF XPLAT_GENERICS}
+    fFontList     : TList<TFontReader>;
+{$ELSE}
+    fFontList     : TList;
+{$ENDIF}
+    fFontCache    : TGlyphCache;
+    function  LoadInternal: Boolean;
+    procedure SetBlurQuality(value: integer);
+    function GetIsEmpty: Boolean;
+  protected
+    rawRect       : TRectD;
+    currentColor  : TColor32;
+    procedure GetBestFont(const svgFontInfo: TSVGFontInfo);
+    property  RadGradRenderer: TSvgRadialGradientRenderer read fRadGradRenderer;
+    property  LinGradRenderer: TLinearGradientRenderer read fLinGradRenderer;
+    property  ImageRenderer  : TImageRenderer read fImgRenderer;
+
+    property  TempImage      : TImage32 read fTempImage;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure Clear;
+{$IFDEF MSWINDOWS}
+    function  AddFont(const fontName: string): Boolean;
+{$ENDIF}
+    function  AddFontFromResource(const resName: string; resType: PChar): Boolean;
+    procedure DrawImage(img: TImage32; scaleToImage: Boolean);
+    function  LoadFromStream(stream: TStream): Boolean;
+    function  LoadFromFile(const filename: string): Boolean;
+    property  BackgroundColor: TColor32
+      read fBackgroundColor write fBackgroundColor;
+    //BlurQuality: high quality blurring can really slow down rendering.
+    //Range 0..2 (0: OK & reasonably fast; 1: very good; 2: excellent but slow)
+    property BlurQuality: integer read fBlurQuality write SetBlurQuality;
+    property IsEmpty: Boolean read GetIsEmpty;
+  end;
+
+implementation
+
+uses
+  Image32_Extra, StrUtils;
+
+type
   TSvgElement = class(TElement)
   protected
     viewboxWH : TRectWH;
@@ -438,62 +488,8 @@ type
   public
     constructor Create(parent: TElement; svgEl: TSvgEl); override;
   end;
-
   //-------------------------------------
 
-  TSvgReader = class
-  private
-    fSvgParser        : TSvgParser;
-    fBackgroundColor  : TColor32;
-    fTempImage        : TImage32;
-    fBlurQuality      : integer;
-    fIdList           : TStringList;
-    fClassStyles      : TClassStylesList;
-    fLinGradRenderer  : TLinearGradientRenderer;
-    fRadGradRenderer  : TSvgRadialGradientRenderer;
-    fImgRenderer      : TImageRenderer;
-    fRootElement      : TSvgElement;
-{$IFDEF XPLAT_GENERICS}
-    fFontList     : TList<TFontReader>;
-{$ELSE}
-    fFontList     : TList;
-{$ENDIF}
-    fFontCache    : TGlyphCache;
-    function  LoadInternal: Boolean;
-    procedure SetBlurQuality(value: integer);
-    function GetIsEmpty: Boolean;
-  protected
-    rawRect       : TRectD;
-    currentColor  : TColor32;
-    procedure GetBestFont(const svgFontInfo: TSVGFontInfo);
-    property  RadGradRenderer: TSvgRadialGradientRenderer read fRadGradRenderer;
-    property  LinGradRenderer: TLinearGradientRenderer read fLinGradRenderer;
-    property  ImageRenderer  : TImageRenderer read fImgRenderer;
-
-    property  TempImage      : TImage32 read fTempImage;
-  public
-    constructor Create;
-    destructor Destroy; override;
-    procedure Clear;
-{$IFDEF MSWINDOWS}
-    function  AddFont(const fontName: string): Boolean;
-{$ENDIF}
-    function  AddFontFromResource(const resName: string; resType: PChar): Boolean;
-    procedure DrawImage(img: TImage32; scaleToImage: Boolean);
-    function  LoadFromStream(stream: TStream): Boolean;
-    function  LoadFromFile(const filename: string): Boolean;
-    property  BackgroundColor: TColor32
-      read fBackgroundColor write fBackgroundColor;
-    //BlurQuality: high quality blurring can really slow down rendering.
-    //Range 0..2 (0: OK & reasonably fast; 1: very good; 2: excellent but slow)
-    property BlurQuality: integer read fBlurQuality write SetBlurQuality;
-    property IsEmpty: Boolean read GetIsEmpty;
-  end;
-
-implementation
-
-uses
-  Image32_Extra, StrUtils;
 
 const
   buffSize    = 32;
@@ -4017,7 +4013,7 @@ var
 begin
   if not Assigned(fRootElement) then Exit;
 
-  with fRootElement do
+  with TSvgElement(fRootElement) do
   begin
     di := emptyDrawInfo;
     MatrixTranslate(di.matrix, -viewboxWH.Left, -viewboxWH.Top);
@@ -4027,9 +4023,9 @@ begin
 
     if viewboxWH.IsEmpty then
     begin
-      fRootElement.viewboxWH := RectWH(0, 0, w, h);
-      if fRootElement.viewboxWH.IsEmpty then
-        fRootElement.viewboxWH := RectWH(0, 0, img.Width, img.Height);
+      viewboxWH := RectWH(0, 0, w, h);
+      if viewboxWH.IsEmpty then
+        viewboxWH := RectWH(0, 0, img.Width, img.Height);
       fDrawInfo.bounds := viewboxWH.RectD;
       rawRect  := viewboxWH.RectD;
     end
