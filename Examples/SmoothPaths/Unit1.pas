@@ -67,9 +67,15 @@ type
     clickedLayer     : TLayer32;
     clickPoint       : TPoint;
     rotateAngle      : double;
+    delayedPos       : TPoint;
+    delayedShift     : TShiftState;
+    delayedMovePending : Boolean;
     procedure UpdateSmoothPathLayerAttributes;
   protected
     procedure WMERASEBKGND(var message: TMessage); message WM_ERASEBKGND;
+    procedure AppOnIdle(Sender: TObject; var Done: Boolean);
+    procedure DelayedMouseMove(Sender: TObject;
+      Shift: TShiftState; X, Y: Integer);
   public
     { Public declarations }
   end;
@@ -161,6 +167,7 @@ begin
   Screen.Cursors[crRotate] :=
     LoadImage(hInstance, 'ROTATE', IMAGE_CURSOR, 32,32,0);
 
+  Application.OnIdle := AppOnIdle;
   UpdateSmoothPathLayerAttributes;
 end;
 //------------------------------------------------------------------------------
@@ -176,6 +183,15 @@ end;
 procedure TFrmMain.WMERASEBKGND(var message: TMessage);
 begin
   message.Result := 1;
+end;
+//------------------------------------------------------------------------------
+
+procedure TFrmMain.AppOnIdle(Sender: TObject; var Done: Boolean);
+begin
+  Done := true;
+  if not delayedMovePending then Exit;
+  delayedMovePending := false;
+  DelayedMouseMove(Sender, delayedShift, delayedPos.X, delayedPos.Y);
 end;
 //------------------------------------------------------------------------------
 
@@ -280,6 +296,16 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TFrmMain.pnlMainMouseMove(Sender: TObject;
+  Shift: TShiftState; X, Y: Integer);
+begin
+  delayedMovePending := true;
+  delayedShift := shift;
+  delayedPos.X := X;
+  delayedPos.Y := Y;
+end;
+//------------------------------------------------------------------------------
+
+procedure TFrmMain.DelayedMouseMove(Sender: TObject;
   Shift: TShiftState; X, Y: Integer);
 var
   dx,dy: integer;
