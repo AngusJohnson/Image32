@@ -1,11 +1,11 @@
 program ProjectiveTransform;
 
+{$R ..\Resources.res}
+{$I Image32.inc}
+
 uses
   Forms,
   main in 'main.pas' {Form1};
-
-{$R *.res}
-{$I Image32.inc}
 
 begin
 {$IFDEF REPORTMEMORYLEAKS}

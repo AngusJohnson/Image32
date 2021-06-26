@@ -170,8 +170,9 @@ var
   pp: TPathsD;
 begin
   pp := OffsetPath(Paths, -Left, -Top);
+  DrawShadow(Image, pp, frEvenOdd, DPIAware(4), angle45, clGray32, true);
   DrawPolygon(Image, pp, frEvenOdd, BrushColor);
-  Draw3D(Image, pp, frEvenOdd, 5, 2);
+  Draw3D(Image, pp, frEvenOdd, DPIAware(2.5), 2);
   DrawLine(Image, pp, PenWidth, PenColor, esPolygon);
   UpdateHitTestMask(pp, frEvenOdd);
 end;
@@ -430,6 +431,8 @@ begin
   //resized, or resizing images that have been rotated (and hence require
   //an additional affine transformation).
   UseAppOnIdle := true;//false;//
+
+  layeredImage.SetSize(ClientWidth, ClientHeight);
 end;
 //------------------------------------------------------------------------------
 
@@ -512,7 +515,6 @@ begin
       sizingButtonGroup := CreateSizingButtonGroup(targetLayer,
         ssCorners, bsRound, DefaultButtonSize, clRed32);
   end;
-
   Invalidate;
 end;
 //------------------------------------------------------------------------------

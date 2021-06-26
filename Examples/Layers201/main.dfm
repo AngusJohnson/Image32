@@ -1,9 +1,9 @@
 object MainForm: TMainForm
   Left = 392
   Top = 208
+  Width = 432
+  Height = 492
   Caption = 'Layers201'
-  ClientHeight = 434
-  ClientWidth = 416
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -29,8 +29,8 @@ object MainForm: TMainForm
     SimplePanel = True
   end
   object MainMenu1: TMainMenu
-    Left = 24
-    Top = 32
+    Left = 32
+    Top = 40
     object File1: TMenuItem
       Caption = '&File'
       object mnuCopytoclipboard: TMenuItem
@@ -95,7 +95,7 @@ object MainForm: TMainForm
   object OpenDialog1: TOpenDialog
     DefaultExt = '*.PNG'
     Filter = 'Image Files|*.png;*.bmp;*.jpg'
-    Left = 64
-    Top = 32
+    Left = 88
+    Top = 40
   end
 end

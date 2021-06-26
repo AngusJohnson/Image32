@@ -3,7 +3,7 @@ unit Image32Panels;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  17 June 2021                                                    *
+* Date      :  26 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Component that displays images on a TPanel descendant           *
@@ -217,17 +217,6 @@ type
   end;
 
 //------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-
-//DpiAware: the 'standard' screen resoluton is 96dpi;
-//newer monitors however typically have higher resoulutions (eg 120, 144dpi).
-//Without DPI scaling, application forms and controls would get progressively
-//smaller as DPI resoulutons increase.
-
-function DpiAware(value: integer): integer;
-begin
-  result := MulDiv(value, Screen.PixelsPerInch, 96);
-end;
 //------------------------------------------------------------------------------
 
 function Size(cx, cy: Integer): TSize;
@@ -595,6 +584,8 @@ begin
   //we need to determine 2 things:
   //  1. scroll button size
   //  2. how much a 1px button move moves the scaled image
+
+  if (fImageSize.cx = 0) or (fImageSize.cy = 0) then Exit;
 
   btnMin      := GetMinScrollBtnSize;
   innerRec      := GetInnerClientRect;

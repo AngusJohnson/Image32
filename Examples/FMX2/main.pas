@@ -439,7 +439,7 @@ procedure TMainForm.Timer1Timer(Sender: TObject);
     path1 := RotatePath(path1, origin, angle);
     DrawShadow(path1, handWidth);
     DrawPolygon(imgMain, path1, frNonZero, clMidGreen32);
-    DrawLine(imgMain, path1, handWidth/8, clBlack32, esClosed);
+    DrawLine(imgMain, path1, handWidth/8, clBlack32, esPolygon);
   end;
 
   procedure DrawSecHand(const origin: TPointD;
@@ -458,7 +458,7 @@ procedure TMainForm.Timer1Timer(Sender: TObject);
       origin.X + handWidth, origin.Y + handWidth);
     path2 := Ellipse(rec);
     DrawShadow(path1, handWidth);
-    DrawLine(imgMain, path2, handWidth/5, clBlack32, esClosed);
+    DrawLine(imgMain, path2, handWidth/5, clBlack32, esPolygon);
     DrawPolygon(imgMain, path1, frNonZero, clDarkRed32);
     DrawPolygon(imgMain, path2, frNonZero, clDarkRed32);
   end;

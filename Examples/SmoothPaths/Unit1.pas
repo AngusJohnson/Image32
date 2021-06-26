@@ -107,28 +107,28 @@ var
   dx, dy : integer;
 begin
   inherited;
-  with DesignLayer do
-  begin
-    //draw coordinates on smoothGroupLayer's designer layer
-    for i := 0 to SmoothPath.Count -1 do
-      DrawText(Image,
-        SmoothPath[i].X - Left, //offset the coords relative to the layer
-        SmoothPath[i].Y - Top,
-        Format('  %1.0n,%1.0n', [SmoothPath[i].X,SmoothPath[i].Y]),
-        glyphCache, clMaroon32);
-
-    //and draw a dashed outline of the smoothpath too
-    tmpPath := SmoothPath.FlattenedPath;
-    outline := InflatePath(tmpPath, lineWidth + DPIAware(5), jsRound, esRound);
-    outline := OffsetPath(outline, -Left, -Top);
-    DrawDashedLine(Image, outline, dashes, nil,
-      DPIAware(1), clMaroon32, esPolygon);
-  end;
-
-  dx := DesignLayer.Left - VectorLayer.Left;
-  dy := DesignLayer.Top - VectorLayer.Top;
-  outline := OffsetPath(outline, dx, dy);
-  VectorLayer.UpdateHitTestMask(outline, frEvenOdd);
+//  with DesignLayer do
+//  begin
+//    //draw coordinates on smoothGroupLayer's designer layer
+//    for i := 0 to SmoothPath.Count -1 do
+//      DrawText(Image,
+//        SmoothPath[i].X - Left, //offset the coords relative to the layer
+//        SmoothPath[i].Y - Top,
+//        Format('  %1.0n,%1.0n', [SmoothPath[i].X,SmoothPath[i].Y]),
+//        glyphCache, clMaroon32);
+//
+//    //and draw a dashed outline of the smoothpath too
+//    tmpPath := SmoothPath.FlattenedPath;
+//    outline := InflatePath(tmpPath, lineWidth + DPIAware(5), jsRound, esRound);
+//    outline := OffsetPath(outline, -Left, -Top);
+//    DrawDashedLine(Image, outline, dashes, nil,
+//      DPIAware(1), clMaroon32, esPolygon);
+//  end;
+//
+//  dx := DesignLayer.Left - VectorLayer.Left;
+//  dy := DesignLayer.Top - VectorLayer.Top;
+//  outline := OffsetPath(outline, dx, dy);
+//  VectorLayer.UpdateHitTestMask(outline, frEvenOdd);
 end;
 
 //------------------------------------------------------------------------------
@@ -169,7 +169,7 @@ procedure TFrmMain.FormDestroy(Sender: TObject);
 begin
   fontReader.Free;
   glyphCache.Free;
-  layeredImage32.Free;
+  FreeAndNil(layeredImage32);
 end;
 //------------------------------------------------------------------------------
 
@@ -181,8 +181,7 @@ end;
 
 procedure TFrmMain.FormResize(Sender: TObject);
 begin
-  if not visible then Exit;
-
+  if not Assigned(layeredImage32) then Exit;
   layeredImage32.SetSize(ClientWidth, ClientHeight);
   with layeredImage32 do
     layeredImage32[0].SetSize(Width, Height);

@@ -3,7 +3,7 @@ unit Image32_SVG_Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  17 June 2021                                                    *
+* Date      :  26 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -1055,7 +1055,7 @@ var
   scale, scale2: TSizeD;
   rec2, rec3: TRectD;
 begin
-  inherited;
+  Result := inherited PrepareRenderer(renderer, drawInfo);
   hiStops := High(stops);
   Result := hiStops >= 0;
   if not Result then Exit;
@@ -1140,7 +1140,7 @@ var
   i, hiStops: integer;
   rec2: TRectD;
 begin
-  inherited;
+  Result := inherited PrepareRenderer(renderer, drawInfo);
   hiStops := High(stops);
   Result := (hiStops >= 0);
   if not Result then Exit;
@@ -1279,8 +1279,8 @@ begin
   len := Length(fNames);
   SetLength(fNames, len+1);
   SetLength(fImages, len+1);
-  with fFilterBounds do
-    Result := TImage32.Create(Width, Height);
+  Result :=
+    TImage32.Create(RectWidth(fFilterBounds), RectHeight(fFilterBounds));
   fImages[len] := Result;
   fNames[len] := name;
 end;
@@ -1625,7 +1625,7 @@ begin
   if not GetSrcAndDst then Exit;
 
   for i := 0 to fChilds.Count -1 do
-    if fChilds[i] is TFeMergeNodeElement then
+    if TElement(fChilds[i]) is TFeMergeNodeElement then
       with TFeMergeNodeElement(fChilds[i]) do
       begin
         if not GetSrcAndDst then Continue;
@@ -1812,7 +1812,7 @@ begin
     end;
     clipRec2 := Rect(clipRec);
     clipRec2 := Image32_Vector.IntersectRect(clipRec2, img.Bounds);
-    if clipRec2.IsEmpty then Exit;
+    if IsEmptyRect(clipRec2) then Exit;
     img.Clear(clipRec2);
   end;
 
@@ -2519,7 +2519,7 @@ begin
   {$IFDEF UNICODE}
   s := UTF8ToUnicodeString(HtmlDecode(text));
   {$ELSE}
-  s := HtmlDecode(text);
+  s := Utf8Decode(HtmlDecode(text));
   {$ENDIF}
   s := FixSpaces(s);
 
@@ -2635,7 +2635,7 @@ begin
   {$IFDEF UNICODE}
   s := UTF8ToUnicodeString(HtmlDecode(utf8String));
   {$ELSE}
-  s := HtmlDecode(utf8String);
+  s := Utf8Decode(HtmlDecode(utf8String));
   {$ENDIF}
   for i := 1 to Length(s) do
     if s[i] < #32 then s[i] := #32;

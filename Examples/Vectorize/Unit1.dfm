@@ -1,9 +1,9 @@
 object Form1: TForm1
   Left = 514
   Top = 310
+  Width = 585
+  Height = 494
   Caption = 'Image32: Vectorize'
-  ClientHeight = 436
-  ClientWidth = 569
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText

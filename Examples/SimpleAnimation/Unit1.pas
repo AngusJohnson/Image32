@@ -119,17 +119,14 @@ begin
       img.Free;
     end;
 
+
   //set up the timer to kick things off
   timer := TTimer.Create(self);
   timer.OnTimer := Timer1Timer;
   //There are 60 images to cycle through here every second so, given that the
   //time to execute the OnTimer event is negligble, I'd expect to set the timer
-  //interval to about 17 msec (ie 1000/60). Unfortunately Delphi's TTimer
-  //(a wrapper for the Windows timer) isn't very accurate and, at least on my
-  //PC, even a 16 msec interval takes ~1.3 secs to complete. And the timer
-  //isn't uniformly slow since a 15 msec interval completes in ~0.9 secs, as
-  //expected. Anyhow, if I wanted an accurate metronome, I'd need to replace
-  //the TTimer component with a much more accurate one.
+  //interval to about 17 msec (ie 1000/60), though Delphi's TTimer (a wrapper
+  //for Windows' SetTimer / WM_TIMER event) isn't very accurate.
   timer.Interval := 15;
   timer.Enabled := true;
 
@@ -155,7 +152,7 @@ procedure TForm1.FormResize(Sender: TObject);
 begin
   if csDestroying in ComponentState then Exit;
 
-  //repaint the whole background
+  //repaint the whole background only when resizing.
   Canvas.FillRect(ClientRect);
 
   //center the animation in the form clientrect

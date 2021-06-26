@@ -21,6 +21,9 @@ uses
 {$ENDIF}
   ClipperCore;
 
+const
+  DefaultClipperDScale = 100;
+
 type
   TVertexFlag = (vfOpenStart, vfOpenEnd, vfLocMax, vfLocMin);
   TVertexFlags = set of TVertexFlag;
@@ -268,7 +271,7 @@ type
     procedure AddPaths(const pathsD: TPathsD; polyType: TPathType = ptSubject;
       isOpen: Boolean = false); overload;
 
-    constructor Create(scale: double = 100); reintroduce; overload;
+    constructor Create(scale: double = 0); reintroduce; overload;
     function Execute(clipType: TClipType; fillRule: TFillRule;
       out closedPaths: TPathsD): Boolean; overload;
     function Execute(clipType: TClipType; fillRule: TFillRule;
@@ -300,10 +303,6 @@ type
   function PolyTreeToPaths(PolyTree: TPolyTreeD): TPathsD; overload;
 
 implementation
-
-const
-  DefaultScale = 100;
-
 
 //OVERFLOWCHECKS OFF is a necessary workaround for a compiler bug that very
 //occasionally reports incorrect overflow errors in Delphi versions before 10.2.
@@ -399,7 +398,10 @@ function IsFront(e: PActive): Boolean; {$IFDEF INLINING} inline; {$ENDIF}
 begin
   //the front edge will be the LEFT edge when it's an OUTER polygon
   //so that outer polygons will be orientated clockwise
-  Result := (e = e.OutRec.frontE);
+
+  if (e.OutRec.State = osOpen) then
+    Result := e.WindDx > 0 else
+    Result := (e = e.OutRec.frontE);
 end;
 //------------------------------------------------------------------------------
 
@@ -608,15 +610,6 @@ end;
 function IsMaxima(e: PActive): Boolean; {$IFDEF INLINING} inline; {$ENDIF}
 begin
   Result := vfLocMax in e.vertTop.flags;
-end;
-//------------------------------------------------------------------------------
-
-procedure TerminateHotOpen(e: PActive);
-begin
-  if e.OutRec.frontE = e then
-    e.OutRec.frontE := nil else
-    e.OutRec.backE := nil;
-  e.OutRec := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -1131,6 +1124,7 @@ var
   var
     lm: PLocalMinima;
   begin
+    if vfLocMin in vert.flags then Exit; //ie already added
     Include(vert.flags, vfLocMin);
     new(lm);
     lm.vertex := vert;
@@ -1142,28 +1136,23 @@ var
 
 begin
   highI := high(p);
-  while (highI > 0) and PointsEqual(p[highI], p[0]) do dec(highI);
+  if not isOpen then
+  begin
+    while (highI > 0) and PointsEqual(p[highI], p[0]) do dec(highI);
+    if (highI < 2) then Exit;
+  end
+  else if (highI < 1) then Exit;
 
   GetMem(va, sizeof(TVertex) * (highI +1));
   fVertexList.Add(@va[0]);
 
   SetVertex(@va[0], nil, p[0]);
-  if p[0].Y = p[highI].Y then
-  begin
-    //since path[0] and path[highI] are horizontal
-    //find the first prior non-horizontal pt
-    i := (highI -1);
-    while (i > 0) and (p[i].Y = p[highI].Y) do dec(i);
-    if (i = 0) and not isOpen then
-      Exit; //path is entirely horizontal
-    //get the initial winding direction
-    ascending := p[0].Y < p[i].Y;
-  end else
-    ascending := p[0].Y < p[highI].Y;
-  ascending0 := ascending; //save the initial winding direction
 
   if isOpen then
   begin
+    i := 1;
+    while (i < highI) and (p[i].Y = p[0].Y) do inc(i);
+    ascending := p[i].Y <= p[0].Y;
     if ascending then
     begin
       va[0].flags := [vfOpenStart];
@@ -1171,8 +1160,18 @@ begin
     end else
       va[0].flags := [vfOpenStart, vfLocMax];
   end
-  else if highI < 2 then
-    Exit;
+  else if p[0].Y = p[highI].Y then
+  begin
+    //since path[0] and path[highI] are horizontal
+    //find the first prior non-horizontal pt
+    i := (highI -1);
+    while (i > 0) and (p[i].Y = p[highI].Y) do dec(i);
+    if (i = 0) then Exit; //path is entirely horizontal
+    //get the initial winding direction
+    ascending := p[0].Y < p[i].Y;
+  end else
+    ascending := p[0].Y < p[highI].Y;
+  ascending0 := ascending; //save the initial winding direction
 
   j := 0;
   for i := 1 to highI do
@@ -1193,20 +1192,22 @@ begin
     end;
   end;
 
-  if ascending0 <> ascending then
-  begin
-    if ascending0 then
-    begin
-      AddLocMin(@va[j]);
-    end else
-      Include(va[j].flags, vfLocMax);
-  end;
-
   va[j].next := @va[0];
   va[0].prev := @va[j];
 
   if isOpen then
+  begin
     Include(va[j].flags, vfOpenEnd);
+    if ascending then
+      Include(va[j].flags, vfLocMax) else
+      AddLocMin(@va[j]);
+  end
+  else if ascending0 <> ascending then
+  begin
+    if ascending0 then
+      AddLocMin(@va[j]) else
+      Include(va[j].flags, vfLocMax);
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1655,8 +1656,6 @@ begin
     if e1.OutRec.State in [osOuterCheck, osInnerCheck] then
       RecheckInnerOuter(e1);
 
-    //assert(IsFront(e1) <> IsOuter(e1.OutRec), 'oops!');
-
     //nb: IsClockwise() is generally faster than Area() but will occasionally
     //give false positives when there are tiny self-intersections at the top...
     if IsOuter(e1.OutRec) then
@@ -1710,8 +1709,14 @@ begin
     p2_start.Next := p1_end;
     p1_end.Prev := p2_start;
     e1.OutRec.Pts := p2_start;
-    e1.OutRec.frontE := e2.OutRec.frontE;
-    if not IsOpen(e1) then e1.OutRec.frontE.OutRec := e1.OutRec;
+    if IsOpen(e1) then
+    begin
+      e1.OutRec.Pts := p2_start;
+    end else
+    begin
+      e1.OutRec.frontE := e2.OutRec.frontE;
+      e1.OutRec.frontE.OutRec := e1.OutRec;
+    end;
     //strip duplicates ...
     if (p2_end <> p2_start) and PointsEqual(p2_end.Pt, p2_end.Prev.Pt) then
       DisposeOutPt(p2_end);
@@ -1721,8 +1726,14 @@ begin
     p2_start.Next := p1_end;
     p1_start.Next := p2_end;
     p2_end.Prev := p1_start;
-    e1.OutRec.backE := e2.OutRec.backE;
-    if not IsOpen(e1) then e1.OutRec.backE.OutRec := e1.OutRec;
+    if IsOpen(e1) then
+    begin
+      e1.OutRec.Pts := p1_start;
+    end else
+    begin
+      e1.OutRec.backE := e2.OutRec.backE;
+      e1.OutRec.backE.OutRec := e1.OutRec;
+    end;
     //strip duplicates ...
     if (p1_end <> p1_start) and PointsEqual(p1_end.Pt, p1_end.Prev.Pt) then
       DisposeOutPt(p1_end);
@@ -1832,7 +1843,7 @@ begin
     if IsHotEdge(e1) then
     begin
       AddOutPt(e1, pt);
-      TerminateHotOpen(e1);
+      e1.OutRec := nil;
     end
     else StartOpenPath(e1, pt);
     Exit;
@@ -2480,27 +2491,27 @@ begin
     begin
       e.CurrX := e.Top.X;
 
-      if IsHotEdge(e) then
-      begin
-        if assigned(e.PrevInAEL) and (e.PrevInAEL.CurrX = e.CurrX) and
-          IsHotEdge(e.PrevInAEL) then
-        begin
-          //remove 'minima spikes' ...
-          if LastOp(e.PrevInAEL) = LastOp(e) then
-            LastOp(e).Pt := e.Top
-          //help prevent micro self-intersections ...
-          else if (e.PrevInAEL.Bot.Y <> Y) then  AddOutPt(e.PrevInAEL, e.Top);
-        end;
-        if assigned(e.NextInAEL) and (e.NextInAEL.CurrX = e.CurrX) and
-          IsHotEdge(e.NextInAEL) then
-        begin
-          //remove 'minima spikes' ...
-          if LastOp(e.NextInAEL) = LastOp(e) then
-            LastOp(e).Pt := e.Top
-          //help prevent micro self-intersections ...
-          else if (e.NextInAEL.Top.Y <> Y) then AddOutPt(e.NextInAEL, e.Top);
-        end;
-      end;
+//      if IsHotEdge(e) then
+//      begin
+//        if assigned(e.PrevInAEL) and (e.PrevInAEL.CurrX = e.CurrX) and
+//          IsHotEdge(e.PrevInAEL) then
+//        begin
+//          //remove 'minima spikes' ...
+//          if LastOp(e.PrevInAEL) = LastOp(e) then
+//            LastOp(e).Pt := e.Top
+//          //help prevent micro self-intersections ...
+//          else if (e.PrevInAEL.Bot.Y <> Y) then  AddOutPt(e.PrevInAEL, e.Top);
+//        end;
+//        if assigned(e.NextInAEL) and (e.NextInAEL.CurrX = e.CurrX) and
+//          IsHotEdge(e.NextInAEL) then
+//        begin
+//          //remove 'minima spikes' ...
+//          if LastOp(e.NextInAEL) = LastOp(e) then
+//            LastOp(e).Pt := e.Top
+//          //help prevent micro self-intersections ...
+//          else if (e.NextInAEL.Top.Y <> Y) then AddOutPt(e.NextInAEL, e.Top);
+//        end;
+//      end;
 
       if IsMaxima(e) then
       begin
@@ -2533,7 +2544,7 @@ begin
     if IsHotEdge(e) then AddOutPt(e, e.Top);
     if not IsHorizontal(e) then
     begin
-      if IsHotEdge(e) then TerminateHotOpen(e);
+      if IsHotEdge(e) then e.OutRec := nil;
       DeleteFromAEL(e);
     end;
     Exit;
@@ -2598,11 +2609,11 @@ begin
 
       if IsOpen(outRec) then
       begin
-        openPaths[cntOpen] := BuildPath(outRec.Pts);
+        openPaths[cntOpen] := BuildPath(outRec.Pts.Next);
         if length(openPaths[cntOpen]) > 1 then inc(cntOpen);
       end else
       begin
-        closedPaths[cntClosed] := BuildPath(outRec.Pts);
+        closedPaths[cntClosed] := BuildPath(outRec.Pts.Next);
         j := length(closedPaths[cntClosed]);
         if (j > 2) and
           PointsEqual(closedPaths[cntClosed][0],
@@ -2650,11 +2661,11 @@ begin
 
         if IsOpen(outRec) then
         begin
-          openPaths[cntOpen] := BuildPath(outRec.Pts);
+          openPaths[cntOpen] := BuildPath(outRec.Pts.Next);
           if length(openPaths[cntOpen]) > 1 then inc(cntOpen);
         end else
         begin
-          path := BuildPath(outRec.Pts);
+          path := BuildPath(outRec.Pts.Next);
           j := length(path);
           if (j > 2) and PointsEqual(path[0], path[j -1]) then
             setlength(path, j - 1);
@@ -2803,7 +2814,7 @@ procedure TClipperD.AddPath(const pathD: TPathD; polyType: TPathType = ptSubject
 var
   p: TPath;
 begin
-  if FScale = 0 then FScale := DefaultScale;
+  if FScale = 0 then FScale := DefaultClipperDScale;
   p := ScalePath(pathD, FScale, FScale);
   Inherited AddPath(p, polyType, isOpen);
 end;
@@ -2814,7 +2825,7 @@ procedure TClipperD.AddPaths(const pathsD: TPathsD; polyType: TPathType = ptSubj
 var
   pp: TPaths;
 begin
-  if FScale = 0 then FScale := DefaultScale;
+  if FScale = 0 then FScale := DefaultClipperDScale;
   pp := ScalePaths(pathsD, FScale, FScale);
   Inherited AddPaths(pp, polyType, isOpen);
 end;

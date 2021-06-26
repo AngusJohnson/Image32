@@ -190,7 +190,7 @@ begin
       DrawPolygon(Image, mainGlyphs, frNonZero, txtColor);
       if i = 0 then
       begin
-        DrawLine(Image, mainGlyphs, 1.5, clBlack32, esClosed);
+        DrawLine(Image, mainGlyphs, 1.5, clBlack32, esPolygon);
         Draw3D(Image, mainGlyphs, frNonZero, Round(textRec.Height/30), 3);
       end;
       mainGlyphs := ScalePath(mainGlyphs, 0.9, 0.9);

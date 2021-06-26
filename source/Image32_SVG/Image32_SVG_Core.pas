@@ -3,7 +3,7 @@ unit Image32_SVG_Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  17 June 2021                                                    *
+* Date      :  26 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -173,7 +173,7 @@ type
     function    ParseContent(var c: PAnsiChar; endC: PAnsiChar): Boolean; virtual;
   end;
 
-  TSvgParser = class             
+  TSvgParser = class
   private
     svgStream : TMemoryStream;
     procedure ParseStream;
@@ -202,8 +202,8 @@ type
   TSvgPathSegType = (dsMove, dsLine, dsHorz, dsVert, dsArc,
     dsQBez, dsCBez, dsQSpline, dsCSpline, dsClose);
 
-  PDpathSeg = ^TDpathSeg;
-  TDpathSeg = record
+  PSvgPathSeg = ^TSvgPathSeg;
+  TSvgPathSeg = record
     segType : TSvgPathSegType;
     vals    : TArrayOfDouble;
   end;
@@ -212,7 +212,7 @@ type
   TSvgPath = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
     firstPt   : TPointD;
     isClosed  : Boolean;
-    segs      : array of TDpathSeg;
+    segs      : array of TSvgPathSeg;
     function GetBounds: TRectD;
     //scalePending: if an SVG will be scaled later, then this parameter
     //allows curve 'flattening' to occur with a corresponding precision
@@ -246,7 +246,7 @@ type
   procedure PAnsiCharToAnsiString(var c: PAnsiChar; endC: PAnsiChar; out value: AnsiString);
 
   //special parsing functions //////////////////////////////////////////
-  function ParsePathDAttribute(const value: AnsiString): TSvgPaths;
+  function ParseSvgPath(const value: AnsiString): TSvgPaths;
   procedure ParseStyleElementContent(const value: TAnsi; stylesList: TClassStylesList);
   function ParseTransform(const transform: AnsiString): TMatrixD;
 
@@ -521,7 +521,7 @@ begin
 {$IF COMPILERVERSION >= 17}
     if Ord(c^) = Ord(FormatSettings.DecimalSeparator) then
 {$ELSE}
-    if Ord(current^) = Ord(DecimalSeparator) then
+    if Ord(c^) = Ord(DecimalSeparator) then
 {$IFEND}
     begin
       if decPos >= 0 then break;
@@ -1034,7 +1034,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function HexByteToInt(h: AnsiChar): Cardinal;
+function HexByteToInt(h: AnsiChar): Cardinal; {$IFDEF INLINE} inline; {$ENDIF}
 begin
   case h of
     '0'..'9': Result := Ord(h) - Ord('0');
@@ -1045,9 +1045,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function IsFraction(val: double): Boolean;
+function IsFraction(val: double): Boolean; {$IFDEF INLINE} inline; {$ENDIF}
 begin
-  Result := (val <> 0) and (val > -1) and (val < 1);
+  Result := (val <> 0) and (Abs(val) < 1);
 end;
 //------------------------------------------------------------------------------
 
@@ -1519,7 +1519,7 @@ end;
 
 function TSvgEl.ParseHeader(var c: PAnsiChar; endC: PAnsiChar): Boolean;
 begin
-  Result := inherited;
+  Result := inherited ParseHeader(c, endC);
   if Result then
     hash := GetHash(name.AsAnsiString);
 end;
@@ -2097,6 +2097,9 @@ begin
   SetLength(path2, pathLen);
   Result := GetBoundsD(path2);
 end;
+
+//------------------------------------------------------------------------------
+// TValue
 //------------------------------------------------------------------------------
 
 function ConvertValue(const value: TValue;
@@ -2142,9 +2145,6 @@ begin
           Result := rawVal;
       end;
 end;
-
-//------------------------------------------------------------------------------
-// TValue
 //------------------------------------------------------------------------------
 
 procedure TValue.Init(asPercentBelow: double);
@@ -2491,9 +2491,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ParsePathDAttribute(const value: AnsiString): TSvgPaths;
+function ParseSvgPath(const value: AnsiString): TSvgPaths;
 var
-  currSeg     : PDpathSeg;
+  currSeg     : PSvgPathSeg;
   currDpath   : PSvgPath;
   currSegCnt  : integer;
   currSegCap  : integer;

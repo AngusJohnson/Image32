@@ -3,7 +3,7 @@ unit Image32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  11 June 2021                                                    *
+* Date      :  26 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -250,7 +250,6 @@ type
 
     property Width: Integer read fWidth;
     property Height: Integer read fHeight;
-    //Bounds: Result := Rect(0, 0, Width, Height);
     property Bounds: TRect read GetBounds;
     property IsBlank: Boolean read GetIsBlank;
     property IsEmpty: Boolean read GetIsEmpty;
@@ -3159,14 +3158,10 @@ begin
   finally
     ReleaseDC(0, dc);
   end;
-end;
 
-procedure InitDpiVars;
-begin
-  dpiAwareI   := DPIAware(1);
-  DpiAwareD  := DPIAware(1.0);
+  dpiAwareI   := Round(ScreenScale);
+  DpiAwareD  := ScreenScale;
 end;
-
 {$ENDIF}
 //------------------------------------------------------------------------------
 
@@ -3251,7 +3246,6 @@ initialization
   MakeBlendTables;
 {$IFDEF MSWINDOWS}
   GetScreenScale;
-  InitDpiVars;
 {$ENDIF}
 
 finalization

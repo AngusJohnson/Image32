@@ -3,7 +3,7 @@ unit Image32_Layers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  11 June 2021                                                    *
+* Date      :  26 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -1972,7 +1972,7 @@ var
   group: TSizingGroupLayer32;
   rec: TRectD;
 begin
-  //nb: it may be tempting to store the targetlayer parameter in the
+  //nb: it might be tempting to store the targetlayer parameter in the
   //CreateSizingButtonGroup function call and automatically update its
   //bounds here, except that there are situations where blindly updating
   //the target's bounds using the returned TRect is undesirable
@@ -2193,6 +2193,6 @@ end;
 
 initialization
   InitDashes;
-  DefaultButtonSize := DpiAwareI *10;
+  DefaultButtonSize := DpiAwareI*10;
 
 end.

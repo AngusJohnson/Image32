@@ -3,7 +3,7 @@ unit Image32_Ttf;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  11 June 2021                                                    *
+* Date      :  26 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -201,11 +201,11 @@ type
     italicAngle    : TFixed;
     underlinePos   : Int16;
     underlineWidth : Int16;
-    isFixedPitch   : UInt32;
-    //minMemType42   : UInt32;
-    //maxMemType42   : UInt32;
-    //minMemType1   : UInt32;
-    //maxMemType1   : UInt32;
+    isFixedPitch   : Cardinal;
+    //minMemType42   : Cardinal;
+    //maxMemType42   : Cardinal;
+    //minMemType1   : Cardinal;
+    //maxMemType1   : Cardinal;
   end;
 
   TFontInfo = record                  //a custom summary record

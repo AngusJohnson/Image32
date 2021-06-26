@@ -1,11 +1,11 @@
 program Transform;
 
+{$R ..\Resources.res}
+{$I Image32.inc}
+
 uses
   Forms,
   Unit1 in 'Unit1.pas' {Form1};
-
-{$R *.res}
-{$I Image32.inc}
 
 begin
 {$IFDEF REPORTMEMORYLEAKS}

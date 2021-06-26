@@ -3,7 +3,7 @@ unit Image32_SVG_Writer;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.24                                                            *
-* Date      :  17 June 2021                                                    *
+* Date      :  26 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -30,7 +30,7 @@ uses
 type
   TSvgElWriterClass = class of TBaseElWriter;
 
-  TBaseElWriter = class abstract
+  TBaseElWriter = class
   private
     {$IFDEF XPLAT_GENERICS}
     fChilds   : TList<TBaseElWriter>;
@@ -92,7 +92,8 @@ type
     function GetCurrentPath: PSvgPath;
     function GetNewPath: PSvgPath;
     function GetNewOrAppendSeg(path: PSvgPath; segType: TSvgPathSegType): PSvgPathSeg;
-    procedure AddSegmentValues(seg: PSvgPathSeg; const values: TArrayOfDouble);
+    procedure AddSegmentValues(seg: PSvgPathSeg;
+      const values: array of Double);
   public
     constructor Create(parent: TBaseElWriter); override;
     function  WriteHeader: string; override;
@@ -417,7 +418,7 @@ function TExBaseElWriter.WriteHeader: string;
 var
   i,j: integer;
 begin
-  Result := inherited;
+  Result := inherited WriteHeader;
   if fillClr <> clInvalid then
     AppendColorAttrib(Result, 'fill', fillClr);
 
@@ -430,13 +431,6 @@ begin
   if not IsIdentityMatrix(Matrix) then
   begin
     AppendStr(Result, 'transform="matrix(');
-//    mat[0,0] :=  values[0];
-//    mat[0,1] :=  values[1];
-//    mat[1,0] :=  values[2];
-//    mat[1,1] :=  values[3];
-//    mat[2,0] :=  values[4];
-//    mat[2,1] :=  values[5];
-
 
     for i := 0 to 1 do for j := 0 to 1 do
       AppendFloat(Result, Matrix[i][j]);
@@ -559,7 +553,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSvgPathWriter.AddSegmentValues(seg: PSvgPathSeg; const values: TArrayOfDouble);
+procedure TSvgPathWriter.AddSegmentValues(seg: PSvgPathSeg;
+  const values: array of double);
 var
   i, len, len2: integer;
 begin
@@ -574,7 +569,7 @@ function TSvgPathWriter.WriteHeader: string;
 var
   i,j,k, segLen: integer;
 begin
-  Result := inherited;
+  Result := inherited WriteHeader;
   AppendStr(Result, 'd=" ');
   for i := 0 to High(fSvgPaths) do
   begin
@@ -788,7 +783,7 @@ end;
 
 function  TSvgCircleWriter.WriteHeader: string;
 begin
-  Result := inherited;
+  Result := inherited WriteHeader;
   AppendFloatAttrib(Result, 'cx', Origin.X);
   AppendFloatAttrib(Result, 'cy', Origin.Y);
   AppendFloatAttrib(Result, 'r', radius);
@@ -807,7 +802,7 @@ end;
 
 function  TSvgEllipseWriter.WriteHeader: string;
 begin
-  Result := inherited;
+  Result := inherited WriteHeader;
   AppendFloatAttrib(Result, 'cx', Origin.X);
   AppendFloatAttrib(Result, 'cy', Origin.Y);
   AppendFloatAttrib(Result, 'rx', radii.sx);
@@ -827,13 +822,15 @@ end;
 
 function  TSvgRectWriter.WriteHeader: string;
 begin
-  Result := inherited;
+  Result := inherited WriteHeader;
   AppendFloatAttrib(Result, 'x', RecWH.Left);
   AppendFloatAttrib(Result, 'y', RecWH.Top);
   AppendFloatAttrib(Result, 'width', RecWH.Width);
   AppendFloatAttrib(Result, 'height', RecWH.Height);
-  AppendFloatAttrib(Result, 'rx', radii.sx);
-  AppendFloatAttrib(Result, 'ry', radii.sy);
+  if radii.sx > 0 then
+    AppendFloatAttrib(Result, 'rx', radii.sx);
+  if radii.sy > 0 then
+    AppendFloatAttrib(Result, 'ry', radii.sy);
 end;
 
 //------------------------------------------------------------------------------
@@ -859,7 +856,7 @@ var
   i, len: integer;
   s: string;
 begin
-  Result := inherited;
+  Result := inherited WriteHeader;
   len := Length(path);
   if len = 0 then Exit;
   for i := 0 to len -1 do
@@ -899,7 +896,7 @@ end;
 
 function TSvgTextWriter.WriteHeader: string;
 begin
-  Result := inherited;
+  Result := inherited WriteHeader;
   with fontInfo do
   begin
     case family of
@@ -1011,8 +1008,13 @@ begin
   str := WriteHeader;
   with TStringList.Create do
   try
+  {$IFDEF UNICODE}
     text := str;
     SaveToFile(filename, TEncoding.UTF8);
+  {$ELSE}
+    text := UTF8Encode(str);
+    SaveToFile(filename);
+  {$ENDIF}
   finally
     free;
   end;
@@ -1026,8 +1028,13 @@ begin
   str := WriteHeader;
   with TStringList.Create do
   try
+  {$IFDEF UNICODE}
     text := str;
     SaveToStream (stream, TEncoding.UTF8);
+  {$ELSE}
+    text := UTF8Encode(str);
+    SaveToStream (stream);
+  {$ENDIF}
   finally
     free;
   end;

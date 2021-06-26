@@ -85,7 +85,7 @@ type
 //Area: returns type double to avoid potential integer overflows
 function Area(const path: TPath): Double; overload;
 function Area(const path: TPathD): Double; overload;
-function Orientation(const path: TPath): Boolean;
+function IsClockwise(const path: TPath): Boolean;
 function PointInPolygon(const pt: TPoint64;
   const path: TPath): TPointInPolygonResult;
 
@@ -354,8 +354,8 @@ begin
     setlength(result[i], length(paths[i]));
     for j := 0 to high(paths[i]) do
     begin
-      result[i][j].X := paths[i][j].X * sx;
-      result[i][j].Y := paths[i][j].Y * sy;
+      result[i][j].X := (paths[i][j].X * sx);
+      result[i][j].Y := (paths[i][j].Y * sy);
     end;
   end;
 end;
@@ -913,7 +913,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Orientation(const path: TPath): Boolean;
+function IsClockwise(const path: TPath): Boolean;
 begin
   Result := Area(path) >= 0;
 end;
