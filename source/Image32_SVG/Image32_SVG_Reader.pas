@@ -2,30 +2,17 @@ unit Image32_SVG_Reader;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.24                                                            *
-* Date      :  26 June 2021                                                    *
+* Version   :  2.25                                                            *
+* Date      :  28 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
 * Purpose   :  Read SVG ver 2 files                                            *
 *                                                                              *
-*              To fully support all the features of SVG version 2 is a huge    *
-*              task that would require a team of developers. Nevertheless this *
-*              unit compares very favourably with other Delphi SVG readers.    *
-*                                                                              *
-*              Known unsupported features: animation, masks,                   *
-*              a number of less commonly used filter effects,                  *
-*              <image> and <foreignObject> and nested <svg> elements,          *
-*              affine transforms of pattern and gradient fills.                *
-*                                                                              *
 * License   :  Use, modification & distribution is subject to                  *
 *              Boost Software License Ver 1                                    *
 *              http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
-
-//immediate todos: move XML parsing into a separate unit; ENTITY support;
-//fix 'middle' and 'end' <text> alignment where it contains <tspan> elements
-//add support for masks and animation
 
 interface
 
@@ -73,7 +60,7 @@ type
   TElement = class
   private
     fParent         : TElement;
-    fParserEl       : TSvgEl;
+    fParserEl       : TSvgTreeEl;
     fReader         : TSvgReader;
 {$IFDEF XPLAT_GENERICS}
     fChilds         : TList<TElement>;
@@ -92,7 +79,7 @@ type
     procedure Draw(image: TImage32; drawInfo: TDrawInfo); virtual;
     procedure DrawChildren(image: TImage32; drawInfo: TDrawInfo); virtual;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); virtual;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); virtual;
     destructor  Destroy; override;
   end;
 
@@ -155,12 +142,12 @@ type
   protected
     viewboxWH : TRectWH;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TDefsElement = class(TElement)
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   //-------------------------------------
@@ -180,7 +167,7 @@ type
     procedure DrawMarkers(img: TImage32; drawInfo: TDrawInfo);
     procedure Draw(image: TImage32; drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TGroupElement = class(TShapeElement)
@@ -204,7 +191,7 @@ type
   protected
     viewboxWH: TRectWH;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   //-------------------------------------
@@ -237,7 +224,7 @@ type
     procedure GetPaths(const drawInfo: TDrawInfo); override;
     function  GetUncurvedPath(const drawInfo: TDrawInfo): TPathsD; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TCircleElement = class(TShapeElement)
@@ -247,7 +234,7 @@ type
     function  GetBounds: TRectD; override;
     procedure GetPaths(const drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TEllipseElement = class(TShapeElement)
@@ -257,7 +244,7 @@ type
     function  GetBounds: TRectD; override;
     procedure GetPaths(const drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TRectElement = class(TShapeElement)
@@ -267,7 +254,7 @@ type
     procedure GetPaths(const drawInfo: TDrawInfo); override;
     function  GetUncurvedPath(const drawInfo: TDrawInfo): TPathsD; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   //TTextElement: although this is a TShapeElement descendant, it's really
@@ -275,18 +262,21 @@ type
   TTextElement = class(TShapeElement)
   protected
     offset    : TValuePt;
+    startX    : double;
     currentPt : TPointD;
+    function  GetTopTextElement: TTextElement;
+    procedure DoOffsetX(dx: double);
     procedure ResetTmpPt;
     procedure GetPaths(const drawInfo: TDrawInfo); override;
     function  LoadContent: Boolean; override;
     procedure Draw(img: TImage32; drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TTSpanElement = class(TTextElement)
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TSubtextElement = class(TShapeElement)
@@ -294,7 +284,7 @@ type
     text      : AnsiString;
     procedure GetPaths(const drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   //-------------------------------------
@@ -318,7 +308,7 @@ type
     function SetMiddlePoints(const points: TPathD): Boolean;
     procedure Draw(img: TImage32; drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TSvgColorStop = record
@@ -339,7 +329,7 @@ type
     function PrepareRenderer(renderer: TImageRenderer;
       drawInfo: TDrawInfo): Boolean; virtual;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   //nb: gradients with objectBoundingBox should not be applied to
@@ -363,7 +353,7 @@ type
     function PrepareRenderer(renderer: TCustomGradientRenderer;
       drawInfo: TDrawInfo): Boolean; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TLinGradElement = class(TGradientElement)
@@ -373,7 +363,7 @@ type
     function PrepareRenderer(renderer: TCustomGradientRenderer;
       drawInfo: TDrawInfo): Boolean; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TGradStopElement = class(TElement)
@@ -381,7 +371,7 @@ type
     offset: double;
     color: TColor32;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TFilterElement = class(TElement)
@@ -402,7 +392,7 @@ type
     procedure Apply(img: TImage32;
       const filterBounds: TRect; const matrix: TMatrixD);
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
     destructor Destroy; override;
   end;
 
@@ -447,7 +437,7 @@ type
     floodColor  : TColor32;
     procedure Apply; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TFeFloodElement  = class(TFeBaseElement)
@@ -455,7 +445,7 @@ type
     floodColor  : TColor32;
     procedure Apply; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TFeGaussElement  = class(TFeBaseElement)
@@ -463,7 +453,7 @@ type
     stdDev: double;
     procedure Apply; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TFeMergeElement  = class(TFeBaseElement)
@@ -486,7 +476,7 @@ type
   protected
     procedure GetPaths(const drawInfo: TDrawInfo); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgEl); override;
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
   //-------------------------------------
 
@@ -559,16 +549,6 @@ begin
     hUse            : Result := TUseElement;
     else              Result := TElement; //use generic class
   end;
-end;
-//------------------------------------------------------------------------------
-
-procedure BestGuessUndefined(var val: TValue; const compare: TValue);
-begin
-  //determining implicit percentages seems to be more art than science :(
-  if (val.mu <> muUndefined) or (val.rawVal > 1) then Exit;
-  if (compare.mu <> muUndefined) or (compare.rawVal > 1)  then Exit;
-  val.mu := muPercent;
-  val.rawVal := val.rawVal * 100;
 end;
 //------------------------------------------------------------------------------
 
@@ -734,7 +714,7 @@ end;
 // TDefsElement
 //------------------------------------------------------------------------------
 
-constructor TDefsElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TDefsElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fDrawInfo.visible := false;
@@ -893,6 +873,7 @@ begin
           mat := IdentityMatrix;
           MatrixScale(mat, s, s);
           drawInfo.matrix := MatrixMultiply(drawInfo.matrix, mat);
+          drawInfo.bounds := RectD(0,0,viewboxWH.Width, viewboxWH.Height);
         end;
 
         if self.elRectWH.width.IsValid and
@@ -938,7 +919,7 @@ end;
 // TSymbolElement
 //------------------------------------------------------------------------------
 
-constructor TSymbolElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TSymbolElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fPcBelow := 1.0;
@@ -1020,7 +1001,7 @@ end;
 // TRadGradElement
 //------------------------------------------------------------------------------
 
-constructor TRadGradElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TRadGradElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   radius.Init(1.0);
@@ -1051,7 +1032,7 @@ var
   scale, scale2: TSizeD;
   rec2, rec3: TRectD;
 begin
-  Result := inherited PrepareRenderer(renderer, drawInfo);
+  inherited PrepareRenderer(renderer, drawInfo);
   hiStops := High(stops);
   Result := hiStops >= 0;
   if not Result then Exit;
@@ -1108,7 +1089,7 @@ end;
 // TLinGradElement
 //------------------------------------------------------------------------------
 
-constructor TLinGradElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TLinGradElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   startPt.Init(2.5);
@@ -1136,7 +1117,7 @@ var
   i, hiStops: integer;
   rec2: TRectD;
 begin
-  Result := inherited PrepareRenderer(renderer, drawInfo);
+  inherited PrepareRenderer(renderer, drawInfo);
   hiStops := High(stops);
   Result := (hiStops >= 0);
   if not Result then Exit;
@@ -1197,7 +1178,7 @@ end;
 // TGradStopElement
 //------------------------------------------------------------------------------
 
-constructor TGradStopElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TGradStopElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   color := clBlack32;
@@ -1207,7 +1188,7 @@ end;
 // TFilterElement
 //------------------------------------------------------------------------------
 
-constructor TFilterElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TFilterElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fDrawInfo.visible := false;
@@ -1518,7 +1499,7 @@ end;
 // TFeDropShadowElement
 //------------------------------------------------------------------------------
 
-constructor TFeDropShadowElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TFeDropShadowElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   stdDev := InvalidD;
@@ -1560,7 +1541,7 @@ end;
 // TFeFloodElement
 //------------------------------------------------------------------------------
 
-constructor TFeFloodElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TFeFloodElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   floodColor := clInvalid;
@@ -1583,7 +1564,7 @@ end;
 // TFeGaussElement
 //------------------------------------------------------------------------------
 
-constructor TFeGaussElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TFeGaussElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   stdDev := InvalidD;
@@ -1684,7 +1665,7 @@ end;
 // TClipPathElement
 //------------------------------------------------------------------------------
 
-constructor TClipPathElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TClipPathElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fDrawInfo.visible := false;
@@ -1712,7 +1693,7 @@ end;
 // TShapeElement
 //------------------------------------------------------------------------------
 
-constructor TShapeElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TShapeElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   elRectWH.Init(fPcBelow);
@@ -2177,7 +2158,7 @@ end;
 // TLineElement
 //------------------------------------------------------------------------------
 
-constructor TLineElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TLineElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   SetLength(path, 2);
@@ -2209,7 +2190,7 @@ end;
 // TCircleElement
 //------------------------------------------------------------------------------
 
-constructor TCircleElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TCircleElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   centerPt.Init(1.0);
@@ -2240,8 +2221,6 @@ var
 begin
   if Assigned(drawPathsC) then Exit;
   if not radius.IsValid then Exit;
-
-  BestGuessUndefined(radius, centerPt.X);
   r := radius.GetValueXY(drawInfo.bounds, drawInfo.fontInfo.size);
   pt := centerPt.GetPoint(drawInfo.bounds, drawInfo.fontInfo.size);
   scalePending := ExtractAvgScaleFromMatrix(drawInfo.matrix);
@@ -2255,7 +2234,7 @@ end;
 // TEllipseElement
 //------------------------------------------------------------------------------
 
-constructor TEllipseElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TEllipseElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   centerPt.Init(1.0);
@@ -2285,9 +2264,6 @@ var
   centPt    : TPointD;
 begin
   if Assigned(drawPathsC) then Exit;
-
-  BestGuessUndefined(radius.X, centerPt.X);
-  BestGuessUndefined(radius.Y, centerPt.Y);
   rad := radius.GetPoint(drawInfo.bounds, drawInfo.fontInfo.size);
   centPt := centerPt.GetPoint(drawInfo.bounds, drawInfo.fontInfo.size);
   with centPt do
@@ -2302,7 +2278,7 @@ end;
 // TRectElement
 //------------------------------------------------------------------------------
 
-constructor TRectElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TRectElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   radius.Init(1.0);
@@ -2354,7 +2330,7 @@ end;
 // TTextElement
 //------------------------------------------------------------------------------
 
-constructor TTextElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TTextElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   offset.Init(fPcBelow);
@@ -2365,14 +2341,14 @@ end;
 function  TTextElement.LoadContent: Boolean;
 var
   i       : integer;
-  svgEl   : TSvgEl;
+  svgEl   : TSvgTreeEl;
   elClass : TElementClass;
   el      : TElement;
 begin
   Result := false;
   for i := 0 to fParserEl.childs.Count -1 do
   begin
-    svgEl := TSvgEl(fParserEl.childs[i]);
+    svgEl := TSvgTreeEl(fParserEl.childs[i]);
     if svgEl.hash = 0 then
     begin
       el := TSubtextElement.Create(self, svgEl);
@@ -2392,28 +2368,48 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TTextElement.GetPaths(const drawInfo: TDrawInfo);
-begin
-  //deferred to TSubtextElement.GetDrawPaths
-end;
-//------------------------------------------------------------------------------
-
-procedure TTextElement.ResetTmpPt;
-begin
-  currentPt := InvalidPointD;
-end;
-//------------------------------------------------------------------------------
-
-procedure TTextElement.Draw(img: TImage32; drawInfo: TDrawInfo);
+function TTextElement.GetTopTextElement: TTextElement;
 var
+  el: TElement;
+begin
+  el := self;
+  while Assigned(el.fParent) and (el.fParent is TTextElement) do
+    el := el.fParent;
+  Result := TTextElement(el);
+end;
+//------------------------------------------------------------------------------
+
+procedure TTextElement.DoOffsetX(dx: double);
+var
+  i: integer;
+begin
+  for i := 0 to fChilds.Count -1 do
+    if TElement(fChilds[i]) is TTextElement then
+      TTextElement(fChilds[i]).DoOffsetX(dx)
+    else if TElement(fChilds[i]) is TSubTextElement then
+      with TSubTextElement(fChilds[i]) do
+        drawPathsF := OffsetPath(drawPathsF, dx, 0);
+end;
+//------------------------------------------------------------------------------
+
+procedure TTextElement.GetPaths(const drawInfo: TDrawInfo);
+var
+  i         : integer;
   el        : TElement;
+  di        : TDrawInfo;
+  offsetX   : double;
   topTextEl : TTextElement;
 begin
+  di := drawInfo;
+  if self <> GetTopTextElement then
+    UpdateDrawInfo(di, self);
+
   if Self is TTSpanElement then
   begin
     el := fParent;
-    while (el is TTSpanElement) do el := el.fParent;
-    if not (el is TTextElement) then Exit; //ie error
+    while (el is TTSpanElement) do
+      el := el.fParent;
+    if not (el is TTextElement) then Exit; //ie error (eg <textarea>)
     topTextEl := TTextElement(el);
 
     if elRectWH.left.IsValid then
@@ -2425,10 +2421,10 @@ begin
 
     if offset.X.IsValid then
       currentPt.X := currentPt.X +
-        offset.X.GetValue(0, drawInfo.fontInfo.size);
+        offset.X.GetValue(0, di.fontInfo.size);
     if offset.Y.IsValid then
       currentPt.Y := currentPt.Y +
-        offset.Y.GetValue(0, drawInfo.fontInfo.size);
+        offset.Y.GetValue(0, di.fontInfo.size);
 
     topTextEl.currentPt := currentPt;
   end else
@@ -2439,9 +2435,53 @@ begin
     if elRectWH.top.IsValid then
       currentPt.Y := elRectWH.top.rawVal else
       currentPt.Y := 0;
+    startX := currentPt.X;
   end;
 
-  UpdateDrawInfo(drawInfo, self);
+  for i := 0 to fChilds.Count -1 do
+    if TElement(fChilds[i]) is TShapeElement then
+      TShapeElement(fChilds[i]).GetPaths(di);
+end;
+//------------------------------------------------------------------------------
+
+procedure TTextElement.ResetTmpPt;
+begin
+  startX    := 0;
+  currentPt := InvalidPointD;
+end;
+//------------------------------------------------------------------------------
+
+procedure TTextElement.Draw(img: TImage32; drawInfo: TDrawInfo);
+var
+  i: integer;
+  scale     : double;
+  dx        : double;
+  el        : TElement;
+  topTextEl : TTextElement;
+begin
+  if self = GetTopTextElement then
+  begin
+    UpdateDrawInfo(drawInfo, self);
+    //get child paths
+    GetPaths(drawInfo);
+
+    case drawInfo.FontInfo.align of
+      staCenter:
+        begin
+          dx := (currentPt.X - startX) * 0.5;
+          DoOffsetX(-dx);
+        end;
+      staRight:
+        begin
+          dx := (currentPt.X - startX);
+          DoOffsetX(-dx);
+        end;
+    end;
+  end
+  else if (currentPt.X = InvalidD) or
+    (currentPt.Y = InvalidD) then
+      Exit; //probably a <textarea> element
+
   DrawChildren(img, drawInfo);
 end;
 
@@ -2449,7 +2489,7 @@ end;
 // TSubtextElement
 //------------------------------------------------------------------------------
 
-constructor TSubtextElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TSubtextElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   hasPaths := true;
@@ -2511,6 +2551,9 @@ begin
   if not (el is TTextElement) then Exit;
   topTextEl := TTextElement(el);
 
+  if (topTextEl.currentPt.X = InvalidD) or
+    (topTextEl.currentPt.Y = InvalidD) then Exit;
+
   //trim CRLFs and multiple spaces
   {$IFDEF UNICODE}
   s := UTF8ToUnicodeString(HtmlDecode(text));
@@ -2526,23 +2569,10 @@ begin
   scale := fontSize /fReader.fFontCache.FontHeight;
 
   with topTextEl.currentPt do
-    case drawInfo.FontInfo.align of
-      staCenter:
-        begin
-          offsetX := X - tmpX * scale /2;
-          X := X + tmpX * scale/2;
-        end;
-      staRight:
-        begin
-          offsetX := X - tmpX * scale;
-          X := offsetX;
-        end;
-      else //staLeft
-        begin
-          offsetX := X;
-          X := X + tmpX * scale;
-        end;
-    end;
+  begin
+    offsetX := X;
+    X := X + tmpX * scale;
+  end;
 
   with drawInfo.fontInfo do
     if baseShift.rawVal = 0 then
@@ -2560,7 +2590,7 @@ end;
 // TTSpanElement
 //------------------------------------------------------------------------------
 
-constructor TTSpanElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TTSpanElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fDrawInfo.FontInfo.decoration := fdUndefined;
@@ -2682,7 +2712,7 @@ end;
 // TMarkerElement
 //------------------------------------------------------------------------------
 
-constructor TMarkerElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TMarkerElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fDrawInfo.visible := false;
@@ -2768,7 +2798,7 @@ end;
 // TPatternElement
 //------------------------------------------------------------------------------
 
-constructor TPatternElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TPatternElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fPcBelow := 1.0;
@@ -2862,7 +2892,7 @@ end;
 // TSvgElement
 //------------------------------------------------------------------------------
 
-constructor TSvgElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TSvgElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited Create(parent, svgEl);
 end;
@@ -2871,7 +2901,7 @@ end;
 // TElement
 //------------------------------------------------------------------------------
 
-constructor TElement.Create(parent: TElement; svgEl: TSvgEl);
+constructor TElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
 {$IFDEF XPLAT_GENERICS}
   fChilds         := TList<TElement>.create;
@@ -3892,14 +3922,14 @@ end;
 function TElement.LoadContent: Boolean;
 var
   i       : integer;
-  svgEl   : TSvgEl;
+  svgEl   : TSvgTreeEl;
   elClass : TElementClass;
   el      : TElement;
 begin
   Result := false;
   for i := 0 to fParserEl.childs.Count -1 do
   begin
-    svgEl := TSvgEl(fParserEl.childs[i]);
+    svgEl := TSvgTreeEl(fParserEl.childs[i]);
     if svgEl.hash = 0 then
       Continue;
     elClass := HashToElementClass(svgEl.hash);

@@ -129,7 +129,7 @@ type
 
   TSvgParser = class;
 
-  TParserBaseEl = class       //(abstract) base element class
+  TXmlEl = class              //base element class
   public
     name        : TAnsi;
     {$IFDEF XPLAT_GENERICS}
@@ -149,7 +149,7 @@ type
     procedure   ParseStyleAttribute(const style: AnsiString);
   end;
 
-  TDocTypeEl = class(TParserBaseEl)
+  TDocTypeEl = class(TXmlEl)
   private
     procedure   SkipWord(var c, endC: PAnsiChar);
     function    ParseEntities(var c, endC: PAnsiChar): Boolean;
@@ -157,12 +157,12 @@ type
     function    ParseAttributes(var c: PAnsiChar; endC: PAnsiChar): Boolean; override;
   end;
 
-  TSvgEl = class(TParserBaseEl) //<svg> el. PLUS all contained els.
+  TSvgTreeEl = class(TXmlEl)
   public
     hash        : Cardinal;
     text        : TAnsi;
     {$IFDEF XPLAT_GENERICS}
-    childs      : TList<TSvgEl>;
+    childs      : TList<TSvgTreeEl>;
     {$ELSE}
     childs      : TList;
     {$ENDIF}
@@ -179,11 +179,11 @@ type
     procedure ParseStream;
   public
     classStyles :TClassStylesList;
-    xmlHeader   : TParserBaseEl;
+    xmlHeader   : TXmlEl;
     docType     : TDocTypeEl;
-    svgTree     : TSvgEl;
+    svgTree     : TSvgTreeEl;
     {$IFDEF XPLAT_GENERICS}
-    entities    : TList<TSvgEl>;
+    entities    : TList<TSvgTreeEl>;
     {$ELSE}
     entities    : TList;
     {$ENDIF}
@@ -1235,10 +1235,10 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TSvg classes 
+// TXmlEl classes
 //------------------------------------------------------------------------------
 
-constructor TParserBaseEl.Create(owner: TSvgParser);
+constructor TXmlEl.Create(owner: TSvgParser);
 begin
 {$IFDEF XPLAT_GENERICS}
   attribs := TList<PSvgAttrib>.Create;
@@ -1250,7 +1250,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-destructor TParserBaseEl.Destroy;
+destructor TXmlEl.Destroy;
 begin
   Clear;
   attribs.Free;
@@ -1258,7 +1258,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TParserBaseEl.Clear;
+procedure TXmlEl.Clear;
 var
   i: integer;
 begin
@@ -1268,7 +1268,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TParserBaseEl.ParseHeader(var c: PAnsiChar; endC: PAnsiChar): Boolean;
+function TXmlEl.ParseHeader(var c: PAnsiChar; endC: PAnsiChar): Boolean;
 var
   className, style: AnsiString;
 begin
@@ -1285,7 +1285,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TParserBaseEl.ParseAttribName(var c: PAnsiChar;
+function TXmlEl.ParseAttribName(var c: PAnsiChar;
   endC: PAnsiChar; attrib: PSvgAttrib): Boolean;
 var
   c2: PAnsiChar;
@@ -1300,7 +1300,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TParserBaseEl.ParseAttribValue(var c: PAnsiChar;
+function TXmlEl.ParseAttribValue(var c: PAnsiChar;
   endC: PAnsiChar; attrib: PSvgAttrib): Boolean;
 var
   quoteChar : AnsiChar;
@@ -1322,7 +1322,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TParserBaseEl.ParseAttributes(var c: PAnsiChar; endC: PAnsiChar): Boolean;
+function TXmlEl.ParseAttributes(var c: PAnsiChar; endC: PAnsiChar): Boolean;
 var
   attrib, styleAttrib, classAttrib, idAttrib: PSvgAttrib;
   ansi: AnsiString;
@@ -1390,7 +1390,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TParserBaseEl.ParseStyleAttribute(const style: AnsiString);
+procedure TXmlEl.ParseStyleAttribute(const style: AnsiString);
 var
   styleName, styleVal: TAnsi;
   c, endC: PAnsiChar;
@@ -1427,6 +1427,9 @@ begin
     attribs.Add(attrib);
   end;
 end;
+
+//------------------------------------------------------------------------------
+// TDocTypeEl
 //------------------------------------------------------------------------------
 
 procedure TDocTypeEl.SkipWord(var c, endC: PAnsiChar);
@@ -1485,13 +1488,16 @@ begin
   Result := (c < endC) and (c^ = '>');
   inc(c);
 end;
+
+//------------------------------------------------------------------------------
+// TSvgTreeEl
 //------------------------------------------------------------------------------
 
-constructor TSvgEl.Create(owner: TSvgParser);
+constructor TSvgTreeEl.Create(owner: TSvgParser);
 begin
   inherited Create(owner);
 {$IFDEF XPLAT_GENERICS}
-  childs := TList<TSvgEl>.Create;
+  childs := TList<TSvgTreeEl>.Create;
 {$ELSE}
   childs := TList.Create;
 {$ENDIF}
@@ -1499,25 +1505,25 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-destructor TSvgEl.Destroy;
+destructor TSvgTreeEl.Destroy;
 begin
   inherited;
   childs.Free;
 end;
 //------------------------------------------------------------------------------
 
-procedure TSvgEl.Clear;
+procedure TSvgTreeEl.Clear;
 var
   i: integer;
 begin
   for i := 0 to childs.Count -1 do
-    TSvgEl(childs[i]).free;
+    TSvgTreeEl(childs[i]).free;
   childs.Clear;
   inherited;
 end;
 //------------------------------------------------------------------------------
 
-function TSvgEl.ParseHeader(var c: PAnsiChar; endC: PAnsiChar): Boolean;
+function TSvgTreeEl.ParseHeader(var c: PAnsiChar; endC: PAnsiChar): Boolean;
 begin
   Result := inherited ParseHeader(c, endC);
   if Result then
@@ -1525,9 +1531,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgEl.ParseContent(var c: PAnsiChar; endC: PAnsiChar): Boolean;
+function TSvgTreeEl.ParseContent(var c: PAnsiChar; endC: PAnsiChar): Boolean;
 var
-  child: TSvgEl;
+  child: TSvgTreeEl;
   entity: PSvgAttrib;
   tmpC, tmpEndC: PAnsiChar;
 begin
@@ -1574,7 +1580,7 @@ begin
         else
         begin
           //starting a new element
-          child := TSvgEl.Create(owner);
+          child := TSvgTreeEl.Create(owner);
           childs.Add(child);
           if not child.ParseHeader(c, endC) then break;
           if not child.selfClosed then
@@ -1607,7 +1613,7 @@ begin
         text.len := c - tmpC;
       end else
       begin
-        child := TSvgEl.Create(owner);
+        child := TSvgTreeEl.Create(owner);
         childs.Add(child);
         child.text.text := tmpC;
         child.text.len := c - tmpC;
@@ -1631,10 +1637,10 @@ constructor TSvgParser.Create;
 begin
   classStyles := TClassStylesList.Create;
   svgStream   := TMemoryStream.Create;
-  xmlHeader   := TParserBaseEl.Create(Self);
+  xmlHeader   := TXmlEl.Create(Self);
   docType     := TDocTypeEl.Create(Self);
 {$IFDEF XPLAT_GENERICS}
-  entities    := TList<TSvgEl>.Create;
+  entities    := TList<TSvgTreeEl>.Create;
 {$ELSE}
   entities    := TList.Create;
 {$ENDIF}
@@ -1726,7 +1732,7 @@ begin
     if (c^ = '<') and Match(c, '<svg') then
     begin
       inc(c);
-      svgTree := TSvgEl.Create(self);
+      svgTree := TSvgTreeEl.Create(self);
       if svgTree.ParseHeader(c, endC) and
         not svgTree.selfClosed then
           svgTree.ParseContent(c, endC);

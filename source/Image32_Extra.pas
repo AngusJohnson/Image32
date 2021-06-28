@@ -2586,11 +2586,9 @@ end;
 
 procedure BoxBlurH(var src, dst: TArrayOfColor32; w,h, stdDev: integer);
 var
-  i,j, ti, li, ri, iarr: integer;
-  fv, lv, val, tmp: TWeightedColor;
+  i,j, ti, li, ri: integer;
+  fv, lv, val: TWeightedColor;
 begin
-  iarr := Ceil(1 / (stdDev *2 +1));
-
   for i := 0 to h -1 do
   begin
     ti := i * w;
@@ -2609,28 +2607,21 @@ begin
       val.Add(src[ti + j]);
     for j := 0 to stdDev do
     begin
-      val.Add(src[ri]);
-      val.Subtract(fv); inc(ri);
-      tmp.Reset;
-      tmp.Add(val.Color, iarr);
-      dst[ti] := tmp.Color; inc(ti);
+      val.Add(src[ri]); inc(ri);
+      val.Subtract(fv);
+      dst[ti] := val.Color; inc(ti);
     end;
     for j := stdDev +1 to w - stdDev -1 do
     begin
-      val.Add(src[ri]);
-      val.Subtract(src[li]);
-      inc(ri); inc(li);
-      tmp.Reset;
-      tmp.Add(val.Color, iarr);
-      dst[ti] := tmp.Color; inc(ti);
+      val.Add(src[ri]); inc(ri);
+      val.Subtract(src[li]); inc(li);
+      dst[ti] := val.Color; inc(ti);
     end;
     for j := w - stdDev to w -1 do
     begin
       val.Add(lv);
       val.Subtract(src[li]); inc(li);
-      tmp.Reset;
-      tmp.Add(val.Color, iarr);
-      dst[ti] := tmp.Color; inc(ti);
+      dst[ti] := val.Color; inc(ti);
     end;
   end;
 end;
@@ -2638,10 +2629,9 @@ end;
 
 procedure BoxBlurT(var src, dst: TArrayOfColor32; w, h, stdDev: integer);
 var
-  i,j, ti, li, ri, iarr: integer;
-  fv, lv, val, tmp: TWeightedColor;
+  i,j, ti, li, ri: integer;
+  fv, lv, val: TWeightedColor;
 begin
-  iarr := Ceil(1 / (stdDev *2 +1));
   for i := 0 to w -1 do
   begin
     ti := i;
@@ -2660,30 +2650,22 @@ begin
       val.Add(src[ti + j *w]);
     for j := 0 to stdDev do
     begin
-      val.Add(src[ri]);
+      val.Add(src[ri]); inc(ri, w);
       val.Subtract(fv);
-      tmp.Reset;
-      tmp.Add(val.Color, iarr);
-      dst[ti] := tmp.Color; inc(ti, w);
-      inc(ri, w);
+      dst[ti] := val.Color; inc(ti, w);
+
     end;
     for j := stdDev +1 to h - stdDev -1 do
     begin
-      val.Add(src[ri]);
-      val.Subtract(src[li]);
-      tmp.Reset;
-      tmp.Add(val.Color, iarr);
-      dst[ti] := tmp.Color; inc(ti, w);
-      inc(ri, w); inc(li, w);
+      val.Add(src[ri]); inc(ri, w);
+      val.Subtract(src[li]); inc(li, w);
+      dst[ti] := val.Color; inc(ti, w);
     end;
     for j := h - stdDev to h -1 do
     begin
       val.Add(lv);
-      val.Subtract(src[li]);
-      tmp.Reset;
-      tmp.Add(val.Color, iarr);
-      dst[ti] := tmp.Color; inc(ti, w);
-      inc(li, w);
+      val.Subtract(src[li]); inc(li, w);
+      dst[ti] := val.Color; inc(ti, w);
     end;
   end;
 end;
@@ -2716,12 +2698,13 @@ begin
     stdDev := maxStdDev;
   if stdDev < 1 then Exit;
 
-  //copy image rect into dst array
   if blurFullImage then
   begin
+    //copy image rect into  dst array
     Move(img.PixelBase^, dst[0], len * SizeOf(TColor32));
   end else
   begin
+    //copy just a rectangular region into  dst array
     p := @dst[0];
     for i := rec2.Top to rec2.Bottom -1 do
     begin

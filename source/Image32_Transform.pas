@@ -90,13 +90,14 @@ type
     fColorTotB: Int64;
     function GetColor: TColor32;
   public
-    procedure Reset;
+    procedure Reset; {$IFDEF INLINE} inline; {$ENDIF}
     procedure Add(c: TColor32; w: Integer = 1); overload;
     procedure Add(const other: TWeightedColor); overload;
+      {$IFDEF INLINE} inline; {$ENDIF}
     procedure Subtract(c: TColor32; w: Integer =1); overload;
     procedure Subtract(const other: TWeightedColor); overload;
-
-    procedure AddWeight(w: Integer); //ie add clNone32
+      {$IFDEF INLINE} inline; {$ENDIF}
+    procedure AddWeight(w: Integer); {$IFDEF INLINE} inline; {$ENDIF}
     property AddCount: Integer read fAddCount;
     property Color: TColor32 read GetColor;
     property Weight: integer read fAddCount;
@@ -918,29 +919,23 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DivRound(num, denom: Integer): Byte;
-begin
-  result := ClampByte((num  + (denom div 2)) div denom);
-end;
-//------------------------------------------------------------------------------
-
 function TWeightedColor.GetColor: TColor32;
 var
-  a: byte;
-  invAt: double;
-  argb: TARGB absolute Result;
+  invAlpha: double;
+  res: TARGB absolute Result;
 begin
-  result := clNone32;
-  if (fAlphaTot <= 0) or (fAddCount <= 0) then Exit;
-  a := DivRound(fAlphaTot, fAddCount);
-  if (a = 0) then Exit;
-  argb.A := a;
+  if (fAlphaTot <= 0) or (fAddCount <= 0) then
+  begin
+    result := clNone32;
+    Exit;
+  end;
+  res.A := Min(255, (fAlphaTot  + (fAddCount shr 1)) div fAddCount);
   //nb: alpha weighting is applied to colors when added,
   //so we now need to div by fAlphaTot here ...
-  invAt := 1/fAlphaTot;
-  argb.R := ClampByte(fColorTotR * invAt);
-  argb.G := ClampByte(fColorTotG * invAt);
-  argb.B := ClampByte(fColorTotB * invAt);
+  invAlpha := 1/fAlphaTot;
+  res.R := ClampByte(fColorTotR * invAlpha);
+  res.G := ClampByte(fColorTotG * invAlpha);
+  res.B := ClampByte(fColorTotB * invAlpha);
 end;
 
 //------------------------------------------------------------------------------
