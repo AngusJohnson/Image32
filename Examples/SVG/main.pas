@@ -66,7 +66,7 @@ begin
   ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
 
   svgReader := TSvgReader.Create;
-  svgReader.BackgroundColor := clWhite32;// $FFF0F0F0;
+  //svgReader.BackgroundColor := clWhite32;
 
   svgReader.AddFont('Arial');
   svgReader.AddFont('Arial Bold');

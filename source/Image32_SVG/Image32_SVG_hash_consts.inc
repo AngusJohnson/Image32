@@ -82,6 +82,7 @@ const
   hMarker_045_Start           = $CF854A0E;    // Marker-Start
   hMarkerHeight               = $10360978;    // MarkerHeight
   hMarkerWidth                = $EF8DF427;    // MarkerWidth
+  hMask                       = $FAF8F32F;    // Mask
   hMatrix                     = $31E3AD46;    // Matrix
   hMiddle                     = $80732990;    // Middle
   hMiter                      = $33868A3B;    // Miter

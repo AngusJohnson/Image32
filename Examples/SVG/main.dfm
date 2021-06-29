@@ -1,9 +1,9 @@
 object Form1: TForm1
   Left = 298
   Top = 205
-  Width = 746
-  Height = 536
   Caption = 'Svg101'
+  ClientHeight = 477
+  ClientWidth = 730
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -21,14 +21,17 @@ object Form1: TForm1
     Left = 161
     Top = 0
     Width = 569
-    Height = 478
+    Height = 477
     Align = alClient
     BevelInner = bvLowered
     BorderWidth = 12
     Color = clBtnFace
+    DoubleBuffered = True
     ParentBackground = False
+    ParentDoubleBuffered = False
     TabOrder = 0
     TabStop = True
+    Touch.InteractiveGestures = [igZoom, igPan, igPressAndTap]
     OnResize = ImagePanelResize
     AutoCenter = True
     FocusedColor = clActiveCaption
@@ -44,7 +47,7 @@ object Form1: TForm1
     Left = 0
     Top = 0
     Width = 161
-    Height = 478
+    Height = 477
     Align = alLeft
     Color = 16316664
     ItemHeight = 14

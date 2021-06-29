@@ -15,14 +15,27 @@ implementation
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
+function ParseNameLength(var c: PAnsiChar; endC: PAnsiChar): integer; overload;
+var
+  c2: PAnsiChar;
+const
+  validNonFirstChars =  ['0'..'9','A'..'Z','a'..'z','_',':','-'];
+begin
+  c2 := c;
+  inc(c);
+  while (c < endC) and CharInSet(c^, validNonFirstChars) do inc(c);
+  Result := c - c2;
+end;
+//------------------------------------------------------------------------------
+
 function GetHashedName(const s: string): cardinal; overload;
 var
   ansi: ansiString;
-  name: TAnsiName;
+  name: TAnsi;
   c, endC: PAnsiChar;
 begin
   ansi := ansiString(s);
-  name.name := PAnsiChar(ansi);
+  name.text := PAnsiChar(ansi);
   if s[1] = '&' then
   begin
     c := @ansi[2];
@@ -34,18 +47,18 @@ begin
     endC := c + Length(ansi);
     name.len := ParseNameLength(c, endC);
   end;
-  Result := Image32_SVG_Core.GetHashedName(name);
+  Result := Image32_SVG_Core.GetHash(name.AsAnsiString);
 end;
 //------------------------------------------------------------------------------
 
 function GetHashedNameCaseSens(const s: string): cardinal; overload;
 var
   ansi: ansiString;
-  name: TAnsiName;
+  name: TAnsi;
   c, endC: PAnsiChar;
 begin
   ansi := ansiString(s);
-  name.name := PAnsiChar(ansi);
+  name.text := PAnsiChar(ansi);
   if s[1] = '&' then
   begin
     c := @ansi[2];
@@ -57,7 +70,7 @@ begin
     endC := c + Length(ansi);
     name.len := ParseNameLength(c, endC);
   end;
-  Result := Image32_SVG_Core.GetHashedNameCaseSens(name.name, name.len);
+  Result := Image32_SVG_Core.GetHashCaseSensitive(name.text, name.len);
 end;
 //------------------------------------------------------------------------------
 
@@ -398,6 +411,7 @@ begin
       AddName('Marker-Mid');
       AddName('Marker-Start');
       AddName('Marker');
+      AddName('Mask');
       AddName('MarkerHeight');
       AddName('MarkerWidth');
       AddName('Matrix');

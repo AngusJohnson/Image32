@@ -1,5 +1,6 @@
 program Svg101;
 
+
 {$R ..\Resources.res}
 {$I Image32.inc}
 

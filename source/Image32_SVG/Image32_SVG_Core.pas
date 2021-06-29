@@ -2,8 +2,8 @@ unit Image32_SVG_Core;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.24                                                            *
-* Date      :  26 June 2021                                                    *
+* Version   :  2.25                                                            *
+* Date      :  29 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -24,34 +24,41 @@ uses
   Image32, Image32_Vector, Image32_Ttf, Image32_Transform;
 
 type
-  TMeasureUnit = (muUndefined, muPixel, muPercent,
-    muDegree, muRadian, muInch, muCm, muMm, muEm, muEx, muPt, muPica);
+  TTriState = (tsUnknown, tsYes, tsNo);
+
+  TUnitType = (utUnknown, utNumber, utPercent, utEm, utEx, utPixel,
+    utCm, utMm, utInch, utPt, utPica, utDegree, utRadian);
 
   //////////////////////////////////////////////////////////////////////
   // TValue - Structure to store numerics with measurement units.
-  //          Includes methods to scale percent units depending on the 
-  //          supplied bounding width/height/rectangle etc.
+  // See https://www.w3.org/TR/SVG/types.html#InterfaceSVGLength
+  // and https://www.w3.org/TR/SVG/types.html#InterfaceSVGAngle
   //////////////////////////////////////////////////////////////////////
 
+  //Unfortunately unit-less values can exhibit ambiguity, especially when their
+  //values are small (eg < 1.0). These values can be either absolute values or
+  //relative values (ie relative to the supplied dimension size).
+  //The 'assumeRelValBelow' parameter (see below) attempts to address this
+  //ambiguity, such that unit-less values will be assumed to be 'relative' when
+  //'rawVal' is less than the supplied 'assumeRelValBelow' value.
+
   TValue = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
-    rawVal  : double;
-    mu      : TMeasureUnit;
-    pcBelow : double; //manages % vs frac. ambiguity with untyped values
-    procedure Init(asPercentBelow: double);
-    procedure SetValue(val: double; measureUnit: TMeasureUnit = muUndefined);
-    function  GetValue(scale: double; fontSize: double = 16.0): double;
-    function  GetValueX(const scale: double; fontSize: double): double;
-    function  GetValueY(const scale: double; fontSize: double): double;
-    function  GetValueXY(const scaleRec: TRectD; fontSize: double): double;
+    rawVal    : double;
+    unitType  : TUnitType;
+    procedure Init;
+    procedure SetValue(val: double; unitTyp: TUnitType = utNumber);
+    function  GetValue(pcSize: double; assumeRelValBelow: Double): double;
+    function  GetValueXY(const pcSize: TRectD; assumeRelValBelow: Double): double;
     function  IsValid: Boolean;
-    function  IsPercent: Boolean;
+    function  HasFontUnits: Boolean;
+    function  HasAngleUnits: Boolean;
   end;
 
   TValuePt = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
-    X       : TValue;
-    Y       : TValue;
-    procedure Init(asPercentBelow: double);
-    function  GetPoint(const scaleRec: TRectD; fontSize: double): TPointD;
+    X, Y    : TValue;
+    procedure Init;
+    function  GetPoint(const pcSize: double; assumeRelValBelow: Double): TPointD; overload;
+    function  GetPoint(const pcSize: TRectD; assumeRelValBelow: Double): TPointD; overload;
     function  IsValid: Boolean;
   end;
 
@@ -60,9 +67,10 @@ type
     top     : TValue;
     width   : TValue;
     height  : TValue;
-    procedure Init(asPercentBelow: double);
-    function  GetRectD(const scaleRec: TRectD; fontSize: double): TRectD;
-    function  GetRectWH(const scaleRec: TRectD; fontSize: double): TRectWH;
+    procedure Init;
+    function  GetRectD(const pcSize: TRectD; assumeRelValBelow: Double): TRectD; overload;
+    function  GetRectD(pcSize: double; assumeRelValBelow: Double): TRectD; overload;
+    function  GetRectWH(const pcSize: TRectD; assumeRelValBelow: Double): TRectWH;
     function  IsValid: Boolean;
     function  IsEmpty: Boolean;
   end;
@@ -70,7 +78,7 @@ type
   //////////////////////////////////////////////////////////////////////
   // TAnsi - alternative to AnsiString with less overhead.
   //////////////////////////////////////////////////////////////////////
-  
+
   TAnsi = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
     text: PAnsiChar;
     len : integer;
@@ -93,8 +101,6 @@ type
     decoration  : TFontDecoration;
     baseShift   : TValue;
   end;
-
-  TSizeType = (stAverage, stWidth, stHeight);
 
   //////////////////////////////////////////////////////////////////////
   // TClassStylesList: custom TStringList that stores ansistring objects
@@ -234,7 +240,7 @@ type
   function ParseNextNum(var c: PAnsiChar; endC: PAnsiChar;
     skipComma: Boolean; out val: double): Boolean;
   function ParseNextNumEx(var c: PAnsiChar; endC: PAnsiChar; skipComma: Boolean;
-    out val: double; out measureUnit: TMeasureUnit): Boolean;
+    out val: double; out unitType: TUnitType): Boolean;
   function GetHash(const name: AnsiString): cardinal;
   function GetHashCaseSensitive(name: PAnsiChar; nameLen: integer): cardinal;
   function ExtractRef(const href: AnsiString): AnsiString;
@@ -492,14 +498,14 @@ end;
 //------------------------------------------------------------------------------
 
 function ParseNextNumEx(var c: PAnsiChar; endC: PAnsiChar; skipComma: Boolean;
-  out val: double; out measureUnit: TMeasureUnit): Boolean;
+  out val: double; out unitType: TUnitType): Boolean;
 var
   decPos,exp: integer;
   isNeg, expIsNeg: Boolean;
   start: PAnsiChar;
 begin
   Result := false;
-  measureUnit := muUndefined;
+  unitType := utNumber;
 
   //skip white space +/- single comma
   if skipComma then
@@ -563,66 +569,66 @@ begin
     '%':
       begin
         inc(c);
-        measureUnit := muPercent;
+        unitType := utPercent;
       end;
     'c': //convert cm to pixels
       if ((c+1)^ = 'm') then
       begin
         inc(c, 2);
-        measureUnit := muCm;
+        unitType := utCm;
       end;
     'd': //ignore deg
       if ((c+1)^ = 'e') and ((c+2)^ = 'g') then
       begin
         inc(c, 3);
-        measureUnit := muDegree;
+        unitType := utDegree;
       end;
     'e': //convert cm to pixels
       if ((c+1)^ = 'm') then
       begin
         inc(c, 2);
-        measureUnit := muEm;
+        unitType := utEm;
       end
       else if ((c+1)^ = 'x') then
       begin
         inc(c, 2);
-        measureUnit := muEx;
+        unitType := utEx;
       end;
     'i': //convert inchs to pixels
       if ((c+1)^ = 'n') then
       begin
         inc(c, 2);
-        measureUnit := muInch;
+        unitType := utInch;
       end;
     'm': //convert mm to pixels
       if ((c+1)^ = 'm') then
       begin
         inc(c, 2);
-        measureUnit := muMm;
+        unitType := utMm;
       end;
     'p':
       case (c+1)^ of
         'c':
           begin
             inc(c, 2);
-            measureUnit := muPica;
+            unitType := utPica;
           end;
         't':
           begin
             inc(c, 2);
-            measureUnit := muPt;
+            unitType := utPt;
           end;
         'x':
           begin
             inc(c, 2);
-            measureUnit := muPixel;
+            unitType := utPixel;
           end;
       end;
     'r': //convert radian angles to degrees
-      if ((c+1)^ = 'a') and ((c+2)^ = 'd') then
+      if Match(c, 'rad') then
       begin
         inc(c, 3);
-        measureUnit := muRadian;
+        unitType := utRadian;
       end;
   end;
 end;
@@ -633,9 +639,9 @@ function ParseNextNum(var c: PAnsiChar; endC: PAnsiChar;
 var
   tmp: TValue;
 begin
-  tmp.Init(0);
-  Result := ParseNextNumEx(c, endC, skipComma, tmp.rawVal, tmp.mu);
-  val := tmp.GetValue(1);
+  tmp.Init;
+  Result := ParseNextNumEx(c, endC, skipComma, tmp.rawVal, tmp.unitType);
+  val := tmp.GetValue(1, 1);
 end;
 //------------------------------------------------------------------------------
 
@@ -1058,7 +1064,7 @@ var
   clr     : TColor32;
   alpha   : Byte;
   vals    : array[0..3] of double;
-  mus     :  array[0..3] of TMeasureUnit;
+  mus     :  array[0..3] of TUnitType;
   c, endC : PAnsiChar;
 begin
   Result := false;
@@ -1080,7 +1086,7 @@ begin
       not ParseNextNumEx(c, endC, true, vals[1], mus[1]) or
       not ParseNextNumEx(c, endC, true, vals[2], mus[2]) then Exit;
     for i := 0 to 2 do
-      if mus[i] = muPercent then
+      if mus[i] = utPercent then
         vals[i] := vals[i] * 255 / 100;
 
     if ParseNextNumEx(c, endC, true, vals[3], mus[3]) then
@@ -1895,11 +1901,7 @@ end;
 function TSvgPath.GetSimplePath: TPathD;
 var
   i,j, pathLen, pathCap: integer;
-  currPt, radii, pt2, pt3, pt4: TPointD;
-  arcFlag, sweepFlag: integer;
-  angle, arc1, arc2, bezTolerance: double;
-  rec: TRectD;
-  path2: TPathD;
+  currPt, pt2: TPointD;
 
   procedure AddPoint(const pt: TPointD);
   begin
@@ -2108,44 +2110,43 @@ end;
 // TValue
 //------------------------------------------------------------------------------
 
-function ConvertValue(const value: TValue;
-  scale: double; fontSize: double): double;
+function ConvertValue(const value: TValue; scale: double): double;
 const
   mm  = 96 / 25.4;
   cm  = 96 / 2.54;
   rad = 180 / PI;
   pt  = 4 / 3;
 begin
-  if fontSize = 0 then fontSize := 96;
-
   //https://oreillymedia.github.io/Using_SVG/guide/units.html
   //todo: still lots of units to support (eg times for animation)
   with value do
     if not IsValid or (rawVal = 0) then
       Result := 0
     else
-      case value.mu of
-        muUndefined:
-          if (Abs(rawVal) < pcBelow) then
-            Result := rawVal * scale else
-            Result := rawVal;
-        muPercent:
+      case value.unitType of
+        utNumber:
+          Result := rawVal;
+        utPercent:
           Result := rawVal * 0.01 * scale;
-        muRadian:
+        utRadian:
           Result := rawVal * rad;
-        muInch:
+        utInch:
           Result := rawVal * 96;
-        muCm:
+        utCm:
           Result := rawVal * cm;
-        muMm:
+        utMm:
           Result := rawVal * mm;
-        muEm:
-          Result := rawVal * fontSize;
-        muEx:
-          Result := rawVal * fontSize * 0.5;
-        muPica:
+        utEm:
+          if scale <= 0 then
+            Result := rawVal * 16 else
+            Result := rawVal * scale;
+        utEx:
+          if scale <= 0 then
+            Result := rawVal * 8 else
+            Result := rawVal * scale * 0.5;
+        utPica:
           Result := rawVal * 16;
-        muPt:
+        utPt:
           Result := rawVal * pt;
         else
           Result := rawVal;
@@ -2153,58 +2154,58 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TValue.Init(asPercentBelow: double);
+procedure TValue.Init;
 begin
-  rawVal  := InvalidD;
-  mu      := muUndefined;
-  pcBelow := asPercentBelow;
+  rawVal      := InvalidD;
+  unitType          := utNumber;
 end;
 //------------------------------------------------------------------------------
 
-procedure TValue.SetValue(val: double; measureUnit: TMeasureUnit);
+procedure TValue.SetValue(val: double; unitTyp: TUnitType);
 begin
   rawVal  := val;
-  mu      := measureUnit;
+  unitType      := unitTyp;
 end;
 //------------------------------------------------------------------------------
 
-function TValue.GetValue(scale: double; fontSize: double): double;
+function TValue.GetValue(pcSize: double; assumeRelValBelow: Double): double;
 begin
-  Result := ConvertValue(self, scale, fontSize);
+  if not IsValid or (rawVal = 0) then
+    Result := 0
+  else if (unitType = utNumber) and (Abs(rawVal) <= assumeRelValBelow) then
+    Result := rawVal * pcSize
+  else
+    Result := ConvertValue(self, pcSize);
 end;
 //------------------------------------------------------------------------------
 
-function TValue.GetValueX(const scale: double; fontSize: double): double;
-begin
-  Result := ConvertValue(self, scale, fontSize);
-end;
-//------------------------------------------------------------------------------
-
-function TValue.GetValueY(const scale: double; fontSize: double): double;
-begin
-  Result := ConvertValue(self, scale, fontSize);
-end;
-//------------------------------------------------------------------------------
-
-function TValue.GetValueXY(const scaleRec: TRectD; fontSize: double): double;
+function TValue.GetValueXY(const pcSize: TRectD; assumeRelValBelow: Double): double;
 begin
   //https://www.w3.org/TR/SVG11/coords.html#Units
-  Result := ConvertValue(self,
-    Hypot(scaleRec.Width, scaleRec.Height)/sqrt2, fontSize);
+  Result := GetValue(Hypot(pcSize.Width, pcSize.Height)/sqrt2, assumeRelValBelow);
 end;
 //------------------------------------------------------------------------------
 
 function TValue.IsValid: Boolean;
 begin
-  Result := Image32_Vector.IsValid(rawVal);
+  Result := (unitType <> utUnknown) and Image32_Vector.IsValid(rawVal);
 end;
 //------------------------------------------------------------------------------
 
-function TValue.IsPercent: Boolean;
+function TValue.HasFontUnits: Boolean;
 begin
-  case mu of
-    muUndefined: Result := Abs(rawVal) < pcBelow;
-    muPercent: Result := True;
+  case unitType of
+    utEm, utEx: Result := true;
+    else Result := False;
+  end;
+end;
+
+//------------------------------------------------------------------------------
+
+function TValue.HasAngleUnits: Boolean;
+begin
+  case unitType of
+    utDegree, utRadian: Result := true;
     else Result := False;
   end;
 end;
@@ -2213,17 +2214,24 @@ end;
 // TValuePt
 //------------------------------------------------------------------------------
 
-procedure TValuePt.Init(asPercentBelow: double);
+procedure TValuePt.Init;
 begin
-  X.Init(asPercentBelow);
-  Y.Init(asPercentBelow);
+  X.Init;
+  Y.Init;
 end;
 //------------------------------------------------------------------------------
 
-function TValuePt.GetPoint(const scaleRec: TRectD; fontSize: double): TPointD;
+function TValuePt.GetPoint(const pcSize: double; assumeRelValBelow: Double): TPointD;
 begin
-  Result.X := X.GetValueX(scaleRec.Width, fontSize);
-  Result.Y := Y.GetValueY(scaleRec.Height, fontSize);
+  Result.X := X.GetValue(pcSize, assumeRelValBelow);
+  Result.Y := Y.GetValue(pcSize, assumeRelValBelow);
+end;
+//------------------------------------------------------------------------------
+
+function TValuePt.GetPoint(const pcSize: TRectD; assumeRelValBelow: Double): TPointD;
+begin
+  Result.X := X.GetValue(pcSize.Width, assumeRelValBelow);
+  Result.Y := Y.GetValue(pcSize.Height, assumeRelValBelow);
 end;
 //------------------------------------------------------------------------------
 
@@ -2236,18 +2244,18 @@ end;
 // TValueRec
 //------------------------------------------------------------------------------
 
-procedure TValueRecWH.Init(asPercentBelow: double);
+procedure TValueRecWH.Init;
 begin
-  left.Init(asPercentBelow);
-  top.Init(asPercentBelow);
-  width.Init(asPercentBelow);
-  height.Init(asPercentBelow);
+  left.Init;
+  top.Init;
+  width.Init;
+  height.Init;
 end;
 //------------------------------------------------------------------------------
 
-function TValueRecWH.GetRectD(const scaleRec: TRectD; fontSize: double): TRectD;
+function TValueRecWH.GetRectD(const pcSize: TRectD; assumeRelValBelow: Double): TRectD;
 begin
-  with GetRectWH(scaleRec, fontSize) do
+  with GetRectWH(pcSize, assumeRelValBelow) do
   begin
     Result.Left :=Left;
     Result.Top := Top;
@@ -2257,18 +2265,33 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TValueRecWH.GetRectWH(const scaleRec: TRectD; fontSize: double): TRectWH;
+function TValueRecWH.GetRectD(pcSize: double; assumeRelValBelow: Double): TRectD;
 begin
   if not left.IsValid then
     Result.Left := 0 else
-    Result.Left := left.GetValueX(scaleRec.Width, fontSize);
+    Result.Left := left.GetValue(pcSize, assumeRelValBelow);
 
   if not top.IsValid then
     Result.Top := 0 else
-    Result.Top := top.GetValueY(scaleRec.Height, fontSize);
+    Result.Top := top.GetValue(pcSize, assumeRelValBelow);
 
-  Result.Width := width.GetValueX(scaleRec.Width, fontSize);
-  Result.Height := height.GetValueY(scaleRec.Height, fontSize);
+  Result.Right := Result.Left + width.GetValue(pcSize, assumeRelValBelow);
+  Result.Bottom := Result.Top + height.GetValue(pcSize, assumeRelValBelow);
+end;
+//------------------------------------------------------------------------------
+
+function TValueRecWH.GetRectWH(const pcSize: TRectD; assumeRelValBelow: Double): TRectWH;
+begin
+  if not left.IsValid then
+    Result.Left := 0 else
+    Result.Left := left.GetValue(pcSize.Width, assumeRelValBelow);
+
+  if not top.IsValid then
+    Result.Top := 0 else
+    Result.Top := top.GetValue(pcSize.Height, assumeRelValBelow);
+
+  Result.Width := width.GetValue(pcSize.Width, assumeRelValBelow);
+  Result.Height := height.GetValue(pcSize.Height, assumeRelValBelow);
 end;
 //------------------------------------------------------------------------------
 
