@@ -1,11 +1,11 @@
 program Layers101;
 
-{$R ..\Resources.res}
-{$I Image32.inc}
-
 uses
   Forms,
   Unit1 in 'Unit1.pas' {MainForm};
+
+{$I Image32.inc}
+{$R ..\Resources.res}
 
 begin
 {$IFDEF REPORTMEMORYLEAKS}

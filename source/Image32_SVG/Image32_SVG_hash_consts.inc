@@ -1,6 +1,7 @@
 const
   hAmplitude                  = $DA119D26;    // Amplitude
   hArial                      = $EC47D4A0;    // Arial
+  harithmetic                 = $978C7D6F;    // arithmetic
   hAtop                       = $7655315D;    // Atop
   hauto_045_start_045_reverse = $EE4545A2;    // auto-start-reverse
   hBaseline                   = $C7461648;    // Baseline
@@ -21,6 +22,7 @@ const
   hD                          = $2350C685;    // D
   hDarken                     = $3DD2B17F;    // Darken
   hDefs                       = $A819FE18;    // Defs
+  hdiffuseConstant            = $08AD9D7D;    // diffuseConstant
   hDiscrete                   = $ECBBCCA1;    // Discrete
   hDisplay                    = $17D82A47;    // Display
   hDx                         = $6798DE45;    // Dx
@@ -33,6 +35,7 @@ const
   hfeColorMatrix              = $C0C4CF02;    // feColorMatrix
   hfeComponentTransfer        = $8B01CCC8;    // feComponentTransfer
   hfeComposite                = $E652E33C;    // feComposite
+  hfeDefuseLighting           = $D9F6C722;    // feDefuseLighting
   hfeDropShadow               = $16269B00;    // feDropShadow
   hfeFlood                    = $0B6C5F4E;    // feFlood
   hfeFuncA                    = $2EA47C9E;    // feFuncA
@@ -43,6 +46,8 @@ const
   hfeMerge                    = $A2C358C0;    // feMerge
   hfeMergeNode                = $F5F1E90F;    // feMergeNode
   hfeOffset                   = $04493A72;    // feOffset
+  hfePointLight               = $D3FFCCA4;    // fePointLight
+  hfeSpecularLighting         = $577C6E4B;    // feSpecularLighting
   hFill                       = $A3AAAB69;    // Fill
   hFill_045_Opacity           = $18000C02;    // Fill-Opacity
   hFill_045_Rule              = $5264679F;    // Fill-Rule
@@ -69,9 +74,15 @@ const
   hIn2                        = $FBFE02B1;    // In2
   hIntercept                  = $7CBB607F;    // Intercept
   hItalic                     = $F07E7786;    // Italic
+  hk1                         = $33176D43;    // k1
+  hk2                         = $DD11C139;    // k2
+  hk3                         = $CF4B25AC;    // k3
+  hk4                         = $77CCF6AD;    // k4
+  hkernelUnitLength           = $3B25E980;    // kernelUnitLength
   hletter_045_spacing         = $5130BCF5;    // letter-spacing
   hLighten                    = $85E826DE;    // Lighten
   hLighter                    = $CCEDB4E8;    // Lighter
+  hlighting_045_color         = $B4114C27;    // lighting-color
   hLine                       = $7A6D718F;    // Line
   hline_045_through           = $1C703CCD;    // line-through
   hLinear                     = $39327DA3;    // Linear
@@ -126,6 +137,7 @@ const
   hSlope                      = $4774735C;    // Slope
   hSourceAlpha                = $F891B958;    // SourceAlpha
   hSourceGraphic              = $A4DB1DC2;    // SourceGraphic
+  hspecularExponent           = $93D520E8;    // specularExponent
   hSpreadMethod               = $A08CEB57;    // SpreadMethod
   hSquare                     = $20E48144;    // Square
   hStart                      = $84DC271F;    // Start
@@ -144,6 +156,7 @@ const
   hStyle                      = $A9473AB4;    // Style
   hSub                        = $1B3C1FFA;    // Sub
   hSuper                      = $9C5EE034;    // Super
+  hsurfaceScale               = $EA29CC4F;    // surfaceScale
   hSvg                        = $ED67C37E;    // Svg
   hSwitch                     = $D60E64BB;    // Switch
   hSymbol                     = $07754611;    // Symbol
@@ -173,3 +186,4 @@ const
   hY                          = $80950108;    // Y
   hY1                         = $7F247680;    // Y1
   hY2                         = $6DE3D3FF;    // Y2
+  hZ                          = $B6606C9E;    // Z

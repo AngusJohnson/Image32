@@ -346,6 +346,8 @@ type
   //BlendMask: Whereever the mask is, preserves the background
   function BlendMask(bgColor, alphaMask: TColor32): TColor32;
   function BlendInvertedMask(bgColor, alphaMask: TColor32): TColor32;
+  //BlendBlueChannel: typically useful for white color masks
+  function BlendBlueChannel(bgColor, blueMask: TColor32): TColor32;
 
   //COMPARE COLOR FUNCTIONS (ConvertToBoolMask, FloodFill, Vectorize etc.)
 
@@ -670,6 +672,17 @@ begin
   Result := bgColor;
   res.A := MulBytes(bg.A, fg.A);
   if res.A = 0 then Result := 0;
+end;
+//------------------------------------------------------------------------------
+
+function BlendBlueChannel(bgColor, blueMask: TColor32): TColor32;
+var
+  res: TARGB absolute Result;
+  bg: TARGB absolute bgColor;
+  fg: TARGB absolute blueMask;
+begin
+  Result := bgColor;
+  res.A := MulBytes(bg.A, MulBytes(fg.B, fg.A));
 end;
 //------------------------------------------------------------------------------
 

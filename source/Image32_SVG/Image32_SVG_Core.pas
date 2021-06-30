@@ -47,8 +47,8 @@ type
     unitType  : TUnitType;
     procedure Init;
     procedure SetValue(val: double; unitTyp: TUnitType = utNumber);
-    function  GetValue(pcSize: double; assumeRelValBelow: Double): double;
-    function  GetValueXY(const pcSize: TRectD; assumeRelValBelow: Double): double;
+    function  GetValue(relSize: double; assumeRelValBelow: Double): double;
+    function  GetValueXY(const relSize: TRectD; assumeRelValBelow: Double): double;
     function  IsValid: Boolean;
     function  HasFontUnits: Boolean;
     function  HasAngleUnits: Boolean;
@@ -57,8 +57,8 @@ type
   TValuePt = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
     X, Y    : TValue;
     procedure Init;
-    function  GetPoint(const pcSize: double; assumeRelValBelow: Double): TPointD; overload;
-    function  GetPoint(const pcSize: TRectD; assumeRelValBelow: Double): TPointD; overload;
+    function  GetPoint(const relSize: double; assumeRelValBelow: Double): TPointD; overload;
+    function  GetPoint(const relSize: TRectD; assumeRelValBelow: Double): TPointD; overload;
     function  IsValid: Boolean;
   end;
 
@@ -68,9 +68,9 @@ type
     width   : TValue;
     height  : TValue;
     procedure Init;
-    function  GetRectD(const pcSize: TRectD; assumeRelValBelow: Double): TRectD; overload;
-    function  GetRectD(pcSize: double; assumeRelValBelow: Double): TRectD; overload;
-    function  GetRectWH(const pcSize: TRectD; assumeRelValBelow: Double): TRectWH;
+    function  GetRectD(const relSize: TRectD; assumeRelValBelow: Double): TRectD; overload;
+    function  GetRectD(relSize: double; assumeRelValBelow: Double): TRectD; overload;
+    function  GetRectWH(const relSize: TRectD; assumeRelValBelow: Double): TRectWH;
     function  IsValid: Boolean;
     function  IsEmpty: Boolean;
   end;
@@ -2168,21 +2168,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TValue.GetValue(pcSize: double; assumeRelValBelow: Double): double;
+function TValue.GetValue(relSize: double; assumeRelValBelow: Double): double;
 begin
   if not IsValid or (rawVal = 0) then
     Result := 0
   else if (unitType = utNumber) and (Abs(rawVal) <= assumeRelValBelow) then
-    Result := rawVal * pcSize
+    Result := rawVal * relSize
   else
-    Result := ConvertValue(self, pcSize);
+    Result := ConvertValue(self, relSize);
 end;
 //------------------------------------------------------------------------------
 
-function TValue.GetValueXY(const pcSize: TRectD; assumeRelValBelow: Double): double;
+function TValue.GetValueXY(const relSize: TRectD; assumeRelValBelow: Double): double;
 begin
   //https://www.w3.org/TR/SVG11/coords.html#Units
-  Result := GetValue(Hypot(pcSize.Width, pcSize.Height)/sqrt2, assumeRelValBelow);
+  Result := GetValue(Hypot(relSize.Width, relSize.Height)/sqrt2, assumeRelValBelow);
 end;
 //------------------------------------------------------------------------------
 
@@ -2221,17 +2221,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TValuePt.GetPoint(const pcSize: double; assumeRelValBelow: Double): TPointD;
+function TValuePt.GetPoint(const relSize: double; assumeRelValBelow: Double): TPointD;
 begin
-  Result.X := X.GetValue(pcSize, assumeRelValBelow);
-  Result.Y := Y.GetValue(pcSize, assumeRelValBelow);
+  Result.X := X.GetValue(relSize, assumeRelValBelow);
+  Result.Y := Y.GetValue(relSize, assumeRelValBelow);
 end;
 //------------------------------------------------------------------------------
 
-function TValuePt.GetPoint(const pcSize: TRectD; assumeRelValBelow: Double): TPointD;
+function TValuePt.GetPoint(const relSize: TRectD; assumeRelValBelow: Double): TPointD;
 begin
-  Result.X := X.GetValue(pcSize.Width, assumeRelValBelow);
-  Result.Y := Y.GetValue(pcSize.Height, assumeRelValBelow);
+  Result.X := X.GetValue(relSize.Width, assumeRelValBelow);
+  Result.Y := Y.GetValue(relSize.Height, assumeRelValBelow);
 end;
 //------------------------------------------------------------------------------
 
@@ -2253,9 +2253,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TValueRecWH.GetRectD(const pcSize: TRectD; assumeRelValBelow: Double): TRectD;
+function TValueRecWH.GetRectD(const relSize: TRectD; assumeRelValBelow: Double): TRectD;
 begin
-  with GetRectWH(pcSize, assumeRelValBelow) do
+  with GetRectWH(relSize, assumeRelValBelow) do
   begin
     Result.Left :=Left;
     Result.Top := Top;
@@ -2265,33 +2265,33 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TValueRecWH.GetRectD(pcSize: double; assumeRelValBelow: Double): TRectD;
+function TValueRecWH.GetRectD(relSize: double; assumeRelValBelow: Double): TRectD;
 begin
   if not left.IsValid then
     Result.Left := 0 else
-    Result.Left := left.GetValue(pcSize, assumeRelValBelow);
+    Result.Left := left.GetValue(relSize, assumeRelValBelow);
 
   if not top.IsValid then
     Result.Top := 0 else
-    Result.Top := top.GetValue(pcSize, assumeRelValBelow);
+    Result.Top := top.GetValue(relSize, assumeRelValBelow);
 
-  Result.Right := Result.Left + width.GetValue(pcSize, assumeRelValBelow);
-  Result.Bottom := Result.Top + height.GetValue(pcSize, assumeRelValBelow);
+  Result.Right := Result.Left + width.GetValue(relSize, assumeRelValBelow);
+  Result.Bottom := Result.Top + height.GetValue(relSize, assumeRelValBelow);
 end;
 //------------------------------------------------------------------------------
 
-function TValueRecWH.GetRectWH(const pcSize: TRectD; assumeRelValBelow: Double): TRectWH;
+function TValueRecWH.GetRectWH(const relSize: TRectD; assumeRelValBelow: Double): TRectWH;
 begin
   if not left.IsValid then
     Result.Left := 0 else
-    Result.Left := left.GetValue(pcSize.Width, assumeRelValBelow);
+    Result.Left := left.GetValue(relSize.Width, assumeRelValBelow);
 
   if not top.IsValid then
     Result.Top := 0 else
-    Result.Top := top.GetValue(pcSize.Height, assumeRelValBelow);
+    Result.Top := top.GetValue(relSize.Height, assumeRelValBelow);
 
-  Result.Width := width.GetValue(pcSize.Width, assumeRelValBelow);
-  Result.Height := height.GetValue(pcSize.Height, assumeRelValBelow);
+  Result.Width := width.GetValue(relSize.Width, assumeRelValBelow);
+  Result.Height := height.GetValue(relSize.Height, assumeRelValBelow);
 end;
 //------------------------------------------------------------------------------
 

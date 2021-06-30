@@ -1,11 +1,11 @@
 program Vectorize;
 
-{$R ..\Resources.res}
-{$I Image32.inc}
-
 uses
   Forms,
   Unit1 in 'Unit1.pas' {Form1};
+
+{$I Image32.inc}
+{$R ..\Resources.res}
 
 begin
 {$IFDEF REPORTMEMORYLEAKS}

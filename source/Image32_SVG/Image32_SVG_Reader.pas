@@ -75,7 +75,7 @@ type
     procedure LoadAttributes;
     procedure LoadAttribute(attrib: PSvgAttrib);
     function  LoadContent: Boolean; virtual;
-    //GetRelFracLimit: assume untyped vals are relative vals up to this limit
+    //GetRelFracLimit: ie when to assume untyped vals are relative vals
     function  GetRelFracLimit: double; virtual;
     procedure Draw(image: TImage32; drawInfo: TDrawInfo); virtual;
     procedure DrawChildren(image: TImage32; drawInfo: TDrawInfo); virtual;
@@ -87,7 +87,7 @@ type
   TSvgReader = class
   private
     fSvgParser        : TSvgParser;
-    fBackgroundColor  : TColor32;
+    fBkgndColor       : TColor32;
     fTempImage        : TImage32;
     fBlurQuality      : integer;
     fIdList           : TStringList;
@@ -106,13 +106,12 @@ type
     function GetIsEmpty: Boolean;
     procedure SetBlurQuality(quality: integer);
   protected
-    rawRect       : TRectD;
-    currentColor  : TColor32;
-    procedure GetBestFont(const svgFontInfo: TSVGFontInfo);
+    userSpaceBounds : TRectD;
+    currentColor    : TColor32;
+    procedure GetBestFontForFontCache(const svgFontInfo: TSVGFontInfo);
     property  RadGradRenderer: TSvgRadialGradientRenderer read fRadGradRenderer;
     property  LinGradRenderer: TLinearGradientRenderer read fLinGradRenderer;
     property  ImageRenderer  : TImageRenderer read fImgRenderer;
-
     property  TempImage      : TImage32 read fTempImage;
   public
     constructor Create;
@@ -125,8 +124,7 @@ type
     procedure DrawImage(img: TImage32; scaleToImage: Boolean);
     function  LoadFromStream(stream: TStream): Boolean;
     function  LoadFromFile(const filename: string): Boolean;
-    property  BackgroundColor: TColor32
-      read fBackgroundColor write fBackgroundColor;
+    property  BackgroundColor: TColor32 read fBkgndColor write fBkgndColor;
     property  BlurQuality: integer read fBlurQuality write SetBlurQuality;
 
     property IsEmpty: Boolean read GetIsEmpty;
@@ -425,17 +423,29 @@ type
     procedure Apply; override;
   end;
 
-  TCompositeOp = (coOver, coIn, coOut, coAtop, coXOR);
+  TCompositeOp = (coOver, coIn, coOut, coAtop, coXOR, coArithmetic);
 
   TFeCompositeElement  = class(TFeBaseElement)
   protected
+    ks: array [0..3] of double; //arithmetic constants
     compositeOp: TCompositeOp;
     procedure Apply; override;
+  public
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
   end;
 
   TFeColorMatrixElement  = class(TFeBaseElement)
   protected
     values: TArrayOfDouble;
+    procedure Apply; override;
+  end;
+
+  TFeDefuseLightElement = class(TFeBaseElement)
+  protected
+    color         : TColor32;
+    surfaceScale  : double;
+    diffuseConst  : double;
+    kernelSize    : integer;
     procedure Apply; override;
   end;
 
@@ -478,6 +488,18 @@ type
   TFeOffsetElement = class(TFeBaseElement)
   protected
     offset        : TValuePt;
+    procedure Apply; override;
+  end;
+
+  TFePointLightElement = class(TFeBaseElement)
+  protected
+    z             : double;
+  end;
+
+  TFeSpecLightElement = class(TFeBaseElement)
+  protected
+    exponent      : double;
+    color         : TColor32;
     procedure Apply; override;
   end;
 
@@ -532,12 +554,15 @@ begin
     hfeBlend        : Result := TFeBlendElement;
     hfeColorMatrix  : Result := TFeColorMatrixElement;
     hfeComposite    : Result := TFeCompositeElement;
+    hfeDefuseLighting : Result := TFeDefuseLightElement;
     hfeDropShadow   : Result := TFeDropShadowElement;
     hfeFlood        : Result := TFeFloodElement;
     hFeGaussianBlur : Result := TFeGaussElement;
     hfeMerge        : Result := TFeMergeElement;
     hfeMergeNode    : Result := TFeMergeNodeElement;
     hfeOffset       : Result := TFeOffsetElement;
+    hfePointLight   : Result := TFePointLightElement;
+    hfeSpecularLighting : Result := TFeSpecLightElement;
     hG              : Result := TGroupElement;
     hLine           : Result := TLineElement;
     hLineargradient : Result := TLinGradElement;
@@ -1090,10 +1115,8 @@ begin
   Result := hiStops >= 0;
   if not Result then Exit;
 
-  //w3c-coords-units-01-b.svg
-
   if units = hUserSpaceOnUse then
-    rec2 := fReader.rawRect else
+    rec2 := fReader.userSpaceBounds else
     rec2 := drawInfo.bounds;
 
   if radius.IsValid then
@@ -1190,7 +1213,7 @@ begin
   //https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/gradientUnits
 
   if units = hUserSpaceOnUse then
-    rec2 := fReader.rawRect else
+    rec2 := fReader.userSpaceBounds else
     rec2 := drawInfo.bounds;
 
   with TLinearGradientRenderer(renderer) do
@@ -1277,6 +1300,7 @@ end;
 
 function TFilterElement.GetRelFracLimit: double;
 begin
+  //always assume fractional values below 2.5 are relative
   Result := 2.5;
 end;
 //------------------------------------------------------------------------------
@@ -1376,11 +1400,13 @@ begin
         hfeBlend        : TFeBlendElement(fChilds[i]).Apply;
         hfeColorMatrix  : TFeColorMatrixElement(fChilds[i]).Apply;
         hfeComposite    : TFeCompositeElement(fChilds[i]).Apply;
+        hfeDefuseLighting : TFeDefuseLightElement(fChilds[i]).Apply;
         hfeDropShadow   : TFeDropShadowElement(fChilds[i]).Apply;
         hfeFlood        : TFeFloodElement(fChilds[i]).Apply;
         hFeGaussianBlur : TFeGaussElement(fChilds[i]).Apply;
         hfeMerge        : TFeMergeElement(fChilds[i]).Apply;
         hfeOffset       : TFeOffsetElement(fChilds[i]).Apply;
+        hfeSpecularLighting : TFeSpecLightElement(fChilds[i]).Apply;
       end;
     end;
     if fLastImg <> fSrcImg then
@@ -1471,6 +1497,61 @@ end;
 // TFeCompositeElement
 //------------------------------------------------------------------------------
 
+constructor TFeCompositeElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+begin
+  inherited;
+  ks[0] := InvalidD; ks[1] := InvalidD; ks[2] := InvalidD; ks[3] := InvalidD;
+end;
+//------------------------------------------------------------------------------
+
+procedure Arithmetic(p1, p2, r: PColor32; const ks: array of byte);
+var
+  c1  : PARGB absolute p1;
+  c2  : PARGB absolute p2;
+  res : PARGB absolute r;
+begin
+  res.A := ClampByte(MulBytes(ks[0], MulBytes(c1.A, c2.A)) +
+    MulBytes(ks[1], c1.A) + MulBytes(ks[2], c2.A) + ks[3]);
+  res.R := ClampByte(MulBytes(ks[0], MulBytes(c1.R, c2.R)) +
+    MulBytes(ks[1], c1.R) + MulBytes(ks[2], c2.R) + ks[3]);
+  res.G := ClampByte(MulBytes(ks[0], MulBytes(c1.G, c2.G)) +
+    MulBytes(ks[1], c1.G) + MulBytes(ks[2], c2.G) + ks[3]);
+  res.B := ClampByte(MulBytes(ks[0], MulBytes(c1.B, c2.B)) +
+    MulBytes(ks[1], c1.B) + MulBytes(ks[2], c2.B) + ks[3]);
+end;
+//------------------------------------------------------------------------------
+
+procedure ArithmeticBlend(src1, src2, dst: TImage32;
+  const recS1, recS2, recDst: TRect; const ks: array of double);
+var
+  kk: array[0..3] of byte;
+  w,h,i,j: integer;
+  p1,p2,r: PColor32;
+begin
+  w := RectWidth(recS1);
+  h := RectHeight(recS1);
+  if (RectWidth(recS2) <> w) or (RectWidth(recDst) <> w) or
+    (RectHeight(recS2) <> h) or (RectHeight(recDst) <> h) or
+    (ks[0] = InvalidD) or (ks[1] = InvalidD) or
+    (ks[2] = InvalidD) or (ks[3] = InvalidD) then Exit;
+
+  for i := 0 to 3 do
+    kk[i] := ClampByte(ks[i]*255);
+
+  for i := 0 to h -1 do
+  begin
+    p1 := @src1.Pixels[(recS1.Top + i) * src1.Width + recS1.Left];
+    p2 := @src2.Pixels[(recS2.Top + i) * src2.Width + recS2.Left];
+    r  := @dst.Pixels[(recDst.Top + i) * dst.Width + recDst.Left];
+    for j := 0 to w -1 do
+    begin
+      Arithmetic(p1, p2, r, kk);
+      inc(p1); inc(p2); inc(r);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
 procedure TFeCompositeElement.Apply;
 var
   pfe: TFilterElement;
@@ -1499,15 +1580,17 @@ begin
         dstImg2.Copy(srcImg, srcRec, dstRec2);
         dstImg2.CopyBlend(srcImg2,  srcRec2,  dstRec2, BlendInvertedMask);
       end;
-//    coAtop: ;
-//    coXOR: ;
+    coArithmetic:
+      begin
+        ArithmeticBlend(srcImg, srcImg2, dstImg2,
+          srcRec, srcRec2, dstRec2, ks);
+      end;
     else     //coOver
       begin
         dstImg2.CopyBlend(srcImg2, srcRec2, dstRec2, BlendToAlpha);
         dstImg2.CopyBlend(srcImg,  srcRec,  dstRec2, BlendToAlpha);
       end;
   end;
-
   if dstImg = srcImg then
     dstImg.Copy(dstImg2, dstRec2, dstRec);
 end;
@@ -1558,6 +1641,18 @@ begin
     end;
     inc(p1, dx1); inc(p2, dx2);
   end;
+end;
+
+//------------------------------------------------------------------------------
+// TFeDefuseLightElement
+//------------------------------------------------------------------------------
+
+procedure TFeDefuseLightElement.Apply;
+begin
+  //not implemented
+  if not GetSrcAndDst then Exit;
+  if srcImg <> dstImg then
+    dstImg.Copy(srcImg, srcRec, dstRec);
 end;
 
 //------------------------------------------------------------------------------
@@ -1726,6 +1821,18 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// TFeSpecLightElement
+//------------------------------------------------------------------------------
+
+procedure TFeSpecLightElement.Apply;
+begin
+  //not implemented
+  if not GetSrcAndDst then Exit;
+  if srcImg <> dstImg then
+    dstImg.Copy(srcImg, srcRec, dstRec);
+end;
+
+//------------------------------------------------------------------------------
 // TClipPathElement
 //------------------------------------------------------------------------------
 
@@ -1798,7 +1905,7 @@ var
   maskEl      : TElement;
   clipPaths   : TPathsD;
   di          : TDrawInfo;
-  usingSpecialEffects: Boolean;
+  usingTempImage: Boolean;
 begin
   UpdateDrawInfo(drawInfo, self);
 
@@ -1822,12 +1929,11 @@ begin
     with TARGB(drawInfo.fillColor) do
       if (A > 0) and (A < 255) then DrawInfo.opacity := A;
 
-  usingSpecialEffects := Assigned(clipPathEl) or
+  usingTempImage := Assigned(clipPathEl) or
     Assigned(filterEl) or Assigned(maskEl) or (DrawInfo.opacity < 255);
 
-  if usingSpecialEffects then
+  if usingTempImage then
   begin
-    //usingSpecialEffects - requires a temporary image
     img := fReader.TempImage;
 
     //get special effects bounds
@@ -1899,7 +2005,7 @@ begin
     with TClipPathElement(clipPathEl) do
       EraseOutsidePaths(img, clipPaths, fDrawInfo.fillRule, clipRec2);
 
-  if usingSpecialEffects then
+  if usingTempImage and (img <> image) then
     image.CopyBlend(img, clipRec2, clipRec2, BlendToAlpha);
 
   //todo: enable "paint-order" to change filled/stroked/marker paint order
@@ -2059,7 +2165,7 @@ begin
   joinStyle := fDrawInfo.strokeJoin;
 
   scale := ExtractAvgScaleFromMatrix(drawInfo.matrix);
-  bounds := fReader.rawRect;
+  bounds := fReader.userSpaceBounds;
   with drawInfo.strokeWidth do
     if HasFontUnits then
       scaledStrokeWidth :=
@@ -2622,7 +2728,7 @@ var
   mat: TMatrixD;
 begin
   if Assigned(drawPathsC) then Exit;
-  fReader.GetBestFont(drawInfo.FontInfo);
+  fReader.GetBestFontForFontCache(drawInfo.FontInfo);
   if drawInfo.FontInfo.size = 0 then
     fontSize := 16 else
     fontSize := drawInfo.FontInfo.size;
@@ -2702,7 +2808,7 @@ var
   isClosed: Boolean;
 begin
   if Assigned(drawPathsC) then Exit;
-  fReader.GetBestFont(drawInfo.FontInfo);
+  fReader.GetBestFontForFontCache(drawInfo.FontInfo);
   if (drawInfo.FontInfo.size < 2) or
     not Assigned(fReader.fFontCache) then Exit;
 
@@ -2884,6 +2990,7 @@ end;
 
 function TFillElement.GetRelFracLimit: double;
 begin
+  //always assume fractional values below 1 are relative
   Result := 1.0;
 end;
 
@@ -2915,11 +3022,9 @@ var
 begin
   Result := false;
 
-  //ExtractAllFromMatrix(drawInfo.matrix, angle, scale, skew, trans);
   scale := ExtractScaleFromMatrix(drawInfo.matrix);
-
   if units = hUserSpaceOnUse then
-    rec := fReader.rawRect else
+    rec := fReader.userSpaceBounds else
     rec := drawInfo.bounds;
 
   //todo: implement patternUnits & patternContentUnits too
@@ -3160,6 +3265,19 @@ begin
   aOwnerEl.fDrawInfo.currentColor := color;
   //for setting currentcolor during element creation (eg gradient colors)
   aOwnerEl.fReader.currentColor := color;
+end;
+//------------------------------------------------------------------------------
+
+procedure LightingColor_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  color: TColor32;
+begin
+  color := clInvalid;
+  AnsiStringToColor32(value, color);
+  if (aOwnerEl is TFeSpecLightElement) then
+    TFeSpecLightElement(aOwnerEl).color := color
+  else if (aOwnerEl is TFeDefuseLightElement) then
+    TFeDefuseLightElement(aOwnerEl).color := color
 end;
 //------------------------------------------------------------------------------
 
@@ -3438,11 +3556,12 @@ begin
   if (aOwnerEl is TFeCompositeElement) then
     with TFeCompositeElement(aOwnerEl) do
       case GetHash(value) of
-        hAtop : compositeOp := coAtop;
-        hIn   : compositeOp := coIn;
-        hOut  : compositeOp := coOut;
-        hOver : compositeOp := coOver;
-        hXor  : compositeOp := coXor;
+        hAtop       : compositeOp := coAtop;
+        hIn         : compositeOp := coIn;
+        hOut        : compositeOp := coOut;
+        hOver       : compositeOp := coOver;
+        hXor        : compositeOp := coXor;
+        hArithmetic : compositeOp := coArithmetic;
       end;
 end;
 //------------------------------------------------------------------------------
@@ -3823,6 +3942,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure SpectacularExponent(aOwnerEl: TElement; const value: AnsiString);
+var
+  se: double;
+begin
+  if not (aOwnerEl is TFeSpecLightElement) then Exit;
+  AnsiStringToFloat(value, se);
+  if (se > 0) and (se < 100) then
+    TFeSpecLightElement(aOwnerEl).exponent := se;
+end;
+//------------------------------------------------------------------------------
+
 procedure StdDev_Attrib(aOwnerEl: TElement; const value: AnsiString);
 var
   sd: double;
@@ -3835,6 +3965,46 @@ begin
     hfeDropShadow:
       TFeDropShadowElement(aOwnerEl).stdDev := sd;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure K1_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  val: double;
+begin
+  AnsiStringToFloat(value, val);
+  if aOwnerEl is TFeCompositeElement then
+    TFeCompositeElement(aOwnerEl).ks[0] := val;
+end;
+//------------------------------------------------------------------------------
+
+procedure K2_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  val: double;
+begin
+  AnsiStringToFloat(value, val);
+  if aOwnerEl is TFeCompositeElement then
+    TFeCompositeElement(aOwnerEl).ks[1] := val;
+end;
+//------------------------------------------------------------------------------
+
+procedure K3_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  val: double;
+begin
+  AnsiStringToFloat(value, val);
+  if aOwnerEl is TFeCompositeElement then
+    TFeCompositeElement(aOwnerEl).ks[2] := val;
+end;
+//------------------------------------------------------------------------------
+
+procedure K4_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  val: double;
+begin
+  AnsiStringToFloat(value, val);
+  if aOwnerEl is TFeCompositeElement then
+    TFeCompositeElement(aOwnerEl).ks[3] := val;
 end;
 //------------------------------------------------------------------------------
 
@@ -3922,6 +4092,16 @@ begin
       end;
   end;
 end;
+//------------------------------------------------------------------------------
+
+procedure Z_Attrib(aOwnerEl: TElement; const value: AnsiString);
+var
+  val: double;
+begin
+  AnsiStringToFloat(value, val);
+  if aOwnerEl is TFePointLightElement then
+    TFePointLightElement(aOwnerEl).z := val;
+end;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -3961,7 +4141,12 @@ begin
     hId:                    Id_Attrib(self, value);
     hIn:                    In_Attrib(self, value);
     hIn2:                   In2_Attrib(self, value);
+    hk1:                    K1_Attrib(self, value);
+    hk2:                    K2_Attrib(self, value);
+    hk3:                    K3_Attrib(self, value);
+    hk4:                    K4_Attrib(self, value);
     hletter_045_spacing:    LetterSpacing_Attrib(self, value);
+    hlighting_045_color:    LightingColor_Attrib(self, value);
     hMarker_045_End:        MarkerEnd_Attrib(self, value);
     hMarkerHeight:          Height_Attrib(self, value);
     hMarker_045_Mid:        MarkerMiddle_Attrib(self, value);
@@ -3981,6 +4166,7 @@ begin
     hResult:                Result_Attrib(self, value);
     hRx:                    Rx_Attrib(self, value);
     hRy:                    Ry_Attrib(self, value);
+    hspecularExponent:      SpectacularExponent(self, value);
     hSpreadMethod:          SpreadMethod_Attrib(self, value);
     hstdDeviation:          StdDev_Attrib(self, value);
     hStop_045_Color:        StopColor_Attrib(self, value);
@@ -4005,6 +4191,7 @@ begin
     hY:                     Y1_Attrib(self, value);
     hY1:                    Y1_Attrib(self, value);
     hY2:                    Y2_Attrib(self, value);
+    hZ:                     Z_Attrib(self, value);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -4019,6 +4206,7 @@ end;
 //------------------------------------------------------------------------------
 
 function PreferRelativeFraction(val: TValue): TTriState;
+  {$IFDEF INLINE} inline; {$ENDIF}
 begin
   if (val.rawVal = InvalidD) or (val.unitType = utUnknown) then
     Result := tsUnknown
@@ -4031,14 +4219,9 @@ end;
 
 function TElement.GetRelFracLimit: double;
 begin
-  case PreferRelativeFraction(elRectWH.width) of
-    tsYes: begin Result := 1.0; Exit; end;
-    tsNo : begin Result := 0; Exit; end;
-  end;
-  case PreferRelativeFraction(elRectWH.height) of
-    tsYes: begin Result := 1.0; Exit; end;
-    tsNo : begin Result := 0; Exit; end;
-  end;
+  //the default behaviour here is to assume untyped fractional values
+  //below 1.0 are values relative (to the bounding size) BUT ONLY WHEN
+  //the parent element's width or height are relative (ie percentages).
   if Assigned(fParent) and (fParent.fParserEl.hash <> hSvg) then
   begin
     case PreferRelativeFraction(fParent.elRectWH.width) of
@@ -4133,8 +4316,8 @@ begin
   fLinGradRenderer.Clear;
   fRadGradRenderer.Clear;
   fImgRenderer.Image.Clear;
-  currentColor  := clBlack32;
-  rawRect       := NullRectD;
+  currentColor := clBlack32;
+  userSpaceBounds := NullRectD;
 end;
 //------------------------------------------------------------------------------
 
@@ -4192,12 +4375,12 @@ begin
       if viewboxWH.IsEmpty then
         viewboxWH := RectWH(0, 0, img.Width, img.Height);
       fDrawInfo.bounds := viewboxWH.RectD;
-      rawRect  := viewboxWH.RectD;
+      userSpaceBounds  := viewboxWH.RectD;
     end
     else if (w > 0) or (h > 0) then
     begin
       fDrawInfo.bounds := viewboxWH.RectD;
-      rawRect  := viewboxWH.RectD;
+      userSpaceBounds  := viewboxWH.RectD;
 
       if (w > 0) then
         sx := w/viewboxWH.Width else
@@ -4213,7 +4396,7 @@ begin
     end else
     begin
       fDrawInfo.bounds := viewboxWH.RectD;
-      rawRect  := viewboxWH.RectD;
+      userSpaceBounds  := viewboxWH.RectD;
     end;
     di.bounds := fDrawInfo.bounds;
 
@@ -4232,8 +4415,8 @@ begin
       img.SetSize(Round(viewboxWH.Width), Round(viewboxWH.Height));
   end;
 
-  if fBackgroundColor <> clNone32 then
-    img.Clear(fBackgroundColor);
+  if fBkgndColor <> clNone32 then
+    img.Clear(fBkgndColor);
 
   fTempImage := TImage32.Create(img.Width, img.Height);
   try
@@ -4272,7 +4455,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSvgReader.GetBestFont(const svgFontInfo: TSVGFontInfo);
+procedure TSvgReader.GetBestFontForFontCache(const svgFontInfo: TSVGFontInfo);
 
   function GetStyleInt(fontReaderIdx: integer): integer;
   begin

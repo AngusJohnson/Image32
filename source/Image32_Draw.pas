@@ -2,8 +2,8 @@ unit Image32_Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  2.24                                                            *
-* Date      :  26 June 2021                                                    *
+* Version   :  2.25                                                            *
+* Date      :  30 June 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -1497,7 +1497,9 @@ begin
         ellipsePt.Y := -q;
       dist := abs(pt.Y - fFocusPt.Y);
       dist2 := abs(ellipsePt.Y - fFocusPt.Y);
-      q := dist/ dist2;
+      if dist2 = 0 then
+        q := 1 else
+        q := dist/ dist2;
     end else
     begin
       //using simultaneous equations and substitution
@@ -1523,7 +1525,9 @@ begin
         ellipsePt.Y := m * ellipsePt.X + c;
         dist := Hypot(pt.X - fFocusPt.X, pt.Y - fFocusPt.Y);
         dist2 := Hypot(ellipsePt.X - fFocusPt.X, ellipsePt.Y - fFocusPt.Y);
-        q := dist/ dist2;
+        if dist2 = 0 then
+          q := 1 else
+          q := dist/ dist2;
       end else
         q := 1; //shouldn't happen :)
     end;
