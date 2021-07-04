@@ -596,7 +596,7 @@ end;
 
 function MulBytes(b1, b2: Byte) : Byte; {$IFDEF INLINE} inline; {$ENDIF}
 begin
-  Result := (b1 * b2) shr 8;
+  Result := MulTable[b1,b2];
 end;
 //------------------------------------------------------------------------------
 
@@ -649,7 +649,7 @@ begin
   begin
     //combine alphas ...
     //res.A := not MulTable[not fg.A, not bg.A];
-    res.A := ((fg.A xor 255) * (bg.A xor 255) shr 8) xor 255; // ~faster
+    res.A := (((fg.A xor 255) * (bg.A xor 255)) shr 8) xor 255; // ~faster
 
     fgWeight := DivTable[fg.A, res.A]; //fgWeight = amount foreground color
                                        //contibutes to total (result) color
@@ -670,7 +670,7 @@ var
   fg: TARGB absolute alphaMask;
 begin
   Result := bgColor;
-  res.A := MulBytes(bg.A, fg.A);
+  res.A := MulTable[bg.A, fg.A];
   if res.A = 0 then Result := 0;
 end;
 //------------------------------------------------------------------------------
@@ -682,7 +682,7 @@ var
   fg: TARGB absolute blueMask;
 begin
   Result := bgColor;
-  res.A := MulBytes(bg.A, MulBytes(fg.B, fg.A));
+  res.A := MulTable[bg.A, MulTable[fg.B, fg.A]];
 end;
 //------------------------------------------------------------------------------
 
@@ -693,7 +693,7 @@ var
   fg: TARGB absolute alphaMask;
 begin
   Result := bgColor;
-  res.A := MulBytes(bg.A, 255 - fg.A);
+  res.A := MulTable[bg.A, 255 - fg.A];
   if res.A < 2 then Result := 0;
 end;
 
@@ -772,7 +772,7 @@ begin
     res := Sqr(mast.R - curr.R) + Sqr(mast.G - curr.G) + Sqr(mast.B - curr.B);
     if res >= 65025 then result := 0
     else result := 255 - Round(Sqrt(res));
-    if curr.A < 255 then result := MulBytes(result, curr.A);
+    if curr.A < 255 then result := MulTable[result, curr.A];
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2271,7 +2271,7 @@ begin
       DeleteDc(memDc);
       ReleaseDc(0, dc);
     end;
-    SetAlpha(255);
+    if IsBlank then SetAlpha(255);
     FlipVertical;
   finally
     EndUpdate;
@@ -2346,9 +2346,9 @@ begin
         begin
           if pc.A > 0 then
           begin
-            pc.R  := MulBytes(pc.R, pc.A);
-            pc.G  := MulBytes(pc.G, pc.A);
-            pc.B  := MulBytes(pc.B, pc.A);
+            pc.R  := MulTable[pc.R, pc.A];
+            pc.G  := MulTable[pc.G, pc.A];
+            pc.B  := MulTable[pc.B, pc.A];
           end else
             pc.Color := 0;
           inc(pc);
@@ -2550,9 +2550,9 @@ begin
   begin
     if c.A > 0 then
     begin
-      c.R  := MulBytes(c.R, c.A);
-      c.G  := MulBytes(c.G, c.A);
-      c.B  := MulBytes(c.B, c.A);
+      c.R  := MulTable[c.R, c.A];
+      c.G  := MulTable[c.G, c.A];
+      c.B  := MulTable[c.B, c.A];
     end
     else
       c.Color := 0;
@@ -2638,7 +2638,7 @@ begin
   c := PARGB(PixelBase);
   for i := 0 to Width * Height -1 do
   begin
-    c.A := MulBytes(c.A, opacity);
+    c.A := MulTable[c.A, opacity];
     inc(c);
   end;
   Changed;
@@ -2658,7 +2658,7 @@ begin
   begin
     for j := 1 to rw do
     begin
-      c.A := MulBytes(c.A, opacity);
+      c.A := MulTable[c.A, opacity];
       inc(c);
     end;
     inc(c, Width - rw);

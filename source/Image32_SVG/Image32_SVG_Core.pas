@@ -199,6 +199,8 @@ type
     function    FindEntity(hash: Cardinal): PSvgAttrib;
     function LoadFromFile(const filename: string): Boolean;
     function LoadFromStream(stream: TStream): Boolean;
+    function  LoadFromString(const str: string): Boolean;
+    function  LoadFromUtf8(const str: UTF8String): Boolean;
   end;
 
   //////////////////////////////////////////////////////////////////////
@@ -1714,6 +1716,33 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
+
+function TSvgParser.LoadFromString(const str: string): Boolean;
+var
+  utf8: UTF8String;
+begin
+  utf8 := UTF8Encode(str);
+  Result := LoadFromUtf8(utf8);
+end;
+//------------------------------------------------------------------------------
+
+function TSvgParser.LoadFromUtf8(const str: UTF8String): Boolean;
+var
+  len: integer;
+begin
+  Result := false;
+  try
+    len := Length(str);
+    svgStream.SetSize(len);
+    if len = 0 then Exit;
+    Move(str[1], svgStream.Memory^, len);
+    Result := true;
+    ParseStream;
+  except
+  end;
+end;
+//------------------------------------------------------------------------------
+
 
 procedure TSvgParser.ParseStream;
 var

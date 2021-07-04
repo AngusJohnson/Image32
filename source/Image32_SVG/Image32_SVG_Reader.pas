@@ -84,6 +84,14 @@ type
     destructor  Destroy; override;
   end;
 
+  TSvgElement = class(TElement)
+  protected
+    viewboxWH : TRectWH;
+  public
+    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    function GetViewbox: TRect;
+  end;
+
   TSvgReader = class
   private
     fSvgParser        : TSvgParser;
@@ -95,7 +103,7 @@ type
     fLinGradRenderer  : TLinearGradientRenderer;
     fRadGradRenderer  : TSvgRadialGradientRenderer;
     fImgRenderer      : TImageRenderer;
-    fRootElement      : TElement;
+    fRootElement      : TSvgElement;
 {$IFDEF XPLAT_GENERICS}
     fFontList     : TList<TFontReader>;
 {$ELSE}
@@ -103,7 +111,7 @@ type
 {$ENDIF}
     fFontCache    : TGlyphCache;
     function  LoadInternal: Boolean;
-    function GetIsEmpty: Boolean;
+    function  GetIsEmpty: Boolean;
     procedure SetBlurQuality(quality: integer);
   protected
     userSpaceBounds : TRectD;
@@ -124,10 +132,12 @@ type
     procedure DrawImage(img: TImage32; scaleToImage: Boolean);
     function  LoadFromStream(stream: TStream): Boolean;
     function  LoadFromFile(const filename: string): Boolean;
-    property  BackgroundColor: TColor32 read fBkgndColor write fBkgndColor;
-    property  BlurQuality: integer read fBlurQuality write SetBlurQuality;
-
-    property IsEmpty: Boolean read GetIsEmpty;
+    function  LoadFromString(const str: string): Boolean;
+    function  LoadFromUtf8(const str: UTF8String): Boolean;
+    property  BackgroundColor : TColor32 read fBkgndColor write fBkgndColor;
+    property  BlurQuality     : integer read fBlurQuality write SetBlurQuality;
+    property  IsEmpty         : Boolean read GetIsEmpty;
+    property  RootElement     : TSvgElement read fRootElement;
   end;
 
 implementation
@@ -136,13 +146,6 @@ uses
   Image32_Extra, StrUtils;
 
 type
-  TSvgElement = class(TElement)
-  protected
-    viewboxWH : TRectWH;
-  public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
-  end;
-
   TDefsElement = class(TElement)
   public
     constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
@@ -3093,6 +3096,34 @@ constructor TSvgElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited Create(parent, svgEl);
 end;
+//------------------------------------------------------------------------------
+
+function TSvgElement.GetViewbox: TRect;
+var
+  w,h, sx,sy: double;
+begin
+  Result := NullRect;
+  Result.Left := Round(elRectWH.left.GetValue(0, 0));
+  Result.Top := Round(elRectWH.top.GetValue(0, 0));
+
+  w := elRectWH.width.GetValue(0, 0);
+  h := elRectWH.height.GetValue(0, 0);
+
+  if viewboxWH.IsEmpty then
+  begin
+    Result := Rect(0,0, Round(w), Round(h));
+  end
+  else if (w > 0) and (h > 0) then
+  begin
+    sx := w/viewboxWH.Width;
+    sy := h/viewboxWH.Height;
+    //preserveAspectRatio
+    sx := (sx + sy) * 0.5; sy := sx;
+    Result.Right := Result.Left + Round(viewboxWH.Width * sx);
+    Result.Bottom := Result.Top + Round(viewboxWH.Height * sy);
+  end;
+
+end;
 
 //------------------------------------------------------------------------------
 // TElement
@@ -4361,13 +4392,13 @@ var
 begin
   if not Assigned(fRootElement) then Exit;
 
-  with TSvgElement(fRootElement) do
+  with fRootElement do
   begin
     di := emptyDrawInfo;
     MatrixTranslate(di.matrix, -viewboxWH.Left, -viewboxWH.Top);
 
-    w := elRectWH.width.GetValue(RectWidth(img.Bounds), GetRelFracLimit);
-    h := elRectWH.height.GetValue(RectHeight(img.Bounds), GetRelFracLimit);
+    w := elRectWH.width.GetValue(RectWidth(img.Bounds), 0);
+    h := elRectWH.height.GetValue(RectHeight(img.Bounds), 0);
 
     if viewboxWH.IsEmpty then
     begin
@@ -4451,6 +4482,22 @@ function TSvgReader.LoadFromStream(stream: TStream): Boolean;
 begin
   Clear;
   Result := fSvgParser.LoadFromStream(stream);
+  if Result then LoadInternal;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgReader.LoadFromString(const str: string): Boolean;
+begin
+  Clear;
+  Result := fSvgParser.LoadFromString(str);
+  if Result then LoadInternal;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgReader.LoadFromUtf8(const str: UTF8String): Boolean;
+begin
+  Clear;
+  Result := fSvgParser.LoadFromUtf8(str);
   if Result then LoadInternal;
 end;
 //------------------------------------------------------------------------------
