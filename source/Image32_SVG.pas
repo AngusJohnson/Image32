@@ -40,7 +40,6 @@ implementation
 
 function TImageFormat_SVG.LoadFromStream(stream: TStream; img32: TImage32): Boolean;
 var
-  w,h: double;
   r: TRect;
 begin
   with TSvgReader.Create do

@@ -25,6 +25,7 @@ uses
 
 type
   TTriState = (tsUnknown, tsYes, tsNo);
+  TSvgEncoding = (eUnknown, eUtf8, eUnicodeLE, eUnicodeBE);
 
   TUnitType = (utUnknown, utNumber, utPercent, utEm, utEx, utPixel,
     utCm, utMm, utInch, utPt, utPica, utDegree, utRadian);
@@ -195,12 +196,11 @@ type
     {$ENDIF}
     constructor Create;
     destructor  Destroy; override;
-    procedure   Clear;
-    function    FindEntity(hash: Cardinal): PSvgAttrib;
-    function LoadFromFile(const filename: string): Boolean;
-    function LoadFromStream(stream: TStream): Boolean;
+    procedure Clear;
+    function  FindEntity(hash: Cardinal): PSvgAttrib;
+    function  LoadFromFile(const filename: string): Boolean;
+    function  LoadFromStream(stream: TStream): Boolean;
     function  LoadFromString(const str: string): Boolean;
-    function  LoadFromUtf8(const str: UTF8String): Boolean;
   end;
 
   //////////////////////////////////////////////////////////////////////
@@ -263,6 +263,8 @@ type
     fA, fS: boolean; out startAngle, endAngle: double; out rec: TRectD): Boolean;
   function HtmlDecode(const html: ansiString): ansistring;
 
+  function GetXmlEncoding(memory: Pointer; len: integer): TSvgEncoding;
+
 {$IF COMPILERVERSION < 17}
 type
   TSetOfChar = set of Char;
@@ -309,6 +311,21 @@ begin
   Result := chr in chrs;
 end;
 {$IFEND}
+//------------------------------------------------------------------------------
+
+function GetXmlEncoding(memory: Pointer; len: integer): TSvgEncoding;
+var
+  p: PAnsiChar;
+begin
+  Result := eUnknown;
+  if (len < 4) or not Assigned(memory) then Exit;
+  p := PAnsiChar(memory);
+  case p^ of
+    #$EF: if ((p +1)^ = #$BB) and ((p +2)^ = #$BF) then Result := eUtf8;
+    #$FF: if ((p +1)^ = #$FE) then Result := eUnicodeLE;
+    #$FE: if ((p +1)^ = #$FF) then Result := eUnicodeBE;
+  end;
+end;
 //------------------------------------------------------------------------------
 
 function SkipBlanks(var c: PAnsiChar; endC: PAnsiChar): Boolean;
@@ -1694,21 +1711,53 @@ end;
 //------------------------------------------------------------------------------
 
 function TSvgParser.LoadFromFile(const filename: string): Boolean;
+var
+  fs: TFileStream;
 begin
+  Result := false;
+  if not FileExists(filename) then Exit;
+
+  fs := TFileStream.Create(filename, fmOpenRead or fmShareDenyNone);
   try
-    svgStream.LoadFromFile(filename);
-    Result := true;
-    ParseStream;
-  except
-    Result := false;
+    Result := LoadFromStream(fs);
+  finally
+    fs.Free;
   end;
 end;
 //------------------------------------------------------------------------------
 
+procedure FlipEndian(var ch: WideChar); {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Word(ch) := Swap(Word(ch));
+end;
+//------------------------------------------------------------------------------
+
 function TSvgParser.LoadFromStream(stream: TStream): Boolean;
+var
+  i, len: integer;
+  encoding: TSvgEncoding;
+  s: WideString;
+  utf8: AnsiString;
 begin
   try
     svgStream.LoadFromStream(stream);
+
+    //check encoding and set to UTF-8 if necessary
+    encoding := GetXmlEncoding(svgStream.Memory, svgStream.Size);
+    case encoding of
+      eUnicodeLE, eUnicodeBE:
+        begin
+          SetLength(s, svgStream.Size div 2);
+          Move(svgStream.Memory^, s[1], svgStream.Size);
+          if encoding = eUnicodeBE then
+            for i := 1 to Length(s) do FlipEndian(s[i]);
+          utf8 := UTF8Encode(s);
+          len := Length(utf8);
+          svgStream.SetSize(len);
+          Move(utf8[1], svgStream.Memory^, len);
+        end;
+    end;
+
     Result := true;
     ParseStream;
   except
@@ -1719,30 +1768,21 @@ end;
 
 function TSvgParser.LoadFromString(const str: string): Boolean;
 var
-  utf8: UTF8String;
-begin
-  utf8 := UTF8Encode(str);
-  Result := LoadFromUtf8(utf8);
-end;
-//------------------------------------------------------------------------------
-
-function TSvgParser.LoadFromUtf8(const str: UTF8String): Boolean;
-var
   len: integer;
+  ms: TMemoryStream;
 begin
-  Result := false;
+  ms := TMemoryStream.Create;
   try
-    len := Length(str);
-    svgStream.SetSize(len);
-    if len = 0 then Exit;
-    Move(str[1], svgStream.Memory^, len);
-    Result := true;
-    ParseStream;
-  except
+    len := Length(str) * SizeOf(Char);
+    ms.SetSize(len);
+    if len > 0 then
+      Move(str[1], ms.Memory^, len);
+    Result := LoadFromStream(ms);
+  finally
+    ms.Free;
   end;
 end;
 //------------------------------------------------------------------------------
-
 
 procedure TSvgParser.ParseStream;
 var

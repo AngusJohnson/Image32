@@ -4494,14 +4494,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgReader.LoadFromUtf8(const str: UTF8String): Boolean;
-begin
-  Clear;
-  Result := fSvgParser.LoadFromUtf8(str);
-  if Result then LoadInternal;
-end;
-//------------------------------------------------------------------------------
-
 procedure TSvgReader.GetBestFontForFontCache(const svgFontInfo: TSVGFontInfo);
 
   function GetStyleInt(fontReaderIdx: integer): integer;
