@@ -246,7 +246,8 @@ type
   function GetHash(const name: AnsiString): cardinal;
   function GetHashCaseSensitive(name: PAnsiChar; nameLen: integer): cardinal;
   function ExtractRef(const href: AnsiString): AnsiString;
-  function IsNumPending(c, endC: PAnsiChar; ignoreComma: Boolean): Boolean;
+  function IsNumPending(var c: PAnsiChar;
+    endC: PAnsiChar; ignoreComma: Boolean): Boolean;
   function AnsiStringToColor32(const value: AnsiString; var color: TColor32): Boolean;
   function MakeDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfInteger;
   function Match(c: PAnsiChar; const compare: AnsiString): Boolean; overload;
@@ -278,6 +279,7 @@ const
   quote       = '''';
   dquote      = '"';
   space       = #32;
+  SvgDecimalSeparator = '.'; //do not localize
 
   {$I Image32_SVG_Hash_Consts.inc}
 
@@ -543,11 +545,7 @@ begin
   start := c;
   while c < endC do
   begin
-{$IF COMPILERVERSION >= 17}
-    if Ord(c^) = Ord(FormatSettings.DecimalSeparator) then
-{$ELSE}
-    if Ord(c^) = Ord(DecimalSeparator) then
-{$IFEND}
+    if Ord(c^) = Ord(SvgDecimalSeparator) then
     begin
       if decPos >= 0 then break;
       decPos := 0;
@@ -808,7 +806,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function IsNumPending(c, endC: PAnsiChar; ignoreComma: Boolean): Boolean;
+function IsNumPending(var c: PAnsiChar;
+  endC: PAnsiChar; ignoreComma: Boolean): Boolean;
+var
+  c2: PAnsiChar;
 begin
   Result := false;
 
@@ -821,9 +822,10 @@ begin
   while (c < endC) and (c^ <= ' ') do inc(c);
   if (c = endC) then Exit;
 
-  if (c^ = '-') then inc(c);
-  if (c^ = '.') then inc(c);
-  Result := (c < endC) and (c^ >= '0') and (c^ <= '9');
+  c2 := c;
+  if (c2^ = '-') then inc(c2);
+  if (c2^ = SvgDecimalSeparator) then inc(c2);
+  Result := (c2 < endC) and (c2^ >= '0') and (c2^ <= '9');
 end;
 //------------------------------------------------------------------------------
 
@@ -850,15 +852,11 @@ begin
     if not ParseNextNum(c, endC, false, values[0]) then Break;
     //now get additional variables
     i := 1;
-    while (i < 6) and IsNumPending(c, endC, true) do
-    begin
-      ParseNextNum(c, endC, true, values[i]);
-      inc(i);
-    end;
+    while (i < 6) and IsNumPending(c, endC, true) and
+      ParseNextNum(c, endC, true, values[i]) do inc(i);
     if ParseNextChar(c, endC) <> ')' then Exit; //syntax check
 
     mat := IdentityMatrix;
-
     //scal(e), matr(i)x, tran(s)late, rota(t)e, skew(X), skew(Y)
     case LowerCaseTable[word[5]] of
       'e' : //scalE
@@ -1227,7 +1225,8 @@ begin
   if Match(c, '<![cdata[') then inc(c, 9);
 
   while SkipStyleBlanks(c, endC) and
-    CharInSet(LowerCaseTable[PeekNextChar(c, endC)], ['.', '#', 'a'..'z']) do
+    CharInSet(LowerCaseTable[PeekNextChar(c, endC)],
+      [SvgDecimalSeparator, '#', 'a'..'z']) do
   begin
     //get one or more class names for each pending style
     aclassName.text := c;
@@ -1394,7 +1393,7 @@ begin
     with classAttrib^ do
     begin
       //get the 'dotted' classname
-      ansi := '.' + value;
+      ansi := SvgDecimalSeparator + value;
       //get the style definition
       ansi := owner.classStyles.GetStyle(ansi);
       if ansi <> '' then ParseStyleAttribute(ansi);
@@ -2730,7 +2729,7 @@ begin
 
     case currSegType of
       dsHorz:
-        while IsNumPending(c, endC, true)and
+        while IsNumPending(c, endC, true) and
           ParseNextNum(c, endC, true, currPt.X) do
         begin
           if isRelative then
@@ -2761,17 +2760,17 @@ begin
         end;
 
       dsQSpline:
-        while IsNumPending(c, endC, true) do
+        while IsNumPending(c, endC, true) and
+          Parse2Num(c, endC, currPt, isRelative) do
         begin
-          if not Parse2Num(c, endC, currPt, isRelative) then break;
           AddSegPoint(currPt);
           lastPt := currPt;
         end;
 
       dsCSpline:
-        while IsNumPending(c, endC, true) do
+        while IsNumPending(c, endC, true) and
+          Parse2Num(c, endC, currPt, isRelative) do
         begin
-          if not Parse2Num(c, endC, currPt, isRelative) then break;
           AddSegPoint(currPt);
           if not Parse2Num(c, endC, currPt, isRelative) then break;
           AddSegPoint(currPt);
@@ -2779,9 +2778,9 @@ begin
         end;
 
       dsQBez:
-        while IsNumPending(c, endC, true) do
+        while IsNumPending(c, endC, true) and
+          Parse2Num(c, endC, currPt, isRelative) do
         begin
-          if not Parse2Num(c, endC, currPt, isRelative) then break;
           AddSegPoint(currPt);
           if not Parse2Num(c, endC, currPt, isRelative) then break;
           AddSegPoint(currPt);
@@ -2789,9 +2788,9 @@ begin
         end;
 
       dsCBez:
-        while IsNumPending(c, endC, true) do
+        while IsNumPending(c, endC, true) and
+          Parse2Num(c, endC, currPt, isRelative) do
         begin
-          if not Parse2Num(c, endC, currPt, isRelative) then break;
           AddSegPoint(currPt);
           if not Parse2Num(c, endC, currPt, isRelative) then break;
           AddSegPoint(currPt);
@@ -2801,9 +2800,9 @@ begin
         end;
 
       dsArc:
-        while IsNumPending(c, endC, true) do
+        while IsNumPending(c, endC, true) and
+          Parse2Num(c, endC, currPt, false) do
         begin
-          if not Parse2Num(c, endC, currPt, false) then break;
           AddSegPoint(currPt);                              //radii
           if ParseNextNum(c, endC, true, d) then
             AddSegValue(d);                                 //angle
