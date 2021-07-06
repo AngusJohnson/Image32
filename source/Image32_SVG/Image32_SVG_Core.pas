@@ -3,7 +3,7 @@ unit Image32_SVG_Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.25                                                            *
-* Date      :  29 June 2021                                                    *
+* Date      :  6 July 2021                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -2730,9 +2730,9 @@ begin
 
     case currSegType of
       dsHorz:
-        while IsNumPending(c, endC, true) do
+        while IsNumPending(c, endC, true)and
+          ParseNextNum(c, endC, true, currPt.X) do
         begin
-          ParseNextNum(c, endC, true, currPt.X);
           if isRelative then
             currPt.X := currPt.X + lastPt.X;
           AddSegValue(currPt.X);
@@ -2740,9 +2740,9 @@ begin
         end;
 
       dsVert:
-        while IsNumPending(c, endC, true) do
+        while IsNumPending(c, endC, true) and
+          ParseNextNum(c, endC, true, currPt.Y) do
         begin
-          ParseNextNum(c, endC, true, currPt.Y);
           if isRelative then
             currPt.Y := currPt.Y + lastPt.Y;
           AddSegValue(currPt.Y);
@@ -2750,9 +2750,8 @@ begin
         end;
 
       dsLine:
-        while true do
+        while Parse2Num(c, endC, currPt, isRelative) do
         begin
-          if not Parse2Num(c, endC, currPt, isRelative) then break;
           AddSegPoint(currPt);
           lastPt := currPt;
           SkipBlanks(c, endC);

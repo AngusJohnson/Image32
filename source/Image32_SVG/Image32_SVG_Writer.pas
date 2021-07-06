@@ -73,14 +73,13 @@ type
     fFillClr     : TColor32;
     fStrokeClr   : TColor32;
     fStrokeWidth : double;
-    fMatrix      : TMatrixD;
     function WriteHeader: string; override;
   public
+    Matrix      : TMatrixD;
     constructor Create(parent: TBaseElWriter); override;
     procedure Rotate(const pivotPt: TPointD; angleRad: double);
     procedure Translate(dx, dy: double);
     procedure Skew(dx, dy: double);
-    property Matrix: TMatrixD read fMatrix;
     property FillColor: TColor32 read fFillClr write fFillClr;
     property StrokeColor: TColor32 read fStrokeClr write fStrokeClr;
     property StrokeWidth: double read fStrokeWidth write fStrokeWidth;
@@ -201,7 +200,7 @@ const
   nullfontInfo: TSVGFontInfo = (family: ttfUnknown; size: 0;
     spacing: 0.0; textLength: 0; italic: sfsUndefined; weight: -1;
     align: staUndefined; decoration: fdUndefined;
-    baseShift: (rawVal: InvalidD; mu: muUndefined; pcBelow: 0));
+    baseShift: (rawVal: InvalidD; unitType: utUnknown));
 
 //------------------------------------------------------------------------------
 // Miscellaneous routines
@@ -414,10 +413,10 @@ end;
 constructor TExBaseElWriter.Create(parent: TBaseElWriter);
 begin
   inherited;
-  fMatrix      := IdentityMatrix;
-  fFillClr     := clInvalid;
-  fStrokeClr   := clInvalid;
-  fStrokeWidth := 1.0;
+  Matrix        := IdentityMatrix;
+  fFillClr      := clInvalid;
+  fStrokeClr    := clInvalid;
+  fStrokeWidth  := 1.0;
 end;
 //------------------------------------------------------------------------------
 
@@ -435,14 +434,14 @@ begin
     AppendFloatAttrib(Result, 'stroke-width', fStrokeWidth);
   end;
 
-  if not IsIdentityMatrix(fMatrix) then
+  if not IsIdentityMatrix(Matrix) then
   begin
     AppendStr(Result, 'transform="matrix(');
 
     for i := 0 to 1 do for j := 0 to 1 do
-      AppendFloat(Result, fMatrix[i][j]);
-    AppendFloat(Result, fMatrix[2][0]);
-    AppendFloat(Result, fMatrix[2][1]);
+      AppendFloat(Result, Matrix[i][j]);
+    AppendFloat(Result, Matrix[2][0]);
+    AppendFloat(Result, Matrix[2][1]);
     AppendStr(Result, ')"');
   end;
 end;
@@ -450,19 +449,19 @@ end;
 
 procedure TExBaseElWriter.Rotate(const pivotPt: TPointD; angleRad: double);
 begin
-  MatrixRotate(fMatrix, pivotPt, angleRad);
+  MatrixRotate(Matrix, pivotPt, angleRad);
 end;
 //------------------------------------------------------------------------------
 
 procedure TExBaseElWriter.Translate(dx, dy: double);
 begin
-  MatrixTranslate(fMatrix, dx, dy);
+  MatrixTranslate(Matrix, dx, dy);
 end;
 //------------------------------------------------------------------------------
 
 procedure TExBaseElWriter.Skew(dx, dy: double);
 begin
-  MatrixSkew(fMatrix, dx, dy);
+  MatrixSkew(Matrix, dx, dy);
 end;
 
 //------------------------------------------------------------------------------
