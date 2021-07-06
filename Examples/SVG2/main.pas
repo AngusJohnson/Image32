@@ -76,7 +76,7 @@ begin
 
         with AddChild(TSvgTSpanWriter) as TSvgTSpanWriter do
         begin
-          fillClr     := $FF990000;
+          FillColor := $FF990000;
           offset.sy := 5;
           fontInfo.size := 20;
           fontInfo.weight := 600;
@@ -90,8 +90,8 @@ begin
       rectWrite  := grpWrite.AddChild(TSvgRectWriter) as TSvgRectWriter;
       with rectWrite do
       begin
-        fillClr     := $10FF3300;
-        strokeClr   := clMaroon32;
+        FillColor   := $10FF3300;
+        StrokeColor := clMaroon32;
         strokeWidth := 3.0;
 
         RecWH := RectWH(10,10, 180, 240);
@@ -102,8 +102,8 @@ begin
       pathWrite := grpWrite.AddChild(TSvgPathWriter) as TSvgPathWriter;
       with pathWrite do
       begin
-        fillClr     := $10007F7F;
-        strokeClr   := clTeal32;
+        FillColor   := $10007F7F;
+        StrokeColor := clTeal32;
         strokeWidth := 3.0;
 
         MoveTo(110,80);
@@ -118,7 +118,7 @@ begin
         LineHTo(110);
         CubicBezierTo(PointD(75,170), PointD(75,120), PointD(110,120));
         //ClosePath;
-        Rotate(angle45, PointD(110,110));
+        Rotate(PointD(110,110), angle45);
         Skew(angle45, 0);
         Translate(-120, 25);
       end;
