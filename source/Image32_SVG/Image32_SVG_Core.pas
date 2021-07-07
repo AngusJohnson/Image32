@@ -1767,18 +1767,17 @@ end;
 
 function TSvgParser.LoadFromString(const str: string): Boolean;
 var
-  len: integer;
-  ms: TMemoryStream;
+  ss: TStringStream;
 begin
-  ms := TMemoryStream.Create;
+{$IFDEF UNICODE}
+  ss := TStringStream.Create(str, TEncoding.UTF8);
+{$ELSE}
+  ss := TStringStream.Create(UTF8Encode(str));
+{$ENDIF}
   try
-    len := Length(str) * SizeOf(Char);
-    ms.SetSize(len);
-    if len > 0 then
-      Move(str[1], ms.Memory^, len);
-    Result := LoadFromStream(ms);
+    Result := LoadFromStream(ss);
   finally
-    ms.Free;
+    ss.Free;
   end;
 end;
 //------------------------------------------------------------------------------

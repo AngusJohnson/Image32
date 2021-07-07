@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls, ShellApi,
-  Image32, Image32_Draw, Image32_BMP, Image32_PNG, Image32_SVG_Reader,
+  Image32, Image32_Draw, Image32_SVG, Image32_PNG, Image32_SVG_Reader,
   Image32_Vector, Image32_Ttf, Image32Panels, Dialogs, StdCtrls;
 
   //This sample app presumes that the TImage32Panel component
@@ -68,15 +68,14 @@ begin
   svgReader := TSvgReader.Create;
   //svgReader.BackgroundColor := clWhite32;
 
-  svgReader.AddFont('Arial');
-  svgReader.AddFont('Arial Bold');
-  svgReader.AddFont('Arial Italic');
-  svgReader.AddFont('Arial Bold Italic');
-  svgReader.AddFont('Times New Roman');
-  svgReader.AddFont('Times New Roman Bold');
-  svgReader.AddFont('Times New Roman Italic');
-  svgReader.AddFont('Times New Roman Bold Italic');
-  svgReader.AddFont('DejaVu Sans Mono');
+  FontLibrary.Add('Arial');
+  FontLibrary.Add('Arial Bold');
+  FontLibrary.Add('Arial Italic');
+  FontLibrary.Add('Arial Bold Italic');
+  FontLibrary.Add('Times New Roman');
+  FontLibrary.Add('Times New Roman Bold');
+  FontLibrary.Add('Times New Roman Italic');
+  FontLibrary.Add('Times New Roman Bold Italic');
 
   OpenFile('.\Sample SVGs\*.svg');
 end;

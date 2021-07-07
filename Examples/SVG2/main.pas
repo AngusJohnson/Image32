@@ -131,10 +131,11 @@ begin
       free;
     end;
 
+    FontLibrary.Add('Arial');
+
     //finally, draw the svg
     with TSvgReader.Create do
     try
-      AddFont('Arial');
       LoadFromStream(memStream);
       DrawImage(ImagePanel.Image, true);
     finally
