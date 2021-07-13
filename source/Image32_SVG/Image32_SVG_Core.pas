@@ -286,6 +286,7 @@ const
 
 var
   LowerCaseTable : array[#0..#255] of AnsiChar;
+  ColorConstList : TStringList;
 
 implementation
 
@@ -300,9 +301,6 @@ const
 
   //include hashed html entity constants
   {$I html_entity_hash_consts.inc}
-
-var
-  ColorConstList : TStringList;
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions ...

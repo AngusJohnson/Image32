@@ -4483,24 +4483,21 @@ end;
 function TSvgReader.LoadFromFile(const filename: string): Boolean;
 begin
   Clear;
-  Result := fSvgParser.LoadFromFile(filename);
-  if Result then LoadInternal;
+  Result := fSvgParser.LoadFromFile(filename) and LoadInternal;
 end;
 //------------------------------------------------------------------------------
 
 function TSvgReader.LoadFromStream(stream: TStream): Boolean;
 begin
   Clear;
-  Result := fSvgParser.LoadFromStream(stream);
-  if Result then LoadInternal;
+  Result := fSvgParser.LoadFromStream(stream) and LoadInternal;
 end;
 //------------------------------------------------------------------------------
 
 function TSvgReader.LoadFromString(const str: string): Boolean;
 begin
   Clear;
-  Result := fSvgParser.LoadFromString(str);
-  if Result then LoadInternal;
+  Result := fSvgParser.LoadFromString(str) and LoadInternal;
 end;
 //------------------------------------------------------------------------------
 

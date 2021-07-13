@@ -131,7 +131,7 @@ begin
       free;
     end;
 
-    FontLibrary.Add('Arial');
+    FontManager.Load('Arial');
 
     //finally, draw the svg
     with TSvgReader.Create do
