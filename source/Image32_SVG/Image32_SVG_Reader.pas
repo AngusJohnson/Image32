@@ -4517,7 +4517,7 @@ begin
   if svgFontInfo.weight >= 600 then
     Include(fi.macStyles, msBold);
 
-  bestFontReader := FontLibrary.GetBestMatchedFont(fi);
+  bestFontReader := FontManager.GetBestMatchFont(fi);
   if not Assigned(bestFontReader) then Exit;
 
   if Assigned(fFontCache) then
