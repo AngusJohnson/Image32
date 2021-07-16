@@ -133,8 +133,8 @@ type
     property  BackgroundColor : TColor32 read fBkgndColor write fBkgndColor;
     property  BlurQuality     : integer read fBlurQuality write SetBlurQuality;
     property  IsEmpty         : Boolean read GetIsEmpty;
-    //UseProportialScaling: IMHO this property should always be true ;)
-    property  UseProportialScaling: Boolean
+    //KeepAspectRatio: IMHO this property should always be true ;)
+    property  KeepAspectRatio: Boolean
       read fUsePropScale write fUsePropScale;
     property  RootElement     : TSvgElement read fRootElement;
   end;
