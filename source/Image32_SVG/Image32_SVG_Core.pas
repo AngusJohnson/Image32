@@ -1599,11 +1599,20 @@ begin
               inc(c, 3);
             end else
             begin
-              //it's quite likely <![CDATA[
+              //it's very likely <![CDATA[
               text.text := c - 1;
-              while (c < endC) and (c^ <> '<') do inc(c);
-              text.len := c - text.text;
-              //and if <style><![CDATA[ ... then load the styles too
+              if Match(c, '![cdata[') then
+              begin
+                while (c < endC) and ((c^ <> ']') or not Match(c, ']]>')) do
+                  inc(c);
+                text.len := c - text.text;
+                inc(c, 3);
+              end else
+              begin
+                while (c < endC) and (c^ <> '<') do inc(c);
+                text.len := c - text.text;
+              end;
+              //if <style><![CDATA[ ...]]> then load the styles too
               if (hash = hStyle) then
                 ParseStyleElementContent(text, owner.classStyles);
             end;

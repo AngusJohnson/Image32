@@ -661,6 +661,7 @@ begin
       drawInfo.fontInfo.decoration := fontInfo.decoration;
     if fontInfo.baseShift.IsValid then
       drawInfo.fontInfo.baseShift := fontInfo.baseShift;
+
     if not IsIdentityMatrix(matrix) then
       drawInfo.matrix := MatrixMultiply(drawInfo.matrix, matrix);
   end;
@@ -795,8 +796,7 @@ var
 begin
   if fChilds.Count = 0 then Exit;
 
-  if not Assigned(drawInfo.useEl) then
-    UpdateDrawInfo(drawInfo, self);
+  UpdateDrawInfo(drawInfo, self);
 
   maskEl := FindRefElement(drawInfo.maskEl);
   clipEl := FindRefElement(drawInfo.clipPathEl);
@@ -927,7 +927,6 @@ begin
   el := FindRefElement(refEl);
   if not Assigned(el) then Exit;
 
-  UpdateDrawInfo(drawInfo, el);
   UpdateDrawInfo(drawInfo, self); //nb: <use> attribs override el's.
   scale := ExtractScaleFromMatrix(drawInfo.matrix);
 
@@ -1003,24 +1002,18 @@ end;
 procedure TMaskElement.GetPaths(const drawInfo: TDrawInfo);
 var
   i   : integer;
-  di,di2 : TDrawInfo;
   el  : TShapeElement;
 begin
-  di := drawInfo;
-  UpdateDrawInfo(di, self);
-
   maskRec := NullRect;
   for i := 0 to fChilds.Count -1 do
     if TElement(fChilds[i]) is TShapeElement then
     begin
       el := TShapeElement(fChilds[i]);
-      di2 := di;
-      UpdateDrawInfo(di2, el);
-      el.GetPaths(di2);
+      el.GetPaths(drawInfo);
       maskRec := Image32_Vector.UnionRect(maskRec,
         Image32_Vector.GetBounds(el.drawPathsF));
     end;
-  MatrixApply(di.matrix, maskRec);
+  MatrixApply(drawInfo.matrix, maskRec);
 end;
 //------------------------------------------------------------------------------
 
@@ -4416,7 +4409,7 @@ begin
   with fRootElement do
   begin
     di := fDrawInfo;
-    MatrixTranslate(di.matrix, -vbox.Left, -vbox.Top);
+    MatrixTranslate(di.matrix, -viewboxWH.Left, -viewboxWH.Top);
 
     //the width and height attributes generally indicate the size of the
     //rendered image unless they are percentage values. Nevertheless, these
@@ -4424,7 +4417,7 @@ begin
 
     if vbox.IsEmpty then
       fDrawInfo.bounds := RectD(img.Bounds) else
-      fDrawInfo.bounds := vbox.RectD;
+      fDrawInfo.bounds := viewboxWH.RectD;
     userSpaceBounds  := fDrawInfo.bounds;
     di.bounds := fDrawInfo.bounds;
 
