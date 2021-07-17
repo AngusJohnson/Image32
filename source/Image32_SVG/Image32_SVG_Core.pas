@@ -81,11 +81,11 @@ type
   end;
 
   //////////////////////////////////////////////////////////////////////
-  // TAnsi - alternative to AnsiString with less overhead.
+  // TAnsi - alternative to AnsiString/UTF8String with less overhead.
   //////////////////////////////////////////////////////////////////////
 
   {$IFNDEF UNICODE}
-  UTF8Char = Char;
+  UTF8Char  = Char;
   PUTF8Char = PChar;
   {$ENDIF}
 
@@ -1137,7 +1137,23 @@ begin
   end
   else if (c^ = '#') then           //#RRGGBB or #RGB
   begin
-    if (len = 7) then
+    if (len = 9) then
+    begin
+      clr := $0;
+      alpha := $0;
+      for i := 1 to 6 do
+      begin
+        inc(c);
+        clr := clr shl 4 + HexByteToInt(c^);
+      end;
+      for i := 1 to 2 do
+      begin
+        inc(c);
+        alpha := alpha shl 4 + HexByteToInt(c^);
+      end;
+      clr := clr or alpha shl 24;
+    end
+    else if (len = 7) then
     begin
       clr := $0;
       for i := 1 to 6 do
@@ -1146,6 +1162,21 @@ begin
         clr := clr shl 4 + HexByteToInt(c^);
       end;
       clr := clr or $FF000000;
+    end
+    else if (len = 5) then
+    begin
+      clr := $0;
+      for i := 1 to 3 do
+      begin
+        inc(c);
+        j := HexByteToInt(c^);
+        clr := clr shl 4 + j;
+        clr := clr shl 4 + j;
+      end;
+      inc(c);
+      alpha := HexByteToInt(c^);
+      alpha := alpha + alpha shl 4;
+      clr := clr or alpha shl 24;
     end
     else if (len = 4) then
     begin
@@ -1607,14 +1638,13 @@ begin
                   inc(c);
                 text.len := c - text.text;
                 inc(c, 3);
+                if (hash = hStyle) then
+                  ParseStyleElementContent(text, owner.classStyles);
               end else
               begin
                 while (c < endC) and (c^ <> '<') do inc(c);
                 text.len := c - text.text;
               end;
-              //if <style><![CDATA[ ...]]> then load the styles too
-              if (hash = hStyle) then
-                ParseStyleElementContent(text, owner.classStyles);
             end;
           end;
         '/', '?':
