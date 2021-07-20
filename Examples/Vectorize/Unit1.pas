@@ -5,7 +5,7 @@ interface
 uses
   Windows, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls,
-  Image32, Dialogs, StdCtrls;
+  Img32, Dialogs, StdCtrls;
 
 type
   TForm1 = class(TForm)
@@ -66,8 +66,8 @@ implementation
 {$R Image.res}
 
 uses
-  Image32_Draw, Image32_Vector, Image32_Extra, Image32_SmoothPath,
-  Image32_BMP, Image32_JPG, Image32_PNG;
+  Img32.Draw, Img32.Vector, Img32.Extra, Img32.SmoothPath,
+  Img32.Fmt.BMP, Img32.Fmt.JPG, Img32.Fmt.PNG;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------

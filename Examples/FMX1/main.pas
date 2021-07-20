@@ -6,7 +6,7 @@ uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   System.Rtti, Math, FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics,
   FMX.Dialogs, FMX.Layouts, FMX.ExtCtrls, FMX.Platform, FMX.Surfaces,
-  FMX.StdCtrls, FMX.Controls.Presentation, Image32, Image32_FMX, Image32_Layers;
+  FMX.StdCtrls, FMX.Controls.Presentation, Img32, Img32.FMX, Img32.Layers;
 
 
 type
@@ -27,7 +27,7 @@ type
     zoomIdx: integer;
     bigTextGlyphs, copyrightGlyphs: TPathsD;
     bookImg: TImage32;
-    layeredImage32: TLayeredImage32;
+    layeredImg32: TLayeredImage32;
     procedure ReloadImage;
   public
   end;
@@ -48,8 +48,8 @@ implementation
 {$R image.res}
 
 uses
-  Image32_Vector, Image32_Transform, Image32_Draw, Image32_Extra,
-    Image32_Ttf, Image32_Clipper;
+  Img32.Vector, Img32.Transform, Img32.Draw, Img32.Extra,
+    Img32.Text, Img32.Clipper;
 
 ResourceString
   rsBigText = 'Image32 Rocks!';
@@ -109,8 +109,8 @@ begin
     fontReader.free;
   end;
 
-  layeredImage32 := TLayeredImage32.Create;
-  layeredImage32.BackgroundColor := bkColor;
+  layeredImg32 := TLayeredImage32.Create;
+  layeredImg32.BackgroundColor := bkColor;
 
   bookImg := TImage32.Create;
   bookImg.LoadFromResource('BOOKS', RT_RCDATA);
@@ -123,7 +123,7 @@ end;
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
   bookImg.Free;
-  layeredImage32.Free;
+  layeredImg32.Free;
 end;
 //------------------------------------------------------------------------------
 
@@ -136,31 +136,31 @@ var
   scale: double;
 begin
   //clear (all layers in) layeredImage32
-  layeredImage32.Clear;
+  layeredImg32.Clear;
 
   with Layout1 do
-    rec := Image32_Vector.Rect(0, 0, Trunc(Width), Trunc(Height));
-  layeredImage32.SetSize(rec.Width, rec.Height);
-  rec := Image32_Vector.InflateRect(rec, -margin, -margin);
+    rec := Img32.Vector.Rect(0, 0, Trunc(Width), Trunc(Height));
+  layeredImg32.SetSize(rec.Width, rec.Height);
+  Img32.Vector.InflateRect(rec, -margin, -margin);
 
-  textRec := Image32_Vector.GetBounds(bigTextGlyphs);
+  textRec := Img32.Vector.GetBounds(bigTextGlyphs);
   //scale and position bigTextGlyphs so it fits
   //comfortably into the ImageViewer
   scale := (rec.Width - margin*2) / textRec.Width;
-  mainGlyphs := Image32_Vector.ScalePath(bigTextGlyphs, scale);
-  textRec := Image32_Vector.GetBounds(mainGlyphs);
-  mainGlyphs := Image32_Vector.OffsetPath(mainGlyphs, -textRec.left, -textRec.top);
+  mainGlyphs := Img32.Vector.ScalePath(bigTextGlyphs, scale);
+  textRec := Img32.Vector.GetBounds(mainGlyphs);
+  mainGlyphs := Img32.Vector.OffsetPath(mainGlyphs, -textRec.left, -textRec.top);
 
   //scale and position copyright text
-  tmpRec := Image32_Vector.GetBounds(copyrightGlyphs);
-  copyrightGlyphs := Image32_Vector.OffsetPath(copyrightGlyphs,
+  tmpRec := Img32.Vector.GetBounds(copyrightGlyphs);
+  copyrightGlyphs := Img32.Vector.OffsetPath(copyrightGlyphs,
     rec.Right -tmpRec.Right -margin,
     rec.Bottom -tmpRec.Top -margin *2);
 
   //add the bottom-most layer
-  with layeredImage32.AddLayer(TVectorLayer32) as TVectorLayer32 do
+  with layeredImg32.AddLayer(TVectorLayer32) as TVectorLayer32 do
   begin
-    SetBounds(layeredImage32.Root.Bounds);
+    SetBounds(layeredImg32.Root.Bounds);
 
     //draw a rectangular frame
     tmpPath := Rectangle(rec);
@@ -174,19 +174,19 @@ begin
     if rec.Width < rec.Height then
       i := rec.Width div 2 - margin else
       i := rec.Height div 2 - margin;
-    with Image32_Vector.MidPoint(rec) do
-      tmpRec := Image32_Vector.Rect(X,Y,X,Y);
-    tmpRec := Image32_Vector.InflateRect(tmpRec, i, i);
+    with Img32.Vector.MidPoint(rec) do
+      tmpRec := Img32.Vector.Rect(X,Y,X,Y);
+    Img32.Vector.InflateRect(tmpRec, i, i);
     Image.CopyBlend(bookImg, bookImg.Bounds, tmpRec, BlendToOpaque);
   end;
 
   //now add lots of 'zoom' layers
   for i := 0 to 19 do
-    with layeredImage32.AddLayer(TVectorLayer32) as TVectorLayer32 do
+    with layeredImg32.AddLayer(TVectorLayer32) as TVectorLayer32 do
     begin
       Visible := false;
       SetBounds(textRec);
-      PositionCenteredAt(layeredImage32.MidPoint);
+      PositionCenteredAt(layeredImg32.MidPoint);
       DrawPolygon(Image, mainGlyphs, frNonZero, txtColor);
       if i = 0 then
       begin
@@ -194,7 +194,7 @@ begin
         Draw3D(Image, mainGlyphs, frNonZero, Round(textRec.Height/30), 3);
       end;
       mainGlyphs := ScalePath(mainGlyphs, 0.9, 0.9);
-      textRec := Image32_Vector.GetBounds(mainGlyphs);
+      textRec := Img32.Vector.GetBounds(mainGlyphs);
     end;
 
   btnRefresh.Enabled := false;
@@ -229,7 +229,7 @@ var
   img: TImage32;
   rec: TRectF;
 begin
-  img := layeredImage32.GetMergedImage(false);
+  img := layeredImg32.GetMergedImage(false);
 
   //unfortunately we need an intermediate TBitmap object
   //to draw raster images onto an FMX canvas.
@@ -249,9 +249,9 @@ end;
 
 procedure TMainForm.Timer1Timer(Sender: TObject);
 begin
-  if (zoomIdx < 1) or (zoomIdx >= layeredImage32.Root.ChildCount) then
+  if (zoomIdx < 1) or (zoomIdx >= layeredImg32.Root.ChildCount) then
   begin
-    zoomIdx := layeredImage32.Root.ChildCount -1;
+    zoomIdx := layeredImg32.Root.ChildCount -1;
     Timer1.Interval := 25;
   end
   else if zoomIdx = 1 then
@@ -261,10 +261,10 @@ begin
     Exit;
   end else
   begin
-    layeredImage32.Root[zoomIdx].Visible := false;
+    layeredImg32.Root[zoomIdx].Visible := false;
     Dec(zoomIdx);
   end;
-  layeredImage32.Root[zoomIdx].Visible := true;
+  layeredImg32.Root[zoomIdx].Visible := true;
   Layout1.Repaint;
 end;
 //------------------------------------------------------------------------------
@@ -272,8 +272,8 @@ end;
 procedure TMainForm.btnRefreshClick(Sender: TObject);
 begin
   btnRefresh.Enabled := false;
-  zoomIdx := layeredImage32.Root.ChildCount;
-  layeredImage32.Root[1].Visible := false;
+  zoomIdx := layeredImg32.Root.ChildCount;
+  layeredImg32.Root[1].Visible := false;
   Layout1.Repaint;
   Timer1.Interval := 1000;
   Timer1.Enabled := true;
@@ -288,7 +288,7 @@ end;
 
 procedure TMainForm.FormResize(Sender: TObject);
 begin
-  layeredImage32.SetSize(ClientWidth, ClientHeight);
+  layeredImg32.SetSize(ClientWidth, ClientHeight);
 
   btnClose.Position.X := ClientWidth - btnClose.Width - margin;
   btnClose.Position.Y := ClientHeight - btnClose.Height - margin * 1.75;
@@ -300,6 +300,5 @@ begin
   ReloadImage;
 end;
 //------------------------------------------------------------------------------
-
 
 end.

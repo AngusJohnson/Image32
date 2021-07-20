@@ -2,7 +2,7 @@ object Form1: TForm1
   Left = 298
   Top = 205
   Caption = 'Svg101'
-  ClientHeight = 463
+  ClientHeight = 462
   ClientWidth = 427
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -20,7 +20,7 @@ object Form1: TForm1
     Left = 0
     Top = 0
     Width = 427
-    Height = 463
+    Height = 462
     Align = alClient
     BevelInner = bvLowered
     BorderWidth = 12

@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
-  Types, Menus, ExtCtrls, ComCtrls, Image32, Image32_Layers,
+  Types, Menus, ExtCtrls, ComCtrls, Img32, Img32.Layers,
   Dialogs, ClipBrd, StdCtrls;
 
 type
@@ -95,8 +95,8 @@ implementation
 {$R image.res}
 
 uses
-  Image32_BMP, Image32_PNG, Image32_JPG, Image32_Draw, Image32_Vector,
-  Image32_Extra, Image32_Resamplers, Image32_Transform;
+  Img32.Fmt.BMP, Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Draw, Img32.Vector,
+  Img32.Extra, Img32.Resamplers, Img32.Transform;
 
 //------------------------------------------------------------------------------
 

@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Types, Classes, Graphics,
   Controls, Forms,  Dialogs, Math, ComCtrls, Menus,
-  Image32, Image32_Layers, Image32_Ttf;
+  Img32, Img32.Layers, Img32.Text;
 
 type
   TMainForm = class(TForm)
@@ -26,6 +26,16 @@ type
     mnuAddArrow: TMenuItem;
     mnuCopytoclipboard: TMenuItem;
     N3: TMenuItem;
+    PopupMenu1: TPopupMenu;
+    AddImage1: TMenuItem;
+    AddText1: TMenuItem;
+    AddArrow1: TMenuItem;
+    N4: TMenuItem;
+    Rotate1: TMenuItem;
+    Delete1: TMenuItem;
+    N5: TMenuItem;
+    SendBackOne1: TMenuItem;
+    BringForwardOne1: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormMouseDown(Sender: TObject; Button: TMouseButton;
@@ -88,8 +98,8 @@ implementation
 {$R Cursors.res}
 
 uses
-  Image32_Draw, Image32_Extra, Image32_Vector,
-  Image32_BMP, Image32_PNG, Image32_JPG, Image32_Transform, Image32_Resamplers;
+  Img32.Draw, Img32.Extra, Img32.Vector, Img32.Fmt.BMP,
+  Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Transform, Img32.Resamplers;
 
 type
 
@@ -189,7 +199,7 @@ begin
   Name := word;
   tmp := fontCache.GetTextGlyphs(0, 0, word);
   tmp := ScalePath(tmp, 1, 2.0);
-  rec := Image32_Vector.GetBoundsD(tmp);
+  rec := Img32.Vector.GetBoundsD(tmp);
   with centerPt do
     tmp := OffsetPath(tmp,
       X - rec.Left - rec.Width/2,
@@ -205,7 +215,7 @@ procedure TMyArrowLayer32.Init(const centerPt: TPointD);
 var
   rec: TRectD;
 begin
-  rec := Image32_Vector.GetBoundsD(defaultArrowBtns);
+  rec := Img32.Vector.GetBoundsD(defaultArrowBtns);
   Self.Paths := OffsetPath(defaultArrowBtns,
     centerPt.X - rec.Left - rec.Width/2,
     centerPt.Y -rec.Top - rec.Height/2);
@@ -269,7 +279,7 @@ label
 begin
   //preserve arrow symmetry and avoids 'broken' non-arrow polygons
   p := Copy(Paths[0], 0, 7);
-  center := Image32_Vector.MidPoint(p[3], p[4]);
+  center := Img32.Vector.MidPoint(p[3], p[4]);
   newPt := btnGroup[btnIdx].MidPoint;
   case btnIdx of
     0:
@@ -374,7 +384,7 @@ begin
 bottom: //goto label
   for i := 0 to btnGroup.ChildCount -1 do
     btnGroup[i].PositionCenteredAt(p[i]);
-  Paths := Image32_Vector.Paths(p);
+  Paths := Img32.Vector.Paths(p);
 end;
 
 //------------------------------------------------------------------------------

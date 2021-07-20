@@ -42,8 +42,6 @@ object Form1: TForm1
     ShowScrollButtons = ssbFocused
     AllowScroll = True
     AllowZoom = True
-    ExplicitWidth = 569
-    ExplicitHeight = 477
   end
   object ListBox1: TListBox
     Left = 0
@@ -56,7 +54,6 @@ object Form1: TForm1
     TabOrder = 1
     Visible = False
     OnClick = ListBox1Click
-    ExplicitHeight = 477
   end
   object MainMenu1: TMainMenu
     Left = 192

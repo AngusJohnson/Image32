@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls,
-  Image32, Image32_Layers;
+  Img32, Img32.Layers;
 
 type
   TForm1 = class(TForm)
@@ -39,7 +39,7 @@ implementation
 {$R *.dfm}
 
 uses
-  Image32_Draw, Image32_Vector, Image32_Extra;
+  Img32.Draw, Img32.Vector, Img32.Extra;
 
 //------------------------------------------------------------------------------
 
@@ -156,7 +156,7 @@ begin
   Canvas.FillRect(ClientRect);
 
   //center the animation in the form clientrect
-  Image32_Vector.OffsetRect(drawRec,
+  Types.OffsetRect(drawRec,
     -drawRec.Left + (ClientWidth - layeredImage.Width) div 2,
     -drawRec.Top + (ClientHeight - layeredImage.Height) div 2);
 

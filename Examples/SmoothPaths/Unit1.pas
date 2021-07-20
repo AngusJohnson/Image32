@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Math,
   Types, Menus, ExtCtrls, ComCtrls, StdCtrls,
-  Image32, Image32_Layers, Image32_Ttf, Image32_SmoothPath;
+  Img32, Img32.Layers, Img32.Text, Img32.SmoothPath;
 
 type
 
@@ -61,7 +61,7 @@ type
     procedure mnuSharpWithHdlsClick(Sender: TObject);
     procedure mnuRotateButtonsClick(Sender: TObject);
   private
-    layeredImage32   : TLayeredImage32;
+    layeredImg32   : TLayeredImage32;
     smoothGroupLayer : TSmoothPathGroupLayer32;
     rotateGroupLayer : TRotatingGroupLayer32;
     clickedLayer     : TLayer32;
@@ -90,8 +90,8 @@ implementation
 {$R RotateCursor.res}
 
 uses
-  Image32_BMP, Image32_PNG, Image32_JPG, Image32_Draw, Image32_Vector,
-  Image32_Extra, Image32_Clipper;
+  Img32.Fmt.BMP, Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Draw,
+  Img32.Vector, Img32.Extra, Img32.Clipper;
 
 const
   crRotate = 1;
@@ -158,11 +158,11 @@ begin
   glyphCache := TGlyphCache.Create(fontReader, DpiAware(11));
 
   //SETUP LAYEREDIMAGE32
-  layeredImage32 := TLayeredImage32.Create;
-  layeredImage32.BackgroundColor := Color32(clBtnFace);
+  layeredImg32 := TLayeredImage32.Create;
+  layeredImg32.BackgroundColor := Color32(clBtnFace);
 
   //the first layer will be a hatched TDesignerLayer32 which is 'non-clickable'
-  layeredImage32.AddLayer(TDesignerLayer32);
+  layeredImg32.AddLayer(TDesignerLayer32);
 
   Screen.Cursors[crRotate] :=
     LoadImage(hInstance, 'ROTATE', IMAGE_CURSOR, 32,32,0);
@@ -176,7 +176,7 @@ procedure TFrmMain.FormDestroy(Sender: TObject);
 begin
   fontReader.Free;
   glyphCache.Free;
-  FreeAndNil(layeredImage32);
+  FreeAndNil(layeredImg32);
 end;
 //------------------------------------------------------------------------------
 
@@ -197,11 +197,11 @@ end;
 
 procedure TFrmMain.FormResize(Sender: TObject);
 begin
-  if not Assigned(layeredImage32) then Exit;
-  layeredImage32.SetSize(ClientWidth, ClientHeight);
-  with layeredImage32 do
-    layeredImage32[0].SetSize(Width, Height);
-  HatchBackground(layeredImage32[0].Image);
+  if not Assigned(layeredImg32) then Exit;
+  layeredImg32.SetSize(ClientWidth, ClientHeight);
+  with layeredImg32 do
+    layeredImg32[0].SetSize(Width, Height);
+  HatchBackground(layeredImg32[0].Image);
 end;
 //------------------------------------------------------------------------------
 
@@ -237,7 +237,7 @@ procedure TFrmMain.FormPaint(Sender: TObject);
 var
   updateRec: TRect;
 begin
-  with layeredImage32.GetMergedImage(mnuHideControls.Checked, updateRec) do
+  with layeredImg32.GetMergedImage(mnuHideControls.Checked, updateRec) do
     CopyToDc(updateRec, Canvas.Handle, updateRec.Left, updateRec.Top, false);
 end;
 //------------------------------------------------------------------------------
@@ -248,7 +248,7 @@ begin
   if not Assigned(smoothGroupLayer) then
   begin
     smoothGroupLayer := TSmoothPathGroupLayer32(
-      layeredImage32.AddLayer(TMySmoothPathGroupLayer32));
+      layeredImg32.AddLayer(TMySmoothPathGroupLayer32));
     UpdateSmoothPathLayerAttributes;
     //and make room to display coordinates
     smoothGroupLayer.DesignMargin := DPIAware(40);
@@ -265,7 +265,7 @@ begin
 
   clickPoint := Types.Point(X,Y);
   //get the layer that was clicked (if any)
-  clickedLayer := layeredImage32.GetLayerAt(clickPoint);
+  clickedLayer := layeredImg32.GetLayerAt(clickPoint);
 
   if (clickedLayer is TSmoothButtonLayer32) then
   begin
@@ -319,7 +319,7 @@ begin
 
   if not (ssLeft in Shift) then
   begin
-    layer := layeredImage32.GetLayerAt(clickPoint, mnuHideControls.Checked);
+    layer := layeredImg32.GetLayerAt(clickPoint, mnuHideControls.Checked);
     if Assigned(layer) then
       Cursor := layer.CursorId else
       Cursor := crDefault;
@@ -376,7 +376,7 @@ end;
 
 procedure TFrmMain.CopytoClipboard1Click(Sender: TObject);
 begin
-  layeredImage32.GetMergedImage(mnuHideControls.Checked).CopyToClipBoard;
+  layeredImg32.GetMergedImage(mnuHideControls.Checked).CopyToClipBoard;
 end;
 //------------------------------------------------------------------------------
 

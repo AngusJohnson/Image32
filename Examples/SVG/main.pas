@@ -5,8 +5,8 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls, ShellApi,
-  Image32, Image32_Draw, Image32_SVG, Image32_PNG, Image32_SVG_Reader,
-  Image32_Vector, Image32_Ttf, Image32Panels, Dialogs, StdCtrls;
+  Img32, Img32.Draw, Img32.Fmt.SVG, Img32.Fmt.PNG, Img32.SVG.Reader,
+  Img32.Vector, Img32.Text, Img32.Panels, Dialogs, StdCtrls;
 
   //This sample app presumes that the TImage32Panel component
   //has been installed into your Delphi compiler's IDE.
@@ -44,13 +44,7 @@ implementation
 
 {$R *.dfm}
 
-//alternative fonts that can be loaded from the resource section.
-////https://www.google.com/get/noto/
-//{$R Font_Liberation_Sans}
-//{$R Font_Liberation_Serif}
-//{$R Font_Liberation_Mono}
-
-uses Image32_Transform, Image32_Extra;
+uses Img32.Transform, Img32.Extra;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -68,14 +62,14 @@ begin
   svgReader := TSvgReader.Create;
   //svgReader.BackgroundColor := clWhite32;
 
-  FontLibrary.Add('Arial');
-  FontLibrary.Add('Arial Bold');
-  FontLibrary.Add('Arial Italic');
-  FontLibrary.Add('Arial Bold Italic');
-  FontLibrary.Add('Times New Roman');
-  FontLibrary.Add('Times New Roman Bold');
-  FontLibrary.Add('Times New Roman Italic');
-  FontLibrary.Add('Times New Roman Bold Italic');
+  FontManager.Load('Arial');
+  FontManager.Load('Arial Bold');
+  FontManager.Load('Arial Italic');
+  FontManager.Load('Arial Bold Italic');
+  FontManager.Load('Times New Roman');
+  FontManager.Load('Times New Roman Bold');
+  FontManager.Load('Times New Roman Italic');
+  FontManager.Load('Times New Roman Bold Italic');
 
   OpenFile('.\Sample SVGs\*.svg');
 end;

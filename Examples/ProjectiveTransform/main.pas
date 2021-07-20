@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics,
   Controls, Forms, Dialogs, ExtCtrls, Menus,
-  Image32, Image32_Layers, ComCtrls, StdCtrls;
+  Img32, Img32.Layers, ComCtrls, StdCtrls;
 
 type
 
@@ -96,8 +96,8 @@ implementation
 
 
 uses
-  Image32_BMP, Image32_PNG, Image32_JPG,
-  Image32_Vector, Image32_Draw, Image32_Extra, Image32_Transform;
+  Img32.Fmt.BMP, Img32.Fmt.PNG, Img32.Fmt.JPG,
+  Img32.Vector, Img32.Draw, Img32.Extra, Img32.Transform;
 
 
 //------------------------------------------------------------------------------
@@ -195,7 +195,7 @@ begin
       begin
         rec := Image.Bounds;
         i := DefaultButtonSize div 2;
-        rec := InflateRect(rec, -i, -i);
+        InflateRect(rec, -i, -i);
         srcPts := Rectangle(rec);
       end;
 
@@ -309,7 +309,7 @@ begin
 
   i := DefaultButtonSize div 2;
   rec := rasterLayer.Image.Bounds;
-  rec := InflateRect(rec, -i, -i);
+  InflateRect(rec, -i, -i);
   //when moving buttons make sure it remains inside the image bounds
   //otherwise we'll lose sight (and control) of it.
   pt := SafePoint(Point(X,Y), rec);

@@ -1,9 +1,9 @@
 object MainForm: TMainForm
   Left = 392
   Top = 208
-  Width = 432
-  Height = 492
   Caption = 'Layers201'
+  ClientHeight = 433
+  ClientWidth = 416
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -12,6 +12,7 @@ object MainForm: TMainForm
   Font.Style = []
   Menu = MainMenu1
   OldCreateOrder = False
+  PopupMenu = PopupMenu1
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnMouseDown = FormMouseDown
@@ -22,7 +23,7 @@ object MainForm: TMainForm
   TextHeight = 13
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 415
+    Top = 414
     Width = 416
     Height = 19
     Panels = <>
@@ -97,5 +98,50 @@ object MainForm: TMainForm
     Filter = 'Image Files|*.png;*.bmp;*.jpg'
     Left = 88
     Top = 40
+  end
+  object PopupMenu1: TPopupMenu
+    Left = 160
+    Top = 40
+    object AddImage1: TMenuItem
+      Caption = 'Add &Image ...'
+      ShortCut = 16457
+      OnClick = mnuAddImageClick
+    end
+    object AddText1: TMenuItem
+      Caption = 'Add &Text'
+      ShortCut = 16468
+      OnClick = mnuAddTextClick
+    end
+    object AddArrow1: TMenuItem
+      Caption = 'Add &Arrow'
+      ShortCut = 16449
+      OnClick = mnuAddArrowClick
+    end
+    object N4: TMenuItem
+      Caption = '-'
+    end
+    object Rotate1: TMenuItem
+      Caption = '&Rotate'
+      ShortCut = 16466
+      OnClick = mnuRotateClick
+    end
+    object Delete1: TMenuItem
+      Caption = '&Delete'
+      ShortCut = 46
+      OnClick = mnuDeleteClick
+    end
+    object N5: TMenuItem
+      Caption = '-'
+    end
+    object SendBackOne1: TMenuItem
+      Caption = 'Send &Back One'
+      ShortCut = 16450
+      OnClick = mnuSendBackOneClick
+    end
+    object BringForwardOne1: TMenuItem
+      Caption = 'Bring &Forward One'
+      ShortCut = 16454
+      OnClick = mnuBringForwardOneClick
+    end
   end
 end

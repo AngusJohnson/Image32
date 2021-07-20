@@ -6,8 +6,8 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, StdCtrls, ExtCtrls, Math,
-  Image32, Image32_PNG, Image32_Ttf,
-  Image32_Vector, Image32_Transform, Image32_Extra, Image32_Draw;
+  Types, Img32, Img32.Fmt.PNG, Img32.Text,
+  Img32.Vector, Img32.Transform, Img32.Extra, Img32.Draw;
 
 type
 
@@ -117,7 +117,7 @@ begin
     if not fontReader.IsValidFontFormat then Exit;
 
     //and get the outline for some text ...
-    glyphCache.GetTextGlyphs(0,0, sillyText, mainTxtPaths, nextX);
+    mainTxtPaths := glyphCache.GetTextGlyphs(0,0, sillyText, nextX);
 
     //Normally we'd create different fontReaders for different fonts and
     //also use different glyphManagers for different font heights,
@@ -130,7 +130,7 @@ begin
     glyphCache.FontHeight := DPIAware(10);
 
     //and now get the copyright text outline
-    glyphCache.GetTextGlyphs(0,0, copyright, copyTxtPaths, nextX);
+    copyTxtPaths := glyphCache.GetTextGlyphs(0,0, copyright, nextX);
   finally
     glyphCache.Free;
     fontReader.free;
@@ -145,7 +145,7 @@ begin
   MatrixApply(matrix, mainTxtPaths);
 
   //this seems necessary because Lazarus appears to bypass the initialization
-  //section in Image32_PNG unless some code from that unit is used explicitly.
+  //section in Img32.PNG unless some code from that unit is used explicitly.
   TImage32.RegisterImageFormatClass('PNG', TImageFormat_PNG, cpHigh);
 
   imgBooks := TImage32.Create;
@@ -155,7 +155,7 @@ begin
 
     //set the size of the base image so that it contains
     //both 'imgBooks' and the text with a decent margin ...
-    textRec := Image32_Vector.GetBounds(mainTxtPaths);
+    textRec := Img32.Vector.GetBounds(mainTxtPaths);
     zoomImages[0].SetSize(
       max(imgBooks.Width, textRec.Width) + (margin * 4),
       max(imgBooks.Height, textRec.Height) + (margin * 4));
@@ -164,16 +164,16 @@ begin
     with zoomImages[0] do
     begin
        FillRect(Bounds, bkColor);
-       tmpPath := Image32_Vector.Rectangle(Bounds);
+       tmpPath := Img32.Vector.Rectangle(Bounds);
     end;
-    DrawLine(zoomImages[0], tmpPath, 2, penColor, esClosed);
+    DrawLine(zoomImages[0], tmpPath, 2, penColor, esPolygon);
 
     //offset 'imgBooks' so it's centered in the base image
     //and copy it onto the base image ...
     imageRec := imgBooks.Bounds;
     delta := Point((zoomImages[0].Width - imgBooks.Width) div 2,
       (zoomImages[0].Height - imgBooks.Height) div 2);
-    OffsetRect(imageRec, delta.X, delta.Y);
+    Types.OffsetRect(imageRec, delta.X, delta.Y);
     zoomImages[0].CopyBlend(imgBooks, imgBooks.Bounds,
       imageRec, @BlendToOpaque);
 
@@ -221,14 +221,14 @@ begin
   //draw text background (green)
   DrawPolygon(zoomImages[highI], zoomGlyphs, frNonZero, txtColor);
   //draw the text edges (black) and add a 3D effect
-  DrawLine(zoomImages[highI], zoomGlyphs, 1.5, clBlack32, esClosed);
+  DrawLine(zoomImages[highI], zoomGlyphs, 1.5, clBlack32, esPolygon);
   Draw3D(zoomImages[highI], zoomGlyphs, frNonZero, 6, 3);
 
   for i := highI-1 downto 1 do
   begin
-    textRec := Image32_Vector.GetBounds(zoomGlyphs);
+    textRec := Img32.Vector.GetBounds(zoomGlyphs);
     zoomGlyphs := ScalePath(zoomGlyphs, 0.9, 0.9);
-    textRec2 := Image32_Vector.GetBounds(zoomGlyphs);
+    textRec2 := Img32.Vector.GetBounds(zoomGlyphs);
     zoomGlyphs := OffsetPath(zoomGlyphs,
       (textRec.Left-textRec2.Left) + (textRec.Width-textRec2.Width)/2,
       (textRec.Top-textRec2.Top) + (textRec.Height-textRec2.Height)/2);

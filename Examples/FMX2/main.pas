@@ -6,7 +6,7 @@ uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   System.Math, FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs,
   FMX.StdCtrls, FMX.Platform, FMX.Surfaces, FMX.Controls.Presentation,
-  FMX.Layouts, FMX.TabControl, Image32;
+  FMX.Layouts, FMX.TabControl, Img32;
 
 type
   TMainForm = class(TForm)
@@ -59,8 +59,8 @@ implementation
 {$ZEROBASEDSTRINGS OFF}
 
 uses
-  Image32_Vector, Image32_Draw, Image32_Extra, Image32_FMX,
-  Image32_Ttf, Image32_Clipper;
+  Img32.Vector, Img32.Draw, Img32.Extra, Img32.FMX,
+  Img32.Text, Img32.Clipper;
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions
@@ -158,7 +158,7 @@ begin
   Timer1.Enabled := false;
   //IMPORTANT: we need to avoid any screen scaling
   //as it causes unacceptible blurring (especially of text) ...
-  outerRec := Image32_Vector.Rect(0, 0,
+  outerRec := Img32.Vector.Rect(0, 0,
     DPIAwareFMX(ClientWidth) - margin*2,
     Round(DPIAwareFMX(ClientHeight - TabControl1.TabHeight)) -margin*2);
 
@@ -175,12 +175,13 @@ begin
     if not notoSansReg.IsValidFontFormat then Exit;
     //noto14Cache.Underlined := true;
 
-    tmpRec := Image32_Vector.InflateRect(outerRec, -1, -1);
-    rectangle := Image32_Vector.Rectangle(tmpRec);
+    tmpRec := outerRec;
+    Img32.Vector.InflateRect(tmpRec, -1, -1);
+    rectangle := Img32.Vector.Rectangle(tmpRec);
     DrawLine(imgMain, rectangle, 2, clDarkRed32, esPolygon);
 
-    innerRec := Image32_Vector.InflateRect(outerRec,
-      -innermargin, -innermargin);
+    innerRec := outerRec;
+    Img32.Vector.InflateRect(innerRec, -innermargin, -innermargin);
     w := RectWidth(innerRec) div 2; //half innerRec.width
 
     //load an image and scale it to a useful size ...
@@ -190,8 +191,7 @@ begin
       //draw an image at the top right
       imgBooks.Scale(w / imgBooks.Width);
       imageRec := imgBooks.Bounds;
-      Image32_Vector.OffsetRect(imageRec,
-        imgBooks.Width + innermargin, innermargin);
+      OffsetRect(imageRec, imgBooks.Width + innermargin, innermargin);
       imgMain.CopyBlend(imgBooks,
         imgBooks.Bounds, imageRec, BlendToOpaque);
       h := imgBooks.Height;
@@ -200,7 +200,7 @@ begin
     end;
 
     //draw text starting at the top left corner while avoiding the image ...
-    tmpRec := Image32_Vector.Rect(innerMargin, innerMargin, w,
+    tmpRec := Img32.Vector.Rect(innerMargin, innerMargin, w,
       h + innerMargin + Round(noto14Cache.LineHeight));
 
     txtPaths := noto14Cache.GetTextGlyphs(tmpRec, essay,
@@ -307,9 +307,10 @@ begin
 
   //outer ring (with linear gradients to give the impression of 3D light)
 
-  path := Image32_Vector.Ellipse(recD);
-  rec2 := InflateRect(recD, frameWidth/2, frameWidth/2);
-  path2 := Image32_Vector.Ellipse(rec2);
+  path := Img32.Vector.Ellipse(recD);
+  rec2 := recD;
+  InflateRect(rec2, frameWidth/2, frameWidth/2);
+  path2 := Img32.Vector.Ellipse(rec2);
   DrawShadow(imgClockface, path2, frEvenOdd, frameWidth/4, angle315);
 
   lgr := TLinearGradientRenderer.Create;
@@ -319,13 +320,13 @@ begin
         PointD(Right,Top), PointD(Left,Bottom),
         clNearWhite32, clLightGray32, gfsClamp);
     DrawLine(imgClockface, path, frameWidth, lgr, esPolygon);
-    recD := inflateRect(recD, frameWidth/2, frameWidth/2);
+    inflateRect(recD, frameWidth/2, frameWidth/2);
     path2 := Ellipse(recD);
     DrawLine(imgClockface, path2, 1.0, clGray32, esPolygon);
 
     //inner ring
 
-    recD := inflateRect(recD, -frameWidth, -frameWidth);
+    inflateRect(recD, -frameWidth, -frameWidth);
     path2 := Ellipse(recD);
     with recD do
       lgr.SetParameters(
@@ -340,8 +341,8 @@ begin
   //DRAW THE WATCH FACE
   /////////////////////////////////////////////////////////////
 
-  recD := inflateRect(recD, -frameWidth/8, -frameWidth/8);
-  path2 := Image32_Vector.Ellipse(recD);
+  inflateRect(recD, -frameWidth/8, -frameWidth/8);
+  path2 := Img32.Vector.Ellipse(recD);
   DrawLine(imgClockface, path2, 1.0, clSilver32, esPolygon);
   DrawPolygon(imgClockface, path2, frEvenOdd, clWhite32);
   mp := MidPoint(recD);
@@ -352,7 +353,7 @@ begin
   glyphCache := TGlyphCache.Create(fontReader, clockRadius / 13);
   try
     //DRAW THE "MAKER'S MARK"
-    recI := Image32_Vector.Rect(recD);
+    recI := Img32.Vector.Rect(recD);
     recI.Bottom := recI.Top + clockRadius;
     DrawText(imgClockface, recI, 'angusj', taCenter, tvaMiddle, glyphCache);
 

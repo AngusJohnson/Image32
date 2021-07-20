@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls, Dialogs, ShellApi,
-  Image32, Image32_Layers, Image32_Ttf, Image32_Draw;
+  Img32, Img32.Layers, Img32.Text, Img32.Draw;
 
 type
 
@@ -86,7 +86,7 @@ type
     procedure mnuCutToClipboardClick(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   private
-    layeredImage32: TLayeredImage32;
+    layeredImg32: TLayeredImage32;
     fontReader: TFontReader;
     fontCache: TGlyphCache;
     wordStrings: TStringList;
@@ -112,8 +112,8 @@ implementation
 {$R FONT.RES}
 
 uses
-  Image32_BMP, Image32_PNG, Image32_JPG,
-  Image32_Vector, Image32_Extra, Image32_Clipper;
+  Img32.Fmt.BMP, Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.SVG,
+  Img32.Vector, Img32.Extra, Img32.Clipper;
 
 const
   margin = 100;
@@ -190,10 +190,10 @@ var
 begin
   Randomize;
 
-  layeredImage32 := TLayeredImage32.Create; //sized in FormResize below.
+  layeredImg32 := TLayeredImage32.Create; //sized in FormResize below.
 
   //add a hatched background design layer (see FormResize below).
-  layeredImage32.AddLayer(TDesignerLayer32);
+  layeredImg32.AddLayer(TDesignerLayer32);
 
   //create text rendering objects
   fontReader := TFontReader.Create;
@@ -209,7 +209,7 @@ begin
     resStream.Free;
   end;
 
-  popupPoint := Point(layeredImage32.MidPoint);
+  popupPoint := Point(layeredImg32.MidPoint);
 end;
 //------------------------------------------------------------------------------
 
@@ -218,22 +218,22 @@ begin
   wordStrings.Free;
   fontCache.Free;
   fontReader.Free;
-  FreeAndNil(layeredImage32); //see FormResize
+  FreeAndNil(layeredImg32); //see FormResize
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormResize(Sender: TObject);
 begin
-  if not Assigned(layeredImage32) then Exit;
+  if not Assigned(layeredImg32) then Exit;
 
-  layeredImage32.SetSize(ClientWidth, ClientHeight);
+  layeredImg32.SetSize(ClientWidth, ClientHeight);
 
   //and resize and repaint the hatched design background layer
-  with TDesignerLayer32(layeredImage32[0]) do
+  with TDesignerLayer32(layeredImg32[0]) do
   begin
     //nb: use SetSize not Resize which would waste
     //CPU cycles stretching any previous hatching
-    SetSize(layeredImage32.Width, layeredImage32.Height);
+    SetSize(layeredImg32.Width, layeredImg32.Height);
     HatchBackground(Image);
   end;
 
@@ -254,9 +254,9 @@ begin
     popupPoint.X +x,popupPoint.Y +y);
 
   //create the new layer
-  newLayer := TMyVectorLayer32(layeredImage32.AddLayer(TMyVectorLayer32));
+  newLayer := TMyVectorLayer32(layeredImg32.AddLayer(TMyVectorLayer32));
   with newLayer as TMyVectorLayer32 do
-    Paths := Image32_Vector.Paths(Ellipse(rec));
+    Paths := Img32.Vector.Paths(Ellipse(rec));
   SetTargetLayer(newLayer);
 end;
 //------------------------------------------------------------------------------
@@ -273,9 +273,9 @@ begin
   rec := Rect(popupPoint.X -x,popupPoint.Y -y,
     popupPoint.X +x,popupPoint.Y +y);
 
-  newLayer := layeredImage32.AddLayer(TMyVectorLayer32);
+  newLayer := layeredImg32.AddLayer(TMyVectorLayer32);
   with newLayer as TMyVectorLayer32 do
-    Paths := Image32_Vector.Paths(Rectangle(rec));
+    Paths := Img32.Vector.Paths(Rectangle(rec));
   SetTargetLayer(newLayer);
 end;
 //------------------------------------------------------------------------------
@@ -290,13 +290,13 @@ begin
   randomWord := wordStrings[Random(wordStrings.Count)];
   tmp := fontCache.GetTextGlyphs(0, 0, randomWord);
   tmp := ScalePath(tmp, 1, 2.0);
-  rec := Image32_Vector.GetBoundsD(tmp);
+  rec := Img32.Vector.GetBoundsD(tmp);
   with popupPoint do
     tmp := OffsetPath(tmp,
       X - rec.Left - rec.Width/2,
       Y -rec.Top - rec.Height/2);
 
-  newLayer := layeredImage32.AddLayer(TMyVectorLayer32);
+  newLayer := layeredImg32.AddLayer(TMyVectorLayer32);
   with newLayer as TMyVectorLayer32 do Paths := tmp;
   SetTargetLayer(newLayer);
 end;
@@ -308,7 +308,7 @@ var
 begin
   if not OpenDialog1.Execute then Exit;
 
-  rasterLayer := layeredImage32.AddLayer(TMyRasterLayer32) as TMyRasterLayer32;
+  rasterLayer := layeredImg32.AddLayer(TMyRasterLayer32) as TMyRasterLayer32;
   with rasterLayer do
   begin
     MasterImage.LoadFromFile(OpenDialog1.FileName);
@@ -317,7 +317,7 @@ begin
       Free;
       Exit;
     end;
-    Init(Point(layeredImage32.MidPoint));
+    Init(Point(layeredImg32.MidPoint));
   end;
   SetTargetLayer(rasterLayer);
   Invalidate;
@@ -330,7 +330,7 @@ var
 begin
   if not TImage32.CanPasteFromClipBoard then Exit;
   FreeAndNil(buttonGroup);
-  rasterLayer := layeredImage32.AddLayer(TMyRasterLayer32) as TMyRasterLayer32;
+  rasterLayer := layeredImg32.AddLayer(TMyRasterLayer32) as TMyRasterLayer32;
   with rasterLayer do
   begin
     MasterImage.PasteFromClipBoard;
@@ -339,7 +339,7 @@ begin
       Free;
       Exit;
     end;
-    Init(Point(layeredImage32.MidPoint));
+    Init(Point(layeredImg32.MidPoint));
   end;
   SetTargetLayer(rasterLayer);
   Invalidate;
@@ -357,10 +357,10 @@ procedure TMainForm.FormPaint(Sender: TObject);
 var
   updateRect: TRect;
 begin
-  //layeredImage32.GetMergedImage optionally returns the portion of
+  //layeredImg32.GetMergedImage optionally returns the portion of
   //the image that's changed since the previous GetMergedImage call.
   //Painting only this changed region significantly speeds up drawing.
-  with layeredImage32.GetMergedImage(false, updateRect) do
+  with layeredImg32.GetMergedImage(false, updateRect) do
   begin
     CopyToDc(updateRect, self.Canvas.Handle,
       updateRect.Left, updateRect.Top, false);
@@ -396,7 +396,7 @@ procedure TMainForm.pnlMainMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   clickPoint := Types.Point(X,Y);
-  clickedLayer := layeredImage32.GetLayerAt(clickPoint);
+  clickedLayer := layeredImg32.GetLayerAt(clickPoint);
 
   if not Assigned(clickedLayer) then
   begin
@@ -425,7 +425,7 @@ begin
   if not (ssLeft in Shift) then
   begin
     //not moving anything so just update the cursor
-    layer := layeredImage32.GetLayerAt(pt);
+    layer := layeredImg32.GetLayerAt(pt);
     if Assigned(layer) then
       Cursor := layer.CursorId else
       Cursor := crDefault;
@@ -525,7 +525,7 @@ end;
 procedure TMainForm.PopupMenu1Popup(Sender: TObject);
 begin
   mnuBringToFront.Enabled := assigned(targetLayer) and
-    (targetLayer.Index < layeredImage32.Root.ChildCount -2);
+    (targetLayer.Index < layeredImg32.Root.ChildCount -2);
   mnuBringtoFront2.Enabled := mnuBringtoFront.Enabled;
   mnuSendToBack.Enabled := assigned(targetLayer) and (targetLayer.Index > 1);
   mnuSendtoBack2.Enabled := mnuSendtoBack.Enabled;
@@ -537,7 +537,7 @@ begin
     GetCursorPos(popupPoint);
     popupPoint := ScreenToClient(popupPoint);
   end else
-    popupPoint := Point(layeredImage32.MidPoint);
+    popupPoint := Point(layeredImg32.MidPoint);
 end;
 //------------------------------------------------------------------------------
 

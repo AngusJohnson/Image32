@@ -1,9 +1,9 @@
 object Form1: TForm1
   Left = 514
   Top = 310
-  Width = 585
-  Height = 494
   Caption = 'Image32: Vectorize'
+  ClientHeight = 435
+  ClientWidth = 569
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -22,7 +22,7 @@ object Form1: TForm1
   TextHeight = 16
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 410
+    Top = 409
     Width = 569
     Height = 26
     Panels = <>
@@ -34,7 +34,7 @@ object Form1: TForm1
     Left = 512
     Top = 0
     Width = 57
-    Height = 410
+    Height = 409
     Align = alRight
     ParentBackground = False
     TabOrder = 1
@@ -42,7 +42,7 @@ object Form1: TForm1
     OnExit = pnlSmoothExit
     DesignSize = (
       57
-      410)
+      409)
     object lblSmooth: TLabel
       Left = 6
       Top = 6
@@ -63,7 +63,7 @@ object Form1: TForm1
       Left = 15
       Top = 56
       Width = 27
-      Height = 138
+      Height = 118
       Anchors = [akLeft, akTop, akBottom]
       Orientation = trVertical
       PageSize = 0
@@ -76,7 +76,7 @@ object Form1: TForm1
       Left = 15
       Top = 256
       Width = 27
-      Height = 138
+      Height = 118
       Anchors = [akLeft, akTop, akBottom]
       Max = 5
       Orientation = trVertical
@@ -91,7 +91,7 @@ object Form1: TForm1
     Left = 0
     Top = 0
     Width = 512
-    Height = 410
+    Height = 409
     Align = alClient
     TabOrder = 2
     Visible = False
@@ -138,7 +138,7 @@ object Form1: TForm1
       Left = 1
       Top = 42
       Width = 510
-      Height = 367
+      Height = 366
       Align = alClient
       HideSelection = False
       ReadOnly = True

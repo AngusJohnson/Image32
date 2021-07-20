@@ -7,7 +7,7 @@ uses
   FMX.Forms,
   main in 'main.pas' {MainForm};
 
-{$I Image32.inc}
+{$I Img32.inc}
 {$R ..\Resources.res}
 
 begin

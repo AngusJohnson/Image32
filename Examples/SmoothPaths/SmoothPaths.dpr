@@ -4,7 +4,7 @@ uses
   Forms,
   Unit1 in 'Unit1.pas' {FrmMain};
 
-{$I Image32.inc}
+{$I Img32.inc}
 {$R ..\Resources.res}
 
 begin
