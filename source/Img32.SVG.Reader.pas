@@ -50,9 +50,9 @@ type
     markerStart   : UTF8String;
     markerMiddle  : UTF8String;
     markerEnd     : UTF8String;
-    filterEl      : UTF8String;
-    maskEl        : UTF8String;
-    clipPathEl    : UTF8String;
+    filterElRef   : UTF8String;
+    maskElRef     : UTF8String;
+    clipElRef     : UTF8String;
     opacity       : integer;
     matrix        : TMatrixD;
     visible       : Boolean;
@@ -135,7 +135,7 @@ type
     function  LoadFromFile(const filename: string): Boolean;
     function  LoadFromString(const str: string): Boolean;
     //Both SetOverrideFillColor & SetOverrideStrokeColor are intended
-    //for use by the third-party library - SVGIconImageList
+    //primarily for use by the third-party library - SVGIconImageList
     //https://github.com/EtheaDev/SVGIconImageList/wiki
     procedure SetOverrideFillColor(color: TColor32);
     procedure SetOverrideStrokeColor(color: TColor32);
@@ -143,7 +143,7 @@ type
     property  BlurQuality     : integer read fBlurQuality write SetBlurQuality;
     property  IsEmpty         : Boolean read GetIsEmpty;
     //KeepAspectRatio: this property has also been added for the convenience of
-    //the third-party library: SVGIconImageList. IMHO it should always = true)
+    //the third-party SVGIconImageList. (IMHO it should always = true)
     property  KeepAspectRatio: Boolean
       read fUsePropScale write fUsePropScale;
     property  RootElement     : TSvgElement read fRootElement;
@@ -547,7 +547,7 @@ const
     textLength: 0; italic: sfsUndefined; weight: -1; align: staUndefined;
     decoration: fdUndefined; baseShift: (rawVal: InvalidD; unitType: utNumber));
     markerStart: ''; markerMiddle: ''; markerEnd: '';
-    filterEl: ''; maskEl: ''; clipPathEl: ''; opacity: MaxInt;
+    filterElRef: ''; maskElRef: ''; clipElRef: ''; opacity: MaxInt;
     matrix: ((1, 0, 0),(0, 1, 0),(0, 0, 1)); visible: true;
     useEl: nil; bounds: (Left:0; Top:0; Right:0; Bottom:0));
 
@@ -620,8 +620,6 @@ begin
       drawInfo.fillOpacity := fillOpacity;
     if (fillEl <> '') then
       drawInfo.fillEl := fillEl;
-    if (clipPathEl <> '') then
-      drawInfo.clipPathEl := clipPathEl;
     if (strokeColor = clCurrent) then
       drawInfo.strokeColor := thisElement.fReader.currentColor
     else if strokeColor <> clInvalid then
@@ -640,11 +638,6 @@ begin
       drawInfo.strokeEl := strokeEl;
     if opacity < MaxInt then
       drawInfo.opacity := opacity;
-    if (filterEl <> '') then
-      drawInfo.filterEl := filterEl;
-    if (maskEl <> '') then
-      drawInfo.maskEl := maskEl;
-
     if fontInfo.family <> ttfUnknown then
       drawInfo.fontInfo.family := fontInfo.family;
     if fontInfo.size > 0 then
@@ -804,11 +797,10 @@ begin
 
   UpdateDrawInfo(drawInfo, self);
 
-  maskEl := FindRefElement(drawInfo.maskEl);
-  clipEl := FindRefElement(drawInfo.clipPathEl);
+  maskEl := FindRefElement(fDrawInfo.maskElRef);
+  clipEl := FindRefElement(fDrawInfo.clipElRef);
   if Assigned(clipEl) then
   begin
-    drawInfo.clipPathEl := ''; //avoids propagation
     with TClipPathElement(clipEl) do
     begin
       GetPaths(drawInfo);
@@ -829,7 +821,6 @@ begin
   end
   else if Assigned(maskEl) then
   begin
-    drawInfo.maskEl := '';    //prevent propagation
     with TMaskElement(maskEl) do
     begin
       GetPaths(drawInfo);
@@ -1964,12 +1955,11 @@ begin
   img := image;
   clipRec2 := NullRect;
   clipPathEl := nil; filterEl := nil; maskEl := nil;
-  if (drawInfo.clipPathEl <> '') then
-    clipPathEl := FindRefElement(drawInfo.clipPathEl);
-  if (drawInfo.filterEl <> '') then
-    filterEl := FindRefElement(drawInfo.filterEl);
-  if (drawInfo.maskEl <> '') then
-    maskEl := FindRefElement(drawInfo.maskEl);
+
+  maskEl := FindRefElement(fDrawInfo.maskElRef);
+  clipPathEl := FindRefElement(fDrawInfo.clipElRef);
+  filterEl := FindRefElement(fDrawInfo.filterElRef);
+
   if (drawInfo.fillEl <> '') and
     (drawInfo.fillOpacity > 0) and (drawInfo.fillOpacity < 1) then
       DrawInfo.opacity := Round(drawInfo.fillOpacity * 255);
@@ -1993,7 +1983,6 @@ begin
     end
     else if Assigned(maskEl) then
     begin
-      drawInfo.maskEl := '';
       with TMaskElement(maskEl) do
       begin
         GetPaths(drawInfo);
@@ -3325,7 +3314,7 @@ end;
 
 procedure ClipPath_Attrib(aOwnerEl: TElement; const value: UTF8String);
 begin
-  aOwnerEl.fDrawInfo.clipPathEl := ExtractRef(value);
+  aOwnerEl.fDrawInfo.clipElRef := ExtractRef(value);
 end;
 //------------------------------------------------------------------------------
 
@@ -3562,14 +3551,14 @@ end;
 procedure Filter_Attrib(aOwnerEl: TElement; const value: UTF8String);
 begin
   if (aOwnerEl is TShapeElement) then
-    aOwnerEl.fDrawInfo.filterEl := ExtractRef(value);
+    aOwnerEl.fDrawInfo.filterElRef := ExtractRef(value);
 end;
 //------------------------------------------------------------------------------
 
 procedure Mask_Attrib(aOwnerEl: TElement; const value: UTF8String);
 begin
   if (aOwnerEl is TShapeElement) then
-    aOwnerEl.fDrawInfo.maskEl := ExtractRef(value);
+    aOwnerEl.fDrawInfo.maskElRef := ExtractRef(value);
 end;
 //------------------------------------------------------------------------------
 
@@ -4548,3 +4537,4 @@ end;
 //------------------------------------------------------------------------------
 
 end.
+

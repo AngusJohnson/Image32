@@ -192,15 +192,28 @@ begin
           Replace(folderName + sr.Name,
             'Image32.inc','Img32.inc', backup, [rfIgnoreCase])
         end
-        else if ext = '.pas' then
+        else if (ext = '.pas') or (ext = '.dpk') then
         begin
           Replace(folderName + sr.Name,
             'Image32Panels,','Img32.Panels,', backup, [rfReplaceAll, rfIgnoreCase]);
-
+          Replace(folderName + sr.Name,
+            'Image32Panels.pas','Img32.Panels.pas', backup, [rfReplaceAll, rfIgnoreCase]);
+          Replace(folderName + sr.Name,
+            'Image32Panels in','Img32.Panels in', backup, [rfReplaceAll, rfIgnoreCase]);
+          Replace(folderName + sr.Name,
+            'SetDefaultFillColor','SetOverrideFillColor', backup, [rfReplaceAll, rfIgnoreCase]);
+          Replace(folderName + sr.Name,
+            'SetDefaultStrokeColor','SetOverrideStrokeColor', backup, [rfReplaceAll, rfIgnoreCase]);
           Replace(folderName + sr.Name,
             'TImage32','TImage32!', backup, [rfReplaceAll, rfIgnoreCase]);
           Replace(folderName + sr.Name,
             'edImage32','edImage32!', backup, [rfReplaceAll, rfIgnoreCase]);
+          Replace(folderName + sr.Name,
+            'Image32_SVGEn','Image32!_SVGEn', backup, [rfReplaceAll, rfIgnoreCase]);
+          Replace(folderName + sr.Name,
+            'FImage32','FImage32!', backup, [rfReplaceAll, rfIgnoreCase]);
+          Replace(folderName + sr.Name,
+            'AImage32','AImage32!', backup, [rfReplaceAll, rfIgnoreCase]);
 
           Replace(folderName + sr.Name,
             'Image32_SVG_','Img32.SVG.', backup, [rfReplaceAll, rfIgnoreCase]);
@@ -229,6 +242,17 @@ begin
             'TImage32!','TImage32', backup, [rfReplaceAll, rfIgnoreCase]);
           Replace(folderName + sr.Name,
             'edImage32!','edImage32', backup, [rfReplaceAll, rfIgnoreCase]);
+          Replace(folderName + sr.Name,
+            'Image32!_SVGEn','Image32_SVGEn', backup, [rfReplaceAll, rfIgnoreCase]);
+          Replace(folderName + sr.Name,
+            'FImage32!','FImage32', backup, [rfReplaceAll, rfIgnoreCase]);
+          Replace(folderName + sr.Name,
+            'AImage32!','AImage32', backup, [rfReplaceAll, rfIgnoreCase]);
+
+          Replace(folderName + sr.Name,
+            '  , Image32','  , Img32', backup, [rfReplaceAll, rfIgnoreCase]);
+          Replace(folderName + sr.Name,
+            'Image32 in','Img32 in', backup, [rfReplaceAll, rfIgnoreCase]);
           Replace(folderName + sr.Name,
             'FontLibrary.Add(','FontManager.Load(', backup, [rfReplaceAll, rfIgnoreCase]);
         end;

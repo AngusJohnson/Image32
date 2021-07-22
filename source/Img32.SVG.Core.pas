@@ -1223,12 +1223,15 @@ begin
     Result[i] := Ceil(dblArray[i] * scale);
     dist := Result[i] + dist;
   end;
+
   if dist = 0 then
-    Result := nil
-  else if len = 1 then
   begin
-    SetLength(Result, 2);
-    Result[1] := Result[0];
+    Result := nil;
+  end
+  else if Odd(len) then
+  begin
+    SetLength(Result, len *2);
+    Move(Result[0], Result[len], len * SizeOf(integer));
   end;
 end;
 //------------------------------------------------------------------------------

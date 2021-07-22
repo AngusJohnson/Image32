@@ -19,7 +19,7 @@ interface
 {$I Img32.inc}
 
 uses
-  {$IFDEF MSWINDOWS} Windows,{$ENDIF} Types, SysUtils, Classes,
+  {$IFDEF MSWINDOWS} Windows, {$ENDIF} Types, SysUtils, Classes,
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults, Character,{$ENDIF}
   {$IFDEF UITYPES} UITypes,{$ENDIF} Math;
 
