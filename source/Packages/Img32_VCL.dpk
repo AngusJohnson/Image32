@@ -33,8 +33,7 @@ requires
   designide;
 
 contains
-  Img32.Panels in '..\Img32.Panels.pas',
-  Img32 in '..\Img32.pas';
+  Img32.Panels in '..\Img32.Panels.pas';
 
 end.
 

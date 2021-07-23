@@ -87,6 +87,11 @@ type
   {$IFNDEF UNICODE}
   UTF8Char  = Char;
   PUTF8Char = PChar;
+  {$ELSE}
+  {$IF COMPILERVERSION < 31}
+  UTF8Char = AnsiChar;
+  PUTF8Char = PAnsiChar;
+  {$IFEND}
   {$ENDIF}
 
   TAnsi = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
