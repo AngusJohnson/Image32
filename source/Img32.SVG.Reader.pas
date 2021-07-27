@@ -1671,7 +1671,6 @@ begin
   end;
   if (dstImg <> dstImg2) then
     dstImg.Copy(dstImg2, dstRec2, dstRec);
-  dstImg.SaveToFile('c:\temp\test.png');
 end;
 
 //------------------------------------------------------------------------------
