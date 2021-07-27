@@ -55,6 +55,8 @@ type
     function  GetValue(relSize: double; assumeRelValBelow: Double): double;
     function  GetValueXY(const relSize: TRectD; assumeRelValBelow: Double): double;
     function  IsValid: Boolean;
+    function  IsRelativeValue(assumeRelValBelow: double): Boolean;
+      {$IFDEF INLINE} inline; {$ENDIF}
     function  HasFontUnits: Boolean;
     function  HasAngleUnits: Boolean;
   end;
@@ -2340,7 +2342,7 @@ function TValue.GetValue(relSize: double; assumeRelValBelow: Double): double;
 begin
   if not IsValid or (rawVal = 0) then
     Result := 0
-  else if (unitType = utNumber) and (Abs(rawVal) <= assumeRelValBelow) then
+  else if IsRelativeValue(assumeRelValBelow) then
     Result := rawVal * relSize
   else
     Result := ConvertValue(self, relSize);
@@ -2351,6 +2353,12 @@ function TValue.GetValueXY(const relSize: TRectD; assumeRelValBelow: Double): do
 begin
   //https://www.w3.org/TR/SVG11/coords.html#Units
   Result := GetValue(Hypot(relSize.Width, relSize.Height)/sqrt2, assumeRelValBelow);
+end;
+//------------------------------------------------------------------------------
+
+function  TValue.IsRelativeValue(assumeRelValBelow: double): Boolean;
+begin
+  Result := (unitType = utNumber) and (Abs(rawVal) <= assumeRelValBelow);
 end;
 //------------------------------------------------------------------------------
 
