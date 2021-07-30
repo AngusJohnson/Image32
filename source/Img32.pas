@@ -332,6 +332,10 @@ type
   function BlendToAlpha(bgColor, fgColor: TColor32): TColor32;
   //BlendMask: Whereever the mask is, preserves the background
   function BlendMask(bgColor, alphaMask: TColor32): TColor32;
+  function BlendDifference(bgColor, fgColor: TColor32): TColor32;
+  function BlendSubtract(bgColor, fgColor: TColor32): TColor32;
+  function BlendLighten(bgColor, fgColor: TColor32): TColor32;
+  function BlendDarken(bgColor, fgColor: TColor32): TColor32;
   function BlendInvertedMask(bgColor, alphaMask: TColor32): TColor32;
   //BlendBlueChannel: typically useful for white color masks
   function BlendBlueChannel(bgColor, blueMask: TColor32): TColor32;
@@ -367,7 +371,6 @@ type
   //RGBColor: Converts a TColor32 value into a COLORREF value
   function RGBColor(color: TColor32): Cardinal;
   function InvertColor(color: TColor32): TColor32;
-  procedure Monochrome(var color: TColor32);
 
   //RgbToHsl: See https://en.wikipedia.org/wiki/HSL_and_HSV
   function RgbToHsl(color: TColor32): THsl;
@@ -595,6 +598,22 @@ begin
   Result := Integer(imgFmtRec1.SortOrder) - Integer(imgFmtRec2.SortOrder);
 end;
 
+function ClampByte(val: Integer): byte;
+begin
+  if val < 0 then result := 0
+  else if val > 255 then result := 255
+  else result := val;
+end;
+//------------------------------------------------------------------------------
+
+function ClampByte(val: double): byte;
+begin
+  if val <= 0 then result := 0
+  else if val >= 255 then result := 255
+  else result := Round(val);
+end;
+//------------------------------------------------------------------------------
+
 //------------------------------------------------------------------------------
 // Blend functions - used by TImage32.CopyBlend()
 //------------------------------------------------------------------------------
@@ -659,6 +678,78 @@ begin
   Result := bgColor;
   res.A := MulTable[bg.A, fg.A];
   if res.A = 0 then Result := 0;
+end;
+//------------------------------------------------------------------------------
+
+function BlendDifference(bgColor, fgColor: TColor32): TColor32;
+var
+  res: TARGB absolute Result;
+  bg: TARGB absolute bgColor;
+  fg: TARGB absolute fgColor;
+begin
+  if fg.A = 0 then Result := bgColor
+  else if bg.A = 0 then Result := fgColor
+  else
+  begin
+    res.A := (((fg.A xor 255) * (bg.A xor 255)) shr 8) xor 255;
+    res.R := Abs(fg.R - bg.R);
+    res.G := Abs(fg.G - bg.G);
+    res.B := Abs(fg.B - bg.B);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function BlendSubtract(bgColor, fgColor: TColor32): TColor32;
+var
+  res: TARGB absolute Result;
+  bg: TARGB absolute bgColor;
+  fg: TARGB absolute fgColor;
+begin
+  if fg.A = 0 then Result := bgColor
+  else if bg.A = 0 then Result := fgColor
+  else
+  begin
+    res.A := (((fg.A xor 255) * (bg.A xor 255)) shr 8) xor 255;
+    res.R := ClampByte(fg.R - bg.R);
+    res.G := ClampByte(fg.G - bg.G);
+    res.B := ClampByte(fg.B - bg.B);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function BlendLighten(bgColor, fgColor: TColor32): TColor32;
+var
+  res: TARGB absolute Result;
+  bg: TARGB absolute bgColor;
+  fg: TARGB absolute fgColor;
+begin
+  if fg.A = 0 then Result := bgColor
+  else if bg.A = 0 then Result := fgColor
+  else
+  begin
+    res.A := (((fg.A xor 255) * (bg.A xor 255)) shr 8) xor 255;
+    res.R := Max(fg.R, bg.R);
+    res.G := Max(fg.G, bg.G);
+    res.B := Max(fg.B, bg.B);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function BlendDarken(bgColor, fgColor: TColor32): TColor32;
+var
+  res: TARGB absolute Result;
+  bg: TARGB absolute bgColor;
+  fg: TARGB absolute fgColor;
+begin
+  if fg.A = 0 then Result := bgColor
+  else if bg.A = 0 then Result := fgColor
+  else
+  begin
+    res.A := (((fg.A xor 255) * (bg.A xor 255)) shr 8) xor 255;
+    res.R := Min(fg.R, bg.R);
+    res.G := Min(fg.G, bg.G);
+    res.B := Min(fg.B, bg.B);
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -818,16 +909,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Monochrome(var color: TColor32);
-var
-  c: TARGB absolute color;
-begin
-  c.R := (c.R * 61 + c.G * 174 + c.B * 21) shr 8;
-  if c.R > 127 then c.R := 255 else c.R := 0;
-  c.G := c.R; c.B := c.R; c.A := 255;
-end;
-//------------------------------------------------------------------------------
-
 function Alpha(color: TColor32): TColor32;
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
@@ -897,22 +978,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 {$ENDIF}
-
-function ClampByte(val: Integer): byte;
-begin
-  if val < 0 then result := 0
-  else if val > 255 then result := 255
-  else result := val;
-end;
-//------------------------------------------------------------------------------
-
-function ClampByte(val: double): byte;
-begin
-  if val <= 0 then result := 0
-  else if val >= 255 then result := 255
-  else result := Round(val);
-end;
-//------------------------------------------------------------------------------
 
 function GrayScale(color: TColor32): TColor32;
 var
@@ -2538,12 +2603,17 @@ begin
   r := rgb.R; g := rgb.G; b := rgb.B;
   pc := PARGB(PixelBase);
   for i := 0 to Width * Height -1 do
-  begin
-    pc.R := r;
-    pc.G := g;
-    pc.B := b;
-    inc(pc);
-  end;
+    if pc.A = 0 then
+    begin
+      pc.Color := 0;
+      inc(pc);
+    end else
+    begin
+      pc.R := r;
+      pc.G := g;
+      pc.B := b;
+      inc(pc);
+    end;
   Changed;
 end;
 //------------------------------------------------------------------------------

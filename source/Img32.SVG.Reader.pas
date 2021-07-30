@@ -157,6 +157,8 @@ uses
   Img32.Extra, StrUtils;
 
 type
+  TFourDoubles = array [0..3] of double;
+
   TDefsElement = class(TElement)
   public
     constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
@@ -412,7 +414,7 @@ type
     function GetAdjustedBounds(const bounds: TRectD): TRectD;
     function FindNamedImage(const name: UTF8String): TImage32;
     function AddNamedImage(const name: UTF8String): TImage32;
-    function GetNamedImage(const name: UTF8String; asSource: Boolean): TImage32;
+    function GetNamedImage(const name: UTF8String): TImage32;
     procedure Apply(img: TImage32;
       const filterBounds: TRect; const matrix: TMatrixD);
   public
@@ -444,7 +446,7 @@ type
 
   TFeCompositeElement  = class(TFeBaseElement)
   protected
-    ks: array [0..3] of double; //arithmetic constants
+    fourKs: TFourDoubles; //arithmetic constants
     compositeOp: TCompositeOp;
     procedure Apply; override;
   public
@@ -1400,7 +1402,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFilterElement.GetNamedImage(const name: UTF8String; asSource: Boolean): TImage32;
+function TFilterElement.GetNamedImage(const name: UTF8String): TImage32;
 var
   i, len: integer;
   hash: Cardinal;
@@ -1426,14 +1428,9 @@ begin
       end;
     hSourceGraphic:
       begin
-        if asSource then
-        begin
-          Result := fSrcImg;
-          Exit;
-        end;
         Result := FindNamedImage(name);
-        if Assigned(Result) then Exit;
-        Result := AddNamedImage(name);
+        if not Assigned(Result) then
+          Result := AddNamedImage(name);
         Result.Copy(fSrcImg, fFilterBounds, Result.Bounds);
         Exit;
       end;
@@ -1527,15 +1524,15 @@ var
 begin
   pfe := ParentFilterEl;
   if (in1 <> '') then
-    srcImg := pfe.GetNamedImage(in1, true)
+    srcImg := pfe.GetNamedImage(in1)
   else if Assigned(pfe.fLastImg) then
     srcImg := pfe.fLastImg
   else
-    srcImg := pfe.GetNamedImage(SourceImage, true);
+    srcImg := pfe.GetNamedImage(SourceImage);
 
   if (res <> '') then
-    dstImg := pfe.GetNamedImage(res, false) else
-    dstImg := pfe.GetNamedImage(SourceImage, false);
+    dstImg := pfe.GetNamedImage(res) else
+    dstImg := pfe.GetNamedImage(SourceImage);
 
   Result := Assigned(srcImg) and Assigned(dstImg);
   if not Result then Exit;
@@ -1562,7 +1559,7 @@ begin
     dstImg2 := dstImg;
   dstRec2 := GetBounds(dstImg2);
 
-  srcImg2 := pfe.GetNamedImage(in2, true);
+  srcImg2 := pfe.GetNamedImage(in2);
   srcRec2 := GetBounds(srcImg2);
   dstImg2.CopyBlend(srcImg2, srcRec2, dstRec2, BlendToAlpha);
   dstImg2.CopyBlend(srcImg,  srcRec,  dstRec2, BlendToAlpha);
@@ -1577,7 +1574,8 @@ end;
 constructor TFeCompositeElement.Create(parent: TElement; svgEl: TSvgTreeEl);
 begin
   inherited;
-  ks[0] := InvalidD; ks[1] := InvalidD; ks[2] := InvalidD; ks[3] := InvalidD;
+  fourKs[0] := InvalidD; fourKs[1] := InvalidD;
+  fourKs[2] := InvalidD; fourKs[3] := InvalidD;
 end;
 //------------------------------------------------------------------------------
 
@@ -1587,19 +1585,18 @@ var
   c2  : PARGB absolute p2;
   res : PARGB absolute r;
 begin
-  res.A := ClampByte(MulBytes(ks[0], MulBytes(c1.A, c2.A)) +
-    MulBytes(ks[1], c1.A) + MulBytes(ks[2], c2.A) + ks[3]);
-  res.R := ClampByte(MulBytes(ks[0], MulBytes(c1.R, c2.R)) +
-    MulBytes(ks[1], c1.R) + MulBytes(ks[2], c2.R) + ks[3]);
-  res.G := ClampByte(MulBytes(ks[0], MulBytes(c1.G, c2.G)) +
-    MulBytes(ks[1], c1.G) + MulBytes(ks[2], c2.G) + ks[3]);
-  res.B := ClampByte(MulBytes(ks[0], MulBytes(c1.B, c2.B)) +
-    MulBytes(ks[1], c1.B) + MulBytes(ks[2], c2.B) + ks[3]);
+  res.A := (((c1.A xor 255) * (c2.A xor 255)) shr 8) xor 255;
+  res.R := ClampByte((ks[0] * c1.R * c2.R +
+    ks[1] * c1.R * 255 + ks[2] * c2.R * 255 + ks[3] * 65025) shr 16);
+  res.G := ClampByte((ks[0] * c1.G * c2.G +
+    ks[1] * c1.G * 255 + ks[2] * c2.G * 255 + ks[3] * 65025) shr 16);
+  res.B := ClampByte((ks[0] * c1.B * c2.B +
+    ks[1] * c1.B * 255 + ks[2] * c2.B * 255 + ks[3] * 65025) shr 16);
 end;
 //------------------------------------------------------------------------------
 
 procedure ArithmeticBlend(src1, src2, dst: TImage32;
-  const recS1, recS2, recDst: TRect; const ks: array of double);
+  const recS1, recS2, recDst: TRect; const ks: TFourDoubles);
 var
   kk: array[0..3] of byte;
   w,h,i,j: integer;
@@ -1639,7 +1636,7 @@ begin
   pfe := ParentFilterEl;
   if (in2 = '') then Exit;
 
-  srcImg2 := pfe.GetNamedImage(in2, true);
+  srcImg2 := pfe.GetNamedImage(in2);
   srcRec2 := GetBounds(srcImg2); //either filter bounds or image bounds
 
   if (dstImg = srcImg) or (dstImg = srcImg2) then
@@ -1658,10 +1655,22 @@ begin
         dstImg2.Copy(srcImg, srcRec, dstRec2);
         dstImg2.CopyBlend(srcImg2,  srcRec2,  dstRec2, BlendInvertedMask);
       end;
+    coAtop:
+      begin
+        dstImg2.Copy(srcImg2, srcRec2, dstRec2);
+        dstImg2.CopyBlend(srcImg,  srcRec,  dstRec2, BlendToAlpha);
+        dstImg2.CopyBlend(srcImg2,  srcRec2,  dstRec2, BlendMask);
+      end;
+    coXOR:
+      begin
+        dstImg2.Copy(srcImg2, srcRec2, dstRec2);
+        dstImg2.CopyBlend(srcImg, srcRec, dstRec2, BlendToAlpha);
+        dstImg2.CopyBlend(srcImg2,  srcRec2,  dstRec2, BlendInvertedMask);
+      end;
     coArithmetic:
       begin
         ArithmeticBlend(srcImg, srcImg2, dstImg2,
-          srcRec, srcRec2, dstRec2, ks);
+          srcRec, srcRec2, dstRec2, fourKs);
       end;
     else     //coOver
       begin
@@ -1757,7 +1766,7 @@ var
 begin
   if not GetSrcAndDst then Exit;
   pfe := ParentFilterEl;
-  dropShadImg := pfe.GetNamedImage(tmpFilterImg, false);
+  dropShadImg := pfe.GetNamedImage(tmpFilterImg);
   dropShadImg.Copy(srcImg, srcRec, dropShadImg.Bounds);
 
   off := offset.GetPoint(RectD(pfe.fObjectBounds), GetRelFracLimit);
@@ -1847,7 +1856,7 @@ begin
         if Assigned(tmpImg) then
           tmpImg.CopyBlend(srcImg, srcRec, tmpImg.Bounds, BlendToAlpha)
         else if srcImg = pfe.fSrcImg then
-          tmpImg := pfe.GetNamedImage(SourceImage, false)
+          tmpImg := pfe.GetNamedImage(SourceImage)
         else
           tmpImg := srcImg;
       end;
@@ -1885,7 +1894,7 @@ begin
 
   if srcImg = dstImg then
   begin
-    tmpImg := pfe.GetNamedImage(tmpFilterImg, false);
+    tmpImg := pfe.GetNamedImage(tmpFilterImg);
     tmpImg.Copy(srcImg, srcRec, tmpImg.Bounds);
     dstImg.Clear(dstRec);
     dstImg.Copy(tmpImg, tmpImg.Bounds, dstOffRec);
@@ -4056,7 +4065,7 @@ var
 begin
   UTF8StringToFloat(value, val);
   if aOwnerEl is TFeCompositeElement then
-    TFeCompositeElement(aOwnerEl).ks[0] := val;
+    TFeCompositeElement(aOwnerEl).fourKs[0] := val;
 end;
 //------------------------------------------------------------------------------
 
@@ -4066,7 +4075,7 @@ var
 begin
   UTF8StringToFloat(value, val);
   if aOwnerEl is TFeCompositeElement then
-    TFeCompositeElement(aOwnerEl).ks[1] := val;
+    TFeCompositeElement(aOwnerEl).fourKs[1] := val;
 end;
 //------------------------------------------------------------------------------
 
@@ -4076,7 +4085,7 @@ var
 begin
   UTF8StringToFloat(value, val);
   if aOwnerEl is TFeCompositeElement then
-    TFeCompositeElement(aOwnerEl).ks[2] := val;
+    TFeCompositeElement(aOwnerEl).fourKs[2] := val;
 end;
 //------------------------------------------------------------------------------
 
@@ -4086,7 +4095,7 @@ var
 begin
   UTF8StringToFloat(value, val);
   if aOwnerEl is TFeCompositeElement then
-    TFeCompositeElement(aOwnerEl).ks[3] := val;
+    TFeCompositeElement(aOwnerEl).fourKs[3] := val;
 end;
 //------------------------------------------------------------------------------
 
