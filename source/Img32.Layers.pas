@@ -973,7 +973,8 @@ begin
   if forceRefresh then fRefreshPending := true;
   if not fRefreshPending then Exit;
 
-  //this recursive method updates the group's bounds and fLocalInvalidRect
+  //this method is recursive and updates
+  //both Bounds and fLocalInvalidRect
   rec := NullRect;
   for i := 0 to ChildCount -1 do
   begin
@@ -996,9 +997,9 @@ begin
     begin
       if not forceRefresh and aChild.fRefreshPending then
         Types.UnionRect(fInvalidRect, fInvalidRect, aChild.Bounds);
-      Types.UnionRect(rec, rec, aChild.Bounds);
       aChild.fRefreshPending := false;
     end;
+    Types.UnionRect(rec, rec, aChild.Bounds);
     aChild.fOldBounds := aChild.Bounds;
   end;
   if Assigned(GroupOwner) then
