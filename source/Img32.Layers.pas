@@ -136,8 +136,6 @@ type
     fLastUpdateType         : TUpdateType;
     fInvalidRect            : TRect;
     fUpdateCount            : Integer; //see beginUpdate/EndUpdate
-    fBeforeMerge            : TNotifyEvent;
-    fAfterMerge             : TNotifyEvent;
     function  GetChildCount: integer;
     function  GetChild(index: integer): TLayer32;
     function  FindLayerNamed(const name: string): TLayer32; virtual;
@@ -150,8 +148,6 @@ type
     procedure Merge(hideDesigners: Boolean; const staleRect: TRect);
     function  GetLayerAt(const pt: TPoint; ignoreDesigners: Boolean): TLayer32;
     procedure InternalDeleteChild(index: integer; fromChild: Boolean);
-    procedure  DoBeforeMerge; virtual;
-    procedure  DoAfterMerge; virtual;
   public
     constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
     destructor Destroy; override;
@@ -164,8 +160,6 @@ type
     procedure  ClearChildren;
     property   ChildCount: integer read GetChildCount;
     property   Child[index: integer]: TLayer32 read GetChild; default;
-    property   OnBeforeMerge: TNotifyEvent read fBeforeMerge write fBeforeMerge;
-    property   OnAfterMerge: TNotifyEvent read fAfterMerge write fAfterMerge;
   end;
 
   THitTestLayer32 = class(TLayer32) //abstract classs
@@ -951,18 +945,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TGroupLayer32.DoBeforeMerge;
-begin
-  if Assigned(fBeforeMerge) then fBeforeMerge(self);
-end;
-//------------------------------------------------------------------------------
-
-procedure  TGroupLayer32.DoAfterMerge;
-begin
-  if Assigned(fAfterMerge) then fAfterMerge(self);
-end;
-//------------------------------------------------------------------------------
-
 procedure TGroupLayer32.PreMerge(hideDesigners, forceRefresh: Boolean);
 var
   i           : integer;
@@ -973,8 +955,7 @@ begin
   if forceRefresh then fRefreshPending := true;
   if not fRefreshPending then Exit;
 
-  //this method is recursive and updates
-  //both Bounds and fLocalInvalidRect
+  //this method is recursive and updates Bounds and fInvalidRect
   rec := NullRect;
   for i := 0 to ChildCount -1 do
   begin
@@ -1012,51 +993,54 @@ var
   tmpOpacity: byte;
   i: integer;
   tmp: TImage32;
-  srcRect, dstRect: TRect;
+  childRect, groupRect: TRect;
 begin
 
   if not Visible or (Opacity < 2) or
     Image.IsEmpty or not fRefreshPending then
       Exit;
 
-  DoBeforeMerge;
   for i := 0 to ChildCount -1 do
   begin
     if not Child[i].Visible or
       (hideDesigners and (Child[i] is TDesignerLayer32)) then
         Continue;
 
-    Types.IntersectRect(srcRect, staleRect, Child[i].Bounds);
-    if IsEmptyRect(srcRect) then Continue;
+    Types.IntersectRect(childRect, staleRect, Child[i].Bounds);
+    if IsEmptyRect(childRect) then
+      Continue; //ie when a layer is outside the layeredImage's bounds
 
     if (Child[i] is TGroupLayer32) then
       TGroupLayer32(Child[i]).Merge(hideDesigners, staleRect); //recursive
 
-    //make dstRect relative to groupLayer
-    dstRect := srcRect;
-    Types.OffsetRect(dstRect, -Left, -Top);
-    //make srcRect relative to image
-    Types.OffsetRect(srcRect, -Child[i].Left, -Child[i].Top);
+    //groupRect - the destination rect in the group's image
+    groupRect := childRect;
+    Types.OffsetRect(groupRect, -Left, -Top);
 
-    if Child[i].Opacity < 254 then //reduce layer opacity
+    //childRect - the source rect in Child's image
+    Types.OffsetRect(childRect, -Child[i].Left, -Child[i].Top);
+
+    //get the opacity
+    if Child[i].Opacity < 254 then
       tmpOpacity := MulBytes(fOpacity, Child[i].Opacity) else
       tmpOpacity := fOpacity;
 
+    //finally, draw to the group's image
     if tmpOpacity < 254 then
     begin
       tmp := TImage32.Create(Child[i].Image);
       try
         tmp.ReduceOpacity(tmpOpacity);
-        Image.CopyBlend(tmp, srcRect, dstRect, BlendToAlpha);
+        Image.CopyBlend(tmp, childRect, groupRect, BlendToAlpha);
       finally
         tmp.Free;
       end;
     end else
-      Image.CopyBlend(Child[i].Image, srcRect, dstRect, BlendToAlpha);
+      Image.CopyBlend(Child[i].Image, childRect, groupRect, BlendToAlpha);
   end;
 
+  fInvalidRect := NullRect;
   fRefreshPending := false;
-  DoAfterMerge;
 end;
 //------------------------------------------------------------------------------
 
@@ -1787,7 +1771,7 @@ begin
   begin
     PreMerge(hideDesigners, forceRefresh);
 
-    //intersect layeredImage's bounds with Root.fLocalInvalidRect
+    //intersect layeredImage's bounds with Root.fInvalidRect
     //to clip regions outside the drawing surface
     updateRect := Self.Bounds;
     if not forceRefresh then
