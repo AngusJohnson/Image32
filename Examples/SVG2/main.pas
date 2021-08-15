@@ -19,8 +19,11 @@ type
     Exit1: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure Exit1Click(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure ImagePanelResize(Sender: TObject);
   protected
   public
+    memStream: TMemoryStream;
   end;
 
 var
@@ -38,7 +41,7 @@ uses Img32.Transform, Img32.Extra;
 procedure TForm1.FormCreate(Sender: TObject);
 var
   rec: TRect;
-  memStream: TMemoryStream;
+  pw: TSvgPathWriter;
 begin
 
   ImagePanel.ParentBackground := false;
@@ -46,7 +49,6 @@ begin
   ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
 
   memStream := TMemoryStream.Create;
-  try
 
     //create an SVG file ...
     with TSvgWriter.Create do
@@ -72,7 +74,7 @@ begin
           with AddChild(TSvgTSpanWriter) as TSvgTSpanWriter do
           begin
             FillColor := $FF990000;
-            offset.sy := 5;
+            offset.cy := 5;
             fontInfo.size := 20;
             fontInfo.weight := 600;
             AddText('BIG');
@@ -93,7 +95,9 @@ begin
         end;
 
         //<path> inside group
-        with AddChild(TSvgPathWriter) as TSvgPathWriter do
+        pw := AddChild(TSvgPathWriter) as TSvgPathWriter;
+
+        with pw do
         begin
           FillColor   := $10007F7F;
           StrokeColor := clTeal32;
@@ -125,20 +129,31 @@ begin
     end;
 
     FontManager.Load('Arial');
-
-    //finally, draw the svg
-    with TSvgReader.Create do
-    try
-      LoadFromStream(memStream);
-      DrawImage(ImagePanel.Image, true);
-    finally
-      Free;
-    end;
-
-  finally
-    memStream.Free;
-  end;
+    ImagePanelResize(nil);
 end;
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  memStream.Free;
+end;
+
+procedure TForm1.ImagePanelResize(Sender: TObject);
+begin
+  if not Assigned(memStream) then Exit;
+
+  with ImagePanel.InnerClientRect do
+    ImagePanel.Image.SetSize(width, height);
+
+  with TSvgReader.Create do
+  try
+    LoadFromStream(memStream);
+    DrawImage(ImagePanel.Image, true);
+  finally
+    Free;
+  end;
+
+end;
+
 //------------------------------------------------------------------------------
 
 procedure TForm1.Exit1Click(Sender: TObject);

@@ -1016,7 +1016,7 @@ begin
 
     //any layer that's outside 'staleRect' can safely be ignored
     if (self = fLayeredImage.fRoot) and
-      not OverlapRect(staleRect, ChildLayer.Bounds) then
+      not RectsOverlap(staleRect, ChildLayer.Bounds) then
         Continue;
 
     //recursive merge

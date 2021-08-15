@@ -244,8 +244,7 @@ type
   function ReflectPoint(const pt, pivot: TPointD): TPointD;
   {$IFDEF INLINING} inline; {$ENDIF}
 
-  function OverlapRect(const rec1, rec2: TRect): Boolean;
-  function DifferenceRect(const rec, subRect: TRect): TRect;
+  function RectsOverlap(const rec1, rec2: TRect): Boolean;
 
   function IntersectRect(const rec1, rec2: TRectD): TRectD; overload;
   //UnionRect: this behaves differently to types.UnionRect
@@ -712,21 +711,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function OverlapRect(const rec1, rec2: TRect): Boolean;
+function RectsOverlap(const rec1, rec2: TRect): Boolean;
 begin
   Result := (rec1.Left < rec2.Right) and (rec1.Right > rec2.Left) and
      (rec1.Top < rec2.Bottom) and (rec1.Bottom > rec2.Top);
-end;
-//------------------------------------------------------------------------------
-
-function DifferenceRect(const rec, subRect: TRect): TRect;
-begin
-  Result := rec;
-  if subRect.Left < Result.Right then Result.Right := subRect.Left;
-  if subRect.Top < Result.Bottom then Result.Bottom := subRect.Top;
-  if subRect.Right > Result.Left then Result.Left := subRect.Right;
-  if subRect.Bottom > Result.Top then Result.Top := subRect.Bottom;
-  if IsEmptyRect(Result) then Result := NullRect;
 end;
 //------------------------------------------------------------------------------
 
