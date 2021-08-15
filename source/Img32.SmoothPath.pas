@@ -887,7 +887,7 @@ begin
     //update group bounds
     if i = 0 then
       Result := btnLayer.Bounds else
-      Types.UnionRect(Result, Result, btnLayer.Bounds);
+      Result := Types.UnionRect(Result, btnLayer.Bounds);
   end;
 end;
 //------------------------------------------------------------------------------

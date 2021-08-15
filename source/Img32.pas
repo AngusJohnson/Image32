@@ -26,7 +26,10 @@ uses
 type
   TRect = Types.TRect;
   TColor32 = type Cardinal;
-  TPointD = record X, Y: double; end;
+
+  TPointD = record
+    X, Y: double;
+  end;
 
 const
   clNone32     = TColor32($00000000);
@@ -307,17 +310,18 @@ type
   TArrayOfString = array of string;
 
   TRectD = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
-    Left, Top, Right, Bottom: double;
     function IsEmpty: Boolean;
     function Width: double;
     function Height: double;
-    //Normalize: Returns True if swapping either top & bottom or left & right
-    function Normalize: Boolean;
+    //NormalizeRect:
+    //Returns True if swapping either top & bottom or left & right
+    function NormalizeRect: Boolean;
     function Contains(const Pt: TPoint): Boolean; overload;
     function Contains(const Pt: TPointD): Boolean; overload;
-    function TopLeft: TPointD;
-    function BottomRight: TPointD;
     function MidPoint: TPointD;
+    case Integer of
+      0: (Left, Top, Right, Bottom: Double);
+      1: (TopLeft, BottomRight: TPointD);
   end;
 
   {$IFNDEF PBYTE}
@@ -1267,18 +1271,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TRectD.TopLeft: TPointD;
-begin
-  result := PointD(Left, Top);
-end;
-//------------------------------------------------------------------------------
-
-function TRectD.BottomRight: TPointD;
-begin
-  result := PointD(Right, Bottom);
-end;
-//------------------------------------------------------------------------------
-
 function TRectD.MidPoint: TPointD;
 begin
   Result.X := (Right + Left)/2;
@@ -1286,7 +1278,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TRectD.Normalize: Boolean;
+function TRectD.NormalizeRect: Boolean;
 var
   d: double;
 begin

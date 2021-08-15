@@ -960,9 +960,9 @@ begin
         //scale the symbol according to its width and height attributes
         if elRectWH.width.IsValid and elRectWH.height.IsValid then
         begin
-          scale2.sx := elRectWH.width.rawVal / viewboxWH.Width;
-          scale2.sy := elRectWH.height.rawVal / viewboxWH.Height;
-          if scale2.sy < scale2.sx then s := scale2.sy else s := scale2.sx;
+          scale2.cx := elRectWH.width.rawVal / viewboxWH.Width;
+          scale2.cy := elRectWH.height.rawVal / viewboxWH.Height;
+          if scale2.cy < scale2.cx then s := scale2.cy else s := scale2.cx;
           //the following 3 lines will scale without translating
           mat := IdentityMatrix;
           MatrixScale(mat, s, s);
@@ -974,9 +974,9 @@ begin
           self.elRectWH.height.IsValid then
         begin
           //scale <symbol> proportionally to fill the <use> element
-          scale2.sx := self.elRectWH.width.rawVal / viewboxWH.Width;
-          scale2.sy := self.elRectWH.height.rawVal / viewboxWH.Height;
-          if scale2.sy < scale2.sx then s := scale2.sy else s := scale2.sx;
+          scale2.cx := self.elRectWH.width.rawVal / viewboxWH.Width;
+          scale2.cy := self.elRectWH.height.rawVal / viewboxWH.Height;
+          if scale2.cy < scale2.cx then s := scale2.cy else s := scale2.cx;
 
           //again, scale without translating
           mat := IdentityMatrix;
@@ -984,17 +984,17 @@ begin
           drawInfo.matrix := MatrixMultiply(drawInfo.matrix, mat);
 
           //now center after scaling
-          if scale2.sx > scale2.sy then
+          if scale2.cx > scale2.cy then
           begin
-            if scale2.sx > 1 then
+            if scale2.cx > 1 then
             begin
               s := (self.elRectWH.width.rawVal - viewboxWH.Width) * 0.5;
-              MatrixTranslate(drawInfo.matrix, s * scale.sx, 0);
+              MatrixTranslate(drawInfo.matrix, s * scale.cx, 0);
             end;
-          end else if scale2.sy > 1 then
+          end else if scale2.cy > 1 then
           begin
             s := (self.elRectWH.height.rawVal - viewboxWH.Height) * 0.5;
-            MatrixTranslate(drawInfo.matrix, 0, s * scale.sy);
+            MatrixTranslate(drawInfo.matrix, 0, s * scale.cy);
           end;
 
         end;
@@ -1021,7 +1021,8 @@ begin
     begin
       el := TShapeElement(fChilds[i]);
       el.GetPaths(drawInfo);
-      Types.UnionRect(maskRec, maskRec, Img32.Vector.GetBounds(el.drawPathsF));
+      maskRec :=
+        Img32.Vector.UnionRect(maskRec, Img32.Vector.GetBounds(el.drawPathsF));
     end;
   MatrixApply(drawInfo.matrix, maskRec);
 end;
@@ -1177,7 +1178,7 @@ begin
   end;
   scale := ExtractScaleFromMatrix(drawInfo.matrix);
   scale2 := ExtractScaleFromMatrix(fDrawInfo.matrix);
-  r := ScalePoint(r, scale.sx * scale2.sx, scale.sy * scale2.sy);
+  r := ScalePoint(r, scale.cx * scale2.cx, scale.cy * scale2.cy);
 
   if C.IsValid then
   begin
@@ -3147,15 +3148,15 @@ begin
     Exit;
 
   renderer.Image.SetSize(
-    Round(recWH.Width * scale.sx),
-    Round(recWH.Height * scale.sy));
+    Round(recWH.Width * scale.cx),
+    Round(recWH.Height * scale.cy));
 
   Result := true;
   closedPaths := nil;
   openPaths   := nil;
 
   mat := IdentityMatrix;
-  MatrixScale(mat, scale.sx * sx, scale.sy * sy);
+  MatrixScale(mat, scale.cx * sx, scale.cy * sy);
 
   //recWH.Left := 0; recWH.Top := 0;
   if (refEl <> '') then
