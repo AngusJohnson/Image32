@@ -129,7 +129,7 @@ procedure TMyVectorLayer32.UpdateGroupClipPath;
 var
   pp: TPathsD;
 begin
-  pp := InflatePath(Paths[0], PenWidth);
+  pp := InflatePath(Paths[0], PenWidth/2);
   GroupOwner.ClipPath := pp[0];
 end;
 //------------------------------------------------------------------------------
