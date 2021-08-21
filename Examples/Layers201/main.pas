@@ -414,8 +414,7 @@ begin
   layeredImage.Resampler := rBiLinearResampler;  //high quality (moderately fast)
   //layeredImage.Resampler := rBiCubicResampler;   //excellent quality (slow)
 
-  fontReader := TFontReader.Create;
-  fontReader.LoadFromResource('FONT_NSB', RT_RCDATA);
+  fontReader := FontManager.LoadFromResource('FONT_NSB', RT_RCDATA);
   fontCache := TGlyphCache.Create(fontReader, DPIAware(48));
 
   words := TStringList.Create;
@@ -449,7 +448,7 @@ end;
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
   words.Free;
-  fontReader.Free;
+  //fontReader.Free; //will be done by FontManager :)
   fontCache.Free;
   FreeAndNil(layeredImage); //see FormResize below
 end;

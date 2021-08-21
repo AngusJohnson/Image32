@@ -196,8 +196,7 @@ begin
   layeredImg32.AddLayer(TDesignerLayer32);
 
   //create text rendering objects
-  fontReader := TFontReader.Create;
-  fontReader.LoadFromResource('FONT_NSB', RT_RCDATA);
+  fontReader := FontManager.LoadFromResource('FONT_NSB', RT_RCDATA);
   fontCache := TGlyphCache.Create(fontReader, DPIAware(48));
 
   //load a word list (for random words)
@@ -217,7 +216,7 @@ procedure TMainForm.FormDestroy(Sender: TObject);
 begin
   wordStrings.Free;
   fontCache.Free;
-  fontReader.Free;
+  //fontReader.Free; //this will be done by FontManager
   FreeAndNil(layeredImg32); //see FormResize
 end;
 //------------------------------------------------------------------------------
