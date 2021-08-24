@@ -15,6 +15,9 @@
         <TextName Value="AngusJohnson.Image32_LazarusDemo"/>
       </XPManifest>
       <Icon Value="0"/>
+      <Resources Count="1">
+        <Resource_0 FileName="Image32.svg" Type="RCDATA" ResourceName="IMAGE32"/>
+      </Resources>
     </General>
     <BuildModes Count="3">
       <Item1 Name="Default" Default="True"/>
@@ -126,10 +129,13 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <OtherUnitFiles Value="..\..\source"/>
+      <OtherUnitFiles Value="..\..\source;..\..\source\Clipper"/>
       <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <Linking>
+      <Debugging>
+        <StripSymbols Value="True"/>
+      </Debugging>
       <Options>
         <Win32>
           <GraphicApplication Value="True"/>

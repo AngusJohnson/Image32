@@ -6,7 +6,7 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, StdCtrls, ExtCtrls, Math,
-  Types, Img32, Img32.Fmt.PNG, Img32.Text,
+  Types, Img32, Img32.Text, Img32.Fmt.SVG, Img32.Clipper,
   Img32.Vector, Img32.Transform, Img32.Extra, Img32.Draw;
 
 type
@@ -86,7 +86,7 @@ end;
 
 procedure TMainForm.PrepareBaseImage;
 var
-  imgBooks: TImage32;
+  imgBkgnd: TImage32;
   tmpPath: TPathD;
   mainTxtPaths, copyTxtPaths: TPathsD;
   textRec, imageRec: TRect;
@@ -96,7 +96,8 @@ var
   copyright, sillyText: UnicodeString;
 
   glyphCache: TGlyphCache;
-  fontReader : TFontReader;
+  fontReader2: TFontReader;
+  fontReader3: TFontReader;
 begin
   //workaround a Lazarus quirk ...
   //it doesn't seem to dynamically convert static text ...
@@ -107,58 +108,53 @@ begin
   zoomIdx := 0;
   zoomImages[0] := TImage32.Create();
 
-  //create a TFontReader to access a couple of truetype font files (*.ttf)
-  //that have been stored as font resources and create a TGlyphCache too
-  fontReader := TFontReader.Create;
-  glyphCache := TGlyphCache.Create(fontReader, DpiAware(36));
-  try
-    //connect fontReader to a specific font
-    fontReader.LoadFromResource('FONT_2', RT_RCDATA);
-    if not fontReader.IsValidFontFormat then Exit;
+  //Create two TFontReader objects to access a couple of truetype fonts stored
+  //as font resources. These can be destroyed here, once the text outlines
+  //have been loaded. Otherwise the FontManager can destroy them later.
+  fontReader2 := FontManager.LoadFromResource('FONT_2', RT_RCDATA);
+  fontReader3 := FontManager.LoadFromResource('FONT_3', RT_RCDATA);
+  if not fontReader2.IsValidFontFormat or
+    not fontReader3.IsValidFontFormat then Exit;
 
+  glyphCache := TGlyphCache.Create(fontReader2, DpiAware(48));
+  try
     //and get the outline for some text ...
     mainTxtPaths := glyphCache.GetTextGlyphs(0,0, sillyText, nextX);
+    //bold the text a little
+    mainTxtPaths := InflatePaths(mainTxtPaths, 2);
 
-    //Normally we'd create different fontReaders for different fonts and
-    //also use different glyphManagers for different font heights,
-    //but it's also possible to reuse these objects ...
-
-    fontReader.LoadFromResource('FONT_3', RT_RCDATA);
-    if not fontReader.IsValidFontFormat then Exit;
-    //nb: fontReader changing fonts will automatically clear glyphCache
-    //cache, though changing glyphCache fontHeight will also do the same...
+    //now we have mainTxtPaths in one font we can reuse glyphCache,
+    //assigning it a new font and a new font height
+    glyphCache.FontReader := fontReader3;
     glyphCache.FontHeight := DPIAware(10);
 
-    //and now get the copyright text outline
+    //now get the copyright text outline
     copyTxtPaths := glyphCache.GetTextGlyphs(0,0, copyright, nextX);
   finally
     glyphCache.Free;
-    fontReader.free;
+    //fontReader2.free; //optional - otherwise done by FontManager
+    //fontReader3.free; // "
   end;
 
   //and some affine transformations of mainTxtPaths, just for fun :)
   matrix := IdentityMatrix;
   //stretch it vertically ...
   MatrixScale(matrix, 1, 1.75);
-  //and skew (yes, we could've used an italicized font instead) ...
-  MatrixSkew(matrix, -0.25, 0);
+  //and optionally skew to italicize ...
+  //MatrixSkew(matrix, -0.25, 0);
   MatrixApply(matrix, mainTxtPaths);
 
-  //this seems necessary because Lazarus appears to bypass the initialization
-  //section in Img32.PNG unless some code from that unit is used explicitly.
-  TImage32.RegisterImageFormatClass('PNG', TImageFormat_PNG, cpHigh);
-
-  imgBooks := TImage32.Create;
+  imgBkgnd := TImage32.Create;
   try
-    //load a colourful background image (some books) ...
-    imgBooks.LoadFromResource('PNGIMAGE_1', RT_RCDATA);
+    //load a background SVG image stored as a resource
+    imgBkgnd.LoadFromResource('IMAGE32', RT_RCDATA);
 
     //set the size of the base image so that it contains
-    //both 'imgBooks' and the text with a decent margin ...
+    //both 'imgBkgnd' and the text with a decent margin ...
     textRec := Img32.Vector.GetBounds(mainTxtPaths);
     zoomImages[0].SetSize(
-      max(imgBooks.Width, textRec.Width) + (margin * 4),
-      max(imgBooks.Height, textRec.Height) + (margin * 4));
+      max(imgBkgnd.Width, textRec.Width) + (margin * 4),
+      max(imgBkgnd.Height, textRec.Height) + (margin * 4));
 
     //color fill the base image and give it a border ...
     with zoomImages[0] do
@@ -168,17 +164,17 @@ begin
     end;
     DrawLine(zoomImages[0], tmpPath, 2, penColor, esPolygon);
 
-    //offset 'imgBooks' so it's centered in the base image
+    //offset 'imgBkgnd' so it's centered in the base image
     //and copy it onto the base image ...
-    imageRec := imgBooks.Bounds;
-    delta := Point((zoomImages[0].Width - imgBooks.Width) div 2,
-      (zoomImages[0].Height - imgBooks.Height) div 2);
+    imageRec := imgBkgnd.Bounds;
+    delta := Point((zoomImages[0].Width - imgBkgnd.Width) div 2,
+      (zoomImages[0].Height - imgBkgnd.Height) div 2);
     Types.OffsetRect(imageRec, delta.X, delta.Y);
-    zoomImages[0].CopyBlend(imgBooks, imgBooks.Bounds,
+    zoomImages[0].CopyBlend(imgBkgnd, imgBkgnd.Bounds,
       imageRec, @BlendToOpaque);
 
   finally
-    imgBooks.Free;
+    imgBkgnd.Free;
   end;
 
   //draw a simple copyright notice using a normal font (font_1)
@@ -207,7 +203,6 @@ var
   i,highI: integer;
   textRec, textRec2: TRect;
 begin
-
   zoomGlyphs := OffsetPath(zoomGlyphs, offset.X, offset.Y);
 
   //fill an array of images copying the base image and overlaying
@@ -232,8 +227,7 @@ begin
     zoomGlyphs := OffsetPath(zoomGlyphs,
       (textRec.Left-textRec2.Left) + (textRec.Width-textRec2.Width)/2,
       (textRec.Top-textRec2.Top) + (textRec.Height-textRec2.Height)/2);
-    zoomImages[i] := TImage32.Create(zoomImages[zoomIdx]);
-    DrawPolygon(zoomImages[i], zoomGlyphs, frNonZero, clGray32);
+    DrawPolygon(zoomImages[i], zoomGlyphs, frNonZero, clGreen32);
   end;
 end;
 //------------------------------------------------------------------------------

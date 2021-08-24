@@ -1,7 +1,5 @@
 program Image32_Laz_Demo;
 
-{$R *.dres}
-
 uses
   Forms, Interfaces, main;
 

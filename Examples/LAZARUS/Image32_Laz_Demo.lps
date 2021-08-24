@@ -4,13 +4,13 @@
     <PathDelim Value="\"/>
     <Version Value="11"/>
     <BuildModes Active="Default"/>
-    <Units Count="32">
+    <Units Count="39">
       <Unit0>
         <Filename Value="Image32_Laz_Demo.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <CursorPos Y="3"/>
-        <UsageCount Value="82"/>
+        <CursorPos Y="11"/>
+        <UsageCount Value="91"/>
       </Unit0>
       <Unit1>
         <Filename Value="main.pas"/>
@@ -19,14 +19,13 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <IsVisibleTab Value="True"/>
-        <TopLine Value="105"/>
-        <CursorPos X="21" Y="120"/>
-        <UsageCount Value="82"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="210"/>
+        <CursorPos X="32" Y="224"/>
+        <UsageCount Value="91"/>
         <Bookmarks Count="1">
-          <Item0 Y="140" ID="2"/>
+          <Item0 Y="138" ID="2"/>
         </Bookmarks>
-        <Loaded Value="True"/>
-        <LoadedDesigner Value="True"/>
       </Unit1>
       <Unit2>
         <Filename Value="..\..\source\Image32_FMX.pas"/>
@@ -228,51 +227,73 @@
       </Unit29>
       <Unit30>
         <Filename Value="..\..\source\Img32.Core.pas"/>
-        <EditorIndex Value="2"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="1134"/>
         <CursorPos X="6" Y="1149"/>
         <UsageCount Value="10"/>
-        <Loaded Value="True"/>
       </Unit30>
       <Unit31>
         <Filename Value="..\..\source\Img32.Text.pas"/>
-        <EditorIndex Value="1"/>
-        <TopLine Value="436"/>
-        <CursorPos X="14" Y="449"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1348"/>
+        <CursorPos X="45" Y="1363"/>
         <UsageCount Value="10"/>
-        <Loaded Value="True"/>
       </Unit31>
+      <Unit32>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\objpas\sysutils\sysstrh.inc"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="18" Y="85"/>
+        <UsageCount Value="10"/>
+      </Unit32>
+      <Unit33>
+        <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1835"/>
+        <CursorPos X="17" Y="1848"/>
+        <UsageCount Value="11"/>
+      </Unit33>
+      <Unit34>
+        <Filename Value="..\..\source\Img32.Fmt.SVG.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="76"/>
+        <CursorPos Y="94"/>
+        <UsageCount Value="11"/>
+      </Unit34>
+      <Unit35>
+        <Filename Value="..\..\source\Img32.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="2057"/>
+        <CursorPos Y="2099"/>
+        <UsageCount Value="11"/>
+      </Unit35>
+      <Unit36>
+        <Filename Value="..\..\source\Img32.SVG.HtmlHashConsts.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="145"/>
+        <CursorPos X="3" Y="160"/>
+        <UsageCount Value="10"/>
+      </Unit36>
+      <Unit37>
+        <Filename Value="tiger.svg"/>
+        <EditorIndex Value="-1"/>
+        <WindowIndex Value="-1"/>
+        <TopLine Value="-1"/>
+        <CursorPos X="-1" Y="-1"/>
+        <UsageCount Value="20"/>
+        <DefaultSyntaxHighlighter Value="XML"/>
+      </Unit37>
+      <Unit38>
+        <Filename Value="..\..\source\Img32.Clipper.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="55"/>
+        <CursorPos X="3" Y="16"/>
+        <UsageCount Value="10"/>
+      </Unit38>
     </Units>
-    <JumpHistory Count="7" HistoryIndex="6">
-      <Position1>
-        <Filename Value="main.pas"/>
-        <Caret Line="4"/>
-      </Position1>
-      <Position2>
-        <Filename Value="main.pas"/>
-        <Caret Line="45" Column="3" TopLine="31"/>
-      </Position2>
-      <Position3>
-        <Filename Value="main.pas"/>
-        <Caret Line="4"/>
-      </Position3>
-      <Position4>
-        <Filename Value="main.pas"/>
-        <Caret Line="10" Column="10"/>
-      </Position4>
-      <Position5>
-        <Filename Value="..\..\source\Img32.Core.pas"/>
-        <Caret Line="1149" Column="6" TopLine="1134"/>
-      </Position5>
-      <Position6>
-        <Filename Value="main.pas"/>
-        <Caret Line="10" Column="23"/>
-      </Position6>
-      <Position7>
-        <Filename Value="main.pas"/>
-        <Caret Line="120" Column="26" TopLine="105"/>
-      </Position7>
-    </JumpHistory>
+    <General>
+      <ActiveWindowIndexAtStart Value="-1"/>
+    </General>
+    <JumpHistory HistoryIndex="-1"/>
     <RunParams>
       <FormatVersion Value="2"/>
       <Modes Count="0" ActiveMode=""/>

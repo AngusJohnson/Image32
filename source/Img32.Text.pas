@@ -142,7 +142,7 @@ type
     minorVersion   : Word;
     fontRevision   : TFixed;
     checkSumAdjust : Cardinal;
-    magicNumber    : Cardinal;  //$5F0F3CF5
+    magicNumber    : Cardinal;  // $5F0F3CF5
     flags          : Word;
     unitsPerEm     : Word;
     dateCreated    : UInt64;
@@ -3017,7 +3017,7 @@ begin
   if not Assigned(fr2) or
     ((fr.fFontInfo.macStyles <> fr2.fFontInfo.macStyles) or
     not SameText(fr.fFontInfo.faceName, fr2.fFontInfo.faceName)) then
-      fFontList.Add(fr)
+    fFontList.Add(fr)
   else
       Result := false;
 end;

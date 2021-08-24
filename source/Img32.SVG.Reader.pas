@@ -545,7 +545,7 @@ const
     fillRule: frNonZero; fillEl: '';
     strokeColor: clInvalid; strokeOpacity: InvalidD;
     strokeWidth: (rawVal: InvalidD; unitType: utNumber);
-    strokeCap: esButt; strokeJoin: jsMiter; strokeMitLim: 0.0;
+    strokeCap: esButt; strokeJoin: jsMiter; strokeMitLim: 0.0; strokeEl : '';
     dashArray:nil; dashOffset:0;
     fontInfo: (family: ttfUnknown; size: 0; spacing: 0.0;
     textLength: 0; italic: sfsUndefined; weight: -1; align: staUndefined;
@@ -1842,10 +1842,9 @@ procedure TFeMergeElement.Apply;
 var
   i: integer;
   tmpImg: TImage32;
-  tmpRec: TRect;
   pfe: TFilterElement;
 begin
-  tmpImg := nil; tmpRec := NullRect;
+  tmpImg := nil;
   if not GetSrcAndDst then Exit;
   pfe := ParentFilterEl;
 
@@ -3116,7 +3115,6 @@ var
   mat   : TMatrixD;
   sx,sy : double;
   scale: TSizeD;
-  closedPaths, openPaths: TPathsD;
 begin
   Result := false;
 
@@ -3152,8 +3150,6 @@ begin
     Round(recWH.Height * scale.cy));
 
   Result := true;
-  closedPaths := nil;
-  openPaths   := nil;
 
   mat := IdentityMatrix;
   MatrixScale(mat, scale.cx * sx, scale.cy * sy);
@@ -3767,15 +3763,6 @@ begin
   if LowerCaseTable[value[1]] = 'e' then
     aOwnerEl.fDrawInfo.fillRule := frEvenOdd else
     aOwnerEl.fDrawInfo.fillRule := frNonZero;
-end;
-//------------------------------------------------------------------------------
-
-procedure Style_Attrib(aOwnerEl: TElement; const value: UTF8String);
-begin
-  with aOwnerEl do
-    case fParserEl.Hash of
-      hFlowRegion, hFlowRoot: fDrawInfo.fillColor := clNone32;
-    end;
 end;
 //------------------------------------------------------------------------------
 
