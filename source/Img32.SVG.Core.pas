@@ -257,6 +257,7 @@ type
   function UTF8StringToColor32(const value: UTF8String; var color: TColor32): Boolean;
   function MakeDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfInteger;
   function Match(c: PUTF8Char; const compare: UTF8String): Boolean; overload;
+  function Match(const compare1, compare2: UTF8String): Boolean; overload;
   function ToUTF8String(var c: PUTF8Char; endC: PUTF8Char): UTF8String;
 
   //special parsing functions //////////////////////////////////////////
@@ -344,8 +345,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Match(const compare1, compare2: UTF8String): Boolean; overload;
-  {$IFDEF INLINE} inline; {$ENDIF}
+function Match(const compare1, compare2: UTF8String): Boolean;
 var
   i, len: integer;
   c1, c2: PUTF8Char;

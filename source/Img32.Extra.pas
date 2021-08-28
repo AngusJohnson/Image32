@@ -2634,7 +2634,7 @@ var
   fv, lv, val: TWeightedColor;
   rc: TColor32;
 begin
-  ovr := Max(0, stdDev - w);
+  ovr := Max(0, stdDev - h);
   for i := 0 to w -1 do
   begin
     ti := i;

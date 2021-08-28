@@ -80,6 +80,7 @@ type
     function  FindRefElement(refname: UTF8String): TElement;
     function GetChildCount: integer;
     function GetChild(index: integer): TElement;
+    function FindChild(const idName: UTF8String): TElement;
   protected
     elRectWH        : TValueRecWH;  //multifunction variable
     function  IsFirstChild: Boolean;
@@ -151,6 +152,7 @@ type
     function  LoadFromStream(stream: TStream): Boolean;
     function  LoadFromFile(const filename: string): Boolean;
     function  LoadFromString(const str: string): Boolean;
+    function  FindElement(const idName: UTF8String): TElement;
     //Both SetOverrideFillColor & SetOverrideStrokeColor are intended
     //primarily for use by the third-party library - SVGIconImageList
     //https://github.com/EtheaDev/SVGIconImageList/wiki
@@ -3487,6 +3489,25 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TElement.FindChild(const idName: UTF8String): TElement;
+var
+  i: integer;
+begin
+  if Match(self.fId, idName) then
+  begin
+    Result := self;
+    Exit;
+  end;
+
+  Result := nil;
+  for i := 0 to ChildCount -1 do
+  begin
+    Result := Child[i].FindChild(idName);
+    if Assigned(Result) then Break;
+  end;
+end;
+//------------------------------------------------------------------------------
+
 function TElement.GetChild(index: integer): TElement;
 begin
   if (index < 0) or (index >= fChilds.count) then
@@ -4774,6 +4795,14 @@ function TSvgReader.LoadFromString(const str: string): Boolean;
 begin
   Clear;
   Result := fSvgParser.LoadFromString(str) and LoadInternal;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgReader.FindElement(const idName: UTF8String): TElement;
+begin
+  if Assigned(RootElement) then
+    Result := RootElement.FindChild(idName) else
+    Result := nil;
 end;
 //------------------------------------------------------------------------------
 
