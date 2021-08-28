@@ -73,6 +73,7 @@ type
 {$ELSE}
     fChilds         : TList;
 {$ENDIF}
+    fId             : UTF8String;
     fDrawData       : TDrawData;    //currently both static and dynamic vars
     fSavedDrawData  : TDrawData;
     fSavedElRectWH  : TValueRecWH;
@@ -98,6 +99,7 @@ type
     property Child[index: integer]: TElement read GetChild; default;
     property ChildCount: integer read GetChildCount;
     property DrawData: TDrawData read fDrawData write fDrawData;
+    property Id: UTF8String read fId;
   end;
 
   TSvgElement = class(TElement)
@@ -1398,6 +1400,11 @@ end;
 function TFilterElement.GetAdjustedBounds(const bounds: TRectD): TRectD;
 var
   recWH: TRectWH;
+  delta: TSizeD;
+  d: double;
+  pt: TPointD;
+  i: integer;
+  hasOffset: Boolean;
 begin
   fObjectBounds := Rect(bounds);
   if elRectWH.IsValid then
@@ -1409,10 +1416,49 @@ begin
     Result.Bottom := Result.Top + recWH.Height;
   end else
   begin
-    //default: inflate by 15%
     Result := bounds;
-    Img32.Vector.InflateRect(Result,
-      bounds.Width * 0.15, bounds.Height * 0.15);
+
+    //when the filter's width and height are undefined then limit the filter
+    //margin to 20% of the bounds when just blurring, not also offsetting.
+    hasOffset := false;
+
+    delta.cx := 0; delta.cy := 0;
+    for i := 0 to ChildCount -1 do
+    begin
+      if Child[i] is TFeGaussElement then
+      begin
+        d := TFeGaussElement(Child[i]).stdDev * 3 * fScale;
+        delta.cx := delta.cx + d;
+        delta.cy := delta.cy + d;
+      end
+      else if Child[i] is TFeDropShadowElement then
+        with TFeDropShadowElement(Child[i]) do
+        begin
+          d := stdDev * 0.75 * fScale;
+          pt := offset.GetPoint(bounds, 1);
+          delta.cx := delta.cx + d + Abs(pt.X) * fScale;
+          delta.cy := delta.cy + d + Abs(pt.Y) * fScale;
+          hasOffset := true;
+        end
+      else if Child[i] is TFeOffsetElement then
+        with TFeOffsetElement(Child[i]) do
+        begin
+          pt := offset.GetPoint(bounds, 1);
+          delta.cx := delta.cx + Abs(pt.X) * fScale;
+          delta.cy := delta.cy + Abs(pt.Y) * fScale;
+          hasOffset := true;
+        end;
+    end;
+
+    //limit the filter margin to 20% if only blurring
+    if not hasOffset then
+      with delta, bounds do
+      begin
+        if cx > Width * 0.2 then cx := Width * 0.2;
+        if cy > Height * 0.2 then cy := Height * 0.2;
+      end;
+    Img32.Vector.InflateRect(Result, delta.cx, delta.cy);
+
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2096,7 +2142,10 @@ begin
       begin
         drawDat.filterElRef := '';
         with TFilterElement(filterEl) do
+        begin
+          fScale := ExtractAvgScaleFromMatrix(DrawData.matrix);
           clipRec := GetAdjustedBounds(clipRec);
+        end;
       end;
       MatrixApply(drawDat.matrix, clipRec);
     end;
@@ -3476,6 +3525,7 @@ end;
 
 procedure Id_Attrib(aOwnerEl: TElement; const value: UTF8String);
 begin
+  aOwnerEl.fId := value;
   aOwnerEl.fReader.fIdList.AddObject(string(value), aOwnerEl);
 end;
 //------------------------------------------------------------------------------
