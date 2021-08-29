@@ -592,8 +592,8 @@ const
     fillRule: frNonZero; fillEl: '';
     strokeColor: clInvalid; strokeOpacity: InvalidD;
     strokeWidth: (rawVal: InvalidD; unitType: utNumber);
-    strokeCap: esButt; strokeJoin: jsMiter; strokeMitLim: 0.0; strokeEl : '';
-    dashArray:nil; dashOffset:0;
+    strokeCap: esPolygon; strokeJoin: jsAuto; strokeMitLim: 0.0; strokeEl : '';
+    dashArray: nil; dashOffset: 0;
     fontInfo: (family: ttfUnknown; size: 0; spacing: 0.0;
     textLength: 0; italic: sfsUndefined; weight: -1; align: staUndefined;
     decoration: fdUndefined; baseShift: (rawVal: InvalidD; unitType: utNumber));
@@ -679,6 +679,10 @@ begin
       drawDat.strokeOpacity := strokeOpacity;
     if strokeWidth.IsValid then
       drawDat.strokeWidth := strokeWidth;
+    if strokeCap = esPolygon then
+      drawDat.strokeCap := strokeCap;
+    if strokeJoin = jsAuto then
+      drawDat.strokeJoin := strokeJoin;
     if strokeMitLim > 0 then
       drawDat.strokeMitLim := strokeMitLim;
     if Assigned(dashArray) then
@@ -2342,7 +2346,9 @@ begin
   end else
   begin
     strokePaths := MatrixApply(drawPathsO, drawDat.matrix);
-    endStyle := fDrawData.strokeCap;
+    if fDrawData.strokeCap = esPolygon then
+      endStyle := esButt else
+      endStyle := fDrawData.strokeCap;
   end;
   if not Assigned(strokePaths) then Exit;
   joinStyle := fDrawData.strokeJoin;
