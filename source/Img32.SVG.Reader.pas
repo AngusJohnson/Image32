@@ -29,7 +29,7 @@ uses
 {$ENDIF}
 
 type
-  TElement = class;
+  TSvgElement = class;
 
   TDrawData = record
     currentColor  : TColor32;
@@ -56,20 +56,20 @@ type
     opacity       : integer;
     matrix        : TMatrixD;
     visible       : Boolean;
-    useEl         : TElement; //to check for and prevent <USE> recursion
+    useEl         : TSvgElement; //to check for and prevent <USE> recursion
     bounds        : TRectD;
   end;
 
   TSvgReader = class;
-  TElementClass = class of TElement;
+  TElementClass = class of TSvgElement;
 
-  TElement = class
+  TSvgElement = class
   private
-    fParent         : TElement;
+    fParent         : TSvgElement;
     fParserEl       : TSvgTreeEl;
     fReader         : TSvgReader;
 {$IFDEF XPLAT_GENERICS}
-    fChilds         : TList<TElement>;
+    fChilds         : TList<TSvgElement>;
 {$ELSE}
     fChilds         : TList;
 {$ENDIF}
@@ -77,10 +77,10 @@ type
     fDrawData       : TDrawData;    //currently both static and dynamic vars
     fSavedDrawData  : TDrawData;
     fSavedElRectWH  : TValueRecWH;
-    function  FindRefElement(refname: UTF8String): TElement;
+    function  FindRefElement(refname: UTF8String): TSvgElement;
     function GetChildCount: integer;
-    function GetChild(index: integer): TElement;
-    function FindChild(const idName: UTF8String): TElement;
+    function GetChild(index: integer): TSvgElement;
+    function FindChild(const idName: UTF8String): TSvgElement;
   protected
     elRectWH        : TValueRecWH;  //multifunction variable
     function  IsFirstChild: Boolean;
@@ -92,24 +92,24 @@ type
     procedure Draw(image: TImage32; drawDat: TDrawData); virtual;
     procedure DrawChildren(image: TImage32; drawDat: TDrawData); virtual;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); virtual;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); virtual;
     destructor  Destroy; override;
     //SaveCopy and RestoreCopy are needed for animation
     procedure SaveCopy; virtual;
     procedure RestoreCopy(recursive: Boolean); virtual;
-    property Child[index: integer]: TElement read GetChild; default;
+    property Child[index: integer]: TSvgElement read GetChild; default;
     property ChildCount: integer read GetChildCount;
     property DrawData: TDrawData read fDrawData write fDrawData;
     property Id: UTF8String read fId;
   end;
 
-  TSvgElement = class(TElement)
+  TSvgRootElement = class(TSvgElement)
   private
     fSavedViewboxWH : TRectWH;
   protected
     viewboxWH       : TRectWH;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
     procedure SaveCopy; override;
     procedure RestoreCopy(recursive: Boolean); override;
   end;
@@ -126,11 +126,9 @@ type
     fLinGradRenderer  : TLinearGradientRenderer;
     fRadGradRenderer  : TSvgRadialGradientRenderer;
     fImgRenderer      : TImageRenderer;
-    fRootElement      : TSvgElement;
+    fRootElement      : TSvgRootElement;
     fFontCache        : TGlyphCache;
     fUsePropScale     : Boolean;
-    fDefFillColor     : TColor32;
-    fDefStrokeColor   : TColor32;
     function  LoadInternal: Boolean;
     function  GetIsEmpty: Boolean;
     procedure SetBlurQuality(quality: integer);
@@ -152,12 +150,7 @@ type
     function  LoadFromStream(stream: TStream): Boolean;
     function  LoadFromFile(const filename: string): Boolean;
     function  LoadFromString(const str: string): Boolean;
-    function  FindElement(const idName: UTF8String): TElement;
-    //Both SetOverrideFillColor & SetOverrideStrokeColor are intended
-    //primarily for use by the third-party library - SVGIconImageList
-    //https://github.com/EtheaDev/SVGIconImageList/wiki
-    procedure SetOverrideFillColor(color: TColor32);
-    procedure SetOverrideStrokeColor(color: TColor32);
+    function  FindElement(const idName: UTF8String): TSvgElement;
     property  BackgroundColor : TColor32 read fBkgndColor write fBkgndColor;
     property  BlurQuality     : integer read fBlurQuality write SetBlurQuality;
     property  IsEmpty         : Boolean read GetIsEmpty;
@@ -165,7 +158,7 @@ type
     //the third-party SVGIconImageList. (IMHO it should always = true)
     property  KeepAspectRatio: Boolean
       read fUsePropScale write fUsePropScale;
-    property  RootElement     : TSvgElement read fRootElement;
+    property  RootElement     : TSvgRootElement read fRootElement;
   end;
 
 implementation
@@ -176,14 +169,14 @@ uses
 type
   TFourDoubles = array [0..3] of double;
 
-  TDefsElement = class(TElement)
+  TDefsElement = class(TSvgElement)
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
   //-------------------------------------
 
-  TShapeElement = class(TElement)
+  TShapeElement = class(TSvgElement)
   protected
     hasPaths    : Boolean;
     drawPathsO  : TPathsD; //open only
@@ -199,7 +192,7 @@ type
     procedure DrawMarkers(img: TImage32; drawDat: TDrawData);
     procedure Draw(image: TImage32; drawDat: TDrawData); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
   TGroupElement = class(TShapeElement)
@@ -214,8 +207,8 @@ type
 
   TUseElement = class(TShapeElement)
   private
-    callerUse: TElement;
-    function ValidateNonRecursion(el: TElement): Boolean;
+    callerUse: TSvgElement;
+    function ValidateNonRecursion(el: TSvgElement): Boolean;
   protected
     refEl: UTF8String;
     procedure GetPaths(const drawDat: TDrawData); override;
@@ -233,7 +226,7 @@ type
   protected
     viewboxWH: TRectWH;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
   //-------------------------------------
@@ -275,7 +268,7 @@ type
     procedure GetPaths(const drawDat: TDrawData); override;
     function  GetUncurvedPath(const drawDat: TDrawData): TPathsD; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
     procedure SaveCopy; override;
     procedure RestoreCopy(recursive: Boolean); override;
   end;
@@ -290,7 +283,7 @@ type
     function  GetBounds: TRectD; override;
     procedure GetPaths(const drawDat: TDrawData); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
     procedure SaveCopy; override;
     procedure RestoreCopy(recursive: Boolean); override;
   end;
@@ -305,7 +298,7 @@ type
     function  GetBounds: TRectD; override;
     procedure GetPaths(const drawDat: TDrawData); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
     procedure SaveCopy; override;
     procedure RestoreCopy(recursive: Boolean); override;
   end;
@@ -319,7 +312,7 @@ type
     procedure GetPaths(const drawDat: TDrawData); override;
     function  GetUncurvedPath(const drawDat: TDrawData): TPathsD; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
     procedure SaveCopy; override;
     procedure RestoreCopy(recursive: Boolean); override;
   end;
@@ -338,12 +331,12 @@ type
     function  LoadContent: Boolean; override;
     procedure Draw(img: TImage32; drawDat: TDrawData); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
   TTSpanElement = class(TTextElement)
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
   TSubtextElement = class(TShapeElement)
@@ -353,7 +346,7 @@ type
     text      : UTF8String;
     procedure GetPaths(const drawDat: TDrawData); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
     procedure SaveCopy; override;
     procedure RestoreCopy(recursive: Boolean); override;
   end;
@@ -379,7 +372,7 @@ type
     function SetMiddlePoints(const points: TPathD): Boolean;
     procedure Draw(img: TImage32; drawDat: TDrawData); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
   TSvgColorStop = record
@@ -388,7 +381,7 @@ type
   end;
   TSvgColorStops = array of TSvgColorStop;
 
-  TFillElement = class(TElement)
+  TFillElement = class(TSvgElement)
   protected
     refEl : UTF8String;
     units : Cardinal;
@@ -401,7 +394,7 @@ type
     function PrepareRenderer(renderer: TImageRenderer;
       drawDat: TDrawData): Boolean; virtual;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
   //nb: gradients with objectBoundingBox should not be applied to
@@ -412,7 +405,7 @@ type
     spreadMethod  : TGradientFillStyle;
     function LoadContent: Boolean; override;
     procedure AddStop(color: TColor32; offset: double);
-    procedure AssignTo(other: TElement);  virtual;
+    procedure AssignTo(other: TSvgElement);  virtual;
     function PrepareRenderer(renderer: TCustomGradientRenderer;
       drawDat: TDrawData): Boolean; virtual;
   end;
@@ -421,32 +414,32 @@ type
   protected
     radius: TValuePt;
     F, C: TValuePt;
-    procedure AssignTo(other: TElement); override;
+    procedure AssignTo(other: TSvgElement); override;
     function PrepareRenderer(renderer: TCustomGradientRenderer;
       drawDat: TDrawData): Boolean; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
   TLinGradElement = class(TGradientElement)
   protected
     startPt, endPt: TValuePt;
-    procedure AssignTo(other: TElement); override;
+    procedure AssignTo(other: TSvgElement); override;
     function PrepareRenderer(renderer: TCustomGradientRenderer;
       drawDat: TDrawData): Boolean; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
-  TGradStopElement = class(TElement)
+  TGradStopElement = class(TSvgElement)
   protected
     offset: double;
     color: TColor32;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
-  TFilterElement = class(TElement)
+  TFilterElement = class(TSvgElement)
   private
     fSrcImg       : TImage32;
     fLastImg      : TImage32;
@@ -465,11 +458,11 @@ type
     procedure Apply(img: TImage32;
       const filterBounds: TRect; const matrix: TMatrixD);
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
     destructor Destroy; override;
   end;
 
-  TFeBaseElement = class(TElement)
+  TFeBaseElement = class(TSvgElement)
   private
     function GetParentAsFilterEl: TFilterElement;
   protected
@@ -497,7 +490,7 @@ type
     compositeOp: TCompositeOp;
     procedure Apply; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
   TFeColorMatrixElement  = class(TFeBaseElement)
@@ -522,7 +515,7 @@ type
     floodColor  : TColor32;
     procedure Apply; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
   TFeFloodElement  = class(TFeBaseElement)
@@ -530,7 +523,7 @@ type
     floodColor  : TColor32;
     procedure Apply; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
   TFeGaussElement  = class(TFeBaseElement)
@@ -538,7 +531,7 @@ type
     stdDev: double;
     procedure Apply; override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
 
   TFeMergeElement  = class(TFeBaseElement)
@@ -573,7 +566,7 @@ type
   protected
     procedure GetPaths(const drawDat: TDrawData); override;
   public
-    constructor Create(parent: TElement; svgEl: TSvgTreeEl); override;
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
   //-------------------------------------
 
@@ -644,19 +637,19 @@ begin
     hRadialgradient : Result := TRadGradElement;
     hRect           : Result := TRectElement;
     hStop           : Result := TGradStopElement;
-    hSvg            : Result := TSvgElement;
+    hSvg            : Result := TSvgRootElement;
     hSwitch         : Result := TSwitchElement;
     hSymbol         : Result := TSymbolElement;
     hText           : Result := TTextElement;
     hTextPath       : Result := TTextPathElement;
     hTSpan          : Result := TTSpanElement;
     hUse            : Result := TUseElement;
-    else              Result := TElement; //use generic class
+    else              Result := TSvgElement; //use generic class
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure UpdateDrawInfo(var drawDat: TDrawData; thisElement: TElement);
+procedure UpdateDrawInfo(var drawDat: TDrawData; thisElement: TSvgElement);
 begin
   with thisElement.fDrawData do
   begin
@@ -838,7 +831,7 @@ end;
 // TDefsElement
 //------------------------------------------------------------------------------
 
-constructor TDefsElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TDefsElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fDrawData.visible := false;
@@ -850,8 +843,8 @@ end;
 
 procedure TGroupElement.Draw(image: TImage32; drawDat: TDrawData);
 var
-  clipEl    : TElement;
-  maskEl    : TElement;
+  clipEl    : TSvgElement;
+  maskEl    : TSvgElement;
   tmpImg    : TImage32;
   clipPaths : TPathsD;
   clipRec   : TRect;
@@ -912,7 +905,7 @@ var
   i: integer;
 begin
   for i := 0 to fChilds.Count -1 do
-    if TElement(fChilds[i]) is TShapeElement then
+    if TSvgElement(fChilds[i]) is TShapeElement then
       with TShapeElement(fChilds[i]) do
         if fDrawData.visible then
         begin
@@ -927,7 +920,7 @@ end;
 
 procedure TUseElement.GetPaths(const drawDat: TDrawData);
 var
-  el: TElement;
+  el: TSvgElement;
   dx, dy: double;
 begin
   if Assigned(drawPathsF) or (refEl = '') then Exit;
@@ -959,7 +952,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TUseElement.ValidateNonRecursion(el: TElement): Boolean;
+function TUseElement.ValidateNonRecursion(el: TSvgElement): Boolean;
 begin
   Result := false;
   while assigned(el) do
@@ -974,7 +967,7 @@ end;
 
 procedure TUseElement.Draw(img: TImage32; drawDat: TDrawData);
 var
-  el: TElement;
+  el: TSvgElement;
   s, dx, dy: double;
   scale, scale2: TSizeD;
   mat: TMatrixD;
@@ -1068,7 +1061,7 @@ var
 begin
   maskRec := NullRect;
   for i := 0 to fChilds.Count -1 do
-    if TElement(fChilds[i]) is TShapeElement then
+    if TSvgElement(fChilds[i]) is TShapeElement then
     begin
       el := TShapeElement(fChilds[i]);
       el.GetPaths(drawDat);
@@ -1096,7 +1089,7 @@ end;
 // TSymbolElement
 //------------------------------------------------------------------------------
 
-constructor TSymbolElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TSymbolElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fDrawData.visible := false;
@@ -1112,7 +1105,7 @@ var
 begin
   Result := inherited LoadContent;
   for i := 0 to fChilds.Count -1 do
-    if TElement(fChilds[i]) is TGradStopElement then
+    if TSvgElement(fChilds[i]) is TGradStopElement then
       with TGradStopElement(fChilds[i]) do
         AddStop(color, offset);
 end;
@@ -1133,7 +1126,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TGradientElement.AssignTo(other: TElement);
+procedure TGradientElement.AssignTo(other: TSvgElement);
 var
   i, len: integer;
 begin
@@ -1162,7 +1155,7 @@ end;
 function TGradientElement.PrepareRenderer(
   renderer: TCustomGradientRenderer; drawDat: TDrawData): Boolean;
 var
-  el: TElement;
+  el: TSvgElement;
 begin
   if (refEl <> '') then
   begin
@@ -1177,7 +1170,7 @@ end;
 // TRadGradElement
 //------------------------------------------------------------------------------
 
-constructor TRadGradElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TRadGradElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   radius.Init;
@@ -1186,7 +1179,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TRadGradElement.AssignTo(other: TElement);
+procedure TRadGradElement.AssignTo(other: TSvgElement);
 begin
   if not Assigned(other) or not (other is TGradientElement) then Exit;
   inherited;
@@ -1269,7 +1262,7 @@ end;
 // TLinGradElement
 //------------------------------------------------------------------------------
 
-constructor TLinGradElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TLinGradElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   startPt.Init;
@@ -1277,7 +1270,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TLinGradElement.AssignTo(other: TElement);
+procedure TLinGradElement.AssignTo(other: TSvgElement);
 begin
   if not Assigned(other) or not (other is TGradientElement) then Exit;
   inherited;
@@ -1359,7 +1352,7 @@ end;
 // TGradStopElement
 //------------------------------------------------------------------------------
 
-constructor TGradStopElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TGradStopElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   color := clBlack32;
@@ -1369,7 +1362,7 @@ end;
 // TFilterElement
 //------------------------------------------------------------------------------
 
-constructor TFilterElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TFilterElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fDrawData.visible := false;
@@ -1567,7 +1560,7 @@ begin
   try
     for i := 0 to fChilds.Count -1 do
     begin
-      case TElement(fChilds[i]).fParserEl.hash of
+      case TSvgElement(fChilds[i]).fParserEl.hash of
         hfeBlend            : TFeBlendElement(fChilds[i]).Apply;
         hfeColorMatrix      : TFeColorMatrixElement(fChilds[i]).Apply;
         hfeComposite        : TFeCompositeElement(fChilds[i]).Apply;
@@ -1592,7 +1585,7 @@ end;
 
 function TFeBaseElement.GetParentAsFilterEl: TFilterElement;
 var
-  el: TElement;
+  el: TSvgElement;
 begin
   el := fParent;
   while Assigned(el) and not (el is TFilterElement) do
@@ -1667,7 +1660,7 @@ end;
 // TFeCompositeElement
 //------------------------------------------------------------------------------
 
-constructor TFeCompositeElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TFeCompositeElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fourKs[0] := InvalidD; fourKs[1] := InvalidD;
@@ -1842,7 +1835,7 @@ end;
 // TFeDropShadowElement
 //------------------------------------------------------------------------------
 
-constructor TFeDropShadowElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TFeDropShadowElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   stdDev := InvalidD;
@@ -1884,7 +1877,7 @@ end;
 // TFeFloodElement
 //------------------------------------------------------------------------------
 
-constructor TFeFloodElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TFeFloodElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   floodColor := clInvalid;
@@ -1906,7 +1899,7 @@ end;
 // TFeGaussElement
 //------------------------------------------------------------------------------
 
-constructor TFeGaussElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TFeGaussElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   stdDev := InvalidD;
@@ -1944,7 +1937,7 @@ begin
   pfe := ParentFilterEl;
 
   for i := 0 to fChilds.Count -1 do
-    if TElement(fChilds[i]) is TFeMergeNodeElement then
+    if TSvgElement(fChilds[i]) is TFeMergeNodeElement then
       with TFeMergeNodeElement(fChilds[i]) do
       begin
         if not GetSrcAndDst then Continue;
@@ -2016,7 +2009,7 @@ end;
 // TClipPathElement
 //------------------------------------------------------------------------------
 
-constructor TClipPathElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TClipPathElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fDrawData.visible := false;
@@ -2029,7 +2022,7 @@ var
 begin
   if Assigned(drawPathsC) or Assigned(drawPathsO) then Exit;
   for i := 0 to fChilds.Count -1 do
-    if TElement(fChilds[i]) is TShapeElement then
+    if TSvgElement(fChilds[i]) is TShapeElement then
       with TShapeElement(fChilds[i]) do
       begin
         GetPaths(drawDat);
@@ -2044,7 +2037,7 @@ end;
 // TShapeElement
 //------------------------------------------------------------------------------
 
-constructor TShapeElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TShapeElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   elRectWH.Init;
@@ -2060,7 +2053,7 @@ var
 begin
   Result := NullRectD;
   for i := 0 to fChilds.Count -1 do
-    if TElement(fChilds[i]) is TShapeElement then
+    if TSvgElement(fChilds[i]) is TShapeElement then
        Result := UnionRect(Result, TShapeElement(fChilds[i]).GetBounds);
 end;
 //------------------------------------------------------------------------------
@@ -2080,9 +2073,9 @@ var
   filled      : Boolean;
   clipRec     : TRectD;
   clipRec2    : TRect;
-  clipPathEl  : TElement;
-  filterEl    : TElement;
-  maskEl      : TElement;
+  clipPathEl  : TSvgElement;
+  filterEl    : TSvgElement;
+  maskEl      : TSvgElement;
   clipPaths   : TPathsD;
   di          : TDrawData;
   usingTempImage: Boolean;
@@ -2201,7 +2194,7 @@ procedure TShapeElement.DrawMarkers(img: TImage32; drawDat: TDrawData);
 var
   i,j: integer;
   sw: double;
-  markerEl: TElement;
+  markerEl: TSvgElement;
   markerPaths: TPathsD;
   pt1, pt2: TPointD;
   di: TDrawData;
@@ -2286,7 +2279,7 @@ end;
 
 procedure TShapeElement.DrawFilled(img: TImage32; drawDat: TDrawData);
 var
-  refEl: TElement;
+  refEl: TSvgElement;
   fillPaths: TPathsD;
 begin
   if not assigned(drawPathsF) then Exit;
@@ -2334,7 +2327,7 @@ var
   scale: Double;
   strokeClr: TColor32;
   strokePaths: TPathsD;
-  refEl: TElement;
+  refEl: TSvgElement;
   endStyle: TEndStyle;
   joinStyle: TJoinStyle;
   bounds: TRectD;
@@ -2584,7 +2577,7 @@ end;
 // TLineElement
 //------------------------------------------------------------------------------
 
-constructor TLineElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TLineElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   SetLength(path, 2);
@@ -2630,7 +2623,7 @@ end;
 // TCircleElement
 //------------------------------------------------------------------------------
 
-constructor TCircleElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TCircleElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   centerPt.Init;
@@ -2690,7 +2683,7 @@ end;
 // TEllipseElement
 //------------------------------------------------------------------------------
 
-constructor TEllipseElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TEllipseElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   centerPt.Init;
@@ -2750,7 +2743,7 @@ end;
 // TRectElement
 //------------------------------------------------------------------------------
 
-constructor TRectElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TRectElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   radius.Init;
@@ -2818,7 +2811,7 @@ end;
 // TTextElement
 //------------------------------------------------------------------------------
 
-constructor TTextElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TTextElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   offset.Init;
@@ -2831,7 +2824,7 @@ var
   i       : integer;
   svgEl   : TSvgTreeEl;
   elClass : TElementClass;
-  el      : TElement;
+  el      : TSvgElement;
 begin
   Result := false;
   for i := 0 to fParserEl.childs.Count -1 do
@@ -2846,7 +2839,7 @@ begin
     end else
     begin
       elClass := HashToElementClass(svgEl.hash);
-      if elClass = TElement then Continue;
+      if elClass = TSvgElement then Continue;
       el := elClass.Create(self, svgEl);
       Self.fChilds.Add(el);
       el.LoadAttributes;
@@ -2859,7 +2852,7 @@ end;
 
 function TTextElement.GetTopTextElement: TTextElement;
 var
-  el: TElement;
+  el: TSvgElement;
 begin
   el := self;
   while Assigned(el.fParent) and (el.fParent is TTextElement) do
@@ -2873,9 +2866,9 @@ var
   i: integer;
 begin
   for i := 0 to fChilds.Count -1 do
-    if TElement(fChilds[i]) is TTextElement then
+    if TSvgElement(fChilds[i]) is TTextElement then
       TTextElement(fChilds[i]).DoOffsetX(dx)
-    else if TElement(fChilds[i]) is TSubTextElement then
+    else if TSvgElement(fChilds[i]) is TSubTextElement then
       with TSubTextElement(fChilds[i]) do
       begin
         drawPathsC := OffsetPath(drawPathsC, dx, 0);
@@ -2888,7 +2881,7 @@ end;
 procedure TTextElement.GetPaths(const drawDat: TDrawData);
 var
   i         : integer;
-  el        : TElement;
+  el        : TSvgElement;
   di        : TDrawData;
   topTextEl : TTextElement;
 begin
@@ -2929,7 +2922,7 @@ begin
   end;
 
   for i := 0 to fChilds.Count -1 do
-    if TElement(fChilds[i]) is TShapeElement then
+    if TSvgElement(fChilds[i]) is TShapeElement then
       TShapeElement(fChilds[i]).GetPaths(di);
 end;
 //------------------------------------------------------------------------------
@@ -2975,7 +2968,7 @@ end;
 // TSubtextElement
 //------------------------------------------------------------------------------
 
-constructor TSubtextElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TSubtextElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   hasPaths := true;
@@ -3031,7 +3024,7 @@ end;
 
 procedure TSubtextElement.GetPaths(const drawDat: TDrawData);
 var
-  el : TElement;
+  el : TSvgElement;
   topTextEl : TTextElement;
   s: string;
   tmpX, offsetX, scale, fontSize, bs: double;
@@ -3090,7 +3083,7 @@ end;
 // TTSpanElement
 //------------------------------------------------------------------------------
 
-constructor TTSpanElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TTSpanElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fDrawData.FontInfo.decoration := fdUndefined;
@@ -3107,7 +3100,7 @@ end;
 procedure TTextPathElement.GetPaths(const drawDat: TDrawData);
 var
   parentTextEl, topTextEl: TTextElement;
-  el: TElement;
+  el: TSvgElement;
   isFirst: Boolean;
   s: string;
   i, len, charsThatFit: integer;
@@ -3140,11 +3133,11 @@ begin
   if (fParserEl.text = '') then
   begin
     if (fChilds.Count = 0) or
-      not (TElement(fChilds[0]) is TTSpanElement) then
+      not (TSvgElement(fChilds[0]) is TTSpanElement) then
         Exit;
-    el := TElement(fChilds[0]);
+    el := TSvgElement(fChilds[0]);
     if (el.fChilds.Count = 0) or
-      not (TElement(el.fChilds[0]) is TSubtextElement) then
+      not (TSvgElement(el.fChilds[0]) is TSubtextElement) then
         Exit;
     with TSubtextElement(el.fChilds[0]) do
     begin
@@ -3212,7 +3205,7 @@ end;
 // TMarkerElement
 //------------------------------------------------------------------------------
 
-constructor TMarkerElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TMarkerElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   fDrawData.visible := false;
@@ -3308,7 +3301,7 @@ end;
 // TPatternElement
 //------------------------------------------------------------------------------
 
-constructor TPatternElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TPatternElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited;
   elRectWH.Init;
@@ -3323,7 +3316,7 @@ function TPatternElement.PrepareRenderer(renderer: TImageRenderer;
 var
   i     : integer;
   recWH : TRectWH;
-  el    : TElement;
+  el    : TSvgElement;
   rec   : TRectD;
   mat   : TMatrixD;
   sx,sy : double;
@@ -3382,7 +3375,7 @@ begin
   end;
 
   for i := 0 to fChilds.Count -1 do
-    if TElement(fChilds[i]) is TShapeElement then
+    if TSvgElement(fChilds[i]) is TShapeElement then
       with TShapeElement(fChilds[i]) do
       begin
         drawDat := fDrawData;
@@ -3393,23 +3386,23 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TSvgElement
+// TSvgRootElement
 //------------------------------------------------------------------------------
 
-constructor TSvgElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TSvgRootElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited Create(parent, svgEl);
 end;
 //------------------------------------------------------------------------------
 
-procedure TSvgElement.SaveCopy;
+procedure TSvgRootElement.SaveCopy;
 begin
   fSavedViewboxWH := viewboxWH;
   inherited;
 end;
 //------------------------------------------------------------------------------
 
-procedure TSvgElement.RestoreCopy(recursive: Boolean);
+procedure TSvgRootElement.RestoreCopy(recursive: Boolean);
 begin
   viewboxWH := fSavedViewboxWH;
   inherited RestoreCopy(recursive);
@@ -3419,10 +3412,10 @@ end;
 // TElement
 //------------------------------------------------------------------------------
 
-constructor TElement.Create(parent: TElement; svgEl: TSvgTreeEl);
+constructor TSvgElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
 {$IFDEF XPLAT_GENERICS}
-  fChilds         := TList<TElement>.create;
+  fChilds         := TList<TSvgElement>.create;
 {$ELSE}
   fChilds         := TList.Create;
 {$ENDIF}
@@ -3435,18 +3428,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-destructor TElement.Destroy;
+destructor TSvgElement.Destroy;
 var
   i: integer;
 begin
   for i := 0 to fChilds.Count -1 do
-    TElement(fChilds[i]).Free;
+    TSvgElement(fChilds[i]).Free;
   fChilds.Free;
   inherited;
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.SaveCopy;
+procedure TSvgElement.SaveCopy;
 var
   i: integer;
 begin
@@ -3456,7 +3449,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.RestoreCopy(recursive: Boolean);
+procedure TSvgElement.RestoreCopy(recursive: Boolean);
 var
   i: integer;
 begin
@@ -3467,35 +3460,35 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function  TElement.IsFirstChild: Boolean;
+function  TSvgElement.IsFirstChild: Boolean;
 begin
   Result := not Assigned(fParent) or (self = fParent.fChilds[0]);
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.Draw(image: TImage32; drawDat: TDrawData);
+procedure TSvgElement.Draw(image: TImage32; drawDat: TDrawData);
 begin
   DrawChildren(image, drawDat);
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.DrawChildren(image: TImage32; drawDat: TDrawData);
+procedure TSvgElement.DrawChildren(image: TImage32; drawDat: TDrawData);
 var
   i: integer;
 begin
   for i := 0 to fChilds.Count -1 do
-    with TElement(fChilds[i]) do
+    with TSvgElement(fChilds[i]) do
       if fDrawData.visible then Draw(image, drawDat);
 end;
 //------------------------------------------------------------------------------
 
-function TElement.GetChildCount: integer;
+function TSvgElement.GetChildCount: integer;
 begin
   Result := fChilds.Count;
 end;
 //------------------------------------------------------------------------------
 
-function TElement.FindChild(const idName: UTF8String): TElement;
+function TSvgElement.FindChild(const idName: UTF8String): TSvgElement;
 var
   i: integer;
 begin
@@ -3514,15 +3507,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TElement.GetChild(index: integer): TElement;
+function TSvgElement.GetChild(index: integer): TSvgElement;
 begin
   if (index < 0) or (index >= fChilds.count) then
     Result := nil else
-    Result := TElement(fChilds[index]);
+    Result := TSvgElement(fChilds[index]);
 end;
 //------------------------------------------------------------------------------
 
-function TElement.FindRefElement(refname: UTF8String): TElement;
+function TSvgElement.FindRefElement(refname: UTF8String): TSvgElement;
 var
   i, len: integer;
   c, endC: PUTF8Char;
@@ -3542,7 +3535,7 @@ begin
   ref := ToUTF8String(c, endC);
   i := fReader.fIdList.IndexOf(string(ref));
   if i >= 0 then
-    Result := TElement(fReader.fIdList.Objects[i]) else
+    Result := TSvgElement(fReader.fIdList.Objects[i]) else
     Result := nil;
 end;
 
@@ -3550,37 +3543,37 @@ end;
 // dozens of function to process various element attributes
 //------------------------------------------------------------------------------
 
-procedure Id_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Id_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   aOwnerEl.fId := value;
   aOwnerEl.fReader.fIdList.AddObject(string(value), aOwnerEl);
 end;
 //------------------------------------------------------------------------------
 
-procedure In_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure In_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if aOwnerEl is TFeBaseElement then
     TFeBaseElement(aOwnerEl).in1 := value;
 end;
 //------------------------------------------------------------------------------
 
-procedure In2_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure In2_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if aOwnerEl is TFeBaseElement then
     TFeBaseElement(aOwnerEl).in2 := value;
 end;
 //------------------------------------------------------------------------------
 
-procedure LetterSpacing_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure LetterSpacing_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   with TTextElement(aOwnerEl) do
     UTF8StringToFloat(value, fDrawData.FontInfo.spacing);
 end;
 //------------------------------------------------------------------------------
 
-procedure Href_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Href_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
-  el: TElement;
+  el: TSvgElement;
 begin
   el := aOwnerEl;
   case el.fParserEl.Hash of
@@ -3594,7 +3587,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure BaselineShift_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure BaselineShift_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
@@ -3618,7 +3611,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Color_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Color_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   color: TColor32;
 begin
@@ -3631,7 +3624,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure LightingColor_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure LightingColor_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   color: TColor32;
 begin
@@ -3644,20 +3637,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure ClipPath_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure ClipPath_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   aOwnerEl.fDrawData.clipElRef := ExtractRef(value);
 end;
 //------------------------------------------------------------------------------
 
-procedure D_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure D_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if aOwnerEl is TPathElement then
     TPathElement(aOwnerEl).ParseDAttrib(value);
 end;
 //------------------------------------------------------------------------------
 
-procedure Fill_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Fill_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   case aOwnerEl.fParserEl.Hash of
     hfeDropShadow:
@@ -3675,7 +3668,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure FillOpacity_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure FillOpacity_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   val: double;
 begin
@@ -3693,7 +3686,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DashArray_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure DashArray_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   c, endC: PUTF8Char;
   val: double;
@@ -3714,7 +3707,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DashOffset_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure DashOffset_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   c, endC: PUTF8Char;
 begin
@@ -3725,20 +3718,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Display_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Display_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if GetHash(value) = hNone then
     aOwnerEl.fDrawData.visible := false;
 end;
 //------------------------------------------------------------------------------
 
-procedure Font_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Font_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   GetSvgFontInfo(value, aOwnerEl.fDrawData.FontInfo);
 end;
 //------------------------------------------------------------------------------
 
-procedure FontFamily_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure FontFamily_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   word: UTF8String;
   c, endC: PUTF8Char;
@@ -3762,7 +3755,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure FontSize_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure FontSize_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   num: double;
   c, endC: PUTF8Char;
@@ -3773,7 +3766,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure FontStyle_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure FontStyle_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   with aOwnerEl.fDrawData.FontInfo do
     if GetHash(value) = hItalic then
@@ -3782,7 +3775,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure FontWeight_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure FontWeight_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 
 var
   num: double;
@@ -3810,7 +3803,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Fx_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Fx_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if (aOwnerEl is TRadGradElement) then
     with TRadGradElement(aOwnerEl) do
@@ -3820,7 +3813,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Fy_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Fy_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if (aOwnerEl is TRadGradElement) then
     with TRadGradElement(aOwnerEl) do
@@ -3830,7 +3823,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TextAlign_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure TextAlign_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   with aOwnerEl.fDrawData.FontInfo do
     case GetHash(value) of
@@ -3841,7 +3834,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TextDecoration_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure TextDecoration_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   with aOwnerEl.fDrawData.FontInfo do
     case GetHash(value) of
@@ -3852,49 +3845,49 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TextLength_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure TextLength_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   UTF8StringToFloat(value, aOwnerEl.fDrawData.FontInfo.textLength);
 end;
 //------------------------------------------------------------------------------
 
 
-procedure MarkerStart_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure MarkerStart_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if not (aOwnerEl is TShapeElement) then Exit;
   aOwnerEl.fDrawData.markerStart := ExtractRef(value);
 end;
 //------------------------------------------------------------------------------
 
-procedure MarkerMiddle_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure MarkerMiddle_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if not (aOwnerEl is TShapeElement) then Exit;
   aOwnerEl.fDrawData.markerMiddle := ExtractRef(value);
 end;
 //------------------------------------------------------------------------------
 
-procedure MarkerEnd_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure MarkerEnd_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if not (aOwnerEl is TShapeElement) then Exit;
   aOwnerEl.fDrawData.markerEnd := ExtractRef(value);
 end;
 //------------------------------------------------------------------------------
 
-procedure Filter_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Filter_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if (aOwnerEl is TShapeElement) then
     aOwnerEl.fDrawData.filterElRef := ExtractRef(value);
 end;
 //------------------------------------------------------------------------------
 
-procedure Mask_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Mask_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if (aOwnerEl is TShapeElement) then
     aOwnerEl.fDrawData.maskElRef := ExtractRef(value);
 end;
 //------------------------------------------------------------------------------
 
-procedure Offset_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Offset_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   val: TValue;
 begin
@@ -3908,7 +3901,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Opacity_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Opacity_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   opacity: double;
 begin
@@ -3919,7 +3912,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Operator_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Operator_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if (aOwnerEl is TFeCompositeElement) then
     with TFeCompositeElement(aOwnerEl) do
@@ -3934,7 +3927,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Orient_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Orient_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if (aOwnerEl is TMarkerElement) and
     (GetHash(value) = hauto_045_start_045_reverse) then
@@ -3942,7 +3935,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure StopColor_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure StopColor_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   acolor: TColor32;
 begin
@@ -3958,21 +3951,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure StopOpacity_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure StopOpacity_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if aOwnerEl is TGradStopElement then
   UTF8StringToOpacity(value, TGradStopElement(aOwnerEl).color);
 end;
 //------------------------------------------------------------------------------
 
-procedure Points_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Points_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if aOwnerEl is TPolyElement then
     TPolyElement(aOwnerEl).ParsePoints(value);
 end;
 //------------------------------------------------------------------------------
 
-procedure Stroke_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Stroke_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if Match(PUTF8Char(value), 'url(') then
     aOwnerEl.fDrawData.strokeEl := ExtractRef(value)
@@ -3981,7 +3974,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure StrokeLineCap_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure StrokeLineCap_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   word: UTF8String;
   c, endC: PUTF8Char;
@@ -3998,7 +3991,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure StrokeLineJoin_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure StrokeLineJoin_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   word: UTF8String;
   c, endC: PUTF8Char;
@@ -4015,13 +4008,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure StrokeMiterLimit_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure StrokeMiterLimit_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   UTF8StringToFloat(value, aOwnerEl.fDrawData.strokeMitLim);
 end;
 //------------------------------------------------------------------------------
 
-procedure StrokeOpacity_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure StrokeOpacity_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   val: double;
 begin
@@ -4030,7 +4023,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure StrokeWidth_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure StrokeWidth_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   with aOwnerEl do
   begin
@@ -4040,7 +4033,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure FillRule_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure FillRule_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if LowerCaseTable[value[1]] = 'e' then
     aOwnerEl.fDrawData.fillRule := frEvenOdd else
@@ -4048,14 +4041,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Transform_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Transform_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   with aOwnerEl.fDrawData do
     matrix := MatrixMultiply(matrix, ParseTransform(value));
 end;
 //------------------------------------------------------------------------------
 
-procedure Values_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Values_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   cnt: integer;
   c, endC: PUTF8Char;
@@ -4074,7 +4067,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure GradientTransform_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure GradientTransform_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mat: TMatrixD;
 begin
@@ -4085,7 +4078,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure GradientUnits_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure GradientUnits_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if aOwnerEl is TFillElement then
     with TFillElement(aOwnerEl) do
@@ -4093,7 +4086,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Viewbox_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Viewbox_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 
   function LoadViewbox: TRectWH;
   var
@@ -4111,7 +4104,7 @@ procedure Viewbox_Attrib(aOwnerEl: TElement; const value: UTF8String);
 
 begin
   case aOwnerEl.fParserEl.Hash of
-    hSvg    : TSvgElement(aOwnerEl).viewboxWH := LoadViewbox;
+    hSvg    : TSvgRootElement(aOwnerEl).viewboxWH := LoadViewbox;
     hMarker : TMarkerElement(aOwnerEl).markerBoxWH := LoadViewbox;
     hSymbol : TSymbolElement(aOwnerEl).viewboxWH := LoadViewbox;
     else if aOwnerEl is TPatternElement then
@@ -4120,7 +4113,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Height_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Height_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
@@ -4133,7 +4126,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Width_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Width_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
@@ -4146,7 +4139,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Cx_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Cx_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
@@ -4166,7 +4159,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Cy_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Cy_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
@@ -4186,7 +4179,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Dx_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Dx_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
@@ -4203,7 +4196,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Dy_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Dy_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
@@ -4220,14 +4213,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Result_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Result_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   if (aOwnerEl is TFeBaseElement) then
     TFeBaseElement(aOwnerEl).res := ExtractRef(value);
 end;
 //------------------------------------------------------------------------------
 
-procedure Rx_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Rx_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
@@ -4262,7 +4255,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Ry_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Ry_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
@@ -4285,7 +4278,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure SpreadMethod_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure SpreadMethod_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   word: UTF8String;
   c, endC: PUTF8Char;
@@ -4303,7 +4296,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure SpectacularExponent(aOwnerEl: TElement; const value: UTF8String);
+procedure SpectacularExponent(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   se: double;
 begin
@@ -4314,7 +4307,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure StdDev_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure StdDev_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   sd: double;
 begin
@@ -4329,7 +4322,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure K1_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure K1_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   val: double;
 begin
@@ -4339,7 +4332,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure K2_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure K2_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   val: double;
 begin
@@ -4349,7 +4342,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure K3_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure K3_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   val: double;
 begin
@@ -4359,7 +4352,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure K4_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure K4_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   val: double;
 begin
@@ -4369,7 +4362,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure X1_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure X1_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
@@ -4394,7 +4387,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure X2_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure X2_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
@@ -4412,7 +4405,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Y1_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Y1_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
@@ -4437,7 +4430,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Y2_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Y2_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
@@ -4455,7 +4448,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Z_Attrib(aOwnerEl: TElement; const value: UTF8String);
+procedure Z_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 var
   val: double;
 begin
@@ -4467,7 +4460,7 @@ end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-procedure TElement.LoadAttribute(attrib: PSvgAttrib);
+procedure TSvgElement.LoadAttribute(attrib: PSvgAttrib);
 begin
   with attrib^ do
   case hash of
@@ -4557,7 +4550,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TElement.LoadAttributes;
+procedure TSvgElement.LoadAttributes;
 var
   i: integer;
 begin
@@ -4578,7 +4571,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TElement.GetRelFracLimit: double;
+function TSvgElement.GetRelFracLimit: double;
 begin
   //the default behaviour here is to assume untyped fractional values
   //below 1.0 are values relative (to the bounding size) BUT ONLY WHEN
@@ -4598,12 +4591,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TElement.LoadContent: Boolean;
+function TSvgElement.LoadContent: Boolean;
 var
   i       : integer;
   svgEl   : TSvgTreeEl;
   elClass : TElementClass;
-  el      : TElement;
+  el      : TSvgElement;
 begin
   Result := false;
   for i := 0 to fParserEl.childs.Count -1 do
@@ -4713,14 +4706,6 @@ begin
   with fRootElement do
   begin
     di := fDrawData;
-
-    //override the image's default color (black)
-    if fDefFillColor <> clNone32 then
-      di.fillColor := fDefFillColor;
-    if (fDefStrokeColor <> clNone32) and
-      (di.strokeColor <> clInvalid) then
-        di.strokeColor := fDefStrokeColor;
-
     MatrixTranslate(di.matrix, -viewboxWH.Left, -viewboxWH.Top);
 
     //the width and height attributes generally indicate the size of the
@@ -4776,7 +4761,7 @@ begin
   Result := false;
   if not Assigned(fSvgParser.svgTree) or
     (fSvgParser.svgTree.hash <> hSvg) then Exit;
-  fRootElement := TSvgElement.Create(nil, fSvgParser.svgTree);
+  fRootElement := TSvgRootElement.Create(nil, fSvgParser.svgTree);
   fRootElement.fReader := self;
   fRootElement.LoadAttributes;
   Result := fRootElement.LoadContent;
@@ -4804,7 +4789,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgReader.FindElement(const idName: UTF8String): TElement;
+function TSvgReader.FindElement(const idName: UTF8String): TSvgElement;
 begin
   if Assigned(RootElement) then
     Result := RootElement.FindChild(idName) else
@@ -4846,19 +4831,6 @@ begin
   fBlurQuality := Max(0, Min(2, quality));
 end;
 //------------------------------------------------------------------------------
-
-procedure TSvgReader.SetOverrideFillColor(color: TColor32);
-begin
-  fDefFillColor := color;
-end;
-//------------------------------------------------------------------------------
-
-procedure TSvgReader.SetOverrideStrokeColor(color: TColor32);
-begin
-  fDefStrokeColor := color;
-end;
-//------------------------------------------------------------------------------
-
 
 function TSvgReader.GetIsEmpty: Boolean;
 begin
