@@ -2,8 +2,8 @@ unit Img32.SVG.Reader;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.0                                                             *
-* Date      :  20 July 2021                                                    *
+* Version   :  3.2                                                             *
+* Date      :  30 August 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -150,6 +150,10 @@ type
     function  LoadFromStream(stream: TStream): Boolean;
     function  LoadFromFile(const filename: string): Boolean;
     function  LoadFromString(const str: string): Boolean;
+
+    procedure SetOverrideFillColor(color: TColor32); //deprecated;
+    procedure SetOverrideStrokeColor(color: TColor32); //deprecated;
+
     function  FindElement(const idName: UTF8String): TSvgElement;
     property  BackgroundColor : TColor32 read fBkgndColor write fBkgndColor;
     property  BlurQuality     : integer read fBlurQuality write SetBlurQuality;
@@ -4786,6 +4790,28 @@ function TSvgReader.LoadFromString(const str: string): Boolean;
 begin
   Clear;
   Result := fSvgParser.LoadFromString(str) and LoadInternal;
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgReader.SetOverrideFillColor(color: TColor32);
+var
+  dd: TDrawData;
+begin
+  if not Assigned(RootElement) then Exit;
+  dd := RootElement.DrawData;
+  dd.fillColor := color;
+  RootElement.DrawData := dd;
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgReader.SetOverrideStrokeColor(color: TColor32);
+var
+  dd: TDrawData;
+begin
+  if not Assigned(RootElement) then Exit;
+  dd := RootElement.DrawData;
+  dd.strokeColor := color;
+  RootElement.DrawData := dd;
 end;
 //------------------------------------------------------------------------------
 

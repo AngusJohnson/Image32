@@ -2,8 +2,8 @@ unit Img32.SVG.Core;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.1                                                             *
-* Date      :  15 August 2021                                                    *
+* Version   :  3.2                                                             *
+* Date      :  30 August 2021                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
