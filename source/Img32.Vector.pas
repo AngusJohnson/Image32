@@ -245,6 +245,7 @@ type
   {$IFDEF INLINING} inline; {$ENDIF}
 
   function RectsOverlap(const rec1, rec2: TRect): Boolean;
+  function IsSameRect(const rec1, rec2: TRect): Boolean;
 
   function IntersectRect(const rec1, rec2: TRectD): TRectD; overload;
   //UnionRect: this behaves differently to types.UnionRect
@@ -715,6 +716,13 @@ function RectsOverlap(const rec1, rec2: TRect): Boolean;
 begin
   Result := (rec1.Left < rec2.Right) and (rec1.Right > rec2.Left) and
      (rec1.Top < rec2.Bottom) and (rec1.Bottom > rec2.Top);
+end;
+//------------------------------------------------------------------------------
+
+function IsSameRect(const rec1, rec2: TRect): Boolean;
+begin
+  Result := (rec1.Left = rec2.Left) and (rec1.Top = rec2.Top) and
+    (rec1.Right = rec2.Right) and (rec1.Bottom = rec2.Bottom);
 end;
 //------------------------------------------------------------------------------
 
