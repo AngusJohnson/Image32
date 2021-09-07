@@ -228,7 +228,8 @@ type
     procedure ScaleAlpha(scale: double);
     class procedure RegisterImageFormatClass(ext: string;
       bm32ExClass: TImageFormatClass; clipPriority: TClipboardPriority);
-    class function GetImageFormatClass(const ext: string): TImageFormatClass;
+    class function GetImageFormatClass(const ext: string): TImageFormatClass; overload;
+    class function GetImageFormatClass(stream: TStream): TImageFormatClass; overload;
     class function IsRegisteredFormat(const ext: string): Boolean;
     function SaveToFile(filename: string): Boolean;
     function SaveToStream(stream: TStream; const FmtExt: string): Boolean;
@@ -1471,6 +1472,22 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+class function TImage32.GetImageFormatClass(stream: TStream): TImageFormatClass;
+var
+  i: integer;
+begin
+  Result := nil;
+  for i := 0 to imageFormatClassList.count -1 do
+    with PImgFmtRec(imageFormatClassList[i])^ do
+      if Obj.IsValidImageStream(stream) then
+      begin
+        Result := Obj;
+        break;
+      end;
+end;
+//------------------------------------------------------------------------------
+
+
 procedure TImage32.Assign(src: TImage32);
 begin
   if assigned(src) then
@@ -2074,17 +2091,16 @@ end;
 
 function TImage32.LoadFromFile(const filename: string): Boolean;
 var
-  image32FileFmtClass: TImageFormatClass;
+  stream: TFileStream;
 begin
-  image32FileFmtClass := GetImageFormatClass(ExtractFileExt(filename));
-  result := assigned(image32FileFmtClass);
-  if not result then Exit;
+  Result := false;
+  if not FileExists(filename) then Exit;
 
-  with image32FileFmtClass.Create do
+  stream := TFileStream.Create(filename, fmOpenRead or fmShareDenyNone);
   try
-    result := LoadFromFile(filename, self);
+    result := LoadFromStream(stream);
   finally
-    free;
+    stream.Free;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2092,20 +2108,18 @@ end;
 function TImage32.LoadFromStream(stream: TStream): Boolean;
 var
   i: integer;
+  ifc: TImageFormatClass;
 begin
-  Result := false;
-  for i := 0 to imageFormatClassList.count -1 do
-    with PImgFmtRec(imageFormatClassList[i])^ do
-      if Obj.IsValidImageStream(stream) then
-      begin
-        with obj.Create do
-        try
-          result := LoadFromStream(stream, self);
-        finally
-          free;
-        end;
-        break;
-      end;
+  ifc := GetImageFormatClass(stream);
+  Result := Assigned(ifc);
+  if not Result then Exit;
+
+  with ifc.Create do
+  try
+    result := LoadFromStream(stream, self);
+  finally
+    free;
+  end;
 end;
 //------------------------------------------------------------------------------
 

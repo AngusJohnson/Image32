@@ -59,15 +59,17 @@ begin
       sx := img32.Width / w;
       sy := img32.Height / h;
       if sy < sx then sx := sy;
-      if sx > 1 then
+      if not(SameValue(sx, 1, 0.00001)) then
       begin
         w := w * sx;
         h := h * sx;
       end;
       img32.SetSize(Round(w), Round(h));
-    end
-    else if img32.IsEmpty then
+    end;
+
+    if img32.IsEmpty then
       img32.SetSize(defaultSvgWidth, defaultSvgHeight);
+
     //draw the SVG image to fit inside the canvas
     DrawImage(img32, True);
   finally

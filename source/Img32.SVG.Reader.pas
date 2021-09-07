@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  3.2                                                             *
-* Date      :  30 August 2021                                                    *
+* Date      :  6 September 2021                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -151,6 +151,8 @@ type
     function  LoadFromFile(const filename: string): Boolean;
     function  LoadFromString(const str: string): Boolean;
 
+    //The following two methods are deprecated and intended only for ...
+    //https://github.com/EtheaDev/SVGIconImageList
     procedure SetOverrideFillColor(color: TColor32); //deprecated;
     procedure SetOverrideStrokeColor(color: TColor32); //deprecated;
 
@@ -2287,6 +2289,8 @@ var
   fillPaths: TPathsD;
 begin
   if not assigned(drawPathsF) then Exit;
+  if drawDat.fillColor = clCurrent then
+    drawDat.fillColor := fReader.currentColor;
 
   fillPaths := MatrixApply(drawPathsF, drawDat.matrix);
   if (drawDat.fillEl <> '') then
@@ -2349,6 +2353,8 @@ begin
   end;
   if not Assigned(strokePaths) then Exit;
   joinStyle := fDrawData.strokeJoin;
+  if drawDat.strokeColor = clCurrent then
+    drawDat.strokeColor := fReader.currentColor;
 
   scale := ExtractAvgScaleFromMatrix(drawDat.matrix);
   bounds := fReader.userSpaceBounds;
@@ -4710,6 +4716,9 @@ begin
   with fRootElement do
   begin
     di := fDrawData;
+    if di.currentColor = clInvalid then
+      di.currentColor := currentColor;
+
     MatrixTranslate(di.matrix, -viewboxWH.Left, -viewboxWH.Top);
 
     //the width and height attributes generally indicate the size of the
@@ -4717,10 +4726,9 @@ begin
     //values can be still overridden by the scaleToImage parameter above
 
     if vbox.IsEmpty then
-      fDrawData.bounds := RectD(img.Bounds) else
-      fDrawData.bounds := viewboxWH.RectD;
+      di.bounds := RectD(img.Bounds) else
+      di.bounds := viewboxWH.RectD;
     userSpaceBounds  := fDrawData.bounds;
-    di.bounds := fDrawData.bounds;
 
     if scaleToImage and not img.IsEmpty then
     begin
@@ -4797,7 +4805,7 @@ procedure TSvgReader.SetOverrideFillColor(color: TColor32);
 var
   dd: TDrawData;
 begin
-  if not Assigned(RootElement) then Exit;
+  if not Assigned(RootElement) or (color = clNone32) then Exit;
   dd := RootElement.DrawData;
   dd.fillColor := color;
   RootElement.DrawData := dd;
@@ -4808,8 +4816,9 @@ procedure TSvgReader.SetOverrideStrokeColor(color: TColor32);
 var
   dd: TDrawData;
 begin
-  if not Assigned(RootElement) then Exit;
+  if not Assigned(RootElement) or (color = clNone32) then Exit;
   dd := RootElement.DrawData;
+  if dd.strokeColor = clInvalid then Exit;
   dd.strokeColor := color;
   RootElement.DrawData := dd;
 end;

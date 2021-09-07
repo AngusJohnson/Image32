@@ -136,12 +136,16 @@ type
 {$ENDIF}
     fInvalidRect            : TRect;
     fUpdateCount            : Integer; //see beginUpdate/EndUpdate
-    fClipPath               : TPathD;
+    fClipRect               : TRect;
+    fClipPath               : TPathsD;
+    fClipMask               : TImage32;
+    fAutoSize               : Boolean;
     function  GetChildCount: integer;
     function  GetChild(index: integer): TLayer32;
     function  FindLayerNamed(const name: string): TLayer32; virtual;
     procedure ReindexChildsFrom(startIdx: Integer);
-    procedure SetClipPath(const path: TPathD);
+    procedure SetClipPath(const path: TPathsD);
+    procedure SetClipRect(const rect: TRect);
     procedure UpdateBounds;
   protected
     procedure  BeginUpdate; override;
@@ -161,10 +165,13 @@ type
     procedure  Invalidate(rec: TRect); override;
     procedure  Offset(dx, dy: integer); override;
     procedure  ClearChildren;
-
     property   ChildCount: integer read GetChildCount;
     property   Child[index: integer]: TLayer32 read GetChild; default;
-    property   ClipPath: TPathD read fClipPath write SetClipPath;
+    //ClipPath enables groups to have irregular shapes, even holes
+    property   ClipPath: TPathsD read fClipPath write SetClipPath;
+    //ClipRect is much faster than ClipPath and definitely preferred unless
+    //non-rectangular clip paths are required. (ClipPath overrides ClipRect)
+    property   ClipRect: TRect read fClipRect write SetClipRect;
   end;
 
   THitTestLayer32 = class(TLayer32) //abstract classs
@@ -174,7 +181,6 @@ type
     procedure  ImageChanged(Sender: TImage32); override;
     property   HitTestRec : THitTestRec read fHitTestRec write fHitTestRec;
   public
-    function GetPathsFromHitTestMask: TPathsD;
     procedure ClearHitTesting;
   end;
 
@@ -205,8 +211,8 @@ type
     fOnDraw     : TNotifyEvent;
     procedure SetMargin(new: integer);
     procedure RepositionAndDraw;
-    procedure SetPaths(const newPaths: TPathsD);
   protected
+    procedure SetPaths(const newPaths: TPathsD); virtual;
     procedure Draw; virtual;
   public
     constructor Create(groupOwner: TGroupLayer32; const name: string = ''); override;
@@ -810,6 +816,8 @@ end;
 constructor TGroupLayer32.Create(groupOwner: TGroupLayer32; const name: string);
 begin
   inherited;
+  fAutoSize := true;
+  fClipMask := TImage32.Create;
 {$IFDEF XPLAT_GENERICS}
   fChilds := TList<TLayer32>.Create;
 {$ELSE}
@@ -820,6 +828,7 @@ end;
 
 destructor TGroupLayer32.Destroy;
 begin
+  fClipMask.Free;
   ClearChildren;
   fChilds.Free;
   if Assigned(fGroupOwner) then
@@ -850,6 +859,8 @@ begin
     TLayer32(fChilds[i]).Free;
   fChilds.Clear;
   Image.SetSize(0, 0);
+  fClipPath := nil;
+  fClipMask.SetSize(0,0);
 end;
 //------------------------------------------------------------------------------
 
@@ -877,12 +888,30 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TGroupLayer32.SetClipPath(const path: TPathD);
+procedure TGroupLayer32.SetClipPath(const path: TPathsD);
+var
+  pp: TPathsD;
 begin
   RefreshPending;
   fClipPath := path;
+  if Assigned(fClipPath) then
+  begin
+    pp := OffsetPath(path, -Left, -Top);
+    fClipMask.SetSize(Width, Height);
+    DrawPolygon(fClipMask, pp, frNonZero, clWhite32);
+  end else
+    fClipMask.SetSize(0, 0);
 end;
 //------------------------------------------------------------------------------
+
+procedure TGroupLayer32.SetClipRect(const rect: TRect);
+begin
+  //ClipRect is ignored if a ClipPath has been assigned
+  fClipRect := rect;
+  if not assigned(fClipPath) then RefreshPending;
+end;
+//------------------------------------------------------------------------------
+
 
 procedure  TGroupLayer32.InternalDeleteChild(index: integer; fromChild: Boolean);
 var
@@ -1014,6 +1043,10 @@ begin
   begin
     rec2 := Img32.Vector.GetBounds(fClipPath);
     Types.IntersectRect(rec, rec, rec2);
+  end
+  else if not IsEmptyRect(fClipRect) then
+  begin
+    Types.IntersectRect(rec, rec, fClipRect);
   end;
   SetBounds(rec);
 end;
@@ -1025,7 +1058,7 @@ var
   i: integer;
   img2: TImage32;
   clipRect, childRect, groupRect: TRect;
-  clpPath: TPathD;
+  clpPath: TPathsD;
 begin
   if not Visible or (Opacity < 2) or
     Image.IsEmpty or not fRefreshPending then
@@ -1076,7 +1109,7 @@ begin
         begin
           clpPath := fClipPath;
         clpPath := OffsetPath(clpPath, -ChildLayer.Left, -ChildLayer.Top);
-        EraseOutsidePath(img2, clpPath, frNonZero, img2.Bounds);
+        EraseOutsidePaths(img2, clpPath, frNonZero, img2.Bounds);
         end;
       end else
       begin
@@ -1106,13 +1139,27 @@ function TGroupLayer32.GetLayerAt(const pt: TPoint;
   ignoreDesigners: Boolean): TLayer32;
 var
   i, htIdx: integer;
+  pt2: TPoint;
 begin
   Result := nil;
   for i := ChildCount -1 downto 0 do
   begin
-    if Child[i] is TGroupLayer32 then //recursive
-      Result := TGroupLayer32(Child[i]).GetLayerAt(pt, ignoreDesigners)
-    else if not Child[i].Visible or
+    if Child[i] is TGroupLayer32 then
+      with TGroupLayer32(Child[i]) do
+    begin
+      if not PtInRect(Bounds, pt) then Continue;
+      if Assigned(fClipPath) then
+      begin
+        pt2 := OffsetPoint(pt, -Left, -Top);
+        if not PtInRect(fClipMask.Bounds, pt2) or
+          (fClipMask.Pixel[pt2.X,pt2.Y] shr 24 < 128) then
+            continue;
+      end
+      else if not IsEmptyRect(fClipRect) and
+        not PtInRect(fClipRect, pt) then Continue;
+       //recursive
+      Result := GetLayerAt(pt, ignoreDesigners);
+    end else if not Child[i].Visible or
       (ignoreDesigners and (Child[i] is TDesignerLayer32)) then
         Continue
     else if Child[i] is THitTestLayer32 then
@@ -1169,35 +1216,6 @@ procedure THitTestLayer32.ImageChanged(Sender: TImage32);
 begin
   inherited;
   fHitTestRec.Clear;
-end;
-//------------------------------------------------------------------------------
-
-function THitTestLayer32.GetPathsFromHitTestMask: TPathsD;
-var
-  i, len: integer;
-  tmpImg: TImage32;
-  pp: PPointer;
-  pc: PColor32;
-begin
-  Result := nil;
-  with fHitTestRec do
-  begin
-    len := Length(PtrPixels);
-    if (len = 0) or (len <> width * height) then Exit;
-    tmpImg := TImage32.Create(width, height);
-    try
-      pc := tmpImg.PixelBase;
-      pp := @PtrPixels[0];
-      for i := 0 to len -1 do
-      begin
-        if pp^ <> nil then pc^ := clWhite32;
-        inc(pp); inc(pc);
-      end;
-      result := Vectorize(tmpImg, clWhite32, CompareAlpha, 0);
-    finally
-      tmpImg.Free;
-    end;
-  end;
 end;
 //------------------------------------------------------------------------------
 
