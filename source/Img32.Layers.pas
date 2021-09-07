@@ -3,7 +3,7 @@ unit Img32.Layers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  3.2                                                             *
-* Date      :  5 September 2021                                                *
+* Date      :  8 September 2021                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -1116,7 +1116,11 @@ begin
         img2 := ChildLayer.Image;
       end;
 
-      if Assigned(ChildLayer.BlendFunc) then
+      if i = 0 then
+      begin
+        Image.Copy(img2, childRect, groupRect)
+      end
+      else if Assigned(ChildLayer.BlendFunc) then
       begin
         Image.CopyBlend(img2, childRect, groupRect, ChildLayer.BlendFunc);
       end else
