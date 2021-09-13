@@ -3,7 +3,7 @@ unit Img32.Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  3.2                                                             *
-* Date      :  30 August 2021                                                    *
+* Date      :  13 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *

@@ -13,6 +13,8 @@ type
   // A couple of custom layer classes ...
   //----------------------------------------------------------------------
 
+  TGroupLayer32 = TLayer32;
+
   TMyVectorLayer32 = class(TVectorLayer32) //for vector drawn layers
   private
     BrushColor : TColor32;
@@ -189,7 +191,6 @@ var
   resStream: TResourceStream;
 begin
   Randomize;
-
   layeredImg32 := TLayeredImage32.Create; //sized in FormResize below.
 
   //add a hatched background design layer (see FormResize below).
@@ -403,6 +404,7 @@ begin
     targetLayer := nil;
   end
   else if Assigned(clickedLayer) and
+    (clickedLayer is THitTestLayer32) and
      not (clickedLayer is TButtonDesignerLayer32) and
     (clickedLayer <> targetLayer) then
       SetTargetLayer(clickedLayer);
@@ -495,7 +497,7 @@ begin
   if not assigned(targetLayer) then Exit;
 
   //don't send above the (top-most) sizing button group
-  if targetLayer.Index = targetLayer.GroupOwner.ChildCount -2 then Exit;
+  if targetLayer.Index = targetLayer.Parent.ChildCount -2 then Exit;
 
   if targetLayer.BringForwardOne then
     Invalidate;

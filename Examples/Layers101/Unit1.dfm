@@ -39,6 +39,7 @@ object MainForm: TMainForm
       Caption = '&File'
       object Exit1: TMenuItem
         Caption = 'E&xit'
+        ShortCut = 27
         OnClick = mnuExitClick
       end
     end

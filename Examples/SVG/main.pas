@@ -5,7 +5,8 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls, ShellApi,
-  Img32, Img32.Draw, Img32.Fmt.SVG, Img32.Fmt.PNG, Img32.SVG.Reader,
+  Img32, Img32.Draw, Img32.Fmt.SVG, Img32.Fmt.PNG,
+  Img32.SVG.Core, Img32.SVG.Reader,
   Img32.Vector, Img32.Text, Img32.Panels, Dialogs, StdCtrls;
 
   //This sample app presumes that the TImage32Panel component
@@ -21,6 +22,7 @@ type
     Open1: TMenuItem;
     OpenDialog1: TOpenDialog;
     ListBox1: TListBox;
+    Splitter1: TSplitter;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure Exit1Click(Sender: TObject);
@@ -44,7 +46,7 @@ implementation
 
 {$R *.dfm}
 
-uses Img32.Transform, Img32.Extra;
+uses Img32.Transform, Img32.Extra, Img32.Resamplers;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -54,7 +56,6 @@ var
   rec: TRect;
 begin
   DragAcceptFiles(Handle, True);
-
   ImagePanel.ParentBackground := false;
   rec := ImagePanel.InnerClientRect;
   ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
@@ -163,6 +164,7 @@ begin
   fn := AppendSlash(folder) + filename;
 
   if not svgReader.LoadFromFile(fn) then Exit;
+
   Screen.Cursor := crHourGlass;
   try
     with ImagePanel.InnerClientRect do

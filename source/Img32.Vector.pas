@@ -3,7 +3,7 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  3.2                                                             *
-* Date      :  30 August 2021                                                    *
+* Date      :  13 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -56,6 +56,7 @@ type
   //InflateRect: missing in Delphi 7
   procedure InflateRect(var rec: TRect; dx, dy: integer); overload;
   procedure InflateRect(var rec: TRectD; dx, dy: double); overload;
+  function NormalizeRect(var rect: TRect): Boolean;
 
   function Rectangle(const rec: TRect): TPathD; overload;
   function Rectangle(const rec: TRectD): TPathD; overload;
@@ -2125,6 +2126,31 @@ begin
   rec.Top := rec.Top - dy;
   rec.Right := rec.Right + dx;
   rec.Bottom := rec.Bottom + dy;
+end;
+//------------------------------------------------------------------------------
+
+function NormalizeRect(var rect: TRect): Boolean;
+var
+  i: integer;
+begin
+  Result := False;
+  with rect do
+  begin
+    if Left > Right then
+    begin
+      i := Left;
+      Left := Right;
+      Right := i;
+      Result := True;
+    end;
+    if Top > Bottom then
+    begin
+      i := Top;
+      Top := Bottom;
+      Bottom := i;
+      Result := True;
+    end;
+  end;
 end;
 //------------------------------------------------------------------------------
 

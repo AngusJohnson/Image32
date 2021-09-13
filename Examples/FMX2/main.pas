@@ -100,7 +100,7 @@ procedure TMainForm.FormCreate(Sender: TObject);
 var
   rs: TResourceStream;
 begin
-  margin := DPIAwareFMX(12);
+  margin := DPIAware(12);
 
   clDarkRed32     := $FFCC0000;
   clDarkMaroon32  := $FF400000;
@@ -116,7 +116,7 @@ begin
 
   imgMain      := TImage32.Create;
   imgClockface := TImage32.Create;
-  margin := DPIAwareFMX(20);
+  margin := DPIAware(20);
 
   rs := TResourceStream.Create(hInstance, 'ESSAY', RT_RCDATA);
   with TStringStream.Create('', TEncoding.Unicode) do
@@ -129,8 +129,8 @@ begin
   end;
   essay := StringReplace(essay, '\n', #10, [rfReplaceAll]);
 
-  Layout1.Scale.Point := PointF(1/ScreenScale,1/ScreenScale);
-  fontHeight := DPIAwareFMX(13);
+  Layout1.Scale.Point := PointF(1/DpiAwareD,1/DpiAwareD);
+  fontHeight := DPIAware(13);
 end;
 //------------------------------------------------------------------------------
 
@@ -159,8 +159,8 @@ begin
   //IMPORTANT: we need to avoid any screen scaling
   //as it causes unacceptible blurring (especially of text) ...
   outerRec := Img32.Vector.Rect(0, 0,
-    DPIAwareFMX(ClientWidth) - margin*2,
-    Round(DPIAwareFMX(ClientHeight - TabControl1.TabHeight)) -margin*2);
+    DPIAware(ClientWidth) - margin*2,
+    Round(DPIAware(ClientHeight - TabControl1.TabHeight)) -margin*2);
 
   imgMain.SetSize(outerRec.Width, outerRec.Height);
   //color fill the base image and give it a border ...
@@ -249,8 +249,8 @@ var
   numGlyphs  : array[1..12] of TPathsD;
 begin
   imgClockface.SetSize(
-    DPIAwareFMX(ClientWidth) - margin * 2,
-    Round(DPIAwareFMX(ClientHeight - TabControl1.TabHeight)) - margin * 2);
+    DPIAware(ClientWidth) - margin * 2,
+    Round(DPIAware(ClientHeight - TabControl1.TabHeight)) - margin * 2);
   imgClockface.Clear(clBackground32);
 
   //DRAW WATCH BAND
@@ -259,13 +259,13 @@ begin
   try
     ir.SetTileFillStyle(tfsRotate180); //or tfsMirrorHorz or tfsRepeat
     ir.Image.LoadFromResource('KOOKABURRA' , RT_RCDATA); // see image.res
-    ir.Image.Resize(DPIAwareFMX(16), DPIAwareFMX(16));
+    ir.Image.Resize(DPIAware(16), DPIAware(16));
 
     ir.Image.AdjustHue(10);
     ir.Image.AdjustSaturation(20);
 
 
-    lineWidth6 := DPIAwareFMX(6);
+    lineWidth6 := DPIAware(6);
     if imgClockface.Width > imgClockface.Height then // landscape
     begin
       recD := RectD(0, imgClockface.Height /4,

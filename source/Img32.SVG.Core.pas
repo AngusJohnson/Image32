@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  3.2                                                             *
-* Date      :  30 August 2021                                                    *
+* Date      :  13 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -2003,7 +2003,9 @@ begin
                 path2 := Arc(rec, arc2, arc1, scalePending);
                 path2 := ReversePath(path2);
               end else
+              begin
                 path2 := Arc(rec, arc1, arc2, scalePending);
+              end;
               path2 := RotatePath(path2, rec.MidPoint, angle);
               AddPath(path2);
             end;
@@ -2620,8 +2622,6 @@ var
   x1_, y1_, rxry, rxy1_, ryx1_, s_phi, c_phi: double;
   hd_x, hd_y, hs_x, hs_y, sum_of_sq, lambda, coe: double;
   cx, cy, cx_, cy_, xcr1, xcr2, ycr1, ycr2, deltaAngle: double;
-const
-  twoPi: double = PI *2;
 begin
     Result := false;
     if (radii.X < 0) then radii.X := -radii.X;
@@ -2672,20 +2672,24 @@ begin
 
     // F6.5.5
     startAngle := Radian2(xcr1, ycr1);
-    NormalizeAngle(startAngle);
 
     // F6.5.6
     deltaAngle := Radian4(xcr1, ycr1, -xcr2, -ycr2);
-    while (deltaAngle > twoPi) do deltaAngle := deltaAngle - twoPi;
-    while (deltaAngle < 0.0) do deltaAngle := deltaAngle + twoPi;
-    if not fS then deltaAngle := deltaAngle - twoPi;
-    endAngle := startAngle + deltaAngle;
-    NormalizeAngle(endAngle);
 
     rec.Left := cx - radii.X;
     rec.Right := cx + radii.X;
     rec.Top := cy - radii.Y;
     rec.Bottom := cy + radii.Y;
+
+    NormalizeAngle(startAngle);
+    endAngle := startAngle + deltaAngle;
+    NormalizeAngle(endAngle);
+
+    if not ClockwiseRotationIsAnglePositive then
+    begin
+      startAngle := -startAngle;
+      endAngle := -endAngle;
+    end;
 
     Result := true;
 end;

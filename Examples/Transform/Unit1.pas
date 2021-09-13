@@ -311,7 +311,6 @@ begin
   with transformLayer do
   begin
     if (Image.Width = 0) or (Image.Height = 0) then Exit;
-
     case transformType of
       ttAffineSkew:
         begin
@@ -480,7 +479,7 @@ begin
     if Assigned(rotateGroup) and not allowRotatePivotMove then
       rotateGroup.Offset(dx, dy);
     Invalidate;
-  end else if clickedLayer.GroupOwner = rotateGroup then
+  end else if clickedLayer.Parent = rotateGroup then
   begin
     if clickedLayer = rotateGroup.PivotButton then
     begin
@@ -500,7 +499,7 @@ begin
     end;
     Invalidate;
   end
-  else if clickedLayer.GroupOwner = buttonGroup then
+  else if clickedLayer.Parent = buttonGroup then
   begin
     //clicking a general purpose button (layer)
 

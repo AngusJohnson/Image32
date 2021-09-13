@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Types, Classes, Graphics,
   Controls, Forms,  Dialogs, Math, ComCtrls, Menus,
-  Img32, Img32.Layers, Img32.Text;
+  Img32, Img32.Layers, Img32.Text, Img32.Panels;
 
 type
   TMainForm = class(TForm)
@@ -38,10 +38,6 @@ type
     BringForwardOne1: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
-    procedure FormMouseDown(Sender: TObject; Button: TMouseButton;
-      Shift: TShiftState; X, Y: Integer);
-    procedure FormMouseMove(Sender: TObject; Shift: TShiftState; X,
-      Y: Integer);
     procedure FormPaint(Sender: TObject);
     procedure FormResize(Sender: TObject);
     procedure mnuExitClick(Sender: TObject);
@@ -57,6 +53,10 @@ type
     { Private declarations }
   protected
     procedure WMERASEBKGND(var message: TMessage); message WM_ERASEBKGND;
+    procedure PanelMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure PanelMouseMove(Sender: TObject; Shift: TShiftState; X,
+      Y: Integer);
   public
     layeredImage       : TLayeredImage32;
     words              : TStringList;
@@ -70,8 +70,7 @@ type
     delayedMovePending : Boolean;
     delayedShift       : TShiftState;
     delayedPos         : TPoint;
-    repaintAll         : Boolean;
-    procedure AppActivate(Sender: TObject);
+    imgPanel           : TImage32Panel;
     procedure DeleteAllControlButtons;
     procedure AppOnIdle(Sender: TObject; var Done: Boolean);
     procedure DelayedMouseMove(Sender: TObject;
@@ -83,23 +82,6 @@ var
 
   fontReader: TFontReader; //TTF font reader
   fontCache: TGlyphCache;
-  defaultArrowBtns: TPathsD;
-
-
-const
-  crRotate = 1;
-  crMove   = 2;
-
-implementation
-
-{$R *.dfm}
-{$R font.res}
-{$R words.res}
-{$R Cursors.res}
-
-uses
-  Img32.Draw, Img32.Extra, Img32.Vector, Img32.Fmt.BMP,
-  Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Transform, Img32.Resamplers;
 
 type
 
@@ -117,8 +99,7 @@ type
   protected
     procedure Draw; override;
   public
-    constructor Create(groupOwner: TGroupLayer32;
-      const name: string = ''); override;
+    constructor Create(Parent: TLayer32; const name: string = ''); override;
   end;
 
   TMyTextLayer32 = class(TMyVectorLayer32)
@@ -126,12 +107,20 @@ type
     procedure Init(const word: string; const centerPt: TPointD);
   end;
 
-  TMyArrowLayer32 = class(TMyVectorLayer32)
-  public
-    procedure Init(const centerPt: TPointD);
-    procedure UpdateArrow(btnGroup: TGroupLayer32; btnIdx: integer);
-  end;
+const
+  crRotate = 1;
+  crMove   = 2;
 
+implementation
+
+{$R *.dfm}
+{$R font.res}
+{$R words.res}
+{$R Cursors.res}
+
+uses
+  arrows, Img32.Draw, Img32.Extra, Img32.Vector, Img32.Fmt.BMP,
+  Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Transform, Img32.Resamplers;
 
 //------------------------------------------------------------------------------
 // TMyRasterLayer32 - simplifies initialization of TRasterLayer32 objects
@@ -139,11 +128,11 @@ type
 
 procedure TMyRasterLayer32.Init(const filename: string; const centerPt: TPointD);
 begin
-  if not MasterImage.LoadFromFile(filename) then
-    MasterImage.SetSize(100,100, clBlack32);
-  MasterImage.CropTransparentPixels;
+  if not Image.LoadFromFile(filename) then
+    Image.SetSize(100,100, clBlack32);
+  MasterImage.CropTransparentPixels; //nb: crop MasterImage not Image
   PositionCenteredAt(centerPt);
-  UpdateHitTestMaskTransparent;
+  UpdateHitTestMaskTransparent; //hit-test to non-transparent pixels
   AutoPivot := false; // :)
 end;
 
@@ -151,8 +140,7 @@ end;
 // TMyVectorLayer32 - defines drawing behaviour for TVectorLayer32 objects
 //------------------------------------------------------------------------------
 
-constructor TMyVectorLayer32.Create(groupOwner: TGroupLayer32;
-  const name: string = '');
+constructor TMyVectorLayer32.Create(Parent: TLayer32; const name: string = '');
 begin
   inherited;
   InitRandomColors;
@@ -208,186 +196,6 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TMyArrowLayer32 - demonstrates using custom designer buttons
-//------------------------------------------------------------------------------
-
-procedure TMyArrowLayer32.Init(const centerPt: TPointD);
-var
-  rec: TRectD;
-begin
-  rec := Img32.Vector.GetBoundsD(defaultArrowBtns);
-  Self.Paths := OffsetPath(defaultArrowBtns,
-    centerPt.X - rec.Left - rec.Width/2,
-    centerPt.Y -rec.Top - rec.Height/2);
-end;
-//------------------------------------------------------------------------------
-
-function TurnsLeft2(const pt1, pt2, pt3: TPointD): boolean;
-begin
-  result := CrossProduct(pt1, pt2, pt3) <= 0;
-end;
-//---------------------------------------------------------------------------
-
-function TurnsRight2(const pt1, pt2, pt3: TPointD): boolean;
-begin
-  result := CrossProduct(pt1, pt2, pt3) >= 0;
-end;
-//---------------------------------------------------------------------------
-
-function GrtrEqu90(const pt1, pt2, pt3: TPointD): boolean;
-begin
-  result := DotProduct(pt1, pt2, pt3) <= 0;
-end;
-//---------------------------------------------------------------------------
-
-function AlmostParallel(const pt1, pt2, pt3: TPointD): boolean;
-var
-  a: double;
-const
-  angle5 = angle1 *5;
-  angle175 = angle180 - angle5;
-begin
-  //precondition: angle <= 180 degrees
-  a := Abs(GetAngle(pt1, pt2, pt3));
-  Result := (a < angle5) or (a > angle175);
-end;
-//---------------------------------------------------------------------------
-
-function AlmostPerpendicular(const pt1, pt2, pt3: TPointD): boolean;
-var
-  a: double;
-const
-  angle5 = angle1 *5;
-  angle85 = angle90 - angle5;
-begin
-  //precondition: angle <= 90 degrees
-  a := GetAngle(pt1, pt2, pt3);
-  Result := a > angle85;
-end;
-//---------------------------------------------------------------------------
-
-
-procedure TMyArrowLayer32.UpdateArrow(btnGroup: TGroupLayer32;
-  btnIdx: integer);
-var
-  i: integer;
-  center, newPt, pt2, vec: TPointD;
-  dist: Double;
-  p: TPathD;
-label
-  bottom; //goto label
-begin
-  //preserve arrow symmetry and avoids 'broken' non-arrow polygons
-  p := Copy(Paths[0], 0, 7);
-  center := Img32.Vector.MidPoint(p[3], p[4]);
-  newPt := btnGroup[btnIdx].MidPoint;
-  case btnIdx of
-    0:
-      begin
-        newPt := ClosestPointOnLine(newPt, p[0], center);
-        if TurnsRight(newPt, p[1], p[6]) and
-          TurnsRight(newPt, p[1], p[2]) then
-          p[0] := newPt;
-      end;
-    1:
-      begin
-        dist := Distance(p[2], p[5]) * 0.5;
-        pt2 := ClosestPointOnLine(newPt, p[0], center);
-        if GrtrEqu90(newPt, center, p[0]) or
-          GrtrEqu90(newPt, p[0], center) or
-          (Distance(newPt, pt2) <= dist) or
-          AlmostPerpendicular(center, p[0], newPt) then Goto bottom;
-        p[1] := newPt;
-        p[6] := ReflectPoint(newPt, pt2);
-        if TurnsLeft2(newPt, p[2], p[0]) or
-          TurnsRight(newPt, p[2], p[5]) or
-          TurnsRight2(newPt, p[2], p[3]) then
-        begin
-          vec := GetUnitVector(pt2, p[1]);
-          p[2] := PointD(pt2.X + vec.X * dist, pt2.Y + vec.Y * dist);
-          p[5] := PointD(pt2.X + vec.X * -dist, pt2.Y + vec.Y * -dist);
-        end;
-      end;
-    2:
-      begin
-        if TurnsRight2(newPt, p[1], p[0]) or
-          TurnsRight2(p[1], newPt, p[3]) or
-          TurnsLeft2(newPt, p[3], p[4]) or
-          TurnsLeft2(p[0], newPt, center) or
-          AlmostParallel(p[0], newPt, center) then Goto bottom;
-        p[2] := newPt;
-        pt2 := ClosestPointOnLine(newPt, p[0], center);
-        p[5] := ReflectPoint(newPt, pt2);
-        if TurnsRight2(p[1], newPt, p[6]) then
-        begin
-          dist := Distance(p[1], p[6]) * 0.5;
-          vec := GetUnitNormal(p[0], center); //perpendicular to center line
-          p[1] := PointD(pt2.X + vec.X * dist, pt2.Y + vec.Y * dist);
-          p[6] := PointD(pt2.X + vec.X * -dist, pt2.Y + vec.Y * -dist);
-        end;
-      end;
-    3:
-      begin
-        if TurnsRight(newPt, p[0], center) or
-          TurnsRight2(p[1], p[2], newPt) then Goto bottom;
-        p[3] := newPt;
-        center := ClosestPointOnLine(newPt, p[0], center);
-        p[4] := ReflectPoint(newPt, center);
-      end;
-    4:
-      begin
-        if TurnsLeft(newPt, p[0], center) or
-          TurnsLeft2(p[6], p[5], newPt) then Goto bottom;
-        p[4] := newPt;
-        center := ClosestPointOnLine(newPt, p[0], center);
-        p[3] := ReflectPoint(newPt, center);
-      end;
-    5:
-      begin
-        if TurnsLeft2(newPt, p[6], p[0]) or
-          TurnsLeft2(p[6], newPt, p[4]) or
-          TurnsRight2(newPt, p[4], p[3]) or
-          TurnsRight2(p[0], newPt, center) or
-          AlmostParallel(p[0], newPt, center) then Goto bottom;
-        p[5] := newPt;
-        pt2 := ClosestPointOnLine(newPt, p[0], center);
-        p[2] := ReflectPoint(newPt, pt2);
-        if TurnsLeft2(p[6], newPt, p[1]) then
-        begin
-          dist := Distance(p[6], p[1]) * 0.5;
-          vec := GetUnitNormal(center, p[0]); //perpendicular to center line
-          p[6] := PointD(pt2.X + vec.X * dist, pt2.Y + vec.Y * dist);
-          p[1] := PointD(pt2.X + vec.X * -dist, pt2.Y + vec.Y * -dist);
-        end;
-      end;
-    6:
-      begin
-        dist := Distance(p[5], p[2]) * 0.5;
-        pt2 := ClosestPointOnLine(newPt, p[0], center);
-        if GrtrEqu90(newPt, center, p[0]) or
-          GrtrEqu90(newPt, p[0], center) or
-          (Distance(newPt, pt2) <= dist) or
-          AlmostPerpendicular(center, p[0], newPt) then Goto bottom;
-        p[6] := newPt;
-        p[1] := ReflectPoint(newPt, pt2);
-        if TurnsRight2(newPt, p[5], p[0]) or
-          TurnsLeft(newPt, p[5], p[2]) or
-          TurnsLeft2(newPt, p[5], p[4]) then
-        begin
-          vec := GetUnitVector(pt2, p[6]);
-          p[5] := PointD(pt2.X + vec.X * dist, pt2.Y + vec.Y * dist);
-          p[2] := PointD(pt2.X + vec.X * -dist, pt2.Y + vec.Y * -dist);
-        end;
-      end;
-  end;
-
-bottom: //goto label
-  for i := 0 to btnGroup.ChildCount -1 do
-    btnGroup[i].PositionCenteredAt(p[i]);
-  Paths := Img32.Vector.Paths(p);
-end;
-
-//------------------------------------------------------------------------------
 // TMainForm
 //------------------------------------------------------------------------------
 
@@ -401,11 +209,19 @@ procedure TMainForm.FormCreate(Sender: TObject);
 var
   resStream: TResourceStream;
 begin
-  SetLength(defaultArrowBtns, 1);
-  defaultArrowBtns[0] :=
-    MakePathI([0,100, 100,0, 100,50, 200,50, 200,150, 100,150, 100,200]);
 
-  Application.OnActivate := AppActivate;
+  //ADD A TIMAGE32PANEL COMPONENT TO THE FORM
+  //nb: this can be done more easily when
+  //TImage32Panel is installed in the IDE.
+  imgPanel := TImage32Panel.Create(self);
+  imgPanel.Parent := self;
+  imgPanel.Align := alClient;
+  imgPanel.OnMouseDown := PanelMouseDown;
+  imgPanel.OnMouseMove := PanelMouseMove;
+  //disable zoom and scroll since we will be
+  //using the mouse to move layer 'buttons' around
+  imgPanel.AllowScroll := false;
+  imgPanel.AllowZoom := false;
 
   layeredImage := TLayeredImage32.Create;
   layeredImage.AddLayer(TDesignerLayer32);
@@ -433,22 +249,22 @@ begin
 
   Randomize;
 
-  Application.OnIdle := AppOnIdle;
   //Using Application.OnIdle to process FormMouseMove code avoids
-  //wasting a *lot* of CPU cycles drawing stuff that's never seen.
+  //wasting a *lot* of CPU cycles drawing stuff that's immediately redrawn.
   //This will be especially noticeable when rotating images that have been
   //resized, or resizing images that have been rotated (and hence require
   //an additional affine transformation).
   UseAppOnIdle := true;//false;//
-
-  layeredImage.SetSize(ClientWidth, ClientHeight);
+  if UseAppOnIdle then
+    Application.OnIdle := AppOnIdle;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
   words.Free;
-  //fontReader.Free; //will be done by FontManager :)
+  //fontReader can be Free'd here but will otherwise be done by FontManager :)
+  //fontReader.Free;
   fontCache.Free;
   FreeAndNil(layeredImage); //see FormResize below
 end;
@@ -461,10 +277,10 @@ begin
   if not Assigned(layeredImage) then Exit; //ie when form closing
 
   //resize layeredImage
-  rec := ClientRect;
-  Dec(rec.Bottom, StatusBar1.Height);
+  rec := imgPanel.InnerClientRect;
   layeredImage.SetSize(RectWidth(rec), RectHeight(rec));
 
+  //resize and repaint the designer background hatching
   with layeredImage[0] do
   begin
     SetSize(layeredImage.Width, layeredImage.Height);
@@ -496,12 +312,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.FormMouseDown(Sender: TObject; Button: TMouseButton;
+procedure TMainForm.PanelMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  clickPoint := Point(X,Y);
-  clickedLayer := layeredImage.GetLayerAt(clickPoint);
+  //because the panel image's dimensions rarely corresponds
+  //to the panel's clientrect, the X,Y coordinate needs adjusting
+  clickPoint := imgPanel.ClientToImage(Point(X,Y));
 
+  clickedLayer := layeredImage.GetLayerAt(clickPoint);
   if not assigned(clickedLayer) then
   begin
     DeleteAllControlButtons;
@@ -528,16 +346,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.FormMouseMove(Sender: TObject;
+procedure TMainForm.PanelMouseMove(Sender: TObject;
   Shift: TShiftState; X, Y: Integer);
+var
+  pt: TPoint;
 begin
+  //because the panel image's dimensions rarely corresponds
+  //to the panel's clientrect, the X,Y coordinate needs adjusting
+  pt := imgPanel.ClientToImage(Point(X,Y));
   if UseAppOnIdle then
   begin
     delayedShift := Shift;
-    delayedPos := Point(X,Y);
+    delayedPos := pt;
     delayedMovePending := true;
   end else
-    DelayedMouseMove(Sender, Shift, X, Y);
+    DelayedMouseMove(Sender, Shift, pt.X, pt.Y);
 end;
 //------------------------------------------------------------------------------
 
@@ -559,8 +382,8 @@ begin
     //so update the cursor and exit
     layer := layeredImage.GetLayerAt(clickPoint);
     if assigned(layer) then
-      Cursor := layer.CursorId else
-      Cursor := crDefault;
+      imgPanel.Cursor := layer.CursorId else
+      imgPanel.Cursor := crDefault;
     Exit;
   end;
 
@@ -570,19 +393,19 @@ begin
   clickedLayer.Offset(dx, dy);
 
   //if moving a sizing button
-  if (clickedLayer.GroupOwner is TSizingGroupLayer32) then
+  if (clickedLayer.Parent is TSizingGroupLayer32) then
   begin
     rec := UpdateSizingButtonGroup(clickedLayer);
     targetLayer.SetBounds(rec);
   end
 
   //if moving a rotate button
-  else if (clickedLayer.GroupOwner = rotatingButtonGroup) then
+  else if (clickedLayer.Parent = rotatingButtonGroup) then
   begin
     if clickedLayer = rotatingButtonGroup.PivotButton then
     begin
-      clickedLayer.Offset(-dx, -dy);     //temp undo button move
-      rotatingButtonGroup.Offset(dx,dy); //move the rotate group
+      clickedLayer.Offset(-dx, -dy);     //undo button move above
+      rotatingButtonGroup.Offset(dx,dy); //move the whole rotate group
       targetLayer.PivotPt := clickedLayer.MidPoint;
     end else
     begin
@@ -595,7 +418,7 @@ begin
   end
 
   //if moving an arrow designer button
-  else if (clickedLayer.GroupOwner = arrowButtonGroup) then
+  else if (clickedLayer.Parent = arrowButtonGroup) then
   begin
     with targetLayer as TMyArrowLayer32 do
       UpdateArrow(arrowButtonGroup, clickedLayer.Index)
@@ -622,28 +445,15 @@ end;
 procedure TMainForm.FormPaint(Sender: TObject);
 var
   updateRec: TRect;
+  img: TImage32;
 begin
-  if repaintAll then
-  begin
-    with layeredImage.GetMergedImage(false) do
-      CopyToDc(self.Canvas.Handle);
-    repaintAll := false;
-  end else
-  begin
-    //draw layeredImage onto the form's canvas. But to optimize performance,
-    //only draw whatever's changed since the last draw (hence updateRec).
-    with layeredImage.GetMergedImage(false, updateRec) do
-    begin
-      CopyToDc(updateRec, self.Canvas.Handle,
-        updateRec.Left, updateRec.Top, false);
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.AppActivate(Sender: TObject);
-begin
-  repaintAll := true;
+  //draw layeredImage onto the form's canvas. But to optimize performance,
+  //only draw whatever's changed since the last draw (hence updateRec).
+  img := layeredImage.GetMergedImage(false, updateRec);
+  if (imgPanel.Image.Width <> img.Width) or
+    (imgPanel.Image.Height <> img.Height) then
+    imgPanel.Image.Assign(img) else
+    imgPanel.Image.Copy(img, updateRec, updateRec);
 end;
 //------------------------------------------------------------------------------
 
@@ -655,7 +465,8 @@ begin
   //create a text layer
   targetLayer  := layeredImage.AddLayer(TMyTextLayer32) as TRotateLayer32;
   with TMyTextLayer32(targetLayer) do
-    Init(Words[Random(Words.Count)], layeredImage.MidPoint);
+    //Init(Words[Random(Words.Count)], layeredImage.MidPoint);
+    Init(Words[Random(Words.Count)], PointD(220,220));
   //add sizing buttons
   sizingButtonGroup := CreateSizingButtonGroup(targetLayer, ssCorners,
     bsRound, DefaultButtonSize, clRed32);
@@ -683,11 +494,10 @@ end;
 
 procedure TMainForm.mnuAddArrowClick(Sender: TObject);
 begin
-
   DeleteAllControlButtons;
 
   //create an arrow layer
-  targetLayer  := layeredImage.AddLayer(TMyArrowLayer32) as TRotateLayer32;
+  targetLayer  := layeredImage.AddLayer(TMyArrowLayer32, nil, 'arrow') as TRotateLayer32;
   with TMyArrowLayer32(targetLayer) do
   begin
     Init(layeredImage.MidPoint);

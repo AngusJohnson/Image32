@@ -2,8 +2,8 @@ unit Img32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.0                                                             *
-* Date      :  20 July 2021                                                    *
+* Version   :  3.2                                                             *
+* Date      :  13 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -490,13 +490,8 @@ var
   //DivTable[a,b] = a * 255/b (for a &lt;= b)
   DivTable: array [Byte,Byte] of Byte;
 
-  //ScreenScale: Useful for DPIAware sizing of images and controls.
-  ScreenScale: double = 1.0;
-
-  {$IFDEF MSWINDOWS}
-  dpiAwareI   : integer;
-  DpiAwareD   : double;
-  {$ENDIF}
+  dpiAwareI   : integer = 1;
+  DpiAwareD   : double  = 1.0;
 
   //AND BECAUSE OLDER DELPHI COMPILERS (OLDER THAN D2006)
   //DON'T SUPPORT RECORD METHODS
@@ -990,13 +985,13 @@ end;
 
 function DPIAware(val: Integer): Integer;
 begin
-  result := Round( val * ScreenScale);
+  result := Round( val * DpiAwareD);
 end;
 //------------------------------------------------------------------------------
 
 function DPIAware(val: double): double;
 begin
-  result := val * ScreenScale;
+  result := val * DpiAwareD;
 end;
 //------------------------------------------------------------------------------
 {$ENDIF}
@@ -2107,7 +2102,6 @@ end;
 
 function TImage32.LoadFromStream(stream: TStream): Boolean;
 var
-  i: integer;
   ifc: TImageFormatClass;
 begin
   ifc := GetImageFormatClass(stream);
@@ -3240,13 +3234,11 @@ begin
   dc := GetDC(0);
   try
     ScreenPixelsY := GetDeviceCaps(dc, LOGPIXELSY);
-    ScreenScale := ScreenPixelsY / 96;
+    DpiAwareD := ScreenPixelsY / 96;
   finally
     ReleaseDC(0, dc);
   end;
-
-  dpiAwareI   := Round(ScreenScale);
-  DpiAwareD  := ScreenScale;
+  dpiAwareI   := Round(DpiAwareD);
 end;
 {$ENDIF}
 //------------------------------------------------------------------------------

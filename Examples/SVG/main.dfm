@@ -17,10 +17,18 @@ object Form1: TForm1
   OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 14
-  object ImagePanel: TImage32Panel
+  object Splitter1: TSplitter
     Left = 161
     Top = 0
-    Width = 464
+    Height = 424
+    ExplicitLeft = 184
+    ExplicitTop = 232
+    ExplicitHeight = 100
+  end
+  object ImagePanel: TImage32Panel
+    Left = 164
+    Top = 0
+    Width = 461
     Height = 424
     Align = alClient
     BevelInner = bvLowered

@@ -15,8 +15,6 @@ object MainForm: TMainForm
   PopupMenu = PopupMenu1
   OnCreate = FormCreate
   OnDestroy = FormDestroy
-  OnMouseDown = FormMouseDown
-  OnMouseMove = FormMouseMove
   OnPaint = FormPaint
   OnResize = FormResize
   PixelsPerInch = 96

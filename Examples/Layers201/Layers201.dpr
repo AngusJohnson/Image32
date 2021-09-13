@@ -2,7 +2,8 @@ program Layers201;
 
 uses
   Forms,
-  main in 'main.pas' {MainForm};
+  main in 'main.pas' {MainForm},
+  arrows in 'arrows.pas';
 
 {$I Img32.inc}
 {$R ..\Resources.res}

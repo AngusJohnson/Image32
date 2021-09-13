@@ -2,8 +2,8 @@ unit Img32.Text;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.0                                                             *
-* Date      :  20 July 2021                                                    *
+* Version   :  3.2                                                             *
+* Date      :  13 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -489,8 +489,8 @@ type
     const rec: TRect;
     const text: UnicodeString;
     textAlign: TTextAlign; textAlignV: TTextVAlign;
-    glyphCache: TGlyphCache;
-    textColor: TColor32 = clBlack32): TPointD; overload;
+    glyphCache: TGlyphCache; textColor: TColor32 = clBlack32;
+    useClearType: Boolean = false): TPointD; overload;
 
   function DrawAngledText(image: TImage32;
   x, y: double; angleRadians: double;
@@ -2700,8 +2700,8 @@ end;
 //------------------------------------------------------------------------------
 
 function DrawText(image: TImage32; const rec: TRect; const text: UnicodeString;
-  textAlign: TTextAlign; textAlignV: TTextVAlign;
-  glyphCache: TGlyphCache; textColor: TColor32 = clBlack32): TPointD;
+  textAlign: TTextAlign; textAlignV: TTextVAlign; glyphCache: TGlyphCache;
+  textColor: TColor32 = clBlack32; useClearType: Boolean = false): TPointD;
 var
   glyphs: TPathsD;
   dummy: integer; //assumes all characters will be drawn
@@ -2710,7 +2710,9 @@ begin
   if not assigned(glyphCache) or not glyphCache.IsValidFont then Exit;
   glyphs := glyphCache.GetTextGlyphs(rec, text,
     textAlign, textAlignV, dummy, Result);
-  DrawPolygon(image, glyphs, frNonZero, textColor);
+  if useClearType then
+    DrawPolygon_ClearType(image, glyphs, frNonZero, textColor) else
+    DrawPolygon(image, glyphs, frNonZero, textColor);
 end;
 //------------------------------------------------------------------------------
 

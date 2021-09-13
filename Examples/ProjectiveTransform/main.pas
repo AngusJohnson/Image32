@@ -322,7 +322,7 @@ begin
   //in the srcPts or dstPts array
 
   clickedLayer.Offset(dx, dy);
-  if clickedLayer.GroupOwner = dstBtnGroup then
+  if clickedLayer.Parent = dstBtnGroup then
     dstPts[clickedLayer.Index] := clickedLayer.MidPoint else
     srcPts[clickedLayer.Index] := clickedLayer.MidPoint;
 

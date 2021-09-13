@@ -12,13 +12,9 @@ object MainForm: TMainForm
   Font.Style = []
   Menu = MainMenu1
   OldCreateOrder = False
-  PopupMenu = PopupMenu1
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnKeyDown = FormKeyDown
-  OnMouseDown = pnlMainMouseDown
-  OnMouseMove = pnlMainMouseMove
-  OnMouseUp = pnlMainMouseUp
   OnPaint = FormPaint
   OnResize = FormResize
   PixelsPerInch = 96
@@ -31,6 +27,9 @@ object MainForm: TMainForm
     Panels = <>
     ParentFont = True
     SimplePanel = True
+    SimpleText = 
+      'Selecting a layer before adding a new one will create a nested c' +
+      'hild layer'
     UseSystemFont = False
   end
   object MainMenu1: TMainMenu

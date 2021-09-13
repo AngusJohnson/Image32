@@ -65,8 +65,8 @@ var
   fontCache: TGlyphCache;
   fontReader : TFontReader;
 begin
-  margin := DPIAwareFMX(14);
-  Layout1.Scale.Point := PointF(1/ScreenScale, 1/ScreenScale);
+  margin := DPIAware(14);
+  Layout1.Scale.Point := PointF(1/DpiAwareD, 1/DpiAwareD);
 
   bkColor  := $FFF8F8BB; //yellow
   penColor := clMaroon32;
@@ -82,7 +82,7 @@ begin
   //create a fontReader to access truetype font files (*.ttf) that
   //have been stored as font resources and create a glyph cache too
   fontReader := TFontReader.Create;
-  fontCache := TGlyphCache.Create(fontReader, DPIAwareFMX(12));
+  fontCache := TGlyphCache.Create(fontReader, DPIAware(12));
   try
     //connect fontReader to a simple ttf font resource
     //and get 'copyright' glyph outline ...
@@ -94,11 +94,11 @@ begin
     //connect fontReader to a decorative ttf font resource
     //and get 'bigText' glyph outlines ...
     fontReader.LoadFromResource('FONT_2', RT_RCDATA);
-    fontCache.FontHeight := DPIAwareFMX(25);
+    fontCache.FontHeight := DPIAware(25);
     if fontReader.IsValidFontFormat then
       bigTextGlyphs := fontCache.GetTextGlyphs(0, 0, rsBigText);
 
-    bigTextGlyphs := InflatePaths(bigTextGlyphs, 1.5, jsAuto,esPolygon); //bolder
+    bigTextGlyphs := InflatePaths(bigTextGlyphs, 1.5, jsAuto, esPolygon);
     matrix := IdentityMatrix;
     MatrixScale(matrix, 1, 1.75); //stretched vertically
     MatrixSkew(matrix, -0.25, 0); //and italicized too.
@@ -165,7 +165,7 @@ begin
     //draw a rectangular frame
     tmpPath := Rectangle(rec);
     Image.FillRect(rec, clWhite32);
-    DrawLine(Image, tmpPath, DPIAwareFMX(1), penColor, esPolygon);
+    DrawLine(Image, tmpPath, DPIAware(1), penColor, esPolygon);
 
     //draw copyright
     DrawPolygon(Image, copyrightGlyphs, frNonZero, clBlack32);
@@ -188,11 +188,8 @@ begin
       SetBounds(textRec);
       PositionCenteredAt(layeredImg32.MidPoint);
       DrawPolygon(Image, mainGlyphs, frNonZero, txtColor);
-      if i = 0 then
-      begin
-        DrawLine(Image, mainGlyphs, 1.5, clBlack32, esPolygon);
-        Draw3D(Image, mainGlyphs, frNonZero, Round(textRec.Height/30), 3);
-      end;
+      DrawLine(Image, mainGlyphs, 1.5, clBlack32, esPolygon);
+      Draw3D(Image, mainGlyphs, frNonZero, Round(textRec.Height/30), 3);
       mainGlyphs := ScalePath(mainGlyphs, 0.9, 0.9);
       textRec := Img32.Vector.GetBounds(mainGlyphs);
     end;
