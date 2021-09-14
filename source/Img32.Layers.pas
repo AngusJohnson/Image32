@@ -31,17 +31,13 @@ type
   TLayer32Class = class of TLayer32;
   TLayeredImage32 = class;
 
-  TArrayOfPointer = array of Pointer;
-
-  //THitTestRec is used for hit-testing (see TLayeredImage32.GetLayerAt).
-  THitTestRec = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
-    htFlags   : TArrayOfByte;
-    width     : integer;
-    height    : integer;
+  //THitTest is used for hit-testing (see TLayeredImage32.GetLayerAt).
+  THitTest = class
+    htImage   : TImage32;
     enabled   : Boolean;
-    function  IsEmpty: Boolean;
     procedure Init(ownerLayer: TLayer32);
-    procedure Clear;
+    constructor Create;
+    destructor Destroy; override;
   end;
 
   TLayerNotifyImage32 = class(TImage32)
@@ -71,7 +67,6 @@ type
     fBlendFunc      : TBlendFunction;
     fOldBounds      : TRect;    //bounds at last layer merge
     fRefreshPending : boolean;
-
     fLayeredImage   : TLayeredImage32;
     fParent         : TLayer32;
 {$IFDEF XPLAT_GENERICS}
@@ -164,12 +159,13 @@ type
 
   THitTestLayer32 = class(TLayer32) //abstract classs
   private
-    fHitTestRec     : THitTestRec;
+    fHitTest    : THitTest;
   protected
     procedure  ImageChanged(Sender: TImage32); override;
-    property   HitTestRec : THitTestRec read fHitTestRec write fHitTestRec;
+    property   HitTestRec : THitTest read fHitTest write fHitTest;
   public
     constructor Create(parent: TLayer32; const name: string = ''); override;
+    destructor Destroy; override;
     procedure ClearHitTesting;
   end;
 
@@ -236,7 +232,7 @@ type
     constructor Create(parent: TLayer32;  const name: string = ''); override;
     destructor  Destroy; override;
     procedure Offset(dx,dy: integer); override;
-    procedure UpdateHitTestMaskOpaque;
+    procedure UpdateHitTestMaskOpaque; virtual;
     procedure UpdateHitTestMaskTransparent; overload; virtual;
     procedure UpdateHitTestMaskTransparent(compareFunc: TCompareFunction;
       referenceColor: TColor32; tolerance: integer); overload; virtual;
@@ -452,101 +448,64 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// THitTestRec
+// THitTest
 //------------------------------------------------------------------------------
 
-function THitTestRec.IsEmpty: Boolean;
+constructor THitTest.Create;
 begin
-  Result := (width <= 0) or (height <= 0);
-end;
-//------------------------------------------------------------------------------
-
-procedure THitTestRec.Init(ownerLayer: TLayer32);
-begin
-  width := ownerLayer.width;
-  height := ownerLayer.height;
-  htFlags := nil;
+  htImage := TImage32.Create;
   enabled := true;
-  if not IsEmpty then
-    SetLength(htFlags, width * height);
 end;
 //------------------------------------------------------------------------------
 
-procedure THitTestRec.Clear;
+destructor THitTest.Destroy;
 begin
-  width := 0; height := 0; htFlags := nil;
+  htImage.Free;
+  inherited;
 end;
-
-//------------------------------------------------------------------------------
-// TByteRenderer: renders byte 'pixels' for hit-testing
 //------------------------------------------------------------------------------
 
-type
-  TByteRenderer = class(TCustomRenderer)
-  protected
-    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
-  end;
-
-procedure TByteRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
-var
-  i: integer;
-  dst: PByte;
+procedure THitTest.Init(ownerLayer: TLayer32);
 begin
-  dst := GetDstPixel(x1,y);
-  for i := x1 to x2 do
-  begin
-    if Byte(alpha^) > 127 then dst^ := 255;
-    inc(dst); inc(alpha);
-  end;
+  with ownerLayer do
+    htImage.SetSize(width, height);
 end;
 
 //------------------------------------------------------------------------------
-// THitTestRec helper functions
+// THitTest helper functions
 //------------------------------------------------------------------------------
 
 procedure UpdateHitTestMaskUsingPath(layer: THitTestLayer32;
   const paths: TPathsD; fillRule: TFillRule);
-var
-  renderer: TByteRenderer;
 begin
-  if layer.HitTestRec.IsEmpty then Exit;
-  renderer := TByteRenderer.Create;
-  try
-    with layer.HitTestRec do
-    begin
-      renderer.Initialize(@htFlags[0], width, height, sizeOf(Byte));
-      Rasterize(paths, Rect(0,0,width,height), fillRule, renderer);
-    end;
-  finally
-    renderer.Free;
-  end;
+  with layer.Image do
+    layer.HitTestRec.htImage.SetSize(width, height);
+  if not layer.Image.IsEmpty then
+    DrawPolygon(layer.HitTestRec.htImage, paths, fillRule, clWhite32);
 end;
 //------------------------------------------------------------------------------
 
-//Creates a pointer hit-test mask using the supplied image and compareFunc.
-procedure UpdateHitTestMaskUsingImage(var htr: THitTestRec;
+//Creates a hit-test mask using the supplied image and compareFunc.
+procedure UpdateHitTestMaskUsingImage(var htr: THitTest;
   objPtr: Pointer; img: TImage32; compareFunc: TCompareFunction;
   referenceColor: TColor32; tolerance: integer);
 var
-  i   : integer;
-  pc  : PColor32;
-  pp  : PByte;
+  i: integer;
+  pSrc, pDst: PColor32;
 begin
   with img do
   begin
-    htr.width := Width;
-    htr.height := Height;
-    htr.htFlags := nil;
-    if IsEmpty then Exit;
-    SetLength(htr.htFlags, Width * Height);
-  end;
+    htr.htImage.SetSize(Width, Height);
+    if htr.htImage.IsEmpty then Exit;
 
-  pc := img.PixelBase;
-  pp := @htr.htFlags[0];
-  for i := 0 to high(htr.htFlags) do
-  begin
-    if compareFunc(referenceColor, pc^, tolerance) then pp^ := 255;
-    inc(pc); inc(pp);
+    pSrc := PixelBase;
+    pDst := htr.htImage.PixelBase;
+    for i := 0 to Width * Height -1 do
+    begin
+      if compareFunc(referenceColor, pSrc^, tolerance) then
+        pDst^ := clWhite32;
+      inc(pSrc); inc(pDst);
+    end;
   end;
 end;
 
@@ -1148,7 +1107,7 @@ end;
 function TLayer32.GetLayerAt(const pt: TPoint;
   ignoreDesigners: Boolean): TLayer32;
 var
-  i, htIdx: integer;
+  i: integer;
   childLayer: TLayer32;
   pt2: TPoint;
   Result2: TLayer32;
@@ -1171,12 +1130,12 @@ begin
       with THitTestLayer32(childLayer) do
         if not HitTestRec.enabled then
           Continue
-        else if fHitTestRec.IsEmpty then
+        else if fHitTest.htImage.IsEmpty then
           Result := childLayer //ie rectangles
         else
         begin
-          htIdx := fHitTestRec.width * (pt2.Y - Top) + (pt2.X  -Left);
-          if fHitTestRec.htFlags[htIdx] > 128 then Result := childLayer;
+          if TARGB(fHitTest.htImage.Pixel[pt2.X-left, pt2.Y-top]).A > 128 then
+            Result := childLayer;
           if Assigned(Result) and not childLayer.HasChildren then Exit;
         end;
 
@@ -1237,20 +1196,28 @@ end;
 constructor THitTestLayer32.Create(parent: TLayer32; const name: string = '');
 begin
   inherited;
-  fHitTestRec.enabled := true;
+  fHitTest := THitTest.Create;
+  fHitTest.enabled := true;
+end;
+//------------------------------------------------------------------------------
+
+destructor THitTestLayer32.Destroy;
+begin
+  fHitTest.Free;
+  inherited;
 end;
 //------------------------------------------------------------------------------
 
 procedure THitTestLayer32.ImageChanged(Sender: TImage32);
 begin
   inherited;
-  fHitTestRec.Clear;
+  ClearHitTesting;
 end;
 //------------------------------------------------------------------------------
 
 procedure THitTestLayer32.ClearHitTesting;
 begin
-  fHitTestRec.Clear;
+  fHitTest.htImage.SetSize(0,0);
 end;
 
 //------------------------------------------------------------------------------
@@ -1433,7 +1400,7 @@ end;
 procedure  TVectorLayer32.UpdateHitTestMask(const vectorRegions: TPathsD;
   fillRule: TFillRule);
 begin
-  fHitTestRec.Init(self);
+  fHitTest.Init(self);
   UpdateHitTestMaskUsingPath(self, vectorRegions, fillRule);
 end;
 
@@ -1458,43 +1425,22 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TRasterLayer32.UpdateHitTestMaskOpaque;
-var
-  i   : integer;
-  htr : THitTestRec;
-  pp  : PByte;
 begin
-  //fill the entire Hittest mask with self pointers
-  with Image do
-  begin
-    htr.width := Width;
-    htr.height := Height;
-    SetLength(htr.htFlags, Width * Height);
-    if not IsEmpty then
-    begin
-      pp := @htr.htFlags[0];
-      for i := 0 to High(htr.htFlags) do
-      begin
-        pp^ := 255; inc(pp);
-      end;
-    end;
-  end;
-  HitTestRec := htr;
+  fHitTest.htImage.Assign(Image);
 end;
 //------------------------------------------------------------------------------
 
 procedure TRasterLayer32.UpdateHitTestMaskTransparent;
 begin
-  //this method will mark all pixels with an opacity > 127.
-  UpdateHitTestMaskUsingImage(fHitTestRec,
-    Self, Image, CompareAlpha, clWhite32, 128);
+  fHitTest.htImage.Assign(Image);
 end;
 //------------------------------------------------------------------------------
 
 procedure  TRasterLayer32.UpdateHitTestMaskTransparent(
   compareFunc: TCompareFunction;
-   referenceColor: TColor32; tolerance: integer);
+  referenceColor: TColor32; tolerance: integer);
 begin
-  UpdateHitTestMaskUsingImage(fHitTestRec, Self, Image,
+  UpdateHitTestMaskUsingImage(fHitTest, Self, Image,
   compareFunc, referenceColor, tolerance);
 end;
 //------------------------------------------------------------------------------
@@ -1503,11 +1449,9 @@ procedure TRasterLayer32.DoAutoHitTest;
 begin
   if fAutoHitTest then
   begin
-    if Image.HasTransparency then
-      UpdateHitTestMaskTransparent else
-      UpdateHitTestMaskOpaque;
+    fHitTest.htImage.Assign(Image);
   end else
-    HitTestRec.Clear;
+    HitTestRec.htImage.SetSize(0,0);
 end;
 //------------------------------------------------------------------------------
 
@@ -1778,14 +1722,14 @@ end;
 constructor TDesignerLayer32.Create(parent: TLayer32; const name: string = '');
 begin
   inherited;
-  fHitTestRec.enabled := false;
+  fHitTest.enabled := false;
 end;
 //------------------------------------------------------------------------------
 
 procedure  TDesignerLayer32.UpdateHitTestMask(const vectorRegions: TPathsD;
   fillRule: TFillRule);
 begin
-  fHitTestRec.Init(self);
+  fHitTest.Init(self);
   UpdateHitTestMaskUsingPath(self, vectorRegions, fillRule);
 end;
 
@@ -1819,7 +1763,7 @@ constructor TButtonDesignerLayer32.Create(parent: TLayer32;
   const name: string = '');
 begin
   inherited;
-  fHitTestRec.enabled := true;
+  fHitTest.enabled := true;
   SetButtonAttributes(bsRound, DefaultButtonSize, clGreen32);
 end;
 //------------------------------------------------------------------------------
@@ -1840,7 +1784,7 @@ procedure TButtonDesignerLayer32.Draw;
 begin
   fButtonOutline := Img32.Extra.DrawButton(Image,
     image.MidPoint, fSize, fColor, fShape, [ba3D, baShadow]);
-  UpdateHitTestMask(Img32.Vector.Paths(fButtonOutline), frEvenOdd);
+  //UpdateHitTestMask(Img32.Vector.Paths(fButtonOutline), frEvenOdd);
 end;
 
 //------------------------------------------------------------------------------

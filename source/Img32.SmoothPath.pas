@@ -122,7 +122,7 @@ type
     procedure PaintVectorLayer; virtual;
     procedure PaintDesignerLayer; virtual;
   public
-    constructor Create(grpOwner: TGroupLayer32;
+    constructor Create(parent: TLayer32;
       const aName: string = ''); override;
     destructor Destroy; override;
     procedure Offset(dx, dy: integer); override;
@@ -206,7 +206,7 @@ begin
   begin
     //this button is being deleted directly (not via SmoothPath)
     i := PathIdx;
-    with TSmoothPathGroupLayer32(GroupOwner) do
+    with TSmoothPathGroupLayer32(Parent) do
       while SmoothPath.Count > i do SmoothPath.DeleteLast;
   end;
   inherited;
@@ -696,7 +696,7 @@ end;
 // TSmoothPathGroupLayer32
 //------------------------------------------------------------------------------
 
-constructor TSmoothPathGroupLayer32.Create(grpOwner: TGroupLayer32; const aName: string);
+constructor TSmoothPathGroupLayer32.Create(parent: TLayer32; const aName: string);
 begin
   inherited;
   if Self.Name = '' then
@@ -760,7 +760,7 @@ end;
 procedure TSmoothPathGroupLayer32.SetActiveButton(activeButton: TSmoothButtonLayer32);
 begin
   if (fActiveButton = activeButton) or
-    (Assigned(activeButton) and (activeButton.GroupOwner <> self)) then Exit;
+    (Assigned(activeButton) and (activeButton.Parent <> self)) then Exit;
   fActiveButton := activeButton;
   if Assigned(activeButton) then Invalidate(activeButton.Bounds);
   PaintDesignerLayer;
