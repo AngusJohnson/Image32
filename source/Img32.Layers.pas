@@ -35,11 +35,11 @@ type
 
   //THitTestRec is used for hit-testing (see TLayeredImage32.GetLayerAt).
   THitTestRec = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
-    PtrPixels : TArrayOfPointer;
+    htFlags   : TArrayOfByte;
     width     : integer;
     height    : integer;
     enabled   : Boolean;
-    function IsEmpty: Boolean;
+    function  IsEmpty: Boolean;
     procedure Init(ownerLayer: TLayer32);
     procedure Clear;
   end;
@@ -82,7 +82,6 @@ type
     fInvalidRect    : TRect;
     fUpdateCount    : Integer; //see beginUpdate/EndUpdate
     fClipPath       : TPathsD;
-    fClipMask       : TImage32;
     fBorderMargin   : integer;
     function   TopLeft: TPoint;
     function   GetMidPoint: TPointD;
@@ -466,49 +465,39 @@ procedure THitTestRec.Init(ownerLayer: TLayer32);
 begin
   width := ownerLayer.width;
   height := ownerLayer.height;
-  PtrPixels := nil;
+  htFlags := nil;
   enabled := true;
   if not IsEmpty then
-    SetLength(PtrPixels, width * height);
+    SetLength(htFlags, width * height);
 end;
 //------------------------------------------------------------------------------
 
 procedure THitTestRec.Clear;
 begin
-  width := 0; height := 0; PtrPixels := nil;
+  width := 0; height := 0; htFlags := nil;
 end;
 
 //------------------------------------------------------------------------------
-// TPointerRenderer: renders both 32 & 64bits pointer 'pixels' for hit-testing
+// TByteRenderer: renders byte 'pixels' for hit-testing
 //------------------------------------------------------------------------------
 
 type
-  TPointerRenderer = class(TCustomRenderer)
-  private
-    fObjPointer: Pointer;
+  TByteRenderer = class(TCustomRenderer)
   protected
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
-  public
-    constructor Create(objectPtr: Pointer);
   end;
 
-procedure TPointerRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
+procedure TByteRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
 var
   i: integer;
-  dst: PPointer;
+  dst: PByte;
 begin
   dst := GetDstPixel(x1,y);
   for i := x1 to x2 do
   begin
-    if Byte(alpha^) > 127 then dst^ := fObjPointer;
-    inc(PByte(dst), PixelSize); inc(alpha);
+    if Byte(alpha^) > 127 then dst^ := 255;
+    inc(dst); inc(alpha);
   end;
-end;
-//------------------------------------------------------------------------------
-
-constructor TPointerRenderer.Create(objectPtr: Pointer);
-begin
-  fObjPointer := objectPtr;
 end;
 
 //------------------------------------------------------------------------------
@@ -518,18 +507,18 @@ end;
 procedure UpdateHitTestMaskUsingPath(layer: THitTestLayer32;
   const paths: TPathsD; fillRule: TFillRule);
 var
-  monoRenderer: TPointerRenderer;
+  renderer: TByteRenderer;
 begin
-  monoRenderer := TPointerRenderer.Create(layer);
+  if layer.HitTestRec.IsEmpty then Exit;
+  renderer := TByteRenderer.Create;
   try
     with layer.HitTestRec do
     begin
-      if IsEmpty then Exit;
-      monoRenderer.Initialize(@PtrPixels[0], width, height, sizeOf(Pointer));
-      Rasterize(paths, Rect(0,0,width,height), fillRule, monoRenderer);
+      renderer.Initialize(@htFlags[0], width, height, sizeOf(Byte));
+      Rasterize(paths, Rect(0,0,width,height), fillRule, renderer);
     end;
   finally
-    monoRenderer.Free;
+    renderer.Free;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -539,24 +528,24 @@ procedure UpdateHitTestMaskUsingImage(var htr: THitTestRec;
   objPtr: Pointer; img: TImage32; compareFunc: TCompareFunction;
   referenceColor: TColor32; tolerance: integer);
 var
-  i: integer;
-  pc: PColor32;
-  pp: PPointer;
+  i   : integer;
+  pc  : PColor32;
+  pp  : PByte;
 begin
   with img do
   begin
     htr.width := Width;
     htr.height := Height;
-    htr.PtrPixels := nil;
+    htr.htFlags := nil;
     if IsEmpty then Exit;
-    SetLength(htr.PtrPixels, Width * Height);
+    SetLength(htr.htFlags, Width * Height);
   end;
 
   pc := img.PixelBase;
-  pp := @htr.PtrPixels[0];
-  for i := 0 to high(htr.PtrPixels) do
+  pp := @htr.htFlags[0];
+  for i := 0 to high(htr.htFlags) do
   begin
-    if compareFunc(referenceColor, pc^, tolerance) then pp^ := objPtr;
+    if compareFunc(referenceColor, pc^, tolerance) then pp^ := 255;
     inc(pc); inc(pp);
   end;
 end;
@@ -567,7 +556,6 @@ end;
 
 constructor TLayer32.Create(parent: TLayer32; const name: string);
 begin
-  fClipMask     := TImage32.Create;
 {$IFDEF XPLAT_GENERICS}
   fChilds       := TList<TLayer32>.Create;
 {$ELSE}
@@ -593,7 +581,6 @@ destructor TLayer32.Destroy;
 begin
   ClearChildren;
   fImage.Free;
-  fClipMask.Free;
   fChilds.Free;
   if Assigned(fParent) then
   begin
@@ -902,7 +889,6 @@ begin
   Image.SetSize(0, 0);
   FreeAndNil(fMergeImage);
   fClipPath := nil;
-  fClipMask.SetSize(0,0);
 end;
 //------------------------------------------------------------------------------
 
@@ -934,12 +920,6 @@ procedure TLayer32.SetClipPath(const path: TPathsD);
 begin
   RefreshPending;
   fClipPath := path;
-  if Assigned(fClipPath) then
-  begin
-    fClipMask.SetSize(Width, Height);
-    DrawPolygon(fClipMask, path, frNonZero, clWhite32);
-  end else
-    fClipMask.SetSize(0, 0);
 end;
 //------------------------------------------------------------------------------
 
@@ -1136,9 +1116,8 @@ begin
         img2.ReduceOpacity(childLayer.Opacity);
         if Assigned(fClipPath) then
         begin
-          if Assigned(fClipPath) then
-            clpPaths := OffsetPath(fClipPath,
-              -childLayer.Left, -childLayer.Top);
+          clpPaths := OffsetPath(fClipPath,
+            -childLayer.Left, -childLayer.Top);
           EraseOutsidePaths(img2, clpPaths, frNonZero, img2.Bounds);
         end;
       end else
@@ -1171,8 +1150,8 @@ function TLayer32.GetLayerAt(const pt: TPoint;
 var
   i, htIdx: integer;
   childLayer: TLayer32;
-  isInChild: Boolean;
   pt2: TPoint;
+  Result2: TLayer32;
 begin
   Result := nil;
 
@@ -1184,41 +1163,30 @@ begin
   begin
     childLayer := Child[i];
 
-    if not childLayer.Visible or
+    if not childLayer.Visible or not PtInRect(childLayer.Bounds, pt2) or
       (ignoreDesigners and (childLayer is TDesignerLayer32)) then
         Continue;
 
-    isInChild := PtInRect(childLayer.Bounds, pt2);
-
-//    if isInChild and Assigned(childLayer.fClipPath) then
-//    begin
-//      pt2 := OffsetPoint(pt2, -childLayer.Left, -childLayer.Top);
-//      if not PtInRect(fClipMask.Bounds, pt2) or
-//        (fClipMask.Pixel[pt2.X,pt2.Y] shr 24 < 128) then
-//          continue;
-//    end
+    if (childLayer is THitTestLayer32) then
+      with THitTestLayer32(childLayer) do
+        if not HitTestRec.enabled then
+          Continue
+        else if fHitTestRec.IsEmpty then
+          Result := childLayer //ie rectangles
+        else
+        begin
+          htIdx := fHitTestRec.width * (pt2.Y - Top) + (pt2.X  -Left);
+          if fHitTestRec.htFlags[htIdx] > 128 then Result := childLayer;
+          if Assigned(Result) and not childLayer.HasChildren then Exit;
+        end;
 
     if childLayer.HasChildren and
-      (isInChild or (childLayer is TGroupLayer32)) then
+      (Assigned(Result) or (childLayer is TGroupLayer32)) then
     begin
       //recursive
-      Result := childLayer.GetLayerAt(pt2, ignoreDesigners);
-      if Assigned(Result) then Exit;
+      Result2 := childLayer.GetLayerAt(pt2, ignoreDesigners);
+      if Assigned(Result2) then Result := Result2;
     end;
-
-    if not isInChild or
-      not (childLayer is THitTestLayer32) or
-      not THitTestLayer32(childLayer).HitTestRec.enabled then Continue;
-
-    with THitTestLayer32(childLayer) do
-      if fHitTestRec.IsEmpty then
-      begin
-        Result := childLayer;
-      end else
-      begin
-        htIdx := fHitTestRec.width * (pt2.Y - Top) + (pt2.X  -Left);
-        Result := fHitTestRec.PtrPixels[htIdx];
-      end;
     if Assigned(Result) then Exit;
   end;
 end;
@@ -1397,7 +1365,8 @@ begin
   h := RectHeight(newBounds) -m2;
 
   //make sure the bounds are large enough to scale safely
-  if (Width > m2) and (Height > m2) and (w > 1) and (h > 1)  then
+  if Assigned(fPaths) and
+    (Width > m2) and (Height > m2) and (w > 1) and (h > 1)  then
   begin
     //apply scaling and translation
     mat := IdentityMatrix;
@@ -1409,7 +1378,10 @@ begin
     if fAutoPivot then fPivotPt := InvalidPointD;
     RepositionAndDraw;
   end else
+  begin
     inherited;
+    RepositionAndDraw;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1435,9 +1407,12 @@ procedure TVectorLayer32.RepositionAndDraw;
 var
   rec: TRect;
 begin
-  rec := Img32.Vector.GetBounds(fPaths);
-  Img32.Vector.InflateRect(rec, Margin, Margin);
-  inherited SetBounds(rec);
+  if Assigned(fPaths) then
+  begin
+    rec := Img32.Vector.GetBounds(fPaths);
+    Img32.Vector.InflateRect(rec, Margin, Margin);
+    inherited SetBounds(rec);
+  end;
   Image.BlockUpdate;
   try
     Draw;
@@ -1484,22 +1459,22 @@ end;
 
 procedure TRasterLayer32.UpdateHitTestMaskOpaque;
 var
-  i: integer;
-  htr: THitTestRec;
-  pp: PPointer;
+  i   : integer;
+  htr : THitTestRec;
+  pp  : PByte;
 begin
   //fill the entire Hittest mask with self pointers
   with Image do
   begin
     htr.width := Width;
     htr.height := Height;
-    SetLength(htr.PtrPixels, Width * Height);
+    SetLength(htr.htFlags, Width * Height);
     if not IsEmpty then
     begin
-      pp := @htr.PtrPixels[0];
-      for i := 0 to High(htr.PtrPixels) do
+      pp := @htr.htFlags[0];
+      for i := 0 to High(htr.htFlags) do
       begin
-        pp^ := self; inc(pp);
+        pp^ := 255; inc(pp);
       end;
     end;
   end;
