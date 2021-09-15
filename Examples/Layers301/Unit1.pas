@@ -19,13 +19,11 @@ type
     PenColor   : TColor32;
     PenWidth   : double;
     IsRectangle: Boolean;
-    procedure InitLayer;
-    procedure UpdateGroupClipPath;
   protected
     procedure Draw; override;
   public
+    constructor Create(parent: TLayer32;  const name: string = ''); override;
     procedure SetBounds(const newBounds: TRect); override;
-    procedure Offset(dx,dy: integer); override;
   end;
 
   //----------------------------------------------------------------------
@@ -46,6 +44,9 @@ type
     N5: TMenuItem;
     mnuDeleteLayer2: TMenuItem;
     N1: TMenuItem;
+    N2: TMenuItem;
+    mnuSendBack: TMenuItem;
+    mnuBringForward: TMenuItem;
     procedure mnuExitClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -64,14 +65,16 @@ type
     procedure FormResize(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure FormPaint(Sender: TObject);
+    procedure mnuSendBackClick(Sender: TObject);
+    procedure mnuBringForwardClick(Sender: TObject);
+    procedure WMERASEBKGND(var message: TMessage); message WM_ERASEBKGND;
   private
-    pnlMain: TImage32Panel;
     layeredImg32: TLayeredImage32;
     clickedLayer: TLayer32;
     targetLayer: TMyVectorLayer32;
     buttonGroup   : TGroupLayer32;
     clickPoint    : TPoint;
-    function GetRandomRect: TRect;
+    function MakeRandomRect: TRect;
     procedure SetTargetLayer(layer: TMyVectorLayer32);
   public
   end;
@@ -87,65 +90,52 @@ uses
   Img32.Fmt.BMP, Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.SVG,
   Img32.Vector, Img32.Extra, Img32.Clipper;
 
-const
-  margin = 100;
-
-
-//------------------------------------------------------------------------------
-// Miscellaneous functions
-//------------------------------------------------------------------------------
-
-function MakeDarker(color: TColor32; percent: integer): TColor32;
-var
-  pcFrac: double;
-  r: TARGB absolute Result;
-begin
-  percent := Max(0, Min(100, percent));
-  pcFrac := percent/100;
-  Result := color;
-  r.R := r.R - Round(r.R * pcFrac);
-  r.G := r.G - Round(r.G * pcFrac);
-  r.B := r.B - Round(r.B * pcFrac);
-end;
-
 //------------------------------------------------------------------------------
 // TMyVectorLayer32
 //------------------------------------------------------------------------------
 
-procedure TMyVectorLayer32.InitLayer;
+constructor TMyVectorLayer32.Create(parent: TLayer32; const name: string = '');
 var
   hsl: THsl;
 begin
+  inherited;
   hsl.hue := Random(256);
   hsl.sat := 240;
   hsl.lum := 200;
   hsl.Alpha := 192;
   BrushColor := HslToRgb(hsl);
-  PenColor := MakeDarker(BrushColor, 60) or $FF000000;
-  PenWidth := DpiAware(2);
-end;
-//------------------------------------------------------------------------------
-
-procedure TMyVectorLayer32.UpdateGroupClipPath;
-begin
-  if IsRectangle then Exit;
-  //ClipPath must be relative to the Image bounds
-  ClipPath := OffsetPath(Paths, -Left, -Top);
-  UpdateHitTestMask(ClipPath, frEvenOdd);
+  hsl.lum := 60;
+  Margin := 0;
+  PenColor := HslToRgb(hsl);
+  PenWidth := DpiAware(5);
 end;
 //------------------------------------------------------------------------------
 
 procedure TMyVectorLayer32.SetBounds(const newBounds: TRect);
+var
+  pp: TPathsD;
+  rec: TRect;
+  i: integer;
 begin
   inherited;
-  UpdateGroupClipPath;
-end;
-//------------------------------------------------------------------------------
+  i := Round(PenWidth);
+  rec := Image.Bounds;
 
-procedure TMyVectorLayer32.Offset(dx,dy: integer);
-begin
-  inherited Offset(dx,dy);
-  UpdateGroupClipPath;
+  //make ClipPath relative to the Layer
+  if IsRectangle then
+  begin
+    Img32.Vector.InflateRect(rec, -i, -i);
+    ClipPath := Img32.Vector.Paths(Rectangle(rec));
+  end else
+  begin
+    pp := Img32.Vector.Paths(Ellipse(rec));
+    UpdateHitTestMask(pp, frEvenOdd);
+
+    //the more perfect way to do this would be to use
+    //InflatePath but that way is *much* slower
+    Img32.Vector.InflateRect(rec, -i, -i);
+    ClipPath := Img32.Vector.Paths(Ellipse(rec));
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -155,9 +145,10 @@ var
   p: TPathD;
   rec: TRect;
 begin
-  i := Ceil(PenWidth /2);
+  i := Ceil(PenWidth/2);
   rec := Image.Bounds;
   types.InflateRect(rec, -i,-i);
+  //shrink 'rec' by half of pen width and draw
   if IsRectangle then
     p := Rectangle(rec) else
     p := Ellipse(rec);
@@ -166,25 +157,21 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TForm1 methods
+// TMainForm methods
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
   Randomize;
 
-  //the following can be bypassed by installing TImage32Panel in the IDE
-  pnlMain := TImage32Panel.Create(self);
-  pnlMain.parent := Self;
-  pnlMain.Align := alClient;
-  pnlMain.OnMouseDown := pnlMainMouseDown;
-  pnlMain.OnMouseMove := pnlMainMouseMove;
-  pnlMain.OnMouseUp := pnlMainMouseUp;
-  pnlMain.PopupMenu := PopupMenu1;
-  pnlMain.OnKeyDown := FormKeyDown;
+  self.OnMouseDown := pnlMainMouseDown;
+  self.OnMouseMove := pnlMainMouseMove;
+  self.OnMouseUp := pnlMainMouseUp;
+  self.PopupMenu := PopupMenu1;
+  self.OnKeyDown := FormKeyDown;
 
   layeredImg32 := TLayeredImage32.Create; //sized in FormResize below.
-  layeredImg32.DefaultBorderMargin := DPIAware(2);
+
   //prepare for a hatched background design layer (see FormResize below).
   layeredImg32.AddLayer(TDesignerLayer32);
 end;
@@ -196,6 +183,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TMainForm.WMERASEBKGND(var message: TMessage);
+begin
+  message.Result := 0;
+end;
+//------------------------------------------------------------------------------
+
 procedure TMainForm.FormResize(Sender: TObject);
 var
   rec: TRect;
@@ -203,11 +196,10 @@ var
 begin
   if not Assigned(layeredImg32) then Exit; //ie when destroying
 
-  rec := pnlMain.InnerClientRect;
+  rec := ClientRect;
   w := RectWidth(rec);
   h := RectHeight(rec);
   //resize pnlMain's Image
-  pnlMain.Image.SetSize(w,h);
   //resize layeredImg32 to pnlMain
   layeredImg32.SetSize(w, h);
   //resize and repaint the hatched design background layer
@@ -222,7 +214,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TMainForm.GetRandomRect: TRect;
+function TMainForm.MakeRandomRect: TRect;
 begin
   if Assigned(targetLayer) then
   begin
@@ -238,6 +230,10 @@ begin
     Result.Bottom := Random(layeredImg32.Height);
   end;
   Img32.Vector.NormalizeRect(Result);
+  if Result.Right - Result.Left < 75 then
+    Result.Right := Result.Left +75;
+  if Result.Bottom - Result.Top < 50 then
+    Result.Bottom := Result.Top +50;
 end;
 //------------------------------------------------------------------------------
 
@@ -246,10 +242,10 @@ var
   newLayer: TMyVectorLayer32;
   rec: TRect;
 begin
-  rec := GetRandomRect;
+  rec := MakeRandomRect;
   newLayer := layeredImg32.AddLayer(TMyVectorLayer32, targetLayer) as TMyVectorLayer32;
   newLayer.IsRectangle := false;
-  newLayer.InitLayer;
+  //setting a path will automatically define the layer's bounds
   newLayer.Paths := Img32.Vector.Paths(Ellipse(rec));
   SetTargetLayer(newLayer);
 end;
@@ -260,11 +256,13 @@ var
   newLayer: TMyVectorLayer32;
   rec: TRect;
 begin
-  rec := GetRandomRect;
+  rec := MakeRandomRect;
   newLayer := layeredImg32.AddLayer(TMyVectorLayer32, targetLayer) as TMyVectorLayer32;
   newLayer.IsRectangle := true;
-  newLayer.InitLayer;
-  newLayer.Paths := Img32.Vector.Paths(Rectangle(rec));
+  newLayer.SetBounds(rec);
+  //a path isn't required for rectangular paths
+  //since that's the default when no path is specified
+  //newLayer.Paths := Img32.Vector.Paths(Rectangle(rec));
   SetTargetLayer(newLayer);
 end;
 //------------------------------------------------------------------------------
@@ -275,9 +273,9 @@ var
   img: TImage32;
 begin
   img := layeredImg32.GetMergedImage(false, updateRect);
-  //only update updateRect otherwise repainting can be quite slow
+  //only update 'updateRect' otherwise repainting can be quite slow
   if not IsEmptyRect(updateRect) then
-    pnlMain.Image.Copy(img, updateRect, updateRect);
+    img.CopyToDc(updateRect, updateRect, canvas.Handle);
 end;
 //------------------------------------------------------------------------------
 
@@ -309,7 +307,6 @@ procedure TMainForm.pnlMainMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   clickPoint := Types.Point(X,Y);
-  clickPoint := pnlMain.ClientToImage(clickPoint);
   clickedLayer := layeredImg32.GetLayerAt(clickPoint);
 
   if Assigned(clickedLayer) then
@@ -336,15 +333,14 @@ var
   rec: TRect;
 begin
   pt := Types.Point(X,Y);
-  pt := pnlMain.ClientToImage(pt);
 
   if not (ssLeft in Shift) then
   begin
     //not moving anything so just update the cursor
     layer := layeredImg32.GetLayerAt(pt);
     if Assigned(layer) then
-      pnlMain.Cursor := layer.CursorId else
-      pnlMain.Cursor := crDefault;
+      self.Cursor := layer.CursorId else
+      self.Cursor := crDefault;
     Exit;
   end;
 
@@ -428,5 +424,22 @@ begin
   mnuDeleteLayer2.Enabled := mnuDeleteLayer.Enabled;
 end;
 //------------------------------------------------------------------------------
+
+procedure TMainForm.mnuSendBackClick(Sender: TObject);
+begin
+  if Assigned(targetLayer) then
+    targetLayer.SendBackOne;
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.mnuBringForwardClick(Sender: TObject);
+begin
+  if Assigned(targetLayer) then
+    targetLayer.BringForwardOne;
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+
 
 end.

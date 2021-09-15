@@ -70,7 +70,6 @@ type
     delayedMovePending : Boolean;
     delayedShift       : TShiftState;
     delayedPos         : TPoint;
-    imgPanel           : TImage32Panel;
     procedure DeleteAllControlButtons;
     procedure AppOnIdle(Sender: TObject; var Done: Boolean);
     procedure DelayedMouseMove(Sender: TObject;
@@ -130,10 +129,8 @@ procedure TMyRasterLayer32.Init(const filename: string; const centerPt: TPointD)
 begin
   if not Image.LoadFromFile(filename) then
     Image.SetSize(100,100, clBlack32);
-  MasterImage.CropTransparentPixels; //nb: crop MasterImage not Image
   PositionCenteredAt(centerPt);
-  UpdateHitTestMaskTransparent; //hit-test to non-transparent pixels
-  AutoPivot := false; // :)
+  AutoPivot := false;//true;// :)
 end;
 
 //------------------------------------------------------------------------------
@@ -209,26 +206,16 @@ procedure TMainForm.FormCreate(Sender: TObject);
 var
   resStream: TResourceStream;
 begin
+  self.OnMouseDown := PanelMouseDown;
+  self.OnMouseMove := PanelMouseMove;
 
-  //ADD A TIMAGE32PANEL COMPONENT TO THE FORM
-  //nb: this can be done more easily when
-  //TImage32Panel is installed in the IDE.
-  imgPanel := TImage32Panel.Create(self);
-  imgPanel.Parent := self;
-  imgPanel.Align := alClient;
-  imgPanel.OnMouseDown := PanelMouseDown;
-  imgPanel.OnMouseMove := PanelMouseMove;
-  //disable zoom and scroll since we will be
-  //using the mouse to move layer 'buttons' around
-  imgPanel.AllowScroll := false;
-  imgPanel.AllowZoom := false;
 
   layeredImage := TLayeredImage32.Create;
   layeredImage.AddLayer(TDesignerLayer32);
 
-  //layeredImage.Resampler := rNearestResampler;   //draft quality (fast)
+  //layeredImage.Resampler := rNearestResampler; //draft quality (fast)
   layeredImage.Resampler := rBiLinearResampler;  //high quality (moderately fast)
-  //layeredImage.Resampler := rBiCubicResampler;   //excellent quality (slow)
+  //layeredImage.Resampler := rBiCubicResampler; //excellent quality (slow)
 
   fontReader := FontManager.LoadFromResource('FONT_NSB', RT_RCDATA);
   fontCache := TGlyphCache.Create(fontReader, DPIAware(48));
@@ -275,9 +262,9 @@ var
   rec: TRect;
 begin
   if not Assigned(layeredImage) then Exit; //ie when form closing
+  rec := ClientRect;
 
   //resize layeredImage
-  rec := imgPanel.InnerClientRect;
   layeredImage.SetSize(RectWidth(rec), RectHeight(rec));
 
   //resize and repaint the designer background hatching
@@ -315,9 +302,7 @@ end;
 procedure TMainForm.PanelMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  //because the panel image's dimensions rarely corresponds
-  //to the panel's clientrect, the X,Y coordinate needs adjusting
-  clickPoint := imgPanel.ClientToImage(Point(X,Y));
+  clickPoint := Point(X,Y);
 
   clickedLayer := layeredImage.GetLayerAt(clickPoint);
   if not assigned(clickedLayer) then
@@ -351,9 +336,7 @@ procedure TMainForm.PanelMouseMove(Sender: TObject;
 var
   pt: TPoint;
 begin
-  //because the panel image's dimensions rarely corresponds
-  //to the panel's clientrect, the X,Y coordinate needs adjusting
-  pt := imgPanel.ClientToImage(Point(X,Y));
+  pt := Point(X,Y);
   if UseAppOnIdle then
   begin
     delayedShift := Shift;
@@ -382,8 +365,8 @@ begin
     //so update the cursor and exit
     layer := layeredImage.GetLayerAt(clickPoint);
     if assigned(layer) then
-      imgPanel.Cursor := layer.CursorId else
-      imgPanel.Cursor := crDefault;
+      cursor := layer.CursorId else
+      cursor := crDefault;
     Exit;
   end;
 
@@ -450,10 +433,7 @@ begin
   //draw layeredImage onto the form's canvas. But to optimize performance,
   //only draw whatever's changed since the last draw (hence updateRec).
   img := layeredImage.GetMergedImage(false, updateRec);
-  if (imgPanel.Image.Width <> img.Width) or
-    (imgPanel.Image.Height <> img.Height) then
-    imgPanel.Image.Assign(img) else
-    imgPanel.Image.Copy(img, updateRec, updateRec);
+  img.CopyToDc(updateRec, updateRec, canvas.Handle);
 end;
 //------------------------------------------------------------------------------
 
@@ -461,12 +441,13 @@ procedure TMainForm.mnuAddTextClick(Sender: TObject);
 begin
   //in case the sizing, rotating buttons etc are visible
   DeleteAllControlButtons;
+  clickedLayer := nil;
 
   //create a text layer
   targetLayer  := layeredImage.AddLayer(TMyTextLayer32) as TRotateLayer32;
   with TMyTextLayer32(targetLayer) do
     //Init(Words[Random(Words.Count)], layeredImage.MidPoint);
-    Init(Words[Random(Words.Count)], PointD(220,220));
+    Init(Words[Random(Words.Count)], layeredImage.MidPoint);
   //add sizing buttons
   sizingButtonGroup := CreateSizingButtonGroup(targetLayer, ssCorners,
     bsRound, DefaultButtonSize, clRed32);
@@ -477,8 +458,8 @@ end;
 procedure TMainForm.mnuAddImageClick(Sender: TObject);
 begin
   if not OpenDialog1.Execute then Exit;
-
   DeleteAllControlButtons;
+  clickedLayer := nil;
 
   //create a raster image layer
   targetLayer := layeredImage.AddLayer(TMyRasterLayer32) as TRotateLayer32;
@@ -495,6 +476,7 @@ end;
 procedure TMainForm.mnuAddArrowClick(Sender: TObject);
 begin
   DeleteAllControlButtons;
+  clickedLayer := nil;
 
   //create an arrow layer
   targetLayer  := layeredImage.AddLayer(TMyArrowLayer32, nil, 'arrow') as TRotateLayer32;
@@ -515,6 +497,7 @@ var
   pivot: TPointD;
 begin
   if not assigned(targetLayer) then Exit;
+  clickedLayer := nil;
 
   if assigned(rotatingButtonGroup) then
   begin

@@ -8,9 +8,9 @@
       <Unit0>
         <Filename Value="Image32_Laz_Demo.pas"/>
         <IsPartOfProject Value="True"/>
-        <EditorIndex Value="-1"/>
         <CursorPos Y="11"/>
         <UsageCount Value="91"/>
+        <Loaded Value="True"/>
       </Unit0>
       <Unit1>
         <Filename Value="main.pas"/>
@@ -19,13 +19,15 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <IsVisibleTab Value="True"/>
-        <EditorIndex Value="-1"/>
+        <EditorIndex Value="1"/>
         <TopLine Value="210"/>
-        <CursorPos X="32" Y="224"/>
+        <CursorPos X="44" Y="217"/>
         <UsageCount Value="91"/>
         <Bookmarks Count="1">
           <Item0 Y="138" ID="2"/>
         </Bookmarks>
+        <Loaded Value="True"/>
+        <LoadedDesigner Value="True"/>
       </Unit1>
       <Unit2>
         <Filename Value="..\..\source\Image32_FMX.pas"/>
@@ -290,9 +292,6 @@
         <UsageCount Value="10"/>
       </Unit38>
     </Units>
-    <General>
-      <ActiveWindowIndexAtStart Value="-1"/>
-    </General>
     <JumpHistory HistoryIndex="-1"/>
     <RunParams>
       <FormatVersion Value="2"/>

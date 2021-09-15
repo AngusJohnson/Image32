@@ -18,6 +18,7 @@ object Form1: TForm1
   OnDestroy = FormDestroy
   OnKeyDown = FormKeyDown
   OnPaint = FormPaint
+  OnResize = FormResize
   PixelsPerInch = 96
   TextHeight = 16
   object StatusBar1: TStatusBar
@@ -40,9 +41,6 @@ object Form1: TForm1
     TabOrder = 1
     OnEnter = pnlSmoothEnter
     OnExit = pnlSmoothExit
-    DesignSize = (
-      57
-      409)
     object lblSmooth: TLabel
       Left = 6
       Top = 6
@@ -64,7 +62,6 @@ object Form1: TForm1
       Top = 56
       Width = 27
       Height = 118
-      Anchors = [akLeft, akTop, akBottom]
       Orientation = trVertical
       PageSize = 0
       Position = 3
@@ -77,7 +74,6 @@ object Form1: TForm1
       Top = 256
       Width = 27
       Height = 118
-      Anchors = [akLeft, akTop, akBottom]
       Max = 5
       Orientation = trVertical
       PageSize = 0

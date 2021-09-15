@@ -1,7 +1,7 @@
 object MainForm: TMainForm
-  Left = 1028
+  Left = 1082
   Height = 705
-  Top = 390
+  Top = 614
   Width = 729
   Caption = 'Image32 Lazarus Demo'
   ClientHeight = 705

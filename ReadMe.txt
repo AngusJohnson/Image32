@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 3.1
-Released: 15 August 2021
+Latest version: 3.2
+Released: 15 September 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -12,6 +12,21 @@ Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
+Version 3.2
+  Img32.Layers
+    * This unit has again been rewritten where all layers 
+    can now contain other layers (in a tree like structure 
+    under TLayeredImage32's Root layer).
+    * The TGroupLayer32 remains but is intended only as a
+    fully transparent container for other layers rather than 
+    being a fully or even partially opaque surface to other layers.
+    * TLayer32 Bounds are now relative to their Parent such 
+    that moving a layer will automatically move all contained 
+    children.
+    * The Layers301 sample application demonstrates new features.
+  Img32.FMX
+    The DpiAwareFMX function replaced by the DpiAware function
+    
 Version 3.1
   Img32
     renamed TRectD.Normalize to TRectD.NormalizeRect

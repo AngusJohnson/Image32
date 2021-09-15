@@ -55,6 +55,19 @@ object MainForm: TMainForm
         ShortCut = 16453
         OnClick = mnuAddEllipseClick
       end
+      object N2: TMenuItem
+        Caption = '-'
+      end
+      object mnuSendBack: TMenuItem
+        Caption = 'Send &Back'
+        ShortCut = 16450
+        OnClick = mnuSendBackClick
+      end
+      object mnuBringForward: TMenuItem
+        Caption = 'Bring &Forward'
+        ShortCut = 16454
+        OnClick = mnuBringForwardClick
+      end
       object N5: TMenuItem
         Caption = '-'
       end

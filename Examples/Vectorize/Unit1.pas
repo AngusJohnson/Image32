@@ -49,6 +49,7 @@ type
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure TrackBar1Change(Sender: TObject);
     procedure FormPaint(Sender: TObject);
+    procedure FormResize(Sender: TObject);
   private
     masterImg, workImg: TImage32;
     rawPaths, bezierPaths, flattenedPaths: TPathsD;
@@ -122,11 +123,14 @@ end;
 
 procedure TForm1.FormPaint(Sender: TObject);
 begin
-  with workImg do
-    CopyToDc(Bounds,
-      Self.Canvas.Handle,
-      (ClientWidth - pnlSmooth.Width - Width) div 2,
-      (ClientHeight - Height) div 2);
+  workImg.ScaleToFit(ClientWidth, ClientHeight);
+  workImg.CopyToDc(Self.Canvas.Handle);
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.FormResize(Sender: TObject);
+begin
+  invalidate;
 end;
 //------------------------------------------------------------------------------
 

@@ -513,6 +513,7 @@ type
     out charsThatFit: integer): TPathsD; overload;
 
   {$IFDEF MSWINDOWS}
+  procedure CheckFontHeight(var logFont: TLogFont);
   function PointHeightToPixelHeight(pt: double): double;
   function GetFontFolder: string;
   function GetInstalledTtfFilenames: TArrayOfString;
@@ -2625,6 +2626,16 @@ end;
 //------------------------------------------------------------------------------
 
 {$IFDEF MSWINDOWS}
+
+procedure CheckFontHeight(var logFont: TLogFont);
+const
+  _96Div72 = 96/72;
+begin
+  if logFont.lfHeight > 0 then
+    logFont.lfHeight := -Round(DpiAware(logFont.lfHeight * _96Div72));
+end;
+//------------------------------------------------------------------------------
+
 function PointHeightToPixelHeight(pt: double): double;
 const
   _96Div72 = 96/72;

@@ -77,7 +77,6 @@ type
     fInvalidRect    : TRect;
     fUpdateCount    : Integer; //see beginUpdate/EndUpdate
     fClipPath       : TPathsD;
-    fBorderMargin   : integer;
     function   TopLeft: TPoint;
     function   GetMidPoint: TPointD;
     procedure  SetVisible(value: Boolean);
@@ -130,7 +129,6 @@ type
     procedure  DeleteChild(index: integer);
     procedure  ClearChildren;
 
-    property   BorderMargin: integer read fBorderMargin write fBorderMargin;
     property   ChildCount: integer read GetChildCount;
     property   Child[index: integer]: TLayer32 read GetChild; default;
     //ClipPath enables groups to have irregular shapes, even holes
@@ -160,13 +158,16 @@ type
   THitTestLayer32 = class(TLayer32) //abstract classs
   private
     fHitTest    : THitTest;
+    procedure ClearHitTesting;
+    function  GetEnabled: Boolean;
+    procedure SetEnabled(value: Boolean);
   protected
     procedure  ImageChanged(Sender: TImage32); override;
     property   HitTestRec : THitTest read fHitTest write fHitTest;
   public
     constructor Create(parent: TLayer32; const name: string = ''); override;
     destructor Destroy; override;
-    procedure ClearHitTesting;
+    property HitTestEnabled: Boolean read GetEnabled write SetEnabled;
   end;
 
   TRotateLayer32 = class(THitTestLayer32) //abstract rotating layer class
@@ -228,14 +229,15 @@ type
   protected
     procedure ImageChanged(Sender: TImage32); override;
     procedure SetPivotPt(const pivot: TPointD); override;
+    procedure UpdateHitTestMaskTranspar(compareFunc: TCompareFunction;
+      referenceColor: TColor32; tolerance: integer);
   public
     constructor Create(parent: TLayer32;  const name: string = ''); override;
     destructor  Destroy; override;
     procedure Offset(dx,dy: integer); override;
+    procedure UpdateHitTestMask;
     procedure UpdateHitTestMaskOpaque; virtual;
-    procedure UpdateHitTestMaskTransparent; overload; virtual;
-    procedure UpdateHitTestMaskTransparent(compareFunc: TCompareFunction;
-      referenceColor: TColor32; tolerance: integer); overload; virtual;
+    procedure UpdateHitTestMaskTransparent(alphaValue: Byte = 127); overload; virtual;
     procedure SetBounds(const newBounds: TRect); override;
     procedure Rotate(angleDelta: double); override;
 
@@ -324,7 +326,6 @@ type
     fBackColor         : TColor32;
     fResampler         : integer;
     fLastUpdateType    : TUpdateType;
-    fDefBorderMargin   : integer;
     function  GetRootLayersCount: integer;
     function  GetLayer(index: integer): TLayer32;
     function  GetImage: TImage32;
@@ -358,8 +359,6 @@ type
     property BackgroundColor: TColor32 read fBackColor write SetBackColor;
     property Bounds: TRect read fBounds;
     property Count: integer read GetRootLayersCount;
-    property DefaultBorderMargin : integer
-      read fDefBorderMargin write fDefBorderMargin;
     property Height: integer read GetHeight write SetHeight;
     property Image: TImage32 read GetImage;
     property Layer[index: integer]: TLayer32 read GetLayer; default;
@@ -378,7 +377,6 @@ function CreateRotatingButtonGroup(targetLayer: TLayer32;
   pivotButtonColor: TColor32 = clWhite32;
   angleButtonColor: TColor32 = clBlue32;
   initialAngle: double = 0; angleOffset: double = 0;
-  enablePivotMove: Boolean = True;
   buttonLayerClass: TButtonDesignerLayer32Class = nil): TRotatingGroupLayer32; overload;
 
 function CreateRotatingButtonGroup(targetLayer: TLayer32;
@@ -386,7 +384,6 @@ function CreateRotatingButtonGroup(targetLayer: TLayer32;
   pivotButtonColor: TColor32 = clWhite32;
   angleButtonColor: TColor32 = clBlue32;
   initialAngle: double = 0; angleOffset: double = 0;
-  enablePivotMove: Boolean = True;
   buttonLayerClass: TButtonDesignerLayer32Class = nil): TRotatingGroupLayer32; overload;
 
 function CreateButtonGroup(parent: TLayer32;
@@ -526,13 +523,8 @@ begin
   fVisible      := True;
   fOpacity      := 255;
   CursorId      := crDefault;
-  fBorderMargin := dpiAwareI;
   if assigned(parent) then
-  begin
     fLayeredImage := parent.fLayeredImage;
-    if Assigned(fLayeredImage) then
-      fBorderMargin := fLayeredImage.fDefBorderMargin;
-  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -777,7 +769,8 @@ var
   layer: TLayer32;
 begin
   Result := false;
-  if not assigned(fParent) or not assigned(newParent) then Exit;
+  if not assigned(fParent) or not assigned(newParent) then
+    Exit;
 
   //make sure we don't create circular parenting
   layer := newParent;
@@ -1050,8 +1043,6 @@ begin
       dstRect := childLayer.Bounds;
       OffsetRect(dstRect, -origOffset.X, -origOffset.Y);
       rec := Image.Bounds;
-      if (fBorderMargin > 0) and not (self is TGroupLayer32) then
-        Img32.Vector.InflateRect(rec, -fBorderMargin, -fBorderMargin);
       IntersectRect(dstRect, dstRect, rec);
     end else
     begin
@@ -1134,7 +1125,7 @@ begin
           Result := childLayer //ie rectangles
         else
         begin
-          if TARGB(fHitTest.htImage.Pixel[pt2.X-left, pt2.Y-top]).A > 128 then
+          if TARGB(fHitTest.htImage.Pixel[pt2.X-left, pt2.Y-top]).A >= 128 then
             Result := childLayer;
           if Assigned(Result) and not childLayer.HasChildren then Exit;
         end;
@@ -1212,6 +1203,20 @@ procedure THitTestLayer32.ImageChanged(Sender: TImage32);
 begin
   inherited;
   ClearHitTesting;
+end;
+//------------------------------------------------------------------------------
+
+function THitTestLayer32.GetEnabled: Boolean;
+begin
+  Result := fHitTest.enabled;
+end;
+//------------------------------------------------------------------------------
+
+procedure THitTestLayer32.SetEnabled(value: Boolean);
+begin
+  if fHitTest.enabled = value then Exit;
+  fHitTest.enabled := value;
+  if not value then ClearHitTesting;
 end;
 //------------------------------------------------------------------------------
 
@@ -1314,10 +1319,14 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TVectorLayer32.SetPaths(const newPaths: TPathsD);
+var
+  rec: TRect;
 begin
   fPaths := CopyPaths(newPaths);
+  rec := Img32.Vector.GetBounds(fPaths);
+  Img32.Vector.InflateRect(rec, Margin, margin);
   fPivotPt := InvalidPointD;
-  RepositionAndDraw;
+  SetBounds(rec);
 end;
 //------------------------------------------------------------------------------
 
@@ -1424,19 +1433,36 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TRasterLayer32.UpdateHitTestMask;
+begin
+  fHitTest.htImage.Assign(Image);
+end;
+//------------------------------------------------------------------------------
+
 procedure TRasterLayer32.UpdateHitTestMaskOpaque;
 begin
-  fHitTest.htImage.Assign(Image);
+  UpdateHitTestMask;
 end;
 //------------------------------------------------------------------------------
 
-procedure TRasterLayer32.UpdateHitTestMaskTransparent;
+function CompareAlpha(master, current: TColor32; data: integer): Boolean;
+var
+  mARGB: TARGB absolute master;
+  cARGB: TARGB absolute current;
 begin
-  fHitTest.htImage.Assign(Image);
+  Result := mARGB.A - cARGB.A < data;
 end;
 //------------------------------------------------------------------------------
 
-procedure  TRasterLayer32.UpdateHitTestMaskTransparent(
+procedure TRasterLayer32.UpdateHitTestMaskTransparent(alphaValue: Byte);
+begin
+  if alphaValue = 127 then
+    UpdateHitTestMask else
+    UpdateHitTestMaskTranspar(CompareAlpha, clWhite32, alphaValue);
+end;
+//------------------------------------------------------------------------------
+
+procedure  TRasterLayer32.UpdateHitTestMaskTranspar(
   compareFunc: TCompareFunction;
   referenceColor: TColor32; tolerance: integer);
 begin
@@ -1448,9 +1474,7 @@ end;
 procedure TRasterLayer32.DoAutoHitTest;
 begin
   if fAutoHitTest then
-  begin
-    fHitTest.htImage.Assign(Image);
-  end else
+    fHitTest.htImage.Assign(Image) else
     HitTestRec.htImage.SetSize(0,0);
 end;
 //------------------------------------------------------------------------------
@@ -1474,7 +1498,8 @@ begin
 
       with MasterImage do
         fSavedSize := Img32.Vector.Size(Width, Height);
-      Image.Assign(MasterImage); //this will call ImageChange for Image
+      if not image.IsBlocked then
+        Image.Assign(MasterImage); //this will call ImageChange for Image
       Image.Resampler := RootOwner.Resampler;
     finally
       MasterImage.UnblockUpdate;
@@ -1483,11 +1508,13 @@ begin
   begin
     if MasterImage.IsEmpty then
     begin
-      MasterImage.BlockUpdate;
-      MasterImage.Assign(Image);
-      MasterImage.UnblockUpdate;
+      Image.BlockUpdate;
+      Image.CropTransparentPixels;
+      MasterImage.Assign(Image); //this will call ImageChanged again
+      Image.UnblockUpdate;
     end;
     inherited;
+    DoAutoHitTest;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1560,6 +1587,11 @@ begin
 
   fSavedMidPt := MidPoint;
   if fAutoPivot then fPivotPt := fSavedMidPt;
+
+  if fSavedSize.cx = 0 then
+    fSavedSize.cx := Image.Width;
+  if fSavedSize.cy = 0 then
+    fSavedSize.cy := Image.Height;
 
   //scaling has just ended and rotating is about to start
   //so apply the current scaling to the matrix
@@ -1793,13 +1825,12 @@ end;
 
 constructor TLayeredImage32.Create(Width: integer; Height: integer);
 begin
-  fRoot := TLayer32.Create(nil, rsRoot);
+  fRoot := TGroupLayer32.Create(nil, rsRoot);
   fRoot.fLayeredImage := self;
   fBounds := Rect(0, 0, Width, Height);
   fRoot.SetSize(width, Height);
   fResampler := DefaultResampler;
   fLastUpdateType := utUndefined;
-  fDefBorderMargin := dpiAwareI;
 end;
 //------------------------------------------------------------------------------
 
@@ -2179,14 +2210,13 @@ function CreateRotatingButtonGroup(targetLayer: TLayer32;
   const pivot: TPointD; buttonSize: integer;
   pivotButtonColor, angleButtonColor: TColor32;
   initialAngle: double; angleOffset: double;
-  enablePivotMove: Boolean;
   buttonLayerClass: TButtonDesignerLayer32Class): TRotatingGroupLayer32;
 var
   rec: TRectD;
   radius: integer;
 begin
   if not assigned(targetLayer) or
-    not (targetLayer is THitTestLayer32) then
+    not (targetLayer is TRotateLayer32) then
       raise Exception.Create(rsCreateButtonGroupError);
 
   Result := TRotatingGroupLayer32(targetLayer.RootOwner.AddLayer(
@@ -2203,8 +2233,9 @@ begin
     pivotButtonColor, angleButtonColor, initialAngle,
     angleOffset, buttonLayerClass);
 
-  if not enablePivotMove then
-    Result.PivotButton.ClearHitTesting;
+
+  if TRotateLayer32(targetLayer).AutoPivot then
+    Result.PivotButton.HitTestEnabled := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -2213,7 +2244,6 @@ function CreateRotatingButtonGroup(targetLayer: TLayer32;
   pivotButtonColor: TColor32;
   angleButtonColor: TColor32;
   initialAngle: double; angleOffset: double;
-  enablePivotMove: Boolean;
   buttonLayerClass: TButtonDesignerLayer32Class): TRotatingGroupLayer32;
 var
   pivot: TPointD;
@@ -2221,7 +2251,7 @@ begin
   pivot := PointD(Img32.Vector.MidPoint(targetLayer.Bounds));
   Result := CreateRotatingButtonGroup(targetLayer, pivot, buttonSize,
     pivotButtonColor, angleButtonColor, initialAngle, angleOffset,
-    enablePivotMove, buttonLayerClass);
+    buttonLayerClass);
 end;
 //------------------------------------------------------------------------------
 
