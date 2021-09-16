@@ -123,6 +123,7 @@ type
     function GetHasTransparency: Boolean;
     function GetBounds: TRect;
     function GetMidPoint: TPointD;
+    function GetIsBlocked: Boolean;
   protected
     function CopyPixels(rec: TRect): TArrayOfColor32;
     //CopyInternal: Internal routine (has no scaling or bounds checking)
@@ -243,6 +244,7 @@ type
     property Height: Integer read fHeight;
     property Bounds: TRect read GetBounds;
     property IsBlank: Boolean read GetIsBlank;
+    property IsBlocked: Boolean read GetIsBlocked;
     property IsEmpty: Boolean read GetIsEmpty;
     property MidPoint: TPointD read GetMidPoint;
     property Pixel[x,y: Integer]: TColor32 read GetPixel write SetPixel;
@@ -1523,6 +1525,12 @@ procedure TImage32.Resized;
 begin
   if Assigned(fOnResize) then fOnResize(Self);
   Changed;
+end;
+//------------------------------------------------------------------------------
+
+function TImage32.GetIsBlocked: Boolean;
+begin
+  Result := fUpdateCnt > 0;
 end;
 //------------------------------------------------------------------------------
 
