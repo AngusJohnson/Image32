@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls, Dialogs, ShellApi,
-  Img32, Img32.Layers, Img32.Draw, Img32.Panels;
+  Img32, Img32.Layers, Img32.Draw, Img32.Text, Img32.Panels;
 
 type
 
@@ -18,7 +18,10 @@ type
     BrushColor : TColor32;
     PenColor   : TColor32;
     PenWidth   : double;
+    FrameWidth : integer;
     IsRectangle: Boolean;
+    textPath   : TPathsD;
+    textRect   : TRect;
   protected
     procedure Draw; override;
   public
@@ -81,6 +84,8 @@ type
 
 var
   MainForm: TMainForm;
+  glyphs: TGlyphCache;
+
 
 implementation
 
@@ -108,6 +113,13 @@ begin
   Margin := 0;
   PenColor := HslToRgb(hsl);
   PenWidth := DpiAware(5);
+  FrameWidth := DpiAware(15);
+  IsRectangle := name = 'rectangle';
+
+  textPath := glyphs.GetTextGlyphs(0,0,name);
+  textRect := Img32.Vector.GetBounds(textPath);
+  textPath := OffsetPath(textPath, -textRect.Left, -textRect.Top);
+  types.OffsetRect(textRect,-textRect.Left, -textRect.Top);
 end;
 //------------------------------------------------------------------------------
 
@@ -115,16 +127,13 @@ procedure TMyVectorLayer32.SetBounds(const newBounds: TRect);
 var
   pp: TPathsD;
   rec: TRect;
-  i: integer;
 begin
   inherited;
-  i := Round(PenWidth);
+  //nb: ClipPath is relative to the Layer
   rec := Image.Bounds;
-
-  //make ClipPath relative to the Layer
   if IsRectangle then
   begin
-    Img32.Vector.InflateRect(rec, -i, -i);
+    Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
     ClipPath := Img32.Vector.Paths(Rectangle(rec));
   end else
   begin
@@ -133,27 +142,98 @@ begin
 
     //the more perfect way to do this would be to use
     //InflatePath but that way is *much* slower
-    Img32.Vector.InflateRect(rec, -i, -i);
+    Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
     ClipPath := Img32.Vector.Paths(Ellipse(rec));
   end;
 end;
 //------------------------------------------------------------------------------
 
+procedure DrawFrame(img: TImage32; const rec: TRect;
+  topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
+var
+  p: TPathD;
+begin
+  if topLeftColor <> bottomRightColor then
+  begin
+    with rec do
+    begin
+      p := MakePathD([left, bottom, left, top, right, top]);
+      DrawLine(img, p, penWidth, topLeftColor, esButt);
+      p := MakePathD([right, top, right, bottom, left, bottom]);
+      DrawLine(img, p, penWidth, bottomRightColor, esButt);
+    end;
+  end else
+    DrawLine(img, Rectangle(rec), penWidth, topLeftColor, esPolygon);
+end;
+//------------------------------------------------------------------------------
+
+procedure DrawEllipseFrame(img: TImage32; const rec: TRect;
+  topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
+var
+  p: TPathD;
+  cLtr,cDkr: TColor32;
+begin
+  if topLeftColor <> bottomRightColor then
+  begin
+    cLtr := GradientColor(topLeftColor, bottomRightColor, 0.33);
+    cDkr := GradientColor(topLeftColor, bottomRightColor, 0.67);
+    with rec do
+    begin
+      p := Arc(RectD(rec),angle150,-angle60);
+      DrawLine(img, p, penWidth, topLeftColor, esButt);
+      p := Arc(RectD(rec), -angle60, -angle45);
+      DrawLine(img, p, penWidth, cLtr, esButt);
+      p := Arc(RectD(rec), -angle45, -angle30);
+      DrawLine(img, p, penWidth, cDkr, esButt);
+      p := Arc(RectD(rec),-angle30, angle120);
+      DrawLine(img, p, penWidth, bottomRightColor, esButt);
+      p := Arc(RectD(rec),angle120,angle135);
+      DrawLine(img, p, penWidth, cDkr, esButt);
+      p := Arc(RectD(rec),angle135,angle150);
+      DrawLine(img, p, penWidth, cLtr, esButt);
+    end;
+  end else
+    DrawLine(img, Ellipse(rec), penWidth, topLeftColor, esPolygon);
+end;
+//------------------------------------------------------------------------------
+
 procedure TMyVectorLayer32.Draw;
 var
-  i: integer;
-  p: TPathD;
+  i, fw: integer;
+  pp: TPathsD;
   rec: TRect;
+  delta: TPointD;
 begin
-  i := Ceil(PenWidth/2);
   rec := Image.Bounds;
-  types.InflateRect(rec, -i,-i);
-  //shrink 'rec' by half of pen width and draw
+  //prepare to center text
+  delta.X := (RectWidth(rec) - RectWidth(textRect)) div 2;
+  delta.Y := (RectHeight(rec) - RectHeight(textRect)) div 2;
+
   if IsRectangle then
-    p := Rectangle(rec) else
-    p := Ellipse(rec);
-  DrawPolygon(Image, p, frEvenOdd, BrushColor);
-  DrawLine(Image, p, PenWidth, PenColor, esPolygon);
+  begin
+    fw := FrameWidth - dpiAwareI;
+    Image.Clear(rec, MakeLighter(BrushColor, 70));
+    i := Ceil(DpiAwareD/2);
+    img32.Vector.InflateRect(rec, -i, -i);
+    DrawFrame(Image, rec, clWhite32, $FFCCCCCC, dpiAwareI);
+    img32.Vector.InflateRect(rec, -fw, -fw);
+    Image.Clear(rec, BrushColor);
+    DrawFrame(Image, rec, $FFCCCCCC, clWhite32);
+  end else
+  begin
+    fw := FrameWidth - dpiAwareI;
+    DrawPolygon(Image, Ellipse(rec), frNonZero, MakeLighter(BrushColor, 70));
+    i := Ceil(DpiAwareD/2);
+    img32.Vector.InflateRect(rec, -i,-i);
+    DrawEllipseFrame(Image, rec, clWhite32, $FFCCCCCC, dpiAwareI);
+    img32.Vector.InflateRect(rec, -fw, -fw);
+    DrawPolygon(Image, Ellipse(rec), frNonZero, BrushColor);
+    DrawEllipseFrame(Image, rec, $FFCCCCCC, clWhite32);
+  end;
+
+  //draw the text
+  pp := OffsetPath(textPath, delta.X, delta.Y);
+  DrawPolygon(Image, pp, frNonZero, clBlack32);
 end;
 
 //------------------------------------------------------------------------------
@@ -161,6 +241,8 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormCreate(Sender: TObject);
+var
+  fr: TFontReader;
 begin
   Randomize;
 
@@ -174,12 +256,16 @@ begin
 
   //prepare for a hatched background design layer (see FormResize below).
   layeredImg32.AddLayer(TDesignerLayer32);
+
+  fr := FontManager.Load('Arial');
+  glyphs := TGlyphCache.Create(fr, DPIAware(12));
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
   FreeAndNil(layeredImg32); //see also FormResize
+  glyphs.free;
 end;
 //------------------------------------------------------------------------------
 
@@ -243,8 +329,8 @@ var
   rec: TRect;
 begin
   rec := MakeRandomRect;
-  newLayer := layeredImg32.AddLayer(TMyVectorLayer32, targetLayer) as TMyVectorLayer32;
-  newLayer.IsRectangle := false;
+  newLayer := layeredImg32.AddLayer(
+    TMyVectorLayer32, targetLayer, 'ellipse') as TMyVectorLayer32;
   //setting a path will automatically define the layer's bounds
   newLayer.Paths := Img32.Vector.Paths(Ellipse(rec));
   SetTargetLayer(newLayer);
@@ -257,8 +343,8 @@ var
   rec: TRect;
 begin
   rec := MakeRandomRect;
-  newLayer := layeredImg32.AddLayer(TMyVectorLayer32, targetLayer) as TMyVectorLayer32;
-  newLayer.IsRectangle := true;
+  newLayer := layeredImg32.AddLayer(
+    TMyVectorLayer32, targetLayer, 'rectangle') as TMyVectorLayer32;
   newLayer.SetBounds(rec);
   //a path isn't required for rectangular paths
   //since that's the default when no path is specified
@@ -359,7 +445,7 @@ begin
     rec := UpdateSizingButtonGroup(clickedLayer);
     //convert rec from layeredImg32 coordinates to targetLayer coords
     pt := targetLayer.MergedImagePtToLayerPt(NullPoint);
-    OffsetRect(rec, pt.X, pt.Y);
+    types.OffsetRect(rec, pt.X, pt.Y);
 
     targetLayer.SetBounds(rec);
     Invalidate;

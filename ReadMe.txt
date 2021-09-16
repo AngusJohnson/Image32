@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 3.2
-Released: 15 September 2021
+Latest version: 3.2.1
+Released: 17 September 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -11,6 +11,14 @@ Documentation : http://www.angusj.com/delphi/image32/Docs/
 Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
+
+Version 3.2.1
+  Img32  
+    Renamed TImage32.BlockUpdate to BlockNotify
+    Renamed TImage32.UnblockUpdate to UnblockNotify
+  Img32.Layers
+    Fixed minor bugs preventing Delphi 7 compile
+  Updated Layers301 example
 
 Version 3.2
   Img32.Layers

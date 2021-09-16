@@ -1,9 +1,9 @@
 object MainForm: TMainForm
   Left = 594
   Top = 418
+  Width = 471
+  Height = 470
   Caption = 'Layers301'
-  ClientHeight = 412
-  ClientWidth = 455
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText

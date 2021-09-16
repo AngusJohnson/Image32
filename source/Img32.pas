@@ -139,8 +139,8 @@ type
     destructor Destroy; override;
     procedure BeginUpdate;
     procedure EndUpdate;
-    procedure BlockUpdate;    //Changed not called when unblocked.
-    procedure UnblockUpdate;
+    procedure BlockNotify;
+    procedure UnblockNotify;
 
     procedure Assign(src: TImage32);
     procedure AssignTo(dst: TImage32);
@@ -1547,13 +1547,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.BlockUpdate;
+procedure TImage32.BlockNotify;
 begin
   inc(fUpdateCnt);
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.UnblockUpdate;
+procedure TImage32.UnblockNotify;
 begin
   dec(fUpdateCnt);
 end;

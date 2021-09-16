@@ -451,6 +451,7 @@ end;
 constructor THitTest.Create;
 begin
   htImage := TImage32.Create;
+  htImage.BlockNotify; //ie never notify :)
   enabled := true;
 end;
 //------------------------------------------------------------------------------
@@ -838,7 +839,9 @@ begin
   for i := fChilds.Count -1 downto 0 do
     TLayer32(fChilds[i]).Free;
   fChilds.Clear;
+  Image.BlockNotify;
   Image.SetSize(0, 0);
+  Image.UnblockNotify;
   FreeAndNil(fMergeImage);
   fClipPath := nil;
 end;
@@ -924,9 +927,9 @@ begin
   rec := nullRect;
   for i := 0 to ChildCount -1 do
     rec := Img32.Vector.UnionRect(rec, Child[i].Bounds);
-  Image.BlockUpdate;
+  Image.BlockNotify;
   SetBounds(rec);
-  Image.UnblockUpdate;
+  Image.UnblockNotify;
 end;
 //------------------------------------------------------------------------------
 
@@ -1041,15 +1044,15 @@ begin
     if Assigned(fParent) then
     begin
       dstRect := childLayer.Bounds;
-      OffsetRect(dstRect, -origOffset.X, -origOffset.Y);
+      types.OffsetRect(dstRect, -origOffset.X, -origOffset.Y);
       rec := Image.Bounds;
-      IntersectRect(dstRect, dstRect, rec);
+      types.IntersectRect(dstRect, dstRect, rec);
     end else
     begin
       //this must be the root layer
       dstRect := childLayer.Bounds;
-      IntersectRect(dstRect, dstRect, fLayeredImage.Bounds);
-      IntersectRect(dstRect, dstRect, updateRect);
+      types.IntersectRect(dstRect, dstRect, fLayeredImage.Bounds);
+      types.IntersectRect(dstRect, dstRect, updateRect);
     end;
 
     srcRect := dstRect;
@@ -1058,7 +1061,7 @@ begin
 
     //draw the child  onto the group's image
     img2 := nil;
-    img.BlockUpdate;
+    img.BlockNotify;
     try
       if (childLayer.Opacity < 254) or Assigned(fClipPath) then
       begin
@@ -1086,7 +1089,7 @@ begin
     finally
       if Assigned(img2) and (img2 <> childImg) then
         img2.Free;
-      img.UnblockUpdate;
+      img.UnblockNotify;
     end;
     childLayer.fRefreshPending := false;
   end;
@@ -1222,7 +1225,8 @@ end;
 
 procedure THitTestLayer32.ClearHitTesting;
 begin
-  fHitTest.htImage.SetSize(0,0);
+  if not fHitTest.htImage.IsEmpty then
+    fHitTest.htImage.SetSize(0,0);
 end;
 
 //------------------------------------------------------------------------------
@@ -1389,11 +1393,11 @@ begin
     Img32.Vector.InflateRect(rec, Margin, Margin);
     inherited SetBounds(rec);
   end;
-  Image.BlockUpdate;
+  Image.BlockNotify;
   try
     Draw;
   finally
-    Image.UnblockUpdate;
+    Image.UnblockNotify;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1483,7 +1487,7 @@ procedure TRasterLayer32.ImageChanged(Sender: TImage32);
 begin
   if (Sender = MasterImage) then
   begin
-    MasterImage.BlockUpdate; //avoid endless recursion
+    MasterImage.BlockNotify; //avoid endless recursion
     try
       //reset the layer whenever MasterImage changes
       fAngle := 0;
@@ -1502,16 +1506,16 @@ begin
         Image.Assign(MasterImage); //this will call ImageChange for Image
       Image.Resampler := RootOwner.Resampler;
     finally
-      MasterImage.UnblockUpdate;
+      MasterImage.UnblockNotify;
     end;
   end else
   begin
     if MasterImage.IsEmpty then
     begin
-      Image.BlockUpdate;
+      Image.BlockNotify;
       Image.CropTransparentPixels;
       MasterImage.Assign(Image); //this will call ImageChanged again
-      Image.UnblockUpdate;
+      Image.UnblockNotify;
     end;
     inherited;
     DoAutoHitTest;
