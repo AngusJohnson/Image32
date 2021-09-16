@@ -2,8 +2,8 @@ unit Img32.Panels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.0                                                             *
-* Date      :  20 July 2021                                                    *
+* Version   :  3.2                                                             *
+* Date      :  17 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Component that displays images on a TPanel descendant           *
@@ -61,6 +61,7 @@ type
     fOnKeyUp        : TKeyEvent;
     fOnScrolling    : TNotifyEvent;
     fOnZooming      : TNotifyEvent;
+    fOnMouseWheel   : TMouseWheelEvent;
 {$IFDEF GESTURES}
     fLastDistance: integer;
     fLastLocation: TPoint;
@@ -75,8 +76,6 @@ type
     procedure SetScale(scale: double);
     procedure SetScaleMin(value: double);
     procedure SetScaleMax(value: double);
-    //ScaleAtPoint: zooms in or out keeping 'pt' stationary relative to display
-    procedure ScaleAtPoint(scaleDelta: double; const pt: TPoint);
     function  GetColor: TColor;
     procedure SetColor(acolor: TColor);
     procedure SetAutoCenter(value: Boolean);
@@ -116,10 +115,16 @@ type
     function ClientToImage(const clientPt: TPoint): TPoint;
     function ImageToClient(const surfacePt: TPoint): TPoint;
     function RecenterImageAt(const imagePt: TPoint): Boolean;
+    //ScaleAtPoint: zooms in or out keeping 'pt' stationary relative to display
+    procedure ScaleAtPoint(scaleDelta: double; const pt: TPoint);
 
     property InnerClientRect: TRect read GetInnerClientRect;
     property InnerMargin: integer read GetInnerMargin;
     property Offset: TPoint read GetOffset write SetOffset;
+    property ScrollbarHorz: TPanelScrollbar
+      read fScrollbarHorz write fScrollbarHorz;
+    property ScrollbarVert: TPanelScrollbar
+      read fScrollbarVert write fScrollbarVert;
   published
     //AutoCenter: centers the image when its size is less than the display size
     property AutoCenter: Boolean read fAutoCenter write SetAutoCenter;
@@ -139,6 +144,7 @@ type
     //OnKeyDown: optional event for custom keyboard actions
     property OnKeyDown: TKeyEvent read fOnKeyDown write fOnKeyDown;
     property OnKeyUp: TKeyEvent read fOnKeyUp write fOnKeyUp;
+    property OnMouseWheel: TMouseWheelEvent read FOnMouseWheel write FOnMouseWheel;
     property OnScrolling: TNotifyEvent read fOnScrolling write fOnScrolling;
     property OnZooming: TNotifyEvent read fOnZooming write fOnZooming;
   end;
@@ -1068,7 +1074,11 @@ function TBaseImgPanel.DoMouseWheel(Shift: TShiftState;
 var
   isZooming: Boolean;
 begin
-  Result := inherited DoMouseWheel(Shift, WheelDelta, MousePos);
+  Result := false;
+  if Assigned(FOnMouseWheel) then
+    fOnMouseWheel(Self, Shift, WheelDelta, MousePos, Result);
+  if not Result then
+    Result := inherited DoMouseWheel(Shift, WheelDelta, MousePos);
   if Result then Exit;
 
   isZooming := (ssCtrl in Shift) and fAllowZoom;
