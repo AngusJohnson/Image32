@@ -681,7 +681,7 @@ var
   hsl: THsl;
 begin
   hsl := RgbToHsl(color);
-  hsl.lum := ClampByte(hsl.alpha - (percent/100 * hsl.alpha));
+  hsl.lum := ClampByte(hsl.lum - (percent/100 * hsl.lum));
   Result := HslToRgb(hsl);
 end;
 //------------------------------------------------------------------------------
@@ -691,7 +691,7 @@ var
   hsl: THsl;
 begin
   hsl := RgbToHsl(color);
-  hsl.lum := ClampByte(hsl.alpha + percent/100 * (255 - hsl.alpha));
+  hsl.lum := ClampByte(hsl.lum + percent/100 * (255 - hsl.lum));
   Result := HslToRgb(hsl);
 end;
 //------------------------------------------------------------------------------
