@@ -1650,7 +1650,6 @@ begin
     //rec is considered valid even when completely outside the image bounds,
     //and so when that happens we simply return a fully transparent image ...
     FillChar(Result[0], w * h * SizeOf(TColor32), 0);
-    Changed;
     Exit;
   end;
 
@@ -1664,7 +1663,6 @@ begin
       Move(pSrc^, pDst^, w * SizeOf(TColor32));
       inc(pSrc, Width); inc(pDst, w);
     end;
-    Changed;
     Exit;
   end;
 
@@ -1704,7 +1702,6 @@ begin
     FillChar(pDst^, w * SizeOf(TColor32), 0);
     inc(pDst, w);
   end;
-  Changed;
 end;
 //------------------------------------------------------------------------------
 

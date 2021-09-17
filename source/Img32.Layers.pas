@@ -2,8 +2,8 @@ unit Img32.Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.2                                                             *
-* Date      :  13 September 2021                                               *
+* Version   :  3.2.2                                                           *
+* Date      :  17 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -58,6 +58,7 @@ type
     fTop            : integer;
     fImage          : TImage32;
     fMergeImage     : TImage32;
+    fClipImage      : TImage32;
     fName           : string;
     fIndex          : integer;
     fVisible        : Boolean;
@@ -534,6 +535,8 @@ begin
   ClearChildren;
   fImage.Free;
   fChilds.Free;
+  FreeAndNil(fMergeImage);
+  FreeAndNil(fClipImage);
   if Assigned(fParent) then
   begin
     if fRefreshPending then
@@ -875,6 +878,14 @@ procedure TLayer32.SetClipPath(const path: TPathsD);
 begin
   RefreshPending;
   fClipPath := path;
+  if Assigned(fClipPath) and (self is THitTestLayer32) then
+  begin
+    if Assigned(fClipImage) then
+      fClipImage.SetSize(Width, Height) else
+      fClipImage := TImage32.Create(Width, Height);
+    DrawPolygon(fClipImage, path, frNonZero, clWhite32);
+  end else
+    FreeAndNil(fClipImage);
 end;
 //------------------------------------------------------------------------------
 
@@ -888,7 +899,6 @@ begin
   child := TLayer32(fChilds[index]);
   fChilds.Delete(index);
   FreeAndNil(fMergeImage);
-
   if child.Visible then
     child.Invalidate(child.Bounds);
 
@@ -1111,6 +1121,10 @@ begin
   if (self is TGroupLayer32) then
     pt2 := pt else
     pt2 := OffsetPoint(pt, -Left, -Top);
+
+  //if 'pt2' is on a clipped inner region, then don't continue
+  if Assigned(fClipImage) then
+    if TARGB(fClipImage.Pixel[pt2.X, pt2.Y]).A < 128 then Exit;
 
   for i := ChildCount -1 downto 0 do
   begin

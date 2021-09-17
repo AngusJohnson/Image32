@@ -15,6 +15,7 @@ type
 
   TMyVectorLayer32 = class(TVectorLayer32) //for vector drawn layers
   private
+    useRandomColors: Boolean;
     BrushColor : TColor32;
     PenColor   : TColor32;
     PenWidth   : double;
@@ -86,6 +87,8 @@ var
   MainForm: TMainForm;
   glyphs: TGlyphCache;
 
+const
+  clBtnFace32 = $FFEAEAEA;
 
 implementation
 
@@ -104,11 +107,14 @@ var
   hsl: THsl;
 begin
   inherited;
+  useRandomColors := true; ////////////////////////
   hsl.hue := Random(256);
   hsl.sat := 240;
-  hsl.lum := 200;
-  hsl.Alpha := 192;
-  BrushColor := HslToRgb(hsl);
+  hsl.lum := 180;
+  hsl.Alpha := 255;
+  if useRandomColors then
+    BrushColor := HslToRgb(hsl) else
+    BrushColor := clBtnFace32;
   hsl.lum := 60;
   Margin := 0;
   PenColor := HslToRgb(hsl);
@@ -116,7 +122,7 @@ begin
   FrameWidth := DpiAware(15);
   IsRectangle := name = 'rectangle';
 
-  textPath := glyphs.GetTextGlyphs(0,0,name);
+  textPath := glyphs.GetTextGlyphs(0, 0, name);
   textRect := Img32.Vector.GetBounds(textPath);
   textPath := OffsetPath(textPath, -textRect.Left, -textRect.Top);
   types.OffsetRect(textRect,-textRect.Left, -textRect.Top);
@@ -167,39 +173,44 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawEllipseFrame(img: TImage32; const rec: TRect;
+procedure DrawFramePath(img: TImage32; const path: TPathD;
   topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
 var
+  i, len, quadrant: integer;
+  angle: double;
   p: TPathD;
-  cLtr,cDkr: TColor32;
+  lp, mp, cp: TPointD;
+  c, c2: TColor32;
+  isCw: Boolean;
 begin
-  if topLeftColor <> bottomRightColor then
+  len := Length(path);
+  if len < 3 then Exit;
+  SetLength(p, 2);
+  lp := path[len -1];
+  for i := 0 to High(path) do
   begin
-    cLtr := GradientColor(topLeftColor, bottomRightColor, 0.33);
-    cDkr := GradientColor(topLeftColor, bottomRightColor, 0.67);
-    with rec do
-    begin
-      p := Arc(RectD(rec),angle150,-angle60);
-      DrawLine(img, p, penWidth, topLeftColor, esButt);
-      p := Arc(RectD(rec), -angle60, -angle45);
-      DrawLine(img, p, penWidth, cLtr, esButt);
-      p := Arc(RectD(rec), -angle45, -angle30);
-      DrawLine(img, p, penWidth, cDkr, esButt);
-      p := Arc(RectD(rec),-angle30, angle120);
-      DrawLine(img, p, penWidth, bottomRightColor, esButt);
-      p := Arc(RectD(rec),angle120,angle135);
-      DrawLine(img, p, penWidth, cDkr, esButt);
-      p := Arc(RectD(rec),angle135,angle150);
-      DrawLine(img, p, penWidth, cLtr, esButt);
-    end;
-  end else
-    DrawLine(img, Ellipse(rec), penWidth, topLeftColor, esPolygon);
+    angle := GetAngle(lp, path[i]);
+    if angle < -angle135 then                             //-180..-135
+      c := GradientColor(topLeftColor, bottomRightColor,
+        (-angle-angle135)/angle45)
+    else if angle <= angle0 then c := topLeftColor        //-135..0
+    else if angle < angle45 then
+      c := GradientColor(topLeftColor, bottomRightColor,  //0..45
+        angle/angle45)
+    else c := bottomRightColor;
+    p[0] := lp; p[1] := path[i];
+    DrawLine(img, p, penWidth, c, esButt);
+    lp := path[i];
+  end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMyVectorLayer32.Draw;
 var
   i, fw: integer;
+  p: TPathD;
+  mp: TPoint;
+
   pp: TPathsD;
   rec: TRect;
   delta: TPointD;
@@ -211,26 +222,24 @@ begin
 
   if IsRectangle then
   begin
-    fw := FrameWidth - dpiAwareI;
-    Image.Clear(rec, MakeLighter(BrushColor, 70));
+    fw := FrameWidth - dpiAwareI*2;
+    Image.Clear(rec, clBtnFace32);
     i := Ceil(DpiAwareD/2);
     img32.Vector.InflateRect(rec, -i, -i);
-    DrawFrame(Image, rec, clWhite32, $FFCCCCCC, dpiAwareI);
+    DrawFrame(Image, rec, clWhite32, $FFCCCCCC, dpiAwareI*2);
     img32.Vector.InflateRect(rec, -fw, -fw);
     Image.Clear(rec, BrushColor);
-    DrawFrame(Image, rec, $FFCCCCCC, clWhite32);
+    DrawFrame(Image, rec, $FFCCCCCC, clWhite32, dpiAwareI*2);
   end else
   begin
-    fw := FrameWidth - dpiAwareI;
-    DrawPolygon(Image, Ellipse(rec), frNonZero, MakeLighter(BrushColor, 70));
-    i := Ceil(DpiAwareD/2);
-    img32.Vector.InflateRect(rec, -i,-i);
-    DrawEllipseFrame(Image, rec, clWhite32, $FFCCCCCC, dpiAwareI);
+    fw := FrameWidth - dpiAwareI*2;
+    DrawPolygon(Image, Ellipse(rec), frNonZero, clBtnFace32);
+    img32.Vector.InflateRect(rec, -DpiAwareI,-DpiAwareI);
+    DrawFramePath(Image, Ellipse(rec), clWhite32, $FFCCCCCC, dpiAwareI*2);
     img32.Vector.InflateRect(rec, -fw, -fw);
     DrawPolygon(Image, Ellipse(rec), frNonZero, BrushColor);
-    DrawEllipseFrame(Image, rec, $FFCCCCCC, clWhite32);
+    DrawFramePath(Image, Ellipse(rec), $FFCCCCCC, clWhite32, dpiAwareI*2);
   end;
-
   //draw the text
   pp := OffsetPath(textPath, delta.X, delta.Y);
   DrawPolygon(Image, pp, frNonZero, clBlack32);

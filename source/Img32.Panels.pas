@@ -332,15 +332,11 @@ end;
 
 function MakeDarker(color: TColor; percent: integer): TColor;
 var
-  pcFrac: double;
-  r: TARGB absolute Result;
+  hsl: THsl;
 begin
-  percent := Max(0, Min(100, percent));
-  pcFrac := percent/100;
-  Result := ColorToRGB(color);
-  r.R := r.R - Round(r.R * pcFrac);
-  r.G := r.G - Round(r.G * pcFrac);
-  r.B := r.B - Round(r.B * pcFrac);
+  hsl := RgbToHsl(color);
+  hsl.lum := ClampByte(hsl.lum - (percent/100 * hsl.lum));
+  Result := HslToRgb(hsl);
 end;
 
 //------------------------------------------------------------------------------
