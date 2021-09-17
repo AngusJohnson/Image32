@@ -643,53 +643,56 @@ end;
 //------------------------------------------------------------------------------
 
 function RainbowColor(fraction: double): TColor32;
+var
+  hsl: THsl;
 begin
-  if (fraction >= 1) or (fraction <= 0) then
-    result := clRed32
-  else
+  if (fraction > 0) and (fraction < 1) then
   begin
-    fraction := fraction * 6;
-    case trunc(fraction) of
-      0: result := GradientColor(clRed32, clYellow32, frac(fraction));
-      1: result := GradientColor(clYellow32, clLime32, frac(fraction));
-      2: result := GradientColor(clLime32, clAqua32, frac(fraction));
-      3: result := GradientColor(clAqua32, clBlue32, frac(fraction));
-      4: result := GradientColor(clBlue32, clFuchsia32, frac(fraction));
-      else result := GradientColor(clFuchsia32, clRed32, frac(fraction));
-    end;
-  end;
+    hsl.hue := Round(fraction * 255);
+    hsl.sat := 255;
+    hsl.lum := 255;
+    hsl.alpha := 255;
+    Result := HslToRgb(hsl);
+  end else
+    result := clRed32
 end;
 //------------------------------------------------------------------------------
 
 function GradientColor(color1, color2: TColor32; frac: single): TColor32;
 var
-  c1: TARGB absolute color1;
-  c2: TARGB absolute color2;
-  r:  TARGB absolute Result;
+  hsl1, hsl2: THsl;
 begin
-  if frac >= 1 then
-    result := color2
-  else if frac <= 0 then
-    result := color1
+  if (frac <= 0) then result := color1
+  else if (frac >= 1) then result := color2
   else
   begin
-    r.B := trunc(c1.B*(1-frac) + c2.B*frac);
-    r.G := trunc(c1.G*(1-frac) + c2.G*frac);
-    r.R := trunc(c1.R*(1-frac) + c2.R*frac);
-    r.A := trunc(c1.A*(1-frac) + c2.A*frac);
+    hsl1 := RgbToHsl(color1); hsl2 := RgbToHsl(color2);
+    hsl1.hue := ClampByte(hsl1.hue*(1-frac) + hsl2.hue*frac);
+    hsl1.sat := ClampByte(hsl1.sat*(1-frac) + hsl2.sat*frac);
+    hsl1.lum := ClampByte(hsl1.lum*(1-frac) + hsl2.lum*frac);
+    hsl1.alpha := ClampByte(hsl1.alpha*(1-frac) + hsl2.alpha*frac);
+    Result := HslToRgb(hsl1);
   end;
 end;
 //------------------------------------------------------------------------------
 
 function MakeDarker(color: TColor32; percent: cardinal): TColor32;
+var
+  hsl: THsl;
 begin
-  result := GradientColor(color, $FF000000, percent/100);
+  hsl := RgbToHsl(color);
+  hsl.lum := ClampByte(hsl.alpha - (percent/100 * hsl.alpha));
+  Result := HslToRgb(hsl);
 end;
 //------------------------------------------------------------------------------
 
 function MakeLighter(color: TColor32; percent: cardinal): TColor32;
+var
+  hsl: THsl;
 begin
-  result := GradientColor(color, $FFFFFFFF, percent/100);
+  hsl := RgbToHsl(color);
+  hsl.lum := ClampByte(hsl.alpha + percent/100 * (255 - hsl.alpha));
+  Result := HslToRgb(hsl);
 end;
 //------------------------------------------------------------------------------
 
@@ -708,7 +711,6 @@ begin
   lightSize := radius * 0.25;
 
   rec := RectD(pt.X -radius, pt.Y -radius, pt.X +radius, pt.Y +radius);
-
   case buttonShape of
     bsDiamond:
       begin
@@ -731,7 +733,6 @@ begin
 
   img.BeginUpdate;
   try
-
     //nb: only need to cutout the inside shadow if
     //the pending color fill is semi-transparent
     if baShadow in buttonAttributes then
