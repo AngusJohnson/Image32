@@ -28,6 +28,11 @@ type
   TButtonAttribute = (baShadow, ba3D);
   TButtonAttributes = set of TButtonAttribute;
 
+procedure DrawFrame(img: TImage32; const rec: TRect;
+  topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
+procedure DrawFramePath(img: TImage32; const path: TPathD;
+  topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
+
 procedure DrawShadow(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; depth: double; angleRads: double = angle45;
   color: TColor32 = $80000000; cutoutInsideShadow: Boolean = false); overload;
@@ -236,6 +241,56 @@ var
 begin
   rec := GetSymmetricCropTransparentRect(img);
   if (rec.Top > 0) or (rec.Left > 0) then img.Crop(rec);
+end;
+//------------------------------------------------------------------------------
+
+procedure DrawFrame(img: TImage32; const rec: TRect;
+  topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
+var
+  p: TPathD;
+begin
+  if topLeftColor <> bottomRightColor then
+  begin
+    with rec do
+    begin
+      p := MakePathD([left, bottom, left, top, right, top]);
+      DrawLine(img, p, penWidth, topLeftColor, esButt);
+      p := MakePathD([right, top, right, bottom, left, bottom]);
+      DrawLine(img, p, penWidth, bottomRightColor, esButt);
+    end;
+  end else
+    DrawLine(img, Rectangle(rec), penWidth, topLeftColor, esPolygon);
+end;
+//------------------------------------------------------------------------------
+
+procedure DrawFramePath(img: TImage32; const path: TPathD;
+  topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
+var
+  i, len: integer;
+  angle: double;
+  p: TPathD;
+  lp: TPointD;
+  c: TColor32;
+begin
+  len := Length(path);
+  if len < 3 then Exit;
+  SetLength(p, 2);
+  lp := path[len -1];
+  for i := 0 to High(path) do
+  begin
+    angle := GetAngle(lp, path[i]);
+    if angle < -angle135 then                             //-180..-135
+      c := GradientColor(topLeftColor, bottomRightColor,
+        (-angle-angle135)/angle45)
+    else if angle <= angle0 then c := topLeftColor        //-135..0
+    else if angle < angle45 then
+      c := GradientColor(topLeftColor, bottomRightColor,  //0..45
+        angle/angle45)
+    else c := bottomRightColor;
+    p[0] := lp; p[1] := path[i];
+    DrawLine(img, p, penWidth, c, esButt);
+    lp := path[i];
+  end;
 end;
 //------------------------------------------------------------------------------
 
