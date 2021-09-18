@@ -108,6 +108,7 @@ type
     fOnChange: TNotifyEvent;
     fOnResize: TNotifyEvent;
     fUpdateCnt: integer;
+    fNotifyBlocked: Boolean;
     function GetPixel(x,y: Integer): TColor32;
     procedure SetPixel(x,y: Integer; color: TColor32);
     function GetIsBlank: Boolean;
@@ -123,7 +124,6 @@ type
     function GetHasTransparency: Boolean;
     function GetBounds: TRect;
     function GetMidPoint: TPointD;
-    function GetIsBlocked: Boolean;
   protected
     function CopyPixels(rec: TRect): TArrayOfColor32;
     //CopyInternal: Internal routine (has no scaling or bounds checking)
@@ -189,11 +189,13 @@ type
     procedure Clear(color: TColor32 = 0); overload;
     procedure Clear(const rec: TRect; color: TColor32 = 0); overload;
     procedure FillRect(rec: TRect; color: TColor32);
+
     procedure ConvertToBoolMask(reference: TColor32;
       tolerance: integer; colorFunc: TCompareFunction;
       maskBg: TColor32 = clWhite32; maskFg: TColor32 = clBlack32);
     procedure ConvertToAlphaMask(reference: TColor32;
       colorFunc: TCompareFunctionEx);
+
     procedure FlipVertical;
     procedure FlipHorizontal;
     procedure PreMultiply;
@@ -208,8 +210,6 @@ type
     procedure Grayscale;
     procedure InvertColors;
     procedure InvertAlphas;
-    procedure Tile(newWidth, newHeight: integer;
-      style: TTileFillStyle = tfsRepeat);
     procedure AdjustHue(percent: Integer);         //ie +/- 100%
     procedure AdjustLuminance(percent: Integer);   //ie +/- 100%
     procedure AdjustSaturation(percent: Integer);  //ie +/- 100%
@@ -244,7 +244,6 @@ type
     property Height: Integer read fHeight;
     property Bounds: TRect read GetBounds;
     property IsBlank: Boolean read GetIsBlank;
-    property IsBlocked: Boolean read GetIsBlocked;
     property IsEmpty: Boolean read GetIsEmpty;
     property MidPoint: TPointD read GetMidPoint;
     property Pixel[x,y: Integer]: TColor32 read GetPixel write SetPixel;
@@ -1523,25 +1522,21 @@ end;
 
 procedure TImage32.Resized;
 begin
-  if Assigned(fOnResize) then fOnResize(Self);
-  Changed;
-end;
-//------------------------------------------------------------------------------
-
-function TImage32.GetIsBlocked: Boolean;
-begin
-  Result := fUpdateCnt > 0;
+  if Assigned(fOnResize) then fOnResize(Self)
+  else Changed;
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.BeginUpdate;
 begin
+  if fNotifyBlocked then Exit;
   inc(fUpdateCnt);
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.EndUpdate;
 begin
+  if fNotifyBlocked then Exit;
   dec(fUpdateCnt);
   Changed;
 end;
@@ -1549,13 +1544,17 @@ end;
 
 procedure TImage32.BlockNotify;
 begin
+  if fUpdateCnt <> 0 then Exit;
   inc(fUpdateCnt);
+  fNotifyBlocked := true;
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.UnblockNotify;
 begin
+  if not fNotifyBlocked then Exit;
   dec(fUpdateCnt);
+  fNotifyBlocked := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -2772,91 +2771,6 @@ begin
   begin
     pc.A := 255 - pc.A;
     inc(pc);
-  end;
-  Changed;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImage32.Tile(newWidth, newHeight: integer;
-  style: TTileFillStyle = tfsRepeat);
-var
-  i,j, w,h, w2,h2: integer;
-  pc1, pc2: PColor32;
-  tmp: TImage32;
-begin
-  w := Min(Width, newWidth); h := Min(Height, newHeight);
-  w2 := Min(w*2, newWidth);
-  h2 := Min(h*2, newHeight);
-
-  //do the first 4 tile square (as further tiling will be simple copies)
-  tmp := TImage32.Create(self, Types.Rect(0, 0, w, h));
-  try
-    SetSize(newWidth, newHeight);
-    for i := 0 to h -1 do
-    begin
-      pc1 := tmp.PixelRow[i];
-      pc2 := PixelRow[i];
-      Move(pc1^, pc2^, w * SizeOf(TColor32));
-    end;
-
-    case style of
-      tfsMirrorHorz: tmp.FlipHorizontal;
-      tfsMirrorVert: tmp.FlipVertical;
-      tfsRotate180: tmp.Rotate180;
-    end;
-
-    if w2 > w then
-    begin
-      for i := 0 to h -1 do
-      begin
-        pc1 := tmp.PixelRow[i];
-        pc2 := @Pixels[i * newWidth + w];
-        Move(pc1^, pc2^, (w2 - w) * SizeOf(TColor32));
-      end;
-    end;
-
-    if h2 > h then
-    begin
-      for i := 0 to w2 -1 do
-      begin
-        pc1 := @Pixels[i];
-        pc2 := @Pixels[h * newWidth + i];
-        for j := h to h2 -1 do
-        begin
-          pc2^ := pc1^;
-          inc(pc1, newWidth);
-          inc(pc2, newWidth);
-        end;
-      end;
-    end;
-  finally
-    tmp.Free;
-  end;
-
-  //now straight copy the first 4 tile block to fill the rest of the image
-  w := w2; h := h2;
-  while (w2 < newWidth) do
-  begin
-    j := Min(w2 + w, newWidth);
-    for i := 0 to h -1 do
-    begin
-      pc1 := PixelRow[i];
-      pc2 := IncPColor32(pc1, w2);
-      Move(pc1^, pc2^, (j - w2) * SizeOf(TColor32));
-    end;
-    inc(w2, w);
-  end;
-
-  while (h2 < newHeight) do
-  begin
-    j := Min(h2 + h, newHeight);
-    for i := h2 to j -1 do
-    begin
-      pc1 := PixelRow[i-h2];
-      pc2 := PixelRow[i];
-      Move(pc1^, pc2^, newWidth * SizeOf(TColor32));
-    end;
-    inc(h2, h);
   end;
   Changed;
 end;

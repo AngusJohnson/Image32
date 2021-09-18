@@ -212,9 +212,11 @@ type
   function Size(cx, cy: integer): TSize;
   function SizeD(cx, cy: double): TSizeD;
 
+  function IsClockwise(const path: TPathD): Boolean;
   function Area(const path: TPathD): Double;
   function RectsEqual(const rec1, rec2: TRect): Boolean;
   procedure OffsetRect(var rec: TRectD; dx, dy: double); overload;
+
 
   function IsValid(value: integer): Boolean; overload;
   function IsValid(value: double): Boolean; overload;
@@ -642,6 +644,12 @@ function SizeD(cx, cy: double): TSizeD;
 begin
   Result.cx := cx;
   Result.cy := cy;
+end;
+//------------------------------------------------------------------------------
+
+function IsClockwise(const path: TPathD): Boolean;
+begin
+  Result := Area(path) > 0;
 end;
 //------------------------------------------------------------------------------
 

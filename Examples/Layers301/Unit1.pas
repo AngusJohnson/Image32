@@ -20,7 +20,6 @@ type
     PenColor   : TColor32;
     PenWidth   : double;
     FrameWidth : integer;
-    IsRectangle: Boolean;
     textPath   : TPathsD;
     textRect   : TRect;
   protected
@@ -51,6 +50,8 @@ type
     N2: TMenuItem;
     mnuSendBack: TMenuItem;
     mnuBringForward: TMenuItem;
+    AddStar1: TMenuItem;
+    AddStar2: TMenuItem;
     procedure mnuExitClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -72,6 +73,7 @@ type
     procedure mnuSendBackClick(Sender: TObject);
     procedure mnuBringForwardClick(Sender: TObject);
     procedure WMERASEBKGND(var message: TMessage); message WM_ERASEBKGND;
+    procedure AddStar1Click(Sender: TObject);
   private
     layeredImg32: TLayeredImage32;
     clickedLayer: TLayer32;
@@ -98,61 +100,6 @@ uses
   Img32.Fmt.BMP, Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.SVG,
   Img32.Vector, Img32.Extra, Img32.Clipper;
 
-//------------------------------------------------------------------------------
-// TMyVectorLayer32
-//------------------------------------------------------------------------------
-
-constructor TMyVectorLayer32.Create(parent: TLayer32; const name: string = '');
-var
-  hsl: THsl;
-begin
-  inherited;
-  useRandomColors := true; ////////////////////////
-  hsl.hue := Random(256);
-  hsl.sat := 240;
-  hsl.lum := 180;
-  hsl.Alpha := 255;
-  if useRandomColors then
-    BrushColor := HslToRgb(hsl) else
-    BrushColor := clBtnFace32;
-  hsl.lum := 60;
-  Margin := 0;
-  PenColor := HslToRgb(hsl);
-  PenWidth := DpiAware(5);
-  FrameWidth := DpiAware(15);
-  IsRectangle := name = 'rectangle';
-
-  textPath := glyphs.GetTextGlyphs(0, 0, name);
-  textRect := Img32.Vector.GetBounds(textPath);
-  textPath := OffsetPath(textPath, -textRect.Left, -textRect.Top);
-  types.OffsetRect(textRect,-textRect.Left, -textRect.Top);
-end;
-//------------------------------------------------------------------------------
-
-procedure TMyVectorLayer32.SetBounds(const newBounds: TRect);
-var
-  pp: TPathsD;
-  rec: TRect;
-begin
-  inherited;
-  //nb: ClipPath is relative to the Layer
-  rec := Image.Bounds;
-  if IsRectangle then
-  begin
-    Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
-    ClipPath := Img32.Vector.Paths(Rectangle(rec));
-  end else
-  begin
-    pp := Img32.Vector.Paths(Ellipse(rec));
-    UpdateHitTestMask(pp, frEvenOdd);
-
-    //the more perfect way to do this would be to use
-    //InflatePath but that way is *much* slower
-    Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
-    ClipPath := Img32.Vector.Paths(Ellipse(rec));
-  end;
-end;
-//------------------------------------------------------------------------------
 
 procedure DrawFrame(img: TImage32; const rec: TRect;
   topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
@@ -205,6 +152,94 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function Star(rec: TRect; points: integer): TPathD;
+var
+  i, innerOff: integer;
+  p, p2: TPathD;
+begin
+  Result := nil;
+  if points < 5 then points := 5
+  else if points > 15 then points := 15;
+  innerOff := Min(RectWidth(rec), RectHeight(rec)) div 6;
+
+  if not Odd(points) then inc(points);
+  p := Ellipse(rec, points);
+  if not Assigned(p) then Exit;
+  types.InflateRect(rec, -innerOff, -innerOff);
+  p2 := Ellipse(rec, points*2);
+  SetLength(Result, points*2);
+  for i := 0 to points -1 do
+  begin
+    Result[i*2] := p[i];
+    Result[i*2+1] := p2[i*2+1];
+  end;
+end;
+
+//------------------------------------------------------------------------------
+// TMyVectorLayer32
+//------------------------------------------------------------------------------
+
+constructor TMyVectorLayer32.Create(parent: TLayer32; const name: string = '');
+var
+  hsl: THsl;
+begin
+  inherited;
+  useRandomColors := true; ////////
+  hsl.hue := Random(256);
+  hsl.sat := 240;
+  hsl.lum := 180;
+  hsl.Alpha := 255;
+  if useRandomColors then
+    BrushColor := HslToRgb(hsl) else
+    BrushColor := clBtnFace32;
+  hsl.lum := 60;
+  Margin := 0;
+  PenColor := HslToRgb(hsl);
+  PenWidth := DpiAware(5);
+  FrameWidth := DpiAware(15);
+
+  textPath := glyphs.GetTextGlyphs(0, 0, name);
+  textRect := Img32.Vector.GetBounds(textPath);
+  textPath := OffsetPath(textPath, -textRect.Left, -textRect.Top);
+  types.OffsetRect(textRect,-textRect.Left, -textRect.Top);
+end;
+//------------------------------------------------------------------------------
+
+procedure TMyVectorLayer32.SetBounds(const newBounds: TRect);
+var
+  pp: TPathsD;
+  rec: TRect;
+begin
+  inherited;
+  //nb: ClipPath is relative to the Layer
+  rec := Image.Bounds;
+  if name = 'rectangle' then
+  begin
+    Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
+    ClipPath := Img32.Vector.Paths(Rectangle(rec));
+  end
+  else if name = 'ellipse' then
+  begin
+    pp := Img32.Vector.Paths(Ellipse(rec));
+    UpdateHitTestMask(pp, frEvenOdd);
+
+    //the more perfect way to do this would be to use
+    //InflatePath but that way is *much* slower
+    Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
+    ClipPath := Img32.Vector.Paths(Ellipse(rec));
+  end else
+  begin
+    pp := Img32.Vector.Paths(Star(rec, 7));
+    UpdateHitTestMask(pp, frEvenOdd);
+
+    //the more perfect way to do this would be to use
+    //InflatePath but that way is *much* slower
+    Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
+    ClipPath := Img32.Vector.Paths(Star(rec, 7));
+  end;
+end;
+//------------------------------------------------------------------------------
+
 procedure TMyVectorLayer32.Draw;
 var
   i, fw: integer;
@@ -220,7 +255,7 @@ begin
   delta.X := (RectWidth(rec) - RectWidth(textRect)) div 2;
   delta.Y := (RectHeight(rec) - RectHeight(textRect)) div 2;
 
-  if IsRectangle then
+  if name = 'rectangle' then
   begin
     fw := FrameWidth - dpiAwareI*2;
     Image.Clear(rec, clBtnFace32);
@@ -230,7 +265,8 @@ begin
     img32.Vector.InflateRect(rec, -fw, -fw);
     Image.Clear(rec, BrushColor);
     DrawFrame(Image, rec, $FFCCCCCC, clWhite32, dpiAwareI*2);
-  end else
+  end
+  else if name = 'ellipse' then
   begin
     fw := FrameWidth - dpiAwareI*2;
     DrawPolygon(Image, Ellipse(rec), frNonZero, clBtnFace32);
@@ -239,6 +275,15 @@ begin
     img32.Vector.InflateRect(rec, -fw, -fw);
     DrawPolygon(Image, Ellipse(rec), frNonZero, BrushColor);
     DrawFramePath(Image, Ellipse(rec), $FFCCCCCC, clWhite32, dpiAwareI*2);
+  end else
+  begin
+    fw := FrameWidth - dpiAwareI*2;
+    DrawPolygon(Image, Star(rec, 7), frNonZero, clBtnFace32);
+    img32.Vector.InflateRect(rec, -DpiAwareI,-DpiAwareI);
+    DrawFramePath(Image, Star(rec, 7), clWhite32, $FFCCCCCC, dpiAwareI*2);
+    img32.Vector.InflateRect(rec, -fw, -fw);
+    DrawPolygon(Image, Star(rec, 7), frNonZero, BrushColor);
+    DrawFramePath(Image, Star(rec, 7), $FFCCCCCC, clWhite32, dpiAwareI*2);
   end;
   //draw the text
   pp := OffsetPath(textPath, delta.X, delta.Y);
@@ -329,6 +374,20 @@ begin
     Result.Right := Result.Left +75;
   if Result.Bottom - Result.Top < 50 then
     Result.Bottom := Result.Top +50;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.AddStar1Click(Sender: TObject);
+var
+  newLayer: TMyVectorLayer32;
+  rec: TRect;
+begin
+  rec := MakeRandomRect;
+  newLayer := layeredImg32.AddLayer(
+    TMyVectorLayer32, targetLayer, 'star') as TMyVectorLayer32;
+  //setting a path will automatically define the layer's bounds
+  newLayer.Paths := Img32.Vector.Paths(Star(rec, 7));
+  SetTargetLayer(newLayer);
 end;
 //------------------------------------------------------------------------------
 
@@ -453,8 +512,8 @@ begin
     //in the sizing group and get the bounds rect for the target layer
     rec := UpdateSizingButtonGroup(clickedLayer);
     //convert rec from layeredImg32 coordinates to targetLayer coords
-    pt := targetLayer.MergedImagePtToLayerPt(NullPoint);
-    types.OffsetRect(rec, pt.X, pt.Y);
+    pt := targetLayer.GetAbsoluteOrigin;
+    types.OffsetRect(rec, -pt.X, -pt.Y);
 
     targetLayer.SetBounds(rec);
     Invalidate;

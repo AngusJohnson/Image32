@@ -55,6 +55,11 @@ object MainForm: TMainForm
         ShortCut = 16453
         OnClick = mnuAddEllipseClick
       end
+      object AddStar1: TMenuItem
+        Caption = 'Add &Star'
+        ShortCut = 16467
+        OnClick = AddStar1Click
+      end
       object N2: TMenuItem
         Caption = '-'
       end
@@ -82,15 +87,20 @@ object MainForm: TMainForm
     OnPopup = PopupMenu1Popup
     Left = 128
     Top = 152
+    object AddRectangle1: TMenuItem
+      Caption = 'Add &Rectangle'
+      ShortCut = 16466
+      OnClick = mnuAddRectangleClick
+    end
     object AddEllipse1: TMenuItem
       Caption = 'Add &Ellipse'
       ShortCut = 16453
       OnClick = mnuAddEllipseClick
     end
-    object AddRectangle1: TMenuItem
-      Caption = 'Add &Rectangle'
-      ShortCut = 16466
-      OnClick = mnuAddRectangleClick
+    object AddStar2: TMenuItem
+      Caption = 'Add &Star'
+      ShortCut = 16467
+      OnClick = AddStar1Click
     end
     object N1: TMenuItem
       Caption = '-'

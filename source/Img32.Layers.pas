@@ -115,8 +115,8 @@ type
     function   BringToFront: Boolean;
     function   SendToBack: Boolean;
     function   Move(newParent: TLayer32; idx: integer): Boolean;
-    function   LayerPtToMergedImagePt(const pt: TPoint): TPoint;
-    function   MergedImagePtToLayerPt(const pt: TPoint): TPoint;
+    function   GetAbsoluteOrigin: TPoint;
+
     procedure  PositionAt(const pt: TPoint); overload;
     procedure  PositionAt(x, y: integer); overload; virtual;
     procedure  PositionCenteredAt(X, Y: integer); overload;
@@ -154,6 +154,8 @@ type
   end;
 
   TGroupLayer32 = class(TLayer32)
+  public
+    procedure  Offset(dx, dy: integer); override;
   end;
 
   THitTestLayer32 = class(TLayer32) //abstract classs
@@ -414,7 +416,7 @@ implementation
 
 {$IFNDEF MSWINDOWS}
 uses
-  Img32.FMX;
+  Img32.FMX, Img32.Layers;
 {$ENDIF}
 
 resourcestring
@@ -655,20 +657,8 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TLayer32.Offset(dx, dy: integer);
-var
-  i: integer;
 begin
-  if (dx = 0) and (dy = 0) then Exit;
-  if (self is TGroupLayer32) then
-  begin
-    Invalidate(Bounds);
-    PositionAt(fLeft + dx, fTop + dy);
-    BeginUpdate;
-    for i := 0 to ChildCount -1 do
-      Child[i].Offset(dx, dy);
-    EndUpdate;
-  end
-  else
+  if (dx <> 0) or (dy <> 0) then
     PositionAt(fLeft + dx, fTop + dy);
 end;
 //------------------------------------------------------------------------------
@@ -736,33 +726,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayer32.LayerPtToMergedImagePt(const pt: TPoint): TPoint;
+function TLayer32.GetAbsoluteOrigin: TPoint;
 var
   layer: TLayer32;
 begin
-  Result := pt;
+  Result := NullPoint;
   layer := Parent;
   while Assigned(layer) do
     with layer do
     begin
       if not (layer is TGroupLayer32) then
         Result := OffsetPoint(Result, Left, Top);
-      layer := Parent;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function TLayer32.MergedImagePtToLayerPt(const pt: TPoint): TPoint;
-var
-  layer: TLayer32;
-begin
-  Result := pt;
-  layer := Parent;
-  while Assigned(layer) do
-    with layer do
-    begin
-      if not (layer is TGroupLayer32) then
-        Result := OffsetPoint(Result, -Left, -Top);
       layer := Parent;
   end;
 end;
@@ -1197,6 +1171,22 @@ end;
 // TGroupLayer32 class
 //------------------------------------------------------------------------------
 
+procedure TGroupLayer32.Offset(dx, dy: integer);
+var
+  i: integer;
+begin
+  if (dx = 0) and (dy = 0) then Exit;
+  Invalidate(Bounds);
+  PositionAt(fLeft + dx, fTop + dy);
+  BeginUpdate;
+  try
+  for i := 0 to ChildCount -1 do
+    Child[i].Offset(dx, dy);
+  finally
+    EndUpdate;
+  end;
+end;
+
 //------------------------------------------------------------------------------
 // THitTestLayer32 class
 //------------------------------------------------------------------------------
@@ -1211,8 +1201,8 @@ end;
 
 destructor THitTestLayer32.Destroy;
 begin
-  fHitTest.Free;
   inherited;
+  fHitTest.Free; //do last
 end;
 //------------------------------------------------------------------------------
 
@@ -1516,7 +1506,7 @@ begin
 
       with MasterImage do
         fSavedSize := Img32.Vector.Size(Width, Height);
-      if not image.IsBlocked then
+      if (TLayerNotifyImage32(Image).UpdateCount = 0) then
         Image.Assign(MasterImage); //this will call ImageChange for Image
       Image.Resampler := RootOwner.Resampler;
     finally
@@ -1527,9 +1517,12 @@ begin
     if MasterImage.IsEmpty then
     begin
       Image.BlockNotify;
-      Image.CropTransparentPixels;
-      MasterImage.Assign(Image); //this will call ImageChanged again
-      Image.UnblockNotify;
+      try
+        Image.CropTransparentPixels;
+        MasterImage.Assign(Image); //this will call ImageChanged again
+      finally
+        Image.UnblockNotify;
+      end;
     end;
     inherited;
     DoAutoHitTest;
@@ -1569,8 +1562,7 @@ begin
       Image.Resampler := RootOwner.Resampler;
       //apply any prior transformations
       AffineTransformImage(Image, fMatrix);
-      //unfortunately cropping isn't an affine transformation
-      //so we have to crop separately and before the final resize
+      //cropping is very important with rotation
       SymmetricCropTransparent(Image);
       Image.Resize(newWidth, newHeight);
       PositionAt(newBounds.TopLeft);
@@ -1587,7 +1579,6 @@ procedure TRasterLayer32.DoPreScaleCheck;
 begin
   if not fRotating or not Assigned(Image) then Exit;
   fRotating := false;
-
   //rotation has just ended so add the rotation angle to fMatrix
   if (fAngle <> 0) then
     MatrixRotate(fMatrix, Image.MidPoint, fAngle);
@@ -1602,7 +1593,6 @@ procedure TRasterLayer32.DoPreRotationCheck;
 begin
   if fRotating or not Assigned(Image) then Exit;
   fRotating := true;
-
   fSavedMidPt := MidPoint;
   if fAutoPivot then fPivotPt := fSavedMidPt;
 
@@ -1621,8 +1611,7 @@ end;
 function TRasterLayer32.GetMatrix: TMatrixD;
 begin
   Result := fMatrix;
-
-  //and update for transformations not yet unapplied to fMatrix
+  //update for transformations not yet unapplied to fMatrix
   if fRotating then
   begin
     if fAngle <> 0 then
@@ -2077,8 +2066,9 @@ begin
     targetLayer.RootOwner.AddLayer(TSizingGroupLayer32, nil,
     rsSizingButtonGroup));
   Result.SizingStyle := sizingStyle;
+  //get targetlayer's absolute bounds (disregarding nesting)
   rec := RectD(targetLayer.Bounds);
-  pt := targetLayer.LayerPtToMergedImagePt(NullPoint);
+  pt := targetLayer.GetAbsoluteOrigin;
   OffsetRect(rec, pt.X, pt.Y);
 
   corners := Rectangle(rec);
