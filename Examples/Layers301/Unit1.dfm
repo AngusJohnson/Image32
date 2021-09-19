@@ -85,8 +85,8 @@ object MainForm: TMainForm
   end
   object PopupMenu1: TPopupMenu
     OnPopup = PopupMenu1Popup
-    Left = 128
-    Top = 152
+    Left = 168
+    Top = 72
     object AddRectangle1: TMenuItem
       Caption = 'Add &Rectangle'
       ShortCut = 16466

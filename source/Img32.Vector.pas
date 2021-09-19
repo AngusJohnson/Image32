@@ -74,8 +74,9 @@ type
   function Circle(const pt: TPoint; radius: double): TPathD; overload;
   function Circle(const pt: TPointD; radius: double): TPathD; overload;
 
+  function Star(const rec: TRectD; points: integer; indentFrac: double = 0.8): TPathD; overload;
   function Star(const focalPt: TPointD;
-    innerRadius, outerRadius: double; points: integer): TPathD;
+    innerRadius, outerRadius: double; points: integer): TPathD; overload;
 
   function Arc(const rec: TRectD;
     startAngle, endAngle: double; scale: double = 0): TPathD;
@@ -2324,6 +2325,37 @@ begin
     delta :=  PointD(delta.X * cosA - delta.Y * sinA,
       delta.Y * cosA + delta.X * sinA);
   end; //rotates clockwise
+end;
+//------------------------------------------------------------------------------
+
+function Star(const rec: TRectD; points: integer; indentFrac: double): TPathD;
+var
+  i: integer;
+  innerOff: double;
+  p, p2: TPathD;
+  rec2: TRectD;
+begin
+  Result := nil;
+  if points < 5 then points := 5
+  else if points > 15 then points := 15;
+  if indentFrac < 0.1 then indentFrac := 0.1
+  else if indentFrac > 0.8 then indentFrac := 0.8;
+  innerOff := Min(rec.Width, rec.Height) * indentFrac * 0.5;
+
+  if not Odd(points) then inc(points);
+  p := Ellipse(rec, points);
+  if not Assigned(p) then Exit;
+  rec2 := rec;
+  Img32.Vector.InflateRect(rec2, -innerOff, -innerOff);
+  if rec2.IsEmpty then
+    p2 := Ellipse(rec, points*2) else
+    p2 := Ellipse(rec2, points*2);
+  SetLength(Result, points*2);
+  for i := 0 to points -1 do
+  begin
+    Result[i*2] := p[i];
+    Result[i*2+1] := p2[i*2+1];
+  end;
 end;
 //------------------------------------------------------------------------------
 

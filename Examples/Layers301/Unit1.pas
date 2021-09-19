@@ -100,79 +100,13 @@ uses
   Img32.Fmt.BMP, Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.SVG,
   Img32.Vector, Img32.Extra, Img32.Clipper;
 
-
-procedure DrawFrame(img: TImage32; const rec: TRect;
-  topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
-var
-  p: TPathD;
-begin
-  if topLeftColor <> bottomRightColor then
-  begin
-    with rec do
-    begin
-      p := MakePathD([left, bottom, left, top, right, top]);
-      DrawLine(img, p, penWidth, topLeftColor, esButt);
-      p := MakePathD([right, top, right, bottom, left, bottom]);
-      DrawLine(img, p, penWidth, bottomRightColor, esButt);
-    end;
-  end else
-    DrawLine(img, Rectangle(rec), penWidth, topLeftColor, esPolygon);
-end;
+//------------------------------------------------------------------------------
+//
 //------------------------------------------------------------------------------
 
-procedure DrawFramePath(img: TImage32; const path: TPathD;
-  topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
-var
-  i, len, quadrant: integer;
-  angle: double;
-  p: TPathD;
-  lp, mp, cp: TPointD;
-  c, c2: TColor32;
-  isCw: Boolean;
+function MakeStar(const rec: TRect; IndentFrac: double = 0.4): TPathsD;
 begin
-  len := Length(path);
-  if len < 3 then Exit;
-  SetLength(p, 2);
-  lp := path[len -1];
-  for i := 0 to High(path) do
-  begin
-    angle := GetAngle(lp, path[i]);
-    if angle < -angle135 then                             //-180..-135
-      c := GradientColor(topLeftColor, bottomRightColor,
-        (-angle-angle135)/angle45)
-    else if angle <= angle0 then c := topLeftColor        //-135..0
-    else if angle < angle45 then
-      c := GradientColor(topLeftColor, bottomRightColor,  //0..45
-        angle/angle45)
-    else c := bottomRightColor;
-    p[0] := lp; p[1] := path[i];
-    DrawLine(img, p, penWidth, c, esButt);
-    lp := path[i];
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function Star(rec: TRect; points: integer): TPathD;
-var
-  i, innerOff: integer;
-  p, p2: TPathD;
-begin
-  Result := nil;
-  if points < 5 then points := 5
-  else if points > 15 then points := 15;
-  innerOff := Min(RectWidth(rec), RectHeight(rec)) div 6;
-
-  if not Odd(points) then inc(points);
-  p := Ellipse(rec, points);
-  if not Assigned(p) then Exit;
-  types.InflateRect(rec, -innerOff, -innerOff);
-  p2 := Ellipse(rec, points*2);
-  SetLength(Result, points*2);
-  for i := 0 to points -1 do
-  begin
-    Result[i*2] := p[i];
-    Result[i*2+1] := p2[i*2+1];
-  end;
+  Result := Img32.Vector.Paths(Star(RectD(rec), 7, IndentFrac));
 end;
 
 //------------------------------------------------------------------------------
@@ -184,7 +118,9 @@ var
   hsl: THsl;
 begin
   inherited;
-  useRandomColors := true; ////////
+  ///////////////////////
+  useRandomColors := true;//false;//
+  ///////////////////////
   hsl.hue := Random(256);
   hsl.sat := 240;
   hsl.lum := 180;
@@ -196,7 +132,7 @@ begin
   Margin := 0;
   PenColor := HslToRgb(hsl);
   PenWidth := DpiAware(5);
-  FrameWidth := DpiAware(15);
+  FrameWidth := DpiAware(10);
 
   textPath := glyphs.GetTextGlyphs(0, 0, name);
   textRect := Img32.Vector.GetBounds(textPath);
@@ -229,13 +165,13 @@ begin
     ClipPath := Img32.Vector.Paths(Ellipse(rec));
   end else
   begin
-    pp := Img32.Vector.Paths(Star(rec, 7));
+    pp := MakeStar(rec);
     UpdateHitTestMask(pp, frEvenOdd);
 
     //the more perfect way to do this would be to use
     //InflatePath but that way is *much* slower
     Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
-    ClipPath := Img32.Vector.Paths(Star(rec, 7));
+    ClipPath := MakeStar(rec);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -243,9 +179,6 @@ end;
 procedure TMyVectorLayer32.Draw;
 var
   i, fw: integer;
-  p: TPathD;
-  mp: TPoint;
-
   pp: TPathsD;
   rec: TRect;
   delta: TPointD;
@@ -275,15 +208,16 @@ begin
     img32.Vector.InflateRect(rec, -fw, -fw);
     DrawPolygon(Image, Ellipse(rec), frNonZero, BrushColor);
     DrawFramePath(Image, Ellipse(rec), $FFCCCCCC, clWhite32, dpiAwareI*2);
-  end else
+  end
+  else //name = 'star'
   begin
     fw := FrameWidth - dpiAwareI*2;
-    DrawPolygon(Image, Star(rec, 7), frNonZero, clBtnFace32);
+    DrawPolygon(Image, MakeStar(rec), frNonZero, clBtnFace32);
     img32.Vector.InflateRect(rec, -DpiAwareI,-DpiAwareI);
-    DrawFramePath(Image, Star(rec, 7), clWhite32, $FFCCCCCC, dpiAwareI*2);
+    DrawFramePath(Image, MakeStar(rec)[0], clWhite32, $FFCCCCCC, dpiAwareI*2);
     img32.Vector.InflateRect(rec, -fw, -fw);
-    DrawPolygon(Image, Star(rec, 7), frNonZero, BrushColor);
-    DrawFramePath(Image, Star(rec, 7), $FFCCCCCC, clWhite32, dpiAwareI*2);
+    DrawPolygon(Image, MakeStar(rec), frNonZero, BrushColor);
+    DrawFramePath(Image, MakeStar(rec)[0], $FFCCCCCC, clWhite32, dpiAwareI*2);
   end;
   //draw the text
   pp := OffsetPath(textPath, delta.X, delta.Y);
@@ -386,7 +320,7 @@ begin
   newLayer := layeredImg32.AddLayer(
     TMyVectorLayer32, targetLayer, 'star') as TMyVectorLayer32;
   //setting a path will automatically define the layer's bounds
-  newLayer.Paths := Img32.Vector.Paths(Star(rec, 7));
+  newLayer.Paths := MakeStar(rec);
   SetTargetLayer(newLayer);
 end;
 //------------------------------------------------------------------------------

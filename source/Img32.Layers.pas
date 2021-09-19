@@ -35,7 +35,6 @@ type
   THitTest = class
     htImage   : TImage32;
     enabled   : Boolean;
-    procedure Init(ownerLayer: TLayer32);
     constructor Create;
     destructor Destroy; override;
   end;
@@ -132,7 +131,8 @@ type
 
     property   ChildCount: integer read GetChildCount;
     property   Child[index: integer]: TLayer32 read GetChild; default;
-    //ClipPath enables groups to have irregular shapes, even holes
+    //ClipPath: defines a client region for child layers (in child coords).
+    //When undefined, the clip region is the layer's bounds.
     property   ClipPath: TPathsD read fClipPath write SetClipPath;
     procedure  Offset(dx, dy: integer); virtual;
     property   Bounds: TRect read GetBounds;
@@ -463,13 +463,6 @@ destructor THitTest.Destroy;
 begin
   htImage.Free;
   inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure THitTest.Init(ownerLayer: TLayer32);
-begin
-  with ownerLayer do
-    htImage.SetSize(width, height);
 end;
 
 //------------------------------------------------------------------------------
@@ -854,6 +847,7 @@ begin
   fClipPath := path;
   if Assigned(fClipPath) and (self is THitTestLayer32) then
   begin
+    //create a clip mask
     if Assigned(fClipImage) then
       fClipImage.SetSize(Width, Height) else
       fClipImage := TImage32.Create(Width, Height);
@@ -874,7 +868,10 @@ begin
   fChilds.Delete(index);
   FreeAndNil(fMergeImage);
   if child.Visible then
-    child.Invalidate(child.Bounds);
+  begin
+    Invalidate(child.fOldBounds);
+    Invalidate(child.Bounds);
+  end;
 
   if not fromChild then
   begin
@@ -1051,11 +1048,11 @@ begin
       begin
         img2 := TImage32.Create(childImg);
         img2.ReduceOpacity(childLayer.Opacity);
-        if Assigned(fClipPath) then
+        if Assigned(fClipImage) then
         begin
-          clpPaths := OffsetPath(fClipPath,
-            -childLayer.Left, -childLayer.Top);
-          EraseOutsidePaths(img2, clpPaths, frNonZero, img2.Bounds);
+          rec := fClipImage.Bounds;
+          types.OffsetRect(rec, -childLayer.Left, -childLayer.Top);
+          img2.CopyBlend(fClipImage, fClipImage.Bounds, rec, BlendMask);
         end;
       end else
       begin
@@ -1096,7 +1093,7 @@ begin
     pt2 := pt else
     pt2 := OffsetPoint(pt, -Left, -Top);
 
-  //if 'pt2' is on a clipped inner region, then don't continue
+  //if 'pt2' is outside the clip mask then don't continue
   if Assigned(fClipImage) then
     if TARGB(fClipImage.Pixel[pt2.X, pt2.Y]).A < 128 then Exit;
 
@@ -1417,7 +1414,7 @@ end;
 procedure  TVectorLayer32.UpdateHitTestMask(const vectorRegions: TPathsD;
   fillRule: TFillRule);
 begin
-  fHitTest.Init(self);
+  //fHitTest.Init(self);
   UpdateHitTestMaskUsingPath(self, vectorRegions, fillRule);
 end;
 
@@ -1768,7 +1765,7 @@ end;
 procedure  TDesignerLayer32.UpdateHitTestMask(const vectorRegions: TPathsD;
   fillRule: TFillRule);
 begin
-  fHitTest.Init(self);
+  //fHitTest.Init(self);
   UpdateHitTestMaskUsingPath(self, vectorRegions, fillRule);
 end;
 
