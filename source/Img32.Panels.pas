@@ -250,27 +250,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-//Since record methods were only added to Delphi in version D2006,
-//the following functions provide backward compatability
-
-function RectWidth(const rec: TRect): integer;
-{$IFDEF INLINE} inline; {$ENDIF}
-begin
-  result := rec.Right - rec.Left;
-end;
-//------------------------------------------------------------------------------
-
 procedure SetRectWidth(var rec: TRect; width: integer);
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
   rec.Right := rec.Left + width;
-end;
-//------------------------------------------------------------------------------
-
-function RectHeight(const rec: TRect): integer;
-{$IFDEF INLINE} inline; {$ENDIF}
-begin
-  result := rec.Bottom - rec.Top;
 end;
 //------------------------------------------------------------------------------
 
@@ -334,9 +317,9 @@ function MakeDarker(color: TColor; percent: integer): TColor;
 var
   hsl: THsl;
 begin
-  hsl := RgbToHsl(color);
+  hsl := RgbToHsl(Color32(color));
   hsl.lum := ClampByte(hsl.lum - (percent/100 * hsl.lum));
-  Result := HslToRgb(hsl);
+  Result := HslToRgb(hsl) and $FFFFFF;
 end;
 
 //------------------------------------------------------------------------------

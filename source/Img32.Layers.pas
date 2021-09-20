@@ -185,7 +185,7 @@ type
     procedure SetPivotPt(const pivot: TPointD); virtual;
   public
     constructor Create(parent: TLayer32; const name: string = ''); override;
-    procedure Rotate(angleDelta: double); virtual;
+    function Rotate(angleDelta: double): Boolean; virtual;
     procedure ResetAngle;
     procedure Offset(dx, dy: integer); override;
     property  Angle: double read fAngle write SetAngle;
@@ -207,7 +207,7 @@ type
     constructor Create(parent: TLayer32;  const name: string = ''); override;
     procedure SetBounds(const newBounds: TRect); override;
     procedure Offset(dx,dy: integer); override;
-    procedure Rotate(angleDelta: double); override;
+    function Rotate(angleDelta: double): Boolean; override;
     procedure UpdateHitTestMask(const vectorRegions: TPathsD;
       fillRule: TFillRule); virtual;
     property  Paths: TPathsD read fPaths write SetPaths;
@@ -242,7 +242,7 @@ type
     procedure UpdateHitTestMaskOpaque; virtual;
     procedure UpdateHitTestMaskTransparent(alphaValue: Byte = 127); overload; virtual;
     procedure SetBounds(const newBounds: TRect); override;
-    procedure Rotate(angleDelta: double); override;
+    function  Rotate(angleDelta: double): Boolean; override;
 
     property  AutoSetHitTestMask: Boolean read fAutoHitTest write fAutoHitTest;
     property  MasterImage: TImage32 read fMasterImg;
@@ -589,11 +589,14 @@ end;
 //------------------------------------------------------------------------------
 
 procedure  TLayer32.SetBounds(const newBounds: TRect);
+var
+  w,h: integer;
 begin
   fLeft := newBounds.Left;
   fTop := newBounds.Top;
   //nb: Image.SetSize will call the ImageChanged method
-  Image.SetSize(RectWidth(newBounds),RectHeight(newBounds));
+  RectWidthHeight(newBounds, w, h);
+  Image.SetSize(w, h);
 end;
 //------------------------------------------------------------------------------
 
@@ -985,7 +988,6 @@ var
   i: integer;
   img, img2, childImg: TImage32;
   origOffset: TPoint;
-  clpPaths: TPathsD;
   rec, dstRect, srcRect: TRect;
 begin
   if not Visible or (Opacity < 2) or
@@ -1252,9 +1254,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TRotateLayer32.Rotate(angleDelta: double);
+function TRotateLayer32.Rotate(angleDelta: double): Boolean;
 begin
-  if angleDelta = 0 then Exit;
+  Result := (angleDelta <> 0) and not HasChildren;
+  if not Result then Exit;
   fAngle := fAngle + angleDelta;
   NormalizeAngle(fAngle);
   //the rest is done in descendant classes
@@ -1314,10 +1317,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TVectorLayer32.Rotate(angleDelta: double);
+function TVectorLayer32.Rotate(angleDelta: double): Boolean;
 begin
-  if angleDelta = 0 then Exit;
-  inherited;
+  Result := inherited Rotate(angleDelta);
+  if not Result then Exit;
   fPaths := RotatePath(fPaths, fPivotPt, angleDelta);
   RepositionAndDraw;
 end;
@@ -1488,30 +1491,28 @@ procedure TRasterLayer32.ImageChanged(Sender: TImage32);
 begin
   if (Sender = MasterImage) then
   begin
-    MasterImage.BlockNotify; //avoid endless recursion
-    try
-      //reset the layer whenever MasterImage changes
-      fAngle := 0;
-      fMatrix := IdentityMatrix;
-      fRotating := false;
+    if MasterImage.IsBlank then Exit;
 
-      if not fRefreshPending then
-      begin
-        if not IsEmptyRect(fOldBounds) then Invalidate(fOldBounds);
-        fRefreshPending := true;
-      end;
+    //reset the layer whenever MasterImage changes
+    fAngle := 0;
+    fMatrix := IdentityMatrix;
+    fRotating := false;
 
-      with MasterImage do
-        fSavedSize := Img32.Vector.Size(Width, Height);
-      if (TLayerNotifyImage32(Image).UpdateCount = 0) then
-        Image.Assign(MasterImage); //this will call ImageChange for Image
-      Image.Resampler := RootOwner.Resampler;
-    finally
-      MasterImage.UnblockNotify;
-    end;
+    if not fRefreshPending then
+      Invalidate(fOldBounds);
+
+    if not Image.IsEmpty then Exit;
+    MasterImage.BlockNotify;
+    MasterImage.CropTransparentPixels;
+    MasterImage.UnblockNotify;
+    fSavedSize := Img32.Vector.Size(MasterImage.Width, MasterImage.Height);
+    if (TLayerNotifyImage32(Image).UpdateCount = 0) then
+      Image.Assign(MasterImage); //this will call ImageChange for Image
+    Image.Resampler := RootOwner.Resampler;
+
   end else
   begin
-    if MasterImage.IsEmpty then
+    if MasterImage.IsEmpty and not Image.IsBlank then
     begin
       Image.BlockNotify;
       try
@@ -1546,8 +1547,7 @@ var
   newWidth, newHeight: integer;
 begin
   DoPreScaleCheck;
-  newWidth := RectWidth(newBounds);
-  newHeight := RectHeight(newBounds);
+  RectWidthHeight(newBounds, newWidth, newHeight);
 
   //make sure the image is large enough to scale safely
   if (MasterImage.Width > 1) and (MasterImage.Height > 1) and
@@ -1621,13 +1621,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TRasterLayer32.Rotate(angleDelta: double);
+function TRasterLayer32.Rotate(angleDelta: double): Boolean;
 var
   mat: TMatrixD;
   rec: TRectD;
 begin
-  if MasterImage.IsEmpty or (angleDelta = 0) then Exit;
-  inherited;
+  Result := not MasterImage.IsEmpty and inherited Rotate(angleDelta);
+  if not Result then Exit;
 
   DoPreRotationCheck;
 
@@ -1636,7 +1636,9 @@ begin
 
   Image.BeginUpdate;
   try
+    ////////////////////////////////
     Image.Assign(MasterImage);
+    ////////////////////////////////
     Image.Resampler := RootOwner.Resampler;
     rec := GetRotatedRectBounds(RectD(Image.Bounds), Angle);
 
@@ -1646,9 +1648,11 @@ begin
     MatrixRotate(mat, NullPointD, Angle);
     MatrixTranslate(mat, rec.Width/2, rec.Height/2);
 
+    ////////////////////////////////
     AffineTransformImage(Image, mat);
     //symmetric cropping prevents center wobbling
     SymmetricCropTransparent(Image);
+    ////////////////////////////////
   finally
     Image.EndUpdate;
   end;

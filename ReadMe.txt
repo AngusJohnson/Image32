@@ -13,6 +13,8 @@ Download      : https://sourceforge.net/projects/image32/files/
 Recent changes:
 
 Version 3.2.2
+  Img32.Layers
+    Minor performance tweaks
   Minor bugfixes
   Updated Layers301 example again
 

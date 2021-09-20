@@ -496,7 +496,8 @@ var
 
   //AND BECAUSE OLDER DELPHI COMPILERS (OLDER THAN D2006)
   //DON'T SUPPORT RECORD METHODS
-
+  procedure RectWidthHeight(const rec: TRect; out width, height: Integer);
+  {$IFDEF INLINE} inline; {$ENDIF}
   function RectWidth(const rec: TRect): Integer;
   {$IFDEF INLINE} inline; {$ENDIF}
   function RectHeight(const rec: TRect): Integer;
@@ -891,6 +892,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure RectWidthHeight(const rec: TRect; out width, height: Integer);
+begin
+  width := rec.Right - rec.Left;
+  height := rec.Bottom - rec.Top;
+end;
+//------------------------------------------------------------------------------
+
 function RectWidth(const rec: TRect): Integer;
 begin
   Result := rec.Right - rec.Left;
@@ -1026,10 +1034,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure ScaleRect(var rec: TRect; scale: TPointD);
+procedure ScaleRect(var rec: TRect; x,y: double);
 begin
-  rec.Right := rec.Left + Round((rec.Right - rec.Left) * scale.X);
-  rec.Bottom := rec.Top + Round((rec.Bottom - rec.Top) * scale.Y);
+  rec.Right := rec.Left + Round((rec.Right - rec.Left) * x);
+  rec.Bottom := rec.Top + Round((rec.Bottom - rec.Top) * y);
 end;
 //------------------------------------------------------------------------------
 
@@ -1384,13 +1392,15 @@ end;
 //------------------------------------------------------------------------------
 
 constructor TImage32.Create(src: TImage32; const srcRec: TRect);
+var
+  rec: TRect;
 begin
   fResampler := src.fResampler;
-  fUpdateCnt := 1;
-  SetSize(RectWidth(srcRec), RectHeight(srcRec));
-  if not IsEmptyRect(srcRec) then
-    fPixels := src.CopyPixels(srcRec);
-  fUpdateCnt := 0;
+  types.IntersectRect(rec, src.Bounds, srcRec);
+  RectWidthHeight(rec, fWidth, fHeight);
+  SetLength(fPixels, fWidth * fHeight);
+  if (fWidth = 0) or (fheight = 0) then Exit;
+  fPixels := src.CopyPixels(srcRec);
 end;
 //------------------------------------------------------------------------------
 
@@ -1522,7 +1532,8 @@ end;
 
 procedure TImage32.Resized;
 begin
-  if Assigned(fOnResize) then fOnResize(Self)
+  if fUpdateCnt <> 0 then Exit
+  else if Assigned(fOnResize) then fOnResize(Self)
   else Changed;
 end;
 //------------------------------------------------------------------------------
@@ -1538,7 +1549,7 @@ procedure TImage32.EndUpdate;
 begin
   if fNotifyBlocked then Exit;
   dec(fUpdateCnt);
-  Changed;
+  if fUpdateCnt = 0 then Changed;
 end;
 //------------------------------------------------------------------------------
 
@@ -1637,8 +1648,7 @@ var
   pSrc, pDst, pDst2: PColor32;
   recClipped: TRect;
 begin
-  w := RectWidth(rec);
-  h := RectHeight(rec);
+  RectWidthHeight(rec, w,h);
   setLength(result, w * h);
 
   if w * h = 0 then Exit;
@@ -1707,15 +1717,20 @@ end;
 procedure TImage32.Crop(const rec: TRect);
 var
   newPixels: TArrayOfColor32;
+  w,h: integer;
 begin
+  RectWidthHeight(rec, w, h);
+  if (w = Width) and (h = Height) then Exit;
   newPixels := CopyPixels(rec);
-  BeginUpdate;
+  BlockNotify;
   try
-    SetSize(RectWidth(rec), RectHeight(rec));
-    if not IsEmptyRect(rec) then fPixels := newPixels;
+    SetSize(w, h);
+    if not IsEmptyRect(rec) then
+      fPixels := newPixels;
   finally
-    EndUpdate;
+    UnblockNotify;
   end;
+  Resized;
 end;
 //------------------------------------------------------------------------------
 
@@ -1735,16 +1750,16 @@ procedure TImage32.SetSize(newWidth, newHeight: Integer; color: TColor32);
 begin
   fwidth := Max(0, newWidth);
   fheight := Max(0, newHeight);
-  fPixels := nil; //prevents unnecessary (and unsafe) pixel copy
+  fPixels := nil; //forces a blank image
   SetLength(fPixels, fwidth * fheight);
   fIsPremultiplied := false;
-  BeginUpdate;
-  try
-    if color > 0 then Clear(color);
-    Resized;
-  finally
-    EndUpdate;
+  if color > 0 then
+  begin
+    BlockNotify;
+    Clear(color);
+    UnblockNotify;
   end;
+  Resized;
 end;
 //------------------------------------------------------------------------------
 
@@ -1753,21 +1768,23 @@ var
   tmp: TImage32;
   rec: TRect;
 begin
+
   if (newWidth <= 0) or (newHeight <= 0) then
   begin
     SetSize(0, 0);
     Exit;
-
-  end;
-  if (newWidth = fwidth) and (newHeight = fheight) then Exit;
-
-  if IsEmpty then
+  end
+  else if (newWidth = fwidth) and (newHeight = fheight) then
+  begin
+    Exit
+  end
+  else if IsEmpty then
   begin
     SetSize(newWidth, newHeight);
     Exit;
   end;
 
-  BeginUpdate;
+  BlockNotify;
   try
     if stretchImage then
     begin
@@ -1787,9 +1804,9 @@ begin
       end;
     end;
   finally
-    Resized;
-    EndUpdate;
+    UnblockNotify;
   end;
+  Resized;
 end;
 //------------------------------------------------------------------------------
 
@@ -1875,10 +1892,12 @@ var
   tmp: TImage32;
   rec2: TRect;
 begin
-  if IsEmpty or (width <= 0) or (height <= 0) then Exit;
+  if IsEmpty or (width <= 0) or (height <= 0) or
+    ((width = self.Width) and (height = self.Height)) then Exit;
+
   sx := width / self.Width;
   sy := height / self.Height;
-  BeginUpdate;
+  BlockNotify;
   try
     if sx <= sy then
     begin
@@ -1908,8 +1927,9 @@ begin
       end;
     end;
   finally
-    EndUpdate;
+    UnblockNotify;
   end;
+  Resized;
 end;
 //------------------------------------------------------------------------------
 
@@ -2217,7 +2237,8 @@ function TImage32.CopyBlend(src: TImage32; srcRec, dstRec: TRect;
 var
   tmp: TImage32;
   srcRecClipped, dstRecClipped, r: TRect;
-  scale, scaleSrc, scaleDst: TPointD;
+  scaleX, scaleY: double;
+  w,h, dstW,dstH, srcW,srcH: integer;
 begin
   result := false;
   if IsEmptyRect(srcRec) or IsEmptyRect(dstRec) then Exit;
@@ -2225,28 +2246,30 @@ begin
 
   //get the scaling amount (if any) before
   //dstRec might be adjusted due to clipping ...
-  scale.X := RectWidth(dstRec)/RectWidth(srcRec);
-  scale.Y := RectHeight(dstRec)/RectHeight(srcRec);
+  RectWidthHeight(dstRec, dstW, dstH);
+  RectWidthHeight(srcRec, srcW, srcH);
+  scaleX := dstW / srcW;
+  scaleY := dstH / srcH;
 
   //check if the source rec has been clipped ...
   if not RectsEqual(srcRecClipped, srcRec) then
   begin
     if IsEmptyRect(srcRecClipped) then Exit;
     //the source has been clipped so clip the destination too ...
-    scaleSrc.X := RectWidth(srcRecClipped)/RectWidth(srcRec);
-    scaleSrc.Y := RectHeight(srcRecClipped)/RectHeight(srcRec);
-    ScaleRect(dstRec, scaleSrc);
+    RectWidthHeight(srcRecClipped, w, h);
+    RectWidthHeight(srcRec, srcW, srcH);
+    ScaleRect(dstRec, w / srcW, h / srcH);
     Types.OffsetRect(dstRec,
       srcRecClipped.Left - srcRec.Left,
       srcRecClipped.Top - srcRec.Top);
   end;
 
-  if (scale.X <> 1.0) or (scale.Y <> 1.0) then
+  if (scaleX <> 1.0) or (scaleY <> 1.0) then
   begin
     //scale source (tmp) to the destination then call CopyBlend() again ...
     tmp := TImage32.Create(src, srcRecClipped);
     try
-      tmp.Scale(scale.X, scale.Y);
+      tmp.Scale(scaleX, scaleY);
       result := CopyBlend(tmp, tmp.Bounds, dstRec, blendFunc);
     finally
       tmp.Free;
@@ -2263,9 +2286,9 @@ begin
   if not RectsEqual(dstRecClipped, dstRec) then
   begin
     //the destination rec has been clipped so clip the source too ...
-    scaleDst.X := RectWidth(dstRecClipped)/RectWidth(dstRec);
-    scaleDst.Y := RectHeight(dstRecClipped)/RectHeight(dstRec);
-    ScaleRect(srcRecClipped, scaleDst);
+    RectWidthHeight(dstRecClipped, w, h);
+    RectWidthHeight(dstRec, dstW, dstH);
+    ScaleRect(srcRecClipped, w / dstW, h / dstH);
     Types.OffsetRect(srcRecClipped,
       dstRecClipped.Left - dstRec.Left,
       dstRecClipped.Top - dstRec.Top);
@@ -2315,8 +2338,7 @@ var
 begin
   BeginUpdate;
   try
-    w := RectWidth(srcRect);
-    h := RectHeight(srcRect);
+    RectWidthHeight(srcRect, w,h);
     SetSize(w, h);
     bi := Get32bitBitmapInfoHeader(w, h);
     dc := GetDC(0);
@@ -2354,9 +2376,11 @@ end;
 
 procedure TImage32.CopyToDc(const srcRect: TRect; dstDc: HDC;
   x: Integer = 0; y: Integer = 0; transparent: Boolean = true);
+var
+  recW, recH: integer;
 begin
-  CopyToDc(srcRect, Types.Rect(x,y, x +RectWidth(srcRect),
-    y +RectHeight(srcRect)), dstDc, transparent);
+  RectWidthHeight(srcRect, recW, recH);
+  CopyToDc(srcRect, Types.Rect(x,y, x+recW, y+recH), dstDc, transparent);
 end;
 //------------------------------------------------------------------------------
 
@@ -2375,10 +2399,8 @@ var
 begin
   Types.IntersectRect(rec, srcRect, Bounds);
   if IsEmpty or IsEmptyRect(rec) or IsEmptyRect(dstRect) then Exit;
-  wSrc := RectWidth(rec);
-  hSrc := RectHeight(rec);
-  wDest := RectWidth(dstRect);
-  hDest := RectHeight(dstRect);
+  RectWidthHeight(rec, wSrc, hSrc);
+  RectWidthHeight(dstRect, wDest, hDest);
   x := dstRect.Left;
   y := dstRect.Top;
   inc(x, rec.Left - srcRect.Left);

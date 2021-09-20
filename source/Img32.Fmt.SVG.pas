@@ -50,28 +50,33 @@ begin
     if not Result then Exit;
     r := GetViewbox(img32.Width, img32.Height);
 
-    //if the current image's dimensions are larger than the
-    //SVG's viewbox, then scale the SVG image up to fit
-    if not r.IsEmpty then
-    begin
-      w := r.Width;
-      h := r.Height;
-      sx := img32.Width / w;
-      sy := img32.Height / h;
-      if sy < sx then sx := sy;
-      if not(SameValue(sx, 1, 0.00001)) then
+    img32.BeginUpdate;
+    try
+      //if the current image's dimensions are larger than the
+      //SVG's viewbox, then scale the SVG image up to fit
+      if not r.IsEmpty then
       begin
-        w := w * sx;
-        h := h * sx;
+        w := r.Width;
+        h := r.Height;
+        sx := img32.Width / w;
+        sy := img32.Height / h;
+        if sy < sx then sx := sy;
+        if not(SameValue(sx, 1, 0.00001)) then
+        begin
+          w := w * sx;
+          h := h * sx;
+        end;
+        img32.SetSize(Round(w), Round(h));
       end;
-      img32.SetSize(Round(w), Round(h));
+
+      if img32.IsEmpty then
+        img32.SetSize(defaultSvgWidth, defaultSvgHeight);
+
+      //draw the SVG image to fit inside the canvas
+      DrawImage(img32, True);
+    finally
+      img32.EndUpdate;
     end;
-
-    if img32.IsEmpty then
-      img32.SetSize(defaultSvgWidth, defaultSvgHeight);
-
-    //draw the SVG image to fit inside the canvas
-    DrawImage(img32, True);
   finally
     Free;
   end;

@@ -570,6 +570,7 @@ type
 
   TClipPathElement = class(TShapeElement)
   protected
+    units: Cardinal;
     procedure GetPaths(const drawDat: TDrawData); override;
   public
     constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
@@ -874,13 +875,17 @@ begin
     end;
     if IsEmptyRect(clipRec) then Exit;
 
-    tmpImg := fReader.TempImage;
-    tmpImg.Clear(clipRec);
-    DrawChildren(tmpImg, drawDat);
+    //nb: it's not safe to use fReader.TempImage when calling DrawChildren
+    tmpImg := TImage32.Create(Image.Width, Image.Height);
+    try
+      DrawChildren(tmpImg, drawDat);
+      with TClipPathElement(clipEl) do
+        EraseOutsidePaths(tmpImg, clipPaths, fDrawData.fillRule, clipRec);
+      image.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlpha);
+    finally
+      tmpImg.Free;
+    end;
 
-    with TClipPathElement(clipEl) do
-      EraseOutsidePaths(tmpImg, clipPaths, fDrawData.fillRule, clipRec);
-    image.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlpha);
   end
   else if Assigned(maskEl) then
   begin
@@ -1485,13 +1490,13 @@ end;
 
 function TFilterElement.AddNamedImage(const name: UTF8String): TImage32;
 var
-  len: integer;
+  len, w, h: integer;
 begin
   len := Length(fNames);
   SetLength(fNames, len+1);
   SetLength(fImages, len+1);
-  Result :=
-    TImage32.Create(RectWidth(fFilterBounds), RectHeight(fFilterBounds));
+  RectWidthHeight(fFilterBounds, w, h);
+  Result := TImage32.Create(w, h);
   fImages[len] := Result;
   fNames[len] := name;
 end;
@@ -1694,13 +1699,13 @@ procedure ArithmeticBlend(src1, src2, dst: TImage32;
   const recS1, recS2, recDst: TRect; const ks: TFourDoubles);
 var
   kk: array[0..3] of byte;
-  w,h,i,j: integer;
+  w,h, w2,h2, w3,h3, i,j: integer;
   p1,p2,r: PColor32;
 begin
-  w := RectWidth(recS1);
-  h := RectHeight(recS1);
-  if (RectWidth(recS2) <> w) or (RectWidth(recDst) <> w) or
-    (RectHeight(recS2) <> h) or (RectHeight(recDst) <> h) or
+  RectWidthHeight(recS1, w, h);
+  RectWidthHeight(recS2, w2, h2);
+  RectWidthHeight(recDst, w3, h3);
+  if (w2 <> w) or (w3 <> w) or (h2 <> h) or (h3 <> h) or
     (ks[0] = InvalidD) or (ks[1] = InvalidD) or
     (ks[2] = InvalidD) or (ks[3] = InvalidD) then Exit;
 
@@ -4759,11 +4764,14 @@ begin
   if fBkgndColor <> clNone32 then
     img.Clear(fBkgndColor);
 
+  img.BeginUpdate;
   fTempImage := TImage32.Create(img.Width, img.Height);
   try
+    fTempImage.BlockNotify;
     fRootElement.Draw(img, di);
   finally
     fTempImage.Free;
+    img.EndUpdate;
   end;
 end;
 //------------------------------------------------------------------------------
