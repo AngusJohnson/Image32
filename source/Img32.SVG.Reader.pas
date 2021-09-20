@@ -239,8 +239,8 @@ type
 
   TPathElement = class(TShapeElement)
   private
-    fSavedPaths : TSvgPaths;
-    fSvgPaths   : TSvgPaths;
+    fSavedPaths : TSvgPath;
+    fSvgPaths   : TSvgPath;
     procedure Flatten(index: integer; scalePending: double;
       out path: TPathD; out isClosed: Boolean);
   protected
@@ -250,6 +250,9 @@ type
     function  GetUncurvedPath(const drawDat: TDrawData): TPathsD; override;
     procedure SaveCopy; override;
     procedure RestoreCopy(recursive: Boolean); override;
+  public
+    constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
+    destructor Destroy; override;
   end;
 
   TPolyElement = class(TShapeElement) //polyline or polygon
@@ -2428,36 +2431,43 @@ end;
 // TPathElement
 //------------------------------------------------------------------------------
 
+constructor TPathElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
+begin
+  inherited;
+  fSvgPaths := TSvgPath.Create;
+end;
+//------------------------------------------------------------------------------
+
+destructor TPathElement.Destroy;
+begin
+  fSvgPaths.Free;
+  inherited;
+end;
+//------------------------------------------------------------------------------
+
 function TPathElement.GetBounds: TRectD;
 var
   i: integer;
 begin
   Result := NullRectD;
-  for i := 0 to High(fSvgPaths) do
+  for i := 0 to fSvgPaths.Count -1 do
     Result := UnionRect(Result, fSvgPaths[i].GetBounds);
 end;
 //------------------------------------------------------------------------------
 
 procedure TPathElement.SaveCopy;
-var
-  i, len: integer;
 begin
-  len := Length(fSvgPaths);
-  SetLength(fSavedPaths, len);
-  for i := 0 to len -1 do
-    fSavedPaths[i] := fSvgPaths[i].Clone;
+  FreeAndNil(fSavedPaths);
+  fSavedPaths := fSvgPaths.Clone;
   inherited;
 end;
 //------------------------------------------------------------------------------
 
 procedure TPathElement.RestoreCopy(recursive: Boolean);
-var
-  i, len: integer;
 begin
-  len := Length(fSavedPaths);
-  SetLength(fSvgPaths, len);
-  for i := 0 to len -1 do
-    fSvgPaths[i] := fSavedPaths[i].Clone;
+  FreeAndNil(fSvgPaths);
+  fSvgPaths := fSavedPaths;
+  fSavedPaths := nil;
   inherited RestoreCopy(recursive);
 end;
 //------------------------------------------------------------------------------
@@ -2465,7 +2475,7 @@ end;
 
 procedure TPathElement.ParseDAttrib(const value: UTF8String);
 begin
-  fSvgPaths := ParseSvgPath(value);
+  ParseSvgPath(value, fSvgPaths);
 end;
 //------------------------------------------------------------------------------
 
@@ -2486,7 +2496,7 @@ var
 begin
   if Assigned(drawPathsC) or Assigned(drawPathsO) then inherited;
   scalePending := ExtractAvgScaleFromMatrix(drawDat.matrix);
-  for i := 0 to High(fSvgPaths) do
+  for i := 0 to fSvgPaths.Count -1 do
   begin
     Flatten(i, scalePending, path, isClosed);
     if not Assigned(path) then Continue;
@@ -2502,11 +2512,10 @@ end;
 
 function TPathElement.GetUncurvedPath(const drawDat: TDrawData): TPathsD;
 var
-  i, len: integer;
+  i: integer;
 begin
-  len := Length(fSvgPaths);
-  SetLength(Result, len);
-  for i := 0 to High(fSvgPaths) do
+  SetLength(Result, fSvgPaths.Count);
+  for i := 0 to fSvgPaths.Count -1 do
     Result[i] := fSvgPaths[i].GetSimplePath;
 end;
 
@@ -3199,7 +3208,7 @@ begin
   begin
     mat := fDrawData.matrix;
     MatrixScale(mat, 1/fontScale);
-    for i := 0 to High(fSvgPaths) do
+    for i := 0 to fSvgPaths.Count -1 do
     begin
       Flatten(i, fontScale, tmpPath, isClosed);
       //'path' is temporarily scaled to accommodate fReader.fFontCache's

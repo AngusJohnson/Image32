@@ -52,6 +52,9 @@ type
     mnuBringForward: TMenuItem;
     AddStar1: TMenuItem;
     AddStar2: TMenuItem;
+    AddImage1: TMenuItem;
+    OpenDialog1: TOpenDialog;
+    AddImage2: TMenuItem;
     procedure mnuExitClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -74,14 +77,24 @@ type
     procedure mnuBringForwardClick(Sender: TObject);
     procedure WMERASEBKGND(var message: TMessage); message WM_ERASEBKGND;
     procedure AddStar1Click(Sender: TObject);
+    procedure AddImage1Click(Sender: TObject);
   private
-    layeredImg32: TLayeredImage32;
-    clickedLayer: TLayer32;
-    targetLayer: TMyVectorLayer32;
+    layeredImg32  : TLayeredImage32;
+    clickedLayer  : TLayer32;
+    targetLayer   : TRotateLayer32;
     buttonGroup   : TGroupLayer32;
     clickPoint    : TPoint;
+
+    //this just speeds up clip resizing
+    delayedMovePending : Boolean;
+    delayedShift       : TShiftState;
+    delayedPos         : TPoint;
+    procedure AppOnIdle(Sender: TObject; var Done: Boolean);
+    procedure DelayedMouseMove(Sender: TObject;
+      Shift: TShiftState; X,Y: Integer);
+
     function MakeRandomRect: TRect;
-    procedure SetTargetLayer(layer: TMyVectorLayer32);
+    procedure SetTargetLayer(layer: TRotateLayer32);
   public
   end;
 
@@ -233,6 +246,7 @@ var
   fr: TFontReader;
 begin
   Randomize;
+  Application.OnIdle := AppOnIdle;
 
   self.OnMouseDown := pnlMainMouseDown;
   self.OnMouseMove := pnlMainMouseMove;
@@ -241,6 +255,7 @@ begin
   self.OnKeyDown := FormKeyDown;
 
   layeredImg32 := TLayeredImage32.Create; //sized in FormResize below.
+  layeredImg32.Resampler := rBilinearResampler;
 
   //prepare for a hatched background design layer (see FormResize below).
   layeredImg32.AddLayer(TDesignerLayer32);
@@ -254,6 +269,15 @@ procedure TMainForm.FormDestroy(Sender: TObject);
 begin
   FreeAndNil(layeredImg32); //see also FormResize
   glyphs.free;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.AppOnIdle(Sender: TObject; var Done: Boolean);
+begin
+  Done := true;
+  if not delayedMovePending then Exit;
+  delayedMovePending := false;
+  DelayedMouseMove(Sender, delayedShift, delayedPos.X, delayedPos.Y);
 end;
 //------------------------------------------------------------------------------
 
@@ -355,6 +379,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TMainForm.AddImage1Click(Sender: TObject);
+var
+  newLayer: TRasterLayer32;
+begin
+  if not OpenDialog1.Execute then Exit;
+  newLayer := layeredImg32.AddLayer(
+    TRasterLayer32, targetLayer, 'image') as TRasterLayer32;
+  //in case it's an SVG image since they're best given a default size
+  newLayer.Image.SetSize(640,480);
+  newLayer.Image.LoadFromFile(OpenDialog1.FileName);
+  //setting a path will automatically define the layer's bounds
+  SetTargetLayer(newLayer);
+end;
+//------------------------------------------------------------------------------
+
 procedure TMainForm.FormPaint(Sender: TObject);
 var
   updateRect: TRect;
@@ -378,7 +417,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.SetTargetLayer(layer: TMyVectorLayer32);
+procedure TMainForm.SetTargetLayer(layer: TRotateLayer32);
 begin
   if targetLayer = layer then Exit;
   FreeAndNil(buttonGroup);
@@ -400,8 +439,8 @@ begin
   if Assigned(clickedLayer) then
   begin
     if (clickedLayer = targetLayer) or not
-      (clickedLayer is TMyVectorLayer32) then Exit;
-    SetTargetLayer(clickedLayer as TMyVectorLayer32);
+      (clickedLayer is TRotateLayer32) then Exit;
+    SetTargetLayer(clickedLayer as TRotateLayer32);
     Invalidate;
   end else if assigned(targetLayer) then
   begin
@@ -413,6 +452,15 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.pnlMainMouseMove(Sender: TObject;
+  Shift: TShiftState; X, Y: Integer);
+begin
+  delayedShift := Shift;
+  delayedPos := Types.Point(X,Y);
+  delayedMovePending := true;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.DelayedMouseMove(Sender: TObject;
   Shift: TShiftState; X, Y: Integer);
 var
   dx, dy: integer;

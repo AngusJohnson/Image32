@@ -209,7 +209,7 @@ type
   end;
 
   //////////////////////////////////////////////////////////////////////
-  //TSvgPath structures
+  //TSvgSubPath structures
   //////////////////////////////////////////////////////////////////////
 
   TSvgPathSegType = (dsUnknown, dsMove, dsLine, dsHorz, dsVert, dsArc,
@@ -221,20 +221,35 @@ type
     vals    : TArrayOfDouble;
   end;
 
-  PSvgPath = ^TSvgPath;
-  TSvgPath = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
-    firstPt   : TPointD;
+  TSvgSubPath = class
+  private
     segs      : array of TSvgPathSeg;
+  public
+    firstPt   : TPointD;
     function GetBounds: TRectD;
+    function AddSeg: PSvgPathSeg;
     //scalePending: if an SVG will be scaled later, then this parameter
     //allows curve 'flattening' to occur with a corresponding precision
     function GetFlattenedPath(scalePending: double = 1.0): TPathD;
     //GetSimplePath - ignores curves and is only used with markers
     function GetSimplePath: TPathD;
     function IsClosed: Boolean;
-    function Clone: TSvgPath;
+    function Clone: TSvgSubPath;
   end;
-  TSvgPaths = array of TSvgPath;
+
+  TSvgPath = class
+  private
+    fSubPaths: array of TSvgSubPath;
+    function GetPath(index: integer): TSvgSubPath;
+    function GetCount: integer;
+  public
+    destructor Destroy; override;
+    procedure Clear;
+    function AddPath: TSvgSubPath;
+    function Clone: TSvgPath;
+    property Path[index: integer]: TSvgSubPath read GetPath; default;
+    property Count: integer read GetCount;
+  end;
 
   //////////////////////////////////////////////////////////////////////
   // Miscellaneous SVG functions
@@ -259,9 +274,10 @@ type
   function Match(c: PUTF8Char; const compare: UTF8String): Boolean; overload;
   function Match(const compare1, compare2: UTF8String): Boolean; overload;
   function ToUTF8String(var c: PUTF8Char; endC: PUTF8Char): UTF8String;
+  function Base64Decode(const str: UTF8String): UTF8String;
 
   //special parsing functions //////////////////////////////////////////
-  function ParseSvgPath(const value: UTF8String): TSvgPaths;
+  procedure ParseSvgPath(const value: UTF8String; svgPaths: TSvgPath);
   procedure ParseStyleElementContent(const value: UTF8String; stylesList: TClassStylesList);
   function ParseTransform(const transform: UTF8String): TMatrixD;
 
@@ -1909,7 +1925,7 @@ end;
 // TDpath
 //------------------------------------------------------------------------------
 
-function TSvgPath.GetFlattenedPath(scalePending: double): TPathD;
+function TSvgSubPath.GetFlattenedPath(scalePending: double): TPathD;
 var
   i,j, pathLen, pathCap: integer;
   currPt, radii, pt2, pt3, pt4: TPointD;
@@ -2069,10 +2085,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgPath.Clone: TSvgPath;
+function TSvgSubPath.Clone: TSvgSubPath;
 var
   i, segLen: integer;
 begin
+  Result := TSvgSubPath.Create;
   Result.firstPt := firstPt;
   segLen := Length(segs);
   SetLength(Result.segs, segLen);
@@ -2085,7 +2102,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgPath.IsClosed: Boolean;
+function TSvgSubPath.IsClosed: Boolean;
 var
   len: integer;
 begin
@@ -2094,7 +2111,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgPath.GetSimplePath: TPathD;
+function TSvgSubPath.AddSeg: PSvgPathSeg;
+var
+  i: integer;
+begin
+  i := Length(segs);
+  SetLength(segs, i+1);
+  Result := @segs[i];
+end;
+//------------------------------------------------------------------------------
+
+function TSvgSubPath.GetSimplePath: TPathD;
 var
   i,j, pathLen, pathCap: integer;
   currPt, pt2: TPointD;
@@ -2158,7 +2185,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgPath.GetBounds: TRectD;
+function TSvgSubPath.GetBounds: TRectD;
 var
   i,j, pathLen, pathCap: integer;
   currPt, radii, pt2, pt3, pt4: TPointD;
@@ -2312,6 +2339,62 @@ begin
     end;
   SetLength(path2, pathLen);
   Result := GetBoundsD(path2);
+end;
+
+//------------------------------------------------------------------------------
+// TSvgPaths
+//------------------------------------------------------------------------------
+
+destructor TSvgPath.Destroy;
+begin
+  Clear;
+  inherited;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgPath.GetCount: integer;
+begin
+  Result := Length(fSubPaths);
+end;
+//------------------------------------------------------------------------------
+
+function TSvgPath.GetPath(index: integer): TSvgSubPath;
+begin
+  if (index < 0) or (index >= Count) then
+    raise Exception.Create('TSvgPaths.GetPath range error');
+  Result := fSubPaths[index];
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgPath.Clear;
+var
+  i: integer;
+begin
+  for i := 0 to Count -1 do
+    fSubPaths[i].Free;
+  fSubPaths := nil;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgPath.Clone: TSvgPath;
+var
+  i: integer;
+begin
+  Result := TSvgPath.Create;
+  SetLength(Result.fSubPaths, Count);
+  for i := 0 to Count -1 do
+    Result.fSubPaths[i] := fSubPaths[i].Clone;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgPath.AddPath: TSvgSubPath;
+var
+  i: integer;
+begin
+  i := Count;
+  Result := TSvgSubPath.Create;
+  SetLength(fSubPaths, i + 1);
+  fSubPaths[i] := Result;
 end;
 
 //------------------------------------------------------------------------------
@@ -2725,44 +2808,36 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ParseSvgPath(const value: UTF8String): TSvgPaths;
+procedure ParseSvgPath(const value: UTF8String; svgPaths: TSvgPath);
 var
   currSeg     : PSvgPathSeg;
-  currDpath   : PSvgPath;
+  currDpath   : TSvgSubPath;
   currSegCnt  : integer;
   currSegCap  : integer;
   currSegType : TSvgPathSegType;
   lastPt      : TPointD;
 
   procedure StartNewDpath;
-  var
-    cnt: integer;
   begin
     if Assigned(currDpath) then
     begin
       if not Assigned(currDpath.segs) then Exit;
       SetLength(currSeg.vals, currSegCnt);
     end;
-    cnt := Length(Result);
-    SetLength(Result, cnt +1);
-    currDpath := @Result[cnt];
+    currDpath := svgPaths.AddPath;
     currDpath.firstPt := lastPt;
     currDpath.segs := nil;
     currSeg := nil;
   end;
 
   procedure StartNewSeg;
-  var
-    cnt: integer;
   begin
     if Assigned(currSeg) then
       SetLength(currSeg.vals, currSegCnt)
     else if not Assigned(currDpath) then
       StartNewDpath;
 
-    cnt := Length(currDpath.segs);
-    SetLength(currDpath.segs, cnt +1);
-    currSeg := @currDpath.segs[cnt];
+    currSeg := currDpath.AddSeg;
     currSeg.segType := currSegType;
 
     currSegCap := buffSize;
@@ -2805,6 +2880,9 @@ var
   currPt: TPointD;
   isRelative: Boolean;
 begin
+  if not Assigned(svgPaths) then Exit;
+  svgPaths.Clear;
+
   currSeg     := nil;
   currSegCnt  := 0;
   currSegCap  := 0;
@@ -2940,6 +3018,105 @@ begin
   end;
   if Assigned(currSeg) then
     SetLength(currSeg.vals, currSegCnt); //trim buffer
+end;
+
+//------------------------------------------------------------------------------
+// Base64 (MIME) Encode & Decode
+//------------------------------------------------------------------------------
+
+type
+  PFourChars = ^TFourChars;
+  TFourChars = record
+    c1: UTF8Char;
+    c2: UTF8Char;
+    c3: UTF8Char;
+    c4: UTF8Char;
+  end;
+
+//------------------------------------------------------------------------------
+
+function Chr64ToVal(c: UTF8Char): integer;
+begin
+  case c of
+    '+': result := 62;
+    '/': result := 63;
+    '0'..'9': result := ord(c) + 4;
+    'A'..'Z': result := ord(c) -65;
+    'a'..'z': result := ord(c) -71;
+    else Raise Exception.Create('Corrupted MIME encoded text');
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function Frst6Bits(val: PCardinal): byte;
+begin
+  result := (val^ shr 2) and $3F;
+end;
+//------------------------------------------------------------------------------
+
+function FrstChr(c: PFourChars): UTF8Char;
+begin
+  result := ansichar(Chr64ToVal(c.c1) shl 2 or Chr64ToVal(c.c2) shr 4);
+end;
+//------------------------------------------------------------------------------
+
+function Scnd6Bits(val: PCardinal): byte;
+begin
+  result := (val^ shr 12) and $F or ((val^ and $3) shl 4);
+end;
+//------------------------------------------------------------------------------
+
+function ScndChr(c: PFourChars): UTF8Char;
+begin
+  result := ansichar(Chr64ToVal(c.c2) shl 4 or Chr64ToVal(c.c3) shr 2);
+end;
+//------------------------------------------------------------------------------
+
+function Thrd6Bits(val: PCardinal): byte;
+begin
+  result := (val^ shr 22) and $3 or ((val^ shr 6) and $3C);
+end;
+//------------------------------------------------------------------------------
+
+function ThrdChr(c: PFourChars): UTF8Char;
+begin
+  result := ansichar( Chr64ToVal(c.c3) shl 6 or Chr64ToVal(c.c4) );
+end;
+//------------------------------------------------------------------------------
+
+function Frth6Bits(val: PCardinal): byte;
+begin
+  result := (val^ shr 16) and $3F;
+end;
+//------------------------------------------------------------------------------
+
+function Base64Decode(const str: UTF8String): UTF8String;
+var
+  i, j, len, extra: integer;
+  Chars4: PFourChars;
+begin
+  result := '';
+  len := length(str);
+  if (len = 0) then exit
+  else if (len mod 4 > 0) then //oops!!!
+    Raise Exception.Create('Corrupted MIME encoded text');
+  if str[len-1] = '=' then extra := 2
+  else if str[len] = '=' then extra := 1
+  else extra := 0;
+  setlength(result, (len div 4 * 3) - extra);
+  Chars4 := @str[1];
+  i := 1;
+  for j := 1 to (len div 4) -1 do
+  begin
+    result[i] := FrstChr(Chars4);
+    result[i+1] := ScndChr(Chars4);
+    result[i+2] := ThrdChr(Chars4);
+    inc(pbyte(Chars4),4);
+    inc(i,3);
+  end;
+  result[i] := FrstChr(Chars4);
+  if extra < 2  then result[i+1] := ScndChr(Chars4);
+  if extra < 1 then result[i+2] := ThrdChr(Chars4);
 end;
 
 //------------------------------------------------------------------------------

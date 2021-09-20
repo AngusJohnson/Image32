@@ -60,6 +60,11 @@ object MainForm: TMainForm
         ShortCut = 16467
         OnClick = AddStar1Click
       end
+      object AddImage1: TMenuItem
+        Caption = 'Add &Image ...'
+        ShortCut = 16457
+        OnClick = AddImage1Click
+      end
       object N2: TMenuItem
         Caption = '-'
       end
@@ -86,7 +91,7 @@ object MainForm: TMainForm
   object PopupMenu1: TPopupMenu
     OnPopup = PopupMenu1Popup
     Left = 168
-    Top = 72
+    Top = 80
     object AddRectangle1: TMenuItem
       Caption = 'Add &Rectangle'
       ShortCut = 16466
@@ -102,6 +107,11 @@ object MainForm: TMainForm
       ShortCut = 16467
       OnClick = AddStar1Click
     end
+    object AddImage2: TMenuItem
+      Caption = 'Add &Image ...'
+      ShortCut = 16457
+      OnClick = AddImage1Click
+    end
     object N1: TMenuItem
       Caption = '-'
     end
@@ -110,5 +120,11 @@ object MainForm: TMainForm
       ShortCut = 46
       OnClick = mnuDeleteLayerClick
     end
+  end
+  object OpenDialog1: TOpenDialog
+    Filter = 'Image Files|*.bmp;*.png;*.jpg;*.svg'
+    Options = [ofHideReadOnly, ofFileMustExist, ofEnableSizing]
+    Left = 224
+    Top = 72
   end
 end
