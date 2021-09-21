@@ -219,22 +219,26 @@ type
   private
     fCnt    : integer;
     fVals   : TArrayOfDouble;
+    function GetVal(index: integer): double;
   public
     segType : TSvgPathSegType;
     procedure AddVal(val: double);
     property Count: integer read fCnt;
+    property Val[index: integer]: double read GetVal;
   end;
 
   TSvgSubPath = class
   private
     segs      : array of TSvgSubPathSeg;
     function GetCount: integer;
+    function GetSeg(index: integer): TSvgSubPathSeg;
   public
     firstPt   : TPointD;
     destructor Destroy; override;
     procedure Clear;
     function GetBounds: TRectD;
     function AddSeg: TSvgSubPathSeg;
+    function DeleteLastSeg: Boolean;
     //scalePending: if an SVG will be scaled later, then this parameter
     //allows curve 'flattening' to occur with a corresponding precision
     function GetFlattenedPath(scalePending: double = 1.0): TPathD;
@@ -243,6 +247,7 @@ type
     function IsClosed: Boolean;
     function Clone: TSvgSubPath;
     property Count: integer read GetCount;
+    property seg[index: integer]: TSvgSubPathSeg read GetSeg; default;
   end;
 
   TSvgPath = class
@@ -322,6 +327,8 @@ implementation
 
 resourcestring
   rsSvgPathRangeError = 'TSvgPath.GetPath range error';
+  rsSvgSubPathRangeError = 'TSvgSubPath.GetSeg range error';
+  rsSvgSubPathSegRangeError = 'TSvgSubPathSeg.GetVal range error';
 
 type
   TColorConst = record
@@ -2106,6 +2113,14 @@ begin
   fVals[fCnt] := val;
   inc(fCnt);
 end;
+//------------------------------------------------------------------------------
+
+function TSvgSubPathSeg.GetVal(index: integer): double;
+begin
+  if (index < 0) or (index >= Count) then
+    raise Exception.Create(rsSvgSubPathSegRangeError);
+  Result := fVals[index];
+end;
 
 //------------------------------------------------------------------------------
 // TSvgSubPath
@@ -2145,6 +2160,18 @@ begin
   SetLength(segs, i+1);
   Result := TSvgSubPathSeg.Create;
   segs[i] := Result;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgSubPath.DeleteLastSeg: Boolean;
+var
+  cnt: integer;
+begin
+  cnt := Count;
+  Result := cnt > 0;
+  if not Result then Exit;
+  seg[cnt -1].Free;
+  SetLength(segs, cnt -1);
 end;
 //------------------------------------------------------------------------------
 
@@ -2232,6 +2259,14 @@ end;
 function TSvgSubPath.GetCount: integer;
 begin
   Result := Length(segs);
+end;
+//------------------------------------------------------------------------------
+
+function TSvgSubPath.GetSeg(index: integer): TSvgSubPathSeg;
+begin
+  if (index < 0) or (index >= Count) then
+    raise Exception.Create(rsSvgSubPathRangeError);
+  Result := segs[index];
 end;
 //------------------------------------------------------------------------------
 
