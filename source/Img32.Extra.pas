@@ -2,8 +2,8 @@ unit Img32.Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.2                                                             *
-* Date      :  13 September 2021                                               *
+* Version   :  3.3                                                             *
+* Date      :  21 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -28,9 +28,9 @@ type
   TButtonAttribute = (baShadow, ba3D);
   TButtonAttributes = set of TButtonAttribute;
 
-procedure DrawFrame(img: TImage32; const rec: TRect;
+procedure DrawEdge(img: TImage32; const rec: TRect;
   topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
-procedure DrawFramePath(img: TImage32; const path: TPathD;
+procedure DrawEdgePath(img: TImage32; const path: TPathD;
   topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
 
 procedure DrawShadow(img: TImage32; const polygon: TPathD;
@@ -244,7 +244,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawFrame(img: TImage32; const rec: TRect;
+procedure DrawEdge(img: TImage32; const rec: TRect;
   topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
 var
   p: TPathD;
@@ -263,7 +263,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawFramePath(img: TImage32; const path: TPathD;
+procedure DrawEdgePath(img: TImage32; const path: TPathD;
   topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
 var
   i, len: integer;
@@ -312,7 +312,7 @@ procedure DrawShadow(img: TImage32; const polygons: TPathsD;
   color: TColor32; cutoutInsideShadow: Boolean);
 var
   x, y: double;
-  blurSize: integer;
+  blurSize, w,h: integer;
   rec: TRect;
   polys, shadowPolys: TPathsD;
   shadowImg: TImage32;
@@ -328,7 +328,8 @@ begin
   Img32.Vector.InflateRect(rec, Ceil(depth*2), Ceil(depth*2));
   polys := OffsetPath(polygons, -rec.Left, -rec.Top);
   shadowPolys := OffsetPath(polys, x, y);
-  shadowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
+  RectWidthHeight(rec, w, h);
+  shadowImg := TImage32.Create(w, h);
   try
     DrawPolygon(shadowImg, shadowPolys, fillRule, color);
     FastGaussianBlur(shadowImg, shadowImg.Bounds, blurSize, 1);
@@ -354,6 +355,7 @@ end;
 procedure DrawGlow(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; color: TColor32; blurRadius: integer);
 var
+  w,h: integer;
   rec: TRect;
   glowPolys: TPathsD;
   glowImg: TImage32;
@@ -362,7 +364,8 @@ begin
   glowPolys := OffsetPath(polygons,
     blurRadius -rec.Left +1, blurRadius -rec.Top +1);
   Img32.Vector.InflateRect(rec, blurRadius +1, blurRadius +1);
-  glowImg := TImage32.Create(RectWidth(rec), RectHeight(rec));
+  RectWidthHeight(rec, w, h);
+  glowImg := TImage32.Create(w, h);
   try
     DrawPolygon(glowImg, glowPolys, fillRule, color);
     FastGaussianBlur(glowImg, glowImg.Bounds, blurRadius);
@@ -613,9 +616,11 @@ procedure EraseOutsidePath(img: TImage32; const path: TPathD;
 var
   mask: TImage32;
   p: TPathD;
+  w,h: integer;
 begin
   if not assigned(path) then Exit;
-  mask := TImage32.Create(RectWidth(outsideBounds), RectHeight(outsideBounds));
+  RectWidthHeight(outsideBounds, w,h);
+  mask := TImage32.Create(w, h);
   try
     p := OffsetPath(path, -outsideBounds.Left, -outsideBounds.top);
     DrawPolygon(mask, p, fillRule, clBlack32);
@@ -631,9 +636,11 @@ procedure EraseOutsidePaths(img: TImage32; const paths: TPathsD;
 var
   mask: TImage32;
   pp: TPathsD;
+  w,h: integer;
 begin
   if not assigned(paths) then Exit;
-  mask := TImage32.Create(RectWidth(outsideBounds), RectHeight(outsideBounds));
+  RectWidthHeight(outsideBounds, w,h);
+  mask := TImage32.Create(w, h);
   try
     pp := OffsetPath(paths, -outsideBounds.Left, -outsideBounds.top);
     DrawPolygon(mask, pp, fillRule, clBlack32);
@@ -663,6 +670,7 @@ var
   tmp: TImage32;
   rec: TRect;
   paths, paths2: TPathsD;
+  w,h: integer;
   x,y: double;
 begin
   rec := GetBounds(polygons);
@@ -670,7 +678,8 @@ begin
   if not ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
   GetSinCos(angleRads, y, x);
   paths := OffsetPath(polygons, -rec.Left, -rec.Top);
-  tmp := TImage32.Create(rectWidth(rec), rectHeight(rec));
+  RectWidthHeight(rec, w, h);
+  tmp := TImage32.Create(w, h);
   try
     if colorLt shr 24 > 0 then
     begin
@@ -800,7 +809,7 @@ begin
     if ba3D in buttonAttributes then
       Draw3D(img, Result, frNonZero, lightSize*2,
         Ceil(lightSize), $CCFFFFFF, $AA000000, lightAngle);
-    DrawLine(img, Result, DpiAwareI, clBlack32, esPolygon);
+    DrawLine(img, Result, dpiAware1, clBlack32, esPolygon);
   finally
     img.EndUpdate;
   end;
@@ -2550,7 +2559,7 @@ end;
 
 procedure GaussianBlur(img: TImage32; rec: TRect; radius: Integer);
 var
-  i, x,y,yy,z: Integer;
+  i, w,h, x,y,yy,z: Integer;
   gaussTable: array [-MaxBlur .. MaxBlur] of Cardinal;
   wc: TWeightedColor;
   wca: TArrayOfWeightedColor;
@@ -2567,27 +2576,28 @@ begin
     gaussTable[-i] := gaussTable[i];
   end;
 
-  setLength(wca, RectWidth(rec) * RectHeight(rec));
+  RectWidthHeight(rec, w, h);
+  setLength(wca, w * h);
 
-  for y := 0 to RectHeight(rec) -1 do
+  for y := 0 to h -1 do
   begin
     row := PColor32Array(@img.Pixels[(y + rec.Top) * img.Width + rec.Left]);
-    wcRow := PWeightedColorArray(@wca[y * RectWidth(rec)]);
-    for x := 0 to RectWidth(rec) -1 do
+    wcRow := PWeightedColorArray(@wca[y * w]);
+    for x := 0 to w -1 do
       for z := max(0, x - radius) to min(img.Width -1, x + radius) do
         wcRow[x].Add(row[z], gaussTable[x-z]);
   end;
 
-  for x := 0 to RectWidth(rec) -1 do
+  for x := 0 to w -1 do
   begin
-    for y := 0 to RectHeight(rec) -1 do
+    for y := 0 to h -1 do
     begin
       wc.Reset;
-      yy := max(0, y - radius) * RectWidth(rec);
-      for z := max(0, y - radius) to min(RectHeight(rec) -1, y + radius) do
+      yy := max(0, y - radius) * w;
+      for z := max(0, y - radius) to min(h -1, y + radius) do
       begin
         wc.Add(wca[x + yy].Color, gaussTable[y-z]);
-        inc(yy, RectWidth(rec));
+        inc(yy, w);
       end;
       img.Pixels[x + rec.Left + (y + rec.Top) * img.Width] := wc.Color;
     end;
@@ -2758,8 +2768,7 @@ begin
   if IsEmptyRect(rec2) then Exit;
   blurFullImage := RectsEqual(rec2, img.Bounds);
 
-  w := RectWidth(rec2);
-  h := RectHeight(rec2);
+  RectWidthHeight(rec2, w, h);
   if (Min(w, h) < 2) or (stdDev < 1) then Exit;
 
   len := w * h;

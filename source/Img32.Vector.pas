@@ -2,8 +2,8 @@ unit Img32.Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.2                                                             *
-* Date      :  13 September 2021                                               *
+* Version   :  3.3                                                             *
+* Date      :  21 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -74,7 +74,7 @@ type
   function Circle(const pt: TPoint; radius: double): TPathD; overload;
   function Circle(const pt: TPointD; radius: double): TPathD; overload;
 
-  function Star(const rec: TRectD; points: integer; indentFrac: double = 0.8): TPathD; overload;
+  function Star(const rec: TRectD; points: integer; indentFrac: double = 0.4): TPathD; overload;
   function Star(const focalPt: TPointD;
     innerRadius, outerRadius: double; points: integer): TPathD; overload;
 
@@ -592,8 +592,7 @@ begin
   begin
     GetSinCos(angle, sinA, cosA); //the sign of the angle isn't important
     sinA := Abs(sinA); cosA := Abs(cosA);
-    recW := RectWidth(rec);
-    recH := RectHeight(rec);
+    RectWidthHeight(rec, recW, recH);
     w := Ceil((recW *cosA + recH *sinA) /2);
     h := Ceil((recW *sinA + recH *cosA) /2);
     mp := MidPoint(rec);
@@ -2338,7 +2337,7 @@ begin
   Result := nil;
   if points < 5 then points := 5
   else if points > 15 then points := 15;
-  if indentFrac < 0.1 then indentFrac := 0.1
+  if indentFrac < 0.2 then indentFrac := 0.2
   else if indentFrac > 0.8 then indentFrac := 0.8;
   innerOff := Min(rec.Width, rec.Height) * indentFrac * 0.5;
 

@@ -129,7 +129,7 @@ begin
   end;
   essay := StringReplace(essay, '\n', #10, [rfReplaceAll]);
 
-  Layout1.Scale.Point := PointF(1/DpiAwareD,1/DpiAwareD);
+  Layout1.Scale.Point := PointF(1/DpiAwareOne,1/DpiAwareOne);
   fontHeight := DPIAware(13);
 end;
 //------------------------------------------------------------------------------

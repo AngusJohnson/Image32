@@ -2,8 +2,8 @@ object Form1: TForm1
   Left = 298
   Top = 205
   Caption = 'Svg101'
-  ClientHeight = 424
-  ClientWidth = 625
+  ClientHeight = 490
+  ClientWidth = 704
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -18,18 +18,25 @@ object Form1: TForm1
   PixelsPerInch = 96
   TextHeight = 14
   object Splitter1: TSplitter
-    Left = 161
+    Left = 180
     Top = 0
-    Height = 424
+    Height = 471
     ExplicitLeft = 184
     ExplicitTop = 232
     ExplicitHeight = 100
   end
+  object StatusBar1: TStatusBar
+    Left = 0
+    Top = 471
+    Width = 704
+    Height = 19
+    Panels = <>
+  end
   object ImagePanel: TImage32Panel
-    Left = 164
+    Left = 183
     Top = 0
-    Width = 461
-    Height = 424
+    Width = 521
+    Height = 471
     Align = alClient
     BevelInner = bvLowered
     BorderWidth = 12
@@ -37,7 +44,7 @@ object Form1: TForm1
     DoubleBuffered = True
     ParentBackground = False
     ParentDoubleBuffered = False
-    TabOrder = 0
+    TabOrder = 1
     TabStop = True
     Touch.InteractiveGestures = [igZoom, igPan, igPressAndTap]
     OnResize = ImagePanelResize
@@ -54,18 +61,19 @@ object Form1: TForm1
   object ListBox1: TListBox
     Left = 0
     Top = 0
-    Width = 161
-    Height = 424
+    Width = 180
+    Height = 471
     Align = alLeft
     Color = 16316664
     ItemHeight = 14
-    TabOrder = 1
+    PopupMenu = PopupMenu1
+    TabOrder = 2
     Visible = False
     OnClick = ListBox1Click
   end
   object MainMenu1: TMainMenu
-    Left = 192
-    Top = 104
+    Left = 248
+    Top = 56
     object File1: TMenuItem
       Caption = '&File'
       object Open1: TMenuItem
@@ -86,7 +94,19 @@ object Form1: TForm1
   object OpenDialog1: TOpenDialog
     Filter = 'SVG Files (*.svg)|*.svg'
     Options = [ofHideReadOnly, ofPathMustExist, ofFileMustExist, ofEnableSizing]
-    Left = 256
-    Top = 104
+    Left = 360
+    Top = 56
+  end
+  object PopupMenu1: TPopupMenu
+    Left = 303
+    Top = 56
+    object PopupMenu11: TMenuItem
+      Caption = '&Open in Notepad'
+      OnClick = PopupMenu11Click
+    end
+    object OpeninBrowser1: TMenuItem
+      Caption = '&Open in Browser'
+      OnClick = OpeninBrowser1Click
+    end
   end
 end

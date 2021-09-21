@@ -10,7 +10,7 @@ uses
 type
 
   //----------------------------------------------------------------------
-  // A couple of custom layer classes ...
+  // Customise a TVectorLayer32 ...
   //----------------------------------------------------------------------
 
   TMyVectorLayer32 = class(TVectorLayer32) //for vector drawn layers
@@ -23,9 +23,11 @@ type
     textPath   : TPathsD;
     textRect   : TRect;
   protected
+    //override TVectorLayer32's empty Draw method
     procedure Draw; override;
   public
     constructor Create(parent: TLayer32;  const name: string = ''); override;
+    //override SetBounds to additionally set a ClipPath
     procedure SetBounds(const newBounds: TRect); override;
   end;
 
@@ -46,7 +48,6 @@ type
     mnuAddEllipse: TMenuItem;
     N5: TMenuItem;
     mnuDeleteLayer2: TMenuItem;
-    N1: TMenuItem;
     N2: TMenuItem;
     mnuSendBack: TMenuItem;
     mnuBringForward: TMenuItem;
@@ -55,6 +56,10 @@ type
     AddImage1: TMenuItem;
     OpenDialog1: TOpenDialog;
     AddImage2: TMenuItem;
+    N1: TMenuItem;
+    SendBack1: TMenuItem;
+    BringForward1: TMenuItem;
+    N3: TMenuItem;
     procedure mnuExitClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -64,8 +69,6 @@ type
       Y: Integer);
     procedure pnlMainMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
-    procedure mnuBringToFrontClick(Sender: TObject);
-    procedure mnuSendToBackClick(Sender: TObject);
     procedure mnuDeleteLayerClick(Sender: TObject);
     procedure PopupMenu1Popup(Sender: TObject);
     procedure mnuAddEllipseClick(Sender: TObject);
@@ -94,6 +97,7 @@ type
       Shift: TShiftState; X,Y: Integer);
 
     function MakeRandomRect: TRect;
+    function MakeRandomSquare: TRect;
     procedure SetTargetLayer(layer: TRotateLayer32);
   public
   end;
@@ -164,25 +168,32 @@ begin
   rec := Image.Bounds;
   if name = 'rectangle' then
   begin
+    //don't worry about hittesting here because the default
+    //hittest region is the layer's rectangular bounds :)
+
+    //prevent child layers from drawing over the layer's frame
+    //in other words set ClipPath to the frame's inner margin
     Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
     ClipPath := Img32.Vector.Paths(Rectangle(rec));
   end
   else if name = 'ellipse' then
   begin
     pp := Img32.Vector.Paths(Ellipse(rec));
+    //make anywhere within pp responsive to clicking
     UpdateHitTestMask(pp, frEvenOdd);
 
-    //the more perfect way to do this would be to use
-    //InflatePath but that way is *much* slower
+    //prevent child layers from drawing over the layer's frame
+    //in other words set ClipPath to the frame's inner margin
     Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
     ClipPath := Img32.Vector.Paths(Ellipse(rec));
   end else
   begin
     pp := MakeStar(rec);
+    //make anywhere within pp responsive to clicking
     UpdateHitTestMask(pp, frEvenOdd);
 
-    //the more perfect way to do this would be to use
-    //InflatePath but that way is *much* slower
+    //prevent child layers from drawing over the layer's frame
+    //in other words set ClipPath to the frame's inner margin
     Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
     ClipPath := MakeStar(rec);
   end;
@@ -197,40 +208,44 @@ var
   delta: TPointD;
 begin
   rec := Image.Bounds;
-  //prepare to center text
+  //preparing to center text
   delta.X := (RectWidth(rec) - RectWidth(textRect)) div 2;
   delta.Y := (RectHeight(rec) - RectHeight(textRect)) div 2;
 
   if name = 'rectangle' then
   begin
-    fw := FrameWidth - dpiAwareI*2;
+    //fill the rectangular layer's background
     Image.Clear(rec, clBtnFace32);
-    i := Ceil(DpiAwareD/2);
+    //and draw a pale gray frame that's FrameWidth wide
+    fw := FrameWidth - dpiAware1*2;
+    i := Ceil(DpiAwareOne/2);
     img32.Vector.InflateRect(rec, -i, -i);
-    DrawFrame(Image, rec, clWhite32, $FFCCCCCC, dpiAwareI*2);
+    //draw the frame's outer edge
+    DrawEdge(Image, rec, clWhite32, $FFCCCCCC, dpiAwareOne*2);
     img32.Vector.InflateRect(rec, -fw, -fw);
     Image.Clear(rec, BrushColor);
-    DrawFrame(Image, rec, $FFCCCCCC, clWhite32, dpiAwareI*2);
+    //draw the frame's inner edge
+    DrawEdge(Image, rec, $FFCCCCCC, clWhite32, dpiAwareOne*2);
   end
   else if name = 'ellipse' then
   begin
-    fw := FrameWidth - dpiAwareI*2;
+    fw := FrameWidth - dpiAware1*2;
     DrawPolygon(Image, Ellipse(rec), frNonZero, clBtnFace32);
-    img32.Vector.InflateRect(rec, -DpiAwareI,-DpiAwareI);
-    DrawFramePath(Image, Ellipse(rec), clWhite32, $FFCCCCCC, dpiAwareI*2);
+    img32.Vector.InflateRect(rec, -dpiAware1,-dpiAware1);
+    DrawEdgePath(Image, Ellipse(rec), clWhite32, $FFCCCCCC, dpiAwareOne*2);
     img32.Vector.InflateRect(rec, -fw, -fw);
     DrawPolygon(Image, Ellipse(rec), frNonZero, BrushColor);
-    DrawFramePath(Image, Ellipse(rec), $FFCCCCCC, clWhite32, dpiAwareI*2);
+    DrawEdgePath(Image, Ellipse(rec), $FFCCCCCC, clWhite32, dpiAwareOne*2);
   end
   else //name = 'star'
   begin
-    fw := FrameWidth - dpiAwareI*2;
+    fw := FrameWidth - dpiAware1*2;
     DrawPolygon(Image, MakeStar(rec), frNonZero, clBtnFace32);
-    img32.Vector.InflateRect(rec, -DpiAwareI,-DpiAwareI);
-    DrawFramePath(Image, MakeStar(rec)[0], clWhite32, $FFCCCCCC, dpiAwareI*2);
+    img32.Vector.InflateRect(rec, -dpiAware1,-dpiAware1);
+    DrawEdgePath(Image, MakeStar(rec)[0], clWhite32, $FFCCCCCC, dpiAwareOne*2);
     img32.Vector.InflateRect(rec, -fw, -fw);
     DrawPolygon(Image, MakeStar(rec), frNonZero, BrushColor);
-    DrawFramePath(Image, MakeStar(rec)[0], $FFCCCCCC, clWhite32, dpiAwareI*2);
+    DrawEdgePath(Image, MakeStar(rec)[0], $FFCCCCCC, clWhite32, dpiAwareOne*2);
   end;
   //draw the text
   pp := OffsetPath(textPath, delta.X, delta.Y);
@@ -297,7 +312,6 @@ begin
   rec := ClientRect;
   w := RectWidth(rec);
   h := RectHeight(rec);
-  //resize pnlMain's Image
   //resize layeredImg32 to pnlMain
   layeredImg32.SetSize(w, h);
   //resize and repaint the hatched design background layer
@@ -316,8 +330,8 @@ function TMainForm.MakeRandomRect: TRect;
 begin
   if Assigned(targetLayer) then
   begin
-    Result.Left := Random(targetLayer.Width);
-    Result.Top := Random(targetLayer.Height);
+    Result.Left := Random(targetLayer.Width) div 2;
+    Result.Top := Random(targetLayer.Height) div 2;
     Result.Right := Random(targetLayer.Width);
     Result.Bottom := Random(targetLayer.Height);
   end else
@@ -328,10 +342,30 @@ begin
     Result.Bottom := Random(layeredImg32.Height);
   end;
   Img32.Vector.NormalizeRect(Result);
-  if Result.Right - Result.Left < 75 then
-    Result.Right := Result.Left +75;
-  if Result.Bottom - Result.Top < 50 then
-    Result.Bottom := Result.Top +50;
+  Result.Right := Result.Left + Max(75, RectWidth(Result));
+  Result.Bottom := Result.Top + Max(50, RectHeight(Result));
+end;
+//------------------------------------------------------------------------------
+
+function TMainForm.MakeRandomSquare: TRect;
+begin
+  if Assigned(targetLayer) then
+  begin
+    Result.Left := Random(targetLayer.Width);
+    Result.Top := Random(targetLayer.Height);
+    Result.Right := Random(Max(targetLayer.Width,targetLayer.Height));
+    Result.Bottom := Result.Right - Result.Left
+  end else
+  begin
+    Result.Left := Random(layeredImg32.Width);
+    Result.Top := Random(layeredImg32.Height);
+    Result.Right := Random(layeredImg32.Width);
+    Result.Bottom := Random(layeredImg32.Height);
+  end;
+  Img32.Vector.NormalizeRect(Result);
+  if RectWidth(Result) > RectHeight(Result) then
+    Result.Bottom := Result.Top + RectWidth(Result) else
+    Result.Right := Result.Left + RectHeight(Result);
 end;
 //------------------------------------------------------------------------------
 
@@ -340,7 +374,7 @@ var
   newLayer: TMyVectorLayer32;
   rec: TRect;
 begin
-  rec := MakeRandomRect;
+  rec := MakeRandomSquare;
   newLayer := layeredImg32.AddLayer(
     TMyVectorLayer32, targetLayer, 'star') as TMyVectorLayer32;
   //setting a path will automatically define the layer's bounds
@@ -523,28 +557,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.mnuBringToFrontClick(Sender: TObject);
-begin
-  if not assigned(targetLayer) then Exit;
-
-  //don't send above the (top-most) sizing button group
-  if targetLayer.Index = targetLayer.Parent.ChildCount -2 then Exit;
-
-  if targetLayer.BringForwardOne then
-    Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.mnuSendToBackClick(Sender: TObject);
-begin
-  //don't send below the (bottom-most) hatched background.
-  if targetLayer.Index = 1 then Exit;
-
-  if targetLayer.SendBackOne then
-    Invalidate;
-end;
-//------------------------------------------------------------------------------
-
 procedure TMainForm.mnuDeleteLayerClick(Sender: TObject);
 begin
   if not assigned(targetLayer) then Exit;
@@ -563,8 +575,10 @@ end;
 
 procedure TMainForm.mnuSendBackClick(Sender: TObject);
 begin
-  if Assigned(targetLayer) then
-    targetLayer.SendBackOne;
+  if not Assigned(targetLayer) or
+   ((targetLayer.Parent = targetLayer.Root) and
+    (targetLayer.Index < 2)) then Exit;
+  targetLayer.SendBackOne;
   Invalidate;
 end;
 //------------------------------------------------------------------------------

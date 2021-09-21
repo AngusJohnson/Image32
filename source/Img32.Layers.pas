@@ -2,8 +2,8 @@ unit Img32.Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.2.2                                                           *
-* Date      :  17 September 2021                                               *
+* Version   :  3.3                                                             *
+* Date      :  21 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -28,6 +28,7 @@ type
   TButtonShape = Img32.Extra.TButtonShape;
 
   TLayer32 = class;
+  TGroupLayer32 = class;
   TLayer32Class = class of TLayer32;
   TLayeredImage32 = class;
 
@@ -86,6 +87,7 @@ type
 
     function   GetChildCount: integer;
     function   GetChild(index: integer): TLayer32;
+    function   GetRoot: TGroupLayer32;
     function   FindLayerNamed(const name: string): TLayer32; virtual;
     procedure  ReindexChildsFrom(startIdx: Integer);
     procedure  SetClipPath(const path: TPathsD);
@@ -145,6 +147,7 @@ type
     property   MidPoint: TPointD read GetMidPoint;
     property   Name: string read fName write fName;
     property   Opacity: Byte read fOpacity write SetOpacity;
+    property   Root: TGroupLayer32 read GetRoot;
     property   RootOwner: TLayeredImage32 read fLayeredImage;
     property   Top: integer read fTop;
     property   Visible: Boolean read fVisible write SetVisible;
@@ -324,7 +327,7 @@ type
 
   TLayeredImage32 = class
   private
-    fRoot              : TLayer32;
+    fRoot              : TGroupLayer32;
     fBounds            : TRect;
     fBackColor         : TColor32;
     fResampler         : integer;
@@ -366,7 +369,7 @@ type
     property Image: TImage32 read GetImage;
     property Layer[index: integer]: TLayer32 read GetLayer; default;
     property MidPoint: TPointD read GetMidPoint;
-    property Root: TLayer32 read fRoot;
+    property Root: TGroupLayer32 read fRoot;
     property Width: integer read GetWidth write SetWidth;
   end;
 
@@ -661,7 +664,7 @@ end;
 
 procedure TLayer32.SetVisible(value: Boolean);
 begin
-  if (value = fVisible) or (RootOwner.Root = Self) then Exit;
+  if (value = fVisible) or (Root = Self) then Exit;
   fVisible := value;
   Invalidate(fOldBounds);
 end;
@@ -841,6 +844,14 @@ begin
     fChilds.Insert(index, Result);
     ReindexChildsFrom(index +1);
   end;
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.GetRoot: TGroupLayer32;
+begin
+  if Assigned(fLayeredImage) then
+    Result := fLayeredImage.fRoot else
+    Result := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -1312,7 +1323,7 @@ constructor TVectorLayer32.Create(parent: TLayer32;
   const name: string = '');
 begin
   inherited;
-  fMargin := DpiAwareI *2;
+  fMargin := dpiAware1 *2;
   fCursorId := crHandPoint;
 end;
 //------------------------------------------------------------------------------
@@ -1588,20 +1599,25 @@ end;
 
 procedure TRasterLayer32.DoPreRotationCheck;
 begin
-  if fRotating or not Assigned(Image) then Exit;
+  if fRotating or not Assigned(Image) or
+    not Assigned(MasterImage) then Exit;
   fRotating := true;
   fSavedMidPt := MidPoint;
   if fAutoPivot then fPivotPt := fSavedMidPt;
 
-  if fSavedSize.cx = 0 then
-    fSavedSize.cx := Image.Width;
-  if fSavedSize.cy = 0 then
-    fSavedSize.cy := Image.Height;
-
   //scaling has just ended and rotating is about to start
   //so apply the current scaling to the matrix
-  MatrixScale(fMatrix, Image.Width/fSavedSize.cx,
-    Image.Height/fSavedSize.cy);
+  if (fSavedSize.cx = 0) or (fSavedSize.cy = 0) then
+  begin
+    fSavedSize.cx := Image.Width;
+    fSavedSize.cy := Image.Height;
+    MatrixScale(fMatrix, Image.Width/MasterImage.Width,
+      Image.Height/MasterImage.Height);
+  end else
+  begin
+    MatrixScale(fMatrix, Image.Width/fSavedSize.cx,
+      Image.Height/fSavedSize.cy);
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1686,7 +1702,7 @@ begin
   with AddChild(TDesignerLayer32) do    //Layer 0 - design layer
   begin
     SetBounds(Rect(rec2));
-    i := DpiAwareI*2;
+    i := dpiAware1*2;
     r := rec2;
     Img32.Vector.InflateRect(r, -i,-i);
     OffsetRect(r, -Left, -Top);
@@ -2292,7 +2308,7 @@ begin
     rec := Rect(RectD(mp.X -radius, mp.Y -radius, mp.X +radius,mp.Y +radius));
     designer := DesignLayer;
     designer.SetBounds(rec);
-    i :=  DpiAwareI *2;
+    i :=  dpiAware1 *2;
     DrawDashedLine(designer.Image, Ellipse(Rect(i,i,radius*2 -i, radius*2 -i)),
       dashes, nil, i, clRed32, esPolygon);
     Result := Angle;
@@ -2329,11 +2345,11 @@ end;
 procedure InitDashes;
 begin
   setLength(dashes, 2);
-  dashes[0] := DpiAwareI *2; dashes[1] := DpiAwareI *4;
+  dashes[0] := dpiAware1 *2; dashes[1] := dpiAware1 *4;
 end;
 
 initialization
   InitDashes;
-  DefaultButtonSize := DpiAwareI*10;
+  DefaultButtonSize := dpiAware1*10;
 
 end.

@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 3.2.2
-Released: 18 September 2021
+Latest version: 3.3
+Released: 21 September 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -12,10 +12,16 @@ Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
-Version 3.2.2
+Version 3.3
   Img32.Layers
-    Minor performance tweaks
-  Minor bugfixes
+    Minor bugfixes and performance tweaks
+  Img32.Extra
+    Added DrawEdge and DrawEdgePath functions
+  Img32
+    dpiAwareI & dpiAwareD renamed to dpiAware1 & dpiAwareOne
+  Img32.SmoothPath
+    This unit has been removed as it will be replaced later
+    with another unit that will aid designing SVG Paths
   Updated Layers301 example again
 
 Version 3.2.1

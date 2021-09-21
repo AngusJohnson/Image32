@@ -43,13 +43,9 @@ uses
 
 //------------------------------------------------------------------------------
 
-const
-  margin = 100;
-
 procedure TForm1.FormCreate(Sender: TObject);
 var
-  i, ballsize, SpaceAbove, sqSize: integer;
-  j,k: double;
+  i,j, ballsize, SpaceAbove, maxSquishSize: integer;
   img: TImage32;
   path: TPathD;
   ballRec: TRect;
@@ -85,32 +81,28 @@ begin
     Draw3D(img, path, frNonZero, 8, 8);
     DrawLine(img, path, 3, clGreen32, esPolygon);
 
-    //acceleration phase
-    k := power(SpaceAbove, 1/25); //k^25 = SpaceAbove
-    j := k;
+    //logarithmic acceleration phase
     for i := 1 to 25 do
     begin
       with layeredImage.AddLayer(TLayer32) do
       begin
         SetBounds(drawRec);
-        ballRec := Rect(0, Round(j), ballsize, Round(j) + ballsize);
-        j := j * k;
+        j := Round(power(SpaceAbove, i/25));
+        ballRec := Rect(0, j, ballsize, j + ballsize);
         Image.CopyBlend(img, img.Bounds, ballRec);
         Visible := false;
       end;
     end;
 
-    //deceleration (squishing) phase :)
-    sqSize := ballsize *2 div 3;
-    k := power(sqSize, 1/6); //k^6 = sqSize
-    j := 100/k;
-
+    //logarithmic deceleration (squishing) phase :)
+    maxSquishSize := Round(ballsize * 0.75);
     for i := 1 to 6 do
-      with layeredImage.AddLayer(TRasterLayer32) do
+      with layeredImage.AddLayer(TLayer32) do
       begin
         SetBounds(drawRec);
-        ballRec := Rect(0, SpaceAbove + sqSize -Round(j), ballsize, SpaceAbove +ballsize);
-        j := j/k;
+        ballRec := Rect(0,
+          SpaceAbove +maxSquishSize -Round(power(maxSquishSize, (6-i)/6)),
+          ballsize, SpaceAbove + ballsize);
         Image.CopyBlend(img, img.Bounds, ballRec);
         Visible := false;
       end;

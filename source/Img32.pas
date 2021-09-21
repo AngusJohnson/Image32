@@ -2,8 +2,8 @@ unit Img32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.2                                                             *
-* Date      :  13 September 2021                                               *
+* Version   :  3.3                                                             *
+* Date      :  21 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -491,8 +491,8 @@ var
   //DivTable[a,b] = a * 255/b (for a &lt;= b)
   DivTable: array [Byte,Byte] of Byte;
 
-  dpiAwareI   : integer = 1;
-  DpiAwareD   : double  = 1.0;
+  dpiAware1   : integer = 1;
+  DpiAwareOne : double  = 1.0;
 
   //AND BECAUSE OLDER DELPHI COMPILERS (OLDER THAN D2006)
   //DON'T SUPPORT RECORD METHODS
@@ -994,13 +994,13 @@ end;
 
 function DPIAware(val: Integer): Integer;
 begin
-  result := Round( val * DpiAwareD);
+  result := Round( val * DpiAwareOne);
 end;
 //------------------------------------------------------------------------------
 
 function DPIAware(val: double): double;
 begin
-  result := val * DpiAwareD;
+  result := val * DpiAwareOne;
 end;
 //------------------------------------------------------------------------------
 {$ENDIF}
@@ -3175,11 +3175,11 @@ begin
   dc := GetDC(0);
   try
     ScreenPixelsY := GetDeviceCaps(dc, LOGPIXELSY);
-    DpiAwareD := ScreenPixelsY / 96;
+    DpiAwareOne := ScreenPixelsY / 96;
   finally
     ReleaseDC(0, dc);
   end;
-  dpiAwareI   := Round(DpiAwareD);
+  dpiAware1   := Round(DpiAwareOne);
 end;
 {$ENDIF}
 //------------------------------------------------------------------------------

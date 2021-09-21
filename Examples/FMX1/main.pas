@@ -66,7 +66,7 @@ var
   fontReader : TFontReader;
 begin
   margin := DPIAware(14);
-  Layout1.Scale.Point := PointF(1/DpiAwareD, 1/DpiAwareD);
+  Layout1.Scale.Point := PointF(1/DpiAwareOne, 1/DpiAwareOne);
 
   bkColor  := $FFF8F8BB; //yellow
   penColor := clMaroon32;

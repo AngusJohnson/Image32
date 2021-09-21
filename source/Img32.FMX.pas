@@ -2,8 +2,8 @@ unit Img32.FMX;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.2                                                             *
-* Date      :  13 September 2021                                               *
+* Version   :  3.3                                                             *
+* Date      :  21 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Image file format support for TImage32 and FMX                  *
@@ -198,9 +198,9 @@ var
 begin
   if TPlatformServices.Current.SupportsPlatformService(
   IFMXScreenService, IInterface(ScreenService)) then
-    DpiAwareD := ScreenService.GetScreenScale else
-    DpiAwareD := 1;
-  DpiAwareI := Round(DpiAwareD);
+    DpiAwareOne := ScreenService.GetScreenScale else
+    DpiAwareOne := 1;
+  dpiAware1 := Round(DpiAwareOne);
 end;
 
 //------------------------------------------------------------------------------

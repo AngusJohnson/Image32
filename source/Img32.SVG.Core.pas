@@ -2,8 +2,8 @@ unit Img32.SVG.Core;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.2                                                             *
-* Date      :  13 September 2021                                               *
+* Version   :  3.3                                                             *
+* Date      :  21 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -215,19 +215,26 @@ type
   TSvgPathSegType = (dsUnknown, dsMove, dsLine, dsHorz, dsVert, dsArc,
     dsQBez, dsCBez, dsQSpline, dsCSpline, dsClose);
 
-  PSvgPathSeg = ^TSvgPathSeg;
-  TSvgPathSeg = record
+  TSvgSubPathSeg = class
+  private
+    fCnt    : integer;
+    fVals   : TArrayOfDouble;
+  public
     segType : TSvgPathSegType;
-    vals    : TArrayOfDouble;
+    procedure AddVal(val: double);
+    property Count: integer read fCnt;
   end;
 
   TSvgSubPath = class
   private
-    segs      : array of TSvgPathSeg;
+    segs      : array of TSvgSubPathSeg;
+    function GetCount: integer;
   public
     firstPt   : TPointD;
+    destructor Destroy; override;
+    procedure Clear;
     function GetBounds: TRectD;
-    function AddSeg: PSvgPathSeg;
+    function AddSeg: TSvgSubPathSeg;
     //scalePending: if an SVG will be scaled later, then this parameter
     //allows curve 'flattening' to occur with a corresponding precision
     function GetFlattenedPath(scalePending: double = 1.0): TPathD;
@@ -235,6 +242,7 @@ type
     function GetSimplePath: TPathD;
     function IsClosed: Boolean;
     function Clone: TSvgSubPath;
+    property Count: integer read GetCount;
   end;
 
   TSvgPath = class
@@ -311,6 +319,9 @@ var
   ColorConstList : TStringList;
 
 implementation
+
+resourcestring
+  rsSvgPathRangeError = 'TSvgPath.GetPath range error';
 
 type
   TColorConst = record
@@ -1991,26 +2002,26 @@ begin
     begin
       case segType of
         dsLine:
-          if High(vals) > 0 then
-            for j := 0 to High(vals) div 2 do
-              AddPoint(PointD(vals[j*2], vals[j*2 +1]));
+          if Count > 1 then
+            for j := 0 to (Count -1) div 2 do
+              AddPoint(PointD(fVals[j*2], fVals[j*2 +1]));
         dsHorz:
-          for j := 0 to High(vals) do
-            AddPoint(PointD(vals[j], currPt.Y));
+          for j := 0 to (Count -1) do
+            AddPoint(PointD(fVals[j], currPt.Y));
         dsVert:
-          for j := 0 to High(vals) do
-            AddPoint(PointD(currPt.X, vals[j]));
+          for j := 0 to (Count -1) do
+            AddPoint(PointD(currPt.X, fVals[j]));
         dsArc:
-          if High(vals) > 5 then
-            for j := 0 to High(vals) div 7 do
+          if (Count -1) > 5 then
+            for j := 0 to (Count -1) div 7 do
             begin
-              radii.X   := vals[j*7];
-              radii.Y   := vals[j*7 +1];
-              angle     := DegToRad(vals[j*7 +2]);
-              arcFlag   := Round(vals[j*7 +3]);
-              sweepFlag := Round(vals[j*7 +4]);
-              pt2.X := vals[j*7 +5];
-              pt2.Y := vals[j*7 +6];
+              radii.X   := fVals[j*7];
+              radii.Y   := fVals[j*7 +1];
+              angle     := DegToRad(fVals[j*7 +2]);
+              arcFlag   := Round(fVals[j*7 +3]);
+              sweepFlag := Round(fVals[j*7 +4]);
+              pt2.X := fVals[j*7 +5];
+              pt2.Y := fVals[j*7 +6];
 
               GetSvgArcInfo(currPt, pt2, radii, angle,
                 arcFlag <> 0, sweepFlag <> 0, arc1, arc2, rec);
@@ -2026,55 +2037,55 @@ begin
               AddPath(path2);
             end;
         dsQBez:
-          if High(vals) > 2 then
-            for j := 0 to High(vals) div 4 do
+          if (Count) > 3 then
+            for j := 0 to (Count -1) div 4 do
             begin
-              pt2.X := vals[j*4];
-              pt2.Y := vals[j*4 +1];
-              pt3.X := vals[j*4 +2];
-              pt3.Y := vals[j*4 +3];
+              pt2.X := fVals[j*4];
+              pt2.Y := fVals[j*4 +1];
+              pt3.X := fVals[j*4 +2];
+              pt3.Y := fVals[j*4 +3];
               lastQCtrlPt := pt2;
               path2 := FlattenQBezier(currPt, pt2, pt3, bezTolerance);
               AddPath(path2);
             end;
         dsQSpline:
-          if High(vals) > 0 then
-            for j := 0 to High(vals) div 2 do
+          if Count > 1 then
+            for j := 0 to (Count -1) div 2 do
             begin
               if LastSegWasQuad(i) then
                 pt2 := ReflectPoint(lastQCtrlPt, currPt) else
                 pt2 := currPt;
-              pt3.X := vals[j*2];
-              pt3.Y := vals[j*2 +1];
+              pt3.X := fVals[j*2];
+              pt3.Y := fVals[j*2 +1];
               lastQCtrlPt := pt2;
               path2 := FlattenQBezier(currPt, pt2, pt3, bezTolerance);
               AddPath(path2);
             end;
         dsCBez:
-          if High(vals) > 4 then
-            for j := 0 to High(vals) div 6 do
+          if Count > 5 then
+            for j := 0 to (Count -1) div 6 do
             begin
-              pt2.X := vals[j*6];
-              pt2.Y := vals[j*6 +1];
-              pt3.X := vals[j*6 +2];
-              pt3.Y := vals[j*6 +3];
-              pt4.X := vals[j*6 +4];
-              pt4.Y := vals[j*6 +5];
+              pt2.X := fVals[j*6];
+              pt2.Y := fVals[j*6 +1];
+              pt3.X := fVals[j*6 +2];
+              pt3.Y := fVals[j*6 +3];
+              pt4.X := fVals[j*6 +4];
+              pt4.Y := fVals[j*6 +5];
               lastCCtrlPt := pt3;
               path2 := FlattenCBezier(currPt, pt2, pt3, pt4, bezTolerance);
               AddPath(path2);
             end;
         dsCSpline:
-          if High(vals) > 2 then
-            for j := 0 to High(vals) div 4 do
+          if Count > 3 then
+            for j := 0 to (Count -1) div 4 do
             begin
               if LastSegWasCubic(i) then
                 pt2 := ReflectPoint(lastCCtrlPt, currPt) else
                 pt2 := currPt;
-              pt3.X := vals[j*4];
-              pt3.Y := vals[j*4 +1];
-              pt4.X := vals[j*4 +2];
-              pt4.Y := vals[j*4 +3];
+              pt3.X := fVals[j*4];
+              pt3.Y := fVals[j*4 +1];
+              pt4.X := fVals[j*4 +2];
+              pt4.Y := fVals[j*4 +3];
               lastCCtrlPt := pt3;
               path2 := FlattenCBezier(currPt, pt2, pt3, pt4, bezTolerance);
               AddPath(path2);
@@ -2083,6 +2094,21 @@ begin
     end;
   SetLength(Result, pathLen);
 end;
+
+//------------------------------------------------------------------------------
+// TSvgSubPathSeg
+//------------------------------------------------------------------------------
+
+procedure TSvgSubPathSeg.AddVal(val: double);
+begin
+  if Length(fVals) = fCnt then
+    SetLength(fVals, fCnt + buffSize);
+  fVals[fCnt] := val;
+  inc(fCnt);
+end;
+
+//------------------------------------------------------------------------------
+// TSvgSubPath
 //------------------------------------------------------------------------------
 
 function TSvgSubPath.Clone: TSvgSubPath;
@@ -2097,7 +2123,7 @@ begin
     with segs[i] do
     begin
       Result.segs[i].segType := segType;
-      Result.segs[i].vals := Copy(vals, 0, Length(vals));
+      Result.segs[i].fVals := Copy(fVals, 0, Length(fVals));
     end;
 end;
 //------------------------------------------------------------------------------
@@ -2111,13 +2137,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgSubPath.AddSeg: PSvgPathSeg;
+function TSvgSubPath.AddSeg: TSvgSubPathSeg;
 var
   i: integer;
 begin
   i := Length(segs);
   SetLength(segs, i+1);
-  Result := @segs[i];
+  Result := TSvgSubPathSeg.Create;
+  segs[i] := Result;
 end;
 //------------------------------------------------------------------------------
 
@@ -2146,42 +2173,65 @@ begin
     begin
       case segType of
         dsLine:
-          if High(vals) > 0 then
-            for j := 0 to High(vals) div 2 do
-              AddPoint(PointD(vals[j*2], vals[j*2 +1]));
+          if Count > 1 then
+            for j := 0 to (Count -1) div 2 do
+              AddPoint(PointD(fVals[j*2], fVals[j*2 +1]));
         dsHorz:
-          for j := 0 to High(vals) do
-            AddPoint(PointD(vals[j], currPt.Y));
+          for j := 0 to (Count -1) do
+            AddPoint(PointD(fVals[j], currPt.Y));
         dsVert:
-          for j := 0 to High(vals) do
-            AddPoint(PointD(currPt.X, vals[j]));
+          for j := 0 to (Count -1) do
+            AddPoint(PointD(currPt.X, fVals[j]));
         dsArc:
-          if High(vals) > 5 then
-            for j := 0 to High(vals) div 7 do
-              AddPoint(PointD(vals[j*7 +5], vals[j*7 +6]));
+          if Count > 6 then
+            for j := 0 to (Count -1) div 7 do
+              AddPoint(PointD(fVals[j*7 +5], fVals[j*7 +6]));
         dsQBez:
-          if High(vals) > 2 then
-            for j := 0 to High(vals) div 4 do
+          if Count > 3 then
+            for j := 0 to (Count -1) div 4 do
             begin
-              pt2.X := vals[j*4];
-              pt2.Y := vals[j*4 +1];
-              AddPoint(PointD(vals[j*4 +2], vals[j*4 +3]));
+              pt2.X := fVals[j*4];
+              pt2.Y := fVals[j*4 +1];
+              AddPoint(PointD(fVals[j*4 +2], fVals[j*4 +3]));
             end;
         dsQSpline:
-          if High(vals) > 0 then
-            for j := 0 to High(vals) div 2 do
-              AddPoint(PointD(vals[j*2 +1], vals[j*2 +1]));
+          if Count > 1 then
+            for j := 0 to (Count -1) div 2 do
+              AddPoint(PointD(fVals[j*2 +1], fVals[j*2 +1]));
         dsCBez:
-          if High(vals) > 4 then
-            for j := 0 to High(vals) div 6 do
-              AddPoint(PointD(vals[j*6 +4], vals[j*6 +5]));
+          if Count > 5 then
+            for j := 0 to (Count -1) div 6 do
+              AddPoint(PointD(fVals[j*6 +4], fVals[j*6 +5]));
         dsCSpline:
-          if High(vals) > 2 then
-            for j := 0 to High(vals) div 4 do
-              AddPoint(PointD(vals[j*4 +2], vals[j*4 +3]));
+          if Count > 3 then
+            for j := 0 to (Count -1) div 4 do
+              AddPoint(PointD(fVals[j*4 +2], fVals[j*4 +3]));
       end;
     end;
   SetLength(Result, pathLen);
+end;
+//------------------------------------------------------------------------------
+
+destructor TSvgSubPath.Destroy;
+begin
+  Clear;
+  inherited;
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgSubPath.Clear;
+var
+  i: integer;
+begin
+  for i := 0 to Count -1 do
+    segs[i].Free;
+  segs := nil;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgSubPath.GetCount: integer;
+begin
+  Result := Length(segs);
 end;
 //------------------------------------------------------------------------------
 
@@ -2249,26 +2299,26 @@ begin
     begin
       case segType of
         dsLine:
-          if High(vals) > 0 then
-            for j := 0 to High(vals) div 2 do
-              AddPoint(PointD(vals[j*2], vals[j*2 +1]));
+          if Count > 1 then
+            for j := 0 to (Count -1) div 2 do
+              AddPoint(PointD(fVals[j*2], fVals[j*2 +1]));
         dsHorz:
-          for j := 0 to High(vals) do
-            AddPoint(PointD(vals[j], currPt.Y));
+          for j := 0 to (Count -1) do
+            AddPoint(PointD(fVals[j], currPt.Y));
         dsVert:
-          for j := 0 to High(vals) do
-            AddPoint(PointD(currPt.X, vals[j]));
+          for j := 0 to (Count -1) do
+            AddPoint(PointD(currPt.X, fVals[j]));
         dsArc:
-          if High(vals) > 5 then
-            for j := 0 to High(vals) div 7 do
+          if Count > 6 then
+            for j := 0 to (Count -1) div 7 do
             begin
-              radii.X   := vals[j*7];
-              radii.Y   := vals[j*7 +1];
-              angle     := DegToRad(vals[j*7 +2]);
-              arcFlag   := Round(vals[j*7 +3]);
-              sweepFlag := Round(vals[j*7 +4]);
-              pt2.X := vals[j*7 +5];
-              pt2.Y := vals[j*7 +6];
+              radii.X   := fVals[j*7];
+              radii.Y   := fVals[j*7 +1];
+              angle     := DegToRad(fVals[j*7 +2]);
+              arcFlag   := Round(fVals[j*7 +3]);
+              sweepFlag := Round(fVals[j*7 +4]);
+              pt2.X := fVals[j*7 +5];
+              pt2.Y := fVals[j*7 +6];
 
               GetSvgArcInfo(currPt, pt2, radii, angle,
                 arcFlag <> 0, sweepFlag <> 0, arc1, arc2, rec);
@@ -2282,55 +2332,55 @@ begin
               AddPath(path3);
             end;
         dsQBez:
-          if High(vals) > 2 then
-            for j := 0 to High(vals) div 4 do
+          if Count > 3 then
+            for j := 0 to (Count -1) div 4 do
             begin
-              pt2.X := vals[j*4];
-              pt2.Y := vals[j*4 +1];
-              pt3.X := vals[j*4 +2];
-              pt3.Y := vals[j*4 +3];
+              pt2.X := fVals[j*4];
+              pt2.Y := fVals[j*4 +1];
+              pt3.X := fVals[j*4 +2];
+              pt3.Y := fVals[j*4 +3];
               lastQCtrlPt := pt2;
               path3 := FlattenQBezier(currPt, pt2, pt3, 1);
               AddPath(path3);
             end;
         dsQSpline:
-          if High(vals) > 0 then
-            for j := 0 to High(vals) div 2 do
+          if Count > 1 then
+            for j := 0 to (Count -1) div 2 do
             begin
               if LastSegWasQuad(i) then
                 pt2 := ReflectPoint(lastQCtrlPt, currPt) else
                 pt2 := currPt;
-              pt3.X := vals[j*2];
-              pt3.Y := vals[j*2 +1];
+              pt3.X := fVals[j*2];
+              pt3.Y := fVals[j*2 +1];
               lastQCtrlPt := pt2;
               path3 := FlattenQBezier(currPt, pt2, pt3, 1);
               AddPath(path3);
             end;
         dsCBez:
-          if High(vals) > 4 then
-            for j := 0 to High(vals) div 6 do
+          if Count > 5 then
+            for j := 0 to (Count -1) div 6 do
             begin
-              pt2.X := vals[j*6];
-              pt2.Y := vals[j*6 +1];
-              pt3.X := vals[j*6 +2];
-              pt3.Y := vals[j*6 +3];
-              pt4.X := vals[j*6 +4];
-              pt4.Y := vals[j*6 +5];
+              pt2.X := fVals[j*6];
+              pt2.Y := fVals[j*6 +1];
+              pt3.X := fVals[j*6 +2];
+              pt3.Y := fVals[j*6 +3];
+              pt4.X := fVals[j*6 +4];
+              pt4.Y := fVals[j*6 +5];
               lastCCtrlPt := pt3;
               path3 := FlattenCBezier(currPt, pt2, pt3, pt4, 1);
               AddPath(path3);
             end;
         dsCSpline:
-          if High(vals) > 2 then
-            for j := 0 to High(vals) div 4 do
+          if Count > 3 then
+            for j := 0 to (Count -1) div 4 do
             begin
               if LastSegWasCubic(i) then
                 pt2 := ReflectPoint(lastCCtrlPt, currPt) else
                 pt2 := currPt;
-              pt3.X := vals[j*4];
-              pt3.Y := vals[j*4 +1];
-              pt4.X := vals[j*4 +2];
-              pt4.Y := vals[j*4 +3];
+              pt3.X := fVals[j*4];
+              pt3.Y := fVals[j*4 +1];
+              pt4.X := fVals[j*4 +2];
+              pt4.Y := fVals[j*4 +3];
               lastCCtrlPt := pt3;
               path3 := FlattenCBezier(currPt, pt2, pt3, pt4, 1);
               AddPath(path3);
@@ -2342,7 +2392,7 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TSvgPaths
+// TSvgPath
 //------------------------------------------------------------------------------
 
 destructor TSvgPath.Destroy;
@@ -2361,7 +2411,7 @@ end;
 function TSvgPath.GetPath(index: integer): TSvgSubPath;
 begin
   if (index < 0) or (index >= Count) then
-    raise Exception.Create('TSvgPaths.GetPath range error');
+    raise Exception.Create(rsSvgPathRangeError);
   Result := fSubPaths[index];
 end;
 //------------------------------------------------------------------------------
@@ -2810,20 +2860,15 @@ end;
 
 procedure ParseSvgPath(const value: UTF8String; svgPaths: TSvgPath);
 var
-  currSeg     : PSvgPathSeg;
+  currSeg     : TSvgSubPathSeg;
   currDpath   : TSvgSubPath;
-  currSegCnt  : integer;
-  currSegCap  : integer;
   currSegType : TSvgPathSegType;
   lastPt      : TPointD;
 
   procedure StartNewDpath;
   begin
-    if Assigned(currDpath) then
-    begin
-      if not Assigned(currDpath.segs) then Exit;
-      SetLength(currSeg.vals, currSegCnt);
-    end;
+    if Assigned(currDpath) and
+      not Assigned(currDpath.segs) then Exit;
     currDpath := svgPaths.AddPath;
     currDpath.firstPt := lastPt;
     currDpath.segs := nil;
@@ -2832,30 +2877,16 @@ var
 
   procedure StartNewSeg;
   begin
-    if Assigned(currSeg) then
-      SetLength(currSeg.vals, currSegCnt)
-    else if not Assigned(currDpath) then
+    if not Assigned(currDpath) then
       StartNewDpath;
-
     currSeg := currDpath.AddSeg;
     currSeg.segType := currSegType;
-
-    currSegCap := buffSize;
-    SetLength(currSeg.vals, currSegCap);
-    currSegCnt := 0;
   end;
 
   procedure AddSegValue(val: double);
   begin
     if not Assigned(currSeg) then StartNewSeg;
-
-    if currSegCnt = currSegCap then
-    begin
-      inc(currSegCap, buffSize);
-      SetLength(currSeg.vals, currSegCap);
-    end;
-    currSeg.vals[currSegCnt] := val;
-    inc(currSegCnt);
+    currSeg.AddVal(val);
   end;
 
   procedure AddSegPoint(const pt: TPointD);
@@ -2884,8 +2915,6 @@ begin
   svgPaths.Clear;
 
   currSeg     := nil;
-  currSegCnt  := 0;
-  currSegCap  := 0;
   currDpath   := nil;
   currSegType := dsMove;
 
@@ -2902,8 +2931,6 @@ begin
     lastPt := currPt;
     if (currSegType = dsMove) then
     begin
-      if Assigned(currSeg) then
-        SetLength(currSeg.vals, currSegCnt); //trim buffer
       currDpath := nil;
       currSeg := nil;
 
@@ -2922,9 +2949,6 @@ begin
       StartNewSeg;
       Continue;
     end;
-
-    if Assigned(currSeg) then
-      SetLength(currSeg.vals, currSegCnt); //trim buffer
     currSeg := nil;
 
     case currSegType of
@@ -3016,8 +3040,6 @@ begin
         end;
     end;
   end;
-  if Assigned(currSeg) then
-    SetLength(currSeg.vals, currSegCnt); //trim buffer
 end;
 
 //------------------------------------------------------------------------------

@@ -2,8 +2,8 @@ unit Img32.Text;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.2                                                             *
-* Date      :  13 September 2021                                               *
+* Version   :  3.3                                                             *
+* Date      :  21 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -2324,7 +2324,7 @@ function TGlyphCache.GetTextGlyphs(const rec: TRect;
   const text: UnicodeString; textAlign: TTextAlign; textAlignV: TTextVAlign;
   out nextIdx: integer; out nextPt: TPointD): TPathsD;
 var
-  i,j,k, lenCurr, lenRem, spcCount: integer;
+  i,j,k, lenCurr, lenRem, spcCount, recW: integer;
   lh, currLineWidthPxls, spcDx, dx, dy, y2, w: double;
   currentLine, remainingText: UnicodeString;
   offsets: TArrayOfDouble;
@@ -2344,6 +2344,7 @@ begin
 
   currentLine := '';
   currLineWidthPxls := 0;
+  recW := RectWidth(rec);
 
   remainingText := text;
   while (remainingText <> '') do
@@ -2364,7 +2365,7 @@ begin
       //get character offsets to see how many will fit within rec.Width
       offsets := GetCharOffsets(currentLine);
       j := 0;
-      while (j < High(offsets)) and (offsets[j+1] < RectWidth(rec)) do inc(j);
+      while (j < High(offsets)) and (offsets[j+1] < recW) do inc(j);
       if j = 0 then Exit; //there's no room for any text!
 
       //if currentLine is too long to fit, break it at a space character ...
@@ -2410,9 +2411,9 @@ begin
         if not hardCR then
         begin
           spcCount := CountSpaces(currentLine);
-          if (spcCount > 0) and (currLineWidthPxls < RectWidth(rec)) then
+          if (spcCount > 0) and (currLineWidthPxls < recW) then
           begin
-            spcDx := (RectWidth(rec) - currLineWidthPxls)/spcCount;
+            spcDx := (recW - currLineWidthPxls)/spcCount;
             j := lenCurr;
             while spcCount > 0 do
             begin
@@ -2424,7 +2425,7 @@ begin
               Dec(spcCount);
               j := i -1;
             end;
-            currLineWidthPxls := RectWidth(rec); //needed for underlining
+            currLineWidthPxls := recW; //needed for underlining
           end;
         end;
       end;

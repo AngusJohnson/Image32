@@ -90,7 +90,7 @@ object MainForm: TMainForm
   end
   object PopupMenu1: TPopupMenu
     OnPopup = PopupMenu1Popup
-    Left = 168
+    Left = 176
     Top = 80
     object AddRectangle1: TMenuItem
       Caption = 'Add &Rectangle'
@@ -115,6 +115,19 @@ object MainForm: TMainForm
     object N1: TMenuItem
       Caption = '-'
     end
+    object SendBack1: TMenuItem
+      Caption = 'Send &Back'
+      ShortCut = 16450
+      OnClick = mnuSendBackClick
+    end
+    object BringForward1: TMenuItem
+      Caption = 'Bring &Forward'
+      ShortCut = 16454
+      OnClick = mnuBringForwardClick
+    end
+    object N3: TMenuItem
+      Caption = '-'
+    end
     object mnuDeleteLayer: TMenuItem
       Caption = '&Delete Layer'
       ShortCut = 46
@@ -124,7 +137,7 @@ object MainForm: TMainForm
   object OpenDialog1: TOpenDialog
     Filter = 'Image Files|*.bmp;*.png;*.jpg;*.svg'
     Options = [ofHideReadOnly, ofFileMustExist, ofEnableSizing]
-    Left = 224
-    Top = 72
+    Left = 232
+    Top = 80
   end
 end

@@ -3,11 +3,9 @@ unit main;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls,
-  Forms, Math, Types, Menus, ExtCtrls, ComCtrls, ShellApi,
-  Img32, Img32.Draw, Img32.Fmt.SVG, Img32.Fmt.PNG,
-  Img32.SVG.Core, Img32.SVG.Reader,
-  Img32.Vector, Img32.Text, Img32.Panels, Dialogs, StdCtrls;
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, StdCtrls,
+  Forms, Types, Menus, ExtCtrls, ComCtrls, ShellApi, Dialogs,
+  Img32.Panels;
 
   //This sample app presumes that the TImage32Panel component
   //has been installed into your Delphi compiler's IDE.
@@ -16,11 +14,15 @@ type
   TForm1 = class(TForm)
     MainMenu1: TMainMenu;
     File1: TMenuItem;
-    ImagePanel: TImage32Panel;
     N1: TMenuItem;
     Exit1: TMenuItem;
     Open1: TMenuItem;
     OpenDialog1: TOpenDialog;
+    PopupMenu1: TPopupMenu;
+    PopupMenu11: TMenuItem;
+    OpeninBrowser1: TMenuItem;
+    StatusBar1: TStatusBar;
+    ImagePanel: TImage32Panel;
     ListBox1: TListBox;
     Splitter1: TSplitter;
     procedure FormCreate(Sender: TObject);
@@ -30,13 +32,16 @@ type
     procedure ListSVGFilesInFolder;
     procedure ListBox1Click(Sender: TObject);
     procedure ImagePanelResize(Sender: TObject);
+    procedure PopupMenu11Click(Sender: TObject);
+    procedure OpeninBrowser1Click(Sender: TObject);
   protected
     folder: string;
     filename: string;
+    redrawPending: Boolean;
     procedure OpenFile(const filename: string);
     procedure WMDropFiles(var Msg: TMessage); message WM_DROPFILES;
-  public
-    svgReader: TSvgReader;
+    procedure AppIdle(Sender: TObject; var Done: Boolean);
+    procedure DrawCurrentItem;
   end;
 
 var
@@ -46,7 +51,8 @@ implementation
 
 {$R *.dfm}
 
-uses Img32.Transform, Img32.Extra, Img32.Resamplers;
+uses
+  Img32, Img32.Fmt.PNG, Img32.Fmt.SVG, Img32.Text;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -56,12 +62,13 @@ var
   rec: TRect;
 begin
   DragAcceptFiles(Handle, True);
+  Application.OnIdle := AppIdle;
+
   ImagePanel.ParentBackground := false;
+  ImagePanel.Color := clWhite;
+
   rec := ImagePanel.InnerClientRect;
   ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
-
-  svgReader := TSvgReader.Create;
-  //svgReader.BackgroundColor := clWhite32;
 
   FontManager.Load('Arial');
   FontManager.Load('Arial Bold');
@@ -79,7 +86,15 @@ end;
 procedure TForm1.FormDestroy(Sender: TObject);
 begin
   DragAcceptFiles(Handle, False);
-  svgReader.Free;
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.AppIdle(Sender: TObject; var Done: Boolean);
+begin
+  Done := true;
+  if not redrawPending then Exit;
+  redrawPending := false;
+  DrawCurrentItem;
 end;
 //------------------------------------------------------------------------------
 
@@ -123,7 +138,7 @@ begin
   ListBox1.ItemIndex := ListBox1.Items.IndexOf(self.filename);
   if (ListBox1.ItemIndex < 0) and (ListBox1.Items.Count > 0) then
     ListBox1.ItemIndex := 0;
-  ListBox1Click(nil);
+  redrawPending := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -131,6 +146,26 @@ procedure TForm1.Open1Click(Sender: TObject);
 begin
   if OpenDialog1.Execute then
     OpenFile(OpenDialog1.FileName);
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.PopupMenu11Click(Sender: TObject);
+var
+  fn: string;
+begin
+  if ListBox1.ItemIndex < 0 then Exit;
+  fn := AppendSlash(folder) + ListBox1.Items[ListBox1.ItemIndex];
+  ShellExecute(handle, nil, 'notepad.exe', PChar(fn), nil, SW_SHOWNORMAL);
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.OpeninBrowser1Click(Sender: TObject);
+var
+  fn: string;
+begin
+  if ListBox1.ItemIndex < 0 then Exit;
+  fn := AppendSlash(folder) + ListBox1.Items[ListBox1.ItemIndex];
+  ShellExecute(handle, nil, PChar(fn), nil, nil, SW_SHOWNORMAL);
 end;
 //------------------------------------------------------------------------------
 
@@ -151,25 +186,29 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.ListBox1Click(Sender: TObject);
-var
-  fn: string;
 begin
-  ImagePanel.Image.Clear;
+  redrawPending := true;
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.DrawCurrentItem;
+var
+  svgFilename: string;
+  rec: TRect;
+begin
+  rec := ImagePanel.InnerClientRect;
+  ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
   ImagePanel.Refresh;
   ListBox1.Visible := ListBox1.Items.Count > 0;
-  if (ListBox1.ItemIndex < 0) then Exit;
-
+  if not ListBox1.Visible then Exit;
   ActiveControl := ListBox1;
-  filename := ListBox1.Items[ListBox1.ItemIndex];
-  fn := AppendSlash(folder) + filename;
 
-  if not svgReader.LoadFromFile(fn) then Exit;
+  filename := ListBox1.Items[ListBox1.ItemIndex];
+  svgFilename := AppendSlash(folder) + filename;
 
   Screen.Cursor := crHourGlass;
   try
-    with ImagePanel.InnerClientRect do
-      ImagePanel.Image.SetSize(Width, Height);
-    svgReader.DrawImage(ImagePanel.Image, true);
+    ImagePanel.Image.LoadFromFile(svgFilename);
   finally
     Screen.Cursor := crDefault;
   end;
@@ -182,8 +221,7 @@ var
 begin
   rec := ImagePanel.InnerClientRect;
   ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
-  if Assigned(svgReader) and not svgReader.IsEmpty then
-    ListBox1Click(nil);
+  redrawPending := true;
 end;
 //------------------------------------------------------------------------------
 
