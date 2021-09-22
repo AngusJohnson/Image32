@@ -125,13 +125,14 @@ type
     function GetBounds: TRect;
     function GetMidPoint: TPointD;
   protected
-    function CopyPixels(rec: TRect): TArrayOfColor32;
+    function  RectHasTransparency(rec: TRect): Boolean;
+    function  CopyPixels(rec: TRect): TArrayOfColor32;
     //CopyInternal: Internal routine (has no scaling or bounds checking)
     procedure CopyInternal(src: TImage32;
       const srcRec, dstRec: TRect; blendFunc: TBlendFunction);
-    procedure Changed; virtual;
-    procedure Resized; virtual;
-    property UpdateCount: integer read fUpdateCnt;
+    procedure  Changed; virtual;
+    procedure  Resized; virtual;
+    property   UpdateCount: integer read fUpdateCnt;
   public
     constructor Create(width: Integer = 0; height: Integer = 0); overload;
     constructor Create(src: TImage32); overload;
@@ -485,7 +486,7 @@ var
 
   DefaultResampler: Integer = 0;
 
-  //Both MulTable and DivTable are used in blend functions<br>
+  //Both MulTable and DivTable are used in blend functions
   //MulTable[a,b] = a * b / 255
   MulTable: array [Byte,Byte] of Byte;
   //DivTable[a,b] = a * 255/b (for a &lt;= b)
@@ -605,7 +606,7 @@ end;
 
 function MulBytes(b1, b2: Byte) : Byte; {$IFDEF INLINE} inline; {$ENDIF}
 begin
-  Result := MulTable[b1,b2];
+  Result := MulTable[b1, b2];
 end;
 //------------------------------------------------------------------------------
 
@@ -669,13 +670,11 @@ var
 begin
   //(see https://en.wikipedia.org/wiki/Alpha_compositing)
   if fg.A = 0 then Result := bgColor
-  else if fg.A = 255 then Result := fgColor
+  else if (bg.A = 0) or (fg.A = 255) then Result := fgColor
   else
   begin
     //combine alphas ...
-    //res.A := not MulTable[not fg.A, not bg.A];
-    res.A := (((fg.A xor 255) * (bg.A xor 255)) shr 8) xor 255; // ~faster
-
+    res.A := not MulTable[not fg.A, not bg.A];
     fgWeight := DivTable[fg.A, res.A]; //fgWeight = amount foreground color
                                        //contibutes to total (result) color
 
@@ -1634,6 +1633,29 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TImage32.RectHasTransparency(rec: TRect): Boolean;
+var
+  i,j, rw: Integer;
+  c: PARGB;
+begin
+  Result := True;
+  Types.IntersectRect(rec, rec, bounds);
+  if IsEmptyRect(rec) then Exit;
+  rw := RectWidth(rec);
+  c := @Pixels[rec.Top * Width + rec.Left];
+  for i := rec.Top to rec.Bottom -1 do
+  begin
+    for j := 1 to rw do
+    begin
+      if c.A = 0 then Exit;
+      inc(c);
+    end;
+    inc(c, Width - rw);
+  end;
+  Result := False;
+end;
+//------------------------------------------------------------------------------
+
 procedure CheckBlendFill(pc: PColor32; color: TColor32);
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
@@ -2408,7 +2430,7 @@ begin
 
   bi := Get32bitBitmapInfoHeader(wSrc, hSrc);
 
-  isTransparent := transparent and Self.HasTransparency;
+  isTransparent := transparent and RectHasTransparency(srcRect);
   memDc := CreateCompatibleDC(0);
   try
     bm := CreateDIBSection(memDc, PBITMAPINFO(@bi)^,

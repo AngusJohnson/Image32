@@ -55,7 +55,8 @@ type
     fScrollbarHorz  : TPanelScrollbar;
     fAutoCenter     : Boolean;
     fAllowZoom      : Boolean;
-    fAllowScroll    : Boolean;
+    fAllowKeyScroll : Boolean;
+    fAllowScrnScroll: Boolean;
     fShowScrollBtns : TShowScrollBtns;
     fOnKeyDown      : TKeyEvent;
     fOnKeyUp        : TKeyEvent;
@@ -139,7 +140,8 @@ type
     //ShowScrollButtons: defaults to ssbFocused (ie only when Panel has focus)
     property ShowScrollButtons : TShowScrollBtns
       read fShowScrollBtns write SetShowScrollButtons;
-    property AllowScroll: Boolean read fAllowScroll write fAllowScroll;
+    property AllowKeyScroll: Boolean read fAllowKeyScroll write fAllowKeyScroll;
+    property AllowScrnScroll: Boolean read fAllowScrnScroll write fAllowScrnScroll;
     property AllowZoom: Boolean read fAllowZoom write SetAllowZoom;
     //OnKeyDown: optional event for custom keyboard actions
     property OnKeyDown: TKeyEvent read fOnKeyDown write fOnKeyDown;
@@ -168,6 +170,8 @@ type
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure  ClearImage;
+    //CopyToImage: avoids a full redraw
+    procedure  CopyToImage(srcImg: TImage32; const rec: TRect);
     function   CopyToClipboard: Boolean;
     function   PasteFromClipboard: Boolean;
 
@@ -361,7 +365,8 @@ begin
   {$ENDIF}
 
   fShowScrollBtns := ssbFocused;
-  fAllowScroll := true;
+  fAllowScrnScroll := true;
+  fAllowKeyScroll := true;
   fAllowZoom := true;
   fAutoCenter := true;
   fFocusedColor := clActiveCaption;
@@ -549,7 +554,9 @@ procedure TBaseImgPanel.SetAllowZoom(value: Boolean);
 begin
   if value = fAllowZoom then Exit;
   fAllowZoom := value;
-  if value then fAllowScroll := true;
+  if not value then Exit;
+  fAllowScrnScroll := true;
+  fAllowKeyScroll := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -693,7 +700,7 @@ var
 begin
   inherited;
 
-  if fAllowScroll then
+  if fAllowScrnScroll then
   begin
     fMouseDown := true;
     fScrollbarHorz.MouseDownPos := X;
@@ -728,7 +735,7 @@ var
   inDrawRegion, mobH, mobV: Boolean;
 begin
   inherited;
-  if not fAllowScroll then Exit;
+  if not fAllowScrnScroll then Exit;
 
   rec := GetInnerClientRect;
   inDrawRegion := PtInRect(rec, Point(X,Y));
@@ -736,8 +743,8 @@ begin
   if not fMouseDown then
   begin
     if (BorderWidth >= MinBorderWidth) and
-      fAllowScroll and ((fShowScrollBtns = ssAlways) or
-      (focused and (fShowScrollBtns = ssbFocused))) then
+      ((fShowScrollBtns = ssAlways) or
+        (focused and (fShowScrollBtns = ssbFocused))) then
     begin
       marg := GetInnerMargin;
       mobV := (X > ClientWidth - marg) and
@@ -807,7 +814,7 @@ procedure TBaseImgPanel.MouseUp(Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   inherited;
-  if not fAllowScroll or not fMouseDown then Exit;
+  if not fAllowScrnScroll or not fMouseDown then Exit;
   fMouseDown := false;
   fScrollbarHorz.MouseDown := false;
   fScrollbarHorz.MouseOver := false;
@@ -971,8 +978,9 @@ begin
   end;
 
   if (BorderWidth >= MinBorderWidth) and
-    fAllowScroll and ((fShowScrollBtns = ssAlways) or
-    (Focused and (fShowScrollBtns = ssbFocused))) then
+    (fAllowScrnScroll or fAllowKeyScroll) and
+    ((fShowScrollBtns = ssAlways) or
+      (Focused and (fShowScrollBtns = ssbFocused))) then
   begin
     btnMin := GetMinScrollBtnSize;
 
@@ -1028,7 +1036,7 @@ begin
       end;
     igiPan:
       begin
-        if not fAllowScroll then Exit;
+        if not (fAllowScrnScroll or fAllowKeyScroll) then Exit;
         if not (gfBegin in EventInfo.Flags) then
         begin
           with fScrollbarHorz do
@@ -1061,7 +1069,7 @@ begin
   if Result then Exit;
 
   isZooming := (ssCtrl in Shift) and fAllowZoom;
-  if not isZooming and not fAllowScroll then Exit;
+  if not isZooming and not (fAllowScrnScroll or fAllowKeyScroll) then Exit;
 
   {$IFNDEF FPC}
   MousePos := ScreenToClient(MousePos);
@@ -1094,7 +1102,7 @@ end;
 function TBaseImgPanel.DoMouseHWheel(Shift: TShiftState;
   WheelDelta: Integer; MousePos: TPoint): Boolean;
 begin
-  Result := focused and fAllowScroll;
+  Result := focused and (fAllowScrnScroll or fAllowKeyScroll);
   if not Result then Exit;
   {$IFNDEF FPC}
   MousePos := ScreenToClient(MousePos);
@@ -1120,10 +1128,8 @@ var
   shiftState: TShiftState;
 begin
   inherited;
-  if not fAllowZoom and not fAllowScroll then Exit;
-
+  if not fAllowZoom and not fAllowKeyScroll then Exit;
   shiftState := KeyDataToShiftState(Message.KeyData);
-
   if Assigned(fOnKeyDown) then
   begin
     charCode := Message.CharCode;
@@ -1147,7 +1153,7 @@ begin
           end;
         end else
         begin
-          if not fAllowScroll then Exit;
+          if not fAllowKeyScroll then Exit;
           //otherwise scroll the image with the arrow keys
           if ssShift in shiftState then
             mul := 5 else //ie scrolls 5 times faster with Shift key down
@@ -1229,7 +1235,7 @@ end;
 
 procedure TImage32Panel.ImageChanged(Sender: TObject);
 begin
-  if (fImageSize.cx <> Image.Width) or (fImageSize.cy <> Image.Height) then 
+  if (fImageSize.cx <> Image.Width) or (fImageSize.cy <> Image.Height) then
   begin
     fImageSize.cx := Image.Width;
     fImageSize.cy := Image.Height;
@@ -1250,6 +1256,27 @@ procedure TImage32Panel.ClearImage;
 begin
   fImage.Clear;
   Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32Panel.CopyToImage(srcImg: TImage32; const rec: TRect);
+var
+  srcRect, dstRect: TRect;
+begin
+  fImage.BlockNotify;
+  try
+    dstRect.TopLeft := ImageToClient(rec.TopLeft);
+    dstRect.BottomRight := ImageToClient(rec.BottomRight);
+    fImage.Copy(srcImg, rec, rec);
+
+    Types.IntersectRect(dstRect, dstRect, InnerClientRect);
+    srcRect.TopLeft := ClientToImage(dstRect.TopLeft);
+    srcRect.BottomRight := ClientToImage(dstRect.BottomRight);
+
+    fImage.CopyToDc(srcRect, dstRect, canvas.Handle);
+  finally
+    fImage.UnblockNotify;
+  end;
 end;
 //------------------------------------------------------------------------------
 

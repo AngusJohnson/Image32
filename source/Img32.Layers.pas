@@ -721,7 +721,7 @@ end;
 
 function TLayer32.TopLeft: TPoint;
 begin
-  Result := types.Point(Left, Top);
+  Result := Types.Point(Left, Top);
 end;
 //------------------------------------------------------------------------------
 
@@ -1038,20 +1038,20 @@ begin
     if Assigned(fParent) then
     begin
       dstRect := childLayer.Bounds;
-      types.OffsetRect(dstRect, -origOffset.X, -origOffset.Y);
+      Types.OffsetRect(dstRect, -origOffset.X, -origOffset.Y);
       rec := Image.Bounds;
-      types.IntersectRect(dstRect, dstRect, rec);
+      Types.IntersectRect(dstRect, dstRect, rec);
     end else
     begin
       //this must be the root layer
       dstRect := childLayer.Bounds;
-      types.IntersectRect(dstRect, dstRect, fLayeredImage.Bounds);
-      types.IntersectRect(dstRect, dstRect, updateRect);
+      Types.IntersectRect(dstRect, dstRect, fLayeredImage.Bounds);
+      Types.IntersectRect(dstRect, dstRect, updateRect);
     end;
 
     srcRect := dstRect;
     with childLayer do
-      types.OffsetRect(srcRect, origOffset.X - Left, origOffset.Y - Top);
+      Types.OffsetRect(srcRect, origOffset.X - Left, origOffset.Y - Top);
 
     //draw the child  onto the group's image
     img2 := nil;
@@ -1064,7 +1064,7 @@ begin
         if Assigned(fClipImage) then
         begin
           rec := fClipImage.Bounds;
-          types.OffsetRect(rec, -childLayer.Left, -childLayer.Top);
+          Types.OffsetRect(rec, -childLayer.Left, -childLayer.Top);
           img2.CopyBlend(fClipImage, fClipImage.Bounds, rec, BlendMask);
         end;
       end else
