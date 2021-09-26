@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  3.3                                                             *
-* Date      :  21 September 2021                                               *
+* Date      :  26 September 2021                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -381,10 +381,6 @@ type
 
   function GetByteMask(img: TImage32; reference: TColor32;
     compareFunc: TCompareFunctionEx): TArrayOfByte;
-
-  //GetWeightedPixel - bilinear interpolation:
-  //parameters x256, y256 are coords scaled up by 256.
-  //function GetWeightedPixel(img: TImage32; x256, y256: Integer): TColor32;
 
   {$IFDEF MSWINDOWS}
   //Color32: Converts a Graphics.TColor value into a TColor32 value.
@@ -860,16 +856,9 @@ var
   curr: TARGB absolute current;
   res: Cardinal;
 begin
-  if curr.A = 0 then
-  begin
-    Result := 0;
-  end else
-  begin
-    res := Sqr(mast.R - curr.R) + Sqr(mast.G - curr.G) + Sqr(mast.B - curr.B);
-    if res >= 65025 then result := 0
-    else result := 255 - Round(Sqrt(res));
-    if curr.A < 255 then result := MulTable[result, curr.A];
-  end;
+  res := Sqr(mast.R - curr.R) + Sqr(mast.G - curr.G) + Sqr(mast.B - curr.B);
+  if res >= 65025 then result := 255
+  else result := Round(Sqrt(res));
 end;
 //------------------------------------------------------------------------------
 
@@ -878,7 +867,7 @@ var
   mast: TARGB absolute master;
   curr: TARGB absolute current;
 begin
-  Result := 255 - abs(mast.A - curr.A);
+  Result := abs(mast.A - curr.A);
 end;
 
 //------------------------------------------------------------------------------
@@ -973,7 +962,7 @@ begin
   if rgbColor < 0 then
     result := GetSysColor(rgbColor and $FFFFFF) else
     result := rgbColor;
-  res.A := res.B; res.B := res.R; res.R := res.A; //byte swap
+//  res.A := res.B; res.B := res.R; res.R := res.A; //byte swap
   res.A := 255;
 end;
 //------------------------------------------------------------------------------
@@ -1647,7 +1636,7 @@ begin
   begin
     for j := 1 to rw do
     begin
-      if c.A = 0 then Exit;
+      if c.A < 254 then Exit;
       inc(c);
     end;
     inc(c, Width - rw);

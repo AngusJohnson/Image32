@@ -18,8 +18,8 @@ Version 3.3.03
       small rectangular regions (to significantly improve performance.)
     TImage32Panel's published property AllowScroll has been split into
       two published properties - AllowKeyScroll & AllowScrnScroll
-      Because of this Image32's runtime and designtime packages
-      (Img32_Library.dpk & Img32_VCL_Dsgn.dpk) should be reinstalled.
+      **Because of this Image32's runtime and designtime packages
+      (Img32_Library.dpk & Img32_VCL_Dsgn.dpk) should be reinstalled.**
   Img32
     Minor bugfix in BlendToAlpha function.
 

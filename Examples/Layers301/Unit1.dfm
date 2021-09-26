@@ -86,6 +86,11 @@ object MainForm: TMainForm
         ShortCut = 46
         OnClick = mnuDeleteLayerClick
       end
+      object ChangeColor1: TMenuItem
+        Caption = '&Change Color ...'
+        ShortCut = 16451
+        OnClick = ChangeColor1Click
+      end
     end
   end
   object PopupMenu1: TPopupMenu
@@ -138,6 +143,10 @@ object MainForm: TMainForm
     Filter = 'Image Files|*.bmp;*.png;*.jpg;*.svg'
     Options = [ofHideReadOnly, ofFileMustExist, ofEnableSizing]
     Left = 232
+    Top = 80
+  end
+  object ColorDialog1: TColorDialog
+    Left = 296
     Top = 80
   end
 end

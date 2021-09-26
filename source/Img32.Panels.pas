@@ -228,6 +228,16 @@ type
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
+function RgbColor(rgb: TColor): TColor;
+var
+  res: TARGB absolute Result;
+begin
+  if rgb < 0 then
+    result := GetSysColor(rgb and $FFFFFF) else
+    result := rgb;
+end;
+//------------------------------------------------------------------------------
+
 function Size(cx, cy: Integer): TSize;
 begin
   Result.cx := cx;
@@ -369,7 +379,7 @@ begin
   fAllowKeyScroll := true;
   fAllowZoom := true;
   fAutoCenter := true;
-  fFocusedColor := clActiveCaption;
+  fFocusedColor := RgbColor(clActiveCaption);
   fUnfocusedColor := clBtnFace;
 
   fScale := 1.0;
@@ -698,9 +708,7 @@ procedure TBaseImgPanel.MouseDown(Button: TMouseButton;
 var
   rec: TRect;
 begin
-  inherited;
-
-  if fAllowScrnScroll then
+  if fAllowScrnScroll or fAllowKeyScroll then
   begin
     fMouseDown := true;
     fScrollbarHorz.MouseDownPos := X;
@@ -710,15 +718,16 @@ begin
       (fScrollbarVert.btnSize > 0) then
     begin
       fScrollbarVert.MouseDown := true;
-      Invalidate;
     end
     else if (Y > rec.Bottom)  and (X > rec.Left) and (X < rec.Right) and
       (fScrollbarHorz.btnSize > 0) then
     begin
       fScrollbarHorz.MouseDown := true;
-      Invalidate;
     end;
   end;
+
+  if not (fScrollbarHorz.MouseDown or fScrollbarVert.MouseDown) then  
+    inherited;
 
   if TabStop and not Focused and CanFocus then
   begin
@@ -730,50 +739,57 @@ end;
 
 procedure TBaseImgPanel.MouseMove(Shift: TShiftState; X, Y: Integer);
 var
-  marg: integer;
   rec: TRect;
-  inDrawRegion, mobH, mobV: Boolean;
+  inDrawRegion: Boolean;
 begin
-  inherited;
-  if not fAllowScrnScroll then Exit;
-
   rec := GetInnerClientRect;
   inDrawRegion := PtInRect(rec, Point(X,Y));
 
-  if not fMouseDown then
+  if inDrawRegion and
+    not (fScrollbarHorz.MouseDown or fScrollbarVert.MouseDown) then  
   begin
+    if fScrollbarVert.MouseOver or fScrollbarHorz.MouseOver then 
+    begin
+      Invalidate;          
+      fScrollbarHorz.MouseOver := false;
+      fScrollbarVert.MouseOver := false;
+    end;
+    cursor := crDefault;
+    inherited;
+    Exit;
+  end;
+  
+  if not fMouseDown then
+  begin  
     if (BorderWidth >= MinBorderWidth) and
       ((fShowScrollBtns = ssAlways) or
         (focused and (fShowScrollBtns = ssbFocused))) then
     begin
-      marg := GetInnerMargin;
-      mobV := (X > ClientWidth - marg) and
-        (Y < ClientHeight - marg) and (Y > marg) and
-        (fScrollbarVert.btnSize > 0);
-      mobH := (Y > ClientHeight - marg) and
-        (X < ClientWidth - marg) and (X > marg) and
-        (fScrollbarHorz.btnSize > 0);
-      //now check for change in state ...
-      if fScrollbarVert.MouseOver <> mobV then
+      if (X >= rec.Right) and (fScrollbarVert.btnSize > 0) then
       begin
-        fScrollbarVert.MouseOver := mobV;
-        if mobV then Cursor := crSizeNS;
-        Invalidate;
-      end;
-      if fScrollbarHorz.MouseOver <> mobH then
+        if (Y < rec.Bottom) then
+        begin
+          cursor := crSizeNS;
+          if not fScrollbarVert.MouseOver then Invalidate;          
+          fScrollbarVert.MouseOver := true;
+        end else
+          cursor := crDefault;
+      end
+      else if (Y >= rec.Bottom) and (fScrollbarHorz.btnSize > 0) then
       begin
-        fScrollbarHorz.MouseOver := mobH;
-        if mobH then Cursor := crSizeWE;
-        Invalidate;
-      end;
-      if not inDrawRegion and not mobV and not mobH then
+        Cursor := crSizeWE;
+        if not fScrollbarHorz.MouseOver then Invalidate;
+        fScrollbarHorz.MouseOver := true;
+      end else
         cursor := crDefault;
     end;
     Exit;
   end;
-
   fScrollbarHorz.MouseOver := false;
   fScrollbarVert.MouseOver := false;
+
+  if not (fAllowScrnScroll or fAllowKeyScroll) then Exit;
+
   if fScrollbarVert.MouseDown then
   begin
     //dragging vertical scrollbar
@@ -791,7 +807,7 @@ begin
       inc(srcOffset, Round((X - MouseDownPos) / btnDelta));
       MouseDownPos := X;
     end;
-  end else
+  end else if fAllowScrnScroll then
   begin
     //click and drag the drawing image
     with fScrollbarVert do if btnDelta > 0 then
@@ -804,6 +820,9 @@ begin
       dec(srcOffset, Round((X - MouseDownPos) / fScale));
       MouseDownPos := X;
     end;
+  end else 
+  begin
+    Exit; //ie exit here if NOT scrolling
   end;
   if assigned(fOnScrolling) then fOnScrolling(self);
   Invalidate;
@@ -813,13 +832,11 @@ end;
 procedure TBaseImgPanel.MouseUp(Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
+  if not fMouseDown then Exit;
   inherited;
-  if not fAllowScrnScroll or not fMouseDown then Exit;
   fMouseDown := false;
   fScrollbarHorz.MouseDown := false;
-  fScrollbarHorz.MouseOver := false;
   fScrollbarVert.MouseDown := false;
-  fScrollbarVert.MouseOver := false;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -1107,7 +1124,7 @@ begin
   {$IFNDEF FPC}
   MousePos := ScreenToClient(MousePos);
   {$ENDIF}
-  dec(fScrollbarHorz.srcOffset, Round(WheelDelta / fScale));
+  inc(fScrollbarHorz.srcOffset, Round(WheelDelta / fScale));
   Invalidate;
 end;
 //------------------------------------------------------------------------------

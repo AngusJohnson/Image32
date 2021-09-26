@@ -107,8 +107,7 @@ begin
         dist := Distance(p[2], p[5]) * 0.5;
         pt2 := ClosestPointOnLine(newPt, p[0], center);
         if GrtrEqu90(newPt, center, p[0]) or
-          GrtrEqu90(newPt, p[0], center) or
-          (Distance(newPt, pt2) <= dist) or
+          (Distance(newPt, pt2) <= 2) or
           AlmostPerpendicular(center, p[0], newPt) then Goto bottom;
         p[1] := newPt;
         p[6] := ReflectPoint(newPt, pt2);
@@ -178,8 +177,7 @@ begin
         dist := Distance(p[5], p[2]) * 0.5;
         pt2 := ClosestPointOnLine(newPt, p[0], center);
         if GrtrEqu90(newPt, center, p[0]) or
-          GrtrEqu90(newPt, p[0], center) or
-          (Distance(newPt, pt2) <= dist) or
+          (Distance(newPt, pt2) <= 2) or
           AlmostPerpendicular(center, p[0], newPt) then Goto bottom;
         p[6] := newPt;
         p[1] := ReflectPoint(newPt, pt2);

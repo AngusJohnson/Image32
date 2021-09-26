@@ -211,8 +211,7 @@ type
     procedure SetBounds(const newBounds: TRect); override;
     procedure Offset(dx,dy: integer); override;
     function Rotate(angleDelta: double): Boolean; override;
-    procedure UpdateHitTestMask(const vectorRegions: TPathsD;
-      fillRule: TFillRule); virtual;
+    procedure UpdateHitTestMask(const vectorRegions: TPathsD); virtual;
     property  Paths: TPathsD read fPaths write SetPaths;
     property  Margin: integer read fMargin write SetMargin;
     property  OnDraw: TNotifyEvent read fOnDraw write fOnDraw;
@@ -300,8 +299,7 @@ type
   TDesignerLayer32 = class(THitTestLayer32) //generic design layer
   public
     constructor Create(parent: TLayer32; const name: string = ''); override;
-    procedure UpdateHitTestMask(const vectorRegions: TPathsD;
-      fillRule: TFillRule); virtual;
+    procedure UpdateHitTestMask(const vectorRegions: TPathsD); virtual;
   end;
 
   TButtonDesignerLayer32 = class(TDesignerLayer32) //button (design) layer
@@ -349,8 +347,8 @@ type
     procedure Clear;
     procedure Invalidate;
     function  AddLayer(layerClass: TLayer32Class = nil;
-      group: TLayer32 = nil; const name: string = ''): TLayer32;
-    function  InsertLayer(layerClass: TLayer32Class; group: TLayer32;
+      parent: TLayer32 = nil; const name: string = ''): TLayer32;
+    function  InsertLayer(layerClass: TLayer32Class; parent: TLayer32;
       index: integer; const name: string = ''): TLayer32;
     procedure DeleteLayer(layer: TLayer32); overload;
     procedure DeleteLayer(layerIndex: integer;
@@ -473,12 +471,12 @@ end;
 //------------------------------------------------------------------------------
 
 procedure UpdateHitTestMaskUsingPath(layer: THitTestLayer32;
-  const paths: TPathsD; fillRule: TFillRule);
+  const paths: TPathsD);
 begin
   with layer.Image do
     layer.HitTestRec.htImage.SetSize(width, height);
   if not layer.Image.IsEmpty then
-    DrawPolygon(layer.HitTestRec.htImage, paths, fillRule, clWhite32);
+    DrawPolygon(layer.HitTestRec.htImage, paths, frEvenOdd, clWhite32);
 end;
 //------------------------------------------------------------------------------
 
@@ -865,7 +863,7 @@ begin
     if Assigned(fClipImage) then
       fClipImage.SetSize(Width, Height) else
       fClipImage := TImage32.Create(Width, Height);
-    DrawPolygon(fClipImage, path, frNonZero, clWhite32);
+    DrawPolygon(fClipImage, path, frEvenOdd, clWhite32);
   end else
     FreeAndNil(fClipImage);
 end;
@@ -1345,7 +1343,8 @@ begin
   rec := Img32.Vector.GetBounds(fPaths);
   Img32.Vector.InflateRect(rec, Margin, margin);
   fPivotPt := InvalidPointD;
-  SetBounds(rec);
+  inherited SetBounds(rec);
+  RepositionAndDraw;
 end;
 //------------------------------------------------------------------------------
 
@@ -1425,11 +1424,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure  TVectorLayer32.UpdateHitTestMask(const vectorRegions: TPathsD;
-  fillRule: TFillRule);
+procedure  TVectorLayer32.UpdateHitTestMask(const vectorRegions: TPathsD);
 begin
-  //fHitTest.Init(self);
-  UpdateHitTestMaskUsingPath(self, vectorRegions, fillRule);
+  UpdateHitTestMaskUsingPath(self, vectorRegions);
 end;
 
 //------------------------------------------------------------------------------
@@ -1782,11 +1779,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure  TDesignerLayer32.UpdateHitTestMask(const vectorRegions: TPathsD;
-  fillRule: TFillRule);
+procedure  TDesignerLayer32.UpdateHitTestMask(const vectorRegions: TPathsD);
 begin
   //fHitTest.Init(self);
-  UpdateHitTestMaskUsingPath(self, vectorRegions, fillRule);
+  UpdateHitTestMaskUsingPath(self, vectorRegions);
 end;
 
 //------------------------------------------------------------------------------
@@ -2001,18 +1997,18 @@ end;
 //------------------------------------------------------------------------------
 
 function TLayeredImage32.AddLayer(layerClass: TLayer32Class;
-  group: TLayer32; const name: string): TLayer32;
+  parent: TLayer32; const name: string): TLayer32;
 begin
   if not Assigned(layerClass) then layerClass := TLayer32;
-  Result := InsertLayer(layerClass, group, MaxInt, name);
+  Result := InsertLayer(layerClass, parent, MaxInt, name);
 end;
 //------------------------------------------------------------------------------
 
 function TLayeredImage32.InsertLayer(layerClass: TLayer32Class;
-  group: TLayer32; index: integer; const name: string): TLayer32;
+  parent: TLayer32; index: integer; const name: string): TLayer32;
 begin
-  if not Assigned(group) then group := fRoot;
-  Result := group.InsertChild(layerClass, index, name);
+  if not Assigned(parent) then parent := fRoot;
+  Result := parent.InsertChild(layerClass, index, name);
 end;
 //------------------------------------------------------------------------------
 

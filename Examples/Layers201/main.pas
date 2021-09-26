@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Types, Classes, Graphics,
   Controls, Forms,  Dialogs, Math, ComCtrls, Menus,
-  Img32, Img32.Layers, Img32.Text, Img32.Panels;
+  Img32, Img32.Layers, Img32.Text, Img32.Panels, Vcl.ExtCtrls;
 
 type
   TMainForm = class(TForm)
@@ -24,8 +24,6 @@ type
     mnuSendBackOne: TMenuItem;
     mnuBringForwardOne: TMenuItem;
     mnuAddArrow: TMenuItem;
-    mnuCopytoclipboard: TMenuItem;
-    N3: TMenuItem;
     PopupMenu1: TPopupMenu;
     AddImage1: TMenuItem;
     AddText1: TMenuItem;
@@ -36,6 +34,10 @@ type
     N5: TMenuItem;
     SendBackOne1: TMenuItem;
     BringForwardOne1: TMenuItem;
+    N3: TMenuItem;
+    mnuCloneLayer: TMenuItem;
+    N6: TMenuItem;
+    CloneLayer1: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormPaint(Sender: TObject);
@@ -48,7 +50,7 @@ type
     procedure mnuSendBackOneClick(Sender: TObject);
     procedure mnuBringForwardOneClick(Sender: TObject);
     procedure mnuAddArrowClick(Sender: TObject);
-    procedure mnuCopytoclipboardClick(Sender: TObject);
+    procedure mnuCloneLayerClick(Sender: TObject);
   private
     { Private declarations }
   protected
@@ -58,6 +60,7 @@ type
     procedure PanelMouseMove(Sender: TObject; Shift: TShiftState; X,
       Y: Integer);
   public
+    Image32Panel1      : TImage32Panel;
     layeredImage       : TLayeredImage32;
     words              : TStringList;
     clickedLayer       : TLayer32;
@@ -70,6 +73,8 @@ type
     delayedMovePending : Boolean;
     delayedShift       : TShiftState;
     delayedPos         : TPoint;
+    doMinimumRepaint   : Boolean;
+    procedure PrepareQuickRepaint;
     procedure DeleteAllControlButtons;
     procedure AppOnIdle(Sender: TObject; var Done: Boolean);
     procedure DelayedMouseMove(Sender: TObject;
@@ -83,10 +88,10 @@ var
   fontCache: TGlyphCache;
 
 type
-
   TMyRasterLayer32 = class(TRasterLayer32)
   public
     procedure Init(const filename: string; const centerPt: TPointD);
+    function Clone: TMyRasterLayer32;
   end;
 
   TMyVectorLayer32 = class(TVectorLayer32)
@@ -99,6 +104,7 @@ type
     procedure Draw; override;
   public
     constructor Create(Parent: TLayer32; const name: string = ''); override;
+    function Clone: TMyVectorLayer32;
   end;
 
   TMyTextLayer32 = class(TMyVectorLayer32)
@@ -113,9 +119,8 @@ const
 implementation
 
 {$R *.dfm}
-{$R font.res}
-{$R words.res}
-{$R Cursors.res}
+{$R words.res}   //lost of English words
+{$R Cursors.res} //rotation cursor
 
 uses
   arrows, Img32.Draw, Img32.Extra, Img32.Vector, Img32.Fmt.BMP,
@@ -132,6 +137,21 @@ begin
   PositionCenteredAt(centerPt);
   AutoPivot := false;//true;// :)
 end;
+//------------------------------------------------------------------------------
+
+function TMyRasterLayer32.Clone: TMyRasterLayer32;
+var
+  b: TRect;
+begin
+  result := RootOwner.AddLayer(
+    TMyRasterLayer32, Parent, Name) as TMyRasterLayer32;
+  //image quality will be preserved if we clone copy MasterImage
+  result.MasterImage.Assign(MasterImage);
+  result.Angle := Angle;
+  b := Bounds;
+  Types.OffsetRect(b, 50,50);
+  result.SetBounds(b);
+end;
 
 //------------------------------------------------------------------------------
 // TMyVectorLayer32 - defines drawing behaviour for TVectorLayer32 objects
@@ -142,8 +162,17 @@ begin
   inherited;
   InitRandomColors;
   PenWidth := DPIAware(1);
-  Margin := 20;
+  Margin := DPIAware(1);
   AutoPivot := false; // :)
+end;
+//------------------------------------------------------------------------------
+
+function TMyVectorLayer32.Clone: TMyVectorLayer32;
+begin
+  result := RootOwner.AddLayer(
+    TMyVectorLayer32, Parent, Name) as TMyVectorLayer32;
+  Result.Paths := CopyPaths(Paths);
+  Result.PositionAt(Left+50, Top+ 50);
 end;
 //------------------------------------------------------------------------------
 
@@ -154,7 +183,7 @@ begin
   hsl.hue := Random(256);
   hsl.sat := 240;
   hsl.lum := 200;
-  hsl.Alpha := 172;
+  hsl.Alpha := 212;
   BrushColor := HslToRgb(hsl);
   PenColor := MakeDarker(BrushColor, 80) or $FF000000;
 end;
@@ -198,7 +227,7 @@ end;
 
 procedure TMainForm.WMERASEBKGND(var message: TMessage);
 begin
-  message.Result := 0; //speeds up drawing
+  message.Result := 0; //speeds up drawing (ie don't redraw)
 end;
 //------------------------------------------------------------------------------
 
@@ -206,22 +235,27 @@ procedure TMainForm.FormCreate(Sender: TObject);
 var
   resStream: TResourceStream;
 begin
-  self.OnMouseDown := PanelMouseDown;
-  self.OnMouseMove := PanelMouseMove;
 
+  //This TImage32Panel component allows very easy zooming and scrolling.
+  //(The following would also be a little simpler if TImage32Panel was
+  //installed in Delphi's IDE - using Image32's designtime package.)
+  Image32Panel1 := TImage32Panel.Create(self);
+  Image32Panel1.Parent := self;
+  Image32Panel1.Align := alClient;
+  Image32Panel1.AllowScrnScroll := false;
+  Image32Panel1.OnMouseDown := PanelMouseDown;
+  Image32Panel1.OnMouseMove := PanelMouseMove;
 
   layeredImage := TLayeredImage32.Create;
-  layeredImage.AddLayer(TDesignerLayer32);
-
   //layeredImage.Resampler := rNearestResampler; //draft quality (fast)
   layeredImage.Resampler := rBiLinearResampler;  //high quality (moderately fast)
   //layeredImage.Resampler := rBiCubicResampler; //excellent quality (slow)
 
-  fontReader := FontManager.LoadFromResource('FONT_NSB', RT_RCDATA);
-  fontCache := TGlyphCache.Create(fontReader, DPIAware(48));
+  layeredImage.AddLayer(TDesignerLayer32); //for background hatching
 
+  fontReader := FontManager.Load('Arial Bold');
+  fontCache := TGlyphCache.Create(fontReader, DPIAware(48));
   words := TStringList.Create;
-  words.Capacity := $FFFF;
   resStream := TResourceStream.Create(HInstance, 'WORDS', RT_RCDATA);
   try
     words.LoadFromStream(resStream);
@@ -236,11 +270,9 @@ begin
 
   Randomize;
 
-  //Using Application.OnIdle to process FormMouseMove code avoids
+  //Use Application.OnIdle to process FormMouseMove events. This avoids
   //wasting a *lot* of CPU cycles drawing stuff that's immediately redrawn.
-  //This will be especially noticeable when rotating images that have been
-  //resized, or resizing images that have been rotated (and hence require
-  //an additional affine transformation).
+  //This will be especially noticeable when rotating layers.
   UseAppOnIdle := true;//false;//
   if UseAppOnIdle then
     Application.OnIdle := AppOnIdle;
@@ -250,8 +282,7 @@ end;
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
   words.Free;
-  //fontReader can be Free'd here but will otherwise be done by FontManager :)
-  //fontReader.Free;
+  //fontReader.Free; //will be done by FontManager if not here :)
   fontCache.Free;
   FreeAndNil(layeredImage); //see FormResize below
 end;
@@ -262,17 +293,25 @@ var
   rec: TRect;
 begin
   if not Assigned(layeredImage) then Exit; //ie when form closing
-  rec := ClientRect;
+  rec := Image32Panel1.InnerClientRect;
+  Image32Panel1.Image.SetSize(RectWidth(rec), RectHeight(rec));
 
   //resize layeredImage
   layeredImage.SetSize(RectWidth(rec), RectHeight(rec));
-
   //resize and repaint the designer background hatching
   with layeredImage[0] do
   begin
     SetSize(layeredImage.Width, layeredImage.Height);
     HatchBackground(Image);
   end;
+  Invalidate; //forces a repaint even when shrinking form
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.PrepareQuickRepaint;
+begin
+  doMinimumRepaint := true;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -293,6 +332,7 @@ end;
 
 procedure TMainForm.DeleteAllControlButtons;
 begin
+  //delete all 'designer' buttons
   FreeAndNil(sizingButtonGroup);
   FreeAndNil(rotatingButtonGroup);
   FreeAndNil(arrowButtonGroup);
@@ -302,11 +342,11 @@ end;
 procedure TMainForm.PanelMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  clickPoint := Point(X,Y);
-
+  clickPoint := Image32Panel1.ClientToImage(Point(X,Y));
   clickedLayer := layeredImage.GetLayerAt(clickPoint);
   if not assigned(clickedLayer) then
   begin
+    //probably clicking on the hatched background
     DeleteAllControlButtons;
     targetLayer := nil;
   end
@@ -316,6 +356,8 @@ begin
 
   else if (clickedLayer is TRotateLayer32) then
   begin
+    //nb: TMyRasterLayer32 and TMyVectorLayer32 are both TRotateLayer32
+    //so this is clicking on a new target layer
     DeleteAllControlButtons;
     targetLayer := TRotateLayer32(clickedLayer);
 
@@ -327,7 +369,7 @@ begin
       sizingButtonGroup := CreateSizingButtonGroup(targetLayer,
         ssCorners, bsRound, DefaultButtonSize, clRed32);
   end;
-  Invalidate;
+  PrepareQuickRepaint;
 end;
 //------------------------------------------------------------------------------
 
@@ -336,7 +378,7 @@ procedure TMainForm.PanelMouseMove(Sender: TObject;
 var
   pt: TPoint;
 begin
-  pt := Point(X,Y);
+  pt := Image32Panel1.ClientToImage(Point(X,Y));
   if UseAppOnIdle then
   begin
     delayedShift := Shift;
@@ -365,8 +407,8 @@ begin
     //so update the cursor and exit
     layer := layeredImage.GetLayerAt(clickPoint);
     if assigned(layer) then
-      cursor := layer.CursorId else
-      cursor := crDefault;
+      Image32Panel1.cursor := layer.CursorId else
+      Image32Panel1.cursor := crDefault;
     Exit;
   end;
 
@@ -395,8 +437,6 @@ begin
       //Update rotatingButtonGroup and get the new angle
       newAngle := UpdateRotatingButtonGroup(clickedLayer);
       TRotateLayer32(targetLayer).Angle := newAngle;
-      if newAngle > PI then newAngle := newAngle - Pi*2;
-      StatusBar1.SimpleText := format('angle: %1.0n deg.',[newAngle * 180/pi]);
     end;
   end
 
@@ -419,9 +459,8 @@ begin
     end
     else if Assigned(arrowButtonGroup) then
       arrowButtonGroup.Offset(dx, dy);
-    StatusBar1.SimpleText := '';
   end;
-  Invalidate;
+  PrepareQuickRepaint;
 end;
 //------------------------------------------------------------------------------
 
@@ -430,10 +469,16 @@ var
   updateRec: TRect;
   img: TImage32;
 begin
-  //draw layeredImage onto the form's canvas. But to optimize performance,
-  //only draw whatever's changed since the last draw (hence updateRec).
-  img := layeredImage.GetMergedImage(false, updateRec);
-  img.CopyToDc(updateRec, updateRec, canvas.Handle);
+  if doMinimumRepaint then
+  begin
+    //draw layeredImage onto the form's canvas. But to optimize performance,
+    //only draw whatever's changed since the last draw (hence updateRec).
+    img := layeredImage.GetMergedImage(false, updateRec);
+    Image32Panel1.CopyToImage(img, updateRec);
+    doMinimumRepaint := false;
+  end else
+    //this will repaint the whole of layeredImage
+    Image32Panel1.Image.Assign(layeredImage.GetMergedImage);
 end;
 //------------------------------------------------------------------------------
 
@@ -446,12 +491,11 @@ begin
   //create a text layer
   targetLayer  := layeredImage.AddLayer(TMyTextLayer32) as TRotateLayer32;
   with TMyTextLayer32(targetLayer) do
-    //Init(Words[Random(Words.Count)], layeredImage.MidPoint);
     Init(Words[Random(Words.Count)], layeredImage.MidPoint);
   //add sizing buttons
   sizingButtonGroup := CreateSizingButtonGroup(targetLayer, ssCorners,
     bsRound, DefaultButtonSize, clRed32);
-  Invalidate;
+  PrepareQuickRepaint;
 end;
 //------------------------------------------------------------------------------
 
@@ -469,7 +513,7 @@ begin
   //add sizing buttons
   sizingButtonGroup := CreateSizingButtonGroup(targetLayer, ssCorners,
     bsRound, DefaultButtonSize, clRed32);
-  invalidate;
+  PrepareQuickRepaint;
 end;
 //------------------------------------------------------------------------------
 
@@ -486,8 +530,7 @@ begin
     arrowButtonGroup := CreateButtonGroup(layeredImage.Root,
       Paths[0], bsRound, DefaultButtonSize, clGreen32);
   end;
-
-  Invalidate;
+  PrepareQuickRepaint;
 end;
 //------------------------------------------------------------------------------
 
@@ -526,12 +569,8 @@ begin
       targetLayer, pivot, DPIAware(10),
       clWhite32, clLime32, displayAngle, -Angle90);
     rotatingButtonGroup.AngleButton.CursorId := crRotate;
-
-    if displayAngle > PI then displayAngle := displayAngle - Pi*2;
-    StatusBar1.SimpleText := format('angle: %1.0n deg.',[displayAngle * 180/pi]);
   end;
-
-  Invalidate;
+  PrepareQuickRepaint;
 end;
 //------------------------------------------------------------------------------
 
@@ -542,7 +581,7 @@ begin
   FreeAndNil(targetLayer);
   DeleteAllControlButtons;
   clickedLayer := nil;
-  Invalidate;
+  PrepareQuickRepaint;
 end;
 //------------------------------------------------------------------------------
 
@@ -551,21 +590,25 @@ begin
   if assigned(targetLayer) and
     (targetLayer.Index > 1) then //ie don't send behind the hatched layer :).
       targetLayer.SendBackOne;
-  Invalidate;
+  PrepareQuickRepaint;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuBringForwardOneClick(Sender: TObject);
 begin
   if assigned(targetLayer) then targetLayer.BringForwardOne;
-  Invalidate;
+  PrepareQuickRepaint;
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.mnuCopytoclipboardClick(Sender: TObject);
+procedure TMainForm.mnuCloneLayerClick(Sender: TObject);
 begin
-  with layeredImage.GetMergedImage(true) do
-    CopyToClipBoard;
+  if not assigned(targetLayer) then Exit;
+  if targetLayer is TMyRasterLayer32 then
+    TMyRasterLayer32(targetLayer).Clone
+  else if targetLayer is TMyVectorLayer32 then
+    TMyVectorLayer32(targetLayer).Clone;
+  PrepareQuickRepaint;
 end;
 //------------------------------------------------------------------------------
 

@@ -26,20 +26,13 @@ object MainForm: TMainForm
     Height = 19
     Panels = <>
     SimplePanel = True
+    SimpleText = '  Use <Shift> to Scroll, Ctrl> to Zoom, and <Num> to Scale'
   end
   object MainMenu1: TMainMenu
     Left = 32
     Top = 40
     object File1: TMenuItem
       Caption = '&File'
-      object mnuCopytoclipboard: TMenuItem
-        Caption = '&Copy to clipboard'
-        ShortCut = 16451
-        OnClick = mnuCopytoclipboardClick
-      end
-      object N3: TMenuItem
-        Caption = '-'
-      end
       object mnuExit: TMenuItem
         Caption = 'E&xit'
         ShortCut = 27
@@ -88,6 +81,14 @@ object MainForm: TMainForm
         Caption = 'Bring &Forward One'
         ShortCut = 16454
         OnClick = mnuBringForwardOneClick
+      end
+      object N3: TMenuItem
+        Caption = '-'
+      end
+      object mnuCloneLayer: TMenuItem
+        Caption = '&Clone Layer'
+        ShortCut = 16462
+        OnClick = mnuCloneLayerClick
       end
     end
   end
@@ -140,6 +141,14 @@ object MainForm: TMainForm
       Caption = 'Bring &Forward One'
       ShortCut = 16454
       OnClick = mnuBringForwardOneClick
+    end
+    object N6: TMenuItem
+      Caption = '-'
+    end
+    object CloneLayer1: TMenuItem
+      Caption = '&Clone Layer'
+      ShortCut = 16462
+      OnClick = mnuCloneLayerClick
     end
   end
 end
