@@ -106,6 +106,7 @@ type
     function   GetBounds: TRect;
     procedure  SetOpacity(value: Byte); virtual;
     procedure  ImageChanged(Sender: TImage32); virtual;
+    procedure  UpdateLayeredImage(newLayeredImage: TLayeredImage32);
   public
     constructor Create(parent: TLayer32; const name: string = ''); virtual;
     destructor Destroy; override;
@@ -358,6 +359,8 @@ type
     function  GetMergedImage(hideDesigners: Boolean = false): TImage32; overload;
     function  GetMergedImage(hideDesigners: Boolean;
       out updateRect: TRect): TImage32; overload;
+    function  DetachRoot: TGroupLayer32;
+    function  AttachRoot(newRoot: TGroupLayer32): Boolean;
 
     property Resampler: integer read fResampler write SetResampler;
     property BackgroundColor: TColor32 read fBackColor write SetBackColor;
@@ -999,7 +1002,8 @@ var
   origOffset: TPoint;
   rec, dstRect, srcRect: TRect;
 begin
-  if not Visible or (Opacity < 2) or
+  if not Assigned(fLayeredImage) or
+    not Visible or (Opacity < 2) or
     not fRefreshPending or Image.IsEmpty then
       Exit;
 
@@ -1173,6 +1177,16 @@ begin
       Break;
     end;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.UpdateLayeredImage(newLayeredImage: TLayeredImage32);
+var
+  i: integer;
+begin
+  fLayeredImage := newLayeredImage;
+  for i := 0 to ChildCount -1 do
+    Child[i].UpdateLayeredImage(newLayeredImage);
 end;
 
 //------------------------------------------------------------------------------
@@ -1500,7 +1514,6 @@ begin
   if (Sender = MasterImage) then
   begin
     if MasterImage.IsBlank then Exit;
-
     //reset the layer whenever MasterImage changes
     fAngle := 0;
     fMatrix := IdentityMatrix;
@@ -1516,7 +1529,8 @@ begin
     fSavedSize := Img32.Vector.Size(MasterImage.Width, MasterImage.Height);
     if (TLayerNotifyImage32(Image).UpdateCount = 0) then
       Image.Assign(MasterImage); //this will call ImageChange for Image
-    Image.Resampler := RootOwner.Resampler;
+    if Assigned(fLayeredImage) then
+      Image.Resampler := fLayeredImage.Resampler;
 
   end else
   begin
@@ -1564,7 +1578,8 @@ begin
     Image.BeginUpdate;
     try
       Image.Assign(MasterImage);
-      Image.Resampler := RootOwner.Resampler;
+      if Assigned(fLayeredImage) then
+        Image.Resampler := fLayeredImage.Resampler;
       //apply any prior transformations
       AffineTransformImage(Image, fMatrix);
       //cropping is very important with rotation
@@ -1652,7 +1667,8 @@ begin
     ////////////////////////////////
     Image.Assign(MasterImage);
     ////////////////////////////////
-    Image.Resampler := RootOwner.Resampler;
+    if Assigned(fLayeredImage) then
+      Image.Resampler := fLayeredImage.Resampler;
     rec := GetRotatedRectBounds(RectD(Image.Bounds), Angle);
 
     //get prior transformations and apply new rotation
@@ -1856,7 +1872,7 @@ end;
 
 destructor TLayeredImage32.Destroy;
 begin
-  fRoot.Free;
+  FreeAndNil(fRoot);
   inherited;
 end;
 //------------------------------------------------------------------------------
@@ -1864,7 +1880,7 @@ end;
 procedure TLayeredImage32.SetSize(width, height: integer);
 begin
   fBounds := Rect(0, 0, Width, Height);
-
+  if not Assigned(fRoot) then Exit;
   fRoot.SetBounds(fBounds);
   Invalidate;
   if fBackColor <> clNone32 then
@@ -1919,6 +1935,7 @@ end;
 
 procedure TLayeredImage32.Clear;
 begin
+  if not Assigned(fRoot) then Exit;
   fRoot.ClearChildren;
   Invalidate;
 end;
@@ -1926,6 +1943,7 @@ end;
 
 procedure TLayeredImage32.Invalidate;
 begin
+  if not Assigned(fRoot) then Exit;
   fRoot.fInvalidRect := fBounds;
   fLastUpdateType := utUndefined;
 end;
@@ -1941,19 +1959,25 @@ end;
 
 function TLayeredImage32.GetRootLayersCount: integer;
 begin
-  Result := fRoot.ChildCount;
+  if Assigned(fRoot) then
+    Result := fRoot.ChildCount else
+    Result := 0;
 end;
 //------------------------------------------------------------------------------
 
 function TLayeredImage32.GetLayer(index: integer): TLayer32;
 begin
-  Result := fRoot[index];
+  if Assigned(fRoot) then
+    Result := fRoot[index] else
+    Result := nil;
 end;
 //------------------------------------------------------------------------------
 
 function TLayeredImage32.GetImage: TImage32;
 begin
-  Result := fRoot.Image;
+  if Assigned(fRoot) then
+    Result := fRoot.Image else
+    Result := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -1985,6 +2009,7 @@ procedure TLayeredImage32.SetBackColor(color: TColor32);
 begin
   if color = fBackColor then Exit;
   fBackColor := color;
+  if not Assigned(fRoot) then Exit;
   fRoot.Image.Clear(fBackColor);
   Invalidate;
 end;
@@ -2007,6 +2032,11 @@ end;
 function TLayeredImage32.InsertLayer(layerClass: TLayer32Class;
   parent: TLayer32; index: integer; const name: string): TLayer32;
 begin
+  if not Assigned(fRoot) then
+  begin
+    Result := nil;
+    Exit;
+  end;
   if not Assigned(parent) then parent := fRoot;
   Result := parent.InsertChild(layerClass, index, name);
 end;
@@ -2014,13 +2044,16 @@ end;
 
 function TLayeredImage32.FindLayerNamed(const name: string): TLayer32;
 begin
-  Result := Root.FindLayerNamed(name);
+  if not Assigned(fRoot) then
+    Result := nil else
+    Result := Root.FindLayerNamed(name);
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayeredImage32.DeleteLayer(layer: TLayer32);
 begin
-  if not assigned(layer) or not assigned(layer.fParent) then Exit;
+  if not Assigned(fRoot) or not assigned(layer) or
+    not assigned(layer.fParent) then Exit;
   layer.fParent.DeleteChild(layer.Index);
 end;
 //------------------------------------------------------------------------------
@@ -2028,6 +2061,7 @@ end;
 procedure TLayeredImage32.DeleteLayer(layerIndex: integer;
   parent: TLayer32 = nil);
 begin
+  if not Assigned(fRoot) then Exit;
   if not assigned(parent) then parent := Root;
   if (layerIndex < 0) or (layerIndex >= parent.ChildCount) then
     raise Exception.Create(rsChildIndexRangeError);
@@ -2037,7 +2071,31 @@ end;
 
 function TLayeredImage32.GetLayerAt(const pt: TPoint; ignoreDesigners: Boolean): TLayer32;
 begin
-  result := Root.GetLayerAt(pt, ignoreDesigners);
+  if not Assigned(fRoot) then
+    result := nil else
+    result := Root.GetLayerAt(pt, ignoreDesigners);
+end;
+//------------------------------------------------------------------------------
+
+function TLayeredImage32.DetachRoot: TGroupLayer32;
+begin
+  Result := fRoot;
+  if not Assigned(fRoot) then Exit;
+  fRoot := Nil;
+  Result.UpdateLayeredImage(nil);
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+function TLayeredImage32.AttachRoot(newRoot: TGroupLayer32): Boolean;
+begin
+  Result := not Assigned(fRoot);
+  if not Result then Exit;
+  fRoot := newRoot;
+  fRoot.UpdateLayeredImage(self);
+  fRoot.SetBounds(Rect(0,0,Width, Height));
+  fRoot.Visible := true;
+  Invalidate;
 end;
 
 //------------------------------------------------------------------------------

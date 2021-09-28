@@ -909,9 +909,9 @@ begin
   for j := 0 to w-1 do
   begin
     s := @tmp[j]; d := @tmp2[j];
+    s2 := IncPColor32(s, w);
     for i := 0 to h-2 do
     begin
-      s2 := IncPColor32(s, w);
       d.A := AlphaAverage(s^, s2^);
       inc(s, w); inc(s2, w); inc(d, w);
     end;

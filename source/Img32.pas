@@ -965,7 +965,7 @@ begin
   if rgbColor < 0 then
     result := GetSysColor(rgbColor and $FFFFFF) else
     result := rgbColor;
-//  res.A := res.B; res.B := res.R; res.R := res.A; //byte swap
+  res.A := res.B; res.B := res.R; res.R := res.A; //byte swap
   res.A := 255;
 end;
 //------------------------------------------------------------------------------

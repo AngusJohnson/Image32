@@ -2926,7 +2926,9 @@ var
 
   procedure AddSegPoint(const pt: TPointD);
   begin
-    AddSegValue(pt.X); AddSegValue(pt.Y);
+    if not Assigned(currSeg) then StartNewSeg;
+    currSeg.AddVal(pt.X);
+    currSeg.AddVal(pt.Y);
   end;
 
   function Parse2Num(var c, endC: PUTF8Char;
