@@ -118,8 +118,7 @@ function Vectorize(img: TImage32; compareColor: TColor32;
   compareFunc: TCompareFunction; colorTolerance: Integer;
   roundingTolerance: integer = 2): TPathsD;
 
-function VectorizeMask(const mask: TArrayOfByte;
-  maskWidth: integer): TPathsD;
+function VectorizeMask(const mask: TArrayOfByte; maskWidth: integer): TPathsD;
 
 //RamerDouglasPeucker: simplifies paths, recursively removing vertices where
 //they deviate no more than 'epsilon' from their adjacent vertices.
@@ -265,30 +264,30 @@ end;
 procedure DrawEdgePath(img: TImage32; const path: TPathD;
   topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
 var
-  i, len: integer;
-  angle: double;
+  i, highI, deg: integer;
+  frac: double;
   p: TPathD;
-  lp: TPointD;
   c: TColor32;
+const
+  RadToDeg = 180/PI;
 begin
-  len := Length(path);
-  if len < 3 then Exit;
+  highI := high(path);
+  if highI < 2 then Exit;
   SetLength(p, 2);
-  lp := path[len -1];
-  for i := 0 to High(path) do
+  p[0] := path[highI];
+  for i := 0 to highI do
   begin
-    angle := GetAngle(lp, path[i]);
-    if angle < -angle135 then                             //-180..-135
-      c := GradientColor(topLeftColor, bottomRightColor,
-        (-angle-angle135)/angle45)
-    else if angle <= angle0 then c := topLeftColor        //-135..0
-    else if angle < angle45 then
-      c := GradientColor(topLeftColor, bottomRightColor,  //0..45
-        angle/angle45)
-    else c := bottomRightColor;
-    p[0] := lp; p[1] := path[i];
+    deg := Round(GetAngle(p[0], path[i]) * RadToDeg);
+    case deg of
+      -180..-136: frac := (-deg-135)/45;
+      -135..0   : frac := 0;
+      1..44     : frac := deg/45;
+      else        frac := 1;
+    end;
+    c := GradientColor(topLeftColor, bottomRightColor, frac);
+    p[1] := path[i];
     DrawLine(img, p, penWidth, c, esButt);
-    lp := path[i];
+    p[0] := p[1];
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1673,8 +1672,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function VectorizeMask(const mask: TArrayOfByte;
-  maskWidth: integer): TPathsD;
+function VectorizeMask(const mask: TArrayOfByte; maskWidth: integer): TPathsD;
 var
   i,j, len, height, blockStart: integer;
   current: TPt2;
@@ -1749,13 +1747,10 @@ var
   prev: TPointD;
   tolSqrd: double;
 begin
+  Result := nil;
   highI := High(poly);
   while  (HighI >= 0) and PointsEqual(poly[highI], poly[0]) do dec(highI);
-  if highI < 1 then
-  begin
-    Result := nil;
-    Exit;
-  end;
+  if highI < 1 then Exit;
   tolSqrd := Sqr(Max(2.02, Min(16.1, tolerance + 0.01)));
   SetLength(Result, highI +1);
   prev := poly[highI];
@@ -1780,6 +1775,7 @@ begin
     TurnsLeft(result[j], Result[0], Result[1]) then
       SetLength(Result, j +1) else
       SetLength(Result, j);
+  if Abs(Area(Result)) < Length(Result) * tolerance/2 then Result := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -1787,13 +1783,18 @@ function Vectorize(img: TImage32; compareColor: TColor32;
   compareFunc: TCompareFunction; colorTolerance: Integer;
   roundingTolerance: integer): TPathsD;
 var
-  i: integer;
+  i,j: integer;
   mask: TArrayOfByte;
 begin
   mask := GetBoolMask(img, compareColor, compareFunc, colorTolerance);
   Result := VectorizeMask(mask, img.Width);
+  j := 0;
   for i := 0 to high(Result) do
-    Result[i] := Tidy(Result[i], roundingTolerance);
+  begin
+    Result[j] := Tidy(Result[i], roundingTolerance);
+    if Assigned(Result[j]) then inc(j);
+  end;
+  SetLength(Result, j);
 end;
 
 //------------------------------------------------------------------------------

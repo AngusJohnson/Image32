@@ -159,6 +159,8 @@ begin
   PenColor := HslToRgb(hsl);
   PenWidth := DpiAware(5);
   FrameWidth := DpiAware(10);
+  if name = 'star' then
+    FrameWidth := Round(FrameWidth * 1.5);
 
   textPath := glyphs.GetTextGlyphs(0, 0, name);
   textRect := Img32.Vector.GetBounds(textPath);
@@ -260,7 +262,7 @@ begin
   end;
   //draw the text
   pp := OffsetPath(textPath, delta.X, delta.Y);
-  //DrawPolygon(Image, pp, frNonZero, clBlack32);
+  DrawPolygon(Image, pp, frNonZero, clBlack32);
 end;
 
 //------------------------------------------------------------------------------

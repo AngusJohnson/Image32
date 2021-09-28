@@ -80,6 +80,16 @@ type
     procedure SetColor(value: TColor32);
   end;
 
+  TAliasedColorRenderer = class(TCustomRenderer)
+  private
+    fColor: TColor32;
+  protected
+    function Initialize(targetImage: TImage32): Boolean; override;
+    procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
+  public
+    constructor Create(color: TColor32 = clNone32);
+  end;
+
   TEraseRenderer = class(TCustomRenderer)
   protected
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
@@ -1005,14 +1015,14 @@ begin
       case fillRule of
         frEvenOdd:
           begin
-            aa := Round(Abs(accum) * 1275) mod 2550; //255 * 5/4 (see below)
+            aa := Round(Abs(accum) * 1275) mod 2550;              // *5
             if aa > 1275 then
-              byteBuffer[j] := Min(255, (2550 - aa) shr 2) else
-              byteBuffer[j] := Min(255, aa shr 2);
+              byteBuffer[j] := Min(255, (2550 - aa) shr 2) else   // /4
+              byteBuffer[j] := Min(255, aa shr 2);                // /4
           end;
         frNonZero:
           begin
-            byteBuffer[j] := Min(255, Round(Abs(accum) * 318)); //318=255*1.25
+            byteBuffer[j] := Min(255, Round(Abs(accum) * 318));
           end;
         frPositive:
           begin
@@ -1061,13 +1071,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-type THackedImage32 = class(TImage32); //to expose protected 'Changed' method.
+type THackedImage32 = class(TImage32); //exposes protected Changed method.
 
 function TCustomRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
   fChangeProc := THackedImage32(targetImage).Changed;
   with targetImage do
-    result := Initialize(PixelBase, Width, Height, 4); //Result always true
+    result := Initialize(PixelBase, Width, Height, SizeOf(TColor32));
 end;
 //------------------------------------------------------------------------------
 
@@ -1096,7 +1106,7 @@ end;
 function TColorRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
   //there's no point rendering if the color is fully transparent
-  result := inherited Initialize(targetImage) and (fAlpha > 0);
+  result := (fAlpha > 0) and inherited Initialize(targetImage);
 end;
 //------------------------------------------------------------------------------
 
@@ -1119,6 +1129,36 @@ begin
     //here because it's universally applicable.
     //Ord() is used here because very old compilers define PByte as a PChar
     dst^ := BlendToAlpha(dst^, ((Ord(alpha^) * fAlpha) shr 8) shl 24 or fColor);
+    inc(dst); inc(alpha);
+  end;
+end;
+
+//------------------------------------------------------------------------------
+// TAliasedColorRenderer
+//------------------------------------------------------------------------------
+
+constructor TAliasedColorRenderer.Create(color: TColor32 = clNone32);
+begin
+  fColor := color;
+end;
+//------------------------------------------------------------------------------
+
+function TAliasedColorRenderer.Initialize(targetImage: TImage32): Boolean;
+begin
+  //there's no point rendering if the color is fully transparent
+  result := (fColor shr 24 > 0) and inherited Initialize(targetImage);
+end;
+//------------------------------------------------------------------------------
+
+procedure TAliasedColorRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
+var
+  i: integer;
+  dst: PColor32;
+begin
+  dst := GetDstPixel(x1,y);
+  for i := x1 to x2 do
+  begin
+    if alpha^ > 127 then dst^ := fColor; //ie no blending
     inc(dst); inc(alpha);
   end;
 end;
@@ -1725,13 +1765,15 @@ procedure DrawLine(img: TImage32; const lines: TPathsD;
   endStyle: TEndStyle; joinStyle: TJoinStyle; miterLimit: double);
 var
   lines2: TPathsD;
-  cr: TColorRenderer;
+  cr: TCustomRenderer;
 begin
   if not assigned(lines) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
   lines2 := Outline(lines, lineWidth, joinStyle, endStyle, miterLimit);
 
-  cr := TColorRenderer.Create(color);
+  if img.AntiAliased then
+    cr := TColorRenderer.Create(color) else
+    cr := TAliasedColorRenderer.Create(color);
   try
     if cr.Initialize(img) then
     begin
@@ -1934,10 +1976,12 @@ end;
 procedure DrawPolygon(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; color: TColor32);
 var
-  cr: TColorRenderer;
+  cr: TCustomRenderer;
 begin
   if not assigned(polygons) then exit;
-  cr := TColorRenderer.Create(color);
+  if img.AntiAliased then
+    cr := TColorRenderer.Create(color) else
+    cr := TAliasedColorRenderer.Create(color);
   try
     if cr.Initialize(img) then
     begin

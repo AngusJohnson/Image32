@@ -108,6 +108,7 @@ type
     fOnChange: TNotifyEvent;
     fOnResize: TNotifyEvent;
     fUpdateCnt: integer;
+    fAntiAliased: Boolean;
     fNotifyBlocked: Boolean;
     function GetPixel(x,y: Integer): TColor32;
     procedure SetPixel(x,y: Integer; color: TColor32);
@@ -155,7 +156,8 @@ type
     //ScaleToFit: The new image will be scaled to fit within 'rec'
     procedure ScaleToFit(width, height: integer);
     //ScaleToFitCentered: The new image will be scaled and also centred
-    procedure ScaleToFitCentered(width, height: integer);
+    procedure ScaleToFitCentered(width, height: integer); overload;
+    procedure ScaleToFitCentered(const rect: TRect); overload;
     procedure Scale(s: double); overload;
     procedure Scale(sx, sy: double); overload;
 
@@ -241,6 +243,7 @@ type
 
     //properties ...
 
+    property AntiAliased: Boolean read fAntiAliased write fAntiAliased;
     property Width: Integer read fWidth;
     property Height: Integer read fHeight;
     property Bounds: TRect read GetBounds;
@@ -665,8 +668,8 @@ var
   R, InvR: PByteArray;
 begin
   //(see https://en.wikipedia.org/wiki/Alpha_compositing)
-  if fg.A = 0 then Result := bgColor
-  else if (bg.A = 0) or (fg.A = 255) then Result := fgColor
+  if (bg.A = 0) or (fg.A = 255) then Result := fgColor
+  else if fg.A = 0 then Result := bgColor
   else
   begin
     //combine alphas ...
@@ -1366,6 +1369,7 @@ end;
 
 constructor TImage32.Create(width: Integer; height: Integer);
 begin
+  fAntiAliased := true;
   fResampler := DefaultResampler;
   fwidth := Max(0, width);
   fheight := Max(0, height);
@@ -1383,6 +1387,7 @@ constructor TImage32.Create(src: TImage32; const srcRec: TRect);
 var
   rec: TRect;
 begin
+  fAntiAliased := src.AntiAliased;
   fResampler := src.fResampler;
   types.IntersectRect(rec, src.Bounds, srcRec);
   RectWidthHeight(rec, fWidth, fHeight);
@@ -1894,6 +1899,12 @@ begin
   if sx <= sy then
     Scale(sx) else
     Scale(sy);
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.ScaleToFitCentered(const rect: TRect);
+begin
+  ScaleToFitCentered(RectWidth(rect), RectHeight(rect));
 end;
 //------------------------------------------------------------------------------
 
