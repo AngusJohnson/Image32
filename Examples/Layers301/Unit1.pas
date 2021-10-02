@@ -17,8 +17,6 @@ type
   private
     useRandomColors: Boolean;
     BrushColor : TColor32;
-    PenColor   : TColor32;
-    PenWidth   : double;
     FrameWidth : integer;
     textPath   : TPathsD;
     textRect   : TRect;
@@ -27,7 +25,6 @@ type
     procedure Draw; override;
   public
     constructor Create(parent: TLayer32;  const name: string = ''); override;
-    //override SetBounds to additionally set a ClipPath
     procedure SetBounds(const newBounds: TRect); override;
     procedure UpdateHitTestAndClipPath;
   end;
@@ -144,24 +141,25 @@ var
   hsl: THsl;
 begin
   inherited;
-  ///////////////////////
+
+  //setup object brush color
   useRandomColors := true;//false;//
-  ///////////////////////
-  hsl.hue := Random(256);
-  hsl.sat := 240;
-  hsl.lum := 180;
-  hsl.Alpha := 255;
   if useRandomColors then
-    BrushColor := HslToRgb(hsl) else
+  begin
+    hsl.hue := Random(256);
+    hsl.sat := 240;
+    hsl.lum := 180;
+    hsl.Alpha := 255;
+    BrushColor := HslToRgb(hsl)
+  end else
     BrushColor := clBtnFace32;
-  hsl.lum := 60;
+
   Margin := 0;
-  PenColor := HslToRgb(hsl);
-  PenWidth := DpiAware(5);
   FrameWidth := DpiAware(10);
   if name = 'star' then
     FrameWidth := Round(FrameWidth * 1.5);
 
+  //get 'textPath' ready to draw centered text
   textPath := glyphs.GetTextGlyphs(0, 0, name);
   textRect := Img32.Vector.GetBounds(textPath);
   textPath := OffsetPath(textPath, -textRect.Left, -textRect.Top);
@@ -193,8 +191,7 @@ begin
   end else if Name = 'ellipse' then
   begin
     //make anywhere within pp responsive to clicking
-    pp := MakeEllipse(rec);
-    UpdateHitTestMask(pp);
+    UpdateHitTestMaskFromImage;
     //update ClipPath
     Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
     ClipPath := MakeEllipse(rec)
@@ -202,8 +199,7 @@ begin
   else if Name = 'star' then
   begin
     //make anywhere within pp responsive to clicking
-    pp := MakeStar(rec);
-    UpdateHitTestMask(pp);
+    UpdateHitTestMaskFromImage;
     //update ClipPath
     Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
     ClipPath := MakeStar(rec);
@@ -240,13 +236,18 @@ begin
   end
   else if name = 'ellipse' then
   begin
+    //clear background
     Image.Clear;
     fw := FrameWidth - dpiAware1*2;
+    //fill ellipse border background (with clBtnFace32 color)
     DrawPolygon(Image, MakeEllipse(rec), frNonZero, clBtnFace32);
+    //draw outer 3D border
     img32.Vector.InflateRect(rec, -dpiAware1,-dpiAware1);
     DrawEdgePath(Image, Ellipse(rec), clWhite32, $FFCCCCCC, dpiAwareOne*2);
     img32.Vector.InflateRect(rec, -fw, -fw);
+    //fill ellipse background (with random) color
     DrawPolygon(Image, MakeEllipse(rec), frNonZero, BrushColor);
+    //draw inner 3D border
     DrawEdgePath(Image, Ellipse(rec), $FFCCCCCC, clWhite32, dpiAwareOne*2);
   end
   else //name = 'star'
@@ -311,7 +312,7 @@ end;
 
 procedure TMainForm.WMERASEBKGND(var message: TMessage);
 begin
-  message.Result := 0;
+  message.Result := 0; //speed up drawing
 end;
 //------------------------------------------------------------------------------
 

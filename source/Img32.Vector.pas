@@ -2716,6 +2716,8 @@ var
   tmp: TPathsD;
 begin
   Result := nil;
+  for i := 0 to High(pattern) do
+    if pattern[i] <= 0 then pattern[i] := 1;
   tmp := GetDashedPath(path, closed, pattern, patternOffset);
   for i := 0 to high(tmp) do
     AppendPath(Result, GrowOpenLine(tmp[i],

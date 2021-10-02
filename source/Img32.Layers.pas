@@ -118,6 +118,8 @@ type
     function   SendToBack: Boolean;
     function   Move(newParent: TLayer32; idx: integer): Boolean;
     function   GetAbsoluteOrigin: TPoint;
+    function   NextLayerInGroup: TLayer32;
+    function   PrevLayerInGroup: TLayer32;
 
     procedure  PositionAt(const pt: TPoint); overload;
     procedure  PositionAt(x, y: integer); overload; virtual;
@@ -128,7 +130,8 @@ type
     procedure  Invalidate(rec: TRect); virtual;
 
     function   AddChild(layerClass: TLayer32Class; const name: string = ''): TLayer32;
-    function   InsertChild(layerClass: TLayer32Class; index: integer; const name: string = ''): TLayer32;
+    function   InsertChild(layerClass: TLayer32Class;
+      index: integer; const name: string = ''): TLayer32;
     procedure  DeleteChild(index: integer);
     procedure  ClearChildren;
 
@@ -213,6 +216,7 @@ type
     procedure Offset(dx,dy: integer); override;
     function Rotate(angleDelta: double): Boolean; override;
     procedure UpdateHitTestMask(const vectorRegions: TPathsD); virtual;
+    procedure UpdateHitTestMaskFromImage;
     property  Paths: TPathsD read fPaths write SetPaths;
     property  Margin: integer read fMargin write SetMargin;
     property  OnDraw: TNotifyEvent read fOnDraw write fOnDraw;
@@ -308,7 +312,9 @@ type
     fSize     : integer;
     fColor    : TColor32;
     fShape    : TButtonShape;
-    fButtonOutline: TPathD;
+    fEnabled  : Boolean;
+    fOutline  : TPathD;
+    procedure SetEnabled(value: Boolean);
   protected
     procedure SetButtonAttributes(const shape: TButtonShape;
       size: integer; color: TColor32); virtual;
@@ -316,10 +322,11 @@ type
     constructor Create(parent: TLayer32; const name: string = ''); override;
     procedure Draw; virtual;
 
-    property Size  : integer read fSize write fSize;
-    property Color : TColor32 read fColor write fColor;
-    property Shape : TButtonShape read fShape write fShape;
-    property ButtonOutline: TPathD read fButtonOutline write fButtonOutline;
+    property Enabled  : Boolean read fEnabled write SetEnabled;
+    property Size     : integer read fSize write fSize;
+    property Color    : TColor32 read fColor write fColor;
+    property Shape    : TButtonShape read fShape write fShape;
+    property ButtonOutline: TPathD read fOutline write fOutline;
   end;
 
   TUpdateType = (utUndefined, utShowDesigners, utHideDesigners);
@@ -473,13 +480,13 @@ end;
 // THitTest helper functions
 //------------------------------------------------------------------------------
 
-procedure UpdateHitTestMaskUsingPath(layer: THitTestLayer32;
-  const paths: TPathsD);
+procedure UpdateHitTestMaskUsingPath(layer: THitTestLayer32; const paths: TPathsD);
 begin
   with layer.Image do
     layer.HitTestRec.htImage.SetSize(width, height);
-  if not layer.Image.IsEmpty then
-    DrawPolygon(layer.HitTestRec.htImage, paths, frEvenOdd, clWhite32);
+  if layer.Image.IsEmpty then Exit;
+  layer.HitTestRec.enabled := true;
+  DrawPolygon(layer.HitTestRec.htImage, paths, frEvenOdd, clWhite32);
 end;
 //------------------------------------------------------------------------------
 
@@ -565,6 +572,22 @@ procedure TLayer32.Invalidate(rec: TRect);
 begin
   fInvalidRect := Img32.Vector.UnionRect(fInvalidRect, rec);
   RefreshPending;
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.NextLayerInGroup: TLayer32;
+begin
+  if not Assigned(fParent) or (fIndex = fParent.ChildCount -1) then
+    Result := nil else
+    Result := fParent[fIndex +1];
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.PrevLayerInGroup: TLayer32;
+begin
+  if not Assigned(fParent) or (fIndex = 0) then
+    Result := nil else
+    Result := fParent[fIndex -1];
 end;
 //------------------------------------------------------------------------------
 
@@ -1337,6 +1360,7 @@ begin
   inherited;
   fMargin := dpiAware1 *2;
   fCursorId := crHandPoint;
+  fHitTest.enabled := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -1441,6 +1465,13 @@ end;
 procedure  TVectorLayer32.UpdateHitTestMask(const vectorRegions: TPathsD);
 begin
   UpdateHitTestMaskUsingPath(self, vectorRegions);
+end;
+//------------------------------------------------------------------------------
+
+procedure TVectorLayer32.UpdateHitTestMaskFromImage;
+begin
+  fHitTest.enabled := true;
+  fHitTest.htImage.Assign(Image);
 end;
 
 //------------------------------------------------------------------------------
@@ -1797,7 +1828,6 @@ end;
 
 procedure  TDesignerLayer32.UpdateHitTestMask(const vectorRegions: TPathsD);
 begin
-  //fHitTest.Init(self);
   UpdateHitTestMaskUsingPath(self, vectorRegions);
 end;
 
@@ -1831,8 +1861,19 @@ constructor TButtonDesignerLayer32.Create(parent: TLayer32;
   const name: string = '');
 begin
   inherited;
-  fHitTest.enabled := true;
+  fEnabled := true;
+  fHitTest.enabled := fEnabled;
   SetButtonAttributes(bsRound, DefaultButtonSize, clGreen32);
+end;
+//------------------------------------------------------------------------------
+
+procedure TButtonDesignerLayer32.SetEnabled(value: Boolean);
+begin
+  if value = fEnabled then Exit;
+  fEnabled := value;
+  fHitTest.enabled := fEnabled;
+  Draw;
+  Invalidate(Bounds);
 end;
 //------------------------------------------------------------------------------
 
@@ -1849,10 +1890,12 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TButtonDesignerLayer32.Draw;
+var
+  c: TColor32;
 begin
-  fButtonOutline := Img32.Extra.DrawButton(Image,
-    image.MidPoint, fSize, fColor, fShape, [ba3D, baShadow]);
-  //UpdateHitTestMask(Img32.Vector.Paths(fButtonOutline), frEvenOdd);
+  if fEnabled then c := fColor else c := clNone32;
+  fOutline := Img32.Extra.DrawButton(Image,
+    image.MidPoint, fSize, c, fShape, [ba3D, baShadow]);
 end;
 
 //------------------------------------------------------------------------------
@@ -2089,7 +2132,7 @@ end;
 
 function TLayeredImage32.AttachRoot(newRoot: TGroupLayer32): Boolean;
 begin
-  Result := not Assigned(fRoot);
+  Result := not Assigned(fRoot) and Assigned(newRoot);
   if not Result then Exit;
   fRoot := newRoot;
   fRoot.UpdateLayeredImage(self);

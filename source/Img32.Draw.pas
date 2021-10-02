@@ -1833,9 +1833,14 @@ procedure DrawDashedLine(img: TImage32; const line: TPathD;
 var
   lines: TPathsD;
   cr: TColorRenderer;
+  i: integer;
 begin
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
   if not assigned(line) then exit;
+
+  for i := 0 to High(dashPattern) do
+    if dashPattern[i] <= 0 then dashPattern[i] := 1;
+
   lines := GetDashedPath(line, endStyle = esPolygon, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
   case joinStyle of
@@ -1877,10 +1882,15 @@ procedure DrawDashedLine(img: TImage32; const line: TPathD;
   dashPattern: TArrayOfInteger; patternOffset: PDouble; lineWidth: double;
   renderer: TCustomRenderer; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
+  i: integer;
   lines: TPathsD;
 begin
   if (not assigned(line)) or (not assigned(renderer)) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
+
+  for i := 0 to High(dashPattern) do
+    if dashPattern[i] <= 0 then dashPattern[i] := 1;
+
   lines := GetDashedPath(line, endStyle = esPolygon, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
   lines := Outline(lines, lineWidth, joinStyle, endStyle);
@@ -1910,11 +1920,16 @@ procedure DrawInvertedDashedLine(img: TImage32;
   patternOffset: PDouble; lineWidth: double; endStyle: TEndStyle;
   joinStyle: TJoinStyle = jsAuto);
 var
+  i: integer;
   lines: TPathsD;
   renderer: TInverseRenderer;
 begin
   if not assigned(line) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
+
+  for i := 0 to High(dashPattern) do
+    if dashPattern[i] <= 0 then dashPattern[i] := 1;
+
   lines := GetDashedPath(line, endStyle = esPolygon, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
   lines := Outline(lines, lineWidth, joinStyle, endStyle);

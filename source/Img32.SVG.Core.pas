@@ -2,8 +2,8 @@ unit Img32.SVG.Core;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.3                                                             *
-* Date      :  21 September 2021                                               *
+* Version   :  3.4                                                             *
+* Date      :  2 October 2021                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -215,53 +215,159 @@ type
   TSvgPathSegType = (dsUnknown, dsMove, dsLine, dsHorz, dsVert, dsArc,
     dsQBez, dsCBez, dsQSpline, dsCSpline, dsClose);
 
-  TSvgSubPathSeg = class
-  private
-    fCnt    : integer;
-    fVals   : TArrayOfDouble;
-    function GetVal(index: integer): double;
-  public
-    segType : TSvgPathSegType;
-    procedure AddVal(val: double);
-    property Count: integer read fCnt;
-    property Val[index: integer]: double read GetVal;
+  TArcInfo = record
+    rec         : TRectD;
+    angle       : double;
+    startAngle  : double;
+    endAngle    : double;
+    sweepFlag   : Boolean;
   end;
+  TArcInfos = array of TArcInfo;
+
+  TSvgPath = class;
+  TSvgSubPath = class;
+
+  TSvgBaseSeg = class
+  private
+    fParent   : TSvgSubPath;
+    fIdx      : integer;
+    fFlatPath : TPathD;
+    fPathLen  : integer;
+    fPathCap  : integer;
+    fSegType  : TSvgPathSegType;
+  protected
+    procedure AddCtrlPoint(const pt: TPointD);
+    function Parse(var c, endC: PUTF8Char;
+      isRelative: Boolean): TPointD; virtual; abstract;
+    function GetFlattened: TPathD; virtual;
+    procedure GetFlattenedInternal; virtual; abstract;
+  public
+    ctrlPts : TPathD;
+    constructor Create(parent: TSvgSubPath; idx: integer;
+      segType : TSvgPathSegType; const firstPt : TPointD); virtual;
+    function GetBounds: TRectD; virtual;
+    function GetSimplePoints: TPathD; virtual;
+    property Parent: TSvgSubPath read fParent;
+    property Flattened: TPathD read GetFlattened;
+    property SegType: TSvgPathSegType read fSegType;
+  end;
+
+  TSvgBaseStraightSeg = class(TSvgBaseSeg)
+  protected
+    procedure GetFlattenedInternal; override;
+  end;
+
+  TSvgBaseCurvedSeg = class(TSvgBaseSeg)
+  protected
+    pendingScale: double;
+    function GetFlattened: TPathD; override;
+    function GetPreviousCtrlPt: TPointD;
+  public
+    lastCtrlPt  : TPointD;
+    constructor Create(parent: TSvgSubPath; idx: integer;
+      segType : TSvgPathSegType; const firstPt : TPointD); override;
+  end;
+
+  TSvgASegment = class(TSvgBaseCurvedSeg)
+  private
+  protected
+    procedure GetFlattenedInternal; override;
+    function Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD; override;
+  public
+    arcInfos: TArcInfos;
+  end;
+
+  TSvgCSegment = class(TSvgBaseCurvedSeg)
+  protected
+    procedure GetFlattenedInternal; override;
+    function Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD; override;
+  public
+    function GetSimplePoints: TPathD; override;
+  end;
+
+  TSvgHSegment = class(TSvgBaseStraightSeg)
+  protected
+    function Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD; override;
+  end;
+
+  TSvgLSegment = class(TSvgBaseStraightSeg)
+  protected
+    function Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD; override;
+  end;
+
+  TSvgQSegment = class(TSvgBaseCurvedSeg)
+  protected
+    procedure GetFlattenedInternal; override;
+    function Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD; override;
+  public
+    function GetSimplePoints: TPathD; override;
+  end;
+
+  TSvgSSegment = class(TSvgBaseCurvedSeg)
+  protected
+    procedure GetFlattenedInternal; override;
+    function Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD; override;
+  public
+    function GetSimplePoints: TPathD; override;
+  end;
+
+  TSvgTSegment = class(TSvgBaseCurvedSeg)
+  protected
+    procedure GetFlattenedInternal; override;
+    function Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD; override;
+  public
+    function GetSimplePoints: TPathD; override;
+  end;
+
+  TSvgVSegment = class(TSvgBaseStraightSeg)
+  protected
+    function Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD; override;
+  end;
+
+  TSvgSegmentClass = class of TSvgBaseSeg;
 
   TSvgSubPath = class
   private
-    segs      : array of TSvgSubPathSeg;
+    fParent   : TSvgPath;
+    segs      : array of TSvgBaseSeg;
     function GetCount: integer;
-    function GetSeg(index: integer): TSvgSubPathSeg;
+    function GetSeg(index: integer): TSvgBaseSeg;
+  protected
+    fPendingScale: double;
   public
     firstPt   : TPointD;
+    isClosed  : Boolean;
+    constructor Create(parent: TSvgPath);
     destructor Destroy; override;
     procedure Clear;
     function GetBounds: TRectD;
-    function AddSeg: TSvgSubPathSeg;
+    function AddSeg(segType: TSvgPathSegType;
+      const firstPt: TPointD): TSvgBaseSeg;
     function DeleteLastSeg: Boolean;
-    //scalePending: if an SVG will be scaled later, then this parameter
-    //allows curve 'flattening' to occur with a corresponding precision
-    function GetFlattenedPath(scalePending: double = 1.0): TPathD;
+    //pendingScale: allows 'flattening' to occur with
+    //curve precision appropriate to future path scaling
+    function GetFlattenedPath(pendingScale: double = 1.0): TPathD;
     //GetSimplePath - ignores curves and is only used with markers
     function GetSimplePath: TPathD;
-    function IsClosed: Boolean;
-    function Clone: TSvgSubPath;
     property Count: integer read GetCount;
-    property seg[index: integer]: TSvgSubPathSeg read GetSeg; default;
+    property seg[index: integer]: TSvgBaseSeg read GetSeg; default;
   end;
 
   TSvgPath = class
   private
     fSubPaths: array of TSvgSubPath;
     function GetPath(index: integer): TSvgSubPath;
+    function GetBounds: TRectD;
+    function GetControlBounds: TRectD;
     function GetCount: integer;
   public
     destructor Destroy; override;
     procedure Clear;
-    function AddPath: TSvgSubPath;
-    function Clone: TSvgPath;
-    property Path[index: integer]: TSvgSubPath read GetPath; default;
+    function AddPath(const firstPt: TPointD): TSvgSubPath;
+    property Bounds: TRectD read GetBounds;
+    property CtrlBounds: TRectD read GetControlBounds;
     property Count: integer read GetCount;
+    property Path[index: integer]: TSvgSubPath read GetPath; default;
   end;
 
   //////////////////////////////////////////////////////////////////////
@@ -287,6 +393,7 @@ type
   function Match(c: PUTF8Char; const compare: UTF8String): Boolean; overload;
   function Match(const compare1, compare2: UTF8String): Boolean; overload;
   function ToUTF8String(var c: PUTF8Char; endC: PUTF8Char): UTF8String;
+  //Base64Decode: sometimes binary data (eg PNG images) is embedded in the SVG.
   function Base64Decode(const str: UTF8String): UTF8String;
 
   //special parsing functions //////////////////////////////////////////
@@ -328,7 +435,7 @@ implementation
 resourcestring
   rsSvgPathRangeError = 'TSvgPath.GetPath range error';
   rsSvgSubPathRangeError = 'TSvgSubPath.GetSeg range error';
-  rsSvgSubPathSegRangeError = 'TSvgSubPathSeg.GetVal range error';
+  rsSvgSegmentRangeError = 'TSvgSegment.GetVal range error';
 
 type
   TColorConst = record
@@ -341,7 +448,7 @@ type
   end;
 
 const
-  buffSize    = 32;
+  buffSize    = 8;
 
   //include hashed html entity constants
   {$I Img32.SVG.HtmlHashConsts.inc}
@@ -767,6 +874,26 @@ begin
   tmp.Init;
   Result := ParseNextNumEx(c, endC, skipComma, tmp.rawVal, tmp.unitType);
   val := tmp.GetValue(1, 1);
+end;
+//------------------------------------------------------------------------------
+
+function Parse2Num(var c, endC: PUTF8Char;
+  out pt: TPointD; const relPt: TPointD): Boolean;
+begin
+  Result := ParseNextNum(c, endC, true, pt.X) and
+    ParseNextNum(c, endC, true, pt.Y);
+  if not Result or (relPt.X = InvalidD) then Exit;
+  pt.X := pt.X + relPt.X;
+  pt.Y := pt.Y + relPt.Y;
+end;
+//------------------------------------------------------------------------------
+
+function Parse1Num(var c: PUTF8Char; endC: PUTF8Char;
+  out val: double; relVal: double): Boolean;
+begin
+  Result := ParseNextNum(c, endC, true, val);
+  if Result and (relVal <> InvalidD) then
+    val := val + relVal;
 end;
 //------------------------------------------------------------------------------
 
@@ -1841,12 +1968,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure FlipEndian(var ch: WideChar); {$IFDEF INLINE} inline; {$ENDIF}
-begin
-  Word(ch) := Swap(Word(ch));
-end;
-//------------------------------------------------------------------------------
-
 function TSvgParser.LoadFromStream(stream: TStream): Boolean;
 var
   i, len: LongInt;
@@ -1943,222 +2064,484 @@ end;
 // TDpath
 //------------------------------------------------------------------------------
 
-function TSvgSubPath.GetFlattenedPath(scalePending: double): TPathD;
+function TSvgSubPath.GetFlattenedPath(pendingScale: double): TPathD;
 var
-  i,j, pathLen, pathCap: integer;
-  currPt, radii, pt2, pt3, pt4: TPointD;
-  lastQCtrlPt, lastCCtrlPt: TPointD;
-  arcFlag, sweepFlag: integer;
-  angle, arc1, arc2, bezTolerance: double;
-  rec: TRectD;
-  path2: TPathD;
-
-  procedure AddPoint(const pt: TPointD);
-  begin
-    if pathLen = pathCap then
-    begin
-      pathCap := pathCap + buffSize;
-      SetLength(Result, pathCap);
-    end;
-    Result[pathLen] := pt;
-    currPt := pt;
-    inc(pathLen);
-  end;
-
-  procedure AddPath(const p: TPathD);
-  var
-    i, pLen: integer;
-  begin
-    pLen := Length(p);
-    if pLen = 0 then Exit;
-    currPt := p[pLen -1];
-    if pathLen + pLen >= pathCap then
-    begin
-      pathCap := pathLen + pLen + buffSize;
-      SetLength(Result, pathCap);
-    end;
-    for i := 0 to pLen -1 do
-    begin
-      Result[pathLen] := p[i];
-      inc(pathLen);
-    end;
-  end;
-
-  function LastSegWasCubic(segIdx: integer): Boolean;
-  begin
-    Result := (segIdx > 0) and
-      (segs[segIdx -1].segType in [dsCBez, dsCSpline]);
-  end;
-
-  function LastSegWasQuad(segIdx: integer): Boolean;
-  begin
-    Result := (segIdx > 0) and
-      (segs[segIdx -1].segType in [dsQBez, dsQSpline]);
-  end;
-
+  i: integer;
 begin
-  if scalePending <= 0 then scalePending := 1.0;
-
-  bezTolerance := BezierTolerance / scalePending;
-  pathLen := 0; pathCap := 0;
-  lastQCtrlPt := InvalidPointD;
-  lastCCtrlPt := InvalidPointD;
-  AddPoint(firstPt);
+  if pendingScale <= 0 then pendingScale := 1.0;
+  if (pendingScale > fPendingScale) then
+    fPendingScale := pendingScale;
+  Result := nil;
   for i := 0 to High(segs) do
-    with segs[i] do
+    AppendPath(Result, segs[i].GetFlattened);
+end;
+
+//------------------------------------------------------------------------------
+// TSvgSegment
+//------------------------------------------------------------------------------
+
+constructor TSvgBaseSeg.Create(parent: TSvgSubPath;
+  idx: integer; segType : TSvgPathSegType; const firstPt : TPointD);
+begin
+  Self.fParent := parent;
+  Self.fIdx    := idx;
+  Self.fSegType := segType;
+  AddCtrlPoint(firstPt);
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgBaseSeg.AddCtrlPoint(const pt: TPointD);
+begin
+    if fPathLen = fPathCap then
     begin
-      case segType of
-        dsLine:
-          if Count > 1 then
-            for j := 0 to (Count -1) div 2 do
-              AddPoint(PointD(fVals[j*2], fVals[j*2 +1]));
-        dsHorz:
-          for j := 0 to (Count -1) do
-            AddPoint(PointD(fVals[j], currPt.Y));
-        dsVert:
-          for j := 0 to (Count -1) do
-            AddPoint(PointD(currPt.X, fVals[j]));
-        dsArc:
-          if (Count -1) > 5 then
-            for j := 0 to (Count -1) div 7 do
-            begin
-              radii.X   := fVals[j*7];
-              radii.Y   := fVals[j*7 +1];
-              angle     := DegToRad(fVals[j*7 +2]);
-              arcFlag   := Round(fVals[j*7 +3]);
-              sweepFlag := Round(fVals[j*7 +4]);
-              pt2.X := fVals[j*7 +5];
-              pt2.Y := fVals[j*7 +6];
-
-              GetSvgArcInfo(currPt, pt2, radii, angle,
-                arcFlag <> 0, sweepFlag <> 0, arc1, arc2, rec);
-              if (sweepFlag = 0)  then
-              begin
-                path2 := Arc(rec, arc2, arc1, scalePending);
-                path2 := ReversePath(path2);
-              end else
-              begin
-                path2 := Arc(rec, arc1, arc2, scalePending);
-              end;
-              path2 := RotatePath(path2, rec.MidPoint, angle);
-              AddPath(path2);
-            end;
-        dsQBez:
-          if (Count) > 3 then
-            for j := 0 to (Count -1) div 4 do
-            begin
-              pt2.X := fVals[j*4];
-              pt2.Y := fVals[j*4 +1];
-              pt3.X := fVals[j*4 +2];
-              pt3.Y := fVals[j*4 +3];
-              lastQCtrlPt := pt2;
-              path2 := FlattenQBezier(currPt, pt2, pt3, bezTolerance);
-              AddPath(path2);
-            end;
-        dsQSpline:
-          if Count > 1 then
-            for j := 0 to (Count -1) div 2 do
-            begin
-              if LastSegWasQuad(i) then
-                pt2 := ReflectPoint(lastQCtrlPt, currPt) else
-                pt2 := currPt;
-              pt3.X := fVals[j*2];
-              pt3.Y := fVals[j*2 +1];
-              lastQCtrlPt := pt2;
-              path2 := FlattenQBezier(currPt, pt2, pt3, bezTolerance);
-              AddPath(path2);
-            end;
-        dsCBez:
-          if Count > 5 then
-            for j := 0 to (Count -1) div 6 do
-            begin
-              pt2.X := fVals[j*6];
-              pt2.Y := fVals[j*6 +1];
-              pt3.X := fVals[j*6 +2];
-              pt3.Y := fVals[j*6 +3];
-              pt4.X := fVals[j*6 +4];
-              pt4.Y := fVals[j*6 +5];
-              lastCCtrlPt := pt3;
-              path2 := FlattenCBezier(currPt, pt2, pt3, pt4, bezTolerance);
-              AddPath(path2);
-            end;
-        dsCSpline:
-          if Count > 3 then
-            for j := 0 to (Count -1) div 4 do
-            begin
-              if LastSegWasCubic(i) then
-                pt2 := ReflectPoint(lastCCtrlPt, currPt) else
-                pt2 := currPt;
-              pt3.X := fVals[j*4];
-              pt3.Y := fVals[j*4 +1];
-              pt4.X := fVals[j*4 +2];
-              pt4.Y := fVals[j*4 +3];
-              lastCCtrlPt := pt3;
-              path2 := FlattenCBezier(currPt, pt2, pt3, pt4, bezTolerance);
-              AddPath(path2);
-            end;
-      end;
+      fPathCap := fPathCap + buffSize;
+      SetLength(ctrlPts, fPathCap);
     end;
-  SetLength(Result, pathLen);
-end;
-
-//------------------------------------------------------------------------------
-// TSvgSubPathSeg
-//------------------------------------------------------------------------------
-
-procedure TSvgSubPathSeg.AddVal(val: double);
-begin
-  if Length(fVals) = fCnt then
-    SetLength(fVals, fCnt + buffSize);
-  fVals[fCnt] := val;
-  inc(fCnt);
+    ctrlPts[fPathLen] := pt;
+    inc(fPathLen);
 end;
 //------------------------------------------------------------------------------
 
-function TSvgSubPathSeg.GetVal(index: integer): double;
+function TSvgBaseSeg.GetBounds: TRectD;
 begin
-  if (index < 0) or (index >= Count) then
-    raise Exception.Create(rsSvgSubPathSegRangeError);
-  Result := fVals[index];
+  Result := GetBoundsD(GetFlattened);
+end;
+//------------------------------------------------------------------------------
+
+function TSvgBaseSeg.GetFlattened: TPathD;
+begin
+  if not Assigned(fFlatPath) then GetFlattenedInternal;
+  Result := fFlatPath;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgBaseSeg.GetSimplePoints: TPathD;
+begin
+  Result := ctrlPts;
+end;
+
+//------------------------------------------------------------------------------
+// TSvgBaseStraightSeg
+//------------------------------------------------------------------------------
+
+procedure TSvgBaseStraightSeg.GetFlattenedInternal;
+begin
+  fFlatPath := CopyPath(ctrlPts);
+end;
+
+//------------------------------------------------------------------------------
+// TSvgBaseCurvedSeg
+//------------------------------------------------------------------------------
+
+constructor TSvgBaseCurvedSeg.Create(parent: TSvgSubPath; idx: integer;
+  segType : TSvgPathSegType; const firstPt : TPointD);
+begin
+  inherited;
+  pendingScale := 1.0;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgBaseCurvedSeg.GetFlattened: TPathD;
+begin
+  //if the image has been rendered previously at a lower resolution, then
+  //redo the flattening otherwise curves my look very rough.
+  if (pendingScale < Parent.fPendingScale) then
+  begin
+    pendingScale := Parent.fPendingScale;
+    fFlatPath := nil;
+  end;
+  if not Assigned(fFlatPath) then GetFlattenedInternal;
+  Result := fFlatPath;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgBaseCurvedSeg.GetPreviousCtrlPt: TPointD;
+begin
+  if (fIdx > 0) and (fSegType in [dsQSpline, dsCSpline]) then
+  begin
+    if (fSegType = dsQSpline) and
+      (fParent[fIdx -1].fSegType in [dsQBez, dsQSpline]) then
+        Result := TSvgBaseCurvedSeg(fParent[fIdx -1]).lastCtrlPt
+    else if (fSegType = dsCSpline) and
+      (fParent[fIdx -1].fSegType in [dsCBez, dsCSpline]) then
+        Result := TSvgBaseCurvedSeg(fParent[fIdx -1]).lastCtrlPt
+    else
+      Result := ctrlPts[0];
+  end else
+    Result := ctrlPts[0];
+end;
+
+//------------------------------------------------------------------------------
+// TSvgASegment
+//------------------------------------------------------------------------------
+
+function TSvgASegment.Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD;
+var
+  a: double;
+  pt, currPt, radii: TPointD;
+  i, arc, sweep: integer;
+begin
+  if isRelative then
+    Result := ctrlPts[0] else
+    Result := InvalidPointD;
+  pt := ctrlPts[0];
+
+  while IsNumPending(c, endC, true) and
+    Parse2Num(c, endC, radii, InvalidPointD) and
+    ParseNextNum(c, endC, true, a) and
+    GetSingleDigit(c, endC, arc) and
+    GetSingleDigit(c, endC, sweep) and
+    Parse2Num(c, endC, currPt, Result) do
+  begin
+    i := Length(arcInfos);
+    SetLength(arcInfos, i+1);
+    with arcInfos[i] do
+    begin
+      sweepFlag := sweep <> 0;
+      angle := DegToRad(a);
+      GetSvgArcInfo(pt, currPt, radii, angle,
+        arc <> 0, sweepFlag, startAngle, endAngle, rec);
+      if isRelative then Result := currPt;
+    end;
+    pt := currPt;
+  end;
+  Result := currPt;
+
+  //simple points :)
+  AddCtrlPoint(Result);
+  SetLength(ctrlPts, 2);
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgASegment.GetFlattenedInternal;
+var
+  i: integer;
+  p: TPathD;
+begin
+  fFlatPath := nil;
+  for i := 0 to High(arcInfos) do
+    with arcInfos[i] do
+    begin
+      if not sweepFlag then
+      begin
+        p := Arc(rec, endAngle, startAngle, 1);
+        p := ReversePath(p);
+      end else
+        p := Arc(rec, startAngle, endAngle, 1);
+      if angle <> 0 then
+        p := RotatePath(p, rec.MidPoint, angle);
+      AppendPath(fFlatPath, p);
+    end;
+end;
+
+//------------------------------------------------------------------------------
+// TSvgCSegment
+//------------------------------------------------------------------------------
+
+function TSvgCSegment.GetSimplePoints: TPathD;
+var
+  i, len: integer;
+begin
+  len := Length(ctrlPts);
+  SetLength(Result, len div 3 +1);
+  Result[0] := ctrlPts[0];
+  for i := 1 to High(Result) do
+    Result[i] := ctrlPts[i*3];
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgCSegment.GetFlattenedInternal;
+var
+  i   : integer;
+  pt  : TPointD;
+  p   : TPathD;
+  bt  : double;
+begin
+  bt := BezierTolerance / pendingScale;
+
+  fFlatPath := nil;
+  pt := ctrlPts[0];
+  for i := 1 to Length(ctrlPts) div 3 do
+  begin
+    lastCtrlPt := ctrlPts[i*3 -1];
+    p := FlattenCBezier(pt, ctrlPts[i*3 -2], lastCtrlPt, ctrlPts[i*3], bt);
+    AppendPath(fFlatPath, p);
+    pt := ctrlPts[i*3];
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgCSegment.Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD;
+var
+  pt, currPt: TPointD;
+begin
+  if isRelative then
+    Result := ctrlPts[0] else
+    Result := InvalidPointD;
+
+  while IsNumPending(c, endC, true) and
+    Parse2Num(c, endC, pt, Result) and
+    Parse2Num(c, endC, lastCtrlPt, Result) and
+    Parse2Num(c, endC, currPt, Result) do
+  begin
+    AddCtrlPoint(pt);
+    AddCtrlPoint(lastCtrlPt);
+    AddCtrlPoint(currPt);
+    if isRelative then Result := currPt;
+  end;
+  Result := currPt;
+  SetLength(ctrlPts, fPathLen);
+end;
+
+//------------------------------------------------------------------------------
+// TSvgHSegment
+//------------------------------------------------------------------------------
+
+function TSvgHSegment.Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD;
+var
+  currPt: TPointD;
+begin
+  if isRelative then
+    Result := ctrlPts[0] else
+    Result := InvalidPointD;
+
+  currPt := ctrlPts[0];
+  while IsNumPending(c, endC, true) and
+    Parse1Num(c, endC, currPt.X, Result.X) do
+  begin
+    AddCtrlPoint(currPt);
+    if isRelative then Result := currPt;
+  end;
+  Result := currPt;
+  SetLength(ctrlPts, fPathLen);
+end;
+
+//------------------------------------------------------------------------------
+// TSvgLSegment
+//------------------------------------------------------------------------------
+
+function TSvgLSegment.Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD;
+var
+  currPt: TPointD;
+begin
+  if isRelative then
+    Result := ctrlPts[0] else
+    Result := InvalidPointD;
+
+  currPt := ctrlPts[0];
+  while IsNumPending(c, endC, true) and
+    Parse2Num(c, endC, currPt, Result) do
+  begin
+    AddCtrlPoint(currPt);
+    if isRelative then Result := currPt;
+  end;
+  Result := currPt;
+  SetLength(ctrlPts, fPathLen);
+end;
+
+//------------------------------------------------------------------------------
+// TSvgQSegment
+//------------------------------------------------------------------------------
+
+function TSvgQSegment.GetSimplePoints: TPathD;
+var
+  i, len: integer;
+begin
+  len := Length(ctrlPts);
+  SetLength(Result, len div 2 +1);
+  Result[0] := ctrlPts[0];
+  for i := 1 to High(Result) do
+    Result[i] := ctrlPts[i*2];
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgQSegment.GetFlattenedInternal;
+var
+  i   : integer;
+  pt  : TPointD;
+  p   : TPathD;
+  bt  : double;
+begin
+  bt := BezierTolerance / pendingScale;
+
+  fFlatPath := nil;
+  pt := ctrlPts[0];
+  for i := 1 to Length(ctrlPts) div 2 do
+  begin
+    lastCtrlPt := ctrlPts[i*2-1];
+    p := FlattenQBezier(pt, lastCtrlPt, ctrlPts[i*2], bt);
+    AppendPath(fFlatPath, p);
+    pt := ctrlPts[i*2];
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgQSegment.Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD;
+var
+  currPt: TPointD;
+begin
+  if isRelative then
+    Result := ctrlPts[0] else
+    Result := InvalidPointD;
+
+  currPt := ctrlPts[0];
+  while IsNumPending(c, endC, true) and
+    Parse2Num(c, endC, lastCtrlPt, Result) and
+    Parse2Num(c, endC, currPt, Result) do
+  begin
+    AddCtrlPoint(lastCtrlPt);
+    AddCtrlPoint(currPt);
+    if isRelative then Result := currPt;
+  end;
+  Result := currPt;
+  SetLength(ctrlPts, fPathLen);
+end;
+
+//------------------------------------------------------------------------------
+// TSvgSSegment
+//------------------------------------------------------------------------------
+
+procedure TSvgSSegment.GetFlattenedInternal;
+var
+  bt      : double;
+begin
+  bt := BezierTolerance / pendingScale;
+  fFlatPath := FlattenCSpline(ctrlPts, bt);
+end;
+//------------------------------------------------------------------------------
+
+function TSvgSSegment.Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD;
+var
+  pt, currPt: TPointD;
+begin
+  if isRelative then
+    Result := ctrlPts[0] else
+    Result := InvalidPointD;
+
+  currPt := ctrlPts[0];
+  pt := ReflectPoint(GetPreviousCtrlPt, currPt);
+  AddCtrlPoint(pt);
+  while IsNumPending(c, endC, true) and
+    Parse2Num(c, endC, lastCtrlPt, Result) and
+    Parse2Num(c, endC, currPt, Result) do
+  begin
+    AddCtrlPoint(lastCtrlPt);
+    AddCtrlPoint(currPt);
+    if isRelative then Result := currPt;
+  end;
+  Result := currPt;
+  SetLength(ctrlPts, fPathLen);
+end;
+//------------------------------------------------------------------------------
+
+function TSvgSSegment.GetSimplePoints: TPathD;
+var
+  i: integer;
+begin
+  //0,3,5,7,9 etc
+  SetLength(Result, Length(ctrlPts) div 2);
+  Result[0] := ctrlPts[0];
+  for i := 1 to High(Result) do
+    Result[i] := ctrlPts[i*2+1];
+end;
+
+//------------------------------------------------------------------------------
+// TSvgTSegment
+//------------------------------------------------------------------------------
+
+procedure TSvgTSegment.GetFlattenedInternal;
+var
+  bt: double;
+begin
+  bt := BezierTolerance / pendingScale;
+  fFlatPath := FlattenQSpline(ctrlPts, bt);
+end;
+//------------------------------------------------------------------------------
+
+function TSvgTSegment.Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD;
+var
+  pt, currPt: TPointD;
+begin
+  if isRelative then
+    Result := ctrlPts[0] else
+    Result := InvalidPointD;
+
+  pt := ReflectPoint(GetPreviousCtrlPt, currPt);
+  AddCtrlPoint(pt);
+  while IsNumPending(c, endC, true) and
+    Parse2Num(c, endC, currPt, Result) do
+  begin
+    AddCtrlPoint(currPt);
+    if isRelative then Result := currPt;
+  end;
+
+  //this isn't strictly correct but it's very rarely an issue ...
+  lastCtrlPt := currPt;
+
+  Result := currPt;
+  SetLength(ctrlPts, fPathLen);
+end;
+//------------------------------------------------------------------------------
+
+function TSvgTSegment.GetSimplePoints: TPathD;
+var
+  len: integer;
+begin
+  len := Length(ctrlPts);
+  Result := Copy(ctrlPts, 1, len -1);
+  Result[0] := ctrlPts[0]; //removes the single control point
+end;
+
+//------------------------------------------------------------------------------
+// TSvgVSegment
+//------------------------------------------------------------------------------
+
+function TSvgVSegment.Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD;
+var
+  currPt: TPointD;
+begin
+  if isRelative then
+    Result := ctrlPts[0] else
+    Result := InvalidPointD;
+
+  currPt := ctrlPts[0];
+  while IsNumPending(c, endC, true) and
+    Parse1Num(c, endC, currPt.Y, Result.Y) do
+  begin
+    AddCtrlPoint(currPt);
+    if isRelative then Result := currPt;
+  end;
+  Result := currPt;
+  SetLength(ctrlPts, fPathLen);
 end;
 
 //------------------------------------------------------------------------------
 // TSvgSubPath
 //------------------------------------------------------------------------------
 
-function TSvgSubPath.Clone: TSvgSubPath;
-var
-  i, segLen: integer;
-begin
-  Result := TSvgSubPath.Create;
-  Result.firstPt := firstPt;
-  segLen := Length(segs);
-  SetLength(Result.segs, segLen);
-  for i := 0 to segLen -1 do
-    with segs[i] do
-    begin
-      Result.segs[i].segType := segType;
-      Result.segs[i].fVals := Copy(fVals, 0, Length(fVals));
-    end;
-end;
-//------------------------------------------------------------------------------
-
-function TSvgSubPath.IsClosed: Boolean;
-var
-  len: integer;
-begin
-  len := Length(segs);
-  Result := (len > 0) and (segs[len-1].segType = dsClose);
-end;
-//------------------------------------------------------------------------------
-
-function TSvgSubPath.AddSeg: TSvgSubPathSeg;
+function TSvgSubPath.AddSeg(segType: TSvgPathSegType;
+  const firstPt: TPointD): TSvgBaseSeg;
 var
   i: integer;
+  segClass: TSvgSegmentClass;
 begin
+  Result := nil;
+  segClass := nil;
+  case segType of
+    dsLine    : segClass := TSvgLSegment;
+    dsHorz    : segClass := TSvgHSegment;
+    dsVert    : segClass := TSvgVSegment;
+    dsArc     : segClass := TSvgASegment;
+    dsQBez    : segClass := TSvgQSegment;
+    dsCBez    : segClass := TSvgCSegment;
+    dsQSpline : segClass := TSvgTSegment;
+    dsCSpline : segClass := TSvgSSegment;
+    dsClose   : isClosed := true;
+  end;
+  if not Assigned(segClass) then Exit;
   i := Length(segs);
   SetLength(segs, i+1);
-  Result := TSvgSubPathSeg.Create;
+  Result := segClass.Create(self, i, segType, firstPt);
   segs[i] := Result;
 end;
 //------------------------------------------------------------------------------
@@ -2177,65 +2560,17 @@ end;
 
 function TSvgSubPath.GetSimplePath: TPathD;
 var
-  i,j, pathLen, pathCap: integer;
-  currPt, pt2: TPointD;
-
-  procedure AddPoint(const pt: TPointD);
-  begin
-    if pathLen = pathCap then
-    begin
-      pathCap := pathCap + buffSize;
-      SetLength(Result, pathCap);
-    end;
-    Result[pathLen] := pt;
-    currPt := pt;
-    inc(pathLen);
-  end;
-
+  i: integer;
 begin
-  pathLen := 0; pathCap := 0;
-  AddPoint(firstPt);
+  Result := nil;
   for i := 0 to High(segs) do
-    with segs[i] do
-    begin
-      case segType of
-        dsLine:
-          if Count > 1 then
-            for j := 0 to (Count -1) div 2 do
-              AddPoint(PointD(fVals[j*2], fVals[j*2 +1]));
-        dsHorz:
-          for j := 0 to (Count -1) do
-            AddPoint(PointD(fVals[j], currPt.Y));
-        dsVert:
-          for j := 0 to (Count -1) do
-            AddPoint(PointD(currPt.X, fVals[j]));
-        dsArc:
-          if Count > 6 then
-            for j := 0 to (Count -1) div 7 do
-              AddPoint(PointD(fVals[j*7 +5], fVals[j*7 +6]));
-        dsQBez:
-          if Count > 3 then
-            for j := 0 to (Count -1) div 4 do
-            begin
-              pt2.X := fVals[j*4];
-              pt2.Y := fVals[j*4 +1];
-              AddPoint(PointD(fVals[j*4 +2], fVals[j*4 +3]));
-            end;
-        dsQSpline:
-          if Count > 1 then
-            for j := 0 to (Count -1) div 2 do
-              AddPoint(PointD(fVals[j*2 +1], fVals[j*2 +1]));
-        dsCBez:
-          if Count > 5 then
-            for j := 0 to (Count -1) div 6 do
-              AddPoint(PointD(fVals[j*6 +4], fVals[j*6 +5]));
-        dsCSpline:
-          if Count > 3 then
-            for j := 0 to (Count -1) div 4 do
-              AddPoint(PointD(fVals[j*4 +2], fVals[j*4 +3]));
-      end;
-    end;
-  SetLength(Result, pathLen);
+    AppendPath(Result, segs[i].GetSimplePoints);
+end;
+//------------------------------------------------------------------------------
+
+constructor TSvgSubPath.Create(parent: TSvgPath);
+begin
+  fParent := parent;
 end;
 //------------------------------------------------------------------------------
 
@@ -2262,7 +2597,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgSubPath.GetSeg(index: integer): TSvgSubPathSeg;
+function TSvgSubPath.GetSeg(index: integer): TSvgBaseSeg;
 begin
   if (index < 0) or (index >= Count) then
     raise Exception.Create(rsSvgSubPathRangeError);
@@ -2272,158 +2607,11 @@ end;
 
 function TSvgSubPath.GetBounds: TRectD;
 var
-  i,j, pathLen, pathCap: integer;
-  currPt, radii, pt2, pt3, pt4: TPointD;
-  lastQCtrlPt, lastCCtrlPt: TPointD;
-  arcFlag, sweepFlag: integer;
-  angle, arc1, arc2: double;
-  rec: TRectD;
-  path2, path3: TPathD;
-
-  procedure AddPoint(const pt: TPointD);
-  begin
-    if pathLen = pathCap then
-    begin
-      pathCap := pathCap + buffSize;
-      SetLength(path2, pathCap);
-    end;
-    path2[pathLen] := pt;
-    currPt := pt;
-    inc(pathLen);
-  end;
-
-  procedure AddPath(const p: TPathD);
-  var
-    i, pLen: integer;
-  begin
-    pLen := Length(p);
-    if pLen = 0 then Exit;
-    currPt := p[pLen -1];
-    if pathLen + pLen >= pathCap then
-    begin
-      pathCap := pathLen + pLen + buffSize;
-      SetLength(path2, pathCap);
-    end;
-    for i := 0 to pLen -1 do
-    begin
-      path2[pathLen] := p[i];
-      inc(pathLen);
-    end;
-  end;
-
-  function LastSegWasCubic(segIdx: integer): Boolean;
-  begin
-    Result := (segIdx > 0) and
-      (segs[segIdx -1].segType in [dsCBez, dsCSpline]);
-  end;
-
-  function LastSegWasQuad(segIdx: integer): Boolean;
-  begin
-    Result := (segIdx > 0) and
-      (segs[segIdx -1].segType in [dsQBez, dsQSpline]);
-  end;
-
+  i: integer;
 begin
-  path2 := nil;
-  pathLen := 0; pathCap := 0;
-  lastQCtrlPt := InvalidPointD;
-  lastCCtrlPt := InvalidPointD;
-  AddPoint(firstPt);
-  for i := 0 to High(segs) do
-    with segs[i] do
-    begin
-      case segType of
-        dsLine:
-          if Count > 1 then
-            for j := 0 to (Count -1) div 2 do
-              AddPoint(PointD(fVals[j*2], fVals[j*2 +1]));
-        dsHorz:
-          for j := 0 to (Count -1) do
-            AddPoint(PointD(fVals[j], currPt.Y));
-        dsVert:
-          for j := 0 to (Count -1) do
-            AddPoint(PointD(currPt.X, fVals[j]));
-        dsArc:
-          if Count > 6 then
-            for j := 0 to (Count -1) div 7 do
-            begin
-              radii.X   := fVals[j*7];
-              radii.Y   := fVals[j*7 +1];
-              angle     := DegToRad(fVals[j*7 +2]);
-              arcFlag   := Round(fVals[j*7 +3]);
-              sweepFlag := Round(fVals[j*7 +4]);
-              pt2.X := fVals[j*7 +5];
-              pt2.Y := fVals[j*7 +6];
-
-              GetSvgArcInfo(currPt, pt2, radii, angle,
-                arcFlag <> 0, sweepFlag <> 0, arc1, arc2, rec);
-              if (sweepFlag = 0)  then
-              begin
-                path3 := Arc(rec, arc2, arc1, 1);
-                path3 := ReversePath(path3);
-              end else
-                path3 := Arc(rec, arc1, arc2, 1);
-              path3 := RotatePath(path3, rec.MidPoint, angle);
-              AddPath(path3);
-            end;
-        dsQBez:
-          if Count > 3 then
-            for j := 0 to (Count -1) div 4 do
-            begin
-              pt2.X := fVals[j*4];
-              pt2.Y := fVals[j*4 +1];
-              pt3.X := fVals[j*4 +2];
-              pt3.Y := fVals[j*4 +3];
-              lastQCtrlPt := pt2;
-              path3 := FlattenQBezier(currPt, pt2, pt3, 1);
-              AddPath(path3);
-            end;
-        dsQSpline:
-          if Count > 1 then
-            for j := 0 to (Count -1) div 2 do
-            begin
-              if LastSegWasQuad(i) then
-                pt2 := ReflectPoint(lastQCtrlPt, currPt) else
-                pt2 := currPt;
-              pt3.X := fVals[j*2];
-              pt3.Y := fVals[j*2 +1];
-              lastQCtrlPt := pt2;
-              path3 := FlattenQBezier(currPt, pt2, pt3, 1);
-              AddPath(path3);
-            end;
-        dsCBez:
-          if Count > 5 then
-            for j := 0 to (Count -1) div 6 do
-            begin
-              pt2.X := fVals[j*6];
-              pt2.Y := fVals[j*6 +1];
-              pt3.X := fVals[j*6 +2];
-              pt3.Y := fVals[j*6 +3];
-              pt4.X := fVals[j*6 +4];
-              pt4.Y := fVals[j*6 +5];
-              lastCCtrlPt := pt3;
-              path3 := FlattenCBezier(currPt, pt2, pt3, pt4, 1);
-              AddPath(path3);
-            end;
-        dsCSpline:
-          if Count > 3 then
-            for j := 0 to (Count -1) div 4 do
-            begin
-              if LastSegWasCubic(i) then
-                pt2 := ReflectPoint(lastCCtrlPt, currPt) else
-                pt2 := currPt;
-              pt3.X := fVals[j*4];
-              pt3.Y := fVals[j*4 +1];
-              pt4.X := fVals[j*4 +2];
-              pt4.Y := fVals[j*4 +3];
-              lastCCtrlPt := pt3;
-              path3 := FlattenCBezier(currPt, pt2, pt3, pt4, 1);
-              AddPath(path3);
-            end;
-      end;
-    end;
-  SetLength(path2, pathLen);
-  Result := GetBoundsD(path2);
+  Result := NullRectD;
+  for i := 0 to Count -1 do
+    Result := Img32.Vector.UnionRect(Result, segs[i].GetBounds);
 end;
 
 //------------------------------------------------------------------------------
@@ -2461,23 +2649,38 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgPath.Clone: TSvgPath;
+function TSvgPath.GetBounds: TRectD;
 var
   i: integer;
 begin
-  Result := TSvgPath.Create;
-  SetLength(Result.fSubPaths, Count);
+  Result := NullRectD;
   for i := 0 to Count -1 do
-    Result.fSubPaths[i] := fSubPaths[i].Clone;
+    Result := Img32.Vector.UnionRect(Result, fSubPaths[i].GetBounds);
 end;
 //------------------------------------------------------------------------------
 
-function TSvgPath.AddPath: TSvgSubPath;
+function TSvgPath.GetControlBounds: TRectD;
+var
+  i,j: integer;
+begin
+  Result := NullRectD;
+  for i := 0 to Count -1 do
+    with fSubPaths[i] do
+      for j := 0 to High(segs) do
+      begin
+        //segs[j].GetBounds;
+        Result := Img32.Vector.UnionRect(Result, GetBoundsD(segs[j].ctrlPts));
+      end;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgPath.AddPath(const firstPt: TPointD): TSvgSubPath;
 var
   i: integer;
 begin
   i := Count;
-  Result := TSvgSubPath.Create;
+  Result := TSvgSubPath.Create(self);
+  Result.firstPt := firstPt;
   SetLength(fSubPaths, i + 1);
   fSubPaths[i] := Result;
 end;
@@ -2895,65 +3098,17 @@ end;
 
 procedure ParseSvgPath(const value: UTF8String; svgPaths: TSvgPath);
 var
-  currSeg     : TSvgSubPathSeg;
-  currDpath   : TSvgSubPath;
-  currSegType : TSvgPathSegType;
+  c, endC     : PUTF8Char;
   lastPt      : TPointD;
-
-  procedure StartNewDpath;
-  begin
-    if Assigned(currDpath) and
-      not Assigned(currDpath.segs) then Exit;
-    currDpath := svgPaths.AddPath;
-    currDpath.firstPt := lastPt;
-    currDpath.segs := nil;
-    currSeg := nil;
-  end;
-
-  procedure StartNewSeg;
-  begin
-    if not Assigned(currDpath) then
-      StartNewDpath;
-    currSeg := currDpath.AddSeg;
-    currSeg.segType := currSegType;
-  end;
-
-  procedure AddSegValue(val: double);
-  begin
-    if not Assigned(currSeg) then StartNewSeg;
-    currSeg.AddVal(val);
-  end;
-
-  procedure AddSegPoint(const pt: TPointD);
-  begin
-    if not Assigned(currSeg) then StartNewSeg;
-    currSeg.AddVal(pt.X);
-    currSeg.AddVal(pt.Y);
-  end;
-
-  function Parse2Num(var c, endC: PUTF8Char;
-    var pt: TPointD; isRelative: Boolean): Boolean;
-  begin
-    Result := ParseNextNum(c, endC, true, pt.X) and
-      ParseNextNum(c, endC, true, pt.Y);
-    if not Result or not isRelative then Exit;
-    pt.X := pt.X + lastPt.X;
-    pt.Y := pt.Y + lastPt.Y;
-  end;
-
-var
-  i: integer;
-  d: double;
-  c, endC: PUTF8Char;
-  currPt: TPointD;
-  isRelative: Boolean;
+  currPt      : TPointD;
+  isRelative  : Boolean;
+  currSegType : TSvgPathSegType;
+  currSubPath : TSvgSubPath;
+  segment     : TSvgBaseSeg;
 begin
   if not Assigned(svgPaths) then Exit;
   svgPaths.Clear;
-
-  currSeg     := nil;
-  currDpath   := nil;
-  currSegType := dsMove;
+  currSubPath := nil;
 
   c := PUTF8Char(value);
   endC := c + Length(value);
@@ -2963,17 +3118,18 @@ begin
   while true do
   begin
     currSegType := GetSegType(c, endC, isRelative);
-    if currSegType = dsUnknown then break;
+    if currSegType = dsUnknown then Break;
 
-    lastPt := currPt;
-    if (currSegType = dsMove) then
+    if currSegType = dsMove then
     begin
-      currDpath := nil;
-      currSeg := nil;
+      currSubPath := nil;
 
-      if not Parse2Num(c, endC, currPt, isRelative) then break;
+      if isRelative then
+        lastPt := currPt else
+        lastPt := InvalidPointD;
+
+      if not Parse2Num(c, endC, currPt, lastPt) then break;
       lastPt :=  currPt;
-
       //values immediately following a Move are implicitly Line statements
       if IsNumPending(c, endC, true) then
         currSegType := dsLine else
@@ -2981,101 +3137,21 @@ begin
     end
     else if (currSegType = dsClose) then
     begin
-      if Assigned(currDpath) then
-        currPt := currDpath.firstPt;
-      StartNewSeg;
+      if Assigned(currSubPath) then
+      begin
+        currPt := currSubPath.firstPt;
+        currSubPath.isClosed := true;
+      end;
+      currSubPath := nil;
       Continue;
     end;
-    currSeg := nil;
 
-    case currSegType of
-      dsHorz:
-        while IsNumPending(c, endC, true) and
-          ParseNextNum(c, endC, true, currPt.X) do
-        begin
-          if isRelative then
-            currPt.X := currPt.X + lastPt.X;
-          AddSegValue(currPt.X);
-          lastPt := currPt;
-        end;
+    if not Assigned(currSubPath) then
+      currSubPath := svgPaths.AddPath(currPt);
 
-      dsVert:
-        while IsNumPending(c, endC, true) and
-          ParseNextNum(c, endC, true, currPt.Y) do
-        begin
-          if isRelative then
-            currPt.Y := currPt.Y + lastPt.Y;
-          AddSegValue(currPt.Y);
-          lastPt := currPt;
-        end;
-
-      dsLine:
-        while Parse2Num(c, endC, currPt, isRelative) do
-        begin
-          AddSegPoint(currPt);
-          lastPt := currPt;
-          SkipBlanks(c, endC);
-          if IsNumPending(c, endC, true) then Continue;
-          if LowerCaseTable[c^] = 'l' then GetSegType(c, endC, isRelative)
-          else break;
-        end;
-
-      dsQSpline:
-        while IsNumPending(c, endC, true) and
-          Parse2Num(c, endC, currPt, isRelative) do
-        begin
-          AddSegPoint(currPt);
-          lastPt := currPt;
-        end;
-
-      dsCSpline:
-        while IsNumPending(c, endC, true) and
-          Parse2Num(c, endC, currPt, isRelative) do
-        begin
-          AddSegPoint(currPt);
-          if not Parse2Num(c, endC, currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          lastPt := currPt;
-        end;
-
-      dsQBez:
-        while IsNumPending(c, endC, true) and
-          Parse2Num(c, endC, currPt, isRelative) do
-        begin
-          AddSegPoint(currPt);
-          if not Parse2Num(c, endC, currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          lastPt := currPt;
-        end;
-
-      dsCBez:
-        while IsNumPending(c, endC, true) and
-          Parse2Num(c, endC, currPt, isRelative) do
-        begin
-          AddSegPoint(currPt);
-          if not Parse2Num(c, endC, currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          if not Parse2Num(c, endC, currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          lastPt := currPt;
-        end;
-
-      dsArc:
-        while IsNumPending(c, endC, true) and
-          Parse2Num(c, endC, currPt, false) do
-        begin
-          AddSegPoint(currPt);                              //radii
-          if ParseNextNum(c, endC, true, d) then
-            AddSegValue(d);                                 //angle
-          if not GetSingleDigit(c, endC, i) then break;     //arc-flag
-          AddSegValue(i);
-          if not GetSingleDigit(c, endC, i) then break;     //sweep-flag
-          AddSegValue(i);
-          if not Parse2Num(c, endC, currPt, isRelative) then break;
-          AddSegPoint(currPt);
-          lastPt := currPt;
-        end;
-    end;
+    segment := currSubPath.AddSeg(currSegType, currPt);
+    if not Assigned(segment) then Break;
+    currPt := segment.Parse(c, endC, isRelative);
   end;
 end;
 

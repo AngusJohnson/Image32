@@ -198,7 +198,7 @@ begin
   DrawPolygon(Image, pp, frEvenOdd, BrushColor);
   Draw3D(Image, pp, frEvenOdd, DPIAware(2.5), 2);
   DrawLine(Image, pp, PenWidth, PenColor, esPolygon);
-  UpdateHitTestMask(pp);
+  UpdateHitTestMaskFromImage;
 end;
 
 //------------------------------------------------------------------------------

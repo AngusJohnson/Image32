@@ -2,8 +2,8 @@ unit Img32.SVG.Reader;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.3                                                             *
-* Date      :  21 September 2021                                               *
+* Version   :  3.4                                                             *
+* Date      :  2 October 2021                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -75,8 +75,6 @@ type
 {$ENDIF}
     fId             : UTF8String;
     fDrawData       : TDrawData;    //currently both static and dynamic vars
-    fSavedDrawData  : TDrawData;
-    fSavedElRectWH  : TValueRecWH;
     function  FindRefElement(refname: UTF8String): TSvgElement;
     function GetChildCount: integer;
     function GetChild(index: integer): TSvgElement;
@@ -94,9 +92,6 @@ type
   public
     constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); virtual;
     destructor  Destroy; override;
-    //SaveCopy and RestoreCopy are needed for animation
-    procedure SaveCopy; virtual;
-    procedure RestoreCopy(recursive: Boolean); virtual;
     property Child[index: integer]: TSvgElement read GetChild; default;
     property ChildCount: integer read GetChildCount;
     property DrawData: TDrawData read fDrawData write fDrawData;
@@ -104,14 +99,10 @@ type
   end;
 
   TSvgRootElement = class(TSvgElement)
-  private
-    fSavedViewboxWH : TRectWH;
   protected
     viewboxWH       : TRectWH;
   public
     constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
-    procedure SaveCopy; override;
-    procedure RestoreCopy(recursive: Boolean); override;
   end;
 
   TSvgReader = class
@@ -239,7 +230,6 @@ type
 
   TPathElement = class(TShapeElement)
   private
-    fSavedPaths : TSvgPath;
     fSvgPaths   : TSvgPath;
     procedure Flatten(index: integer; scalePending: double;
       out path: TPathD; out isClosed: Boolean);
@@ -248,29 +238,21 @@ type
     procedure ParseDAttrib(const value: UTF8String);
     procedure GetPaths(const drawDat: TDrawData); override;
     function  GetUncurvedPath(const drawDat: TDrawData): TPathsD; override;
-    procedure SaveCopy; override;
-    procedure RestoreCopy(recursive: Boolean); override;
   public
     constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
     destructor Destroy; override;
   end;
 
   TPolyElement = class(TShapeElement) //polyline or polygon
-  private
-    fSavedPath  : TPathD;
   protected
     path        : TPathD;
     function  GetBounds: TRectD; override;
     procedure ParsePoints(const value: UTF8String);
     procedure GetPaths(const drawDat: TDrawData); override;
     function  GetUncurvedPath(const drawDat: TDrawData): TPathsD; override;
-    procedure SaveCopy; override;
-    procedure RestoreCopy(recursive: Boolean); override;
   end;
 
   TLineElement = class(TShapeElement)
-  private
-    fSavedPath  : TPathD;
   protected
     path      : TPathD;
     function  GetBounds: TRectD; override;
@@ -278,14 +260,9 @@ type
     function  GetUncurvedPath(const drawDat: TDrawData): TPathsD; override;
   public
     constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
-    procedure SaveCopy; override;
-    procedure RestoreCopy(recursive: Boolean); override;
   end;
 
   TCircleElement = class(TShapeElement)
-  private
-    fSavedCenterPt  : TValuePt;
-    fSavedRadius    : TValue;
   protected
     centerPt        : TValuePt;
     radius          : TValue;
@@ -293,14 +270,9 @@ type
     procedure GetPaths(const drawDat: TDrawData); override;
   public
     constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
-    procedure SaveCopy; override;
-    procedure RestoreCopy(recursive: Boolean); override;
   end;
 
   TEllipseElement = class(TShapeElement)
-  private
-    fSavedCenterPt  : TValuePt;
-    fSavedRadius    : TValuePt;
   protected
     centerPt  : TValuePt;
     radius    : TValuePt;
@@ -308,13 +280,9 @@ type
     procedure GetPaths(const drawDat: TDrawData); override;
   public
     constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
-    procedure SaveCopy; override;
-    procedure RestoreCopy(recursive: Boolean); override;
   end;
 
   TRectElement = class(TShapeElement)
-  private
-    fSavedRadius    : TValuePt;
   protected
     radius    : TValuePt;
     function  GetBounds: TRectD; override;
@@ -322,8 +290,6 @@ type
     function  GetUncurvedPath(const drawDat: TDrawData): TPathsD; override;
   public
     constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
-    procedure SaveCopy; override;
-    procedure RestoreCopy(recursive: Boolean); override;
   end;
 
   //TTextElement: although this is a TShapeElement descendant, it's really
@@ -349,15 +315,11 @@ type
   end;
 
   TSubtextElement = class(TShapeElement)
-  private
-    fSavedText: UTF8String;
   protected
     text      : UTF8String;
     procedure GetPaths(const drawDat: TDrawData); override;
   public
     constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
-    procedure SaveCopy; override;
-    procedure RestoreCopy(recursive: Boolean); override;
   end;
 
   //-------------------------------------
@@ -2455,24 +2417,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPathElement.SaveCopy;
-begin
-  FreeAndNil(fSavedPaths);
-  fSavedPaths := fSvgPaths.Clone;
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TPathElement.RestoreCopy(recursive: Boolean);
-begin
-  FreeAndNil(fSvgPaths);
-  fSvgPaths := fSavedPaths;
-  fSavedPaths := nil;
-  inherited RestoreCopy(recursive);
-end;
-//------------------------------------------------------------------------------
-
-
 procedure TPathElement.ParseDAttrib(const value: UTF8String);
 begin
   ParseSvgPath(value, fSvgPaths);
@@ -2545,20 +2489,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPolyElement.SaveCopy;
-begin
-   fSavedPath := path;
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TPolyElement.RestoreCopy(recursive: Boolean);
-begin
-   path := fSavedPath;
-  inherited RestoreCopy(recursive);
-end;
-//------------------------------------------------------------------------------
-
 function TPolyElement.GetUncurvedPath(const drawDat: TDrawData): TPathsD;
 begin
   Result := nil;
@@ -2609,20 +2539,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TLineElement.SaveCopy;
-begin
-   fSavedPath := path;
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TLineElement.RestoreCopy(recursive: Boolean);
-begin
-   path := fSavedPath;
-  inherited RestoreCopy(recursive);
-end;
-//------------------------------------------------------------------------------
-
 function TLineElement.GetBounds: TRectD;
 begin
   Result := GetBoundsD(path);
@@ -2652,22 +2568,6 @@ begin
   inherited;
   centerPt.Init;
   radius.Init;
-end;
-//------------------------------------------------------------------------------
-
-procedure TCircleElement.SaveCopy;
-begin
-  fSavedCenterPt := centerPt;
-  fSavedRadius   := radius;
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TCircleElement.RestoreCopy(recursive: Boolean);
-begin
-  centerPt := fSavedCenterPt;
-  radius := fSavedRadius;
-  inherited RestoreCopy(recursive);
 end;
 //------------------------------------------------------------------------------
 
@@ -2715,22 +2615,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TEllipseElement.SaveCopy;
-begin
-  fSavedCenterPt := centerPt;
-  fSavedRadius   := radius;
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TEllipseElement.RestoreCopy(recursive: Boolean);
-begin
-  centerPt := fSavedCenterPt;
-  radius := fSavedRadius;
-  inherited RestoreCopy(recursive);
-end;
-//------------------------------------------------------------------------------
-
 function TEllipseElement.GetBounds: TRectD;
 var
   cp  : TPointD;
@@ -2773,20 +2657,6 @@ begin
   radius.Init;
   elRectWH.width.SetValue(100, utPercent);
   elRectWH.height.SetValue(100, utPercent);
-end;
-//------------------------------------------------------------------------------
-
-procedure TRectElement.SaveCopy;
-begin
-  fSavedRadius   := radius;
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TRectElement.RestoreCopy(recursive: Boolean);
-begin
-  radius := fSavedRadius;
-  inherited RestoreCopy(recursive);
 end;
 //------------------------------------------------------------------------------
 
@@ -2998,20 +2868,6 @@ begin
   hasPaths := true;
   fDrawData := fParent.fDrawData;
   fDrawData.matrix := IdentityMatrix;
-end;
-//------------------------------------------------------------------------------
-
-procedure TSubtextElement.SaveCopy;
-begin
-  fSavedText := text;
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TSubtextElement.RestoreCopy(recursive: Boolean);
-begin
-  text := fSavedText;
-  inherited RestoreCopy(recursive);
 end;
 //------------------------------------------------------------------------------
 
@@ -3417,20 +3273,6 @@ constructor TSvgRootElement.Create(parent: TSvgElement; svgEl: TSvgTreeEl);
 begin
   inherited Create(parent, svgEl);
 end;
-//------------------------------------------------------------------------------
-
-procedure TSvgRootElement.SaveCopy;
-begin
-  fSavedViewboxWH := viewboxWH;
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TSvgRootElement.RestoreCopy(recursive: Boolean);
-begin
-  viewboxWH := fSavedViewboxWH;
-  inherited RestoreCopy(recursive);
-end;
 
 //------------------------------------------------------------------------------
 // TElement
@@ -3460,27 +3302,6 @@ begin
     TSvgElement(fChilds[i]).Free;
   fChilds.Free;
   inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TSvgElement.SaveCopy;
-var
-  i: integer;
-begin
-  fSavedDrawData := fDrawData;
-  fSavedElRectWH := ElRectWH;
-  for i := 0 to fChilds.Count -1 do SaveCopy;
-end;
-//------------------------------------------------------------------------------
-
-procedure TSvgElement.RestoreCopy(recursive: Boolean);
-var
-  i: integer;
-begin
-  fDrawData := fSavedDrawData;
-  ElRectWH := fSavedElRectWH;
-  if not recursive then Exit;
-  for i := 0 to fChilds.Count -1 do RestoreCopy(recursive);
 end;
 //------------------------------------------------------------------------------
 
