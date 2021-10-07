@@ -69,10 +69,11 @@ type
 
   function Ellipse(const rec: TRect; steps: integer = 0): TPathD; overload;
   function Ellipse(const rec: TRectD; steps: integer = 0): TPathD; overload;
-  function Ellipse(const rec: TRectD; scale: double): TPathD; overload;
+  function Ellipse(const rec: TRectD; pendingScale: double): TPathD; overload;
 
   function Circle(const pt: TPoint; radius: double): TPathD; overload;
   function Circle(const pt: TPointD; radius: double): TPathD; overload;
+  function Circle(const pt: TPointD; radius: double; pendingScale: double): TPathD; overload;
 
   function Star(const rec: TRectD; points: integer; indentFrac: double = 0.4): TPathD; overload;
   function Star(const focalPt: TPointD;
@@ -303,13 +304,19 @@ type
   function ClosestPointOnSegment(const pt, segPt1, segPt2: TPointD): TPointD;
 
   function IsPointInEllipse(const ellipseRec: TRect; const pt: TPoint): Boolean;
-
   //GetIntersectsEllipseAndLine: Gets the intersection of an ellipse and
   //a line. The function result = true when the line either touches
   //tangentially or passes through the ellipse. If the line touches
   //tangentially, the coordintates returned in pt1 and pt2 will match.
   function GetLineEllipseIntersects(const ellipseRect: TRect;
     var linePt1, linePt2: TPointD): Boolean;
+  function GetPtOnEllipseFromAngle(const ellipseRect: TRectD; angle: double): TPointD;
+  function GetPtOnRotatedEllipseFromAngle(const ellipseRect: TRectD;
+    ellipseRotAngle, angle: double): TPointD;
+  function GetEllipticalAngleFromPoint(const ellipseRect: TRectD;
+    const pt: TPointD): double;
+  function GetClosestPtOnRotatedEllipse(const ellipseRect: TRectD;
+    ellipseRotation: double; const pt: TPointD): TPointD;
 
   function Outline(const line: TPathD; lineWidth: double;
     joinStyle: TJoinStyle; endStyle: TEndStyle;
@@ -1436,6 +1443,49 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function GetPtOnEllipseFromAngle(const ellipseRect: TRectD;
+  angle: double): TPointD;
+var
+  sn, co: double;
+begin
+  NormalizeAngle(angle);
+  GetSinCos(angle, sn, co);
+  Result.X := ellipseRect.MidPoint.X + ellipseRect.Width/2 * co;
+  Result.Y := ellipseRect.MidPoint.Y + ellipseRect.Height/2 * sn;
+end;
+//------------------------------------------------------------------------------
+
+function GetEllipticalAngleFromPoint(const ellipseRect: TRectD;
+  const pt: TPointD): double;
+begin
+  with ellipseRect do
+    Result := ArcTan2(Width/Height * (pt.Y - MidPoint.Y), (pt.X - MidPoint.X));
+end;
+//------------------------------------------------------------------------------
+
+function GetPtOnRotatedEllipseFromAngle(const ellipseRect: TRectD;
+  ellipseRotAngle, angle: double): TPointD;
+begin
+  Result := GetPtOnEllipseFromAngle(ellipseRect, angle);
+  if ellipseRotAngle <> 0 then
+    img32.Vector.RotatePoint(Result, ellipseRect.MidPoint, ellipseRotAngle);
+end;
+//------------------------------------------------------------------------------
+
+function GetClosestPtOnRotatedEllipse(const ellipseRect: TRectD;
+  ellipseRotation: double; const pt: TPointD): TPointD;
+var
+  pt2: TPointD;
+  angle: double;
+begin
+  pt2 := pt;
+  Img32.Vector.RotatePoint(pt2, ellipseRect.MidPoint, -ellipseRotation);
+  angle := GetEllipticalAngleFromPoint(ellipseRect, pt2);
+  Result := GetPtOnEllipseFromAngle(ellipseRect, angle);
+  Img32.Vector.RotatePoint(Result, ellipseRect.MidPoint, ellipseRotation);
+end;
+//------------------------------------------------------------------------------
+
 function IsPointInEllipse(const ellipseRec: TRect; const pt: TPoint): Boolean;
 var
   rec: TRectD;
@@ -2277,12 +2327,24 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Ellipse(const rec: TRectD; scale: double): TPathD;
+function Circle(const pt: TPointD; radius: double; pendingScale: double): TPathD;
+var
+  rec: TRectD;
+begin
+  rec.Left := pt.X - radius;
+  rec.Right := pt.X + radius;
+  rec.Top := pt.Y - radius;
+  rec.Bottom := pt.Y + radius;
+  Result := Ellipse(rec, pendingScale);
+end;
+//------------------------------------------------------------------------------
+
+function Ellipse(const rec: TRectD; pendingScale: double): TPathD;
 var
   steps: integer;
 begin
-  if scale <= 0 then scale := 1;
-  steps := 4 * Max(1, Trunc(Sqrt((rec.width + rec.Height) * scale)));
+  if pendingScale <= 0 then pendingScale := 1;
+  steps := 4 * Max(1, Trunc(Sqrt((rec.width + rec.Height) * pendingScale)));
   Result := Ellipse(rec, steps);
 end;
 //------------------------------------------------------------------------------
@@ -2411,7 +2473,7 @@ begin
 
   with rec do
   begin
-    centre := rec.MidPoint;
+    centre := MidPoint;
     radius := PointD(Width * 0.5, Height  * 0.5);
   end;
 

@@ -518,6 +518,8 @@ implementation
 uses
   Img32.Vector, Img32.Resamplers, Img32.Transform;
 
+resourcestring
+  rsImageTooLarge = 'Image32 error: the image is too large.';
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
@@ -1764,6 +1766,10 @@ end;
 
 procedure TImage32.SetSize(newWidth, newHeight: Integer; color: TColor32);
 begin
+  //very large images are usually due to a bug
+  if (newWidth > 20000) or (newHeight > 20000) then
+    raise Exception.Create(rsImageTooLarge);
+
   fwidth := Max(0, newWidth);
   fheight := Max(0, newHeight);
   fPixels := nil; //forces a blank image

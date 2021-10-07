@@ -80,6 +80,7 @@ type
     fClipPath       : TPathsD;
     function   TopLeft: TPoint;
     function   GetMidPoint: TPointD;
+    function   GetLocation: TPoint;
     procedure  SetVisible(value: Boolean);
     function   GetHeight: integer;
     function   GetWidth: integer;
@@ -148,6 +149,7 @@ type
     property   Image: TImage32 read fImage;
     property   Index: integer read fIndex;
     property   Left: integer read fLeft;
+    property   Location: TPoint read GetLocation;
     property   MidPoint: TPointD read GetMidPoint;
     property   Name: string read fName write fName;
     property   Opacity: Byte read fOpacity write SetOpacity;
@@ -292,13 +294,16 @@ type
 
   TButtonGroupLayer32 = class(TGroupLayer32) //groups generic buttons
   private
-    fBtnSize: integer;
-    fBtnShape: TButtonShape;
-    fBtnColor: TColor32;
-    fBbtnLayerClass: TButtonDesignerLayer32Class;
+    fBtnSize  : integer;
+    fBtnShape : TButtonShape;
+    fBtnColor : TColor32;
+    fBtnLayerClass: TButtonDesignerLayer32Class;
+    fBtnCount : integer;
   public
     function AddButton(const pt: TPointD): TButtonDesignerLayer32;
     function InsertButton(const pt: TPointD; btnIdx: integer): TButtonDesignerLayer32;
+    property ButtonCnt: integer read fBtnCount;
+
   end;
 
   TDesignerLayer32 = class(THitTestLayer32) //generic design layer
@@ -314,6 +319,7 @@ type
     fShape    : TButtonShape;
     fEnabled  : Boolean;
     fOutline  : TPathD;
+    fBtnIdx   : integer;
     procedure SetEnabled(value: Boolean);
   protected
     procedure SetButtonAttributes(const shape: TButtonShape;
@@ -327,6 +333,8 @@ type
     property Color    : TColor32 read fColor write fColor;
     property Shape    : TButtonShape read fShape write fShape;
     property ButtonOutline: TPathD read fOutline write fOutline;
+    //BtnIdx: useful when Buttons are 'moved' (ie their level changed)
+    property BtnIdx   : integer read fBtnIdx;
   end;
 
   TUpdateType = (utUndefined, utShowDesigners, utHideDesigners);
@@ -639,6 +647,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function   TLayer32.GetLocation: TPoint;
+begin
+  Result := Types.Point(fLeft, fTop);
+end;
+//------------------------------------------------------------------------------
+
 procedure TLayer32.PositionAt(const pt: TPoint);
 begin
   PositionAt(pt.X, pt.Y);
@@ -792,11 +806,12 @@ begin
   begin
     if Visible then
       fParent.Invalidate(Bounds);
+    fParent.fChilds.Delete(fIndex);
     fParent.ReindexChildsFrom(fIndex);
 
-    fIndex := idx;
     newParent.fChilds.Insert(idx, self);
-    newParent.ReindexChildsFrom(idx +1);
+    self.fParent := newParent;
+    newParent.ReindexChildsFrom(idx);
   end;
   newParent.RefreshPending;
   Result := true;
@@ -1374,15 +1389,11 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TVectorLayer32.SetPaths(const newPaths: TPathsD);
-var
-  rec: TRect;
 begin
   fPaths := CopyPaths(newPaths);
-  rec := Img32.Vector.GetBounds(fPaths);
-  Img32.Vector.InflateRect(rec, Margin, margin);
   fPivotPt := InvalidPointD;
-  inherited SetBounds(rec);
-  RepositionAndDraw;
+  if Assigned(fPaths) then RepositionAndDraw
+  else inherited SetBounds(NullRect);
 end;
 //------------------------------------------------------------------------------
 
@@ -1480,7 +1491,7 @@ end;
 
 constructor TRasterLayer32.Create(parent: TLayer32;  const name: string = '');
 begin
-  inherited;
+  inherited Create(parent, name);
   fMasterImg := TLayerNotifyImage32.Create(self);
   fCursorId := crHandPoint;
   fAutoHitTest := true;
@@ -1772,7 +1783,7 @@ begin
     pt := Point(GetPointAtAngleAndDist(PointD(pivot),
       startingAngle + startingZeroOffset, dist));
     PositionCenteredAt(pt);
-    CursorId := crHandPoint;
+    CursorId := crSizeAll;
   end;
 
 end;
@@ -1844,13 +1855,15 @@ end;
 function TButtonGroupLayer32.InsertButton(const pt: TPointD;
   btnIdx: integer): TButtonDesignerLayer32;
 begin
-  result := TButtonDesignerLayer32(InsertChild(fBbtnLayerClass, btnIdx));
+  result := TButtonDesignerLayer32(InsertChild(fBtnLayerClass, btnIdx));
   with result do
   begin
     SetButtonAttributes(fBtnShape, FBtnSize, fBtnColor);
     PositionCenteredAt(pt);
     CursorId := crHandPoint;
+    fBtnIdx := Self.fBtnCount;
   end;
+  inc(fBtnCount);
 end;
 
 //------------------------------------------------------------------------------
@@ -1893,7 +1906,7 @@ procedure TButtonDesignerLayer32.Draw;
 var
   c: TColor32;
 begin
-  if fEnabled then c := fColor else c := clNone32;
+  if fEnabled then c := fColor else c := clWhite32;
   fOutline := Img32.Extra.DrawButton(Image,
     image.MidPoint, fSize, c, fShape, [ba3D, baShadow]);
 end;
@@ -2429,7 +2442,7 @@ begin
   Result.fBtnSize := buttonSize;
   Result.fBtnShape := buttonShape;
   Result.fBtnColor := buttonColor;
-  Result.fBbtnLayerClass := buttonLayerClass;
+  Result.fBtnLayerClass := buttonLayerClass;
 
   for i := 0 to high(buttonPts) do
   begin

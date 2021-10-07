@@ -25,7 +25,7 @@ uses
 
 type
   TButtonShape = (bsRound, bsSquare, bsDiamond);
-  TButtonAttribute = (baShadow, ba3D, baClearBelow);
+  TButtonAttribute = (baShadow, ba3D, baEraseBeneath);
   TButtonAttributes = set of TButtonAttribute;
 
 procedure DrawEdge(img: TImage32; const rec: TRect;
@@ -111,7 +111,7 @@ function MakeLighter(color: TColor32; percent: cardinal): TColor32;
 function DrawButton(img: TImage32; const pt: TPointD;
   size: double; color: TColor32 = clNone32;
   buttonShape: TButtonShape = bsRound;
-  buttonAttributes: TButtonAttributes = [baShadow, ba3D, baClearBelow]): TPathD;
+  buttonAttributes: TButtonAttributes = [baShadow, ba3D, baEraseBeneath]): TPathD;
 
 //Vectorize: convert an image into polygon vectors
 function Vectorize(img: TImage32; compareColor: TColor32;
@@ -773,7 +773,7 @@ begin
   lightSize := radius * 0.25;
 
   rec := RectD(pt.X -radius, pt.Y -radius, pt.X +radius, pt.Y +radius);
-  if baClearBelow in buttonAttributes then
+  if baEraseBeneath in buttonAttributes then
     img.Clear(Rect(rec));
 
   case buttonShape of

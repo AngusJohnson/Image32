@@ -2086,6 +2086,8 @@ begin
   Self.fParent := parent;
   Self.fIdx    := idx;
   Self.fSegType := segType;
+  //note: the first and last points in ctrlPts
+  //will always be the segments start and end positions
   AddCtrlPoint(firstPt);
 end;
 //------------------------------------------------------------------------------
@@ -2180,6 +2182,7 @@ var
   a: double;
   pt, currPt, radii: TPointD;
   i, arc, sweep: integer;
+  rec2: TRectD;
 begin
   if isRelative then
     Result := ctrlPts[0] else
@@ -2205,11 +2208,9 @@ begin
     end;
     pt := currPt;
   end;
+  AddCtrlPoint(currPt);
+  SetLength(ctrlPts, fPathLen);
   Result := currPt;
-
-  //simple points :)
-  AddCtrlPoint(Result);
-  SetLength(ctrlPts, 2);
 end;
 //------------------------------------------------------------------------------
 
@@ -2667,10 +2668,7 @@ begin
   for i := 0 to Count -1 do
     with fSubPaths[i] do
       for j := 0 to High(segs) do
-      begin
-        //segs[j].GetBounds;
         Result := Img32.Vector.UnionRect(Result, GetBoundsD(segs[j].ctrlPts));
-      end;
 end;
 //------------------------------------------------------------------------------
 
