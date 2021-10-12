@@ -3,7 +3,7 @@ unit Img32.SVG.PathDesign;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  3.4                                                             *
-* Date      :  5 October 2021                                                  *
+* Date      :  12 October 2021                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -19,6 +19,8 @@ interface
 {$I Img32.inc}
 
 uses
+  windows, //debugging
+
   SysUtils, Classes, Types,
   Math, Img32, Img32.Svg.Core, Img32.Vector, Img32.Layers;
 
@@ -43,11 +45,6 @@ type
     function  GetBtnCtrlPts: TPathD; virtual;
     procedure SetBtnCtrlPts(const pts: TPathD); virtual;
     procedure FlattenPath; virtual;
-    function  AsIntStr(val: double): string;
-    function  AsFloatStr(val: double;
-      precision: integer; useComma: Boolean): string;
-    function  AsPointStr(pt: TPointD;
-      const relPt: TPointD; precision: integer): string;
     property  Owner  : TSvgPathLayer read fOwner;
   public
     constructor Create(parent: TLayer32;  const name: string = ''); override;
@@ -79,14 +76,12 @@ type
     fHorzLeft : Boolean;
     fVertTop  : Boolean;
     procedure SetArcInfo(const arcInfo: TArcInfo);
-    procedure GetRectSizePositions(out pt1, pt2: TPointD);
+    procedure GetRectBtnPoints(out pt1, pt2: TPointD);
   protected
     procedure SetBtnCtrlPts(const pts: TPathD); override;
     function GetBtnCtrlPts: TPathD; override;
-    function GetHorzSizeBtnPos: TPointD;
-    function GetVertSizeBtnPos: TPointD;
-    function GetStartAngleBtnPos: TPointD;
-    function GetEndAngleBtnPos: TPointD;
+    function GetStartAngle: double;
+    function GetEndAngle: double;
     procedure DrawDesigner(designer: TDesignerLayer32); override;
     procedure FlattenPath; override;
   public
@@ -149,6 +144,7 @@ type
     procedure FlattenPath; override;
   public
     function GetStringDef: string; override;
+    function CreateBtnGroup: TButtonGroupLayer32; override;
     procedure DrawDesigner(designer: TDesignerLayer32); override;
   end;
 
@@ -167,6 +163,8 @@ type
     property Owner : TSvgPathLayer read fOwner;
   public
     procedure Init(subPath: TSvgSubPath); virtual;
+    function GetLastSegLayer: TSegBaseLayer;
+    function GetStringDef: string;
     property SubPath: TSvgSubPath read fSubPath;
     property SegLayer[index: integer]: TSegBaseLayer read GetSegLayer;
   end;
@@ -177,25 +175,26 @@ type
     fStrokeColor  : TColor32;
     fStrokeColor2 : TColor32;
     fstrokeWidth  : double;
-    fOffset       : TPoint;
     fRelativeStr  : Boolean;
     fSvgPath      : TSvgPath;
     function GetMargin: integer;
     procedure SetStrokeWidth(width: double);
     function GetSubPathLayer(index: integer): TSvgSubPathLayer;
   protected
-    property Scale        : double read fScale;
-    property PathOffset   : TPoint read fOffset;
+    function AsPointStr(pt: TPointD;
+      const relPt: TPointD; precision: integer): string;
     property StrokeColor  : TColor32 read fStrokeColor;
     property StrokeColor2 : TColor32 read fStrokeColor2;
   public
-    procedure Init(svgPath: TSvgPath; scale: double; const offset: TPoint); virtual;
+    procedure Init(svgPath: TSvgPath; scale: double;
+      offsetX, offsetY: integer); virtual;
     procedure ScaleAndOffset(scale: double; dx, dy: integer);
 
     property StrokeWidth  : double read fstrokeWidth write SetStrokeWidth;
     property SvgPath: TSvgPath read fSvgPath;
     property SvgSubPath[index: integer]: TSvgSubPathLayer read GetSubPathLayer;
     property Margin  : integer read GetMargin;
+    property Scale   : double read fScale;
   end;
 
 implementation
@@ -218,11 +217,43 @@ const
 
 //------------------------------------------------------------------------------
 
+function TrimTrailingZeros(const floatValStr: string): string;
+var
+  i: integer;
+begin
+  Result := floatValStr;
+  i := Length(Result);
+  while Result[i] = '0' do dec(i);
+  if Result[i] = '.' then dec(i);
+  SetLength(Result, i);
+end;
+//------------------------------------------------------------------------------
+
+function AsIntStr(val: double): string;
+begin
+  Result := Format('%1.0n ', [val]);
+end;
+//------------------------------------------------------------------------------
+
+function AsFloatStr(val: double; precision: integer): string;
+begin
+  Result := TrimTrailingZeros(Format('%1.*f', [precision, val]));
+end;
+//------------------------------------------------------------------------------
+
 function ScaleAndOffsetPath(const p: TPathD;
   scale: double; dx,dy: integer): TPathD;
 begin
   result := ScalePath(p, scale);
   result := OffsetPath(result, dx, dy);
+end;
+//------------------------------------------------------------------------------
+
+function ScaleAndOffsetPoint(const pt: TPointD;
+  scale: double; dx,dy: integer): TPointD;
+begin
+  result := ScalePoint(pt, scale);
+  result := OffsetPoint(result, dx, dy);
 end;
 //------------------------------------------------------------------------------
 
@@ -268,7 +299,7 @@ var
   p: TPathD;
 begin
   p := ScaleAndOffsetPath(seg.ctrlPts,
-    Owner.Scale, Owner.fOffset.X, Owner.fOffset.Y);
+    Owner.Scale, Owner.Location.X, Owner.Location.Y);
   SetBtnCtrlPts(p);
   DrawPath;
 end;
@@ -314,7 +345,7 @@ var
 begin
   if not Assigned(fCtrlPts) then Exit;
   pt := fCtrlPts[0];
-  pt := OffsetPoint(pt, fOwner.fOffset.X -Left, fOwner.fOffset.Y -Top);
+  pt := OffsetPoint(pt, fOwner.Location.X -Left, fOwner.Location.Y -Top);
   Img32.Extra.DrawButton(Image, pt,
     DefaultButtonSize, $FFFF9999, bsRound, [ba3D, baShadow]);
 
@@ -496,54 +527,27 @@ function TSegBaseLayer.GetStringDef: string;
 begin
   Result := name + ' ';
 end;
-//------------------------------------------------------------------------------
-
-function TSegBaseLayer.AsIntStr(val: double): string;
-begin
-  Result := Format('%1.0n ', [val]);
-end;
-//------------------------------------------------------------------------------
-
-function TSegBaseLayer.AsFloatStr(val: double;
-  precision: integer; useComma: Boolean): string;
-var
-  ext: string;
-begin
-  if useComma then ext := ',' else ext := '';
-  Result := Format('%1.*f%s ', [precision, val, ext]);
-end;
-//------------------------------------------------------------------------------
-
-function TSegBaseLayer.AsPointStr(pt: TPointD;
-  const relPt: TPointD; precision: integer): string;
-var
-  delta: TPointD;
-begin
-  with fOwner do
-  begin
-    pt.x := (pt.x - fOffset.X) /Scale;
-    pt.y := (pt.y - fOffset.Y) /Scale;
-    if fRelativeStr then
-    begin
-      delta.X := (relPt.X - fOffset.X) /Scale;
-      delta.Y := (relPt.Y - fOffset.Y) /Scale;
-      pt := OffsetPoint(pt, -delta.X, -delta.Y);
-    end;
-  end;
-  Result := Format('%1.*f %1.*f, ', [precision, pt.x, precision, pt.y]);
-end;
 
 //------------------------------------------------------------------------------
 // TSvgASegLayer
 //------------------------------------------------------------------------------
 
 procedure TSvgASegLayer.Init(seg: TSvgBaseSeg; arcIdx: integer);
+var
+  offset: TPoint;
+  s: double;
 begin
   with TSvgASegment(seg) do
     fArcInfo := arcInfos[arcIdx];
-  fArcInfo.rec := ScaleAndOffsetRect(fArcInfo.rec,
-    Owner.Scale, Owner.fOffset.X, Owner.fOffset.Y);
 
+  offset := Owner.Location;
+  s := Owner.Scale;
+  with fArcInfo do
+  begin
+    rec := ScaleAndOffsetRect(rec, s, offset.X, offset.Y);
+    startPos := ScaleAndOffsetPoint(startPos, s, offset.X, offset.Y);
+    endPos := ScaleAndOffsetPoint(endPos,s, offset.X, offset.Y);
+  end;
   SetBtnCtrlPts(nil);
   DrawPath;
 end;
@@ -552,8 +556,14 @@ end;
 procedure TSvgASegLayer.ScaleAndOffset(scale: double; dx,dy: integer);
 begin
   if scale = 0 then scale := 1;
-  fCtrlPts := ScaleAndOffsetPath(fCtrlPts, scale, dx,dy);
-  fArcInfo.rec := ScaleAndOffsetRect(fArcInfo.rec, scale, dx,dy);
+  if Assigned(fCtrlPts) then
+    fCtrlPts := ScaleAndOffsetPath(fCtrlPts, scale, dx,dy);
+  with fArcInfo do
+  begin
+    rec := ScaleAndOffsetRect(rec, scale, dx,dy);
+    startPos := ScaleAndOffsetPoint(startPos, scale, dx,dy);
+    endPos := ScaleAndOffsetPoint(endPos, scale, dx,dy);
+  end;
   FlattenPath;
   DrawPath;
 end;
@@ -568,35 +578,35 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSvgASegLayer.GetRectSizePositions(out pt1, pt2: TPointD);
+procedure TSvgASegLayer.GetRectBtnPoints(out pt1, pt2: TPointD);
 var
-  r: TRectD;
-  startPt, pt: TPointD;
+  pt: TPointD;
 begin
-  r := fArcInfo.rec;
-  startPt := GetPtOnEllipseFromAngle(r, fArcInfo.startAngle);
-  pt := PointD(r.Left, r.MidPoint.Y);
-  pt2 := PointD(r.Right, r.MidPoint.Y);
-  fHorzLeft := DistanceSqrd(pt, startPt) > DistanceSqrd(pt2, startPt);
-  if fHorzLeft then
-    pt1 := PointD(r.Left - ArcRectMargin, r.MidPoint.Y) else
-    pt1 := PointD(r.Right + ArcRectMargin, r.MidPoint.Y);
+  with fArcInfo do
+  begin
+    pt := PointD(rec.Left, rec.MidPoint.Y);
+    pt2 := PointD(rec.Right, rec.MidPoint.Y);
+    fHorzLeft := DistanceSqrd(pt, startPos) > DistanceSqrd(pt2, startPos);
+    if fHorzLeft then
+      pt1 := PointD(rec.Left - ArcRectMargin, rec.MidPoint.Y) else
+      pt1 := PointD(rec.Right + ArcRectMargin, rec.MidPoint.Y);
 
-  pt := PointD(r.MidPoint.X, r.Top);
-  pt2 := PointD(r.MidPoint.X, r.Bottom);
-  fVertTop := DistanceSqrd(pt, startPt) > DistanceSqrd(pt2, startPt);
-  if fVertTop then
-    pt2 := PointD(r.MidPoint.X, r.Top - ArcRectMargin) else
-    pt2 := PointD(r.MidPoint.X, r.Bottom + ArcRectMargin);
-  RotatePoint(pt1, r.MidPoint, fArcInfo.angle);
-  RotatePoint(pt2, r.MidPoint, fArcInfo.angle);
+    pt := PointD(rec.MidPoint.X, rec.Top);
+    pt2 := PointD(rec.MidPoint.X, rec.Bottom);
+    fVertTop := DistanceSqrd(pt, startPos) > DistanceSqrd(pt2, startPos);
+    if fVertTop then
+      pt2 := PointD(rec.MidPoint.X, rec.Top - ArcRectMargin) else
+      pt2 := PointD(rec.MidPoint.X, rec.Bottom + ArcRectMargin);
+    RotatePoint(pt1, rec.MidPoint, fArcInfo.rectAngle);
+    RotatePoint(pt2, rec.MidPoint, fArcInfo.rectAngle);
+  end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TSvgASegLayer.ReverseArcDirection;
 begin
-  fArcInfo.sweepFlag := not fArcInfo.sweepFlag;
-  SetBtnCtrlPts(nil);
+  fArcInfo.sweepClockW := not fArcInfo.sweepClockW;
+  FlattenPath;
   DrawPath;
   Invalidate(Bounds);
 end;
@@ -605,30 +615,37 @@ end;
 procedure TSvgASegLayer.Offset(dx,dy: integer);
 begin
   inherited;
-  OffsetRect(fArcInfo.rec, dx, dy);
+  with fArcInfo do
+  begin
+    startPos := OffsetPoint(startPos, dx, dy);
+    endPos := OffsetPoint(endPos, dx, dy);
+    OffsetRect(rec, dx, dy);
+  end;
 end;
 //------------------------------------------------------------------------------
 
 function TSvgASegLayer.GetStringDef: string;
 var
-  a: double;
-  pt: TPointD;
+  a, a1,a2: double;
 begin
   with fArcInfo do
   begin
     //descaled radii
     if Owner.fRelativeStr then Result := 'a ' else Result := 'A ';
 
-    Result := Result + AsFloatStr(rec.Width/(Owner.Scale *2), 2, true);
-    Result := Result + AsFloatStr(rec.Height/(Owner.Scale *2), 2, false);
+    Result := Result + AsFloatStr(rec.Width/(Owner.Scale *2), 2) + ',';
+    Result := Result + AsFloatStr(rec.Height/(Owner.Scale *2), 2) + ' ';
     //angle as degrees
-    Result := Result + AsIntStr(RadToDeg(angle));
+    Result := Result + AsIntStr(RadToDeg(rectAngle));
+
+    a1 := GetStartAngle;
+    a2 := GetEndAngle;
 
     //large arce and direction flags
-    if fArcInfo.endAngle < fArcInfo.startAngle then
-      a := endAngle + angle360 - startAngle else
-      a := endAngle - startAngle;
-    if sweepFlag then
+    a := a2 - a1;
+    if a < 0 then a := a + angle360;
+
+    if sweepClockW then
     begin
       if a  > angle180 then
         Result := Result + '1 1 ' else
@@ -640,50 +657,37 @@ begin
         Result := Result + '1 0 ';
     end;
     //descaled and de-offset end position
-    pt := GetPtOnEllipseFromAngle(rec, endAngle);
 
     if Owner.fRelativeStr then
-      Result := Result + AsPointStr(pt, fCtrlPts[0], 2) else
-      Result := Result + AsPointStr(pt, NullPointD, 2);
+      Result := Result + Owner.AsPointStr(endPos, startPos, 2) else
+      Result := Result + Owner.AsPointStr(endPos, NullPointD, 2);
 
   end;
 end;
 //------------------------------------------------------------------------------
 
-function TSvgASegLayer.GetStartAngleBtnPos: TPointD;
-begin
-  with fArcInfo do
-    Result := GetPtOnRotatedEllipseFromAngle(rec, angle, startAngle);
-end;
-//------------------------------------------------------------------------------
-
-function TSvgASegLayer.GetEndAngleBtnPos: TPointD;
-begin
-  with fArcInfo do
-    Result := GetPtOnRotatedEllipseFromAngle(rec, angle, endAngle);
-end;
-//------------------------------------------------------------------------------
-
-function TSvgASegLayer.GetHorzSizeBtnPos: TPointD;
+function TSvgASegLayer.GetStartAngle: double;
+var
+  pt: TPointD;
 begin
   with fArcInfo do
   begin
-    if fHorzLeft then
-      Result := PointD(rec.Left - ArcRectMargin, rec.MidPoint.Y) else
-      Result := PointD(rec.Right + ArcRectMargin, rec.MidPoint.Y);
-    if angle <> 0 then RotatePoint(Result, rec.MidPoint, angle);
+    pt := startPos;
+    Img32.Vector.RotatePoint(pt, rec.MidPoint, -rectAngle);
+    Result := GetEllipticalAngleFromPoint(rec, pt);
   end;
 end;
 //------------------------------------------------------------------------------
 
-function TSvgASegLayer.GetVertSizeBtnPos: TPointD;
+function TSvgASegLayer.GetEndAngle: double;
+var
+  pt: TPointD;
 begin
   with fArcInfo do
   begin
-    if fVertTop then
-      Result := PointD(rec.MidPoint.X, rec.Top - ArcRectMargin) else
-      Result := PointD(rec.MidPoint.X, rec.Bottom + ArcRectMargin);
-    if angle <> 0 then RotatePoint(Result, rec.MidPoint, angle);
+    pt := endPos;
+    Img32.Vector.RotatePoint(pt, rec.MidPoint, -rectAngle);
+    Result := GetEllipticalAngleFromPoint(rec, pt);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -700,9 +704,9 @@ begin
   SetLength(Result, 4);
   with fArcInfo do
   begin
-    Result[0] := GetStartAngleBtnPos;
-    GetRectSizePositions(Result[1], Result[2]);
-    Result[3] := GetEndAngleBtnPos;
+    Result[0] := startPos;
+    GetRectBtnPoints(Result[1], Result[2]);
+    Result[3] := endPos;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -757,7 +761,8 @@ begin
   r := ArcInfo.rec;
   mp := r.MidPoint;
   pt := PointD(movedBtn.MidPoint.X + moveDx, movedBtn.MidPoint.Y + moveDy);
-  img32.Vector.RotatePoint(pt, mp, -fArcInfo.angle);
+  img32.Vector.RotatePoint(pt, mp, -fArcInfo.rectAngle);
+
   //see GetBtnCtrlPts() for button order
   case TButtonDesignerLayer32(movedBtn).BtnIdx of
     1:                                //rect horz
@@ -785,7 +790,7 @@ begin
       Exit;
     end;
   end;
-  img32.Vector.RotatePoint(pt, mp, fArcInfo.angle);
+  img32.Vector.RotatePoint(pt, mp, fArcInfo.rectAngle);
   moveDx := Round(pt.X - movedBtn.MidPoint.X);
   moveDy := Round(pt.Y - movedBtn.MidPoint.Y);
 end;
@@ -793,68 +798,82 @@ end;
 
 procedure TSvgASegLayer.UpdateBtnGroup(movedBtn: TLayer32);
 var
-  d,dx,dy: double;
-  r: TRectD;
-  mp, mp2, sp, sp2: TPointD;
+  sa,ea, d,dx,dy: double;
+  mp, sp: TPointD;
   designer  : TDesignerLayer32;
 begin
   designer := GetDesignerLayer(movedBtn);
   if not Assigned(designer) then Exit;
-
-  r := fArcInfo.rec;
-  mp := r.MidPoint;
-  mp2 := movedBtn.MidPoint;
-  img32.Vector.RotatePoint(mp2, mp, - fArcInfo.angle);
+  mp := movedBtn.MidPoint;
 
   case TButtonDesignerLayer32(movedBtn).BtnIdx of
     1:                                //rect horz
       begin
-        if fHorzLeft then
-          d := (mp2.X + ArcRectMargin - r.Left) else
-          d := (r.Right + ArcRectMargin - mp2.X);
-        if d = 0 then Exit;
-
-        //save the start point before resizing rect
-        //then after resizing, realign the rect so
-        //the start point doesn't change
-        sp  := Paths[0][0];
-        fArcInfo.rec.Left := fArcInfo.rec.Left + d;
-        fArcInfo.rec.Right := fArcInfo.rec.Right - d;
-        sp2 := GetStartAngleBtnPos;
-        dx := sp.X - sp2.X; dy := sp.Y - sp2.Y;
-        OffsetRect(fArcInfo.rec, dx, dy);
-        movedBtn.Offset(Round(dx), Round(dy));
-
+        with fArcInfo do
+        begin
+          img32.Vector.RotatePoint(mp, rec.MidPoint, - rectAngle);
+          if fHorzLeft then
+            d := (mp.X + ArcRectMargin - rec.Left) else
+            d := (rec.Right + ArcRectMargin - mp.X);
+          d := d/2;
+          if d = 0 then Exit;
+          //save the start point before resizing rect
+          //then after resizing, realign the rect so
+          //the start point doesn't change
+          sa := GetStartAngle;
+          ea := GetEndAngle;
+          rec.Left := rec.Left + d;
+          rec.Right := rec.Right - d;
+          sp := GetPtOnRotatedEllipseFromAngle(rec, rectAngle, sa);
+          endPos := GetPtOnRotatedEllipseFromAngle(rec, rectAngle, ea);
+          dx := startPos.X - sp.X; dy := startPos.Y - sp.Y;
+          OffsetRect(fArcInfo.rec, dx, dy);
+          endPos := OffsetPoint(endPos, dx, dy);
+        end;
+        fCtrlPts := GetBtnCtrlPts;  //todo check if needed
         FlattenPath;
         DrawPath;
         DrawDesigner(designer);
-        movedBtn.Parent[3].PositionCenteredAt(GetVertSizeBtnPos);
-        movedBtn.Parent[4].PositionCenteredAt(GetEndAngleBtnPos);
+        movedBtn.PositionCenteredAt(fCtrlPts[1]);
+        movedBtn.Parent[3].PositionCenteredAt(fCtrlPts[2]);
+        movedBtn.Parent[4].PositionCenteredAt(fArcInfo.endPos);
       end;
     2:                                //rect vert
       begin
-        if fVertTop then
-          d := (mp2.Y + ArcRectMargin - r.Top) else
-          d := (r.Bottom + ArcRectMargin - mp2.Y);
-        if d = 0 then Exit;
+        with fArcInfo do
+        begin
+          img32.Vector.RotatePoint(mp, rec.MidPoint, - rectAngle);
+          if fVertTop then
+            d := (mp.Y + ArcRectMargin - rec.Top) else
+            d := (rec.Bottom + ArcRectMargin - mp.Y);
+          if d = 0 then Exit;
 
-        sp  := Paths[0][0];
-        fArcInfo.rec.Top := fArcInfo.rec.Top + d;
-        fArcInfo.rec.Bottom := fArcInfo.rec.Bottom - d;
-        sp2 := GetStartAngleBtnPos;
-        dx := sp.X - sp2.X; dy := sp.Y - sp2.Y;
-        OffsetRect(fArcInfo.rec, dx, dy);
-        movedBtn.Offset(Round(dx),Round(dy));
-
+          //save the start point before resizing rect
+          //then after resizing, realign the rect so
+          //the start point doesn't change
+          sa := GetStartAngle;
+          ea := GetEndAngle;
+          rec.Top := rec.Top + d;
+          rec.Bottom := rec.Bottom - d;
+          sp := GetPtOnRotatedEllipseFromAngle(rec, rectAngle, sa);
+          dx := (startpos.X - sp.X); dy:= (startpos.Y - sp.Y);
+          OffsetRect(rec, dx, dy);
+          endPos := GetPtOnRotatedEllipseFromAngle(rec, rectAngle, ea);
+        end;
+        fCtrlPts := GetBtnCtrlPts;  //todo check if needed
         FlattenPath;
         DrawPath;
         DrawDesigner(designer);
-        movedBtn.Parent[2].PositionCenteredAt(GetHorzSizeBtnPos);
-        movedBtn.Parent[4].PositionCenteredAt(GetEndAngleBtnPos);
+        movedBtn.PositionCenteredAt(fCtrlPts[2]);
+        movedBtn.Parent[2].PositionCenteredAt(fCtrlPts[1]);
+        movedBtn.Parent[4].PositionCenteredAt(fArcInfo.endPos);
       end;
     3:
       begin
-        fArcInfo.endAngle := GetEllipticalAngleFromPoint(r, mp2);
+        with fArcInfo do
+        begin
+          endPos := GetClosestPtOnRotatedEllipse(rec, rectAngle, mp);
+        end;
         FlattenPath;
         DrawPath;
       end;
@@ -866,28 +885,32 @@ end;
 function TSvgASegLayer.CreateRotateBtnGroup(target: TSegBaseLayer): TRotatingGroupLayer32;
 begin
   Result := inherited CreateRotateBtnGroup(target);
-  fRotAngle := fArcInfo.angle;
+  fRotAngle := fArcInfo.rectAngle;
 end;
 //------------------------------------------------------------------------------
 
 procedure TSvgASegLayer.UpdateRotateBtnGroup(movedBtn: TLayer32);
 var
-  a, dx, dy: double;
-  sp,sp2: TPointD;
+  a, sa, ea, dx, dy: double;
+  sp: TPointD;
 begin
   if not (movedBtn.Parent is TRotatingGroupLayer32) then Exit;
   a := UpdateRotatingButtonGroup(movedBtn);
   if a = 0 then Exit;
 
-  //save the start point before rotating rect
+  //save the start angle before rotating rect
   //then after rotating, realign the rect so
   //the start point doesn't change
-  sp  := Paths[0][0];
-  fArcInfo.angle := fRotAngle + a;
-  sp2 := GetStartAngleBtnPos;
-  dx := sp.X - sp2.X; dy := sp.Y - sp2.Y;
-  OffsetRect(fArcInfo.rec, dx, dy);
-
+  sa := GetStartAngle;
+  ea := GetEndAngle;
+  with fArcInfo do
+  begin
+    rectAngle := fRotAngle + a;
+    sp := GetPtOnRotatedEllipseFromAngle(rec, rectAngle, sa);
+    dx := sp.X - startPos.X; dy := sp.Y - startPos.Y;
+    OffsetRect(rec, -dx, -dy);
+    endPos := GetPtOnRotatedEllipseFromAngle(rec, rectAngle, ea);
+  end;
   FlattenPath;
   DrawPath;
   Invalidate(Bounds);
@@ -898,14 +921,17 @@ end;
 procedure TSvgASegLayer.FlattenPath;
 var
   p: TPathD;
+  a1,a2: double;
 begin
   with fArcInfo do
   begin
-    if not sweepFlag then
-      p := Arc(rec, endAngle, startAngle) else
-      p := Arc(rec, startAngle, endAngle);
-    if angle <> 0 then
-      p := RotatePath(p, rec.MidPoint, angle);
+    a1 := GetStartAngle;
+    a2 := GetEndAngle;
+    if not sweepClockW then
+      p := Arc(rec, a2, a1) else
+      p := Arc(rec, a1, a2);
+    if rectAngle <> 0 then
+      p := RotatePath(p, rec.MidPoint, rectAngle);
   end;
   Paths := Img32.Vector.Paths(p);
 end;
@@ -923,19 +949,20 @@ begin
 
   r2 := r;
   InflateRect(r2, dpiAware1, dpiAware1);
-  if fArcInfo.angle = 0 then
+  if fArcInfo.rectAngle = 0 then
   begin
     designer.SetBounds(Rect(r2));
     OffsetRect(r, - designer.Left, -designer.Top);
-    DrawDashedLine(designer.Image, Rectangle(r), [j,j],
+    DrawDashedLine(designer.Image, Ellipse(r), [j,j],
       nil, dpiAware1, clMaroon32, esPolygon);
   end else
   begin
     p := Rectangle(r2);
-    p := RotatePath(p, r2.MidPoint, fArcInfo.angle);
+    p := RotatePath(p, r2.MidPoint, fArcInfo.rectAngle);
     designer.SetBounds(Rect(Img32.Vector.GetBoundsD(p)));
-    p := Rectangle(r);
-    p := RotatePath(p, r2.MidPoint, fArcInfo.angle);
+
+    p := Ellipse(r);
+    p := RotatePath(p, r2.MidPoint, fArcInfo.rectAngle);
     p := OffsetPath(p, - designer.Left, -designer.Top);
     DrawDashedLine(designer.Image, p, [j,j],
       nil, dpiAware1, clMaroon32, esPolygon);
@@ -957,14 +984,14 @@ begin
     relPt := fCtrlPts[0];
     for i := 1 to High(fCtrlPts) do
     begin
-      Result := Result + AsPointStr(fCtrlPts[i], relPt, 2);
+      Result := Result + Owner.AsPointStr(fCtrlPts[i], relPt, 2);
       if (i mod 3) = 0 then relPt := fCtrlPts[i];
     end;
   end else
   begin
     Result := 'C ';
     for i := 1 to High(fCtrlPts) do
-      Result := Result + AsPointStr(fCtrlPts[i], NullPointD, 2);
+      Result := Result + Owner.AsPointStr(fCtrlPts[i], NullPointD, 2);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1037,13 +1064,13 @@ begin
     for i := 1 to High(fCtrlPts) do
     begin
       dx := (fCtrlPts[i].X - fCtrlPts[i-1].X)/fOwner.Scale;
-      Result := Result + AsFloatStr(dx, 2, false);
+      Result := Result + AsFloatStr(dx, 2) + ' ';
     end;
   end else
   begin
     Result := 'H ';
     for i := 1 to High(fCtrlPts) do
-      Result := Result + AsFloatStr(fCtrlPts[i].X, 2, false);
+      Result := Result + AsFloatStr(fCtrlPts[i].X, 2) + ' ';
   end;
 end;
 
@@ -1062,14 +1089,14 @@ begin
     Result := 'l ';
     for i := 1 to High(fCtrlPts) do
     begin
-      Result := Result + AsPointStr(fCtrlPts[i], relPt, 2);
+      Result := Result + Owner.AsPointStr(fCtrlPts[i], relPt, 2);
       relPt := fCtrlPts[i];
     end;
   end else
   begin
     Result := 'L ';
     for i := 1 to High(fCtrlPts) do
-      Result := Result + AsPointStr(fCtrlPts[i], NullPointD, 2);
+      Result := Result + Owner.AsPointStr(fCtrlPts[i], NullPointD, 2);
   end;
 end;
 
@@ -1088,14 +1115,14 @@ begin
     Result := 'q ';
     for i := 1 to High(fCtrlPts) do
     begin
-      Result := Result + AsPointStr(fCtrlPts[i], relPt, 2);
+      Result := Result + Owner.AsPointStr(fCtrlPts[i], relPt, 2);
       if (i mod 2) = 0 then relPt := fCtrlPts[i];
     end;
   end else
   begin
     Result := 'Q ';
     for i := 1 to High(fCtrlPts) do
-      Result := Result + AsPointStr(fCtrlPts[i], NullPointD, 2);
+      Result := Result + Owner.AsPointStr(fCtrlPts[i], NullPointD, 2);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1173,14 +1200,14 @@ begin
     Result := 's ';
     for i := 2 to High(fCtrlPts) do
     begin
-      Result := Result + AsPointStr(fCtrlPts[i], relPt, 2);
+      Result := Result + Owner.AsPointStr(fCtrlPts[i], relPt, 2);
       if (i mod 2 = 1) then relPt := fCtrlPts[i];
     end;
   end else
   begin
     Result := 'S ';
     for i := 2 to High(fCtrlPts) do
-      Result := Result + AsPointStr(fCtrlPts[i], NullPointD, 2);
+      Result := Result + Owner.AsPointStr(fCtrlPts[i], NullPointD, 2);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1245,6 +1272,18 @@ end;
 // TSvgTSegLayer
 //------------------------------------------------------------------------------
 
+function TSvgTSegLayer.CreateBtnGroup: TButtonGroupLayer32;
+begin
+  Result := inherited CreateBtnGroup;
+  //nb: don't forget there's a designer layer inside this TButtonGroupLayer32
+  with TButtonDesignerLayer32(Result[2]) do
+  begin
+    Visible := False;
+    Move(Result, Index -1);
+  end;
+end;
+//------------------------------------------------------------------------------
+
 function  TSvgTSegLayer.GetStringDef: string;
 var
   i: integer;
@@ -1256,14 +1295,14 @@ begin
     Result := 't ';
     for i := 2 to High(fCtrlPts) do
     begin
-      Result := Result + AsPointStr(fCtrlPts[i], relPt, 2);
+      Result := Result + Owner.AsPointStr(fCtrlPts[i], relPt, 2);
       relPt := fCtrlPts[i];
     end;
   end else
   begin
     Result := 'T ';
     for i := 2 to High(fCtrlPts) do
-      Result := Result + AsPointStr(fCtrlPts[i], NullPointD, 2);
+      Result := Result + Owner.AsPointStr(fCtrlPts[i], NullPointD, 2);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1295,13 +1334,13 @@ begin
     for i := 1 to High(fCtrlPts) do
     begin
       dy := (fCtrlPts[i].Y - fCtrlPts[i-1].Y)/fOwner.Scale;
-      Result := Result + AsFloatStr(dy, 2, false);
+      Result := Result + AsFloatStr(dy, 2) + ' ';
     end;
   end else
   begin
     Result := 'V ';
     for i := 1 to High(fCtrlPts) do
-      Result := Result + AsFloatStr(fCtrlPts[i].Y, 2, false);
+      Result := Result + AsFloatStr(fCtrlPts[i].Y, 2) + ' ';
   end;
 end;
 
@@ -1344,9 +1383,35 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TSvgSubPathLayer.GetStringDef: string;
+var
+  i: integer;
+begin
+  Result := 'M ' +
+    AsFloatStr(fStartPos.X, 2) + ',' +
+    AsFloatStr(fStartPos.Y, 2) + ' ';
+
+  for i := 0 to ChildCount -1 do
+    if Child[i] is TSegBaseLayer then
+      Result := Result + TSegBaseLayer(Child[i]).GetStringDef;
+end;
+//------------------------------------------------------------------------------
+
 function TSvgSubPathLayer.GetSegLayer(index: integer): TSegBaseLayer;
 begin
   Result := Child[index] as TSegBaseLayer;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgSubPathLayer.GetLastSegLayer: TSegBaseLayer;
+var
+  i: integer;
+begin
+  i := ChildCount -1;
+  while (i >= 0) and not
+    (Child[i] is TSegBaseLayer) do dec(i);
+  if i < 0 then Result := nil
+  else Result := TSegBaseLayer(Child[i]);
 end;
 
 //------------------------------------------------------------------------------
@@ -1354,16 +1419,18 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TSvgPathLayer.Init(svgPath: TSvgPath;
-  scale: double; const offset: TPoint);
+  scale: double; offsetX, offsetY: integer);
 var
   i       : integer;
   subPath : TSvgSubPathLayer;
 begin
   if not Assigned(svgPath) then Exit;
 
+  ClearChildren; //in case of reusing
+
+  PositionAt(offsetX, offsetY);
   fSvgPath      := svgPath;
   fScale        := scale;
-  fOffset       := offset;
   fStrokeWidth  := DPIAware(5);
   fStrokeColor  := clBlack32;
   fStrokeColor2 := $FFCC0000;
@@ -1395,7 +1462,6 @@ begin
           if Child[i][j] is TSegBaseLayer then
             TSegBaseLayer(Child[i][j]).ScaleAndOffset(scale, dx, dy);
   fScale := fScale * scale;
-  fOffset.Offset(dx, dy);
   Invalidate(Image.Bounds);
 end;
 //------------------------------------------------------------------------------
@@ -1415,6 +1481,26 @@ end;
 function TSvgPathLayer.GetSubPathLayer(index: integer): TSvgSubPathLayer;
 begin
   Result := Child[index] as TSvgSubPathLayer;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgPathLayer.AsPointStr(pt: TPointD;
+  const relPt: TPointD; precision: integer): string;
+var
+  delta: TPointD;
+  s1, s2: string;
+begin
+  pt.x := (pt.x - Location.X) /Scale;
+  pt.y := (pt.y - Location.Y) /Scale;
+  if fRelativeStr then
+  begin
+    delta.X := (relPt.X - Location.X) /Scale;
+    delta.Y := (relPt.Y - Location.Y) /Scale;
+    pt := OffsetPoint(pt, -delta.X, -delta.Y);
+  end;
+  s1 := TrimTrailingZeros(Format('%1.*f', [precision, pt.x]));
+  s2 := TrimTrailingZeros(Format('%1.*f', [precision, pt.y]));
+  Result := s1 + ',' + s2 + ' ';
 end;
 //------------------------------------------------------------------------------
 

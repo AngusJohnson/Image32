@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  3.4                                                             *
-* Date      :  2 October 2021                                                  *
+* Date      :  12 October 2021                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -217,10 +217,10 @@ type
 
   TArcInfo = record
     rec         : TRectD;
-    angle       : double;
-    startAngle  : double;
-    endAngle    : double;
-    sweepFlag   : Boolean;
+    startPos    : TPointD;
+    endPos      : TPointD;
+    rectAngle   : double;
+    sweepClockW : Boolean;
   end;
   TArcInfos = array of TArcInfo;
 
@@ -403,7 +403,7 @@ type
 
   procedure GetSvgFontInfo(const value: UTF8String; var fontInfo: TSVGFontInfo);
   function GetSvgArcInfo(const p1, p2: TPointD; radii: TPointD; phi_rads: double;
-    fA, fS: boolean; out startAngle, endAngle: double; out rec: TRectD): Boolean;
+    fA, fS: boolean; out rec: TRectD): Boolean;
   function HtmlDecode(const html: UTF8String): UTF8String;
 
   function GetXmlEncoding(memory: Pointer; len: integer): TSvgEncoding;
@@ -2179,10 +2179,10 @@ end;
 
 function TSvgASegment.Parse(var c, endC: PUTF8Char; isRelative: Boolean): TPointD;
 var
-  a: double;
-  pt, currPt, radii: TPointD;
-  i, arc, sweep: integer;
-  rec2: TRectD;
+  a     : double;
+  rec2  : TRectD;
+  pt, currPt, radii : TPointD;
+  i, arc, sweepCW   : integer;
 begin
   if isRelative then
     Result := ctrlPts[0] else
@@ -2193,17 +2193,18 @@ begin
     Parse2Num(c, endC, radii, InvalidPointD) and
     ParseNextNum(c, endC, true, a) and
     GetSingleDigit(c, endC, arc) and
-    GetSingleDigit(c, endC, sweep) and
+    GetSingleDigit(c, endC, sweepCW) and
     Parse2Num(c, endC, currPt, Result) do
   begin
     i := Length(arcInfos);
     SetLength(arcInfos, i+1);
     with arcInfos[i] do
     begin
-      sweepFlag := sweep <> 0;
-      angle := DegToRad(a);
-      GetSvgArcInfo(pt, currPt, radii, angle,
-        arc <> 0, sweepFlag, startAngle, endAngle, rec);
+      startPos    := pt;
+      endPos      := currPt;
+      sweepClockW := sweepCW <> 0;
+      rectAngle   := DegToRad(a);
+      GetSvgArcInfo(pt, currPt, radii, rectAngle, arc <> 0, sweepClockW, rec);
       if isRelative then Result := currPt;
     end;
     pt := currPt;
@@ -2217,20 +2218,23 @@ end;
 procedure TSvgASegment.GetFlattenedInternal;
 var
   i: integer;
+  a1,a2: double;
   p: TPathD;
 begin
   fFlatPath := nil;
   for i := 0 to High(arcInfos) do
     with arcInfos[i] do
     begin
-      if not sweepFlag then
+      a1 := getAngle(rec.MidPoint, startPos) - rectAngle;
+      a2 := getAngle(rec.MidPoint, endPos) - rectAngle;
+      if not sweepClockW then
       begin
-        p := Arc(rec, endAngle, startAngle, 1);
+        p := Arc(rec, a2, a1, 1);
         p := ReversePath(p);
       end else
-        p := Arc(rec, startAngle, endAngle, 1);
-      if angle <> 0 then
-        p := RotatePath(p, rec.MidPoint, angle);
+        p := Arc(rec, a1, a2, 1);
+      if rectAngle <> 0 then
+        p := RotatePath(p, rec.MidPoint, rectAngle);
       AppendPath(fFlatPath, p);
     end;
 end;
@@ -2467,17 +2471,17 @@ begin
     Result := ctrlPts[0] else
     Result := InvalidPointD;
 
+  currPt := ctrlPts[0];
   pt := ReflectPoint(GetPreviousCtrlPt, currPt);
   AddCtrlPoint(pt);
   while IsNumPending(c, endC, true) and
     Parse2Num(c, endC, currPt, Result) do
   begin
+    lastCtrlPt := pt;
     AddCtrlPoint(currPt);
-    if isRelative then Result := currPt;
+    pt := ReflectPoint(lastCtrlPt, currPt);
   end;
-
-  //this isn't strictly correct but it's very rarely an issue ...
-  lastCtrlPt := currPt;
+  if isRelative then Result := currPt;
 
   Result := currPt;
   SetLength(ctrlPts, fPathLen);
@@ -2663,12 +2667,17 @@ end;
 function TSvgPath.GetControlBounds: TRectD;
 var
   i,j: integer;
+  p: TPathD;
 begin
+  p := nil;
   Result := NullRectD;
   for i := 0 to Count -1 do
     with fSubPaths[i] do
       for j := 0 to High(segs) do
-        Result := Img32.Vector.UnionRect(Result, GetBoundsD(segs[j].ctrlPts));
+        AppendPath(p, segs[j].ctrlPts);
+
+  p := Img32.Vector.Grow(p, nil, 1, jsSquare, 0);
+  Result := GetBoundsD(p);
 end;
 //------------------------------------------------------------------------------
 
@@ -2985,12 +2994,12 @@ end;
 
 //https://stackoverflow.com/a/12329083
 function GetSvgArcInfo(const p1, p2: TPointD; radii: TPointD;
-  phi_rads: double; fA, fS: boolean;
-  out startAngle, endAngle: double; out rec: TRectD): Boolean;
+  phi_rads: double; fA, fS: boolean; out rec: TRectD): Boolean;
 var
   x1_, y1_, rxry, rxy1_, ryx1_, s_phi, c_phi: double;
   hd_x, hd_y, hs_x, hs_y, sum_of_sq, lambda, coe: double;
   cx, cy, cx_, cy_, xcr1, xcr2, ycr1, ycr2, deltaAngle: double;
+  p3: TPointD;
 begin
     Result := false;
     if (radii.X < 0) then radii.X := -radii.X;
@@ -3039,27 +3048,10 @@ begin
     ycr1 := (y1_ - cy_) / radii.Y;
     ycr2 := (y1_ + cy_) / radii.Y;
 
-    // F6.5.5
-    startAngle := Radian2(xcr1, ycr1);
-
-    // F6.5.6
-    deltaAngle := Radian4(xcr1, ycr1, -xcr2, -ycr2);
-
     rec.Left := cx - radii.X;
     rec.Right := cx + radii.X;
     rec.Top := cy - radii.Y;
     rec.Bottom := cy + radii.Y;
-
-    NormalizeAngle(startAngle);
-    endAngle := startAngle + deltaAngle;
-    NormalizeAngle(endAngle);
-
-    if not ClockwiseRotationIsAnglePositive then
-    begin
-      startAngle := -startAngle;
-      endAngle := -endAngle;
-    end;
-
     Result := true;
 end;
 

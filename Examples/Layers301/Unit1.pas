@@ -89,6 +89,7 @@ type
     buttonGroup   : TGroupLayer32;
     clickPoint    : TPoint;
 
+
     //this just speeds up clip resizing
     delayedMovePending : Boolean;
     delayedShift       : TShiftState;
@@ -104,8 +105,9 @@ type
   end;
 
 var
-  MainForm: TMainForm;
-  glyphs: TGlyphCache;
+  MainForm    : TMainForm;
+  glyphs      : TGlyphCache;
+  hsl         : THsl;
 
 const
   clBtnFace32 = $FFEAEAEA;
@@ -118,7 +120,6 @@ uses
   Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.SVG, Img32.Vector, Img32.Extra;
 
 //------------------------------------------------------------------------------
-//
 //------------------------------------------------------------------------------
 
 function MakeStar(const rec: TRect; IndentFrac: double = 0.4): TPathsD;
@@ -136,9 +137,17 @@ end;
 // TMyVectorLayer32
 //------------------------------------------------------------------------------
 
-constructor TMyVectorLayer32.Create(parent: TLayer32; const name: string = '');
+function CountAll(layer: TLayer32): integer;
 var
-  hsl: THsl;
+  i: integer;
+begin
+  Result := 1;
+  for I := 0 to layer.ChildCount -1 do
+    inc(Result, CountAll(layer[i]));
+end;
+//------------------------------------------------------------------------------
+
+constructor TMyVectorLayer32.Create(parent: TLayer32; const name: string = '');
 begin
   inherited;
 
@@ -146,11 +155,8 @@ begin
   useRandomColors := true;//false;//
   if useRandomColors then
   begin
-    hsl.hue := Random(256);
-    hsl.sat := 240;
-    hsl.lum := 180;
-    hsl.Alpha := 255;
-    BrushColor := HslToRgb(hsl)
+    hsl.hue := (hsl.hue + 23) mod 256;
+    BrushColor := HslToRgb(hsl);
   end else
     BrushColor := clBtnFace32;
 
@@ -275,6 +281,12 @@ var
   fr: TFontReader;
 begin
   Randomize;
+
+  hsl.hue := Random(256);
+  hsl.sat := 240;
+  hsl.lum := 180;
+  hsl.Alpha := 255;
+
   Application.OnIdle := AppOnIdle;
 
   self.OnMouseDown := pnlMainMouseDown;

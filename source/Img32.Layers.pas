@@ -2,8 +2,8 @@ unit Img32.Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.3                                                             *
-* Date      :  21 September 2021                                               *
+* Version   :  3.4                                                             *
+* Date      :  12 October 2021                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -66,7 +66,7 @@ type
     fCursorId       : integer;
     fUserData       : TObject;
     fBlendFunc      : TBlendFunction;
-    fOldBounds      : TRect;    //bounds at last layer merge
+    fOldBounds      : TRect;    //bounds when layer was last merged
     fRefreshPending : boolean;
     fLayeredImage   : TLayeredImage32;
     fParent         : TLayer32;
@@ -80,7 +80,6 @@ type
     fClipPath       : TPathsD;
     function   TopLeft: TPoint;
     function   GetMidPoint: TPointD;
-    function   GetLocation: TPoint;
     procedure  SetVisible(value: Boolean);
     function   GetHeight: integer;
     function   GetWidth: integer;
@@ -149,7 +148,7 @@ type
     property   Image: TImage32 read fImage;
     property   Index: integer read fIndex;
     property   Left: integer read fLeft;
-    property   Location: TPoint read GetLocation;
+    property   Location: TPoint read TopLeft;
     property   MidPoint: TPointD read GetMidPoint;
     property   Name: string read fName write fName;
     property   Opacity: Byte read fOpacity write SetOpacity;
@@ -539,6 +538,7 @@ begin
   fVisible      := True;
   fOpacity      := 255;
   CursorId      := crDefault;
+  fInvalidRect  := NullRect;
   if assigned(parent) then
     fLayeredImage := parent.fLayeredImage;
 end;
@@ -644,12 +644,6 @@ end;
 function TLayer32.GetMidPoint: TPointD;
 begin
   Result := Img32.Vector.MidPoint(RectD(Bounds));
-end;
-//------------------------------------------------------------------------------
-
-function   TLayer32.GetLocation: TPoint;
-begin
-  Result := Types.Point(fLeft, fTop);
 end;
 //------------------------------------------------------------------------------
 
@@ -759,7 +753,7 @@ end;
 
 function TLayer32.TopLeft: TPoint;
 begin
-  Result := Types.Point(Left, Top);
+  Result := Types.Point(fLeft, fTop);
 end;
 //------------------------------------------------------------------------------
 
@@ -970,38 +964,43 @@ end;
 procedure TLayer32.PreMerge(hideDesigners: Boolean);
 var
   i         : integer;
-  rec       : TRect;
   childLayer: TLayer32;
 begin
+  fInvalidRect := NullRect;
   //this method is recursive and updates each group's fInvalidRect
   for i := 0 to ChildCount -1 do
   begin
     childLayer := Child[i];
-
-    if not childLayer.Visible or
-      (hideDesigners and (childLayer is TDesignerLayer32)) then
-        Continue;
-
-    fInvalidRect := Img32.Vector.UnionRect(fInvalidRect,
-      childLayer.fInvalidRect);
-
     with childLayer do
-      if HasChildren and fRefreshPending then
-        PreMerge(hideDesigners);
-
-    if childLayer.fRefreshPending then
     begin
-      if (childLayer is TGroupLayer32) then
+      if not Visible or
+        ((childLayer is TDesignerLayer32) and hideDesigners) then
+          Continue;
+
+      if fRefreshPending then
       begin
-        fInvalidRect := Img32.Vector.UnionRect(fInvalidRect, childLayer.Bounds);
-        childLayer.UpdateBounds;
+        //get childLayer's 'old' Bounds
+        Self.fInvalidRect :=
+          Img32.Vector.UnionRect(Self.fInvalidRect, fInvalidRect);
+        if HasChildren then
+          PreMerge(hideDesigners);
+
+        //get childLayer's new Bounds
+        if (childLayer is TGroupLayer32) then
+        begin
+          UpdateBounds;
+          Self.fInvalidRect :=
+            Img32.Vector.UnionRect(Self.fInvalidRect, fInvalidRect);
+        end else
+          //todo: this can be improved
+          Self.fInvalidRect :=
+            Img32.Vector.UnionRect(Self.fInvalidRect, Bounds);
       end;
-      rec := childLayer.Bounds;
-      fInvalidRect := Img32.Vector.UnionRect(fInvalidRect, rec);
+
+      fInvalidRect := NullRect;
+      fOldBounds := Bounds;
     end;
 
-    childLayer.fInvalidRect := NullRect;
-    childLayer.fOldBounds := childLayer.Bounds;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1052,7 +1051,7 @@ begin
       fMergeImage.Assign(fImage);
     img := fMergeImage;
   end else
-    img := Image;
+    img := fImage;
 
   if (self is TGroupLayer32) then
     origOffset := TopLeft else
@@ -1069,7 +1068,7 @@ begin
 
     //recursive merge
     if (childLayer.HasChildren) then
-      TLayer32(childLayer).Merge(hideDesigners, NullRect);
+      TLayer32(childLayer).Merge(hideDesigners, updateRect);
 
     if Assigned(childLayer.fMergeImage) then
       childImg := childLayer.fMergeImage else
@@ -1079,8 +1078,7 @@ begin
     begin
       dstRect := childLayer.Bounds;
       Types.OffsetRect(dstRect, -origOffset.X, -origOffset.Y);
-      rec := Image.Bounds;
-      Types.IntersectRect(dstRect, dstRect, rec);
+      Types.IntersectRect(dstRect, dstRect, Image.Bounds);
     end else
     begin
       //this must be the root layer
@@ -1093,7 +1091,7 @@ begin
     with childLayer do
       Types.OffsetRect(srcRect, origOffset.X - Left, origOffset.Y - Top);
 
-    //draw the child  onto the group's image
+    //draw the child  onto the parent's image
     img2 := nil;
     img.BlockNotify;
     try
@@ -1375,7 +1373,6 @@ begin
   inherited;
   fMargin := dpiAware1 *2;
   fCursorId := crHandPoint;
-  fHitTest.enabled := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -1967,13 +1964,21 @@ begin
 
   with Root do
   begin
+    //get 'old bounds' that need erasing
+    updateRect := fInvalidRect;
     //PreMerge resizes (and clears) invalidated groups
     if forceRefresh then PreMergeAll(hideDesigners)
     else if fRefreshPending then PreMerge(hideDesigners);
 
     if forceRefresh then
-      updateRect := Self.Bounds else
-      Types.IntersectRect(updateRect, fInvalidRect, Self.Bounds);
+    begin
+      updateRect := Self.Bounds;
+    end else
+    begin
+      //and include 'new bounds' that need redrawing
+      updateRect := Img32.Vector.UnionRect(updateRect, fInvalidRect);
+      Types.IntersectRect(updateRect, updateRect, Self.Bounds);
+    end;
 
     fInvalidRect := NullRect;
     if IsEmptyRect(updateRect) then Exit;

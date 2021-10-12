@@ -2,8 +2,8 @@ unit Img32.Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.3                                                             *
-* Date      :  21 September 2021                                               *
+* Version   :  3.4                                                             *
+* Date      :  12 October 2021                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -211,6 +211,8 @@ type
   procedure DrawPoint(img: TImage32; const paths: TPathsD;
     radius: double; color: TColor32); overload;
 
+  procedure DrawLine(img: TImage32;
+    const pt1, pt2: TPointD; lineWidth: double; color: TColor32); overload;
   procedure DrawLine(img: TImage32;
     const line: TPathD; lineWidth: double; color: TColor32;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto;
@@ -1722,6 +1724,19 @@ var
 begin
   for i := 0 to high(paths) do
     DrawPoint(img, paths[i], radius, color);
+end;
+//------------------------------------------------------------------------------
+
+procedure DrawLine(img: TImage32;
+  const pt1, pt2: TPointD; lineWidth: double; color: TColor32);
+var
+  lines: TPathsD;
+begin
+  setLength(lines, 1);
+  setLength(lines[0], 2);
+  lines[0][0] := pt1;
+  lines[0][1] := pt2;
+  DrawLine(img, lines, lineWidth, color, esRound);
 end;
 //------------------------------------------------------------------------------
 

@@ -2,8 +2,8 @@ unit Img32.Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.3                                                             *
-* Date      :  21 September 2021                                               *
+* Version   :  3.4                                                             *
+* Date      :  12 October 2021                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -70,6 +70,12 @@ type
   function Ellipse(const rec: TRect; steps: integer = 0): TPathD; overload;
   function Ellipse(const rec: TRectD; steps: integer = 0): TPathD; overload;
   function Ellipse(const rec: TRectD; pendingScale: double): TPathD; overload;
+
+  function RotatedEllipse(const rec: TRectD; angle: double; steps: integer = 0): TPathD; overload;
+  function RotatedEllipse(const rec: TRectD; angle: double; pendingScale: double): TPathD; overload;
+
+  function AngleToEllipticalAngle(const ellRec: TRectD; angle: double): double;
+  function EllipticalAngleToAngle(const ellRec: TRectD; angle: double): double;
 
   function Circle(const pt: TPoint; radius: double): TPathD; overload;
   function Circle(const pt: TPointD; radius: double): TPathD; overload;
@@ -224,6 +230,7 @@ type
   function IsValid(value: double): Boolean; overload;
   function IsValid(const pt: TPoint): Boolean; overload;
   function IsValid(const pt: TPointD): Boolean; overload;
+  function IsValid(const rec: TRect): Boolean; overload;
 
   function Point(X,Y: Integer): TPoint; overload;
   function Point(const pt: TPointD): TPoint; overload;
@@ -343,8 +350,9 @@ const
   InvalidPoint  : TPoint  = (X: -MaxInt; Y: -MaxInt);
   InvalidPointD : TPointD = (X: -Infinity; Y: -Infinity);
 
-  NullRect: TRect = (left: 0; top: 0; right: 0; Bottom: 0);
-  NullRectD: TRectD = (left: 0; top: 0; right: 0; Bottom: 0);
+  NullRect      : TRect = (left: 0; top: 0; right: 0; Bottom: 0);
+  NullRectD     : TRectD = (left: 0; top: 0; right: 0; Bottom: 0);
+  InvalidRect   : TRect = (left: MaxInt; top: MaxInt; right: 0; Bottom: 0);
 
   BezierTolerance: double  = 0.25;
 var
@@ -495,6 +503,12 @@ end;
 function IsValid(const pt: TPointD): Boolean;
 begin
   result := (pt.X <> -Infinity) and (pt.Y <> -Infinity);
+end;
+//------------------------------------------------------------------------------
+
+function IsValid(const rec: TRect): Boolean;
+begin
+  result := (rec.Left <> MaxInt) and (rec.Top <> MaxInt);
 end;
 //------------------------------------------------------------------------------
 
@@ -2386,6 +2400,34 @@ begin
     delta :=  PointD(delta.X * cosA - delta.Y * sinA,
       delta.Y * cosA + delta.X * sinA);
   end; //rotates clockwise
+end;
+//------------------------------------------------------------------------------
+
+function RotatedEllipse(const rec: TRectD; angle: double; steps: integer = 0): TPathD;
+begin
+  Result := Ellipse(rec, steps);
+  if angle = 0 then Exit;
+  Result := RotatePath(Result, rec.MidPoint, angle);
+end;
+//------------------------------------------------------------------------------
+
+function RotatedEllipse(const rec: TRectD; angle: double; pendingScale: double): TPathD;
+begin
+  Result := Ellipse(rec, pendingScale);
+  if angle = 0 then Exit;
+  Result := RotatePath(Result, rec.MidPoint, angle);
+end;
+//------------------------------------------------------------------------------
+
+function AngleToEllipticalAngle(const ellRec: TRectD; angle: double): double;
+begin
+  Result := arctan2(ellRec.Height/ellRec.Width * sin(angle), cos(angle));
+end;
+//------------------------------------------------------------------------------
+
+function EllipticalAngleToAngle(const ellRec: TRectD; angle: double): double;
+begin
+  Result := ArcTan2(sin(angle) *ellRec.Width, cos(angle) * ellRec.Height);
 end;
 //------------------------------------------------------------------------------
 

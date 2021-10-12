@@ -119,7 +119,8 @@ uses
 
 const
   margin = 100;
-
+var
+  hsl: THsl;
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions
@@ -143,13 +144,8 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TMyVectorLayer32.InitRandomColors;
-var
-  hsl: THsl;
 begin
-  hsl.hue := Random(256);
-  hsl.sat := 240;
-  hsl.lum := 200;
-  hsl.Alpha := 128;
+  hsl.hue := (hsl.hue + 23) mod 256;
   BrushColor := HslToRgb(hsl);
   PenColor := MakeDarker(BrushColor, 60) or $FF000000;
 end;
@@ -168,7 +164,7 @@ begin
   p := OffsetPath(Paths, -Left, -Top);
   DrawPolygon(Image, p, frEvenOdd, BrushColor);
   DrawLine(Image, p, PenWidth, PenColor, esPolygon);
-  UpdateHitTestMask(p, frEvenOdd);
+  UpdateHitTestMask(p);
 end;
 
 //------------------------------------------------------------------------------
@@ -191,6 +187,11 @@ var
   resStream: TResourceStream;
 begin
   Randomize;
+  hsl.hue := Random(256);
+  hsl.sat := 240;
+  hsl.lum := 200;
+  hsl.Alpha := 128;
+
   layeredImg32 := TLayeredImage32.Create; //sized in FormResize below.
 
   //add a hatched background design layer (see FormResize below).
@@ -355,16 +356,15 @@ end;
 
 procedure TMainForm.FormPaint(Sender: TObject);
 var
+  img: TImage32;
   updateRect: TRect;
 begin
   //layeredImg32.GetMergedImage optionally returns the portion of
   //the image that's changed since the previous GetMergedImage call.
   //Painting only this changed region significantly speeds up drawing.
-  with layeredImg32.GetMergedImage(false, updateRect) do
-  begin
-    CopyToDc(updateRect, self.Canvas.Handle,
-      updateRect.Left, updateRect.Top, false);
-  end;
+  img := layeredImg32.GetMergedImage(false, updateRect);
+  img.CopyToDc(updateRect,
+    self.Canvas.Handle, updateRect.Left, updateRect.Top, false);
 end;
 //------------------------------------------------------------------------------
 

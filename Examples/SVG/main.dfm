@@ -2,8 +2,8 @@ object Form1: TForm1
   Left = 298
   Top = 205
   Caption = 'Svg101'
-  ClientHeight = 490
-  ClientWidth = 704
+  ClientHeight = 471
+  ClientWidth = 756
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -20,23 +20,23 @@ object Form1: TForm1
   object Splitter1: TSplitter
     Left = 180
     Top = 0
-    Height = 471
+    Height = 452
     ExplicitLeft = 184
     ExplicitTop = 232
     ExplicitHeight = 100
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 471
-    Width = 704
+    Top = 452
+    Width = 756
     Height = 19
     Panels = <>
   end
   object ImagePanel: TImage32Panel
     Left = 183
     Top = 0
-    Width = 521
-    Height = 471
+    Width = 573
+    Height = 452
     Align = alClient
     BevelInner = bvLowered
     BorderWidth = 12
@@ -55,14 +55,15 @@ object Form1: TForm1
     ScaleMin = 0.050000000000000000
     ScaleMax = 20.000000000000000000
     ShowScrollButtons = ssbFocused
-    AllowScroll = True
+    AllowKeyScroll = True
+    AllowScrnScroll = True
     AllowZoom = True
   end
   object ListBox1: TListBox
     Left = 0
     Top = 0
     Width = 180
-    Height = 471
+    Height = 452
     Align = alLeft
     Color = 16316664
     ItemHeight = 14
@@ -80,6 +81,11 @@ object Form1: TForm1
         Caption = '&Open ...'
         ShortCut = 16463
         OnClick = Open1Click
+      end
+      object SaveAs1: TMenuItem
+        Caption = 'Save &As ...'
+        ShortCut = 16449
+        OnClick = SaveAs1Click
       end
       object N1: TMenuItem
         Caption = '-'
@@ -108,5 +114,11 @@ object Form1: TForm1
       Caption = '&Open in Browser'
       OnClick = OpeninBrowser1Click
     end
+  end
+  object SaveDialog1: TSaveDialog
+    DefaultExt = '.jpg'
+    Filter = 'Image Files (*.png;*.jpg)'
+    Left = 407
+    Top = 56
   end
 end

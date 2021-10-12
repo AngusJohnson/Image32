@@ -1,8 +1,8 @@
 object MainForm: TMainForm
-  Left = 594
-  Top = 418
+  Left = 404
+  Top = 201
   Caption = 'Layers101'
-  ClientHeight = 412
+  ClientHeight = 411
   ClientWidth = 455
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -25,7 +25,7 @@ object MainForm: TMainForm
   TextHeight = 14
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 386
+    Top = 385
     Width = 455
     Height = 26
     Panels = <>
@@ -162,7 +162,7 @@ object MainForm: TMainForm
   end
   object OpenDialog1: TOpenDialog
     DefaultExt = '*.png'
-    Filter = 'Image Files (BMP, PNG, JPG)|*.bmp;*.png;*.jpg'
+    Filter = 'Image Files (BMP, PNG, JPG, SVG)|*.bmp;*.png;*.jpg;*.svg'
     Left = 128
     Top = 144
   end

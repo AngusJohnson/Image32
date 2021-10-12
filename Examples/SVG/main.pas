@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, StdCtrls,
-  Forms, Types, Menus, ExtCtrls, ComCtrls, ShellApi, Dialogs,
+  Forms, Types, Menus, ExtCtrls, ComCtrls, ShellApi, Dialogs, Math,
   Img32.Panels;
 
   //This sample app presumes that the TImage32Panel component
@@ -25,6 +25,8 @@ type
     ImagePanel: TImage32Panel;
     ListBox1: TListBox;
     Splitter1: TSplitter;
+    SaveAs1: TMenuItem;
+    SaveDialog1: TSaveDialog;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure Exit1Click(Sender: TObject);
@@ -34,13 +36,12 @@ type
     procedure ImagePanelResize(Sender: TObject);
     procedure PopupMenu11Click(Sender: TObject);
     procedure OpeninBrowser1Click(Sender: TObject);
+    procedure SaveAs1Click(Sender: TObject);
   protected
     folder: string;
     filename: string;
-    redrawPending: Boolean;
     procedure OpenFile(const filename: string);
     procedure WMDropFiles(var Msg: TMessage); message WM_DROPFILES;
-    procedure AppIdle(Sender: TObject; var Done: Boolean);
     procedure DrawCurrentItem;
   end;
 
@@ -52,7 +53,7 @@ implementation
 {$R *.dfm}
 
 uses
-  Img32, Img32.Fmt.PNG, Img32.Fmt.SVG, Img32.Text;
+  Img32, Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.SVG, Img32.Text;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -62,7 +63,6 @@ var
   rec: TRect;
 begin
   DragAcceptFiles(Handle, True);
-  Application.OnIdle := AppIdle;
 
   ImagePanel.ParentBackground := false;
   ImagePanel.Color := clWhite;
@@ -79,22 +79,15 @@ begin
   FontManager.Load('Times New Roman Italic');
   FontManager.Load('Times New Roman Bold Italic');
 
-  OpenFile('.\Sample SVGs\*.svg');
+  OpenFile('.\SVGs\*.svg');
+  ListSVGFilesInFolder;
+  DrawCurrentItem;
 end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.FormDestroy(Sender: TObject);
 begin
   DragAcceptFiles(Handle, False);
-end;
-//------------------------------------------------------------------------------
-
-procedure TForm1.AppIdle(Sender: TObject; var Done: Boolean);
-begin
-  Done := true;
-  if not redrawPending then Exit;
-  redrawPending := false;
-  DrawCurrentItem;
 end;
 //------------------------------------------------------------------------------
 
@@ -115,30 +108,40 @@ var
   sr: TSearchRec;
   i, idx, searchResult: integer;
 begin
-  ListBox1.Items.Clear;
-  searchResult := FindFirst(AppendSlash(folder) + '*.svg', faAnyFile, sr);
-  idx := -1;
-  while searchResult = 0 do
-  begin
-    if sr.Name[1] = '.' then Continue;
-    i := ListBox1.Items.Add(sr.Name);
-    if sr.Name = filename then idx := i;
-    searchResult := FindNext(sr);
+  ListBox1.Items.BeginUpdate;
+  try
+    ListBox1.Items.Clear;
+    searchResult := FindFirst(AppendSlash(folder) + '*.svg', faAnyFile, sr);
+    idx := -1;
+    while searchResult = 0 do
+    begin
+      if sr.Name[1] = '.' then Continue;
+      i := ListBox1.Items.Add(sr.Name);
+      if sr.Name = filename then idx := i;
+      searchResult := FindNext(sr);
+    end;
+    ListBox1.Visible := ListBox1.Items.Count > 0;
+    if not ListBox1.Visible then Exit;
+    idx := Max(0, idx);
+    ListBox1.ItemIndex := idx;
+  finally
+    ListBox1.Items.EndUpdate;
   end;
-  ListBox1.ItemIndex := idx;
 end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.OpenFile(const filename: string);
+var
+  i: integer;
 begin
   self.filename := ExtractFileName(filename);
   folder := ExtractFilePath(filename);
   OpenDialog1.InitialDir := folder;
   ListSVGFilesInFolder;
-  ListBox1.ItemIndex := ListBox1.Items.IndexOf(self.filename);
-  if (ListBox1.ItemIndex < 0) and (ListBox1.Items.Count > 0) then
-    ListBox1.ItemIndex := 0;
-  redrawPending := true;
+  i := ListBox1.Items.IndexOf(self.filename);
+  if i <> ListBox1.ItemIndex then
+    ListBox1.ItemIndex := i else
+    DrawCurrentItem;
 end;
 //------------------------------------------------------------------------------
 
@@ -187,31 +190,30 @@ end;
 
 procedure TForm1.ListBox1Click(Sender: TObject);
 begin
-  redrawPending := true;
+  DrawCurrentItem;
 end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.DrawCurrentItem;
 var
-  svgFilename: string;
+  svgFilenameAndPath: string;
   rec: TRect;
 begin
+  if ListBox1.ItemIndex < 0 then Exit;
   rec := ImagePanel.InnerClientRect;
-  ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
-  ImagePanel.Refresh;
-  ListBox1.Visible := ListBox1.Items.Count > 0;
-  if not ListBox1.Visible then Exit;
-  ActiveControl := ListBox1;
-
-  filename := ListBox1.Items[ListBox1.ItemIndex];
-  svgFilename := AppendSlash(folder) + filename;
-
+  ImagePanel.Image.BeginUpdate;
   Screen.Cursor := crHourGlass;
   try
-    ImagePanel.Image.LoadFromFile(svgFilename);
+    ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
+
+    filename := ListBox1.Items[ListBox1.ItemIndex];
+    svgFilenameAndPath := AppendSlash(folder) + filename;
+    ImagePanel.Image.LoadFromFile(svgFilenameAndPath);
   finally
+    ImagePanel.Image.EndUpdate;
     Screen.Cursor := crDefault;
   end;
+  ActiveControl := ListBox1;
 end;
 //------------------------------------------------------------------------------
 
@@ -221,13 +223,20 @@ var
 begin
   rec := ImagePanel.InnerClientRect;
   ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
-  redrawPending := true;
+  DrawCurrentItem;
 end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.Exit1Click(Sender: TObject);
 begin
   Close;
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.SaveAs1Click(Sender: TObject);
+begin
+  if SaveDialog1.Execute then
+    ImagePanel.Image.SaveToFile(SaveDialog1.FileName);
 end;
 //------------------------------------------------------------------------------
 

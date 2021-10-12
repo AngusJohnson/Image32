@@ -126,6 +126,10 @@ uses
   arrows, Img32.Draw, Img32.Extra, Img32.Vector, Img32.Fmt.BMP,
   Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Transform, Img32.Resamplers;
 
+var
+  hsl: THsl;
+
+
 //------------------------------------------------------------------------------
 // TMyRasterLayer32 - simplifies initialization of TRasterLayer32 objects
 //------------------------------------------------------------------------------
@@ -177,13 +181,8 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TMyVectorLayer32.InitRandomColors;
-var
-  hsl: THsl;
 begin
-  hsl.hue := Random(256);
-  hsl.sat := 240;
-  hsl.lum := 200;
-  hsl.Alpha := 212;
+  hsl.hue := (hsl.hue + 23) mod 256;
   BrushColor := HslToRgb(hsl);
   PenColor := MakeDarker(BrushColor, 80) or $FF000000;
 end;
@@ -269,6 +268,10 @@ begin
     LoadImage(hInstance, 'MOVE', IMAGE_CURSOR, 32,32, LR_DEFAULTSIZE);
 
   Randomize;
+  hsl.hue := Random(256);
+  hsl.sat := 240;
+  hsl.lum := 200;
+  hsl.Alpha := 212;
 
   //Use Application.OnIdle to process FormMouseMove events. This avoids
   //wasting a *lot* of CPU cycles drawing stuff that's immediately redrawn.

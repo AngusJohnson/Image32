@@ -2,8 +2,8 @@ unit Img32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.3                                                             *
-* Date      :  26 September 2021                                               *
+* Version   :  3.4                                                             *
+* Date      :  12 October 2021                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -570,8 +570,9 @@ procedure NormalizeAngle(var angle: double; tolerance: double = Pi/360);
 var
   aa: double;
 begin
-  while angle < -angle180 do angle := angle + angle360;
-  while angle > angle180 do angle := angle - angle360;
+  angle := FMod(angle, angle360);
+  if angle < -angle180 then angle := angle + angle360
+  else if angle > angle180 then angle := angle - angle360;
 
   aa := Abs(angle);
   if aa < tolerance then angle := 0
@@ -1769,7 +1770,6 @@ begin
   //very large images are usually due to a bug
   if (newWidth > 20000) or (newHeight > 20000) then
     raise Exception.Create(rsImageTooLarge);
-
   fwidth := Max(0, newWidth);
   fheight := Max(0, newHeight);
   fPixels := nil; //forces a blank image
