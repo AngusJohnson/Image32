@@ -315,37 +315,24 @@ type
   TArrayOfDouble = array of double;
   TArrayOfString = array of string;
 
-{$IFDEF RECORD_METHODS}
-  TRectD = record
+  TRectD = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
     function IsEmpty: Boolean;
     function Width: double;
     function Height: double;
-    //NormalizeRect:
-    //Returns True if swapping either top & bottom or left & right
-    function NormalizeRect: Boolean;
+    //Normalize: Returns True if swapping top & bottom or left & right
+    function Normalize: Boolean;
     function Contains(const Pt: TPoint): Boolean; overload;
     function Contains(const Pt: TPointD): Boolean; overload;
     function MidPoint: TPointD;
+    {$IFDEF RECORD_METHODS}
     case Integer of
       0: (Left, Top, Right, Bottom: Double);
       1: (TopLeft, BottomRight: TPointD);
-  end;
-{$ELSE}
-  TRectD = object
-    Left, Top, Right, Bottom: Double;
-    function IsEmpty: Boolean;
-    function Width: double;
-    function Height: double;
-    //NormalizeRect:
-    //Returns True if swapping either top & bottom or left & right
-    function NormalizeRect: Boolean;
-    function Contains(const Pt: TPoint): Boolean; overload;
-    function Contains(const Pt: TPointD): Boolean; overload;
-    function MidPoint: TPointD;
+    {$ELSE}
     function TopLeft: TPointD;
     function BottomRight: TPointD;
+    {$ENDIF}
   end;
-{$ENDIF}
 
   {$IFNDEF PBYTE}
   PByte = type PChar;
@@ -1310,7 +1297,7 @@ end;
 //------------------------------------------------------------------------------
 {$ENDIF}
 
-function TRectD.NormalizeRect: Boolean;
+function TRectD.Normalize: Boolean;
 var
   d: double;
 begin

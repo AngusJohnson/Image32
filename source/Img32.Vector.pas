@@ -3,7 +3,7 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  3.4                                                             *
-* Date      :  12 October 2021                                                 *
+* Date      :  21 October 2021                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -58,6 +58,9 @@ type
   procedure InflateRect(var rec: TRectD; dx, dy: double); overload;
   function NormalizeRect(var rect: TRect): Boolean;
 
+  function PrePendPoint(const pt: TPointD; const p: TPathD): TPathD;
+  function PrePendPoints(const pt1, pt2: TPointD; const p: TPathD): TPathD;
+
   function Rectangle(const rec: TRect): TPathD; overload;
   function Rectangle(const rec: TRectD): TPathD; overload;
   function Rectangle(l, t, r, b: double): TPathD; overload;
@@ -94,27 +97,31 @@ type
     tolerance: double = 0.0): TPathD; overload;
   function FlattenQBezier(const pts: TPathD;
     tolerance: double = 0.0): TPathD; overload;
-  function FlattenQBezier(const pts: TPathsD;
-    tolerance: double = 0.0): TPathsD; overload;
+  function FlattenQBezier(const firstPt: TPointD; const pts: TPathD;
+    tolerance: double = 0.0): TPathD; overload;
   function GetPointInQuadBezier(const a,b,c: TPointD; t: double): TPointD;
 
   function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD;
     tolerance: double = 0.0): TPathD; overload;
   function FlattenCBezier(const pts: TPathD;
     tolerance: double = 0.0): TPathD; overload;
-  function FlattenCBezier(const pts: TPathsD;
-    tolerance: double = 0.0): TPathsD; overload;
+  function FlattenCBezier(const firstPt: TPointD; const pts: TPathD;
+    tolerance: double = 0.0): TPathD; overload;
   function GetPointInCubicBezier(const a,b,c,d: TPointD; t: double): TPointD;
 
   //FlattenCSpline: Approximates the 'S' command inside the 'd' property of an
   //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
   function FlattenCSpline(const pts: TPathD;
-    tolerance: double = 0.0): TPathD;
+    tolerance: double = 0.0): TPathD; overload;
+  function FlattenCSpline(const priorCtrlPt, startPt: TPointD;
+    const pts: TPathD; tolerance: double = 0.0): TPathD; overload;
 
   //FlattenQSpline: Approximates the 'T' command inside the 'd' property of an
   //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
   function FlattenQSpline(const pts: TPathD;
-    tolerance: double = 0.0): TPathD;
+    tolerance: double = 0.0): TPathD; overload;
+  function FlattenQSpline(const priorCtrlPt, startPt: TPointD;
+    const pts: TPathD; tolerance: double = 0.0): TPathD; overload;
 
   //ArrowHead: The ctrlPt's only function is to control the angle of the arrow.
   function ArrowHead(const arrowTip, ctrlPt: TPointD; size: double;
@@ -177,6 +184,7 @@ type
   function OpenPathToFlatPolygon(const path: TPathD): TPathD;
   procedure AppendPoint(var path: TPathD; const extra: TPointD);
 
+  procedure AppendPath(var path: TPathD; const pt: TPointD); overload;
   procedure AppendPath(var path1: TPathD; const path2: TPathD); overload;
   procedure AppendPath(var paths: TPathsD; const extra: TPathD); overload;
   procedure AppendPath(var paths: TPathsD; const extra: TPathsD); overload;
@@ -205,6 +213,7 @@ type
 
   function MakePathI(const pts: array of integer): TPathD; overload;
   function MakePathD(const pts: array of double): TPathD; overload;
+  function MakePathD(const pts: array of TPointD): TPathD; overload;
 
   function GetBounds(const path: TPathD): TRect; overload;
   function GetBounds(const paths: TPathsD): TRect; overload;
@@ -237,7 +246,10 @@ type
 
   function PointsEqual(const pt1, pt2: TPointD): Boolean; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
-  function PointsNearEqual(const pt1, pt2: TPointD; distSqrd: double): Boolean;
+  function PointsNearEqual(const pt1, pt2: TPoint;
+    dist: integer): Boolean; overload;
+  function PointsNearEqual(const pt1, pt2: TPointD;
+    distSqrd: double): Boolean; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
   function StripNearDuplicates(const path: TPathD;
     minDist: double; isClosedPath: Boolean): TPathD; overload;
@@ -529,6 +541,12 @@ end;
 function PointsEqual(const pt1, pt2: TPointD): Boolean;
 begin
   result := (pt1.X = pt2.X) and (pt1.Y = pt2.Y);
+end;
+//------------------------------------------------------------------------------
+
+function PointsNearEqual(const pt1, pt2: TPoint; dist: integer): Boolean;
+begin
+  Result := (Abs(pt1.X - pt2.X) <= dist) and (Abs(pt1.Y - pt2.Y) < dist);
 end;
 //------------------------------------------------------------------------------
 
@@ -1660,8 +1678,9 @@ var
   end;
 
 begin
+  Result := nil;
+  if not Assigned(path) then exit;
   highI := high(path);
-  if (highI < 1) then exit;
   if delta < MinStrokeWidth/2 then delta := MinStrokeWidth/2;
 
   pathArea := Area(path);
@@ -1735,11 +1754,23 @@ begin
 
   setLength(result, resultLen);
 
-  if not isShrinking then Exit;
-  resultArea := area(Result);
-  if (Sign(resultArea) <> Sign(pathArea)) or
-    (abs(resultArea) > absPathArea) then
-      Result := nil;
+//  The following can fail with self-intersections eg figure-8 lines.
+//  if not isShrinking then Exit;
+//  resultArea := area(Result);
+//  if (Sign(resultArea) <> Sign(pathArea)) or
+//    (abs(resultArea) > absPathArea) then
+//      Result := nil;
+end;
+//------------------------------------------------------------------------------
+
+procedure AppendPath(var path: TPathD; const pt: TPointD);
+var
+  len: integer;
+begin
+  len := length(path);
+  if (len > 0) and PointsEqual(pt, path[len -1]) then Exit;
+  setLength(path, len + 1);
+  path[len] := pt;
 end;
 //------------------------------------------------------------------------------
 
@@ -1822,6 +1853,7 @@ procedure RotatePoint(var pt: TPointD;
 var
   sinA, cosA: double;
 begin
+  if angleRad = 0 then Exit;
   if not ClockwiseRotationIsAnglePositive then angleRad := -angleRad;
   GetSinCos(angleRad, sinA, cosA);
   RotatePoint(pt, focalPoint, sinA, cosA);
@@ -1850,6 +1882,11 @@ function RotatePath(const path: TPathD;
 var
   sinA, cosA: double;
 begin
+  if angleRads = 0 then
+  begin
+    Result := path;
+    Exit;
+  end;
   if not ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
   GetSinCos(angleRads, sinA, cosA);
   Result := RotatePathInternal(path, focalPoint, sinA, cosA);
@@ -2901,6 +2938,31 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function PrePendPoint(const pt: TPointD; const p: TPathD): TPathD;
+var
+  len: integer;
+begin
+  len := Length(p);
+  SetLength(Result, len +1);
+  Result[0] := pt;
+  if len > 0 then Move(p[0], Result[1], len * SizeOf(TPointD));
+
+end;
+//------------------------------------------------------------------------------
+
+function PrePendPoints(const pt1, pt2: TPointD; const p: TPathD): TPathD;
+var
+  len: integer;
+begin
+  len := Length(p);
+  SetLength(Result, len +2);
+  Result[0] := pt1;
+  Result[1] := pt2;
+  if len > 0 then Move(p[0], Result[2], len * SizeOf(TPointD));
+
+end;
+//------------------------------------------------------------------------------
+
 function GetPointInQuadBezier(const a,b,c: TPointD; t: double): TPointD;
 var
   omt: double;
@@ -2913,15 +2975,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenQBezier(const pts: TPathsD; tolerance: double = 0.0): TPathsD;
-var
-  i, len: integer;
+function FlattenQBezier(const firstPt: TPointD; const pts: TPathD;
+  tolerance: double = 0.0): TPathD; overload;
 begin
-  len := Length(pts);
-  SetLength(Result, len);
   if tolerance <= 0.0 then tolerance := BezierTolerance;
-  for i := 0 to len -1 do
-    Result[i] := FlattenQBezier(pts[i], tolerance);
+  Result := FlattenQBezier(PrePendPoint(firstPt, pts), tolerance);
 end;
 //------------------------------------------------------------------------------
 
@@ -3018,15 +3076,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenCBezier(const pts: TPathsD; tolerance: double = 0.0): TPathsD;
-var
-  i, len: integer;
+function FlattenCBezier(const firstPt: TPointD; const pts: TPathD;
+  tolerance: double = 0.0): TPathD; overload;
 begin
-  len := Length(pts);
-  SetLength(Result, len);
-  if tolerance <= 0.0 then tolerance := BezierTolerance;
-  for i := 0 to len -1 do
-    Result[i] := FlattenCBezier(pts[i], tolerance);
+    Result := FlattenCBezier(PrePendPoint(firstPt, pts), tolerance);
 end;
 //------------------------------------------------------------------------------
 
@@ -3129,8 +3182,23 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenCSpline(const pts: TPathD;
-  tolerance: double = 0.0): TPathD;
+function FlattenCSpline(const priorCtrlPt, startPt: TPointD;
+  const pts: TPathD; tolerance: double = 0.0): TPathD;
+var
+  p: TPathD;
+  len: integer;
+begin
+  len := Length(pts);
+  SetLength(p, len + 2);
+  p[0] := startPt;
+  p[1] := ReflectPoint(priorCtrlPt, startPt);
+  if len > 0 then
+    Move(pts[0], p[2], len * SizeOf(TPointD));
+  Result := FlattenCSpline(p, tolerance);
+end;
+//------------------------------------------------------------------------------
+
+function FlattenCSpline(const pts: TPathD; tolerance: double = 0.0): TPathD;
 var
   resultCnt, resultLen: integer;
 
@@ -3204,8 +3272,23 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FlattenQSpline(const pts: TPathD;
-  tolerance: double = 0.0): TPathD;
+function FlattenQSpline(const priorCtrlPt, startPt: TPointD;
+  const pts: TPathD; tolerance: double = 0.0): TPathD;
+var
+  p: TPathD;
+  len: integer;
+begin
+  len := Length(pts);
+  SetLength(p, len + 2);
+  p[0] := startPt;
+  p[1] := ReflectPoint(priorCtrlPt, startPt);
+  if len > 0 then
+    Move(pts[0], p[2], len * SizeOf(TPointD));
+  Result := FlattenQSpline(p, tolerance);
+end;
+//------------------------------------------------------------------------------
+
+function FlattenQSpline(const pts: TPathD; tolerance: double = 0.0): TPathD;
 var
   resultCnt, resultLen: integer;
 
@@ -3299,7 +3382,7 @@ var
 begin
   Result := nil;
   len := length(pts) div 2;
-  if len < 1 then Exit;
+  if len = 0 then Exit;
 
   setlength(Result, len);
   Result[0].X := pts[0];
@@ -3314,6 +3397,21 @@ begin
     Result[j].Y := y;
   end;
   setlength(Result, j+1);
+end;
+//------------------------------------------------------------------------------
+
+function MakePathD(const pts: array of TPointD): TPathD;
+var
+  i, len: Integer;
+begin
+  Result := nil;
+  len := length(pts);
+  if len = 0 then Exit;
+
+  setlength(Result, len);
+  Result[0] := pts[0];
+  for i := 1 to len -1 do
+    Result[i] := pts[i];
 end;
 //------------------------------------------------------------------------------
 

@@ -3,7 +3,7 @@ unit Img32.Layers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  3.4                                                             *
-* Date      :  12 October 2021                                                 *
+* Date      :  25 October 2021                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -92,6 +92,8 @@ type
     procedure  ReindexChildsFrom(startIdx: Integer);
     procedure  SetClipPath(const path: TPathsD);
     procedure  UpdateBounds;
+    function   GetNextLayerInGroup: TLayer32;
+    function   GetPrevLayerInGroup: TLayer32;
   protected
     procedure  BeginUpdate; virtual;
     procedure  EndUpdate;   virtual;
@@ -118,8 +120,6 @@ type
     function   SendToBack: Boolean;
     function   Move(newParent: TLayer32; idx: integer): Boolean;
     function   GetAbsoluteOrigin: TPoint;
-    function   NextLayerInGroup: TLayer32;
-    function   PrevLayerInGroup: TLayer32;
 
     procedure  PositionAt(const pt: TPoint); overload;
     procedure  PositionAt(x, y: integer); overload; virtual;
@@ -159,11 +159,18 @@ type
     property   Width: integer read GetWidth;
     property   UserData: TObject read fUserData write fUserData;
     property   BlendFunc: TBlendFunction read fBlendFunc write SetBlendFunc;
+    property   PrevLayerInGroup: TLayer32 read GetPrevLayerInGroup;
+    property   NextLayerInGroup: TLayer32 read GetNextLayerInGroup;
   end;
 
   TGroupLayer32 = class(TLayer32)
+  private
+    function   GetFirstChild: TLayer32;
+    function   GetLastChild: TLayer32;
   public
     procedure  Offset(dx, dy: integer); override;
+    property   FirstChild: TLayer32 read GetFirstChild;
+    property   LastChild: TLayer32 read GetLastChild;
   end;
 
   THitTestLayer32 = class(TLayer32) //abstract classs
@@ -583,7 +590,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayer32.NextLayerInGroup: TLayer32;
+function TLayer32.GetNextLayerInGroup: TLayer32;
 begin
   if not Assigned(fParent) or (fIndex = fParent.ChildCount -1) then
     Result := nil else
@@ -591,7 +598,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayer32.PrevLayerInGroup: TLayer32;
+function TLayer32.GetPrevLayerInGroup: TLayer32;
 begin
   if not Assigned(fParent) or (fIndex = 0) then
     Result := nil else
@@ -787,17 +794,20 @@ begin
     if (layer = self) then Exit
     else layer := layer.Parent;
 
-  with newParent do
-    if idx < 0 then idx := 0
-    else if idx >= ChildCount then idx := ChildCount;
 
   if newParent = fParent then
   begin
+    if idx >= fParent.ChildCount then idx := fParent.ChildCount-1
+    else if idx < 0 then idx := 0;
     if idx = fIndex then Exit;
+
     fParent.fChilds.Move(fIndex, idx);
     fParent.ReindexChildsFrom(Min(idx, fIndex));
   end else
   begin
+    if idx >= newParent.ChildCount then idx := newParent.ChildCount
+    else if idx < 0 then idx := 0;
+
     if Visible then
       fParent.Invalidate(Bounds);
     fParent.fChilds.Delete(fIndex);
@@ -1243,6 +1253,20 @@ begin
   finally
     EndUpdate;
   end;
+end;
+//------------------------------------------------------------------------------
+
+function TGroupLayer32.GetFirstChild: TLayer32;
+begin
+  if ChildCount = 0 then Result := nil
+  else Result := Child[0];
+end;
+//------------------------------------------------------------------------------
+
+function TGroupLayer32.GetLastChild: TLayer32;
+begin
+  if ChildCount = 0 then Result := nil
+  else Result := Child[ChildCount -1];
 end;
 
 //------------------------------------------------------------------------------
@@ -1935,9 +1959,9 @@ begin
   fBounds := Rect(0, 0, Width, Height);
   if not Assigned(fRoot) then Exit;
   fRoot.SetBounds(fBounds);
-  Invalidate;
   if fBackColor <> clNone32 then
     fRoot.Image.Clear(fBackColor);
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -1958,23 +1982,22 @@ begin
   Result := Image;
   if IsEmptyRect(Bounds) then Exit;
 
-  forceRefresh :=
-    (fLastUpdateType = utUndefined) or
+  forceRefresh := (fLastUpdateType = utUndefined) or
     (hideDesigners <> (fLastUpdateType = utHideDesigners));
 
   with Root do
   begin
-    //get 'old bounds' that need erasing
-    updateRect := fInvalidRect;
-    //PreMerge resizes (and clears) invalidated groups
-    if forceRefresh then PreMergeAll(hideDesigners)
-    else if fRefreshPending then PreMerge(hideDesigners);
-
+    //get 'old bounds' that will need erasing
     if forceRefresh then
     begin
       updateRect := Self.Bounds;
+      //PreMergeAll resizes all groups
+      PreMergeAll(hideDesigners);
     end else
     begin
+      updateRect := fInvalidRect;
+      //PreMerge resizes (and clears) invalidated groups
+      PreMerge(hideDesigners);
       //and include 'new bounds' that need redrawing
       updateRect := Img32.Vector.UnionRect(updateRect, fInvalidRect);
       Types.IntersectRect(updateRect, updateRect, Self.Bounds);

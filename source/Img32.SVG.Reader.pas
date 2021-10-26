@@ -2419,7 +2419,7 @@ end;
 
 procedure TPathElement.ParseDAttrib(const value: UTF8String);
 begin
-  ParseSvgPath(value, fSvgPaths);
+  fSvgPaths.Parse(value);
 end;
 //------------------------------------------------------------------------------
 
