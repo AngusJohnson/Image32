@@ -316,6 +316,11 @@ type
   TArrayOfString = array of string;
 
   TRectD = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
+    {$IFNDEF RECORD_METHODS}
+    Left, Top, Right, Bottom: Double;
+    function TopLeft: TPointD;
+    function BottomRight: TPointD;
+    {$ENDIF}
     function IsEmpty: Boolean;
     function Width: double;
     function Height: double;
@@ -328,9 +333,6 @@ type
     case Integer of
       0: (Left, Top, Right, Bottom: Double);
       1: (TopLeft, BottomRight: TPointD);
-    {$ELSE}
-    function TopLeft: TPointD;
-    function BottomRight: TPointD;
     {$ENDIF}
   end;
 
@@ -550,6 +552,12 @@ begin
 {$ELSE}
   ImageFormatClassList := TList.Create;
 {$ENDIF}
+end;
+//------------------------------------------------------------------------------
+
+function FMod(const ANumerator, ADenominator: Double): Double;
+begin
+  Result := ANumerator - Trunc(ANumerator / ADenominator) * ADenominator;
 end;
 //------------------------------------------------------------------------------
 

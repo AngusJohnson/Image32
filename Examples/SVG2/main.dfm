@@ -40,7 +40,8 @@ object Form1: TForm1
     ScaleMin = 0.050000000000000000
     ScaleMax = 20.000000000000000000
     ShowScrollButtons = ssbFocused
-    AllowScroll = True
+    AllowKeyScroll = True
+    AllowScrnScroll = True
     AllowZoom = True
   end
   object MainMenu1: TMainMenu

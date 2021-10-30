@@ -19,10 +19,10 @@ interface
 {$I Img32.inc}
 
 uses
-  SysUtils, Classes, Types, Math,
+  SysUtils, Classes, Types, Math, StrUtils,
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults,{$ENDIF}
-  Img32, Img32.SVG.Core, Img32.Vector, Img32.Draw,
-  Img32.Transform, Img32.Text;
+  Img32, Img32.SVG.Core, Img32.SVG.Path, Img32.Vector,
+  Img32.Draw, Img32.Text, Img32.Transform;
 
 {$IFDEF ZEROBASEDSTR}
   {$ZEROBASEDSTRINGS OFF}
@@ -161,7 +161,7 @@ type
 implementation
 
 uses
-  Img32.Extra, StrUtils;
+  Img32.Extra;
 
 type
   TFourDoubles = array [0..3] of double;
@@ -182,8 +182,8 @@ type
     function  GetBounds: TRectD; virtual;
     function  HasMarkers: Boolean;
     procedure GetPaths(const drawDat: TDrawData); virtual;
-    //GetUncurvedPath: required only for markers
-    function  GetUncurvedPath(const drawDat: TDrawData): TPathsD; virtual;
+    //GetSimplePath: required only for markers
+    function  GetSimplePath(const drawDat: TDrawData): TPathsD; virtual;
     procedure DrawFilled(img: TImage32; drawDat: TDrawData);
     procedure DrawStroke(img: TImage32; drawDat: TDrawData; isClosed: Boolean);
     procedure DrawMarkers(img: TImage32; drawDat: TDrawData);
@@ -237,7 +237,7 @@ type
     function  GetBounds: TRectD; override;
     procedure ParseDAttrib(const value: UTF8String);
     procedure GetPaths(const drawDat: TDrawData); override;
-    function  GetUncurvedPath(const drawDat: TDrawData): TPathsD; override;
+    function  GetSimplePath(const drawDat: TDrawData): TPathsD; override;
   public
     constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
     destructor Destroy; override;
@@ -249,7 +249,7 @@ type
     function  GetBounds: TRectD; override;
     procedure ParsePoints(const value: UTF8String);
     procedure GetPaths(const drawDat: TDrawData); override;
-    function  GetUncurvedPath(const drawDat: TDrawData): TPathsD; override;
+    function  GetSimplePath(const drawDat: TDrawData): TPathsD; override;
   end;
 
   TLineElement = class(TShapeElement)
@@ -257,7 +257,7 @@ type
     path      : TPathD;
     function  GetBounds: TRectD; override;
     procedure GetPaths(const drawDat: TDrawData); override;
-    function  GetUncurvedPath(const drawDat: TDrawData): TPathsD; override;
+    function  GetSimplePath(const drawDat: TDrawData): TPathsD; override;
   public
     constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
@@ -287,7 +287,7 @@ type
     radius    : TValuePt;
     function  GetBounds: TRectD; override;
     procedure GetPaths(const drawDat: TDrawData); override;
-    function  GetUncurvedPath(const drawDat: TDrawData): TPathsD; override;
+    function  GetSimplePath(const drawDat: TDrawData): TPathsD; override;
   public
     constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
@@ -2175,7 +2175,7 @@ var
   pt1, pt2: TPointD;
   di: TDrawData;
 begin
-  markerPaths := GetUncurvedPath(drawDat);
+  markerPaths := GetSimplePath(drawDat);
   markerPaths := StripNearDuplicates(markerPaths, 0.01, false);
 
   if not Assigned(markerPaths) then Exit;
@@ -2247,7 +2247,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function  TShapeElement.GetUncurvedPath(const drawDat: TDrawData): TPathsD;
+function  TShapeElement.GetSimplePath(const drawDat: TDrawData): TPathsD;
 begin
   Result := nil;
 end;
@@ -2384,10 +2384,9 @@ begin
     DrawLine(img, strokePaths, scaledStrokeWidth,
       strokeClr, endStyle, joinStyle, drawDat.strokeMitLim)
   else
-    DrawLine(img, strokePaths,scaledStrokeWidth,
+    DrawLine(img, strokePaths, scaledStrokeWidth,
       strokeClr, endStyle, joinStyle, roundingScale);
 end;
-
 
 //------------------------------------------------------------------------------
 // TPathElement
@@ -2454,7 +2453,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TPathElement.GetUncurvedPath(const drawDat: TDrawData): TPathsD;
+function TPathElement.GetSimplePath(const drawDat: TDrawData): TPathsD;
 var
   i: integer;
 begin
@@ -2489,7 +2488,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TPolyElement.GetUncurvedPath(const drawDat: TDrawData): TPathsD;
+function TPolyElement.GetSimplePath(const drawDat: TDrawData): TPathsD;
 begin
   Result := nil;
   AppendPath(Result, path);
@@ -2553,7 +2552,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLineElement.GetUncurvedPath(const drawDat: TDrawData): TPathsD;
+function TLineElement.GetSimplePath(const drawDat: TDrawData): TPathsD;
 begin
   Result := nil;
   AppendPath(Result, path);
@@ -2691,7 +2690,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TRectElement.GetUncurvedPath(const drawDat: TDrawData): TPathsD;
+function TRectElement.GetSimplePath(const drawDat: TDrawData): TPathsD;
 var
   rec: TRectD;
 begin
@@ -4399,8 +4398,8 @@ procedure TSvgElement.LoadAttributes;
 var
   i: integer;
 begin
-  for i := 0 to fParserEl.attribs.Count -1 do
-    LoadAttribute(PSvgAttrib(fParserEl.attribs[i]));
+  for i := 0 to fParserEl.AttribCount -1 do
+    LoadAttribute(PSvgAttrib(fParserEl.attrib[i]));
 end;
 //------------------------------------------------------------------------------
 

@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Types, Classes, Graphics,
   Controls, Forms,  Dialogs, Math, ComCtrls, Menus,
-  Img32, Img32.Layers, Img32.Text, Img32.Panels, Vcl.ExtCtrls;
+  Img32, Img32.Layers, Img32.Text, Img32.Panels, ExtCtrls;
 
 type
   TMainForm = class(TForm)
@@ -247,8 +247,8 @@ begin
 
   layeredImage := TLayeredImage32.Create;
   //layeredImage.Resampler := rNearestResampler; //draft quality (fast)
-  layeredImage.Resampler := rBiLinearResampler;  //high quality (moderately fast)
-  //layeredImage.Resampler := rBiCubicResampler; //excellent quality (slow)
+  layeredImage.Resampler := rBiLinearResampler;  //high quality (pretty fast)
+  //layeredImage.Resampler := rBiCubicResampler; //best quality (slower)
 
   layeredImage.AddLayer(TDesignerLayer32); //for background hatching
 

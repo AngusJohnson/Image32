@@ -19,23 +19,23 @@ interface
 {$I Img32.inc}
 
 uses
-  SysUtils, Classes, Types,
-  Math, Img32, Img32.Svg.Core, Img32.Vector, Img32.Layers;
+  SysUtils, Classes, Types, Math,
+  Img32, Img32.SVG.Core, Img32.Svg.Path, Img32.Vector, Img32.Layers;
 
 type
   TSegPos = (spFirst, spMiddle, spLast);
-  TSvgSubPathLayer    = class;
-  TSvgPathLayer       = class;
+  TSubPathLayer    = class;
+  TSvgPathLayer    = class;
 
-  TSegBaseLayer = class(TVectorLayer32)
+  TPathSegLayer = class(TVectorLayer32)
   private
     fOwner        : TSvgPathLayer;
     fFocused      : Boolean;
     fRotAngle     : double;
-    fSeg          : TSvgBaseSeg;
+    fSeg          : TSvgPathSeg;
   protected
-    function  GetPrevSegLayer: TSegBaseLayer;
-    function  GetNextSegLayer: TSegBaseLayer;
+    function  GetPrevSegLayer: TPathSegLayer;
+    function  GetNextSegLayer: TPathSegLayer;
     function  GetDesignerLayer(btnLayer: TLayer32): TDesignerLayer32;
     procedure DrawDesigner(designer: TDesignerLayer32); virtual;
     procedure SetFocus(value: Boolean);
@@ -44,20 +44,20 @@ type
     property  Owner: TSvgPathLayer read fOwner;
   public
     constructor Create(parent: TLayer32;  const name: string = ''); override;
-    procedure Init(seg: TSvgBaseSeg); virtual;
+    procedure Init(seg: TSvgPathSeg); virtual;
     function  CreateBtnGroup: TButtonGroupLayer32; virtual;
     procedure UpdateBtnGroup(movedBtn: TLayer32); virtual;
-    function  CreateRotateBtnGroup(target: TSegBaseLayer;
+    function  CreateRotateBtnGroup(target: TPathSegLayer;
       startAngle: double = 0; angleOffset: double = 0): TRotatingGroupLayer32; virtual;
     procedure UpdateRotateBtnGroup(movedBtn: TLayer32); virtual;
     function  TestUpdateBtnGroup(movedBtn: TLayer32;
       var dx, dy: integer): Boolean; virtual;
     procedure DrawPath;
     property  Focused: Boolean read fFocused write SetFocus;
-    property  Seg: TSvgBaseSeg read fSeg;
+    property  Seg: TSvgPathSeg read fSeg;
   end;
 
-  TSvgASegLayer = class(TSegBaseLayer)
+  TSvgASegLayer = class(TPathSegLayer)
   private
     fRectMargin     : integer;
     fRotateDistance : double;
@@ -69,43 +69,43 @@ type
     procedure DrawDesigner(designer: TDesignerLayer32); override;
   public
     constructor Create(parent: TLayer32;  const name: string = ''); override;
-    procedure Init(seg: TSvgBaseSeg); override;
+    procedure Init(seg: TSvgPathSeg); override;
     function CreateBtnGroup: TButtonGroupLayer32; override;
     function TestUpdateBtnGroup(movedBtn: TLayer32;
       var dx, dy: integer): Boolean; override; //todo - redo this with absolute points
     procedure UpdateBtnGroup(movedBtn: TLayer32); override;
-    function  CreateRotateBtnGroup(target: TSegBaseLayer;
+    function  CreateRotateBtnGroup(target: TPathSegLayer;
       startAngle: double = 0; angleOffset: double = 0): TRotatingGroupLayer32; override;
     procedure UpdateRotateBtnGroup(movedBtn: TLayer32); override;
     procedure ReverseArcDirection;
-    //RectMargin: offset for rec horz and vert ctrl buttons
-    //so they don't get in the way of the arc button
+    //RectMargin: offset for rec ctrl buttons (horz. & vert.)
+    //so they stay out of the way of the arc button
     property RectMargin: integer read fRectMargin write fRectMargin;
   end;
 
-  TSvgCSegLayer = class(TSegBaseLayer)
+  TSvgCSegLayer = class(TPathSegLayer)
   protected
     procedure DrawDesigner(designer: TDesignerLayer32); override;
   public
     function CreateBtnGroup: TButtonGroupLayer32; override;
   end;
 
-  TSvgHSegLayer = class(TSegBaseLayer)
+  TSvgHSegLayer = class(TPathSegLayer)
   public
     function TestUpdateBtnGroup(movedBtn: TLayer32;
       var dx, dy: integer): Boolean; override;
   end;
 
-  TSvgLSegLayer = class(TSegBaseLayer)
+  TSvgLSegLayer = class(TPathSegLayer)
   end;
 
-  TSvgQSegLayer = class(TSegBaseLayer)
+  TSvgQSegLayer = class(TPathSegLayer)
   public
     function CreateBtnGroup: TButtonGroupLayer32; override;
     procedure DrawDesigner(designer: TDesignerLayer32); override;
   end;
 
-  TSvgSSegLayer = class(TSegBaseLayer)
+  TSvgSSegLayer = class(TPathSegLayer)
   protected
     procedure BtnMoveCheck(const pos: TPointD); override;
   public
@@ -113,46 +113,44 @@ type
     procedure DrawDesigner(designer: TDesignerLayer32); override;
   end;
 
-  TSvgTSegLayer = class(TSegBaseLayer)
+  TSvgTSegLayer = class(TPathSegLayer)
   protected
     procedure BtnMoveCheck(const pos: TPointD); override;
   end;
 
-  TSvgVSegLayer = class(TSegBaseLayer)
+  TSvgVSegLayer = class(TPathSegLayer)
   public
     function TestUpdateBtnGroup(movedBtn: TLayer32;
       var dx, dy: integer): Boolean; override; //todo - redo this with absolute points
   end;
 
-  TSvgZSegLayer = class(TSegBaseLayer)
+  TSvgZSegLayer = class(TPathSegLayer)
   protected
     procedure BtnMoveCheck(const pos: TPointD); override;
   public
-    destructor Destroy; override;
-    procedure Init(seg: TSvgBaseSeg); override;
     function CreateBtnGroup: TButtonGroupLayer32; override;
     function TestUpdateBtnGroup(movedBtn: TLayer32;
       var moveDx, moveDy: integer): Boolean; override;
     procedure UpdateBtnGroup(movedBtn: TLayer32); override;
-    function  CreateRotateBtnGroup(target: TSegBaseLayer;
+    function  CreateRotateBtnGroup(target: TPathSegLayer;
       startAngle: double = 0; angleOffset: double = 0): TRotatingGroupLayer32; override;
     procedure UpdateRotateBtnGroup(movedBtn: TLayer32); override;
   end;
 
-  TSvgSubPathLayer = class(TGroupLayer32)
+  TSubPathLayer = class(TGroupLayer32)
   private
     fOwner        : TSvgPathLayer;
     fSubPath      : TSvgSubPath;
-    function GetSegLayer(index: integer): TSegBaseLayer;
+    function GetSegLayer(index: integer): TPathSegLayer;
   protected
     property Owner : TSvgPathLayer read fOwner;
   public
     procedure Init(subPath: TSvgSubPath); virtual;
     procedure Offset(dx, dy: integer); override;
-    function GetLastSegLayer: TSegBaseLayer;
+    function GetLastSegLayer: TPathSegLayer;
     function GetStringDef(decimalPrec: integer): string;
     property SubPath: TSvgSubPath read fSubPath;
-    property SegLayer[index: integer]: TSegBaseLayer read GetSegLayer;
+    property SegLayer[index: integer]: TPathSegLayer read GetSegLayer;
   end;
 
   TSvgPathLayer = class(TGroupLayer32)
@@ -164,7 +162,7 @@ type
     fSvgPath      : TSvgPath;
     function GetMargin: integer;
     procedure SetStrokeWidth(width: double);
-    function GetSubPathLayer(index: integer): TSvgSubPathLayer;
+    function GetSubPathLayer(index: integer): TSubPathLayer;
   protected
     property StrokeColor  : TColor32 read fStrokeColor;
     property StrokeColor2 : TColor32 read fStrokeColor2;
@@ -172,16 +170,18 @@ type
     constructor Create(parent: TLayer32;  const name: string = ''); override;
     destructor Destroy; override;
     procedure LoadPath(const dpath: string; const destRect: TRect; scale: double = 0);
+    procedure LoadPathsFromFile(const filename: string;
+      const destRect: TRect; scale: double = 0);
     property StrokeWidth  : double read fstrokeWidth write SetStrokeWidth;
     property SvgPath: TSvgPath read fSvgPath;
-    property SvgSubPath[index: integer]: TSvgSubPathLayer read GetSubPathLayer;
+    property SvgSubPath[index: integer]: TSubPathLayer read GetSubPathLayer;
     property Margin  : integer read GetMargin;
   end;
 
 implementation
 
 uses
-  Img32.Extra, Img32.Draw;
+  Img32.Extra, Img32.Draw, Img32.SVG.Reader;
 
 resourcestring
   rsErrorCreatingButtonGroup =
@@ -195,10 +195,10 @@ const
   rotateBtnColor    : TColor32 = clGreen32;
 
 //------------------------------------------------------------------------------
-// TSegBaseLayer
+// TPathSegLayer
 //------------------------------------------------------------------------------
 
-constructor TSegBaseLayer.Create(parent: TLayer32;  const name: string = '');
+constructor TPathSegLayer.Create(parent: TLayer32;  const name: string = '');
 begin
   inherited;
   fOwner := Parent.Parent as TSvgPathLayer;
@@ -206,7 +206,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSegBaseLayer.Init(seg: TSvgBaseSeg);
+procedure TPathSegLayer.Init(seg: TSvgPathSeg);
 begin
   fSeg := seg;
   Paths := Img32.Vector.Paths(fSeg.FlatPath);
@@ -214,13 +214,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSegBaseLayer.DrawPath;
+procedure TPathSegLayer.DrawPath;
 var
   c: TColor32;
   p: TPathD;
 begin
   if not Assigned(Paths) or not Assigned(Paths[0]) then Exit;
-  //Image.Clear; //Image.Clear($10FF0000);
+  Image.Clear; //Image.Clear($10FF0000); //debugging :)
   if Focused then c := Owner.fStrokeColor2 else c := Owner.fStrokeColor;
   p := OffsetPath(Paths[0], -Left, -Top);
   DrawLine(Image, p, Owner.StrokeWidth, c, esRound);
@@ -232,36 +232,36 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSegBaseLayer.SetBtnCtrlPts(const pts: TPathD);
+procedure TPathSegLayer.SetBtnCtrlPts(const pts: TPathD);
 begin
-  fSeg.ctrlPts := pts;
+  fSeg.CtrlPts := pts;
   Paths := Img32.Vector.Paths(fSeg.FlatPath);
 end;
 //------------------------------------------------------------------------------
 
-function TSegBaseLayer.GetPrevSegLayer: TSegBaseLayer;
+function TPathSegLayer.GetPrevSegLayer: TPathSegLayer;
 var
   layer: TLayer32;
 begin
   layer := PrevLayerInGroup;
-  if Assigned(layer) and (layer is TSegBaseLayer) then
-    Result := TSegBaseLayer(layer) else
+  if Assigned(layer) and (layer is TPathSegLayer) then
+    Result := TPathSegLayer(layer) else
     Result := nil;
 end;
 //------------------------------------------------------------------------------
 
-function TSegBaseLayer.GetNextSegLayer: TSegBaseLayer;
+function TPathSegLayer.GetNextSegLayer: TPathSegLayer;
 var
   layer: TLayer32;
 begin
   layer := NextLayerInGroup;
-  if Assigned(layer) and (layer is TSegBaseLayer) then
-    Result := TSegBaseLayer(layer) else
+  if Assigned(layer) and (layer is TPathSegLayer) then
+    Result := TPathSegLayer(layer) else
     Result := nil;
 end;
 //------------------------------------------------------------------------------
 
-function TSegBaseLayer.GetDesignerLayer(btnLayer: TLayer32): TDesignerLayer32;
+function TPathSegLayer.GetDesignerLayer(btnLayer: TLayer32): TDesignerLayer32;
 begin
   if Assigned(btnLayer) and
     (btnLayer.Parent is TButtonGroupLayer32) and
@@ -272,12 +272,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSegBaseLayer.DrawDesigner(designer: TDesignerLayer32);
+procedure TPathSegLayer.DrawDesigner(designer: TDesignerLayer32);
 begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSegBaseLayer.SetFocus(value: Boolean);
+procedure TPathSegLayer.SetFocus(value: Boolean);
 begin
   if fFocused = value then Exit;
   fFocused := value;
@@ -285,7 +285,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSegBaseLayer.CreateBtnGroup: TButtonGroupLayer32;
+function TPathSegLayer.CreateBtnGroup: TButtonGroupLayer32;
 var
   designer: TDesignerLayer32;
 begin
@@ -298,7 +298,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSegBaseLayer.TestUpdateBtnGroup(movedBtn: TLayer32;
+function TPathSegLayer.TestUpdateBtnGroup(movedBtn: TLayer32;
   var dx, dy: integer): Boolean;
 begin
   Result := (movedBtn is TButtonDesignerLayer32) or
@@ -306,9 +306,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSegBaseLayer.BtnMoveCheck(const pos: TPointD);
+procedure TPathSegLayer.BtnMoveCheck(const pos: TPointD);
 var
-  segLayer  : TSegBaseLayer;
+  segLayer  : TPathSegLayer;
   dx, dy    : integer;
 begin
   if PointsEqual(pos, fSeg.FirstPt) then Exit;
@@ -322,17 +322,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSegBaseLayer.UpdateBtnGroup(movedBtn: TLayer32);
+procedure TPathSegLayer.UpdateBtnGroup(movedBtn: TLayer32);
 var
   i         : integer;
   pts       : TPathD;
   designer  : TDesignerLayer32;
-  segLayer  : TSegBaseLayer;
+  segLayer  : TPathSegLayer;
 begin
   designer := GetDesignerLayer(movedBtn);
   if not assigned(designer)  then Exit;
   i := TButtonDesignerLayer32(movedBtn).BtnIdx;
   pts := fSeg.ctrlPts;
+  if i >= Length(pts) then Exit;
   pts[i] := movedBtn.MidPoint;
   SetBtnCtrlPts(pts);
   DrawPath;
@@ -345,7 +346,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSegBaseLayer.CreateRotateBtnGroup(target: TSegBaseLayer;
+function TPathSegLayer.CreateRotateBtnGroup(target: TPathSegLayer;
   startAngle: double; angleOffset: double): TRotatingGroupLayer32;
 begin
 //  if (GetNextSegLayer <> nil) then
@@ -358,15 +359,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSegBaseLayer.UpdateRotateBtnGroup(movedBtn: TLayer32);
+procedure TPathSegLayer.UpdateRotateBtnGroup(movedBtn: TLayer32);
 var
   a: double;
-  segLayer  : TSegBaseLayer;
+  segLayer  : TPathSegLayer;
+  pts: TPathD;
 begin
   if not (movedBtn.Parent is TRotatingGroupLayer32) then Exit;
   a := UpdateRotatingButtonGroup(movedBtn);
-  with fSeg do
-   ctrlPts := RotatePath(ctrlPts, FirstPt, a - fRotAngle);
+  pts := RotatePath(fSeg.ctrlPts, fSeg.FirstPt, a - fRotAngle);
+  fSeg.CtrlPts := pts;
   fRotAngle := a;
   Paths := Img32.Vector.Paths(fSeg.FlatPath);
   DrawPath;
@@ -389,7 +391,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSvgASegLayer.Init(seg: TSvgBaseSeg);
+procedure TSvgASegLayer.Init(seg: TSvgPathSeg);
 begin
   fSeg    := seg;
   Paths := Img32.Vector.Paths(fSeg.FlatPath);
@@ -399,8 +401,7 @@ end;
 
 procedure TSvgASegLayer.ReverseArcDirection;
 begin
-  with TSvgASegment(fSeg).arcInfo do
-    sweepClockW := not sweepClockW;
+  TSvgASegment(fSeg).ReverseArc;
   Paths := Img32.Vector.Paths(fSeg.FlatPath);
   DrawPath;
   Invalidate(Bounds);
@@ -415,7 +416,7 @@ begin
   with TSvgASegment(fSeg), arcInfo do
   begin
     if rectAngle <> 0 then RotatePoint(pt, rec.MidPoint, -rectAngle);
-    if arcRectLeft then
+    if IsLeftCtrl then
       pt.X := pt.X - fRectMargin else
       pt.X := pt.X + fRectMargin;
     if rectAngle <> 0 then RotatePoint(pt, rec.MidPoint, rectAngle);
@@ -432,7 +433,7 @@ begin
   with TSvgASegment(fSeg), arcInfo do
   begin
     if rectAngle <> 0 then RotatePoint(pt, rec.MidPoint, -rectAngle);
-    if arcRectTop then
+    if IsTopCtrl then
       pt.Y := pt.Y - fRectMargin else
       pt.Y := pt.Y + fRectMargin;
     if rectAngle <> 0 then RotatePoint(pt, rec.MidPoint, rectAngle);
@@ -447,7 +448,7 @@ begin
   with TSvgASegment(fSeg), arcInfo do
   begin
     if rectAngle <> 0 then RotatePoint(Result, rec.MidPoint, -rectAngle);
-    if arcRectLeft then
+    if IsLeftCtrl then
       Result.X := Result.X + fRectMargin else
       Result.X := Result.X - fRectMargin;
     if rectAngle <> 0 then RotatePoint(Result, rec.MidPoint, rectAngle);
@@ -461,7 +462,7 @@ begin
   with TSvgASegment(fSeg), arcInfo do
   begin
     if rectAngle <> 0 then RotatePoint(Result, rec.MidPoint, -rectAngle);
-    if arcRectTop then
+    if IsTopCtrl then
       Result.Y := Result.Y + fRectMargin else
       Result.Y := Result.Y - fRectMargin;
     if rectAngle <> 0 then RotatePoint(Result, rec.MidPoint, rectAngle);
@@ -477,21 +478,24 @@ begin
   Result := CreateButtonGroup(Root, fSeg.ctrlPts,
     bsRound, DefaultButtonSize, clRed32);
 
-  TButtonDesignerLayer32(Result[0]).Visible := false;
-  OffsetHorzBtn(Result[1]);
-  OffsetVertBtn(Result[3]);
+  Result[0].Visible := false; //startpos button
+  OffsetHorzBtn(Result[1]);   //left Rec
+  OffsetVertBtn(Result[3]);   //top Rec
 
-  //insert the designer layer below the button layers (ie level 0)
-  designer := Result.InsertChild(TDesignerLayer32, 0) as TDesignerLayer32;
-  DrawDesigner(designer);
+  for i := 5 to Result.ChildCount -1 do
+    Result[i].Visible := false; //hide rotation & sweep button
 
-  for i := 2 to 4 do
+  for i := 1 to 3 do
     with TButtonDesignerLayer32(Result[i]) do   //rect horz
     begin
       Color := arcRectBtnColor;
       Enabled := true;
       Draw;
     end;
+
+  //insert the designer layer below the button layers (ie level 0)
+  designer := Result.InsertChild(TDesignerLayer32, 0) as TDesignerLayer32;
+  DrawDesigner(designer);
 end;
 //------------------------------------------------------------------------------
 
@@ -569,13 +573,15 @@ var
   dx,dy     : double;
   mp, sp    : TPointD;
   designer  : TDesignerLayer32;
-  segLayer  : TSegBaseLayer;
+  segLayer  : TPathSegLayer;
+  ai        : TArcInfo;
 begin
   designer := GetDesignerLayer(movedBtn);
   if not Assigned(designer) then Exit;
 
-  with TSvgASegment(fSeg), arcInfo do
+  with TSvgASegment(fSeg) do
   begin
+    ai := ArcInfo;
     case TButtonDesignerLayer32(movedBtn).BtnIdx of
       1:                                //rect horz
         begin
@@ -584,38 +590,38 @@ begin
           //the start point doesn't change
           sa := GetStartAngle;
           ea := GetEndAngle;
-          //a: button distance adjustment
+
+          //a = button distance adjustment
           //ie how much more the rec edge should move to keep it
           //aligned with the move button (avoids overshoot & undershoot)
           a := 1-Sqrt(Abs(cos(sa)));
 
           mp := GetPointFromHorzBtn(movedBtn);
-          img32.Vector.RotatePoint(mp, rec.MidPoint, - rectAngle);
-          if arcRectLeft then
+          img32.Vector.RotatePoint(mp, ai.rec.MidPoint, - ai.rectAngle);
+          if IsLeftCtrl then
           begin
-            dx := mp.X - rec.Left;
-            rec.Left := rec.Left + dx + a*dx;
+            dx := mp.X - ai.rec.Left;
+            ai.rec.Left := ai.rec.Left + dx + a*dx;
           end else
           begin
-            dx := mp.X - rec.Right;
-            rec.Right := rec.Right + dx + a*dx;
+            dx := mp.X - ai.rec.Right;
+            ai.rec.Right := ai.rec.Right + dx + a*dx;
           end;
 
-          if rec.Normalize then
+          if ai.rec.Normalize then
           begin
-            arcRectLeft := not arcRectLeft;
             sa := FlipAngleHorizontally(sa);
             ea := FlipAngleHorizontally(ea);
-            sweepClockW := not sweepClockW;
+            ReverseArc;
           end;
 
-          sp := GetPtOnRotatedEllipseFromAngle(rec, rectAngle, sa);
-          endPos := GetPtOnRotatedEllipseFromAngle(rec, rectAngle, ea);
-          dx := startPos.X - sp.X; dy := startPos.Y - sp.Y;
-          OffsetRect(rec, dx, dy);
-          endPos := OffsetPoint(endPos, dx, dy);
+          sp := GetPtOnRotatedEllipseFromAngle(ai.rec, ai.rectAngle, sa);
+          ai.endPos := GetPtOnRotatedEllipseFromAngle(ai.rec, ai.rectAngle, ea);
+          dx := ai.startPos.X - sp.X; dy := ai.startPos.Y - sp.Y;
+          OffsetRect(ai.rec, dx, dy);
+          ai.endPos := OffsetPoint(ai.endPos, dx, dy);
 
-          UpdateCtrlPts;
+          ArcInfo := ai;
           Paths := Img32.Vector.Paths(fSeg.FlatPath);
           DrawPath;
           DrawDesigner(designer);
@@ -625,21 +631,23 @@ begin
           movedBtn.Parent[3].PositionCenteredAt(ctrlPts[2]);
           movedBtn.Parent[4].PositionCenteredAt(ctrlPts[3]);
           OffsetVertBtn(movedBtn.Parent[4]);
-          movedBtn.Parent[5].PositionCenteredAt(endPos);
+          movedBtn.Parent[5].PositionCenteredAt(ai.endPos);
         end;
       2:                                //rect midpoint
         begin
           mp := movedBtn.MidPoint;
-          dx := mp.X - rec.MidPoint.X;
-          dy := mp.Y - rec.MidPoint.Y;
-          OffsetRect(rec, dx, dy);
-          endPos := OffsetPoint(endPos, dx, dy);
-          sa := GetStartAngle;
-          sp := GetPtOnRotatedEllipseFromAngle(rec, rectAngle, sa);
-          dx := (startpos.X - sp.X); dy:= (startpos.Y - sp.Y);
-          OffsetRect(rec, dx, dy);
-          endPos := OffsetPoint(endPos, dx, dy);
-          UpdateCtrlPts;
+          dx := mp.X - ai.rec.MidPoint.X;
+          dy := mp.Y - ai.rec.MidPoint.Y;
+          OffsetRect(ai.rec, dx, dy);
+          ai.endPos := OffsetPoint(ai.endPos, dx, dy);
+          sa := GetRotatedEllipticalAngleFromPoint(ai.rec,
+            ai.rectAngle, ai.startPos);
+          sp := GetPtOnRotatedEllipseFromAngle(ai.rec, ai.rectAngle, sa);
+          dx := (ai.startpos.X - sp.X); dy:= (ai.startpos.Y - sp.Y);
+          OffsetRect(ai.rec, dx, dy);
+          ai.endPos := OffsetPoint(ai.endPos, dx, dy);
+
+          ArcInfo := ai;
           Paths := Img32.Vector.Paths(fSeg.FlatPath);
           DrawPath;
           DrawDesigner(designer);
@@ -649,7 +657,7 @@ begin
           movedBtn.Parent[3].PositionCenteredAt(ctrlPts[2]);
           movedBtn.Parent[4].PositionCenteredAt(ctrlPts[3]);
           OffsetVertBtn(movedBtn.Parent[4]);
-          movedBtn.Parent[5].PositionCenteredAt(endPos);
+          movedBtn.Parent[5].PositionCenteredAt(ai.endPos);
         end;
       3:                                //rect vert
         begin
@@ -661,29 +669,28 @@ begin
           a := 1-Sqrt(Abs(sin(sa))); //button distance adjustment
           mp := movedBtn.MidPoint;
           mp := GetPointFromVertBtn(movedBtn);
-          img32.Vector.RotatePoint(mp, rec.MidPoint, - rectAngle);
-          if arcRectTop then
+          img32.Vector.RotatePoint(mp, ai.rec.MidPoint, - ai.rectAngle);
+          if IsTopCtrl then
           begin
-            dy := mp.Y - rec.Top;
-            rec.Top := rec.Top + dy + a*dy;
+            dy := mp.Y - ai.rec.Top;
+            ai.rec.Top := ai.rec.Top + dy + a*dy;
           end else
           begin
-            dy := mp.Y - rec.Bottom;
-            rec.Bottom := rec.Bottom + dy + a*dy;
+            dy := mp.Y - ai.rec.Bottom;
+            ai.rec.Bottom := ai.rec.Bottom + dy + a*dy;
           end;
-          if rec.Normalize then
+          if ai.rec.Normalize then
           begin
-            arcRectTop := not arcRectTop;
             sa := FlipAngleVertically(sa);
             ea := FlipAngleVertically(ea);
-            sweepClockW := not sweepClockW;
+            ReverseArc;
           end;
-          sp := GetPtOnRotatedEllipseFromAngle(rec, rectAngle, sa);
-          dx := (startpos.X - sp.X); dy:= (startpos.Y - sp.Y);
-          OffsetRect(rec, dx, dy);
-          endPos := GetPtOnRotatedEllipseFromAngle(rec, rectAngle, ea);
-          UpdateCtrlPts;
+          sp := GetPtOnRotatedEllipseFromAngle(ai.rec, ai.rectAngle, sa);
+          dx := (ai.startpos.X - sp.X); dy:= (ai.startpos.Y - sp.Y);
+          OffsetRect(ai.rec, dx, dy);
+          ai.endPos := GetPtOnRotatedEllipseFromAngle(ai.rec, ai.rectAngle, ea);
 
+          ArcInfo := ai;
           Paths := Img32.Vector.Paths(fSeg.FlatPath);
           DrawPath;
           DrawDesigner(designer);
@@ -693,13 +700,13 @@ begin
           movedBtn.Parent[3].PositionCenteredAt(ctrlPts[2]);
           movedBtn.PositionCenteredAt(ctrlPts[3]);
           OffsetVertBtn(movedBtn);
-          movedBtn.Parent[5].PositionCenteredAt(endPos);
+          movedBtn.Parent[5].PositionCenteredAt(ai.endPos);
         end;
       4:
         begin
           mp := movedBtn.MidPoint;
-          endPos := GetClosestPtOnRotatedEllipse(rec, rectAngle, mp);
-          UpdateCtrlPts;
+          ai.endPos := GetClosestPtOnRotatedEllipse(ai.rec, ai.rectAngle, mp);
+          ArcInfo := ai;
           Paths := Img32.Vector.Paths(fSeg.FlatPath);
           DrawPath;
         end;
@@ -714,7 +721,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgASegLayer.CreateRotateBtnGroup(target: TSegBaseLayer;
+function TSvgASegLayer.CreateRotateBtnGroup(target: TPathSegLayer;
   startAngle: double; angleOffset: double): TRotatingGroupLayer32;
 var
   a: double;
@@ -733,28 +740,30 @@ end;
 procedure TSvgASegLayer.UpdateRotateBtnGroup(movedBtn: TLayer32);
 var
   a, sa, ea, dx, dy: double;
+  ai: TArcInfo;
   sp: TPointD;
-  segLayer  : TSegBaseLayer;
+  segLayer  : TPathSegLayer;
 begin
   if not (movedBtn.Parent is TRotatingGroupLayer32) then Exit;
   a := UpdateRotatingButtonGroup(movedBtn);
   if a = 0 then Exit;
 
-  with TSvgASegment(fSeg), arcInfo do
+  with TSvgASegment(fSeg) do
   begin
+    ai := ArcInfo;
     //save the start angle before rotating rect
     //then after rotating, realign the rect so
     //the start point doesn't change
     sa := GetStartAngle;
     ea := GetEndAngle;
 
-    rectAngle := a;
-    sp := GetPtOnRotatedEllipseFromAngle(rec, rectAngle, sa);
-    dx := sp.X - startPos.X; dy := sp.Y - startPos.Y;
-    OffsetRect(rec, -dx, -dy);
-    endPos := GetPtOnRotatedEllipseFromAngle(rec, rectAngle, ea);
+    ai.rectAngle := a;
+    sp := GetPtOnRotatedEllipseFromAngle(ai.rec, ai.rectAngle, sa);
+    dx := sp.X - ai.startPos.X; dy := sp.Y - ai.startPos.Y;
+    OffsetRect(ai.rec, -dx, -dy);
+    ai.endPos := GetPtOnRotatedEllipseFromAngle(ai.rec, ai.rectAngle, ea);
 
-    UpdateCtrlPts;
+    ArcInfo := ai;
     Paths := Img32.Vector.Paths(fSeg.FlatPath);
     DrawPath;
   end;
@@ -773,6 +782,7 @@ var
   j: integer;
   r,r2: TRectD;
   p, p2: TPathD;
+  dashes: TArrayOfInteger;
 begin
   j := Ceil(Owner.StrokeWidth);
   with TSvgASegment(fSeg).arcInfo do
@@ -788,13 +798,15 @@ begin
     r := UnionRect(r, r2);
     InflateRect(r, dpiAware1, dpiAware1); //ie pen width
     designer.SetBounds(Rect(r));
-
     p := OffsetPath(p, -designer.Left, -designer.Top);
-    DrawDashedLine(designer.Image, p, [j,j],
+
+    SetLength(dashes, 2);
+    dashes[0] := j; dashes[1] := j;
+    DrawDashedLine(designer.Image, p, dashes,
       nil, dpiAware1, clMaroon32, esPolygon);
 
     p2 := OffsetPath(p2, -designer.Left, -designer.Top);
-    DrawDashedLine(designer.Image, p2, [j,j],
+    DrawDashedLine(designer.Image, p2, dashes,
       nil, dpiAware1, clSilver32, esPolygon);
   end;
 end;
@@ -833,8 +845,11 @@ var
   i,j: integer;
   pt: TPointD;
   p: TPathD;
+  dashes: TArrayOfInteger;
 begin
   j := Ceil(Owner.StrokeWidth);
+  SetLength(dashes, 2);
+  dashes[0] := j; dashes[1] := j;
   SetLength(p, 2);
   with fSeg do
   begin
@@ -845,13 +860,13 @@ begin
       p[0] := pt;
       p[1] := ctrlPts[i*3];
       p := OffsetPath(p, -designer.Left, -designer.Top);
-      DrawDashedLine(designer.Image, p, [j,j],
+      DrawDashedLine(designer.Image, p, dashes,
         nil, Self.Owner.StrokeWidth/2, clRed32, esRound);
       pt := ctrlPts[i*3+2];
       p[0] := ctrlPts[i*3+1];
       p[1] := pt;
       p := OffsetPath(p, -designer.Left, -designer.Top);
-      DrawDashedLine(designer.Image, p, [j,j],
+      DrawDashedLine(designer.Image, p, dashes,
         nil, Self.Owner.StrokeWidth/2, clRed32, esRound);
     end;
   end;
@@ -893,8 +908,11 @@ var
   i,j: integer;
   p: TPathD;
   pt: TPointD;
+  dashes: TArrayOfInteger;
 begin
   j := Ceil(Owner.StrokeWidth);
+  SetLength(dashes, 2);
+  dashes[0] := j; dashes[1] := j;
   SetLength(p, 2);
   with fSeg do
   begin
@@ -905,13 +923,13 @@ begin
       p[0] := pt;
       p[1] := ctrlPts[i*2];
       p := OffsetPath(p, -designer.Left, -designer.Top);
-      DrawDashedLine(designer.Image, p, [j,j],
+      DrawDashedLine(designer.Image, p, dashes,
         nil, Self.Owner.StrokeWidth/2, clRed32, esRound);
       pt := ctrlPts[i*2+1];
       p[0] := ctrlPts[i*2];
       p[1] := pt;
       p := OffsetPath(p, -designer.Left, -designer.Top);
-      DrawDashedLine(designer.Image, p, [j,j],
+      DrawDashedLine(designer.Image, p, dashes,
         nil, Self.Owner.StrokeWidth/2, clRed32, esRound);
     end;
   end;
@@ -941,8 +959,11 @@ procedure TSvgSSegLayer.DrawDesigner(designer: TDesignerLayer32);
 var
   i,j: integer;
   p: TPathD;
+  dashes: TArrayOfInteger;
 begin
   j := Ceil(Owner.StrokeWidth);
+  SetLength(dashes, 2);
+  dashes[0] := j; dashes[1] := j;
   SetLength(p, 2);
   with fSeg do
   begin
@@ -952,7 +973,7 @@ begin
       p[0] := ctrlPts[i*2];
       p[1] := ctrlPts[i*2+1];
       p := OffsetPath(p, -designer.Left, -designer.Top);
-      DrawDashedLine(designer.Image, p, [j,j],
+      DrawDashedLine(designer.Image, p, dashes,
         nil, Self.Owner.StrokeWidth/2, clRed32, esRound);
     end;
   end;
@@ -962,7 +983,7 @@ end;
 procedure TSvgSSegLayer.BtnMoveCheck(const pos: TPointD);
 var
   dx,dy : integer;
-  layer : TSegBaseLayer;
+  layer : TPathSegLayer;
 begin
   layer := GetPrevSegLayer;
   if layer is TSvgCSegLayer then
@@ -975,7 +996,7 @@ begin
       Offset(dx, dy);
     end;
     //reset Path to redraw and reposition the layer
-    SetBtnCtrlPts(fSeg.CtrlPts);
+    Paths := Img32.Vector.Paths(fSeg.FlatPath);
     DrawPath;
     layer := GetNextSegLayer;
     if Assigned(layer) then
@@ -991,7 +1012,7 @@ end;
 procedure TSvgTSegLayer.BtnMoveCheck(const pos: TPointD);
 var
   dx,dy : integer;
-  layer : TSegBaseLayer;
+  layer : TPathSegLayer;
 begin
   layer := GetPrevSegLayer;
   if layer is TSvgQSegLayer then
@@ -1004,7 +1025,7 @@ begin
       Offset(dx, dy);
     end;
     //reset Path to redraw and reposition the layer
-    SetBtnCtrlPts(fSeg.CtrlPts);
+    Paths := Img32.Vector.Paths(fSeg.FlatPath);
     DrawPath;
     layer := GetNextSegLayer;
     if Assigned(layer) then
@@ -1030,21 +1051,6 @@ end;
 // TSvgZSegLayer
 //------------------------------------------------------------------------------
 
-destructor TSvgZSegLayer.Destroy;
-begin
-  TSvgSubPathLayer(Parent).fSubPath.isClosed := false;
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TSvgZSegLayer.Init(seg: TSvgBaseSeg);
-begin
-  with TSvgSubPathLayer(Parent).fSubPath do
-    Paths := Img32.Vector.Paths([GetFirstPt, GetLastPt]);
-  DrawPath;
-end;
-//------------------------------------------------------------------------------
-
 function TSvgZSegLayer.CreateBtnGroup: TButtonGroupLayer32;
 begin
   Result := CreateButtonGroup(Root,
@@ -1067,7 +1073,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function  TSvgZSegLayer.CreateRotateBtnGroup(target: TSegBaseLayer;
+function  TSvgZSegLayer.CreateRotateBtnGroup(target: TPathSegLayer;
   startAngle: double; angleOffset: double): TRotatingGroupLayer32;
 begin
   Result := nil;
@@ -1080,9 +1086,17 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TSvgZSegLayer.BtnMoveCheck(const pos: TPointD);
+var
+  dx, dy  : double;
+  saved   : TPointD;
 begin
-  with TSvgSubPathLayer(Parent).fSubPath do
-    Paths := Img32.Vector.Paths([GetFirstPt, GetLastPt]);
+  if PointsEqual(pos, fSeg.FirstPt) then Exit;
+  dx := (pos.X - fSeg.FirstPt.X);
+  dy := (pos.Y - fSeg.FirstPt.Y);
+  saved := fSeg.CtrlPts[0];
+  fSeg.Offset(dx, dy); //offset fSeg.FirstPt
+  fSeg.CtrlPts[0] := saved;
+  Paths := Img32.Vector.Paths(fSeg.FlatPath);
   DrawPath;
 end;
 
@@ -1090,37 +1104,33 @@ end;
 // TSvgSubPathLayer
 //------------------------------------------------------------------------------
 
-procedure TSvgSubPathLayer.Init(subPath: TSvgSubPath);
+procedure TSubPathLayer.Init(subPath: TSvgSubPath);
 var
   i: integer;
-  seg: TSegBaseLayer;
+  seg: TPathSegLayer;
 begin
   fOwner    := Parent as TSvgPathLayer;
   fSubPath  := subPath;
   for i := 0 to subPath.Count -1 do
   begin
     case subPath[i].segType of
-      dsLine    : seg := AddChild(TSvgLSegLayer,'L') as TSegBaseLayer;
-      dsHorz    : seg := AddChild(TSvgHSegLayer,'H') as TSegBaseLayer;
-      dsVert    : seg := AddChild(TSvgVSegLayer,'V') as TSegBaseLayer;
-      dsArc     : seg := AddChild(TSvgASegLayer,'A') as TSegBaseLayer;
-      dsQBez    : seg := AddChild(TSvgQSegLayer,'Q') as TSegBaseLayer;
-      dsCBez    : seg := AddChild(TSvgCSegLayer,'C') as TSegBaseLayer;
-      dsQSpline : seg := AddChild(TSvgTSegLayer,'T') as TSegBaseLayer;
-      dsCSpline : seg := AddChild(TSvgSSegLayer,'S') as TSegBaseLayer;
+      stLine    : seg := AddChild(TSvgLSegLayer,'L') as TPathSegLayer;
+      stHorz    : seg := AddChild(TSvgHSegLayer,'H') as TPathSegLayer;
+      stVert    : seg := AddChild(TSvgVSegLayer,'V') as TPathSegLayer;
+      stArc     : seg := AddChild(TSvgASegLayer,'A') as TPathSegLayer;
+      stQBezier    : seg := AddChild(TSvgQSegLayer,'Q') as TPathSegLayer;
+      stCBezier    : seg := AddChild(TSvgCSegLayer,'C') as TPathSegLayer;
+      stQSpline : seg := AddChild(TSvgTSegLayer,'T') as TPathSegLayer;
+      stCSpline : seg := AddChild(TSvgSSegLayer,'S') as TPathSegLayer;
+      stClose   : seg := AddChild(TSvgZSegLayer,'Z') as TPathSegLayer;
       else Continue;
     end;
     seg.Init(subPath[i]);
   end;
-  if fSubPath.isClosed then
-  begin
-    seg := AddChild(TSvgZSegLayer,'Z') as TSegBaseLayer;
-    seg.Init(nil);
-  end;
 end;
 //------------------------------------------------------------------------------
 
-procedure  TSvgSubPathLayer.Offset(dx, dy: integer);
+procedure  TSubPathLayer.Offset(dx, dy: integer);
 begin
   inherited;
   //moving a segment must also involve the whole path
@@ -1128,27 +1138,27 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgSubPathLayer.GetStringDef(decimalPrec: integer): string;
+function TSubPathLayer.GetStringDef(decimalPrec: integer): string;
 begin
   Result := fSubPath.GetStringDef(true, decimalPrec);
 end;
 //------------------------------------------------------------------------------
 
-function TSvgSubPathLayer.GetSegLayer(index: integer): TSegBaseLayer;
+function TSubPathLayer.GetSegLayer(index: integer): TPathSegLayer;
 begin
-  Result := Child[index] as TSegBaseLayer;
+  Result := Child[index] as TPathSegLayer;
 end;
 //------------------------------------------------------------------------------
 
-function TSvgSubPathLayer.GetLastSegLayer: TSegBaseLayer;
+function TSubPathLayer.GetLastSegLayer: TPathSegLayer;
 var
   i: integer;
 begin
   i := ChildCount -1;
   while (i >= 0) and not
-    (Child[i] is TSegBaseLayer) do dec(i);
+    (Child[i] is TPathSegLayer) do dec(i);
   if i < 0 then Result := nil
-  else Result := TSegBaseLayer(Child[i]);
+  else Result := TPathSegLayer(Child[i]);
 end;
 
 //------------------------------------------------------------------------------
@@ -1177,7 +1187,7 @@ procedure TSvgPathLayer.LoadPath(const dpath: string;
   const destRect: TRect; scale: double);
 var
   i, w,h  : integer;
-  subPath : TSvgSubPathLayer;
+  subPath : TSubPathLayer;
   srcRect : TRect;
 begin
   ClearChildren;
@@ -1188,7 +1198,7 @@ begin
 
   if scale > 0 then
     //do nothing
-  else if not srcRect.IsEmpty then
+  else if not IsEmptyRect(srcRect) then
   begin
     w := RectWidth(destRect);
     h := RectHeight(destRect);
@@ -1203,9 +1213,53 @@ begin
   with svgPath do
     for i := 0 to Count -1 do
     begin
-      subPath := AddChild(TSvgSubPathLayer) as TSvgSubPathLayer;
+      subPath := AddChild(TSubPathLayer) as TSubPathLayer;
       subPath.Init(svgPath[i]);
     end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgPathLayer.LoadPathsFromFile(const filename: string;
+  const destRect: TRect; scale: double);
+var
+  s,s2: string;
+
+  procedure ParseTree(el: TSvgTreeEl);
+  var
+    i: integer;
+  begin
+    if el.hash = hDefs then Exit;
+    if el.hash = hPath then
+    begin
+      for i := 0 to el.AttribCount -1 do
+        if el.Attrib[i].hash = hD then
+        begin
+          s2 := Trim(string(el.Attrib[i].value));
+          //when converting separate paths into a single path
+          //a relative starting coord must be made absolute.
+          //nb: this doesn't accommodate matrix transforms
+          if (Length(s2) > 0) then s2[1] := UpCase(s2[1]);
+          s := s + s2 + #10;
+          Exit;
+        end;
+    end;
+    for i := 0 to el.childs.Count -1 do
+      ParseTree(el.childs[i]);
+  end;
+
+var
+  parser: TSvgParser;
+begin
+  s := '';
+  parser := TSvgParser.Create;
+  try
+    parser.LoadFromFile(filename);
+    //collate all path elements into a single path statement.
+    ParseTree(parser.svgTree);
+  finally
+    parser.Free;
+  end;
+  LoadPath(string(s), destRect, scale);
 end;
 //------------------------------------------------------------------------------
 
@@ -1221,9 +1275,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgPathLayer.GetSubPathLayer(index: integer): TSvgSubPathLayer;
+function TSvgPathLayer.GetSubPathLayer(index: integer): TSubPathLayer;
 begin
-  Result := Child[index] as TSvgSubPathLayer;
+  Result := Child[index] as TSubPathLayer;
 end;
 //------------------------------------------------------------------------------
 

@@ -554,6 +554,12 @@ end;
 destructor TLayer32.Destroy;
 begin
   ClearChildren;
+  if fVisible then
+  begin
+    fVisible := false;
+    Invalidate(fOldBounds);
+    Invalidate(Bounds);
+  end;
   fImage.Free;
   fChilds.Free;
   FreeAndNil(fMergeImage);
@@ -924,11 +930,11 @@ begin
   child := TLayer32(fChilds[index]);
   fChilds.Delete(index);
   FreeAndNil(fMergeImage);
-  if child.Visible then
-  begin
-    Invalidate(child.fOldBounds);
-    Invalidate(child.Bounds);
-  end;
+//  if child.Visible then
+//  begin
+//    Invalidate(child.fOldBounds);
+//    Invalidate(child.Bounds);
+//  end;
 
   if not fromChild then
   begin

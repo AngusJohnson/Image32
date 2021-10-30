@@ -1,8 +1,8 @@
 object MainForm: TMainForm
-  Left = 594
-  Top = 418
+  Left = 273
+  Top = 177
   Caption = 'SVG Paths'
-  ClientHeight = 531
+  ClientHeight = 530
   ClientWidth = 770
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -25,18 +25,17 @@ object MainForm: TMainForm
   TextHeight = 14
   object pnlBottom: TPanel
     Left = 0
-    Top = 483
+    Top = 458
     Width = 770
-    Height = 48
+    Height = 72
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 0
-    StyleElements = [seFont, seBorder]
     object memo1: TRichEdit
       Left = 0
       Top = 0
       Width = 770
-      Height = 48
+      Height = 72
       Align = alClient
       Font.Charset = ANSI_CHARSET
       Font.Color = clWindowText
@@ -44,13 +43,11 @@ object MainForm: TMainForm
       Font.Name = 'Tahoma'
       Font.Style = []
       ParentFont = False
+      ScrollBars = ssVertical
       TabOrder = 0
+      WordWrap = False
       Zoom = 100
       OnChange = Memo1Change
-      ExplicitLeft = 400
-      ExplicitTop = 8
-      ExplicitWidth = 185
-      ExplicitHeight = 89
     end
   end
   object MainMenu1: TMainMenu
@@ -58,6 +55,14 @@ object MainForm: TMainForm
     Top = 56
     object File1: TMenuItem
       Caption = '&File'
+      object Open1: TMenuItem
+        Caption = '&Open ...'
+        ShortCut = 16463
+        OnClick = Open1Click
+      end
+      object N12: TMenuItem
+        Caption = '-'
+      end
       object Exit1: TMenuItem
         Caption = 'E&xit'
         ShortCut = 27
@@ -125,8 +130,16 @@ object MainForm: TMainForm
           ShortCut = 24662
           OnClick = mnuTClick
         end
+        object N14: TMenuItem
+          Caption = '-'
+        end
+        object mnuZClose: TMenuItem
+          Caption = 'Close Path'
+          ShortCut = 24666
+          OnClick = mnuTClick
+        end
       end
-      object N1: TMenuItem
+      object N2: TMenuItem
         Caption = '-'
       end
       object mnuReverseArc: TMenuItem
@@ -136,14 +149,19 @@ object MainForm: TMainForm
         OnClick = ReverseArcClick
       end
       object mnuRotate2: TMenuItem
-        Caption = '&Rotate'
+        Caption = '&Rotate Arc'
+        Enabled = False
         ShortCut = 16466
         OnClick = mnuRotateClick
       end
+      object N1: TMenuItem
+        Caption = '-'
+      end
       object mnuDeleteSeg: TMenuItem
         Caption = '&Delete End Segment'
+        Enabled = False
         ShortCut = 46
-        OnClick = mnuDeleteLayerClick
+        OnClick = mnuDeleteClick
       end
     end
   end
@@ -157,13 +175,6 @@ object MainForm: TMainForm
     OnPopup = PopupMenu1Popup
     Left = 64
     Top = 120
-    object mnuScaleToFit2: TMenuItem
-      Caption = 'Scale to &Fit Window'
-      OnClick = mnuScaleToFitClick
-    end
-    object N12: TMenuItem
-      Caption = '-'
-    end
     object N4: TMenuItem
       Caption = 'A&ppend Segment'
       object mnuA: TMenuItem
@@ -215,14 +226,17 @@ object MainForm: TMainForm
         ShortCut = 24662
         OnClick = mnuTClick
       end
+      object N15: TMenuItem
+        Caption = '-'
+      end
+      object mnuZClose2: TMenuItem
+        Caption = 'Close Path'
+        ShortCut = 24666
+        OnClick = mnuTClick
+      end
     end
     object N5: TMenuItem
       Caption = '-'
-    end
-    object mnuDeleteLayer2: TMenuItem
-      Caption = '&Delete Segment'
-      ShortCut = 46
-      OnClick = mnuDeleteLayerClick
     end
     object mnuReverseArc2: TMenuItem
       Caption = 'Reverse &Arc'
@@ -231,15 +245,31 @@ object MainForm: TMainForm
       OnClick = ReverseArcClick
     end
     object mnuRotate: TMenuItem
-      Caption = '&Rotate'
+      Caption = '&Rotate Arc'
+      Enabled = False
       ShortCut = 16466
       OnClick = mnuRotateClick
+    end
+    object N13: TMenuItem
+      Caption = '-'
+    end
+    object mnuDeleteSeg2: TMenuItem
+      Caption = '&Delete End Segment'
+      Enabled = False
+      ShortCut = 46
+      OnClick = mnuDeleteClick
     end
   end
   object OpenDialog1: TOpenDialog
     DefaultExt = '*.png'
     Filter = 'Image Files ( PNG, JPG, SVG)|*.png;*.jpg;*.svg'
+    Options = [ofHideReadOnly, ofFileMustExist, ofEnableSizing]
     Left = 128
     Top = 144
+  end
+  object OpenDialog2: TOpenDialog
+    Filter = 'SVG Files (*.svg)|*.svg'
+    Left = 192
+    Top = 120
   end
 end

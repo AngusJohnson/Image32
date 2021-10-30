@@ -211,9 +211,8 @@ type
   function RotatePath(const paths: TPathsD;
     const focalPoint: TPointD; angleRads: double): TPathsD; overload;
 
-  function MakePathI(const pts: array of integer): TPathD; overload;
-  function MakePathD(const pts: array of double): TPathD; overload;
-  function MakePathD(const pts: array of TPointD): TPathD; overload;
+  function MakePathI(const pts: array of integer): TPathD;
+  function MakePathD(const pts: array of double): TPathD;
 
   function GetBounds(const path: TPathD): TRect; overload;
   function GetBounds(const paths: TPathsD): TRect; overload;
@@ -334,6 +333,8 @@ type
     ellipseRotAngle, angle: double): TPointD;
   function GetEllipticalAngleFromPoint(const ellipseRect: TRectD;
     const pt: TPointD): double;
+  function GetRotatedEllipticalAngleFromPoint(const ellipseRect: TRectD;
+    ellipseRotAngle: double; pt: TPointD): double;
   function GetClosestPtOnRotatedEllipse(const ellipseRect: TRectD;
     ellipseRotation: double; const pt: TPointD): TPointD;
 
@@ -1495,6 +1496,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function GetRotatedEllipticalAngleFromPoint(const ellipseRect: TRectD;
+  ellipseRotAngle: double; pt: TPointD): double;
+begin
+  Result := 0;
+  if ellipseRect.IsEmpty then Exit;
+  RotatePoint(pt, ellipseRect.MidPoint, -ellipseRotAngle);
+  Result := GetEllipticalAngleFromPoint(ellipseRect, pt);
+end;
+//------------------------------------------------------------------------------
+
 function GetPtOnRotatedEllipseFromAngle(const ellipseRect: TRectD;
   ellipseRotAngle, angle: double): TPointD;
 begin
@@ -1612,7 +1623,7 @@ function Grow(const path, normals: TPathD; delta: double;
 var
   i,prevI, highI: cardinal;
   buffLen, resultLen: cardinal;
-  steps360, stepsPerRad, pathArea, absPathArea, resultArea: double;
+  steps360, stepsPerRad, pathArea, absPathArea: double;
   pathBounds: TRectD;
   stepSin, stepCos, cosA: double;
   isShrinking: Boolean;
@@ -3397,21 +3408,6 @@ begin
     Result[j].Y := y;
   end;
   setlength(Result, j+1);
-end;
-//------------------------------------------------------------------------------
-
-function MakePathD(const pts: array of TPointD): TPathD;
-var
-  i, len: Integer;
-begin
-  Result := nil;
-  len := length(pts);
-  if len = 0 then Exit;
-
-  setlength(Result, len);
-  Result[0] := pts[0];
-  for i := 1 to len -1 do
-    Result[i] := pts[i];
 end;
 //------------------------------------------------------------------------------
 

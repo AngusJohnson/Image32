@@ -1160,7 +1160,7 @@ begin
   dst := GetDstPixel(x1,y);
   for i := x1 to x2 do
   begin
-    if alpha^ > 127 then dst^ := fColor; //ie no blending
+    if Ord(alpha^) > 127 then dst^ := fColor; //ie no blending
     inc(dst); inc(alpha);
   end;
 end;

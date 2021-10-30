@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, ShellApi,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls, StdCtrls, Dialogs,
-  Img32, Img32.Layers, Img32.Draw, Img32.SVG.Core, Img32.Svg.PathDesign;
+  Img32, Img32.Layers, Img32.Draw, Img32.SVG.PathDesign;
 
 type
 
@@ -18,7 +18,7 @@ type
     Exit1: TMenuItem;
     SaveDialog1: TSaveDialog;
     PopupMenu1: TPopupMenu;
-    mnuDeleteLayer2: TMenuItem;
+    mnuDeleteSeg2: TMenuItem;
     OpenDialog1: TOpenDialog;
     Action1: TMenuItem;
     mnuReverseArc2: TMenuItem;
@@ -55,9 +55,16 @@ type
     mnuArc2: TMenuItem;
     N11: TMenuItem;
     mnuScaleToFit: TMenuItem;
-    mnuScaleToFit2: TMenuItem;
-    N12: TMenuItem;
     memo1: TRichEdit;
+    N2: TMenuItem;
+    N13: TMenuItem;
+    Open1: TMenuItem;
+    N12: TMenuItem;
+    OpenDialog2: TOpenDialog;
+    N14: TMenuItem;
+    mnuZClose: TMenuItem;
+    N15: TMenuItem;
+    mnuZClose2: TMenuItem;
     procedure mnuExitClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -67,7 +74,7 @@ type
       Y: Integer);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure ReverseArcClick(Sender: TObject);
-    procedure mnuDeleteLayerClick(Sender: TObject);
+    procedure mnuDeleteClick(Sender: TObject);
     procedure mnuRotateClick(Sender: TObject);
     procedure mnuTClick(Sender: TObject);
     procedure Memo1Change(Sender: TObject);
@@ -77,11 +84,12 @@ type
     procedure mnuScaleToFitClick(Sender: TObject);
     procedure FormMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
+    procedure Open1Click(Sender: TObject);
   private
     layeredImg32  : TLayeredImage32;
     svgPathLayer  : TSvgPathLayer;
     clickedLayer  : TLayer32;
-    targetLayer   : TSegBaseLayer;
+    targetLayer   : TPathSegLayer;
     buttonGroup   : TGroupLayer32;
     rotateGroup   : TGroupLayer32;
     clickPoint    : TPoint;
@@ -96,7 +104,7 @@ type
 
 var
   MainForm: TMainForm;
-  decimalPrec: integer = 0;
+  decimalPrec: integer = 2;
 
 implementation
 
@@ -106,7 +114,7 @@ implementation
 
 uses
   Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.SVG,
-  Img32.Vector, Img32.Extra;
+  Img32.Vector, Img32.Extra, Img32.SVG.Core, Img32.SVG.Path;
 
 
 //------------------------------------------------------------------------------
@@ -116,21 +124,39 @@ uses
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
   layeredImg32 := TLayeredImage32.Create;
+  layeredImg32.SetSize(ClientWidth, ClientHeight - pnlBottom.Height);
 
   //add a hatched background design layer (drawn in FormResize).
   layeredImg32.AddLayer(TDesignerLayer32);
 
   //get ready to load an SVG-DPath
   svgPathLayer := layeredImg32.AddLayer(TSvgPathLayer) as TSvgPathLayer;
-
-//  memo1.Lines.Text := 'M 0,0 l 200,0 ';
-
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
   layeredImg32.Free;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.Open1Click(Sender: TObject);
+var
+  rec       : TRect;
+const
+  borderSize = 50;
+begin
+  if not OpenDialog1.Execute then Exit;
+
+  SetTargetLayer(nil);
+
+  rec := layeredImg32.Bounds;
+  img32.Vector.InflateRect(rec, -borderSize, -borderSize);
+
+  ////////////////////////////////////////////////
+  svgPathLayer.LoadPathsFromFile(OpenDialog1.FileName, rec, 0);
+  ////////////////////////////////////////////////
+  UpdateMemo;
 end;
 //------------------------------------------------------------------------------
 
@@ -198,14 +224,14 @@ begin
   clickedLayer := nil;
   targetLayer := nil;
   if not assigned(layer) or
-    not (layer is TSegBaseLayer) then
+    not (layer is TPathSegLayer) then
   begin
     ClearMemoBolding;
     Exit;
   end;
 
   clickedLayer := layer;
-  targetLayer := layer as TSegBaseLayer;
+  targetLayer := layer as TPathSegLayer;
   with targetLayer do
   begin
     buttonGroup := CreateBtnGroup;
@@ -232,7 +258,7 @@ begin
       ClearMemoBolding;
     end;
   end
-  else if (clickedLayer is TSegBaseLayer) and
+  else if (clickedLayer is TPathSegLayer) and
     (clickedLayer <> targetLayer) then
       SetTargetLayer(clickedLayer);
   Invalidate;
@@ -272,15 +298,23 @@ begin
     if not assigned(targetLayer) then Exit;
 
     clickedLayer.Offset(dx, dy);
-    clickPoint.Offset(dx, dy);
+    clickPoint := OffsetPoint(clickPoint, dx, dy);
 
     if (clickedLayer.Parent is TRotatingGroupLayer32) then
       targetLayer.UpdateRotateBtnGroup(clickedLayer) else
       targetLayer.UpdateBtnGroup(clickedLayer);
+
+    //Updating clickPoint when the control button is an Arc rect button can be
+    //problematic because these buttons are offset from the rect. As a result
+    //this can produce 'button bouncing' when the rect is being reflected.
+    //So bypass updating clickPoint for vert and horz Arc rect adjustments
+    if (targetLayer is TSvgASegLayer) and
+      (TButtonDesignerLayer32(clickedLayer).BtnIdx in [2,4]) then
+      clickPoint := Point(clickedLayer.MidPoint);
   end
-  else if Assigned(clickedLayer) and (clickedLayer is TSegBaseLayer) then
+  else if Assigned(clickedLayer) and (clickedLayer is TPathSegLayer) then
   begin
-    clickPoint.Offset(dx, dy);
+    clickPoint := OffsetPoint(clickPoint, dx, dy);
     //move the whole path
     clickedLayer.Parent.Offset(dx, dy);
     //and move the whole button group too
@@ -306,16 +340,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.mnuDeleteLayerClick(Sender: TObject);
+procedure TMainForm.mnuDeleteClick(Sender: TObject);
 var
   layer: TLayer32;
   subPath: TSvgSubPath;
 begin
   if not Assigned(targetLayer) then Exit;
   //it's only safe to delete the last segment
-  layer := TSvgSubPathLayer(targetLayer.Parent).GetLastSegLayer;
+  layer := TSubPathLayer(targetLayer.Parent).GetLastSegLayer;
   SetTargetLayer(layer.PrevLayerInGroup);
-  subPath := TSvgSubPathLayer(layer.Parent).SubPath;
+  subPath := TSubPathLayer(layer.Parent).SubPath;
   subPath.DeleteLastSeg;
   if subPath.Count = 0 then
   begin
@@ -381,55 +415,84 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TextWidth(dc: HDC; const text: string): integer;
+var
+  size: TSize;
+begin
+  if not GetTextExtentPoint32(dc, pchar(text), length(text), size) then
+    Result := 0 else
+    Result := size.cx;
+end;
+//------------------------------------------------------------------------------
+
 procedure TMainForm.UpdateMemo;
 var
   savedOnChange: TNotifyEvent;
-  leftMouseBtnDown: Boolean;
-  i,j, startPos, endPos: integer;
-  txt: string;
+  i,j, len, charWidth, cw, maxWidth, startPos, endPos: integer;
+  s, txt: string;
   svgPath: TSvgPath;
+  targetSeg: TSvgPathSeg;
 begin
-  leftMouseBtnDown := GetAsyncKeyState(VK_LBUTTON) < 0;
+  if (GetAsyncKeyState(VK_LBUTTON) < 0) then Exit;
+  maxWidth := memo1.ClientWidth - GetSystemMetrics(SM_CXVSCROLL) - 2;
+
+  if Assigned(targetLayer) then
+    targetSeg := targetLayer.Seg else
+    targetSeg := nil;
+
   savedOnChange := memo1.OnChange;
   memo1.OnChange := nil;
   memo1.Lines.BeginUpdate;
   try
-    memo1.Text := '';
-    if Assigned(targetLayer) and not leftMouseBtnDown then
-    begin
-      startPos := 0; endPos := 0; txt := '';
-      svgPath := targetLayer.Seg.Owner;
-      for i := 0 to svgPath.Count -1 do
-        with svgPath.Path[i] do
+    memo1.lines.Clear;
+    startPos := 0; endPos := 0; txt := '';
+    svgPath := svgPathLayer.svgPath;
+    for i := 0 to svgPath.Count -1 do
+      with svgPath.Path[i] do
+      begin
+        s := GetMoveStrDef(true, decimalPrec);
+        charWidth := TextWidth(canvas.handle, s);
+        txt := txt + s;
+        for j := 0 to Count -1 do
         begin
-          txt := txt + GetMoveStrDef(true, decimalPrec);
-          for j := 0 to Count -1 do
-            if Seg[j] = targetLayer.Seg then
-            begin
-              startPos := Length(txt);
-              txt := txt + Seg[j].GetStringDef(true, decimalPrec);
-              endPos := Length(txt);
-            end
-            else
-              txt := txt + Seg[j].GetStringDef(true, decimalPrec);
+          s := Seg[j].GetStringDef(true, decimalPrec);
+          len := Length(s);
+          cw := TextWidth(canvas.handle, s);
+          if Seg[j] = targetSeg then
+          begin
+            startPos := Length(txt);
+            endPos := startPos + len;
+          end;
+
+          if charWidth + cw >= maxWidth then
+          begin
+            txt := txt + #10 + s;
+            charWidth := cw;
+            if Seg[j] = targetSeg then inc(startPos);
+          end else
+          begin
+            txt := txt+ s;
+            charWidth := charWidth + cw;
+          end;
         end;
+        txt := txt + #10;
+      end;
 
-      //copy the SVG string to the memo
-      memo1.Text := txt;
+    //copy the SVG string to the memo
+    memo1.Text := txt;
 
+    if endPos > 0 then
+    begin
       //highlight the target segment's text
       memo1.SelStart := startPos;
       memo1.SelLength := endPos - startPos;
-      memo1.SelAttributes.Style := [TFontStyle.fsBold];
-      memo1.SelStart := -1;
-    end else
-    begin
-      memo1.Text := svgPathLayer.svgPath.GetStringDef(true, decimalPrec);
+      //memo1.SelAttributes.Style := [TFontStyle.fsBold];
     end;
+
   finally
     memo1.Lines.EndUpdate;
+    memo1.OnChange := savedOnChange;
   end;
-  memo1.OnChange := savedOnChange;
 end;
 //------------------------------------------------------------------------------
 
@@ -448,74 +511,98 @@ end;
 
 procedure TMainForm.mnuTClick(Sender: TObject);
 var
-  C     : Char;
-  s, lc : string;
-  layer : TSegBaseLayer;
+  i,j   : integer;
+  c     : Char;
+  s, s2 : string;
   d     : double;
-  spl   : TSvgSubPathLayer;
+  spl   : TSubPathLayer;
+  lastSegLayer: TPathSegLayer;
 begin
   //add a new segment to the end of the targetLayer's path
   //unless there is no targetLayer selected.
 
-  C := TMenuItem(Sender).Name[4];
-
-  //draw a new segment that's very roughly proportional
-  //to the size of the previous segment
-
-  layer := nil;
+  lastSegLayer := nil;
   if Assigned(targetLayer) then
-    layer := targetLayer
-  else if (svgPathLayer.ChildCount > 0) then
-    with TGroupLayer32(svgPathLayer[svgPathLayer.ChildCount-1]) do
-      Layer := LastChild as TSegBaseLayer;
-
-  if Assigned(layer) then
   begin
-    if layer.Seg.SegType = dsVert then
-      d := GetBoundsD(layer.Seg.FlatPath).Height else
-      d := GetBoundsD(layer.Seg.FlatPath).Width;
-    d := d/ (3*svgPathLayer.SvgPath.Scale);
+    spl := targetLayer.Parent as TSubPathLayer;
+    lastSegLayer := spl.GetLastSegLayer;
   end else
+  begin
+    spl := nil;
+    if svgPathLayer.ChildCount > 0 then
+      with svgPathLayer[svgPathLayer.ChildCount -1] as TSubPathLayer do
+        lastSegLayer := GetLastSegLayer;
+  end;
+
+  //create a new segment that's very roughly proportional
+  //to the size of the previous segment
+  if Assigned(lastSegLayer) then
+  begin
+    if lastSegLayer.Seg.SegType = stVert then
+      d := GetBoundsD(lastSegLayer.Seg.FlatPath).Height else
+      d := GetBoundsD(lastSegLayer.Seg.FlatPath).Width;
+    d := d/ (3*svgPathLayer.SvgPath.Scale);
+  end
+  else
     d := 100;
 
-  if not Assigned(targetLayer) then
-    lc := 'M 0,0 ' + LowerCase(C)
-  else if (targetLayer.Name <> C) then
-    lc := LowerCase(C)
-  else
-    lc := '';
-
-  case C of
-    'A': s := lc +
-      format(' %1.0f,%1.0f 0 0 1 %1.0f,0 ', [d, d*2, d*2]);
-    'C': s := lc +
-      format(' %1.0f,%1.0f %1.0f,%1.0f, %1.0f,0 ', [d*1.5, d, d*1.5, -d, d*3]);
-    'Q': s := lc +
-      format(' %1.0f,%1.0f %1.0f,0 ', [d, d*2, d*3]);
-    'L': s := lc + format(' %1.0f,0', [d*1.5]);
-    'H': s := lc + format(' %1.0f ', [d*1.5]);
-    'V': s := lc + format(' %1.0f ', [d*1.5]);
-    'S': s := lc + format(' %1.0f,%1.0f %1.0f,0 ', [d*1.5, d, d*3]);
-    'T': s := lc +format(' %1.0f,0 ', [d*1.5]);
+  c := TMenuItem(Sender).Name[4];
+  case c of
+    'A': s2 := format(' %1.0f,%1.0f 0 0 1 %1.0f,0 ', [d, d*2, d*2]);
+    'C': s2 := format(' %1.0f,%1.0f %1.0f,%1.0f, %1.0f,0 ', [d*1.5, d, d*1.5, -d, d*3]);
+    'Q': s2 := format(' %1.0f,%1.0f %1.0f,0 ', [d, d*2, d*3]);
+    'L': s2 := format(' %1.0f,0', [d*1.5]);
+    'H': s2 := format(' %1.0f ', [d*1.5]);
+    'V': s2 := format(' %1.0f ', [d*1.5]);
+    'S': s2 := format(' %1.0f,%1.0f %1.0f,0 ', [d*1.5, d, d*3]);
+    'T': s2 := format(' %1.0f,0 ', [d*1.5]);
+    'Z': s2 := '';
     else Exit;
   end;
 
+  s := ''; j := -1;
+  for i := 0 to svgPathLayer.ChildCount -1 do
+  begin
+    s := s + TSubPathLayer(svgPathLayer[i]).GetStringDef(2);
+    if svgPathLayer[i] = spl then
+    begin
+      if assigned(lastSegLayer) and (lastSegLayer.Name = c) then
+        s := s + s2 else
+        s := s + LowerCase(c) + s2;
+      j := i;
+    end;
+    s := s + #10;
+  end;
+
+  if not Assigned(spl) then
+    s := s + 'M 0,0 ' + LowerCase(c) + s2;
+
   //set the SVG DPath text
-  Memo1.Lines.Text := Memo1.Lines.Text + s;
+  Memo1.Lines.Text := s;
 
   //find the new targetLayer
   if (svgPathLayer.ChildCount = 0) then Exit;
-  spl := svgPathLayer[svgPathLayer.ChildCount -1] as TSvgSubPathLayer;
+  if j < 0 then j := svgPathLayer.ChildCount -1;
+  spl := svgPathLayer[j] as TSubPathLayer;
   if spl.ChildCount > 0 then
     SetTargetLayer(spl.GetLastSegLayer);
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.PopupMenu1Popup(Sender: TObject);
+var
+  targetSelected: Boolean;
+  targetIsArcSeg: Boolean;
 begin
-  mnuReverseArc2.Enabled :=
-    Assigned(targetLayer) and (targetLayer is TSvgASegLayer);
-  mnuReverseArc.Enabled := mnuReverseArc2.Enabled;
+  targetSelected := Assigned(targetLayer);
+  mnuDeleteSeg.Enabled    := targetSelected;
+  mnuDeleteSeg2.Enabled   := targetSelected;
+
+  targetIsArcSeg := targetSelected and (targetLayer is TSvgASegLayer);
+  mnuReverseArc2.Enabled  := targetIsArcSeg;
+  mnuReverseArc.Enabled   := targetIsArcSeg;
+  mnuRotate.Enabled       := targetIsArcSeg;
+  mnuRotate2.Enabled      := targetIsArcSeg;
 end;
 //------------------------------------------------------------------------------
 

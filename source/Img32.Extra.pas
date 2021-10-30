@@ -251,9 +251,9 @@ begin
   begin
     with rec do
     begin
-      p := MakePathD([left, bottom, left, top, right, top]);
+      p := Img32.Vector.MakePathD([left, bottom, left, top, right, top]);
       DrawLine(img, p, penWidth, topLeftColor, esButt);
-      p := MakePathD([right, top, right, bottom, left, bottom]);
+      p := Img32.Vector.MakePathD([right, top, right, bottom, left, bottom]);
       DrawLine(img, p, penWidth, bottomRightColor, esButt);
     end;
   end else
