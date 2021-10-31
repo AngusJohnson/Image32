@@ -39,12 +39,22 @@ object MainForm: TMainForm
       Caption = '&File'
       object Exit1: TMenuItem
         Caption = 'E&xit'
+        ShortCut = 27
         OnClick = mnuExitClick
       end
     end
     object Action1: TMenuItem
       Caption = '&Action'
       OnClick = PopupMenu1Popup
+      object mnuHideHatching: TMenuItem
+        AutoCheck = True
+        Caption = 'Hide &Hatching'
+        ShortCut = 16456
+        OnClick = mnuHideHatchingClick
+      end
+      object N4: TMenuItem
+        Caption = '-'
+      end
       object mnuAddRectangle: TMenuItem
         Caption = 'Add &Rectangle'
         ShortCut = 16466

@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 3.4
-Released: 26 October 2021
+Latest version: 3.4.1
+Released: 31 October 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -12,12 +12,23 @@ Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
 
+Version 3.4.1
+  Img32.Extra
+    Bugfix HatchBackground function -
+      incorrectly drawn when background wasn't clear
+    DrawEdgePath renamed to DrawEdge (and overloaded)
+  Img32.Layers
+    Bugfix TLayer32 - 
+      incorrectly redraw when changing layer visibility
+    TLayeredImage32 
+      default BackgroundColor changed to clBtnFace
+      
 Version 3.4 
-  Img32.SVG.Core
-    Major redesign of TSvgPath and related classes 
-      to facilitate SVG editing
+  Img32.SVG.Core 
+    Split into 2 units Img32.SVG.Core & Img32.SVG.Path
+    Major class redesign to facilitate SVG editing
   Img32.SVG.PathDesign
-    New unit that facilitates GUI editing of SVG paths
+    New unit to aid GUI editing of SVG paths
   Sample Applications
     New SVGPathDesign application
   Img32.Layers

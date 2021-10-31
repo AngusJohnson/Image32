@@ -2,8 +2,8 @@ unit Img32.Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.4                                                             *
-* Date      :  25 October 2021                                                 *
+* Version   :  3.5                                                             *
+* Date      :  31 October 2021                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -711,7 +711,9 @@ procedure TLayer32.SetVisible(value: Boolean);
 begin
   if (value = fVisible) or (Root = Self) then Exit;
   fVisible := value;
-  Invalidate(fOldBounds);
+  if Visible then
+    Invalidate(fOldBounds) else
+    Parent.Invalidate(fOldBounds);
 end;
 //------------------------------------------------------------------------------
 
@@ -1948,6 +1950,7 @@ begin
   fRoot.fLayeredImage := self;
   fBounds := Rect(0, 0, Width, Height);
   fRoot.SetSize(width, Height);
+  fBackColor := clBtnFace32;
   fResampler := DefaultResampler;
   fLastUpdateType := utUndefined;
 end;

@@ -165,15 +165,6 @@ procedure AppendPaths(var paths: TPathsD; const extra: TPathsD); overload;
 
 function ArrayOfPathsToPaths(const ap: TArrayOfPaths): TPaths;
 
-{$IFDEF DEBUG}
-function PathToString(const path: TPath): string; overload;
-function PathsToString(const paths: TPaths): string; overload;
-function PathToString(const path: TPathD): string; overload;
-function PathsToString(const paths: TPathsD): string; overload;
-procedure StringToFile(const str, filename: string);
-function Ellipse(const rec: TRectD; steps: integer = 0): TPathD;
-{$ENDIF}
-
 const
   floatingPointTolerance: double = 1E-15;
   defaultMinEdgeLen: double = 0.1;
@@ -1103,122 +1094,7 @@ begin
   for i := 0 to High(paths) do
     CleanPathInternal(paths[i], isClosed, minEdgeLength, sinSqrdMinAngleRads);
 end;
-
 //------------------------------------------------------------------------------
-// useful debugging functions
-//------------------------------------------------------------------------------
-
-{$IFDEF DEBUG}
-function PointTosString(const pt: TPoint64): string;
-  {$IFDEF INLINING} inline; {$ENDIF}
-begin
-  result := format('%d,%d', [pt.X, pt.Y]);
-end;
-//------------------------------------------------------------------------------
-
-function PathToString(const path: TPath): string;
-var
-  i, highI: integer;
-begin
-  result := '';
-  highI := high(path);
-  if highI < 0 then Exit;
-  for i := 0 to highI -1 do
-    result := result + PointTosString(path[i]) + ', ';
-  result := result + PointTosString(path[highI]);
-end;
-//------------------------------------------------------------------------------
-
-function PathsToString(const paths: TPaths): string;
-var
-  i, highI: integer;
-begin
-  result := '';
-  highI := high(paths);
-  if highI < 0 then Exit;
-  for i := 0 to highI do
-    result := result + PathToString(paths[i]) + #10;
-end;
-//------------------------------------------------------------------------------
-
-function PointDTosString(const pt: TPointD): string;
-  {$IFDEF INLINING} inline; {$ENDIF}
-begin
-  result := format('%1.2f,%1.2f', [pt.X, pt.Y]);
-end;
-//------------------------------------------------------------------------------
-
-function PathToString(const path: TPathD): string;
-var
-  i, highI: integer;
-begin
-  result := '';
-  highI := high(path);
-  if highI < 0 then Exit;
-  for i := 0 to highI -1 do
-    result := result + PointDTosString(path[i]) + ', ';
-  result := result + PointDTosString(path[highI]);
-end;
-//------------------------------------------------------------------------------
-
-function PathsToString(const paths: TPathsD): string;
-var
-  i, highI: integer;
-begin
-  result := '';
-  highI := high(paths);
-  if highI < 0 then Exit;
-  for i := 0 to highI do
-    result := result + PathToString(paths[i]) + #10#10;
-end;
-//------------------------------------------------------------------------------
-
-procedure StringToFile(const str, filename: string);
-begin
-  with TStringList.Create do
-  try
-    Text := str;
-    SaveToFile(filename);
-  finally
-    free;
-  end;
-end;
-
-//------------------------------------------------------------------------------
-
-function Ellipse(const rec: TRectD; steps: integer = 0): TPathD;
-var
-  i: integer;
-  centre, radii: TPointD;
-  avgRadius, sinA, cosA, dxx, dx,dy: double;
-begin
-  Result := nil;
-  if (rec.IsEmpty) then Exit;
-  centre.X := (rec.left + rec.right) / 2;
-  centre.Y := (rec.top + rec.bottom) / 2;
-  radii.X := (rec.right - rec.left) / 2;
-  radii.Y := (rec.bottom - rec.top) / 2;
-  avgRadius := (radii.x + radii.y) / 2;
-  if (steps = 0) then
-    steps := Round(PI / ArcCos(1 - 0.5 / avgRadius));
-  if (steps < 3) then steps := 3;
-
-  SinCos(Pi * 2 / steps, sinA, cosA);
-  dx := cosA;
-  dy := sinA;
-  SetLength(Result, steps);
-  Result[0] := PointD(centre.X + radii.X, centre.Y);
-  for i := 1 to steps -1 do
-  begin
-    Result[i].X := centre.X + radii.X * dx;
-    Result[i].Y := centre.Y + radii.Y * dy;
-    dxx := dx;
-    dx := dxx * cosA - dy * sinA;
-    dy := dy * cosA + dxx * sinA;
-  end;
-end;
-//------------------------------------------------------------------------------
-{$ENDIF}
 
 end.
 

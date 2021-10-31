@@ -2,8 +2,8 @@ unit Img32.Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.4                                                             *
-* Date      :  12 October 2021                                                 *
+* Version   :  3.5                                                             *
+* Date      :  31 October 2021                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -29,9 +29,9 @@ type
   TButtonAttributes = set of TButtonAttribute;
 
 procedure DrawEdge(img: TImage32; const rec: TRect;
-  topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
-procedure DrawEdgePath(img: TImage32; const path: TPathD;
-  topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
+  topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0); overload;
+procedure DrawEdge(img: TImage32; const path: TPathD;
+  topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0); overload;
 
 procedure DrawShadow(img: TImage32; const polygon: TPathD;
   fillRule: TFillRule; depth: double; angleRads: double = angle45;
@@ -261,7 +261,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawEdgePath(img: TImage32; const path: TPathD;
+procedure DrawEdge(img: TImage32; const path: TPathD;
   topLeftColor, bottomRightColor: TColor32; penWidth: double = 1.0);
 var
   i, highI, deg: integer;
@@ -429,7 +429,7 @@ begin
       for j := 0 to img.Width -1 do
       begin
         if (j + 1) mod hatchSize = 0 then hatch := not hatch;
-        pc^ := BlendToOpaque(colors[hatch], pc^);
+        pc^ := BlendToOpaque(pc^, colors[hatch]);
        inc(pc);
       end;
     end;

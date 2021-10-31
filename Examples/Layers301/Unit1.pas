@@ -60,6 +60,8 @@ type
     N3: TMenuItem;
     ColorDialog1: TColorDialog;
     ChangeColor1: TMenuItem;
+    mnuHideHatching: TMenuItem;
+    N4: TMenuItem;
     procedure mnuExitClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -82,14 +84,13 @@ type
     procedure AddStar1Click(Sender: TObject);
     procedure AddImage1Click(Sender: TObject);
     procedure ChangeColor1Click(Sender: TObject);
+    procedure mnuHideHatchingClick(Sender: TObject);
   private
     layeredImg32  : TLayeredImage32;
     clickedLayer  : TLayer32;
     targetLayer   : TRotateLayer32;
     buttonGroup   : TGroupLayer32;
     clickPoint    : TPoint;
-
-
     //this just speeds up clip resizing
     delayedMovePending : Boolean;
     delayedShift       : TShiftState;
@@ -108,9 +109,6 @@ var
   MainForm    : TMainForm;
   glyphs      : TGlyphCache;
   hsl         : THsl;
-
-const
-  clBtnFace32 = $FFEAEAEA;
 
 implementation
 
@@ -135,16 +133,6 @@ end;
 
 //------------------------------------------------------------------------------
 // TMyVectorLayer32
-//------------------------------------------------------------------------------
-
-function CountAll(layer: TLayer32): integer;
-var
-  i: integer;
-begin
-  Result := 1;
-  for I := 0 to layer.ChildCount -1 do
-    inc(Result, CountAll(layer[i]));
-end;
 //------------------------------------------------------------------------------
 
 constructor TMyVectorLayer32.Create(parent: TLayer32; const name: string = '');
@@ -183,7 +171,6 @@ end;
 procedure TMyVectorLayer32.UpdateHitTestAndClipPath;
 var
   rec: TRect;
-  pp: TPathsD;
 begin
   rec := Image.Bounds;
   if Name = 'rectangle' then
@@ -249,12 +236,12 @@ begin
     DrawPolygon(Image, MakeEllipse(rec), frNonZero, clBtnFace32);
     //draw outer 3D border
     img32.Vector.InflateRect(rec, -dpiAware1,-dpiAware1);
-    DrawEdgePath(Image, Ellipse(rec), clWhite32, $FFCCCCCC, dpiAwareOne*2);
+    DrawEdge(Image, Ellipse(rec), clWhite32, $FFCCCCCC, dpiAwareOne*2);
     img32.Vector.InflateRect(rec, -fw, -fw);
     //fill ellipse background (with random) color
     DrawPolygon(Image, MakeEllipse(rec), frNonZero, BrushColor);
     //draw inner 3D border
-    DrawEdgePath(Image, Ellipse(rec), $FFCCCCCC, clWhite32, dpiAwareOne*2);
+    DrawEdge(Image, Ellipse(rec), $FFCCCCCC, clWhite32, dpiAwareOne*2);
   end
   else //name = 'star'
   begin
@@ -262,10 +249,10 @@ begin
     fw := FrameWidth - dpiAware1*2;
     DrawPolygon(Image, MakeStar(rec), frNonZero, clBtnFace32);
     img32.Vector.InflateRect(rec, -dpiAware1,-dpiAware1);
-    DrawEdgePath(Image, MakeStar(rec)[0], clWhite32, $FFCCCCCC, dpiAwareOne*2);
+    DrawEdge(Image, MakeStar(rec)[0], clWhite32, $FFCCCCCC, dpiAwareOne*2);
     img32.Vector.InflateRect(rec, -fw, -fw);
     DrawPolygon(Image, MakeStar(rec), frNonZero, BrushColor);
-    DrawEdgePath(Image, MakeStar(rec)[0], $FFCCCCCC, clWhite32, dpiAwareOne*2);
+    DrawEdge(Image, MakeStar(rec)[0], $FFCCCCCC, clWhite32, dpiAwareOne*2);
   end;
   //draw the text
   pp := OffsetPath(textPath, delta.X, delta.Y);
@@ -346,7 +333,8 @@ begin
     //nb: use SetSize not Resize which would waste
     //CPU cycles stretching any previous hatching
     SetSize(w,h);
-    HatchBackground(Image);
+    if visible then
+      HatchBackground(Image);
   end;
   invalidate; //force repaint (ie even when resizing smaller)
 end;
@@ -575,7 +563,13 @@ end;
 
 procedure TMainForm.mnuExitClick(Sender: TObject);
 begin
-  Close;
+  if Assigned(targetLayer) then
+  begin
+    if targetLayer.Parent is TRotateLayer32 then
+      SetTargetLayer(TRotateLayer32(targetLayer.Parent)) else
+      SetTargetLayer(nil);
+  end else
+    Close;
 end;
 //------------------------------------------------------------------------------
 
@@ -624,6 +618,18 @@ begin
     BrushColor := Color32(ColorDialog1.Color);
     //this is an easy way to force a repaint and redo hit-testing too.
     SetBounds(Bounds);
+  end;
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.mnuHideHatchingClick(Sender: TObject);
+begin
+  with layeredImg32[0] do
+  begin
+    visible := not mnuHideHatching.Checked;
+    if visible then
+      HatchBackground(Image);
   end;
   Invalidate;
 end;

@@ -2,8 +2,8 @@ unit Img32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.4                                                             *
-* Date      :  12 October 2021                                                 *
+* Version   :  3.5                                                             *
+* Date      :  31 October 2021                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -50,6 +50,8 @@ const
   clTeal32     = TColor32($FF007F7F);
   clWhite32    = TColor32($FFFFFFFF);
   clYellow32   = TColor32($FFFFFF00);
+  clBtnFace32  = TColor32($FFF0F0F0);
+
 
 {$IFDEF ZEROBASEDSTR}
   {$ZEROBASEDSTRINGS OFF}
