@@ -3,7 +3,7 @@ unit Unit1;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls,
+  Windows, Messages, SysUtils, Classes, Graphics, Controls,   Img32.Storage,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls, Dialogs, ShellApi,
   Img32, Img32.Layers, Img32.Draw, Img32.Text;
 
@@ -19,14 +19,20 @@ type
     BrushColor : TColor32;
     FrameWidth : integer;
     textPath   : TPathsD;
-    textRect   : TRect;
+    textRect   : TRectD;
   protected
+    procedure SetName(const aName: string); override;
     //override TVectorLayer32's empty Draw method
     procedure Draw; override;
   public
-    constructor Create(parent: TLayer32;  const name: string = ''); override;
-    procedure SetBounds(const newBounds: TRect); override;
+    constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
+    procedure SetInnerBounds(const newBounds: TRectD); override;
     procedure UpdateHitTestAndClipPath;
+  end;
+
+  TMyStarLayer32 = class(TMyVectorLayer32)
+  public
+    procedure SetInnerBounds(const newBounds: TRectD); override;
   end;
 
   //----------------------------------------------------------------------
@@ -62,6 +68,10 @@ type
     ChangeColor1: TMenuItem;
     mnuHideHatching: TMenuItem;
     N4: TMenuItem;
+    ShadowDepth1: TMenuItem;
+    MnuShadow0: TMenuItem;
+    MnuShadow10: TMenuItem;
+    MnuShadow25: TMenuItem;
     procedure mnuExitClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -88,7 +98,7 @@ type
   private
     layeredImg32  : TLayeredImage32;
     clickedLayer  : TLayer32;
-    targetLayer   : TRotateLayer32;
+    targetLayer   : TRotatableLayer32;
     buttonGroup   : TGroupLayer32;
     clickPoint    : TPoint;
     //this just speeds up clip resizing
@@ -99,15 +109,16 @@ type
     procedure DelayedMouseMove(Sender: TObject;
       Shift: TShiftState; X,Y: Integer);
 
-    function MakeRandomRect(const mp:TPointD): TRect;
-    function MakeRandomSquare(const mp:TPointD): TRect;
-    procedure SetTargetLayer(layer: TRotateLayer32);
+    function MakeRandomRect(const mp:TPointD): TRectD;
+    function MakeRandomSquare(const mp:TPointD): TRectD;
+    procedure SetTargetLayer(layer: TRotatableLayer32);
   public
   end;
 
 var
   MainForm    : TMainForm;
-  glyphs      : TGlyphCache;
+  arial12     : TFontCache;
+  arial14     : TFontCache;
   hsl         : THsl;
 
 implementation
@@ -120,22 +131,22 @@ uses
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-function MakeStar(const rec: TRect; IndentFrac: double = 0.4): TPathsD;
+function MakeStar(const rec: TRectD; IndentFrac: double = 0.4): TPathD;
 begin
-  Result := Img32.Vector.Paths(Star(RectD(rec), 7, IndentFrac));
+  Result := Star(rec, 7, IndentFrac);
 end;
 //------------------------------------------------------------------------------
 
-function MakeEllipse(const rec: TRect): TPathsD;
+function MakeEllipse(const rec: TRect): TPathD;
 begin
-  Result := Img32.Vector.Paths(Ellipse(RectD(rec)));
+  Result := Ellipse(RectD(rec));
 end;
 
 //------------------------------------------------------------------------------
 // TMyVectorLayer32
 //------------------------------------------------------------------------------
 
-constructor TMyVectorLayer32.Create(parent: TLayer32; const name: string = '');
+constructor TMyVectorLayer32.Create(parent: TLayer32; const name: string);
 begin
   inherited;
 
@@ -143,25 +154,36 @@ begin
   useRandomColors := true;//false;//
   if useRandomColors then
   begin
-    hsl.hue := (hsl.hue + 23) mod 256;
+    hsl.hue := (hsl.hue + 17) mod 256;
     BrushColor := HslToRgb(hsl);
   end else
     BrushColor := clBtnFace32;
 
-  Margin := 0;
-  FrameWidth := DpiAware(10);
-  if name = 'star' then
-    FrameWidth := Round(FrameWidth * 1.5);
+  if MainForm.MnuShadow0.Checked then
+    OuterMargin := dpiAware(0)
+  else if MainForm.MnuShadow10.Checked then
+    OuterMargin := dpiAware(10)
+  else
+    OuterMargin := dpiAware(25);
 
-  //get 'textPath' ready to draw centered text
-  textPath := glyphs.GetTextGlyphs(0, 0, name);
-  textRect := Img32.Vector.GetBounds(textPath);
-  textPath := OffsetPath(textPath, -textRect.Left, -textRect.Top);
-  types.OffsetRect(textRect,-textRect.Left, -textRect.Top);
+  FrameWidth := DpiAware(10);
+  if self is TMyStarLayer32 then
+    FrameWidth := Round(FrameWidth * 1.72);
 end;
 //------------------------------------------------------------------------------
 
-procedure TMyVectorLayer32.SetBounds(const newBounds: TRect);
+procedure TMyVectorLayer32.SetName(const aName: string);
+begin
+  inherited;
+  //get 'textPath' ready to draw centered text
+  textPath := arial12.GetTextOutline(0, 0, name);
+  textRect := Img32.Vector.GetBoundsD(textPath);
+  textPath := OffsetPath(textPath, -textRect.Left, -textRect.Top);
+  OffsetRect(textRect, -textRect.Left, -textRect.Top);
+end;
+//------------------------------------------------------------------------------
+
+procedure TMyVectorLayer32.SetInnerBounds(const newBounds: TRectD);
 begin
   inherited;
   UpdateHitTestAndClipPath;
@@ -170,16 +192,17 @@ end;
 
 procedure TMyVectorLayer32.UpdateHitTestAndClipPath;
 var
-  rec: TRect;
+  rec: TRectD;
 begin
-  rec := Image.Bounds;
+  rec := RectD(0,0,Width,Height);
   if Name = 'rectangle' then
   begin
     //don't worry about hittesting for rectangles because the
     //default hittest region is the layer's rectangular bounds :)
 
     //but ClipPath still needs setting
-    Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
+    Img32.Vector.InflateRect(rec,
+      -FrameWidth, -FrameWidth);
     ClipPath := Img32.Vector.Paths(Rectangle(rec))
   end else if Name = 'ellipse' then
   begin
@@ -187,7 +210,7 @@ begin
     UpdateHitTestMaskFromImage;
     //update ClipPath
     Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
-    ClipPath := MakeEllipse(rec)
+    ClipPath := Img32.Vector.Paths(MakeEllipse(Rect(rec)))
   end
   else if Name = 'star' then
   begin
@@ -195,68 +218,80 @@ begin
     UpdateHitTestMaskFromImage;
     //update ClipPath
     Img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
-    ClipPath := MakeStar(rec);
+    ClipPath := Img32.Vector.Paths(MakeStar(rec));
   end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMyVectorLayer32.Draw;
 var
-  i, fw: integer;
+  p: TPathD;
   pp: TPathsD;
-  rec: TRect;
+  rec: TRectD;
   delta: TPointD;
 begin
-  rec := Image.Bounds;
+  rec := RectD(0,0, Width, Height);
+  OffsetRect(rec, OuterMargin, OuterMargin);
   //preparing to center text
-  delta.X := (RectWidth(rec) - RectWidth(textRect)) div 2;
-  delta.Y := (RectHeight(rec) - RectHeight(textRect)) div 2;
+  delta.X := (rec.Width - textRect.Width) / 2;
+  delta.Y := (rec.Height - textRect.Height) / 2;
+  Image.Clear;
 
   if name = 'rectangle' then
   begin
-    //fill the rectangular layer's background
-    Image.Clear(rec, clBtnFace32);
-    //and draw a pale gray frame that's FrameWidth wide
-    fw := FrameWidth - dpiAware1*2;
-    i := Ceil(DpiAwareOne/2);
-    img32.Vector.InflateRect(rec, -i, -i);
-    //draw the frame's outer edge
-    DrawEdge(Image, rec, clWhite32, $FFCCCCCC, dpiAwareOne*2);
-    img32.Vector.InflateRect(rec, -fw, -fw);
-    Image.Clear(rec, BrushColor);
-    //draw the frame's inner edge
-    DrawEdge(Image, rec, $FFCCCCCC, clWhite32, dpiAwareOne*2);
+    //draw a drop shadow and then fill the layer's background
+    DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, $40000000);
+    Image.FillRect(Rect(rec), clBtnFace32);
+    //and draw a pale 3D gray frame
+    DrawEdge(Image, rec, clWhite32, $FFCCCCCC, dpiAware(2));
+    img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
+    Image.FillRect(Rect(rec), BrushColor);
+    DrawEdge(Image, rec, $FFCCCCCC, clWhite32, dpiAware(2));
   end
   else if name = 'ellipse' then
   begin
-    //clear background
-    Image.Clear;
-    fw := FrameWidth - dpiAware1*2;
-    //fill ellipse border background (with clBtnFace32 color)
-    DrawPolygon(Image, MakeEllipse(rec), frNonZero, clBtnFace32);
-    //draw outer 3D border
-    img32.Vector.InflateRect(rec, -dpiAware1,-dpiAware1);
-    DrawEdge(Image, Ellipse(rec), clWhite32, $FFCCCCCC, dpiAwareOne*2);
-    img32.Vector.InflateRect(rec, -fw, -fw);
-    //fill ellipse background (with random) color
-    DrawPolygon(Image, MakeEllipse(rec), frNonZero, BrushColor);
-    //draw inner 3D border
+    //draw drop shadow and fill the ellipse layer's background
+    p := MakeEllipse(Rect(rec));
+    DrawShadow(Image, p, frNonZero, OuterMargin, angle45, $40000000);
+    DrawPolygon(Image, p, frNonZero, clBtnFace32);
+    //and draw a pale 3D gray frame
+    p := MakeEllipse(Rect(rec));
+    DrawEdge(Image, p, clWhite32, $FFCCCCCC, dpiAwareOne*2);
+    img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
+    p := MakeEllipse(Rect(rec));
+    DrawPolygon(Image, p, frNonZero, BrushColor);
     DrawEdge(Image, Ellipse(rec), $FFCCCCCC, clWhite32, dpiAwareOne*2);
   end
   else //name = 'star'
   begin
-    Image.Clear;
-    fw := FrameWidth - dpiAware1*2;
-    DrawPolygon(Image, MakeStar(rec), frNonZero, clBtnFace32);
-    img32.Vector.InflateRect(rec, -dpiAware1,-dpiAware1);
-    DrawEdge(Image, MakeStar(rec)[0], clWhite32, $FFCCCCCC, dpiAwareOne*2);
-    img32.Vector.InflateRect(rec, -fw, -fw);
+    p := MakeStar(rec);
+    DrawShadow(Image, p, frNonZero, OuterMargin, angle45, $40000000);
+    DrawPolygon(Image, p, frNonZero, clBtnFace32);
+    DrawEdge(Image, MakeStar(rec), clWhite32, $FFCCCCCC, dpiAwareOne*2);
+    img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
     DrawPolygon(Image, MakeStar(rec), frNonZero, BrushColor);
-    DrawEdge(Image, MakeStar(rec)[0], $FFCCCCCC, clWhite32, dpiAwareOne*2);
+    DrawEdge(Image, MakeStar(rec), $FFCCCCCC, clWhite32, dpiAwareOne*2);
   end;
   //draw the text
-  pp := OffsetPath(textPath, delta.X, delta.Y);
+  pp := OffsetPath(textPath,
+    delta.X + OuterMargin, delta.Y + OuterMargin);
   DrawPolygon(Image, pp, frNonZero, clBlack32);
+end;
+
+//------------------------------------------------------------------------------
+// TMyStarLayer32 methods
+//------------------------------------------------------------------------------
+
+procedure TMyStarLayer32.SetInnerBounds(const newBounds: TRectD);
+var
+  i: double;
+  r: TRectD;
+begin
+  r := newBounds;
+  i := Average(r.Right - r.Left, r.Bottom - r.Top);
+  r.Right := r.Left + i;
+  r.Bottom := r.Top + i;
+  inherited SetInnerBounds(r);
 end;
 
 //------------------------------------------------------------------------------
@@ -268,10 +303,9 @@ var
   fr: TFontReader;
 begin
   Randomize;
-
   hsl.hue := Random(256);
   hsl.sat := 240;
-  hsl.lum := 180;
+  hsl.lum := 160;
   hsl.Alpha := 255;
 
   Application.OnIdle := AppOnIdle;
@@ -289,14 +323,19 @@ begin
   layeredImg32.AddLayer(TDesignerLayer32);
 
   fr := FontManager.Load('Arial');
-  glyphs := TGlyphCache.Create(fr, DPIAware(12));
+  arial12 := TFontCache.Create(fr, DPIAware(12));
+  arial14 := TFontCache.Create(fr, DPIAware(14));
+
+  ClientWidth := DpiAware(800);
+  ClientHeight := DpiAware(600) + StatusBar1.Height;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.FormDestroy(Sender: TObject);
 begin
   FreeAndNil(layeredImg32); //see also FormResize
-  glyphs.free;
+  arial12.free;
+  arial14.free;
 end;
 //------------------------------------------------------------------------------
 
@@ -317,14 +356,12 @@ end;
 
 procedure TMainForm.FormResize(Sender: TObject);
 var
-  rec: TRect;
   w,h: integer;
 begin
   if not Assigned(layeredImg32) then Exit; //ie when destroying
 
-  rec := ClientRect;
-  w := RectWidth(rec);
-  h := RectHeight(rec);
+  RectWidthHeight(ClientRect, w, h);
+  dec(h, StatusBar1.Height);
   //resize layeredImg32 to pnlMain
   layeredImg32.SetSize(w, h);
   //resize and repaint the hatched design background layer
@@ -340,14 +377,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TMainForm.MakeRandomRect(const mp:TPointD): TRect;
+function TMainForm.MakeRandomRect(const mp:TPointD): TRectD;
 var
-  x2,y2: integer;
+  x2,y2: double;
 begin
   with Point(mp) do
   begin
-    x2 := X div 2 + Random(X div 2);
-    y2 := Y div 2 + Random(Y div 2);
+    x2 := X / 2 + Random(Round(X / 2));
+    y2 := Y / 2 + Random(Round(Y / 2));
     Result.Left := X - x2;
     Result.Right := X + x2;
     Result.Top := Y - y2;
@@ -356,7 +393,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TMainForm.MakeRandomSquare(const mp:TPointD): TRect;
+function TMainForm.MakeRandomSquare(const mp:TPointD): TRectD;
 var
   x2,y2: integer;
 begin
@@ -376,15 +413,15 @@ end;
 procedure TMainForm.AddStar1Click(Sender: TObject);
 var
   newLayer: TMyVectorLayer32;
-  rec: TRect;
+  rec: TRectD;
 begin
   if Assigned(targetLayer) then
     rec := MakeRandomSquare(targetLayer.Image.MidPoint) else
     rec := MakeRandomSquare(layeredImg32.MidPoint);
   newLayer := layeredImg32.AddLayer(
-    TMyVectorLayer32, targetLayer, 'star') as TMyVectorLayer32;
+    TMyStarLayer32, targetLayer, 'star') as TMyVectorLayer32;
   //setting a path will automatically define the layer's bounds
-  newLayer.Paths := MakeStar(rec);
+  newLayer.Paths := Paths(MakeStar(rec));
   newLayer.UpdateHitTestAndClipPath;
   SetTargetLayer(newLayer);
 end;
@@ -393,7 +430,7 @@ end;
 procedure TMainForm.mnuAddEllipseClick(Sender: TObject);
 var
   newLayer: TMyVectorLayer32;
-  rec: TRect;
+  rec: TRectD;
 begin
   if Assigned(targetLayer) then
     rec := MakeRandomRect(targetLayer.Image.MidPoint) else
@@ -401,7 +438,7 @@ begin
   newLayer := layeredImg32.AddLayer(
     TMyVectorLayer32, targetLayer, 'ellipse') as TMyVectorLayer32;
   //setting a path will automatically define the layer's bounds
-  newLayer.Paths := MakeEllipse(rec);
+  newLayer.Paths := Paths(MakeEllipse(Rect(rec)));
   newLayer.UpdateHitTestAndClipPath;
   SetTargetLayer(newLayer);
 end;
@@ -410,14 +447,15 @@ end;
 procedure TMainForm.mnuAddRectangleClick(Sender: TObject);
 var
   newLayer: TMyVectorLayer32;
-  rec: TRect;
+  rec: TRectD;
 begin
   if Assigned(targetLayer) then
     rec := MakeRandomRect(targetLayer.Image.MidPoint) else
     rec := MakeRandomRect(layeredImg32.MidPoint);
+
   newLayer := layeredImg32.AddLayer(
     TMyVectorLayer32, targetLayer, 'rectangle') as TMyVectorLayer32;
-  newLayer.SetBounds(rec);
+  newLayer.SetInnerBounds(rec);
   newLayer.UpdateHitTestAndClipPath;
   SetTargetLayer(newLayer);
 end;
@@ -431,8 +469,8 @@ begin
   newLayer := layeredImg32.AddLayer(
     TRasterLayer32, targetLayer, 'image') as TRasterLayer32;
   //in case it's an SVG image since they're best given a default size
-  newLayer.Image.SetSize(640,480);
-  newLayer.Image.LoadFromFile(OpenDialog1.FileName);
+  newLayer.MasterImage.SetSize(DPIAware(320),DPIAware(240));
+  newLayer.MasterImage.LoadFromFile(OpenDialog1.FileName);
   //setting a path will automatically define the layer's bounds
   SetTargetLayer(newLayer);
 end;
@@ -461,7 +499,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.SetTargetLayer(layer: TRotateLayer32);
+procedure TMainForm.SetTargetLayer(layer: TRotatableLayer32);
 begin
   if targetLayer = layer then Exit;
   FreeAndNil(buttonGroup);
@@ -478,13 +516,13 @@ procedure TMainForm.pnlMainMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   clickPoint := Types.Point(X,Y);
-  clickedLayer := layeredImg32.GetLayerAt(clickPoint);
+  clickedLayer := layeredImg32.GetLayerAt(PointD(clickPoint));
 
   if Assigned(clickedLayer) then
   begin
     if (clickedLayer = targetLayer) or not
-      (clickedLayer is TRotateLayer32) then Exit;
-    SetTargetLayer(clickedLayer as TRotateLayer32);
+      (clickedLayer is TRotatableLayer32) then Exit;
+    SetTargetLayer(clickedLayer as TRotatableLayer32);
     Invalidate;
   end else if assigned(targetLayer) then
   begin
@@ -510,14 +548,14 @@ var
   dx, dy: integer;
   pt: TPoint;
   layer: TLayer32;
-  rec: TRect;
+  rec: TRectD;
 begin
   pt := Types.Point(X,Y);
 
   if not (ssLeft in Shift) then
   begin
     //not moving anything so just update the cursor
-    layer := layeredImg32.GetLayerAt(pt);
+    layer := layeredImg32.GetLayerAt(PointD(pt));
     if Assigned(layer) then
       self.Cursor := layer.CursorId else
       self.Cursor := crDefault;
@@ -536,12 +574,11 @@ begin
     clickedLayer.Offset(dx, dy);
     //call UpdateSizingButtonGroup to reposition the other buttons
     //in the sizing group and get the bounds rect for the target layer
-    rec := UpdateSizingButtonGroup(clickedLayer);
+    rec := RectD(UpdateSizingButtonGroup(clickedLayer));
     //convert rec from layeredImg32 coordinates to targetLayer coords
-    pt := targetLayer.GetAbsoluteOrigin;
-    types.OffsetRect(rec, -pt.X, -pt.Y);
-
-    targetLayer.SetBounds(rec);
+    //nb: bounds must be set relative to the layer's parent
+    rec := TLayer32(targetLayer.Parent).MakeRelative(rec);
+    targetLayer.SetInnerBounds(rec);
     Invalidate;
   end
   else if Assigned(targetLayer) then
@@ -565,8 +602,8 @@ procedure TMainForm.mnuExitClick(Sender: TObject);
 begin
   if Assigned(targetLayer) then
   begin
-    if targetLayer.Parent is TRotateLayer32 then
-      SetTargetLayer(TRotateLayer32(targetLayer.Parent)) else
+    if targetLayer.Parent is TRotatableLayer32 then
+      SetTargetLayer(TRotatableLayer32(targetLayer.Parent)) else
       SetTargetLayer(nil);
   end else
     Close;
@@ -574,10 +611,15 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuDeleteLayerClick(Sender: TObject);
+var
+  layer: TLayer32;
 begin
   if not assigned(targetLayer) then Exit;
+  layer := TLayer32(targetLayer.Parent);
   FreeAndNil(targetLayer);
   FreeAndNil(buttonGroup);
+  if Assigned(layer) and (layer is TRotatableLayer32) then
+    SetTargetLayer(TRotatableLayer32(layer));
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -617,7 +659,7 @@ begin
   begin
     BrushColor := Color32(ColorDialog1.Color);
     //this is an easy way to force a repaint and redo hit-testing too.
-    SetBounds(Bounds);
+    SetInnerBounds(InnerBounds);
   end;
   Invalidate;
 end;

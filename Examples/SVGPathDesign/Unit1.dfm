@@ -15,7 +15,6 @@ object MainForm: TMainForm
   PopupMenu = PopupMenu1
   OnCreate = FormCreate
   OnDestroy = FormDestroy
-  OnKeyDown = FormKeyDown
   OnMouseDown = MainFormMouseDown
   OnMouseMove = MainFormMouseMove
   OnMouseUp = FormMouseUp
@@ -48,6 +47,8 @@ object MainForm: TMainForm
       WordWrap = False
       Zoom = 100
       OnChange = Memo1Change
+      OnKeyDown = memo1KeyDown
+      OnKeyUp = memo1KeyUp
     end
   end
   object MainMenu1: TMainMenu

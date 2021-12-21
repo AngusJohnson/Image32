@@ -143,15 +143,15 @@ end;
 
 procedure TMainForm.DrawTextTab;
 var
-  nextCharIdx, innerMargin, w, h: integer;
+  i, innerMargin, w, h, lineCnt: integer;
   rectangle: TPathD;
   txtPaths: TPathsD;
   outerRec, innerRec, tmpRec, imageRec: TRect;
-  nextCharPt: TPointD;
-  tmpStr: string;
 
+  wordList: TWordInfoList;
+  pageMetrics: TTextPageMetrics;
   imgBooks: TImage32;
-  noto14Cache: TGlyphCache;
+  noto14Cache: TFontCache;
   notoSansReg : TFontReader;
   useClearType: Boolean;
 begin
@@ -170,10 +170,9 @@ begin
   innermargin := margin div 2;
 
   notoSansReg := TFontReader.CreateFromResource('FONT_NSR', RT_RCDATA);
-  noto14Cache := TGlyphCache.Create(notoSansReg, fontHeight);
+  noto14Cache := TFontCache.Create(notoSansReg, fontHeight);
   try
     if not notoSansReg.IsValidFontFormat then Exit;
-    //noto14Cache.Underlined := true;
 
     tmpRec := outerRec;
     Img32.Vector.InflateRect(tmpRec, -1, -1);
@@ -199,29 +198,47 @@ begin
       imgBooks.Free;
     end;
 
-    //draw text starting at the top left corner while avoiding the image ...
+    //draw text that fits to left of the image, then remaining text
+    //in the space below the image but using the full 'page' width.
+
+    //get rect to left of image
     tmpRec := Img32.Vector.Rect(innerMargin, innerMargin, w,
-      h + innerMargin + Round(noto14Cache.LineHeight));
+      h + innerMargin);
 
-    txtPaths := noto14Cache.GetTextGlyphs(tmpRec, essay,
-      taJustify, tvaTop, nextCharIdx, nextCharPt);
-    if useClearType then
-      DrawPolygon_ClearType(imgMain, txtPaths, frNonZero, clBlack32) else
-      DrawPolygon(imgMain, txtPaths, frNonZero, clBlack32);
-
-    //now draw the remaining text under the image
-    if (nextCharIdx <> 0) then
-    begin
-      tmpStr := Copy(essay, nextCharIdx, Length(essay));
-      if (tmpStr[1] <= #32) then Delete(tmpStr,1,1); //ie skip a CR or a space
-
-      innerRec.Top := Round(nextCharPt.Y);
-      txtPaths := noto14Cache.GetTextGlyphs(innerRec, tmpStr,
-        taJustify, tvaTop, nextCharIdx, nextCharPt);
-
+    //break text string into a TWordInfoList and use that to get the
+    //metrics of how many lines of text will fit on left of image
+    wordList := TWordInfoList.Create;
+    try
+      FillWordList(essay, wordList, noto14Cache);
+      pageMetrics := GetPageMetrics(RectWidth(tmpRec), wordList);
+      //calculate lines that will fit on left of image
+      lineCnt := Trunc(RectHeight(tmpRec) / noto14Cache.LineHeight);
+      //now get the text glyph outlines and draw them
+      txtPaths := noto14Cache.GetTextOutline(tmpRec,
+        wordList, pageMetrics, taJustify, 0, lineCnt);
       if useClearType then
         DrawPolygon_ClearType(imgMain, txtPaths, frNonZero, clBlack32) else
         DrawPolygon(imgMain, txtPaths, frNonZero, clBlack32);
+
+      inc(lineCnt);
+      if lineCnt < pageMetrics.lineCount then
+      begin
+        //getting the index of the word starting the next line
+        i := pageMetrics.wordListOffsets[lineCnt];
+        //delete all the words just drawn from wordList
+        wordList.DeleteRange(0, i-1);
+        //get new pagemetrics using full 'page' width
+        innerRec.Top := tmpRec.Top + Round(lineCnt * noto14Cache.LineHeight);
+        pageMetrics := GetPageMetrics(RectWidth(innerRec),wordList);
+        //now get the text glyph outlines and draw them
+        txtPaths := noto14Cache.GetTextOutline(innerRec,
+          wordList, pageMetrics, taJustify, 0, -1);
+        if useClearType then
+          DrawPolygon_ClearType(imgMain, txtPaths, frNonZero, clBlack32) else
+          DrawPolygon(imgMain, txtPaths, frNonZero, clBlack32);
+      end;
+    finally
+      wordList.Free;
     end;
 
   finally
@@ -245,7 +262,7 @@ var
   ir         : TImageRenderer;
   lgr        : TLinearGradientRenderer;
   fontReader : TFontReader;
-  glyphCache : TGlyphCache;
+  font : TFontCache;
   numGlyphs  : array[1..12] of TPathsD;
 begin
   imgClockface.SetSize(
@@ -350,24 +367,24 @@ begin
   //get the Noto Sans Regular font from the registry
   fontReader := TFontReader.CreateFromResource('FONT_NSR', RT_RCDATA);
   //create a glyph cache for the font with font height = clockRadius / 13
-  glyphCache := TGlyphCache.Create(fontReader, clockRadius / 13);
+  font := TFontCache.Create(fontReader, clockRadius / 13);
   try
     //DRAW THE "MAKER'S MARK"
     recI := Img32.Vector.Rect(recD);
     recI.Bottom := recI.Top + clockRadius;
-    DrawText(imgClockface, recI, 'angusj', taCenter, tvaMiddle, glyphCache);
+    DrawText(imgClockface, recI, 'angusj', taCenter, tvaMiddle, font);
 
     fontReader.LoadFromResource('FONT_NSB', RT_RCDATA); //noto sans bold
-    glyphCache.FontHeight := glyphCache.FontHeight * 1.5;
+    font.FontHeight := font.FontHeight * 1.5;
 
     //GET CLOCK NUMBERS (AGAIN MAKING THE FONT LARGER)
-    glyphCache.FontHeight := glyphCache.FontHeight * 1.4;
+    font.FontHeight := font.FontHeight * 1.4;
     for i := 1 to 12 do
-      numGlyphs[i] := glyphCache.GetTextGlyphs(0,0,inttostr(i));
+      numGlyphs[i] := font.GetTextOutline(0,0,inttostr(i));
 
   finally
     fontReader.Free;
-    glyphCache.Free;
+    font.Free;
   end;
 
   pt.X := mp.X;

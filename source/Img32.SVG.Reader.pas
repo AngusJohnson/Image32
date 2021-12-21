@@ -2,8 +2,8 @@ unit Img32.SVG.Reader;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  3.4                                                             *
-* Date      :  2 October 2021                                                  *
+* Version   :  4.0                                                             *
+* Date      :  22 December 2021                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -118,7 +118,7 @@ type
     fRadGradRenderer  : TSvgRadialGradientRenderer;
     fImgRenderer      : TImageRenderer;
     fRootElement      : TSvgRootElement;
-    fFontCache        : TGlyphCache;
+    fFontCache        : TFontCache;
     fUsePropScale     : Boolean;
     function  LoadInternal: Boolean;
     function  GetIsEmpty: Boolean;
@@ -1840,7 +1840,7 @@ begin
   with Point(off) do Types.OffsetRect(dstOffRec, X, Y);
   dstImg.Copy(srcImg, srcRec, dstOffRec);
   dstImg.SetRGB(floodColor);
-  alpha := floodColor shr 24;
+  alpha := GetAlpha(floodColor);
   if (alpha > 0) and (alpha < 255) then
     dstImg.ReduceOpacity(alpha);
   if stdDev > 0 then
@@ -2934,11 +2934,11 @@ begin
   {$ENDIF}
   s := FixSpaces(s);
 
-  drawPathsC := fReader.fFontCache.GetTextGlyphs(0, 0, s, tmpX);
+  drawPathsC := fReader.fFontCache.GetTextOutline(0, 0, s, tmpX);
   //by not changing the fontCache.FontHeight, the quality of
   //small font render improves very significantly (though of course
   //this requires additional glyph scaling and offsetting).
-  scale := fontSize /fReader.fFontCache.FontHeight;
+  scale := fontSize / fReader.fFontCache.FontHeight;
 
   with topTextEl.currentPt do
   begin
@@ -3070,7 +3070,7 @@ begin
       //static fontheight. The returned glyphs will be de-scaled later.
       MatrixApply(mat, tmpPath);
       AppendPath(self.drawPathsC,
-        GetTextGlyphsOnPath(s, tmpPath, fReader.fFontCache,
+        GetTextOutlineOnPath(s, tmpPath, fReader.fFontCache,
           taLeft, 0, spacing, charsThatFit));
       if charsThatFit = Length(s) then Break;
       Delete(s, 1, charsThatFit);
@@ -4687,7 +4687,7 @@ begin
 
   if Assigned(fFontCache) then
     fFontCache.FontReader := bestFontReader else
-    fFontCache := TGlyphCache.Create(bestFontReader, defaultFontHeight);
+    fFontCache := TFontCache.Create(bestFontReader, defaultFontHeight);
 
   fFontCache.Underlined := False;
   fFontCache.StrikeOut := False;
@@ -4708,7 +4708,6 @@ function TSvgReader.GetIsEmpty: Boolean;
 begin
   Result := not Assigned(fRootElement);
 end;
-
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 

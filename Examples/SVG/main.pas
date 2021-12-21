@@ -65,7 +65,7 @@ begin
   DragAcceptFiles(Handle, True);
 
   ImagePanel.ParentBackground := false;
-  ImagePanel.Color := clWhite;
+  ImagePanel.Color := clBtnFace;
 
   rec := ImagePanel.InnerClientRect;
   ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
@@ -205,7 +205,6 @@ begin
   Screen.Cursor := crHourGlass;
   try
     ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
-
     filename := ListBox1.Items[ListBox1.ItemIndex];
     svgFilenameAndPath := AppendSlash(folder) + filename;
     ImagePanel.Image.LoadFromFile(svgFilenameAndPath);

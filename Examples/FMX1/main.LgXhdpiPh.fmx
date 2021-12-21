@@ -3,7 +3,8 @@ inherited MainForm_LgXhdpiPh: TMainForm_LgXhdpiPh
   ClientWidth = 450
   DesignerMasterStyle = 3
   inherited Layout1: TLayout
-    Size.Width = 450.000000000000000000
+    Scale.X = 2.000000000000000000
+    Size.Width = 225.000000000000000000
     Size.Height = 695.000000000000000000
   end
 end

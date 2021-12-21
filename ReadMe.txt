@@ -1,7 +1,7 @@
 
 Image32 - 2D graphics library for Delphi Pascal
-Latest version: 3.4.1
-Released: 31 October 2021
+Latest version: 4.0 (preliminary)
+Released: 22 December 2021
 
 Copyright © 2019-2021 Angus Johnson
 Freeware released under Boost Software License
@@ -11,6 +11,29 @@ Documentation : http://www.angusj.com/delphi/image32/Docs/
 Download      : https://sourceforge.net/projects/image32/files/
 
 Recent changes:
+
+Version 4.0(prelim)
+Img32.Ctrls
+  New experimental unit
+  See the Examples/Experimental folder
+  Requires Delphi 2010 or newer (RTTI for public methods)
+Img32.Layers
+  This unit has had another major overhaul primarily to add layer 
+    persistence (save layer objects in the file system).
+  Added TLayer32.MakeRelative and TLayer32.MakeAbsolute methods
+  Added TLayer32.OuterMargin property
+  Added TLayer32.OuterBounds property
+  Added TLayer32.InnerRect property
+  Renamed TLayer32.Bounds property to InnerBounds
+Img32.Vector
+  Significantly improved Grow algorithm
+Img32.Text
+  Renamed GetTextGlyphs to GetTextOutline
+  Renamed TGlyphCache to TFontCache
+Img32.Extra
+  Added DrawShadowRect procedure
+  Added TileImage procedure
+
 
 Version 3.4.1
   Img32.Extra

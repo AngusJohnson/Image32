@@ -72,7 +72,6 @@ type
       Shift: TShiftState; X, Y: Integer);
     procedure MainFormMouseMove(Sender: TObject; Shift: TShiftState; X,
       Y: Integer);
-    procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
     procedure ReverseArcClick(Sender: TObject);
     procedure mnuDeleteClick(Sender: TObject);
     procedure mnuRotateClick(Sender: TObject);
@@ -85,6 +84,8 @@ type
     procedure FormMouseUp(Sender: TObject; Button: TMouseButton;
       Shift: TShiftState; X, Y: Integer);
     procedure Open1Click(Sender: TObject);
+    procedure memo1KeyUp(Sender: TObject; var Key: Word; Shift: TShiftState);
+    procedure memo1KeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   private
     layeredImg32  : TLayeredImage32;
     svgPathLayer  : TSvgPathLayer;
@@ -94,6 +95,7 @@ type
     rotateGroup   : TGroupLayer32;
     clickPoint    : TPoint;
     resizing      : Boolean;
+    MemoKeyPressed    : Boolean;
     procedure SetTargetLayer(layer: TLayer32);
     procedure UpdateMemo;
     procedure ClearMemoBolding;
@@ -104,7 +106,8 @@ type
 
 var
   MainForm: TMainForm;
-  decimalPrec: integer = 2;
+  decimalPrec: integer = 0;
+  relativeCoords: Boolean = true;
 
 implementation
 
@@ -151,7 +154,7 @@ begin
   SetTargetLayer(nil);
 
   rec := layeredImg32.Bounds;
-  img32.Vector.InflateRect(rec, -borderSize, -borderSize);
+  img32.Vector.InflateRect(rec, -borderSize, -borderSize*2);
 
   ////////////////////////////////////////////////
   svgPathLayer.LoadPathsFromFile(OpenDialog1.FileName, rec, 0);
@@ -166,6 +169,7 @@ var
 const
   borderSize = 50;
 begin
+  if MemoKeyPressed then Exit;
   SetTargetLayer(nil);
 
   rec := layeredImg32.Bounds;
@@ -178,13 +182,38 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.FormKeyDown(Sender: TObject;
-  var Key: Word; Shift: TShiftState);
+procedure TMainForm.mnuExitClick(Sender: TObject);
 begin
-  if (Key = VK_ESCAPE) and Assigned(targetLayer) then
+  if Assigned(targetLayer) then
   begin
+    MemoKeyPressed := false;
     SetTargetLayer(nil); //deselect the active control
-    Key := 0;
+  end else
+    Close;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.memo1KeyDown(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+begin
+  if Shift * [ssAlt, ssCtrl] <> [] then
+  begin
+    MemoKeyPressed := false;
+    Exit;
+  end;
+  case key of
+    Ord('Z'), VK_SPACE, VK_RETURN: MemoKeyPressed := false;
+    else MemoKeyPressed := true;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.memo1KeyUp(Sender: TObject; var Key: Word;
+  Shift: TShiftState);
+begin
+  if MemoKeyPressed or (Shift * [ssAlt, ssCtrl] <> []) then Exit;
+  case key of
+    Ord('Z'), VK_SPACE, VK_RETURN: Memo1Change(nil);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -246,6 +275,7 @@ procedure TMainForm.MainFormMouseDown(Sender: TObject; Button: TMouseButton;
 begin
   clickPoint := Types.Point(X,Y);
   clickedLayer := layeredImg32.GetLayerAt(clickPoint);
+  MemoKeyPressed := false;
 
   if not Assigned(clickedLayer) then          //no target
   begin
@@ -331,12 +361,6 @@ begin
   //Updating the richedit memo can be very slow,
   //so we'll avoid calling it in MouseMove
   UpdateMemo;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.mnuExitClick(Sender: TObject);
-begin
-  Close;
 end;
 //------------------------------------------------------------------------------
 
@@ -447,36 +471,37 @@ begin
     memo1.lines.Clear;
     startPos := 0; endPos := 0; txt := '';
     svgPath := svgPathLayer.svgPath;
-    for i := 0 to svgPath.Count -1 do
-      with svgPath.Path[i] do
-      begin
-        s := GetMoveStrDef(true, decimalPrec);
-        charWidth := TextWidth(canvas.handle, s);
-        txt := txt + s;
-        for j := 0 to Count -1 do
-        begin
-          s := Seg[j].GetStringDef(true, decimalPrec);
-          len := Length(s);
-          cw := TextWidth(canvas.handle, s);
-          if Seg[j] = targetSeg then
-          begin
-            startPos := Length(txt);
-            endPos := startPos + len;
-          end;
+    if Assigned(svgPath) then
+      for i := 0 to svgPath.Count -1 do
+         with svgPath.Path[i] do
+         begin
+            s := GetMoveStrDef(true, decimalPrec);
+            charWidth := TextWidth(canvas.handle, s);
+            txt := txt + s;
+            for j := 0 to Count -1 do
+            begin
+              s := Seg[j].GetStringDef(relativeCoords, decimalPrec);
+              len := Length(s);
+              cw := TextWidth(canvas.handle, s);
+              if Seg[j] = targetSeg then
+              begin
+                startPos := Length(txt);
+                endPos := startPos + len;
+              end;
 
-          if charWidth + cw >= maxWidth then
-          begin
-            txt := txt + #10 + s;
-            charWidth := cw;
-            if Seg[j] = targetSeg then inc(startPos);
-          end else
-          begin
-            txt := txt+ s;
-            charWidth := charWidth + cw;
+              if charWidth + cw >= maxWidth then
+              begin
+                txt := txt + #10 + s;
+                charWidth := cw;
+                if Seg[j] = targetSeg then inc(startPos);
+              end else
+              begin
+                txt := txt+ s;
+                charWidth := charWidth + cw;
+              end;
+            end;
+            txt := txt + #10;
           end;
-        end;
-        txt := txt + #10;
-      end;
 
     //copy the SVG string to the memo
     memo1.Text := txt;
@@ -563,7 +588,7 @@ begin
   s := ''; j := -1;
   for i := 0 to svgPathLayer.ChildCount -1 do
   begin
-    s := s + TSubPathLayer(svgPathLayer[i]).GetStringDef(2);
+    s := s + TSubPathLayer(svgPathLayer[i]).GetStringDef(relativeCoords, 2);
     if svgPathLayer[i] = spl then
     begin
       if assigned(lastSegLayer) and (lastSegLayer.Name = c) then

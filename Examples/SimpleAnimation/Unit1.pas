@@ -62,7 +62,7 @@ begin
   path := MakePathI([0, ballsize*3-8, ballsize, ballsize*3 -8]);
   with layeredImage.AddLayer(TLayer32) do
   begin
-    SetBounds(drawRec);
+    SetInnerBounds(RectD(drawRec));
     DrawLine(Image, path, 5, clBlack32, esSquare);
   end;
 
@@ -86,7 +86,7 @@ begin
     begin
       with layeredImage.AddLayer(TLayer32) do
       begin
-        SetBounds(drawRec);
+        SetInnerBounds(RectD(drawRec));
         j := Round(power(SpaceAbove, i/25));
         ballRec := Rect(0, j, ballsize, j + ballsize);
         Image.CopyBlend(img, img.Bounds, ballRec);
@@ -99,7 +99,7 @@ begin
     for i := 1 to 6 do
       with layeredImage.AddLayer(TLayer32) do
       begin
-        SetBounds(drawRec);
+        SetInnerBounds(RectD(drawRec));
         ballRec := Rect(0,
           SpaceAbove +maxSquishSize -Round(power(maxSquishSize, (6-i)/6)),
           ballsize, SpaceAbove + ballsize);

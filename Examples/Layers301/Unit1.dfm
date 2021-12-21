@@ -1,8 +1,8 @@
 object MainForm: TMainForm
-  Left = 594
-  Top = 418
+  Left = 387
+  Top = 152
   Caption = 'Layers301'
-  ClientHeight = 411
+  ClientHeight = 410
   ClientWidth = 455
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -12,6 +12,7 @@ object MainForm: TMainForm
   Font.Style = []
   Menu = MainMenu1
   OldCreateOrder = False
+  Position = poMainFormCenter
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnKeyDown = FormKeyDown
@@ -21,7 +22,7 @@ object MainForm: TMainForm
   TextHeight = 14
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 385
+    Top = 384
     Width = 455
     Height = 26
     Panels = <>
@@ -51,6 +52,31 @@ object MainForm: TMainForm
         Caption = 'Hide &Hatching'
         ShortCut = 16456
         OnClick = mnuHideHatchingClick
+      end
+      object ShadowDepth1: TMenuItem
+        Caption = 'Shadow De&pth'
+        object MnuShadow0: TMenuItem
+          AutoCheck = True
+          Caption = 'None'
+          GroupIndex = 1
+          RadioItem = True
+          ShortCut = 16432
+        end
+        object MnuShadow10: TMenuItem
+          AutoCheck = True
+          Caption = '10'
+          Checked = True
+          GroupIndex = 1
+          RadioItem = True
+          ShortCut = 16433
+        end
+        object MnuShadow25: TMenuItem
+          AutoCheck = True
+          Caption = '25'
+          GroupIndex = 1
+          RadioItem = True
+          ShortCut = 16434
+        end
       end
       object N4: TMenuItem
         Caption = '-'

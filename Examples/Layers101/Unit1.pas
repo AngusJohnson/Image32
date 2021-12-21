@@ -13,8 +13,6 @@ type
   // A couple of custom layer classes ...
   //----------------------------------------------------------------------
 
-  TGroupLayer32 = TLayer32;
-
   TMyVectorLayer32 = class(TVectorLayer32) //for vector drawn layers
   private
     BrushColor : TColor32;
@@ -27,7 +25,7 @@ type
 
   TMyRasterLayer32 = class(TRasterLayer32) //for raster image layers
   public
-    procedure Init(const pt: TPoint);
+    procedure Init(const pt: TPointD);
   end;
 
   //----------------------------------------------------------------------
@@ -90,7 +88,7 @@ type
   private
     layeredImg32: TLayeredImage32;
     fontReader: TFontReader;
-    fontCache: TGlyphCache;
+    fontCache: TFontCache;
     wordStrings: TStringList;
     clickedLayer: TLayer32;
     targetLayer: TLayer32;
@@ -161,7 +159,7 @@ begin
     PenWidth := DpiAware(1.5);
   end;
 
-  p := OffsetPath(Paths, -Left, -Top);
+  p := OffsetPath(Paths, -Left+OuterMargin, -Top+OuterMargin);
   DrawPolygon(Image, p, frEvenOdd, BrushColor);
   DrawLine(Image, p, PenWidth, PenColor, esPolygon);
   UpdateHitTestMask(p);
@@ -171,7 +169,7 @@ end;
 // TMyRasterLayer32 methods
 //------------------------------------------------------------------------------
 
-procedure TMyRasterLayer32.Init(const pt: TPoint);
+procedure TMyRasterLayer32.Init(const pt: TPointD);
 begin
   MasterImage.CropTransparentPixels;
   UpdateHitTestMaskTransparent;
@@ -199,7 +197,7 @@ begin
 
   //create text rendering objects
   fontReader := FontManager.LoadFromResource('FONT_NSB', RT_RCDATA);
-  fontCache := TGlyphCache.Create(fontReader, DPIAware(48));
+  fontCache := TFontCache.Create(fontReader, DPIAware(48));
 
   //load a word list (for random words)
   wordStrings := TStringList.Create;
@@ -257,7 +255,10 @@ begin
   //create the new layer
   newLayer := TMyVectorLayer32(layeredImg32.AddLayer(TMyVectorLayer32));
   with newLayer as TMyVectorLayer32 do
+  begin
     Paths := Img32.Vector.Paths(Ellipse(rec));
+    OuterMargin := dpiAware(5);
+  end;
   SetTargetLayer(newLayer);
 end;
 //------------------------------------------------------------------------------
@@ -276,7 +277,10 @@ begin
 
   newLayer := layeredImg32.AddLayer(TMyVectorLayer32);
   with newLayer as TMyVectorLayer32 do
+  begin
     Paths := Img32.Vector.Paths(Rectangle(rec));
+    OuterMargin := dpiAware(5);
+  end;
   SetTargetLayer(newLayer);
 end;
 //------------------------------------------------------------------------------
@@ -289,7 +293,7 @@ var
   rec: TRectD;
 begin
   randomWord := wordStrings[Random(wordStrings.Count)];
-  tmp := fontCache.GetTextGlyphs(0, 0, randomWord);
+  tmp := fontCache.GetTextOutline(0, 0, randomWord);
   tmp := ScalePath(tmp, 1, 2.0);
   rec := Img32.Vector.GetBoundsD(tmp);
   with popupPoint do
@@ -298,7 +302,11 @@ begin
       Y -rec.Top - rec.Height/2);
 
   newLayer := layeredImg32.AddLayer(TMyVectorLayer32);
-  with newLayer as TMyVectorLayer32 do Paths := tmp;
+  with newLayer as TMyVectorLayer32 do
+  begin
+    Paths := tmp;
+    OuterMargin := dpiAware(5);
+  end;
   SetTargetLayer(newLayer);
 end;
 //------------------------------------------------------------------------------
@@ -318,7 +326,7 @@ begin
       Free;
       Exit;
     end;
-    Init(Point(layeredImg32.MidPoint));
+    Init(layeredImg32.MidPoint);
   end;
   SetTargetLayer(rasterLayer);
   Invalidate;
@@ -340,7 +348,7 @@ begin
       Free;
       Exit;
     end;
-    Init(Point(layeredImg32.MidPoint));
+    Init(layeredImg32.MidPoint);
   end;
   SetTargetLayer(rasterLayer);
   Invalidate;
@@ -363,8 +371,9 @@ begin
   //the image that's changed since the previous GetMergedImage call.
   //Painting only this changed region significantly speeds up drawing.
   img := layeredImg32.GetMergedImage(false, updateRect);
-  img.CopyToDc(updateRect,
-    self.Canvas.Handle, updateRect.Left, updateRect.Top, false);
+  //only update 'updateRect' otherwise repainting can be quite slow
+  if not IsEmptyRect(updateRect) then
+    img.CopyToDc(updateRect, updateRect, canvas.Handle);
 end;
 //------------------------------------------------------------------------------
 
@@ -448,7 +457,7 @@ begin
     //now call UpdateSizingButtonGroup to reposition the other buttons
     //in the sizing group and get the bounds rect for the target layer
     rec := UpdateSizingButtonGroup(clickedLayer);
-    targetLayer.SetBounds(rec);
+    targetLayer.SetInnerBounds(RectD(rec));
 
   end
   else if Assigned(targetLayer) then

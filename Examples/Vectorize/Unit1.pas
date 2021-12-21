@@ -67,7 +67,7 @@ implementation
 {$R Image.res}
 
 uses
-  Img32.Draw, Img32.Vector, Img32.Extra, Img32.SmoothPath,
+  Img32.Draw, Img32.Vector, Img32.Extra,
   Img32.Fmt.BMP, Img32.Fmt.JPG, Img32.Fmt.PNG;
 
 //------------------------------------------------------------------------------
@@ -135,6 +135,8 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.DisplayImage;
+var
+  i: integer;
 begin
   rawPaths := nil;
   bezierPaths := nil;
@@ -179,7 +181,9 @@ begin
     begin
       bezierPaths := SmoothToBezier(flattenedPaths, true, TrackBar1.Position, 2);
       //and finally 'flatten' the poly-beziers
-      flattenedPaths := FlattenCBezier(bezierPaths);
+      SetLength(flattenedPaths, Length(bezierPaths));
+      for i := 0 to High(bezierPaths) do
+        flattenedPaths[i] := FlattenCBezier(bezierPaths[i]);
     end;
 
     lblSmooth.Caption :=

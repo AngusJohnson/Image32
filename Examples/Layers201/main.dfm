@@ -2,8 +2,8 @@ object MainForm: TMainForm
   Left = 392
   Top = 208
   Caption = 'Layers201'
-  ClientHeight = 433
-  ClientWidth = 416
+  ClientHeight = 432
+  ClientWidth = 423
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -21,8 +21,8 @@ object MainForm: TMainForm
   TextHeight = 13
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 414
-    Width = 416
+    Top = 413
+    Width = 423
     Height = 19
     Panels = <>
     SimplePanel = True

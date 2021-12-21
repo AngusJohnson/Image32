@@ -271,6 +271,8 @@ procedure TForm1.pnlLeftMouseDown(Sender: TObject; Button: TMouseButton;
 begin
   clickedPoint := Point(X,Y);
   clickedLayer := layeredImage.GetLayerAt(clickedPoint);
+  if not (clickedLayer is TButtonDesignerLayer32) then
+    clickedLayer := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -373,6 +375,7 @@ begin
   offRec := ScaleRect(offRec, scale);
 
   //TRANSFORM...
+  transformedImage.Resampler := rBicubicResampler;
   ProjectiveTransform(transformedImage, scaledSrc, scaledDst, offRec);
 
   transformedImage.ScaleToFit(pnlRight.ClientWidth, pnlRight.ClientHeight);

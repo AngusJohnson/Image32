@@ -6,7 +6,8 @@ uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   System.Rtti, Math, FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics,
   FMX.Dialogs, FMX.Layouts, FMX.ExtCtrls, FMX.Platform, FMX.Surfaces,
-  FMX.StdCtrls, FMX.Controls.Presentation, Img32, Img32.FMX, Img32.Layers;
+  FMX.StdCtrls, FMX.Controls.Presentation, Img32, Img32.FMX, Img32.Layers,
+  FMX.ListBox, System.ImageList, FMX.ImgList;
 
 
 type
@@ -62,7 +63,7 @@ ResourceString
 procedure TMainForm.FormCreate(Sender: TObject);
 var
   matrix: TMatrixD;
-  fontCache: TGlyphCache;
+  fontCache: TFontCache;
   fontReader : TFontReader;
 begin
   margin := DPIAware(14);
@@ -82,21 +83,21 @@ begin
   //create a fontReader to access truetype font files (*.ttf) that
   //have been stored as font resources and create a glyph cache too
   fontReader := TFontReader.Create;
-  fontCache := TGlyphCache.Create(fontReader, DPIAware(12));
+  fontCache := TFontCache.Create(fontReader, DPIAware(12));
   try
     //connect fontReader to a simple ttf font resource
     //and get 'copyright' glyph outline ...
     fontReader.LoadFromResource('FONT_1', RT_RCDATA);
     if fontReader.IsValidFontFormat then
       copyrightGlyphs :=
-        fontCache.GetTextGlyphs(0,0,#$00A9' 2021 Angus Johnson');
+        fontCache.GetTextOutline(0,0,#$00A9' 2021 Angus Johnson');
 
     //connect fontReader to a decorative ttf font resource
     //and get 'bigText' glyph outlines ...
     fontReader.LoadFromResource('FONT_2', RT_RCDATA);
     fontCache.FontHeight := DPIAware(25);
     if fontReader.IsValidFontFormat then
-      bigTextGlyphs := fontCache.GetTextGlyphs(0, 0, rsBigText);
+      bigTextGlyphs := fontCache.GetTextOutline(0, 0, rsBigText);
 
     bigTextGlyphs := InflatePaths(bigTextGlyphs, 1.5, jsAuto, esPolygon);
     matrix := IdentityMatrix;
@@ -160,7 +161,7 @@ begin
   //add the bottom-most layer
   with layeredImg32.AddLayer(TVectorLayer32) as TVectorLayer32 do
   begin
-    SetBounds(layeredImg32.Root.Bounds);
+    SetInnerBounds(layeredImg32.Root.InnerBounds);
 
     //draw a rectangular frame
     tmpPath := Rectangle(rec);
@@ -185,7 +186,7 @@ begin
     with layeredImg32.AddLayer(TVectorLayer32) as TVectorLayer32 do
     begin
       Visible := false;
-      SetBounds(textRec);
+      SetInnerBounds(RectD(textRec));
       PositionCenteredAt(layeredImg32.MidPoint);
       DrawPolygon(Image, mainGlyphs, frNonZero, txtColor);
       DrawLine(Image, mainGlyphs, 1.5, clBlack32, esPolygon);
@@ -198,24 +199,6 @@ begin
   zoomIdx := 0;
   Timer1.Enabled := true;
   Layout1.Repaint;
-end;
-//------------------------------------------------------------------------------
-
-procedure CopyImage32ToFmxBitmap(img: TImage32; bmp: TBitmap);
-var
-  src, dst: TBitmapData;
-begin
-  src := TBitMapData.Create(img.Width, img.Height, TPixelFormat.BGRA);
-  src.Data := img.PixelBase;
-  src.Pitch := img.Width * 4;
-  if not Assigned(img) or not Assigned(bmp) then Exit;
-  bmp.SetSize(img.Width, img.Height);
-  if bmp.Map(TMapAccess.Write, dst) then
-  try
-    dst.Copy(src);
-  finally
-    bmp.Unmap(dst);
-  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -232,7 +215,7 @@ begin
   //to draw raster images onto an FMX canvas.
   bmp := TBitmap.Create;
   try
-    CopyImage32ToFmxBitmap(img, bmp);
+    AssignImage32ToFmxBitmap(img, bmp);
     rec := RectF(0,0,bmp.Width,bmp.Height);
     Canvas.Lock;
     Canvas.DrawBitmap(bmp, rec, rec, 1.0);
