@@ -44,8 +44,8 @@ type
   TUpdateInfo = record
     updateMethod  : TUpdateMethod;
     childUpdating : Boolean;
-    region  : TRectD;
-    boundsPrevUpd : TRectD; //ie update the previous position when moved.
+    updateRegion  : TRectD;
+    priorPosition : TRectD; //ie update the previous position when moved.
   end;
 
 
@@ -77,7 +77,6 @@ type
     fUserData       : TObject;
     fBlendFunc      : TBlendFunction; //defaults to BlendToAlpha
     fLayeredImage   : TLayeredImage32;
-    fUpdateCount    : Integer;        //see beginUpdate/EndUpdate
     fClipPath       : TPathsD;  //used in conjunction with fClipImage
     fStreamingRec   : TRectWH;
     function  GetMidPoint: TPointD;
@@ -94,17 +93,15 @@ type
     function  GetLayer32Parent: TLayer32;
     procedure SetLayer32Parent(parent: TLayer32);
     procedure SetOuterMargin(margin: double);
-    procedure DoCreate2;
+    procedure CreateInternal(parent: TStorage = nil; const name: string = '');
   protected
     UpdateInfo : TUpdateInfo;
-    procedure BeginUpdate; virtual;
-    procedure EndUpdate;   virtual;
-
     function  GetUpdateNeeded: Boolean;
-    procedure InvalidateBounds; //invalidates the entire bounds
-    procedure InvalidateRegion; //invalidates a specified region
+    //InvalidateBounds: invalidates the layer's outer bounds
+    procedure InvalidateBounds;
+    //InvalidateRegion: invalidates a specified region
+    procedure InvalidateRegion;
     procedure DoNotifyRefresh;
-    function  GetStgParent: TStorage;
     procedure PreMerge(hideDesigners: Boolean); virtual;
     procedure PreMergeAll(hideDesigners: Boolean); virtual;
     procedure Merge(hideDesigners: Boolean; updateRect: TRect);
@@ -499,7 +496,7 @@ end;
 constructor THitTest.Create;
 begin
   htImage := TImage32.Create;
-  htImage.BlockNotify; //ie never notify :)
+  htImage.BlockNotify; //ie never notifies :)
   enabled := true;
 end;
 //------------------------------------------------------------------------------
@@ -552,8 +549,9 @@ end;
 // TLayer32 class
 //------------------------------------------------------------------------------
 
-procedure TLayer32.DoCreate2;
+procedure TLayer32.CreateInternal(parent: TStorage = nil; const name: string = '');
 begin
+  inherited Create(parent, name);
   fImage        := TLayerNotifyImage32.Create(self);
   fVisible      := True;
   fOpacity      := 255;
@@ -568,14 +566,16 @@ end;
 
 constructor TLayer32.Create(parent: TStorage = nil; const name: string = '');
 begin
-  if Assigned(parent) and not parent.InheritsFrom(TLayer32) then
+  if Assigned(parent) and
+    not parent.InheritsFrom(TLayer32) then
   begin
     //make sure this is the root layer
-    if not (parent is TLayeredImage32) or (parent.ChildCount > 0) or
+    if not (parent is TLayeredImage32) or
+      (parent.ChildCount > 0) or
       not (self is TGroupLayer32) then
         raise Exception.Create(rsLayeredImage32Error);
-    inherited Create(parent, name);
-    DoCreate2;
+
+    CreateInternal(parent, name);
     TLayeredImage32(parent).fRoot := TGroupLayer32(self);
     fLayeredImage := TLayeredImage32(parent);
   end else
@@ -585,14 +585,11 @@ end;
 
 constructor TLayer32.Create(parent: TLayer32; const name: string);
 begin
-  inherited Create(parent, name);
-  DoCreate2;
-  if Assigned(parent) then
-  begin
-    fLayeredImage := parent.fLayeredImage;
-    if Assigned(fLayeredImage) then
-      Image.Resampler := fLayeredImage.Resampler;
-  end;
+  CreateInternal(parent, name);
+  if not Assigned(parent) then Exit;
+  fLayeredImage := parent.fLayeredImage;
+  if Assigned(fLayeredImage) then
+    Image.Resampler := fLayeredImage.Resampler;
 end;
 //------------------------------------------------------------------------------
 
@@ -604,7 +601,7 @@ begin
   begin
     fVisible := false;
     DoNotifyRefresh;
-    rec := Parent.MakeAbsolute(UpdateInfo.boundsPrevUpd);
+    rec := Parent.MakeAbsolute(UpdateInfo.priorPosition);
     if Assigned(fLayeredImage) then
       with fLayeredImage do
         fInvalidRect := UnionRect(fInvalidRect, rec);
@@ -613,12 +610,6 @@ begin
   FreeAndNil(fMergeImage);
   FreeAndNil(fClipImage);
   inherited;
-end;
-//------------------------------------------------------------------------------
-
-function  TLayer32.GetStgParent: TStorage;
-begin
-  Result := inherited Parent;
 end;
 //------------------------------------------------------------------------------
 
@@ -638,19 +629,6 @@ begin
   if inherited parent = parent then Exit;
   inherited SetParent(parent);
   if Visible then DoNotifyRefresh;
-end;
-//------------------------------------------------------------------------------
-
-procedure TLayer32.BeginUpdate;
-begin
-  DoNotifyRefresh;
-  Inc(Parent.fUpdateCount);
-end;
-//------------------------------------------------------------------------------
-
-procedure TLayer32.EndUpdate;
-begin
-  Dec(Parent.fUpdateCount);
 end;
 //------------------------------------------------------------------------------
 
@@ -683,12 +661,14 @@ var
   rec, ob: TRectD;
 begin
   if (self = Root) then Exit;
-  rec := Parent.MakeAbsolute(UpdateInfo.boundsPrevUpd);
+  //invalidate both the old position and the new one
+
+  rec := Parent.MakeAbsolute(UpdateInfo.priorPosition);
   with fLayeredImage do
     fInvalidRect := UnionRect(fInvalidRect, rec);
 
   ob := OuterBounds;
-  UpdateInfo.boundsPrevUpd := ob;
+  UpdateInfo.priorPosition := ob;
   rec := Parent.MakeAbsolute(ob);
   with fLayeredImage do
     fInvalidRect := UnionRect(fInvalidRect, rec);
@@ -699,8 +679,8 @@ procedure  TLayer32.InvalidateRegion;
 var
   rec: TRectD;
 begin
-  rec := MakeAbsolute(UpdateInfo.region);
-  UpdateInfo.region := NullRectD;
+  rec := MakeAbsolute(UpdateInfo.updateRegion);
+  UpdateInfo.updateRegion := NullRectD;
   with fLayeredImage do
     fInvalidRect := UnionRect(fInvalidRect, rec);
 end;
@@ -712,7 +692,7 @@ var
 begin
   if not Assigned(fLayeredImage) or (self = Root) then Exit;
   UpdateInfo.updateMethod := umRegion;
-  UpdateInfo.region := UnionRect(UpdateInfo.region, rec);
+  UpdateInfo.updateRegion := UnionRect(UpdateInfo.updateRegion, rec);
   layer := self;
   while Assigned(layer) and (layer is TLayer32) do
   begin
@@ -844,7 +824,7 @@ procedure TLayer32.SetVisible(value: Boolean);
 begin
   if (value = fVisible) or (Root = Self) then Exit;
   fVisible := value;
-  if not value and IsEmptyRect(UpdateInfo.boundsPrevUpd) then
+  if not value and IsEmptyRect(UpdateInfo.priorPosition) then
     UpdateInfo.updateMethod := umNone;
   DoNotifyRefresh;
 end;
@@ -1330,20 +1310,20 @@ begin
 
     with childLayer.UpdateInfo do
     begin
-      boundsPrevUpd := childLayer.OuterBounds;
+      priorPosition := childLayer.OuterBounds;
       updateMethod := umNone;
-      region := NullRectD;
+      updateRegion := NullRectD;
       childUpdating := false;
     end;
   end;
 
   with UpdateInfo do
   begin
-    boundsPrevUpd := OuterBounds;
+    priorPosition := OuterBounds;
     if (updateMethod = umRegion) and (self <> Root) then
       Parent.UpdateInfo.updateMethod := umRegion;
     updateMethod := umNone;
-    region := NullRectD;
+    updateRegion := NullRectD;
     childUpdating := false;
   end;
 end;
@@ -1475,13 +1455,8 @@ begin
   if (dx = 0) and (dy = 0) then Exit;
   DoNotifyRefresh;
   PositionAt(fLeft + dx, fTop + dy);
-  BeginUpdate;
-  try
   for i := 0 to ChildCount -1 do
     Child[i].Offset(dx, dy);
-  finally
-    EndUpdate;
-  end;
 end;
 
 //------------------------------------------------------------------------------

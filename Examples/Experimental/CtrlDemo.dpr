@@ -27,6 +27,10 @@ uses
 
 type
 
+  //TEventPropertyHandler: use this class to connect
+  //objects and events to a TCtrlStorageManager
+  //nb: all events must be TNotifyEvent
+  //(See TCtrlStorageManager.EventAndPropertyHandler)
   TEventPropertyHandler1 = class(TEventPropertyHandler)
   private
     fArial14: TFontCache;
@@ -52,34 +56,36 @@ var
   WinClass: TWndClass;
   Inst, mainHdl: THandle;
   Msg: TMsg;
-  sizeCursor: HIcon;
-  handCursor: HIcon;
-  arrowCursor: HIcon;
-  eventPropHandler1: TEventPropertyHandler1;
 
+  eventPropHandler1: TEventPropertyHandler1;
   storageMngr : TCtrlStorageManager;
   fontReader  : TFontReader;
+
   layeredImg32: TLayeredImage32;
   rootCtrl    : TPanelCtrl;
   pageCtrl    : TPageCtrl;
+  statusCtrl  : TStatusbarCtrl;
 
   prevScale   : double;
   updateRect  : TRect;
   imageSize64 : double;
   imageSize24 : double;
 
-  inDesignMode: Boolean;
+  designing   : Boolean;
   clickPt     : TPoint;
   clickLayer  : TLayer32;
   target      : TCustomCtrl;
   sizingGroup : TSizingGroupLayer32;
 
+  sizeCursor  : HIcon;
+  handCursor  : HIcon;
+  arrowCursor : HIcon;
+
 const
   DoLoadFromStorage = true;//false;//
-  cmd_OK = 1;
-
 
 //------------------------------------------------------------------------------
+//Miscellaneous functions
 //------------------------------------------------------------------------------
 
 function IsOwnedBy(ctrl: TLayer32; ownerCtrlClass: TCustomCtrlClass): Boolean;
@@ -192,6 +198,9 @@ begin
     pageCtrl.Scale(scaleDelta);
   InvalidateRect(mainHdl, nil, false);
 end;
+
+//------------------------------------------------------------------------------
+// TEventPropertyHandler1 events
 //------------------------------------------------------------------------------
 
 procedure TEventPropertyHandler1.SaveClick(Sender: TObject);
@@ -247,9 +256,12 @@ end;
 
 procedure TEventPropertyHandler1.DesignModeClick(Sender: TObject);
 begin
-  inDesignMode := TCheckboxCtrl(Sender).TriState = tsChecked;
-  if not inDesignMode then SetTarget(nil);
+  designing := TCheckboxCtrl(Sender).TriState = tsChecked;
+  if not designing then SetTarget(nil);
 end;
+
+//------------------------------------------------------------------------------
+// Main Window Callback Procedure
 //------------------------------------------------------------------------------
 
 function WindowProc(hWnd, uMsg,	wParam: WPARAM; lParam: LPARAM): Integer; stdcall;
@@ -270,7 +282,7 @@ begin
       begin
         Result := 0;
         clickPt := Img32.vector.Point(LoWord(lParam), HiWord(lParam));
-        if inDesignMode then
+        if designing then
         begin
           clickLayer := layeredImg32.GetLayerAt(clickPt);
           if IsOwnedBy(clickLayer, TPagePnlCtrl) then
@@ -292,6 +304,8 @@ begin
         storageMngr.MouseDown(mbLeft, WParamToShiftState(wParam), clickPt);
         if storageMngr.RepaintRequired then
           InvalidateRect(hWnd, nil, false);
+
+        statusCtrl.Text := storageMngr.RootCtrl.FocusedCtrl.Name;
       end;
     WM_MOUSEMOVE:
       begin
@@ -299,7 +313,7 @@ begin
         pt := Img32.vector.Point(LoWord(lParam), HiWord(lParam));
         dx := pt.X - clickPt.X; dy := pt.Y - clickPt.Y;
 
-        if inDesignMode then
+        if designing then
         begin
           if not assigned(clickLayer) then
           begin
@@ -342,7 +356,7 @@ begin
       end;
     WM_LBUTTONUP:
       begin
-        if inDesignMode then clickLayer := nil;
+        if designing then clickLayer := nil;
         clickPt := Img32.vector.Point(LoWord(lParam), HiWord(lParam));
         storageMngr.MouseUp(mbLeft, WParamToShiftState(wParam), clickPt);
         if storageMngr.RepaintRequired then
@@ -368,7 +382,7 @@ begin
           PostQuitMessage(0);
         end
 
-        else if inDesignMode and Assigned(Target) then
+        else if designing and Assigned(Target) then
         begin
           case Key of
             VK_DELETE:
@@ -464,6 +478,9 @@ begin
       Result := DefWindowProc(hWnd, uMsg, wParam, lParam);
   end;
 end;
+
+//------------------------------------------------------------------------------
+// Setup numerouse form controls (ie. if not loading from file storage)
 //------------------------------------------------------------------------------
 
 procedure SetupCtrls;
@@ -497,7 +514,9 @@ begin
   rootCtrl.Color := clBtnFace32;
   rootCtrl.Margin := 50;
 
-  with layeredImg32.AddLayer(TStatusbarCtrl, rootCtrl) as TStatusbarCtrl do
+  statusCtrl :=
+    layeredImg32.AddLayer(TStatusbarCtrl, rootCtrl) as TStatusbarCtrl;
+  with statusCtrl do
   begin
     BevelHeight := DPIAware(1.5);
     Color := clNone32;
@@ -567,7 +586,7 @@ begin
 
   // PAGE 1 ///////////////////////////////////////////////////////
   pagePnl := pageCtrl.Panel[0];
-  //pagePnl.Color := $20FFFF00; //try it :)
+  pagePnl.Color := $20FFFF00; //try it :)
 
   with layeredImg32.AddLayer(TButtonCtrl, pagePnl) as TButtonCtrl do
   begin
@@ -737,10 +756,13 @@ begin
     OuterMargin := 40;
   end;
 end;
+
+//------------------------------------------------------------------------------
+// Application entry
 //------------------------------------------------------------------------------
 
 begin
-  {Register Custom WndClass ...}
+  //Register Window Class
   Inst := hInstance;
   with WinClass do
   begin
@@ -754,25 +776,25 @@ begin
   end;
   RegisterClass(WinClass);
 
-  {Create Main Window and center it on the desktop...}
+  //Create the main window and center it
   mainHdl := CreateWindow('IMG32_DEMO', 'Demo',
               WS_OVERLAPPEDWINDOW, 0, 0,
               DpiAware(800), DpiAware(600), 0, 0, Inst, nil);
   CenterForm(mainHdl);
 
-///////////////////////////////////////////////////////////////
-  sizeCursor := LoadCursor(0, IDC_SIZEALL);
-  handCursor := LoadCursor(0, IDC_HAND);
-  arrowCursor := LoadCursor(0, IDC_ARROW);
   imageSize64 := DpiAware(64.0);
   imageSize24 := DpiAware(24.0);
 
-  fontReader := FontManager.Load('Arial');
+  //instantiate a number of objects
+  sizeCursor  := LoadCursor(0, IDC_SIZEALL);
+  handCursor  := LoadCursor(0, IDC_HAND);
+  arrowCursor := LoadCursor(0, IDC_ARROW);
+  fontReader  := FontManager.Load('Arial');
 
   eventPropHandler1 := TEventPropertyHandler1.Create;
   with eventPropHandler1 do
   begin
-    //all the following objects will be freed by eventPropHandler1
+    //nb: all the following objects will be freed by eventPropHandler1
 
     arial14 := TFontCache.Create(fontReader, DPIAware(14));
     arialStatic := TFontCache.Create(fontReader, DPIAware(14));
@@ -790,7 +812,6 @@ begin
   end;
 
   storageMngr := TCtrlStorageManager.Create;
-  //attach the eventhandler before reading or writing to storage.
   storageMngr.EventAndPropertyHandler := eventPropHandler1;
 
   if DoLoadFromStorage then
@@ -800,21 +821,18 @@ begin
     prevScale := storageMngr.DesignFormScale;
 
     layeredImg32 := storageMngr.FindByClass(TLayeredImage32) as TLayeredImage32;
-    if Assigned(layeredImg32) and Assigned(layeredImg32.Root) then
-    begin
-      rootCtrl := layeredImg32.root[0] as TPanelCtrl;
-      pageCtrl := rootCtrl.FindByClass(TPageCtrl) as TPageCtrl;
-      DoScale(prevScale);
-
-      SetClientRect(mainHdl, layeredImg32.Width, layeredImg32.Height);
-    end;
+    if not Assigned(layeredImg32) or not Assigned(layeredImg32.Root) then
+      raise Exception.Create('Error loading objects- TLayeredImage32 is missing');
+    rootCtrl := layeredImg32.root[0] as TPanelCtrl;
+    pageCtrl := rootCtrl.FindByClass(TPageCtrl) as TPageCtrl;
+    statusCtrl := rootCtrl.FindByClass(TStatusbarCtrl) as TStatusbarCtrl;
+    DoScale(prevScale);
+    SetClientRect(mainHdl, layeredImg32.Width, layeredImg32.Height);
   end else
   begin
     SetupCtrls;
     storageMngr.FindAllShortcutOwners;
   end;
-
-///////////////////////////////////////////////////////////////
 
   ShowWindow(mainHdl, cmdShow);
   UpdateWindow(mainHdl);

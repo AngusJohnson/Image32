@@ -22,7 +22,6 @@ type
     textRect   : TRectD;
   protected
     procedure SetName(const aName: string); override;
-    //override TVectorLayer32's empty Draw method
     procedure Draw; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
