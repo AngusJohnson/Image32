@@ -3,9 +3,9 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.0                                                             *
-* Date      :  22 December 2021                                                *
+* Date      :  10 January 2022                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2021                                         *
+* Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
 * Purpose   :  Read SVG 2.0 files                                              *
 *                                                                              *
@@ -993,14 +993,20 @@ begin
         if self.elRectWH.width.IsValid and
           self.elRectWH.height.IsValid then
         begin
-          //scale <symbol> proportionally to fill the <use> element
-          scale2.cx := self.elRectWH.width.rawVal / viewboxWH.Width;
-          scale2.cy := self.elRectWH.height.rawVal / viewboxWH.Height;
-          if scale2.cy < scale2.cx then s := scale2.cy else s := scale2.cx;
+          with viewboxWH do
+          begin
+            dx := -Left/Width * self.elRectWH.width.rawVal;
+            dy := -Top/Height * self.elRectWH.height.rawVal;
 
-          //again, scale without translating
+            //scale <symbol> proportionally to fill the <use> element
+            scale2.cx := self.elRectWH.width.rawVal / Width;
+            scale2.cy := self.elRectWH.height.rawVal / Height;
+            if scale2.cy < scale2.cx then s := scale2.cy else s := scale2.cx;
+          end;
+
           mat := IdentityMatrix;
           MatrixScale(mat, s, s);
+          MatrixTranslate(mat, dx, dy);
           drawDat.matrix := MatrixMultiply(drawDat.matrix, mat);
 
           //now center after scaling
@@ -2309,6 +2315,8 @@ var
   endStyle: TEndStyle;
   joinStyle: TJoinStyle;
   bounds: TRectD;
+
+  lines: TPathsD;
 begin
   if isClosed then
   begin

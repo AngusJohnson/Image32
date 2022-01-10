@@ -3,9 +3,9 @@ unit Img32.SVG.PathDesign;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.0                                                             *
-* Date      :  22 December 2021                                                *
+* Date      :  10 January 2022                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2021                                         *
+* Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
 * Purpose   :  Supports designing SVG paths                                    *
 *                                                                              *
@@ -404,7 +404,7 @@ begin
   TSvgASegment(fSeg).ReverseArc;
   Paths := Img32.Vector.Paths(fSeg.FlatPath);
   DrawPath;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -767,7 +767,7 @@ begin
     Paths := Img32.Vector.Paths(fSeg.FlatPath);
     DrawPath;
   end;
-  DoNotifyRefresh;
+  Invalidate;
 
   //move the following segments
   segLayer := GetNextSegLayer;

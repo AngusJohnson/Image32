@@ -29,7 +29,7 @@ type
 
   //TEventPropertyHandler: use this class to connect
   //objects and events to a TCtrlStorageManager
-  //nb: all events must be TNotifyEvent
+  //nb: events can only be TNotifyEvent
   //(See TCtrlStorageManager.EventAndPropertyHandler)
   TEventPropertyHandler1 = class(TEventPropertyHandler)
   private
@@ -159,7 +159,7 @@ begin
   if Assigned(target) then
     sizingGroup := CreateSizingButtonGroup(target, ssCorners,
       bsRound, DefaultButtonSize, clLime32);
-  InvalidateRect(mainHdl, nil, false);
+  //InvalidateRect(mainHdl, nil, false);
 end;
 //------------------------------------------------------------------------------
 
@@ -196,7 +196,7 @@ begin
 
   if not ValueAlmostOne(scaleDelta) then
     pageCtrl.Scale(scaleDelta);
-  InvalidateRect(mainHdl, nil, false);
+  //InvalidateRect(mainHdl, nil, false);
 end;
 
 //------------------------------------------------------------------------------
@@ -452,10 +452,10 @@ begin
       begin
         Result := 0;
         img := layeredImg32.GetMergedImage(false, updateRect);
-        if not Assigned(img) then Exit;
         dc := BeginPaint(hWnd, &ps);
+        //DrawLine(img, Rectangle(updateRect), 1, clRed32, esClosed);
         //FillRect(dc, &ps.rcPaint, (COLOR_BTNFACE+1));
-        img.CopyToDc(updateRect, dc, updateRect.Left, updateRect.Top);
+        img.CopyToDc(updateRect, dc, updateRect.Left, updateRect.Top, false);
         EndPaint(hWnd, &ps);
       end;
     WM_ERASEBKGND: Result := 1;
@@ -586,7 +586,7 @@ begin
 
   // PAGE 1 ///////////////////////////////////////////////////////
   pagePnl := pageCtrl.Panel[0];
-  pagePnl.Color := $20FFFF00; //try it :)
+  //pagePnl.Color := $20FFFF00; //try it :)
 
   with layeredImg32.AddLayer(TButtonCtrl, pagePnl) as TButtonCtrl do
   begin
@@ -691,7 +691,7 @@ begin
   with layeredImg32.AddLayer(TLabelCtrl, pagePnl,'') as TLabelCtrl do
   begin
     Text := 'These buttons use SVG images because they are ideal for scaling.';
-    SetInnerBounds(DPIAware(RectD(50, 40, 480, 62)));
+    SetInnerBounds(DPIAware(RectD(40, 40, 480, 62)));
   end;
 
   //we're about to add a whole number of image buttons
@@ -701,7 +701,7 @@ begin
   pad := DPIAware(4);
   w := bevelSize*2 + pad*2 + imageSize64; //top row button width (bevel, padding & image)
   h := imageSize64 + pad*3 +bevelSize*2 +eventPropHandler1.arial14.LineHeight;  //button height
-  j := DPIAware(50);    //initial button X offset
+  j := DPIAware(40);    //initial button X offset
   k := DPIAware(80);    //initial button Y offset
 
   for i := 0 to eventPropHandler1.svgList.Count -1 do
@@ -714,7 +714,7 @@ begin
       SetInnerBounds(RectD(j, k, j + w, k + h));
       if i mod 8 = 7 then
       begin
-        j := DPIAware(50*prevScale);
+        j := DPIAware(40*prevScale);
         k := k + h +OuterMargin;
         //change button width and height for second row
         w := eventPropHandler1.arial14.GetTextWidth('Btn13')
@@ -849,5 +849,3 @@ begin
 
   Halt(0);
 end.
-
-

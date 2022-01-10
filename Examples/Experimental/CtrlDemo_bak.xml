@@ -7,22 +7,22 @@
 <TLayeredImage32 
   Resampler="2"
   BackgroundColor="FFF0F0F0"
-  Width="1414"
-  Height="904"
+  Width="1450"
+  Height="915"
   ObjId="1">
   <TGroupLayer32 
     Name="root"
     Left="0.00"
     Top="0.00"
-    Width="1414.00"
-    Height="904.00"
+    Width="1450.00"
+    Height="915.00"
     ObjId="2">
     <TPanelCtrl 
       Name="TPanelCtrl"
       Left="0.00"
       Top="0.00"
-      Width="1414.00"
-      Height="904.00"
+      Width="1450.00"
+      Height="915.00"
       OuterMargin="10.00"
       AutoPosition="0"
       BevelHeight="4.00"
@@ -34,21 +34,22 @@
       <TStatusbarCtrl 
         Name="TStatusbarCtrl"
         Left="50.00"
-        Top="806.80"
-        Width="1314.00"
+        Top="817.80"
+        Width="1350.00"
         Height="47.20"
         OuterMargin="10.00"
         AutoPosition="6"
         BevelHeight="3.00"
         CanFocus="0"
         Color="00000000"
+        Text="TButtonCtrl"
         ObjId="4">
       </TStatusbarCtrl>
       <TPanelCtrl 
         Name="TPanelCtrl"
         Left="50.00"
         Top="50.00"
-        Width="1314.00"
+        Width="1350.00"
         Height="80.00"
         OuterMargin="10.00"
         AutoPosition="4"
@@ -134,7 +135,7 @@
         Name="TPanelCtrl"
         Left="50.00"
         Top="130.00"
-        Width="1314.00"
+        Width="1350.00"
         Height="40.00"
         OuterMargin="10.00"
         AutoPosition="4"
@@ -148,8 +149,8 @@
         Name="TPageCtrl"
         Left="50.00"
         Top="170.00"
-        Width="1314.00"
-        Height="636.80"
+        Width="1350.00"
+        Height="647.80"
         OuterMargin="10.00"
         AutoPosition="2"
         BevelHeight="6.00"
@@ -158,15 +159,15 @@
         ?Font="Arial14"
         ActiveIndex="0"
         ShadowSize="0.00"
-        TabWidth="0"
-        TabHeight="0"
+        TabWidth="0.00"
+        TabHeight="0.00"
         ObjId="11">
         <TPageTabCtrl 
           Name="TPageTabCtrl"
           Left="6.00"
-          Top="10.00"
-          Width="154.00"
-          Height="60.00"
+          Top="0.00"
+          Width="154.10"
+          Height="51.00"
           OuterMargin="10.00"
           AutoPosition="1"
           BevelHeight="4.00"
@@ -177,10 +178,10 @@
         </TPageTabCtrl>
         <TPagePnlCtrl 
           Name="TPagePnlCtrl"
-          Left="16.00"
-          Top="70.00"
-          Width="1282.00"
-          Height="550.80"
+          Left="6.00"
+          Top="63.00"
+          Width="1338.00"
+          Height="578.80"
           AutoPosition="2"
           BevelHeight="0.00"
           CanFocus="0"
@@ -359,9 +360,9 @@
             ObjId="23">
             <TScrollCtrl 
               Name="ListScroll"
-              Left="221.80"
+              Left="231.35"
               Top="0.00"
-              Width="38.20"
+              Width="28.65"
               Height="296.00"
               AutoPosition="5"
               BevelHeight="4.00"
@@ -379,10 +380,10 @@
         </TPagePnlCtrl>
         <TPageTabCtrl 
           Name="TPageTabCtrl"
-          Left="160.00"
-          Top="10.00"
-          Width="154.00"
-          Height="60.00"
+          Left="160.10"
+          Top="0.00"
+          Width="154.10"
+          Height="51.00"
           OuterMargin="10.00"
           AutoPosition="1"
           BevelHeight="4.00"
@@ -393,10 +394,10 @@
         </TPageTabCtrl>
         <TPagePnlCtrl 
           Name="TPagePnlCtrl"
-          Left="16.00"
-          Top="70.00"
-          Width="1282.00"
-          Height="550.80"
+          Left="6.00"
+          Top="63.00"
+          Width="1338.00"
+          Height="578.80"
           Visible="0"
           AutoPosition="2"
           BevelHeight="0.00"
@@ -409,9 +410,9 @@
           ObjId="26">
           <TLabelCtrl 
             Name="TLabelCtrl"
-            Left="100.00"
+            Left="80.00"
             Top="80.00"
-            Width="860.00"
+            Width="880.00"
             Height="44.00"
             OuterMargin="10.00"
             AutoPosition="0"
@@ -423,7 +424,7 @@
           </TLabelCtrl>
           <TImageBtnCtrl 
             Name="TImageBtnCtrl"
-            Left="100.00"
+            Left="80.00"
             Top="160.00"
             Width="152.00"
             Height="198.20"
@@ -441,7 +442,7 @@
           </TImageBtnCtrl>
           <TImageBtnCtrl 
             Name="TImageBtnCtrl"
-            Left="262.00"
+            Left="242.00"
             Top="160.00"
             Width="152.00"
             Height="198.20"
@@ -459,7 +460,7 @@
           </TImageBtnCtrl>
           <TImageBtnCtrl 
             Name="TImageBtnCtrl"
-            Left="424.00"
+            Left="404.00"
             Top="160.00"
             Width="152.00"
             Height="198.20"
@@ -477,7 +478,7 @@
           </TImageBtnCtrl>
           <TImageBtnCtrl 
             Name="TImageBtnCtrl"
-            Left="586.00"
+            Left="566.00"
             Top="160.00"
             Width="152.00"
             Height="198.20"
@@ -495,7 +496,7 @@
           </TImageBtnCtrl>
           <TImageBtnCtrl 
             Name="TImageBtnCtrl"
-            Left="748.00"
+            Left="728.00"
             Top="160.00"
             Width="152.00"
             Height="198.20"
@@ -513,7 +514,7 @@
           </TImageBtnCtrl>
           <TImageBtnCtrl 
             Name="TImageBtnCtrl"
-            Left="910.00"
+            Left="890.00"
             Top="160.00"
             Width="152.00"
             Height="198.20"
@@ -531,7 +532,7 @@
           </TImageBtnCtrl>
           <TImageBtnCtrl 
             Name="TImageBtnCtrl"
-            Left="1072.00"
+            Left="1052.00"
             Top="160.00"
             Width="152.00"
             Height="198.20"
@@ -549,7 +550,7 @@
           </TImageBtnCtrl>
           <TImageBtnCtrl 
             Name="TImageBtnCtrl"
-            Left="1234.00"
+            Left="1214.00"
             Top="160.00"
             Width="152.00"
             Height="198.20"
@@ -567,7 +568,7 @@
           </TImageBtnCtrl>
           <TImageBtnCtrl 
             Name="TImageBtnCtrl"
-            Left="100.00"
+            Left="80.00"
             Top="368.20"
             Width="249.17"
             Height="152.00"
@@ -585,7 +586,7 @@
           </TImageBtnCtrl>
           <TImageBtnCtrl 
             Name="TImageBtnCtrl"
-            Left="359.17"
+            Left="339.17"
             Top="368.20"
             Width="249.17"
             Height="152.00"
@@ -603,7 +604,7 @@
           </TImageBtnCtrl>
           <TImageBtnCtrl 
             Name="TImageBtnCtrl"
-            Left="618.34"
+            Left="598.34"
             Top="368.20"
             Width="249.17"
             Height="152.00"
@@ -621,7 +622,7 @@
           </TImageBtnCtrl>
           <TImageBtnCtrl 
             Name="TImageBtnCtrl"
-            Left="877.52"
+            Left="857.52"
             Top="368.20"
             Width="249.17"
             Height="152.00"
@@ -639,7 +640,7 @@
           </TImageBtnCtrl>
           <TImageBtnCtrl 
             Name="TImageBtnCtrl"
-            Left="1136.69"
+            Left="1116.69"
             Top="368.20"
             Width="249.17"
             Height="152.00"
@@ -658,15 +659,15 @@
           <TScrollCtrl 
             Name="TScrollCtrl"
             Left="0.00"
-            Top="512.60"
-            Width="1282.00"
-            Height="38.20"
+            Top="550.15"
+            Width="1338.00"
+            Height="28.65"
             AutoPosition="6"
             BevelHeight="4.00"
             CanFocus="0"
             Color="FFF0F0F0"
             Min="0.00"
-            Max="1406.00"
+            Max="1386.00"
             Position="0.00"
             Size="0.00"
             Step="10"
@@ -675,10 +676,10 @@
           </TScrollCtrl>
           <TScrollCtrl 
             Name="TScrollCtrl"
-            Left="1089.80"
+            Left="1433.35"
             Top="0.00"
-            Width="38.20"
-            Height="510.60"
+            Width="28.65"
+            Height="764.15"
             Visible="0"
             AutoPosition="5"
             BevelHeight="4.00"
@@ -695,10 +696,10 @@
         </TPagePnlCtrl>
         <TPageTabCtrl 
           Name="TPageTabCtrl"
-          Left="314.00"
-          Top="10.00"
-          Width="212.00"
-          Height="60.00"
+          Left="314.19"
+          Top="0.00"
+          Width="211.67"
+          Height="51.00"
           OuterMargin="10.00"
           AutoPosition="1"
           BevelHeight="4.00"
@@ -709,10 +710,10 @@
         </TPageTabCtrl>
         <TPagePnlCtrl 
           Name="TPagePnlCtrl"
-          Left="16.00"
-          Top="70.00"
-          Width="1282.00"
-          Height="550.80"
+          Left="6.00"
+          Top="63.00"
+          Width="1338.00"
+          Height="578.80"
           Visible="0"
           AutoPosition="2"
           BevelHeight="0.00"
@@ -725,8 +726,8 @@
             Name="TMemoCtrl"
             Left="20.00"
             Top="20.00"
-            Width="1242.00"
-            Height="510.80"
+            Width="1298.00"
+            Height="538.80"
             OuterMargin="40.00"
             AutoPosition="2"
             BevelHeight="4.00"
@@ -740,16 +741,17 @@
             ObjId="45">
             <TScrollCtrl 
               Name="TScrollCtrl"
-              Left="1192.89"
+              Left="1385.17"
               Top="0.00"
-              Width="49.11"
-              Height="510.80"
+              Width="36.83"
+              Height="752.80"
+              Visible="0"
               AutoPosition="5"
               BevelHeight="4.00"
               CanFocus="0"
               Color="FFF0F0F0"
               Min="0.00"
-              Max="3333.00"
+              Max="100.00"
               Position="0.00"
               Size="0.00"
               Step="49"

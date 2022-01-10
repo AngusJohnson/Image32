@@ -3,9 +3,9 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.0                                                             *
-* Date      :  22 December 2021                                                *
+* Date      :  10 January 2022                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2021                                         *
+* Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
 * Purpose   :  Vector drawing for TImage32                                     *
 *                                                                              *
@@ -201,8 +201,12 @@ type
   function GetPointAtAngleAndDist(const origin: TPointD;
     angle, distance: double): TPointD;
 
-  function IntersectPoint(const ln1a, ln1b, ln2a, ln2b: TPointD): TPointD;
+  function IntersectPoint(const ln1a, ln1b, ln2a, ln2b: TPointD): TPointD; overload;
+  function IntersectPoint(const ln1a, ln1b, ln2a, ln2b: TPointD; out ip: TPointD): Boolean; overload;
+
   function SegmentIntersectPt(const ln1a, ln1b, ln2a, ln2b: TPointD): TPointD;
+  function SegmentsIntersect(const ln1a, ln1b, ln2a, ln2b: TPointD;
+    out ip: TPointD): Boolean;
 
   procedure RotatePoint(var pt: TPointD;
     const focalPoint: TPointD; sinA, cosA: double); overload;
@@ -1273,7 +1277,8 @@ begin
   setLength(result, len);
   if len = 0 then Exit;
   pt := path[0];
-  //skip duplicates
+
+  //watch out for, and fix up duplicates at end of line
   i := len -1;
   while (i > 0) and PointsNearEqual(path[i], pt, 0.001) do dec(i);
   if (i = 0) then
@@ -1283,9 +1288,9 @@ begin
     Exit;
   end;
   result[i] := GetUnitNormal(path[i], pt);
-  //fix up any duplicates at the end of the path
-  for j := i +1 to len -1 do
-    result[j] := result[j-1];
+  //now fix up any duplicates at the end of the path
+  for j := i +1 to len -1 do result[j] := result[j-1];
+
   //with at least one valid vector, we can now
   //safely get the remaining vectors
   pt := path[i];
@@ -1294,6 +1299,8 @@ begin
     if (path[i].X <> pt.X) or (path[i].Y <> pt.Y) then
     begin
       result[i] := GetUnitNormal(path[i], pt);
+      if (Result[i].X = 0) and (Result[i].Y = 0) then
+        Result[i] := Result[i+1];
       pt := path[i];
     end else
       result[i] := result[i+1]
@@ -1753,6 +1760,9 @@ begin
   if not Assigned(path) then exit;
 
   len := Length(path);
+  while (len > 2) and PointsNearEqual(path[len -1], path[0], 0.001) do
+    dec(len);
+
   if len < 2 then Exit;
 
   absDelta := Abs(delta);
@@ -1829,14 +1839,13 @@ begin
     isConcave := (sinA < 0) = (delta > 0);
 
     if DistanceSqrd(pt2, pt3) < 1 then
-      ip := MidPoint(pt2, pt3)
-    else if isConcave then
-      ip := SegmentIntersectPt(pt1, pt2, pt3, pt4)
-    else
-      ip := InvalidPointD;
-
-    if (ip.X <> InvalidD) then
-      AddPoint(ip)
+    begin
+      AddPoint(MidPoint(pt2, pt3));
+    end else if isConcave and
+      SegmentsIntersect(pt1, pt2, pt3, pt4, ip) then
+    begin
+      AddPoint(ip);
+    end
     else if joinStyle = jsRound then
     begin
       a := ArcTan2(sinA, cosA);
@@ -1852,15 +1861,21 @@ begin
     end
     else if (joinStyle = jsMiter) and (1 + cosA > miterLimOrRndScale) then
     begin
+      //within miter range
       a := delta / (1 + cosA);
       AddPoint(PointD(path[i].X + (norms[i].X + norms[prevI].X) * a,
         path[i].Y + (norms[i].Y + norms[prevI].Y) * a));
-    end else
+    end
+    else if (cosA < 0.0) and (cosA > -0.999) then
     begin
       //see offset_triginometry5.svg
       a := tan( ArcTan2(sinA, cosA)/4 ) * delta;
       AddPoint(GetVector(pt2, norms[prevI], a));
       AddPoint(GetVector(pt3, norms[i], -a));
+    end else
+    begin
+      AddPoint(pt2);
+      AddPoint(pt3);
     end;
     prevI := i;
   end;
@@ -2139,6 +2154,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function IntersectPoint(const ln1a, ln1b, ln2a, ln2b: TPointD;
+  out ip: TPointD): Boolean;
+begin
+  ip := IntersectPoint(ln1a, ln1b, ln2a, ln2b);
+  Result := IsValid(ip);
+end;
+//------------------------------------------------------------------------------
+
 function SegmentIntersectPt(const ln1a, ln1b, ln2a, ln2b: TPointD): TPointD;
 var
   pqd,r,s : TPointD; //scalar vectors;
@@ -2162,12 +2185,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function SegmentsIntersect(const ln1a, ln1b, ln2a, ln2b: TPointD;
+  out ip: TPointD): Boolean;
+begin
+  ip := SegmentIntersectPt(ln1a, ln1b, ln2a, ln2b);
+  Result := IsValid(ip);
+end;
+//------------------------------------------------------------------------------
+
 function GrowOpenLine(const line: TPathD; width: double;
   joinStyle: TJoinStyle; endStyle: TEndStyle;
   miterLimOrRndScale: double): TPathsD;
 var
-  len, x,y, wDiv2: integer;
-  wd2: double;
+  len, x,y: integer;
+  halfWidth, qtrWidth: double;
   line1, line2: TPathD;
   vec1, vec2: TPointD;
 begin
@@ -2177,14 +2208,15 @@ begin
 
   if width < MinStrokeWidth then
     width := MinStrokeWidth;
+  halfWidth := width * 0.5;
 
   if len = 1 then
   begin
-    wDiv2 := Round(width/2);
     x := Round(line[0].X);
     y := Round(line[0].Y);
     SetLength(result, 1);
-    result[0] := Ellipse(RectD(x -wDiv2, y -wDiv2, x +wDiv2, y +wDiv2));
+    result[0] := Ellipse(RectD(x -halfWidth, y -halfWidth,
+      x +halfWidth, y +halfWidth));
     Exit;
   end;
 
@@ -2198,20 +2230,20 @@ begin
   if endStyle = esSquare then
   begin
     line1 := Copy(line, 0, len);
-    //extend both ends of the line by 1/2 lineWidth
-    wd2 := width/2;
+    //extend both ends of the line by 1/4 lineWidth
+    qtrWidth := width * 0.25;
     vec1 := GetUnitVector(line1[1], line1[0]);
     vec2 := GetUnitVector(line1[len-2], line1[len-1]);
     with line1[0] do
-      line1[0] := PointD(X + vec1.X * wd2, Y + vec1.y * wd2);
+      line1[0] := PointD(X + vec1.X * qtrWidth, Y + vec1.y * qtrWidth);
     with line1[len-1] do
-      line1[len-1] := PointD(X + vec2.X * wd2, Y + vec2.y * wd2);
+      line1[len-1] := PointD(X + vec2.X * qtrWidth, Y + vec2.y * qtrWidth);
     line2 := OpenPathToFlatPolygon(line1);
   end else
     line2 := OpenPathToFlatPolygon(line);
 
   SetLength(result, 1);
-  Result[0] := Grow(line2, nil, width/2, joinStyle, miterLimOrRndScale);
+  Result[0] := Grow(line2, nil, halfWidth, joinStyle, miterLimOrRndScale);
 end;
 //------------------------------------------------------------------------------
 
@@ -2240,9 +2272,12 @@ var
   skipHole: Boolean;
 begin
   len := length(line);
+  while (len > 1) and PointsNearEqual(line[len -1], line[0], 0.001) do
+    dec(len);
+  line2 := Copy(line, 0, len);
   if len < 3 then
   begin
-    result := GrowOpenLine(line, width,
+    result := GrowOpenLine(line2, width,
       joinStyle, esPolygon, miterLimOrRndScale);
     Exit;
   end;
@@ -2255,16 +2290,16 @@ begin
       joinStyle := jsRound;
   end;
 
-  rec := GetBoundsD(line);
+  rec := GetBoundsD(line2);
   skipHole := (rec.Width <= width) or (rec.Height <= width);
   if skipHole then
     SetLength(Result, 1) else
     SetLength(Result, 2);
-  norms := GetNormals(line);
-  Result[0] := Grow(line, norms, width/2, joinStyle, miterLimOrRndScale);
+  norms := GetNormals(line2);
+  Result[0] := Grow(line2, norms, width/2, joinStyle, miterLimOrRndScale);
 
   if skipHole then Exit;
-  line2 := ReversePath(line);
+  line2 := ReversePath(line2);
   norms := ReverseNormals(norms);
   Result[1] := Grow(line2, norms, width/2, joinStyle, miterLimOrRndScale);
 end;
@@ -2675,6 +2710,8 @@ var
   sinA, cosA: double;
   centre, radius: TPointD;
   deltaX, deltaX2, deltaY: double;
+const
+  qtrDeg = PI/1440;
 begin
   Result := nil;
   if (endAngle = startAngle) or IsEmptyRect(rec) then Exit;
@@ -2685,9 +2722,8 @@ begin
     startAngle := -startAngle;
     endAngle := -endAngle;
   end;
-
-  NormalizeAngle(startAngle);
-  NormalizeAngle(endAngle);
+  NormalizeAngle(startAngle, qtrDeg);
+  NormalizeAngle(endAngle, qtrDeg);
 
   with rec do
   begin
@@ -2700,6 +2736,9 @@ begin
     angle := endAngle - startAngle;
   //steps = (No. steps for a whole ellipse) * angle/(2*Pi)
   steps := 4 * Trunc(angle * Sqrt((rec.width + rec.height) * scale));
+
+  steps := steps div 2; /////////////////////////////////
+
   if steps < 2 then steps := 2;
   SetLength(Result, Steps +1);
   //angle of the first step ...

@@ -3,9 +3,9 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.0                                                             *
-* Date      :  22 December 2021                                                *
+* Date      :  10 January 2022                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2021                                         *
+* Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
 * Purpose   :  The core module of the Image32 library                          *
 *                                                                              *
@@ -17,10 +17,13 @@ unit Img32;
 interface
 
 {$I Img32.inc}
+{.$DEFINE USING_VCL}
 
 uses
-  {$IFDEF MSWINDOWS} Windows, {$ENDIF} Types, SysUtils, Classes,
+  Types, SysUtils, Classes,
+  {$IFDEF MSWINDOWS} Windows, {$IFDEF USING_VCL} Graphics,{$ENDIF}{$ENDIF}
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults, Character,{$ENDIF}
+  {$IFDEF USING_FMX} FMX.Types, FMX.Graphics,{$ENDIF}
   {$IFDEF UITYPES} UITypes,{$ENDIF} Math;
 
 type
@@ -226,6 +229,10 @@ type
       x: Integer = 0; y: Integer = 0; transparent: Boolean = true); overload;
     procedure CopyToDc(const srcRect, dstRect: TRect; dstDc: HDC;
       transparent: Boolean = true); overload;
+  {$IFDEF USING_VCL}
+    procedure CopyFromBitmap(bmp: TBitmap);
+    procedure CopyToBitmap(bmp: TBitmap);
+  {$ENDIF}
 {$ENDIF}
     function CopyToClipBoard: Boolean;
     class function CanPasteFromClipBoard: Boolean;
@@ -1583,6 +1590,7 @@ begin
   try
     dst.fResampler := fResampler;
     dst.fIsPremultiplied := fIsPremultiplied;
+    dst.fAntiAliased := fAntiAliased;
     dst.fColorCount := 0;
     try
       dst.SetSize(Width, Height);
@@ -2569,7 +2577,32 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
+
+{$IFDEF USING_VCL}
+procedure TImage32.CopyFromBitmap(bmp: TBitmap);
+var
+  savedPF: TPixelFormat;
+begin
+  if not Assigned(bmp) then Exit;
+  savedPF := bmp.PixelFormat;
+  bmp.PixelFormat := pf32bit;
+  SetSize(bmp.Width, bmp.Height);
+  GetBitmapBits(bmp.Handle, Width * Height * 4, PixelBase);
+  bmp.PixelFormat := savedPF;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.CopyToBitmap(bmp: TBitmap);
+begin
+  if not Assigned(bmp) then Exit;
+  bmp.PixelFormat := pf32bit;
+  bmp.SetSize(Width, Height);
+  bmp.AlphaFormat := afDefined;
+  SetBitmapBits(bmp.Handle, Width * Height * 4, PixelBase);
+end;
 {$ENDIF}
+{$ENDIF}
+//------------------------------------------------------------------------------
 
 function TImage32.CopyToClipBoard: Boolean;
 var
@@ -2589,7 +2622,7 @@ begin
     if not formatClass.CanCopyToClipboard then Continue;
     with formatClass.Create do
     try
-      if CopyToClipboard(self) then result := true;
+      result := CopyToClipboard(self);
     finally
       free;
     end;

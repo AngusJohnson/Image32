@@ -155,8 +155,6 @@ type
     procedure SetFont(font: TFontCache); virtual;
     procedure CheckScaleBounds(var value: double); virtual;
     procedure Repaint; virtual;
-    procedure PreMerge(hideDesigners: Boolean); override;
-    procedure PreMergeAll(hideDesigners: Boolean); override;
     procedure DoMouseDown(button: TMouseButton;
       shift: TShiftState; const pt: TPoint); virtual;
     procedure DoMouseMove(button: TMouseButton;
@@ -167,7 +165,7 @@ type
     procedure DoKeyDown(var Key: Word; shift: TShiftState); virtual;
     procedure DoKeyUp(var Key: Word; shift: TShiftState); virtual;
     procedure FontChanged; virtual;
-
+    procedure DoBeforeMerge; override;
     function  ReadProperty(const propName, propVal: string): Boolean; override;
     procedure WriteProperties; override;
   public
@@ -338,10 +336,14 @@ type
     property OnClick: TNotifyEvent read fOnClick write fOnClick;
   end;
 
+  TInsertionPtCtrl = class(TCustomCtrl)
+  public
+    constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
+  end;
+
   TMemoCtrl = class(TScrollingCtrl)
   private
     fTopLine      : integer;
-    fScrollOffsetY: double;
     fWordList     : TWordInfoList;
     fLineHeight   : double;
     fTextMargin   : TPointD;
@@ -352,9 +354,12 @@ type
     fSelEnd       : TPoint;
     fBuffer       : TImage32;
     fSelectRect   : TRectD;
+    fDoFullPaint  : Boolean;
     procedure FillWordList;
-    function GetVisibleLines: integer;
+    function  GetVisibleLines: integer;
     procedure SetTextMargin(const margin: TPointD);
+    procedure InvalidatePos;
+    procedure ScrollCaretIntoView;
   protected
     procedure SetFont(font: TFontCache); override;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
@@ -371,6 +376,7 @@ type
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
+    procedure Scale(value: double); override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
     function WordIdxToPos(const wordIdx: TPoint): TPointD;
     function PosToWordIdx(const relPos: TPointD): TPoint;
@@ -506,11 +512,6 @@ type
     procedure Scale(value: double); override;
   end;
 
-  TTabCtrlMetrics = record
-    bounds: TRect;
-    offsets: TArrayOfInteger;
-  end;
-
   TPageTabCtrl = class(TAutoSizedCtrl)
   protected
     procedure DoMouseDown(Button: TMouseButton;
@@ -532,14 +533,14 @@ type
 
   TPageCtrl = class(TCustomCtrl)
   private
-    fMetrics    : TTabCtrlMetrics;
-    fTabHeight  : integer;
-    fTabWidth   : integer;
+    fTabHeight  : double;
+    fTabWidth   : double;
     fActiveIdx  : integer;
     fShadowSize : double;
     fOnPaint    : TNotifyEvent;
-    procedure SetTabWidth(width: integer);
-    procedure SetTabHeight(height: integer);
+    fTabOffsets : TArrayOfDouble;
+    procedure SetTabWidth(width: double);
+    procedure SetTabHeight(height: double);
     procedure SetActiveIndex(index: integer);
     function  GetPagePanel(index: integer): TPagePnlCtrl;
     procedure DrawTabs;
@@ -553,12 +554,13 @@ type
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
+    procedure Scale(value: double); override;
     procedure ClearTabs;
     procedure AddTab(const caption: string);
     procedure AddTabs(const captions: TArrayOfString);
     property  Panel[index: integer]: TPagePnlCtrl read GetPagePanel;
-    property  TabWidth: integer read fTabWidth write SetTabWidth;
-    property  TabHeight: integer read fTabHeight write SetTabHeight;
+    property  TabWidth: double read fTabWidth write SetTabWidth;
+    property  TabHeight: double read fTabHeight write SetTabHeight;
     property  ActiveIndex: integer read fActiveIdx write SetActiveIndex;
     property  ShadowSize: double read fShadowSize write fShadowSize;
     property  OnPaint  : TNotifyEvent read fOnPaint write fOnPaint;
@@ -708,9 +710,6 @@ const
   VK_RIGHT  = 39;
   VK_DOWN   = 40;
   VK_DELETE = 46;
-
-var
-  halfFocusSize     : double = 0;
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions
@@ -965,7 +964,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function MakeCumulativeArray(start, step, count: integer): TArrayOfInteger;
+function MakeCumulativeArray(start, step: double; count: integer): TArrayOfDouble;
 var
   i: integer;
 begin
@@ -976,57 +975,42 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetTabOffsets(const captions: array of string;
-  font: TFontCache; startingOffset: integer): TArrayOfInteger;
+function GetVaribleWidthTabOffsets(const captions: array of string;
+  font: TFontCache; startingOffset: double): TArrayOfDouble;
 var
   i, len  : integer;
-  padding : integer;
+  padding : double;
 begin
-  if assigned(font) then
-  begin
-    padding := Round(font.GetTextWidth(' ') *6);
-    len := Length(captions);
-    SetLength(Result, len +1);
-    Result[0] := startingOffset;
-    for i := 1 to len do
-      Result[i] := Result[i-1] +
-        Round(font.GetTextWidth(captions[i-1])) + padding;
-  end else
-  begin
-    padding := DPIAware(6) *6;
-    len := Length(captions);
-    SetLength(Result, len +1);
-    Result[0] := startingOffset;
-    for i := 1 to len do
-      Result[i] := Result[i-1] +
-        Length(captions[i-1]) * DPIAware(10) + padding;
-  end;
-
+  Result := nil;
+  len := Length(captions);
+  if (len = 0) or not assigned(font) then Exit;
+  padding := font.GetTextWidth(' ') *6;
+  SetLength(Result, len +1);
+  Result[0] := startingOffset;
+  for i := 1 to len do
+    Result[i] := Result[i-1] +
+      font.GetTextWidth(captions[i-1]) + padding;
 end;
 //------------------------------------------------------------------------------
 
-function DrawTabCtrl(Image: TImage32;
-  const captions: array of string; font: TFontCache;
-  position: TPoint; bevHeight: double; selectedIdx: integer;
-  tabWidth: integer; tabHeight: integer;
+procedure DrawTabCtrl(Image: TImage32; const captions: array of string;
+  const offsets : TArrayOfDouble; font: TFontCache;
+  bevHeight: double; selectedIdx: integer;
+  tabWidth, tabHeight: double;
   color: TColor32; textColor: TColor32;
-  selColor: TColor32; selTextColor: TColor32): TTabCtrlMetrics;
+  selColor: TColor32; selTextColor: TColor32);
 var
   i, len  : integer;
-  bh      : integer;
-  bhDiv2  : integer;
-  totalW  : integer;
+  hbh,bh  : double;
+  totalW  : double;
   lh, r   : double;
   rec     : TRectD;
   recI    : TRect;
   img     : TImage32;
   p       : TPathD;
 begin
-  Result.bounds := NullRect;
-  Result.offsets := nil;
-
   len := Length(captions);
-  if len = 0 then Exit;
+  if (len = 0) or (len <> High(offsets)) then Exit;
   if selectedIdx < 0 then selectedIdx := 0
   else if selectedIdx >= len then selectedIdx := len-1;
 
@@ -1034,57 +1018,47 @@ begin
     lh := font.LineHeight else
     lh := DPIAware(12);
 
-  bhDiv2 := Ceil(bevHeight/2);
-  bh := bhDiv2 * 2;
+  bh := bevHeight;
+  hbh := bevHeight/2;
   r := lh/3;
 
-  if (tabWidth > 0) then
-    Result.offsets := MakeCumulativeArray(position.X, tabWidth, len) else
-    Result.offsets := GetTabOffsets(captions, font, position.X);
-
-  totalW := Result.offsets[len];
+  totalW := offsets[len];
 
   if tabHeight <= 0 then
     tabHeight := Ceil(lh * 1.33);
 
-  Result.bounds := Rect(position.X, position.Y,
-    position.X + totalW +bhDiv2*2, position.Y + tabHeight +bhDiv2 + bh);
-
-  img := TImage32.Create(totalW +bhDiv2*2, tabHeight +bhDiv2*2 +bh);
+  img := TImage32.Create(Ceil(totalW +bh), Ceil(tabHeight +bh*2));
   try
-    if selectedIdx > 0 then
+    //draw tabs before selected tab
+    for i := 0 to selectedIdx-1 do
     begin
-      for i := 0 to selectedIdx-1 do
-      begin
-        rec := RectD(bhDiv2 + Result.offsets[i] - position.X, bhDiv2 + bh,
-          bhDiv2 + Result.offsets[i+1] - position.X, bhDiv2 + bh + tabHeight);
-        p := GetTabOutLine(rec, r);
-        DrawBtnInternal(img, p, captions[i], font,
-          bevHeight, 0, false, true, color, textColor, 0, 0, false);
-      end;
-    end;
-
-    for i := len -1 downto selectedIdx+1 do
-    begin
-      rec := RectD(bhDiv2 + Result.offsets[i] - position.X, bhDiv2 + bh,
-        bhDiv2 + Result.offsets[i+1] - position.X, bhDiv2 + bh + tabHeight);
+      rec := RectD(hbh + offsets[i], bh, hbh + offsets[i+1], bh + tabHeight);
       p := GetTabOutLine(rec, r);
       DrawBtnInternal(img, p, captions[i], font,
         bevHeight, 0, false, true, color, textColor, 0, 0, false);
     end;
 
-    rec := RectD(bhDiv2 + Result.offsets[selectedIdx] - position.X, bhDiv2 + bh,
-      bhDiv2 + Result.offsets[selectedIdx+1] - position.X, bhDiv2 + bh + tabHeight);
+    //draw tabs following selected tab
+    for i := len -1 downto selectedIdx+1 do
+    begin
+      rec := RectD(hbh + offsets[i], bh, hbh + offsets[i+1], bh + tabHeight);
+      p := GetTabOutLine(rec, r);
+      DrawBtnInternal(img, p, captions[i], font,
+        bevHeight, 0, false, true, color, textColor, 0, 0, false);
+    end;
+
+    //draw selected tab
+    rec := RectD(hbh + offsets[selectedIdx], bh,
+      hbh + offsets[selectedIdx+1], bh + tabHeight);
     img32.Vector.InflateRect(rec, 0, bh);
     p := GetTabOutLine(rec, r);
-
     DrawBtnInternal(img, p, captions[selectedIdx], font,
-      bevHeight, 0, false, true, selColor, selTextColor, -bhDiv2, 0, false);
-    p := Grow(p, nil, bhDiv2, jsRound, 2);
+      bevHeight, 0, false, true, selColor, selTextColor, -Round(hbh), 0, false);
+    p := Grow(p, nil, hbh, jsRound, 2);
     DrawLine(img, p, DPIAware(1.2), clLiteGrey32, esSquare);
 
-    recI.Left := Round(position.X);
-    recI.Top := Round(position.Y);
+    recI.Left := Round(offsets[0]);
+    recI.Top := Round(bh);
     recI.Right := recI.Left + img.Width;
     recI.Bottom := recI.Top + img.Height;
     Image.CopyBlend(img, img.Bounds, recI, BlendToAlpha);
@@ -1190,48 +1164,48 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DrawPageCtrl(Image: TImage32;
-  const captions: array of string; font: TFontCache;
-  const pageRect: TRect; selectedIdx: integer;
-  bevHeight: double;  tabWidth: integer = 0; tabHeight: integer = 0;
-  inactiveTabColor: TColor32 = clLiteBtn32;
-  inactiveTextColor: TColor32 = clDarkGray32;
-  activeTabColor: TColor32 = clDarkBtn32;
-  activeTextColor: TColor32 = clBlack32): TTabCtrlMetrics;
-var
-  hbh  : integer;
-  p   : TPathD;
-  pt1 : TPoint;
-  pt2 : TPoint;
-begin
-  hbh := Ceil(bevHeight/2);
-  Result := DrawTabCtrl(Image, captions, font,
-    Types.Point(pageRect.Left + hbh*2, pageRect.Top),
-    bevHeight, selectedIdx, tabWidth, tabHeight,
-    inactiveTabColor, inactiveTextColor, activeTabColor, activeTextColor);
-
-  pt1.X := Result.offsets[selectedIdx];
-  pt1.Y := Result.bounds.Bottom;
-
-  pt2.X := Result.offsets[selectedIdx +1];
-  pt2.Y := Result.bounds.Bottom;
-
-  with Result.bounds do
-  begin
-    DrawLine(Image, PointD(Left, Bottom), PointD(Right, Bottom), hbh, activeTabColor);
-    Image.Clear(Rect(Left, Bottom, pageRect.Right, pageRect.Bottom), activeTabColor);
-  end;
-
-  SetLength(p, 6);
-  p[0] := PointD(pt2);
-  p[1] := PointD(pageRect.Right -hbh, Result.bounds.Bottom);
-  p[2] := PointD(pageRect.Right -hbh, pageRect.Bottom -hbh);
-  p[3] := PointD(pageRect.Left +hbh, pageRect.Bottom -hbh);
-  p[4] := PointD(pageRect.Left +hbh, Result.bounds.Bottom);
-  p[5] := PointD(pt1);
-  DrawEdge(Image, p, clWhite32, clSilver32, bevHeight, false);
-end;
-
+//function DrawPageCtrl(Image: TImage32;
+//  const captions: array of string; font: TFontCache;
+//  const pageRect: TRect; selectedIdx: integer;
+//  bevHeight: double;  tabWidth: integer = 0; tabHeight: integer = 0;
+//  inactiveTabColor: TColor32 = clLiteBtn32;
+//  inactiveTextColor: TColor32 = clDarkGray32;
+//  activeTabColor: TColor32 = clDarkBtn32;
+//  activeTextColor: TColor32 = clBlack32): TTabCtrlMetrics;
+//var
+//  hbh  : integer;
+//  p   : TPathD;
+//  pt1 : TPointD;
+//  pt2 : TPointD;
+//begin
+//  hbh := Ceil(bevHeight/2);
+//  Result := DrawTabCtrl(Image, captions, font,
+//    Types.Point(pageRect.Left + hbh*2, pageRect.Top),
+//    bevHeight, selectedIdx, tabWidth, tabHeight,
+//    inactiveTabColor, inactiveTextColor, activeTabColor, activeTextColor);
+//
+//  pt1.X := Result.offsets[selectedIdx];
+//  pt1.Y := Result.bounds.Bottom;
+//
+//  pt2.X := Result.offsets[selectedIdx +1];
+//  pt2.Y := Result.bounds.Bottom;
+//
+//  with Result.bounds do
+//  begin
+//    DrawLine(Image, PointD(Left, Bottom), PointD(Right, Bottom), hbh, activeTabColor);
+//    Image.Clear(Rect(Left, Bottom, pageRect.Right, pageRect.Bottom), activeTabColor);
+//  end;
+//
+//  SetLength(p, 6);
+//  p[0] := pt2;
+//  p[1] := PointD(pageRect.Right -hbh, Result.bounds.Bottom);
+//  p[2] := PointD(pageRect.Right -hbh, pageRect.Bottom -hbh);
+//  p[3] := PointD(pageRect.Left +hbh, pageRect.Bottom -hbh);
+//  p[4] := PointD(pageRect.Left +hbh, Result.bounds.Bottom);
+//  p[5] := pt1;
+//  DrawEdge(Image, p, clWhite32, clSilver32, bevHeight, false);
+//end;
+//
 //------------------------------------------------------------------------------
 // TCustomCtrl
 //------------------------------------------------------------------------------
@@ -1268,7 +1242,7 @@ end;
 procedure TCustomCtrl.SetInnerBounds(const newBounds: TRectD);
 begin
   inherited SetInnerBounds(newBounds);
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -1295,43 +1269,16 @@ var
   i: integer;
   rec: TRectD;
 begin
-  CheckScaleBounds(value);
-  case AutoPosition of
-    apNone:
-      begin
-        rec := InnerBounds;
-        rec := ScaleRect(rec, value);
-        SetInnerBounds(rec);
-      end;
-    apCustom, apClient: ; //do nothing
-    apLeft:
-      begin
-        rec := InnerBounds;
-        rec.Right := rec.Left + Width * value;
-        SetInnerBounds(rec);
-      end;
-    apTop:
-      begin
-        rec := InnerBounds;
-        rec.Bottom := rec.Top + Height * value;
-        SetInnerBounds(rec);
-      end;
-    apRight:
-      begin
-        rec := InnerBounds;
-        rec.Left := rec.Left + Width * (1- value);
-        SetInnerBounds(rec);
-      end;
-    apBottom:
-      begin
-        rec := InnerBounds;
-        rec.Top := rec.Top + Height * (1- value);
-        SetInnerBounds(rec);
-      end;
+  if AutoPosition <> apClient then
+  begin
+    CheckScaleBounds(value);
+    rec := GetInnerBounds;
+    rec := ScaleRect(rec, value);
+    SetInnerBounds(rec);
+    fBevelHeight := fBevelHeight * value;
+    OuterMargin := OuterMargin * value;
+    Invalidate;
   end;
-  fBevelHeight := fBevelHeight * value;
-  OuterMargin := OuterMargin * value;
-  DoNotifyRefresh;
 
   for i := 0 to ChildCount -1 do
     if Child[i] is TCustomCtrl then
@@ -1343,7 +1290,7 @@ procedure TCustomCtrl.SetText(const text: string);
 begin
   if fText = text then Exit;
   fText := text;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -1351,7 +1298,7 @@ procedure TCustomCtrl.SetColor(color: TColor32);
 begin
   if color = fColor then Exit;
   fColor := color;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -1365,7 +1312,7 @@ procedure TCustomCtrl.SetBevHeight(value: double);
 begin
   if value = fBevelHeight then Exit;
   fBevelHeight := value;
-  DoNotifyRefresh;
+  Invalidate;
   //todo: this can alter bounds of some ctrls so that will need attention
 end;
 //------------------------------------------------------------------------------
@@ -1437,7 +1384,7 @@ begin
     GetUsableFont; //look for a font from a parent
   end;
 
-  DoNotifyRefresh;
+  Invalidate;
   for i := 0 to ChildCount -1 do
     if not Assigned(TCustomCtrl(Child[i]).fFont) then
       TCustomCtrl(Child[i]).FontChanged; //child inherits the parent's font
@@ -1448,7 +1395,7 @@ procedure TCustomCtrl.SetEnabled(value: Boolean);
 begin
   if fEnabled = value then Exit;
   fEnabled := value;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -1470,7 +1417,7 @@ procedure TCustomCtrl.SetAutoPosition(ap: TAutoPosition);
 begin
   if ap = fAutoPosition then Exit;
   fAutoPosition := ap;
-  DoNotifyRefresh;
+  Invalidate;
   if Assigned(Parent) and (Parent is TScrollingCtrl) then
     TScrollingCtrl(Parent).DoChildAutoPositioning;
 end;
@@ -1501,7 +1448,7 @@ begin
   if Assigned(fRootCtrl.fFocusedCtrl) then
     fRootCtrl.fFocusedCtrl.KillFocus;
   fRootCtrl.fFocusedCtrl := Self;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -1509,7 +1456,7 @@ procedure TCustomCtrl.KillFocus;
 begin
   if self <> fRootCtrl.fFocusedCtrl then Exit;
   fRootCtrl.fFocusedCtrl := nil;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -1579,56 +1526,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TCustomCtrl.PreMerge(hideDesigners: Boolean);
-var
-  i: integer;
-begin
-  if not Visible or not UpdateNeeded then Exit;
-
-  if (UpdateInfo.updateMethod <> umNone) then
-  begin
-    Image.BlockNotify;
-    Repaint;
-    if Assigned(fAfterPaint) then fAfterPaint(Self);
-    Image.UnBlockNotify;
-    if (UpdateInfo.updateMethod = umRegion) then
-      InvalidateRegion else
-      InvalidateBounds;
-  end;
-
-  for i := 0 to ChildCount -1 do
-    if Child[i] is TCustomCtrl then
-      with TCustomCtrl(Child[i]) do
-      begin
-        //recursive
-        if (UpdateInfo.updateMethod <> umNone) or
-          UpdateInfo.childUpdating then
-            PreMerge(hideDesigners);
-      end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TCustomCtrl.PreMergeAll(hideDesigners: Boolean);
-var
-  i: integer;
-begin
-  if Visible then
-  begin
-    Image.BlockNotify;
-    Repaint;
-    if Assigned(fAfterPaint) then fAfterPaint(Self);
-    Image.UnBlockNotify;
-  end;
-
-  for i := 0 to ChildCount -1 do
-    if Child[i] is TCustomCtrl then
-      with TCustomCtrl(Child[i]) do
-        PreMergeAll(hideDesigners);
-end;
-//------------------------------------------------------------------------------
-
 procedure TCustomCtrl.Repaint;
 begin
+end;
+//------------------------------------------------------------------------------
+
+procedure TCustomCtrl.DoBeforeMerge;
+begin
+  if UpdateInfo.updateMethod = umNone then Exit;
+  Image.BlockNotify;
+  try
+    Repaint;
+  finally
+    Image.UnblockNotify;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1869,6 +1780,8 @@ var
   clientCtrl  : TCustomCtrl;
   scrollHsize : double;
   scrollVsize : double;
+const
+  scrollScale = 0.75;
 begin
 
   if (StorageState = ssLoading) or (Width = 0) or (Height = 0) or
@@ -1881,13 +1794,13 @@ begin
   if Assigned(fScrollH) and fScrollH.Visible then
   begin
     if fScrollH.fSize = 0 then
-      scrollHsize := fUsableFont.LineHeight else
+      scrollHsize := fUsableFont.LineHeight * scrollScale else
       scrollHsize := fScrollH.fSize;
     rec := clientRect;
     if Assigned(fScrollV) and fScrollV.Visible then
     begin
       if fScrollV.fSize = 0 then
-        scrollVsize := fUsableFont.LineHeight else
+        scrollVsize := fUsableFont.LineHeight * scrollScale else
         scrollVsize := fScrollV.fSize;
       rec.Right := rec.Right - scrollVsize;
     end;
@@ -1898,7 +1811,7 @@ begin
   if Assigned(fScrollV) and fScrollV.Visible then
   begin
     if fScrollV.fSize = 0 then
-      scrollVsize := fUsableFont.LineHeight else
+      scrollVsize := fUsableFont.LineHeight * scrollScale else
       scrollVsize := fScrollV.fSize;
     rec := clientRect;
     rec.Left := Rec.Right - scrollVsize;
@@ -2182,7 +2095,7 @@ begin
   if (index < 0) or (index >= GetItemCount) then index := -1;
   if index = fItemIndex then Exit;
   fItemIndex := index;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2212,7 +2125,7 @@ begin
           ItemIndex := ItemIndex -1;
           Key := 0;
           ScrollItemIndexIntoView;
-          DoNotifyRefresh;
+          Invalidate;
           Exit;
         end;
       VK_DOWN:
@@ -2221,7 +2134,7 @@ begin
           ItemIndex := ItemIndex +1;
           Key := 0;
           ScrollItemIndexIntoView;
-          DoNotifyRefresh;
+          Invalidate;
           Exit;
         end;
     end;
@@ -2239,7 +2152,7 @@ begin
   begin
     pt2 := MakeRelative(PointD(pt.X, pt.Y - fBevelHeight));
     ItemIndex := Trunc(pt2.Y / GetItemHeight) + fTopItem;
-    DoNotifyRefresh;
+    Invalidate;
   end;
   inherited;
 end;
@@ -2253,7 +2166,7 @@ begin
   else if fTopItem > ItemCount - fMaxVisible then
     fTopItem := ItemCount - fMaxVisible;
 
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2410,7 +2323,7 @@ begin
   if (index < 0) or (index >= GetItemCount) then Exit;
   Delete(fItems, index, 1);
   Text := ArrayOfStringToString(fItems);
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2423,7 +2336,7 @@ begin
   if Assigned(fImgList) then
     fImgList.AddRecipient(self as INotifyRecipient);
   SetInnerBounds(InnerBounds);
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2445,7 +2358,7 @@ begin
 
   ScrollV.Position :=
     Min(fTopItem * itmHeight, ScrollV.fMax - Height);
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2454,7 +2367,7 @@ begin
   if (value < 0) then value := 0;
   if fMaxVisible = value then Exit;
   fMaxVisible := value;
-  DoNotifyRefresh;
+  Invalidate;
   SetInnerBounds(GetInnerBounds);
 end;
 //------------------------------------------------------------------------------
@@ -2496,7 +2409,7 @@ begin
   if (index < 0) or (index >= GetItemCount) then index := -1;
   if index = fItemIndex then Exit;
   fItemIndex := index;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2530,7 +2443,7 @@ begin
   if Assigned(fImgList) then
     fImgList.AddRecipient(self as INotifyRecipient);
   SetInnerBounds(InnerBounds);
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2544,7 +2457,7 @@ begin
         begin
           ItemIndex := ItemIndex -1;
           Key := 0;
-          DoNotifyRefresh;
+          Invalidate;
           Exit;
         end;
       VK_DOWN:
@@ -2552,7 +2465,7 @@ begin
         begin
           ItemIndex := ItemIndex +1;
           Key := 0;
-          DoNotifyRefresh;
+          Invalidate;
           Exit;
         end;
     end;
@@ -2570,7 +2483,7 @@ begin
   begin
     pt2 := MakeRelative(PointD(pt.X, pt.Y - fBevelHeight));
     ItemIndex := Trunc(pt2.Y / GetItemHeight);
-    DoNotifyRefresh;
+    Invalidate;
   end;
   inherited;
 end;
@@ -2674,7 +2587,18 @@ begin
   if (index < 0) or (index >= GetItemCount) then Exit;
   Delete(fItems, index, 1);
   Text := ArrayOfStringToString(fItems);
-  DoNotifyRefresh;
+  Invalidate;
+end;
+
+//------------------------------------------------------------------------------
+// TInsertionPtCtrl
+//------------------------------------------------------------------------------
+
+constructor TInsertionPtCtrl.Create(parent: TLayer32; const name: string);
+begin
+  inherited;
+  CanFocus := false;
+  Color := clNone32;
 end;
 
 //------------------------------------------------------------------------------
@@ -2691,7 +2615,8 @@ begin
   BlendFunc  := nil; //assumes edit controls will always be fully opaque.
   fTextMargin := PointD(20, 5);
   fCursorWordIdx := NullPoint;
-  fPageMetrics.lineCount := -1;
+  fDoFullPaint := true;
+  //fPageMetrics.lineCount := -1;
 end;
 //------------------------------------------------------------------------------
 
@@ -2704,10 +2629,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TMemoCtrl.Scale(value: double);
+begin
+  inherited;
+  fTopLine  := 0;
+  fSelStart := NullPoint;
+  fSelEnd   := NullPoint;
+  ScrollV.Position := 0;
+end;
+//------------------------------------------------------------------------------
+
 procedure TMemoCtrl.FillWordList;
 begin
   Img32.Text.FillWordList(fText, fWordList, fUsableFont);
-  fPageMetrics.lineCount := -1;
+  fDoFullPaint := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -2717,60 +2652,95 @@ begin
   if not Assigned(fUsableFont) then Exit;
   if fText <> '' then
     UpdateWordList(fWordList, fUsableFont);
-  fPageMetrics.lineCount := -1;
+  fDoFullPaint := true;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMemoCtrl.ScrollCaretIntoView;
+var
+  visLines: integer;
+begin
+  visLines := GetVisibleLines;
+  if fCursorWordIdx.X < fPageMetrics.wordListOffsets[fTopLine] then
+  begin
+    while fCursorWordIdx.X < fPageMetrics.wordListOffsets[fTopLine] do
+      dec(fTopLine);
+    ScrollV.Position := fTopLine * fLineHeight;
+    Invalidate;
+    fDoFullPaint := true;
+  end
+  else if (fTopLine + visLines < fPageMetrics.lineCount) and
+    (fCursorWordIdx.X >= fPageMetrics.wordListOffsets[fTopLine + visLines]) then
+  begin
+    while (fTopLine + visLines < fPageMetrics.lineCount) and
+      (fCursorWordIdx.X >= fPageMetrics.wordListOffsets[fTopLine + visLines]) do
+        inc(fTopLine);
+    ScrollV.Position := fTopLine * fLineHeight;
+    Invalidate;
+    fDoFullPaint := true;
+  end
+  else
+    InvalidatePos;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMemoCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
 
-  function GetPrev(var curr: TPoint; ctrlDown: Boolean): Boolean;
+  function GetPrev(ctrlDown: Boolean): Boolean;
   begin
     Result := true;
+    InvalidatePos;
     if ctrlDown then
     begin
-      if (curr.Y = 0) and (curr.X > 0) then
+      if (fCursorWordIdx.Y = 0) and (fCursorWordIdx.X > 0) then
       begin
-        dec(curr.X);
-        while (curr.X > 0) and (fWordList[curr.X].word = #32) do
-          dec(curr.X);
-      end else if curr.Y > 0 then curr.Y := 0
+        dec(fCursorWordIdx.X);
+        while (fCursorWordIdx.X > 0) and
+          (fWordList[fCursorWordIdx.X].word = #32) do
+            dec(fCursorWordIdx.X);
+      end else if fCursorWordIdx.Y > 0 then fCursorWordIdx.Y := 0
       else Result := false
     end
-    else if curr.Y > 0 then dec(curr.Y)
-    else if curr.X = 0 then Result := false
+    else if fCursorWordIdx.Y > 0 then dec(fCursorWordIdx.Y)
+    else if fCursorWordIdx.X = 0 then Result := false
     else
     begin
-      dec(curr.X);
-      with fWordList[curr.X] do
-        curr.Y := length-1;
+      dec(fCursorWordIdx.X);
+      with fWordList[fCursorWordIdx.X] do
+        fCursorWordIdx.Y := length-1;
     end;
+    ScrollCaretIntoView;
   end;
 
-  function GetNext(var curr: TPoint; ctrlDown: Boolean): Boolean;
+  function GetNext(ctrlDown: Boolean): Boolean;
   var
     lastWord: Boolean;
   begin
-    Result := true;
-    lastWord := curr.X = fWordList.Count -1;
+    Result := fCursorWordIdx.X < fWordList.Count;
+    if not Result then Exit;
+
+    InvalidatePos;
+    lastWord := fCursorWordIdx.X = fWordList.Count -1;
     if ctrlDown and not lastWord then
     begin
-      inc(curr.X);
-      curr.Y := 0;
-      while (fWordList[curr.X].word = #32) do
+      inc(fCursorWordIdx.X);
+      fCursorWordIdx.Y := 0;
+      while (fWordList[fCursorWordIdx.X].word = #32) do
       begin
-        if curr.X = fWordList.Count -1 then break;
-        inc(curr.X);
+        if fCursorWordIdx.X = fWordList.Count -1 then break;
+        inc(fCursorWordIdx.X);
       end;
     end
-    else if curr.Y < fWordList[curr.X].length -1 then
-      inc(curr.Y)
+    else if fCursorWordIdx.Y < fWordList[fCursorWordIdx.X].length -1 then
+      inc(fCursorWordIdx.Y)
     else if lastWord then
       Result := false
     else
     begin
-      inc(curr.X);
-      curr.Y := 0;
+      inc(fCursorWordIdx.X);
+      fCursorWordIdx.Y := 0;
     end;
+    ScrollCaretIntoView;
   end;
 
 var
@@ -2791,22 +2761,21 @@ begin
         begin
           if PointsEqual(fSelStart, fCursorWordIdx) then
           begin
-            GetPrev(fCursorWordIdx, ctrlDown);
+            GetPrev(ctrlDown);
             fSelStart := fCursorWordIdx;
           end else
           begin
-            GetPrev(fCursorWordIdx, ctrlDown);
+            GetPrev(ctrlDown);
             fSelEnd := fCursorWordIdx;
           end;
         end else
         begin
-          GetPrev(fCursorWordIdx, ctrlDown);
+          GetPrev(ctrlDown);
           fSelStart := fCursorWordIdx;
           fSelEnd := fCursorWordIdx;
         end;
         Key := 0;
         fCursorMoved := true;
-        DoNotifyRefresh;
       end;
     VK_RIGHT:
       begin
@@ -2814,38 +2783,39 @@ begin
         begin
           if PointsEqual(fSelStart, fCursorWordIdx) then
           begin
-            GetNext(fCursorWordIdx, ctrlDown);
+            GetNext(ctrlDown);
             fSelStart := fCursorWordIdx;
           end else
           begin
-            GetNext(fCursorWordIdx, ctrlDown);
+            GetNext(ctrlDown);
             fSelEnd := fCursorWordIdx;
           end;
         end else
         begin
-          GetNext(fCursorWordIdx, ctrlDown);
+          GetNext(ctrlDown);
           fSelStart := fCursorWordIdx;
           fSelEnd := fCursorWordIdx;
         end;
         Key := 0;
         fCursorMoved := true;
-        DoNotifyRefresh;
       end;
     VK_UP:
       begin
         pos := WordIdxToPos(fCursorWordIdx);
         pos.Y := pos.Y - fLineHeight;
+        InvalidatePos;
         fCursorWordIdx := PosToWordIdx(pos);
+        ScrollCaretIntoView;
         Key := 0;
-        DoNotifyRefresh;
       end;
     VK_DOWN:
       begin
         pos := WordIdxToPos(fCursorWordIdx);
         pos.Y := pos.Y + fLineHeight;
+        InvalidatePos;
         fCursorWordIdx := PosToWordIdx(pos);
+        ScrollCaretIntoView;
         Key := 0;
-        DoNotifyRefresh;
       end;
     else
       inherited;
@@ -2860,7 +2830,7 @@ begin
   fSelStart := Types.Point(fCursorWordIdx.X, 0);
   fSelEnd := Types.Point(fCursorWordIdx.X +1, 0);
   fCursorWordIdx := fSelEnd;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2878,6 +2848,7 @@ begin
   inherited;
   if button <> mbLeft then Exit;
 
+  InvalidatePos;
   relPos := MakeRelative(PointD(pt));
   fCursorWordIdx := PosToWordIdx(relPos);
   if Shift = ssShift then
@@ -2888,7 +2859,7 @@ begin
     fSelStart := fCursorWordIdx;
     fSelEnd := fCursorWordIdx;
   end;
-  DoNotifyRefresh;
+  InvalidatePos;
 end;
 //------------------------------------------------------------------------------
 
@@ -2911,8 +2882,8 @@ procedure TMemoCtrl.SetTextMargin(const margin: TPointD);
 begin
   if PointsEqual(margin, fTextMargin) then Exit;
   fTextMargin := margin;
-  DoNotifyRefresh;
-  fPageMetrics.lineCount := -1;
+  Invalidate;
+  fDoFullPaint := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -2920,7 +2891,7 @@ procedure TMemoCtrl.SetInnerBounds(const newBounds: TRectD);
 begin
   inherited;
   fTopLine := 0;
-  fPageMetrics.lineCount := -1;
+  fDoFullPaint := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -2959,7 +2930,8 @@ begin
 
   if wordIdx.X >= fWordList.Count then
   begin
-    Result.X := fPageMetrics.lineWidths[fWordList.Count -1];
+    with fPageMetrics do
+      Result.X := lineWidths[High(lineWidths)];
   end else
   begin
     wordInfo := fWordList[wordIdx.X];
@@ -3056,10 +3028,13 @@ end;
 
 procedure TMemoCtrl.DoScroll(dx, dy: double);
 begin
-  fScrollOffsetY := fScrollOffsetY + dy;
-  fTopLine := Round(fScrollOffsetY/fLineHeight);
-  fPageMetrics.lineCount := -1;
-  DoNotifyRefresh;
+  //fScrollOffsetY := fScrollOffsetY + dy;
+  //fTopLine := Round(fScrollOffsetY/fLineHeight);
+  fTopLine := Round(ScrollV.Position/fLineHeight);
+  if fTopLine >= Length(fPageMetrics.wordListOffsets) then
+    fTopLine := High(fPageMetrics.wordListOffsets);
+  fDoFullPaint := true;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -3073,11 +3048,27 @@ begin
   end;
   fLineHeight := fUsableFont.LineHeight;
   if Assigned(ScrollV) then ScrollV.Step := Round(fLineHeight);
-  fPageMetrics.lineCount := -1;
+  fDoFullPaint := true;
   if (Length(Text) = 0) then Exit;
   if (fWordList.Count = 0) then
     FillWordList else
     UpdateWordList(fWordList, fUsableFont);
+end;
+//------------------------------------------------------------------------------
+
+procedure TMemoCtrl.InvalidatePos;
+var
+  om: integer;
+  d: double;
+  rec: TRectD;
+begin
+  d := fLineHeight/4;
+  rec.TopLeft := WordIdxToPos(fCursorWordIdx);
+  rec.BottomRight := PointD(rec.Left, rec.Top + fLineHeight);
+  InflateRect(rec, d, d);
+  om := Round(OuterMargin);
+  OffsetRect(rec, Round(om-TextMargin.X+10), Round(om-TextMargin.Y -6));
+  Invalidate(rec);
 end;
 //------------------------------------------------------------------------------
 
@@ -3090,7 +3081,7 @@ var
   textRecD, rec: TRectD;
   ri: TRect;
   selStartPt, selStartP2, selEndPt, selEndPt2: TPointD;
-  fullRefresh, ScrollVAutoHide: Boolean;
+  ScrollVAutoHide: Boolean;
   scrollShowing: Boolean;
 begin
 
@@ -3098,9 +3089,9 @@ begin
   scrollShowing := Assigned(ScrollV) and ScrollV.Visible;
   ScrollVAutoHide := assigned(ScrollV) and ScrollV.AutoHide;
   //if fPageMetrics is stale, re-draw the whole edit window
-  fullRefresh := fPageMetrics.lineCount < 0;
-  if fullRefresh then
+  if fDoFullPaint then
   begin
+    fDoFullPaint := false;
     image.Clear;
     fCursorMoved := false; //unset fast redraw
     rec  := InnerRect;
@@ -3163,13 +3154,15 @@ begin
     if scrollShowing then
       textRecD.Right := textRecD.Right - ScrollV.Width;
 
-    OffsetRect(fSelectRect, OuterMargin, OuterMargin);
-    ri := Rect(fSelectRect);
+    rec := UpdateInfo.updateRegion;
+    ri := Rect(rec);
     Image.Copy(fBuffer, ri, ri);
-    OffsetRect(fSelectRect, -OuterMargin, -OuterMargin);
-    if fCursorMoved and not fullRefresh and
-      not fSelectRect.IsEmpty then
-        Invalidate(fSelectRect); //invalidate old selection
+    //Image.FillRect(ri, clRed32);
+
+//    OffsetRect(fSelectRect, -OuterMargin, -OuterMargin);
+//    if fCursorMoved and not fullRefresh and
+//      not fSelectRect.IsEmpty then
+//        Invalidate(fSelectRect); //invalidate old selection
   end;
 
   if not IsValid(fCursorWordIdx) then Exit;
@@ -3241,8 +3234,6 @@ begin
     fSelectRect.Top := selStartPt.Y -i;
     fSelectRect.Right := selEndPt.X+i;
     fSelectRect.Bottom := selEndPt.Y+i;
-    if fCursorMoved and not fullRefresh then
-      Invalidate(fSelectRect);  //flags a very quick update draw
     fCursorMoved := false;    //reset
   end;
 
@@ -3408,7 +3399,7 @@ begin
         end;
         Key := 0;
         fCursorMoved := true;
-        DoNotifyRefresh;
+        Invalidate;
       end;
     VK_RIGHT:
       begin
@@ -3431,7 +3422,7 @@ begin
         end;
         Key := 0;
         fCursorMoved := true;
-        DoNotifyRefresh;
+        Invalidate;
       end;
     VK_UP:
       begin
@@ -3439,7 +3430,7 @@ begin
         pos.Y := pos.Y - fLineHeight;
         fCursorWordIdx := PosToWordIdx(pos);
         Key := 0;
-        DoNotifyRefresh;
+        Invalidate;
       end;
     VK_DOWN:
       begin
@@ -3447,7 +3438,7 @@ begin
         pos.Y := pos.Y + fLineHeight;
         fCursorWordIdx := PosToWordIdx(pos);
         Key := 0;
-        DoNotifyRefresh;
+        Invalidate;
       end;
     VK_DELETE:
       if (fCursorWordIdx.X < fWordList.Count) then
@@ -3460,7 +3451,7 @@ begin
           if fCursorWordIdx.Y = wordInfo.length then
             GetNext(fCursorWordIdx, false);
           Key := 0;
-          DoNotifyRefresh;
+          Invalidate;
         except
         end;
       end;
@@ -3493,7 +3484,7 @@ begin
           end;
         end;
         Key := 0;
-        DoNotifyRefresh;
+        Invalidate;
       end;
     else if Key > VK_SPACE then
     begin
@@ -3525,7 +3516,7 @@ begin
       end else
         inc(fCursorWordIdx.Y);
       Key := 0;
-      DoNotifyRefresh;
+      Invalidate;
     end else
       inherited;
   end;
@@ -3539,7 +3530,7 @@ begin
   fSelStart := Types.Point(fCursorWordIdx.X, 0);
   fSelEnd := Types.Point(fCursorWordIdx.X +1, 0);
   fCursorWordIdx := fSelEnd;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -3566,7 +3557,7 @@ begin
     fSelStart := fCursorWordIdx;
     fSelEnd := fCursorWordIdx;
   end;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -3581,7 +3572,7 @@ procedure TEditCtrl.SetTextMargin(const margin: TPointD);
 begin
   if PointsEqual(margin, fTextMargin) then Exit;
   fTextMargin := margin;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -3782,7 +3773,7 @@ begin
   if (value = fPressed) or not Enabled then Exit;
   fPressed := value;
   if value then Clicked;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -3793,7 +3784,7 @@ begin
   begin
     SetFocus;
     fPressed := true;
-    DoNotifyRefresh;
+    Invalidate;
   end;
   inherited;
 end;
@@ -3832,7 +3823,7 @@ procedure TButtonCtrl.SetPadding(value: double);
 begin
   if value = fPadding then Exit;
   fPadding := value;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -4137,7 +4128,7 @@ procedure TImageBtnCtrl.SetTextPos(value: TTextPosition);
 begin
   if value = fTextPos then Exit;
   fTextPos := value;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -4145,7 +4136,7 @@ procedure TImageBtnCtrl.SetImgList(svgImageList: TSvgImageList32);
 begin
   if svgImageList = fImgList then Exit;
   fImgList := svgImageList;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -4153,7 +4144,7 @@ procedure TImageBtnCtrl.SetImgIdx(index: integer);
 begin
   if index = fImgIdx then Exit;
   fImgIdx := index;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 
 //------------------------------------------------------------------------------
@@ -4201,7 +4192,7 @@ procedure TCheckboxCtrl.SetTriState(state: TTriState);
 begin
   if state =  fTriState then Exit;
   fTriState := state;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -4211,7 +4202,7 @@ begin
   if fTriState = tsNo then
     TriState := tsYes else
     TriState := tsNo;
-  DoNotifyRefresh;
+  Invalidate;
   inherited;
 end;
 //------------------------------------------------------------------------------
@@ -4288,7 +4279,7 @@ procedure TCheckboxCtrl.SetTextPos(value: TTextPositionH);
 begin
   if value = fTextPos then Exit;
   fTextPos := value;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -4445,7 +4436,7 @@ begin
   for i := 0 to ChildCount -1 do
     if not (Child[i] is TScrollCtrl) then
       Child[i].Offset(-dx, -dy);
-  DoNotifyRefresh;
+  Invalidate;
 end;
 
 //------------------------------------------------------------------------------
@@ -4460,78 +4451,36 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TPageCtrl.SetInnerBounds(const newBounds: TRectD);
-var
-  i: integer;
-  bh, om: double;
 begin
   inherited;
-  bh := fBevelHeight;
-  om := OuterMargin;
-  for i := 0 to ChildCount div 2 -1 do
-    with Child[i*2 +1] do
-      SetInnerBounds(RectD(bh+om, fMetrics.bounds.Bottom,
-        self.Width -bh-om, self.Height -bh -om));
+  ResizeTabs;
 end;
 //------------------------------------------------------------------------------
 
-procedure TPageCtrl.SetTabWidth(width: integer);
-var
-  i, len, bhi: integer;
-  offs: TArrayOfInteger;
-  rec: TRectD;
-  tabs: TArrayOfString;
+procedure TPageCtrl.Scale(value: double);
+begin
+  inherited;
+  fTabHeight := fTabHeight * value;
+  fTabWidth  := fTabWidth  * value;
+  ResizeTabs;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPageCtrl.SetTabWidth(width: double);
 begin
   if width = fTabWidth then Exit;
-  bhi := Round(fBevelHeight);
-  fTabWidth := width;
-  len := ChildCount div 2;
-  if len = 0 then Exit;
-  SetLength(tabs, len);
-  for i := 0 to len -1 do
-    tabs[i] := TCustomCtrl(Child[i*2]).text;
-  rec := Child[0].InnerBounds;
-  if width > 0 then
-    offs := MakeCumulativeArray(bhi, width, len) else
-    offs := GetTabOffsets(tabs, fUsableFont, bhi);
-  for i := 0 to len -1 do
-  begin
-    rec.Left := offs[i];
-    rec.Right := offs[i+1];
-    Child[i*2].SetInnerBounds(rec);
-  end;
-  DoNotifyRefresh;
+  fTabWidth := Max(0, width);
+  if (StorageState <> ssLoading)  then
+    ResizeTabs;
 end;
 //------------------------------------------------------------------------------
 
-procedure TPageCtrl.SetTabHeight(height: integer);
-var
-  i,h,len: integer;
-  bh, om: double;
-  rec: TRectD;
+procedure TPageCtrl.SetTabHeight(height: double);
 begin
   if height = fTabHeight then Exit;
-  fTabHeight := height;
-  len := ChildCount div 2;
-  if len = 0 then Exit;
-  if height <= 0 then
-    height := Ceil(fUsableFont.LineHeight * 1.33);
-  fMetrics.bounds.Bottom := height;
-  for i := 0 to len -1 do
-  begin
-    rec := Child[i*2].InnerBounds;
-    rec.Bottom := rec.Top + height;
-    Child[i*2].SetInnerBounds(rec);
-  end;
-
-  h := height;
-  bh := fBevelHeight;
-  om := OuterMargin;
-  for i := 0 to len -1 do
-    with Child[i*2 +1] do
-      SetInnerBounds(RectD(bh+om, bh + h +om,
-        self.Width -bh -om, self.Height -bh -om));
-
-  DoNotifyRefresh;
+  fTabHeight := Max(0, height);
+  if (StorageState <> ssLoading)  then
+    ResizeTabs;
 end;
 //------------------------------------------------------------------------------
 
@@ -4564,7 +4513,7 @@ begin
       end;
   end;
   fActiveIdx := index;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -4578,43 +4527,79 @@ end;
 
 procedure TPageCtrl.DrawTabs;
 var
-  i,len : integer;
-  om    : integer;
+  i,h,len : integer;
+  om    : double;
+  bh,hbh: integer;
   tabs  : TArrayOfString;
-  rec   : TRect;
+  rec   : TRectD;
+  p     : TPathD;
+  pt1,pt2 : TPointD;
 begin
-  rec := Rect(0,0, Ceil(Width),Ceil(Height));
-  om := Round(OuterMargin);
-  if om > 0 then
-    Types.OffsetRect(rec, om, om);
   len := ChildCount div 2;
-  if len = 0 then Exit;
+  if (len = 0) or not GetUsableFont then Exit;
   SetLength(tabs, len);
   for i := 0 to len -1 do
     tabs[i] := TCustomCtrl(Child[i*2]).text;
-  GetUsableFont; //ie continue even without a font
-  fMetrics := DrawPageCtrl(Image, tabs, fUsableFont,
-    rec, fActiveIdx, fBevelHeight, fTabWidth, fTabHeight,
+
+  rec := InnerRect;
+  om := OuterMargin;
+  OffsetRect(rec, om, om);
+
+  bh := Round(BevelHeight);
+  hbh := Round(BevelHeight/2);
+  if fTabHeight = 0 then
+    h := Ceil(fUsableFont.LineHeight * 1.33) else
+    h := Round(fTabHeight);
+
+  DrawTabCtrl(Image, tabs, fTabOffsets, fUsableFont,
+    BevelHeight, fActiveIdx, fTabWidth, h,
     clLiteBtn32,clDarkGray32, self.Color, clBlack32);
-  DoNotifyRefresh;
+
+  pt1.X := rec.Left + fTabOffsets[fActiveIdx];
+  pt1.Y := rec.Top +h +bh;
+
+  pt2.X := rec.Left + fTabOffsets[fActiveIdx +1];
+  pt2.Y := pt1.Y;
+
+  DrawLine(Image, PointD(rec.Left +bh, pt1.Y),
+    PointD(rec.Right-bh, pt1.Y), hbh, self.Color);
+
+  Image.Clear(Rect(RectD(bh, rec.Top+ h, rec.Right, rec.Bottom)), self.Color);
+  SetLength(p, 6);
+  p[0] := pt2;
+  p[1] := PointD(rec.Right, pt1.Y);
+  p[2] := PointD(rec.Right, rec.Bottom);
+  p[3] := PointD(rec.Left, rec.Bottom);
+  p[4] := PointD(rec.Left, pt1.Y);
+  p[5] := pt1;
+  DrawEdge(Image, p, clWhite32, clSilver32, bh, false);
 end;
 //------------------------------------------------------------------------------
 
 procedure TPageCtrl.ResizeTabs;
 var
-  i         : integer;
-  h,w,bh,om : double;
-  rec       : TRect;
+  i, len    : integer;
+  h,bh      : double;
+  tabs      : TArrayOfString;
 begin
-  h := height; w := width;
+  if (Width = 0) or (Height = 0) or not GetUsableFont then Exit;
+  len := ChildCount div 2;
+  SetLength(tabs, len);
+  for i := 0 to len -1 do
+    tabs[i] := TCustomCtrl(Child[i*2]).text;
+  if fTabHeight = 0 then
+    h := Ceil(fUsableFont.LineHeight * 1.33) else
+    h := fTabHeight;
   bh := fBevelHeight;
-  om := OuterMargin;
-  rec := fMetrics.bounds;
-  for i := 0 to ChildCount div 2 -1 do
+  if fTabWidth > 0 then
+    fTabOffsets := MakeCumulativeArray(BevelHeight, fTabWidth, len) else
+    fTabOffsets := GetVaribleWidthTabOffsets(tabs, fUsableFont, BevelHeight);
+
+  if StorageState = ssLoading then Exit;
+  for i := 0 to len -1 do
   begin
-    Child[i*2].SetInnerBounds(RectD(fMetrics.offsets[i]-om, rec.Top,
-      fMetrics.offsets[i+1]-om, rec.Bottom));
-    Child[i*2 +1].SetInnerBounds(RectD(bh+om, rec.Bottom, w -bh-om, h -bh-om));
+    Child[i*2].SetInnerBounds(RectD(fTabOffsets[i], 0, fTabOffsets[i+1], h));
+    Child[i*2 +1].SetInnerBounds(RectD(bh, h+bh*2, width -bh, height -bh));
   end;
 end;
 //------------------------------------------------------------------------------
@@ -4633,15 +4618,14 @@ begin
   if (om > 0) then
     Types.OffsetRect(rec, om, om);
   Img32.Vector.InflateRect(rec, -bhi, -bhi);
-  rec.Top := fMetrics.bounds.Bottom + om;
+  //rec.Top := fMetrics.bounds.Bottom + om;
   if Assigned(fOnPaint) then fOnPaint(Self);
   DrawTabs;
-  ResizeTabs;
 
-  if ShadowSize > 0 then
-    DrawShadowRect(Image,
-      Rect(om+bhi, fMetrics.bounds.Bottom,
-      rec.Width+om+bhi*2, rec.Height+om+bhi), ShadowSize);
+//  if ShadowSize > 0 then
+//    DrawShadowRect(Image,
+//      Rect(om+bhi, fMetrics.bounds.Bottom,
+//      rec.Width+om+bhi*2, rec.Height+om+bhi), ShadowSize);
   UpdateHitTestMask;
 end;
 //------------------------------------------------------------------------------
@@ -4649,6 +4633,7 @@ end;
 procedure TPageCtrl.AddTab(const caption: string);
 begin
   AddTabs([caption]);
+  ResizeTabs;
 end;
 //------------------------------------------------------------------------------
 
@@ -4672,7 +4657,8 @@ begin
   if (fActiveIdx < 0) and (ChildCount > 2) then
     SetActiveIndex(0);
   Panel[fActiveIdx].Visible := true;
-  DoNotifyRefresh;
+  ResizeTabs;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -4680,7 +4666,7 @@ procedure TPageCtrl.ClearTabs;
 begin
   ClearChildren;
   fActiveIdx := 0;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -4717,9 +4703,9 @@ begin
   else if propName = 'ShadowSize' then
     ShadowSize := GetDoubleProp(propVal, Result)
   else if propName = 'TabWidth' then
-    TabWidth := GetIntProp(propVal, Result)
+    TabWidth := GetDoubleProp(propVal, Result)
   else if propName = 'TabHeight' then
-    TabHeight := GetIntProp(propVal, Result)
+    TabHeight := GetDoubleProp(propVal, Result)
   else Result := false;
 end;
 //------------------------------------------------------------------------------
@@ -4746,8 +4732,8 @@ begin
   inherited;
   WriteIntProp('ActiveIndex', ActiveIndex);
   WriteDoubleProp('ShadowSize', fShadowSize);
-  WriteIntProp('TabWidth', TabWidth);
-  WriteIntProp('TabHeight', TabHeight);
+  WriteDoubleProp('TabWidth', TabWidth);
+  WriteDoubleProp('TabHeight', TabHeight);
 end;
 
 //------------------------------------------------------------------------------
@@ -4984,7 +4970,7 @@ end;
 procedure TProgressCtrl.SetPosition(newPos: double);
 begin
   fPosition := Math.Min(fMax, Math.Max(0, newPos));
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -4993,7 +4979,7 @@ begin
   if fOrientation = newOrient then Exit;
   fOrientation := newOrient;
   Image.SetSize(Round(Height), Round(Width));
-  DoNotifyRefresh;
+  Invalidate;
 end;
 
 //------------------------------------------------------------------------------
@@ -5114,14 +5100,14 @@ begin
   if fOrientation = newOrient then Exit;
   fOrientation := newOrient;
   SetInnerBounds(InnerBounds);
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TSliderCtrl.SetPosition(newPos: double);
 begin
   fPosition := Math.Min(fMax, Math.Max(fMin, newPos));
-  DoNotifyRefresh;
+  Invalidate;
   if Assigned(fOnSlider) then fOnSlider(Self);
 end;
 //------------------------------------------------------------------------------
@@ -5130,7 +5116,7 @@ procedure TSliderCtrl.SetPressed(value: Boolean);
 begin
   if fPressed = value then Exit;
   fPressed := value;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -5168,7 +5154,7 @@ begin
         begin
           fScrollState := scScrollBtn;
           fPressed := true;
-          DoNotifyRefresh;
+          Invalidate;
         end;
       end;
     soVertical:
@@ -5186,7 +5172,7 @@ begin
         begin
           fScrollState := scScrollBtn;
           fPressed := true;
-          DoNotifyRefresh;
+          Invalidate;
         end;
       end;
   end;
@@ -5246,7 +5232,7 @@ begin
   if fPressed then
   begin
     fPressed := false;
-    DoNotifyRefresh;
+    Invalidate;
   end;
   fScrollState := scNormal;
 end;
@@ -5275,7 +5261,7 @@ begin
   fMin := Math.Min(newMin, fMax);
   if fPosition < fMin then
     fPosition := fMin;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -5285,7 +5271,7 @@ begin
   if fPosition > fMax then
     fPosition := fMax;
   SetBtnSize;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -5383,7 +5369,7 @@ procedure TScrollCtrl.SetMin(newMin: double);
 begin
   if newMin = fMin then Exit;
   fMin := newMin;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -5392,7 +5378,7 @@ begin
   if newMax = fMax then Exit;
   fMax := newMax;
   CalcScale;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -5438,7 +5424,7 @@ begin
     soHorizontal  : fTargetCtrl.DoScroll(delta, 0);
     soVertical    : fTargetCtrl.DoScroll(0, delta);
   end;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -5446,7 +5432,7 @@ procedure TScrollCtrl.SetAutoHide(value: Boolean);
 begin
   if value = fAutoHide then Exit;
   fAutoHide := value;
-  DoNotifyRefresh;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -5896,7 +5882,7 @@ constructor TCtrlStorageManager.Create(parent: TStorage; const name: string);
 begin
   inherited;
   fShortcutList := TList.Create;
-  fFocusLineW := DPIAware(1.25);
+  fFocusLineW := DPIAware(1);
 end;
 //------------------------------------------------------------------------------
 
@@ -6188,6 +6174,5 @@ end;
 
 initialization
   RegisterClasses;
-  //FormatSettings.DecimalSeparator := '.';
 
 end.

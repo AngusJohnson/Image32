@@ -3,9 +3,9 @@ unit Img32.Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.0                                                             *
-* Date      :  22 December 2021                                                *
+* Date      :  10 January 2022                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2021                                         *
+* Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
 *                                                                              *
@@ -986,11 +986,13 @@ function TFontReader.LoadFromResource(const resName: string; resType: PChar): Bo
 var
   rs: TResourceStream;
 begin
+  BeginUpdate;
   rs := CreateResourceStream(resName, resType);
   try
     Result := assigned(rs) and LoadFromStream(rs);
   finally
     rs.free;
+    EndUpdate;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2380,7 +2382,9 @@ begin
   begin
     a := tpm.wordListOffsets[i];
     b := tpm.wordListOffsets[i+1] -1;
-    spcDx := tpm.justifyDeltas[i];
+    if textAlign = taJustify then
+      spcDx := tpm.justifyDeltas[i] else
+      spcDx := 0;
     lineWidth := tpm.lineWidths[i];
 
     //ingore trailing spaces
@@ -2592,6 +2596,8 @@ begin
     Clear;
   end;
   fFontReader := newFontReader;
+  if Assigned(fFontReader) then
+    fFontReader.AddRecipient(self as INotifyRecipient);
   UpdateScale;
 end;
 //------------------------------------------------------------------------------

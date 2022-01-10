@@ -3,9 +3,9 @@ unit Img32.Storage;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.0                                                             *
-* Date      :  22 December 2021                                                *
+* Date      :  10 January 2022                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2021                                         *
+* Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
 * Purpose   :  Object persistence                                              *
 *                                                                              *
@@ -20,7 +20,6 @@ uses
   SysUtils, Classes, Img32;
 
 type
-
   TStorageState = (ssNormal, ssLoading, ssSaving, ssDestroying);
 
   TStorage = class;
@@ -35,7 +34,7 @@ type
     fIndex    : integer;
     fName     : string;
     fStgState : TStorageState;
-    storageId : integer;
+    fStgId    : integer;
     function  GetChildCount: integer;
     function GetHasChildren: Boolean;
   protected
@@ -45,17 +44,14 @@ type
     procedure ReindexChilds(startFrom: integer);
     procedure CheckChildIndex(index: integer); virtual;
     function  RemoveChildFromList(index: integer): TStorage; virtual;
-
     procedure BeginRead; virtual;
     function  ReadProperty(const propName, propVal: string): Boolean; virtual;
     //procedure EndReadProperties; virtual;
     procedure EndRead; virtual;
-
     procedure WriteProperties; virtual;
     procedure WriteStorageHeader(var objId: integer);
     procedure WriteStorageContent(var objId: integer);
     procedure WriteStorageFooter;
-
     procedure WriteIntProp(const propName: string; propVal: integer);
     procedure WriteCardinalProp(const propName: string; propVal: Cardinal);
     procedure WriteBoolProp(const propName: string; propVal: Boolean);
@@ -71,6 +67,7 @@ type
   public
     constructor Create(parent:  TStorage = nil; const name: string = ''); virtual;
     destructor  Destroy; override;
+    procedure Free;
     procedure ClearChildren; virtual;
     function  AddChild(storeClass: TStorageClass): TStorage; virtual;
     function  InsertChild(index: integer; storeClass: TStorageClass): TStorage; virtual;
@@ -82,13 +79,12 @@ type
     function  FindByClass(stgClass: TStorageClass): TStorage;
     function  FindByClassAndName(stgClass: TStorageClass;
       const objName: string): TStorage;
-
     property  Child[index: integer]: TStorage read GetChild;
     property  Childs: TList read fChilds;
     property  ChildCount: integer read GetChildCount;
     property  HasChildren: Boolean read GetHasChildren;
     property  Index  : integer read fIndex;
-    property  LoadId : integer read storageId;
+    property  LoadId : integer read fStgId;
     property  Name   : string read fName write SetName;
     property  Parent : TStorage read fParent write SetParent;
     property  StorageManager: TStorageManager read fManager;
@@ -97,10 +93,10 @@ type
 
   TStorageManager = class(TStorage)
   private
-    fDesignScreenRes    : double;
-    fDesignFormScale    : double;
-    fXmlStr             : Utf8String;
-    fCurrLevel          : integer;
+    fDesignScreenRes  : double;
+    fDesignFormScale  : double;
+    fXmlStr           : Utf8String;
+    fCurrLevel        : integer;
   protected
     procedure DoBeforeLoad; virtual;
     procedure DoAfterChildLoad(child: TStorage); virtual;
@@ -132,7 +128,6 @@ type
     function  ReadProperty(const propName, propVal: string): Boolean; override;
     procedure WriteProperties; override;
   end;
-
   function GetIntProp(const str: string; out success: Boolean): integer;
   function GetBoolProp(const str: string; out success: Boolean): Boolean;
   function GetCardProp(const str: string; out success: Boolean): Cardinal;
@@ -141,7 +136,6 @@ type
   function GetStorageProp(const str: string; out success: Boolean): TStorage;
   function GetColorProp(const str: string; out success: Boolean): TColor32;
   function GetPointDProp(const str: string; out success: Boolean): TPointD;
-
   procedure RegisterStorageClass(storageClass: TStorageClass);
 
 implementation
@@ -175,11 +169,9 @@ const
   gt      = '>';
   amp     = '&';
   tab     = #9;
-
   spacesPerLevel = 2;
 
 {$IF COMPILERVERSION < 18}
-
 function UIntToStr(value: Cardinal): string;
 begin
   Result := Format('%d', [value]);
@@ -204,7 +196,6 @@ begin
   Val(S, Value, E);
   Result := E = 0;
 end;
-//------------------------------------------------------------------------------
 {$IFEND}
 
 //------------------------------------------------------------------------------
@@ -269,7 +260,6 @@ begin
     'Y':
       if s = 'CLYELLOW32' then color := $FFFFFF00
       else Result := false;
-
     else Result := false;
   end;
 end;
@@ -573,7 +563,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
 function GetNameLength(var c: PUTF8Char; endC: PUTF8Char): integer; overload;
 var
   c2: PUTF8Char;
@@ -772,15 +761,16 @@ end;
 
 procedure LoadStoredObjects(const utf8: UTF8String; storeManager: TStorageManager);
 var
-  loadingObjectsList: TList;
-  loadingPtrProps : TList;
-  xmlCurrent, xmlEnd, c: PUTF8Char;
-  attName, attVal: Utf8String;
+  loadingObjectsList  : TList;
+  loadingPtrProps     : TList;
+  xmlCurr, xmlEnd, c  : PUTF8Char;
+  attName, attVal     : Utf8String;
   clssName: string;
-  storeClass: TStorageClass;
-  currChild: TStorage;
-  loadPtrRec: PLoadPtrRec;
-  i, cnt: Integer;
+  storeClass          : TStorageClass;
+  currChild           : TStorage;
+  loadPtrRec          : PLoadPtrRec;
+  i, cnt              : Integer;
+  savedDecSep         : Char;
 
   function SkipComment(var c: PUTF8Char; endC: PUTF8Char): Boolean;
   var
@@ -793,78 +783,74 @@ var
 
 begin
   if not Assigned(storeManager) or (utf8 = '') then Exit;
+  savedDecSep := FormatSettings.DecimalSeparator;
   loadingPtrProps := TList.Create;
   loadingObjectsList := TList.Create;
   try
-    xmlCurrent := PUTF8Char(utf8);
-    xmlEnd := xmlCurrent;
+    FormatSettings.DecimalSeparator := '.';
+    xmlCurr := PUTF8Char(utf8);
+    xmlEnd := xmlCurr;
     inc(xmlEnd, Length(utf8));
-
     currChild := storeManager;
     currChild.fStgState := ssLoading;
-    while (xmlCurrent <= xmlEnd) do
+    while (xmlCurr <= xmlEnd) do
     begin
       //get next storage object class
-      if not SkipBlanks(xmlCurrent, xmlEnd) or
-        (xmlCurrent^ <> '<') then Break;
-      inc(xmlCurrent);
-
-      if (xmlCurrent^ = '!') then //comment
+      if not SkipBlanks(xmlCurr, xmlEnd) or
+        (xmlCurr^ <> '<') then Break;
+      inc(xmlCurr);
+      if (xmlCurr^ = '!') then //comment
       begin
-        if not CheckChar(xmlCurrent, xmlEnd, 1, '-') or
-          not CheckChar(xmlCurrent, xmlEnd, 2, '-') then
+        if not CheckChar(xmlCurr, xmlEnd, 1, '-') or
+          not CheckChar(xmlCurr, xmlEnd, 2, '-') then
             Break;
-        inc(xmlCurrent, 3);
-        if SkipComment(xmlCurrent, xmlEnd) then
+        inc(xmlCurr, 3);
+        if SkipComment(xmlCurr, xmlEnd) then
           Continue else
           Break;
       end
-      else if (xmlCurrent^ = '/') then
+      else if (xmlCurr^ = '/') then
       begin
         //ending the current child
-        inc(xmlCurrent);
-        c := xmlCurrent;
-        GetNameLength(xmlCurrent, xmlEnd);
-        clssName := string(MakeUTF8String(c, xmlCurrent));
+        inc(xmlCurr);
+        c := xmlCurr;
+        GetNameLength(xmlCurr, xmlEnd);
+        clssName := string(MakeUTF8String(c, xmlCurr));
         if (currChild = storeManager) or
           not SameText(clssName, currChild.ClassName) or
-          not SkipBlanks(xmlCurrent, xmlEnd) or
-          (xmlCurrent^ <> '>') then Break;
-
+          not SkipBlanks(xmlCurr, xmlEnd) or
+          (xmlCurr^ <> '>') then Break;
         currChild.EndRead;
         currChild.fStgState := ssNormal;
         storeManager.DoAfterChildLoad(currChild);
-        inc(xmlCurrent); //'>'
+        inc(xmlCurr); //'>'
         currChild := currChild.Parent;
         Continue;
       end;
       //get next object's classname and create
-      c := xmlCurrent;
-      GetNameLength(xmlCurrent, xmlEnd);
-      clssName := string(MakeUTF8String(c, xmlCurrent));
+      c := xmlCurr;
+      GetNameLength(xmlCurr, xmlEnd);
+      clssName := string(MakeUTF8String(c, xmlCurr));
       storeClass := TStorageManager.GetStorageClass(clssName);
       if not Assigned(storeClass) then
         raise Exception.CreateFmt(rsClassNotRegistered, [clssName]);
-
       currChild := currChild.AddChild(storeClass);
       //get attributes
-      while SkipBlanks(xmlCurrent, xmlEnd) do
+      while SkipBlanks(xmlCurr, xmlEnd) do
       begin
-        if (xmlCurrent^ = '<') then //assume a comment
+        if (xmlCurr^ = '<') then //assume a comment
         begin
-          if not CheckChar(xmlCurrent, xmlEnd, 1, '!') or
-            not CheckChar(xmlCurrent, xmlEnd, 2, '-') or
-            not CheckChar(xmlCurrent, xmlEnd, 3, '-') then Break;
-          inc(xmlCurrent, 4);
-          if SkipComment(xmlCurrent, xmlEnd) then Continue
+          if not CheckChar(xmlCurr, xmlEnd, 1, '!') or
+            not CheckChar(xmlCurr, xmlEnd, 2, '-') or
+            not CheckChar(xmlCurr, xmlEnd, 3, '-') then Break;
+          inc(xmlCurr, 4);
+          if SkipComment(xmlCurr, xmlEnd) then Continue
           else Break;
         end
-        else if (xmlCurrent^ < '?') then Break;
-
-        attName := GetAttribName(xmlCurrent, xmlEnd);
-        attVal := GetAttribValue(xmlCurrent, xmlEnd);
+        else if (xmlCurr^ < '?') then Break;
+        attName := GetAttribName(xmlCurr, xmlEnd);
+        attVal := GetAttribValue(xmlCurr, xmlEnd);
         if (attName = '') then Break;
-
         if attName[1] = '@' then //local pointer (delay these)
         begin
           New(loadPtrRec);
@@ -877,26 +863,25 @@ begin
         end
         else if (attName = 'ObjId') then
         begin
-          currChild.storageId := StrToIntDef(string(attVal), -1);
+          currChild.fStgId := StrToIntDef(string(attVal), -1);
           //if currId is valid then add currChild to loadingObjectsList
-          if (currChild.storageId >= 0) then
+          if (currChild.fStgId >= 0) then
           begin
             //but first add nil for any missing objects
-            for i := loadingObjectsList.Count to currChild.storageId -1 do
+            for i := loadingObjectsList.Count to currChild.fStgId -1 do
               loadingObjectsList.Add(nil);
-            if currChild.storageId < loadingObjectsList.Count then
-              loadingObjectsList[currChild.storageId] := currChild else
+            if currChild.fStgId < loadingObjectsList.Count then
+              loadingObjectsList[currChild.fStgId] := currChild else
               loadingObjectsList.Add(currChild);
           end;
         end
         else
           currChild.ReadProperty(string(attName), string(attVal));
       end;
-      SkipBlanks(xmlCurrent, xmlEnd);
-      if (xmlCurrent^ <> '>') then break;
-      inc(xmlCurrent);
+      SkipBlanks(xmlCurr, xmlEnd);
+      if (xmlCurr^ <> '>') then break;
+      inc(xmlCurr);
     end;
-
     //finally lookup and linkup pointers
     cnt := loadingObjectsList.Count;
     for i := loadingPtrProps.Count -1 downto 0 do
@@ -907,10 +892,10 @@ begin
               PointerToString(loadingObjectsList[propValI]));
           Dispose(PLoadPtrRec(loadingPtrProps[i]));
         end;
-
   finally
     loadingObjectsList.Free;
     loadingPtrProps.Free;
+    FormatSettings.DecimalSeparator := savedDecSep;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -934,10 +919,10 @@ procedure SaveStoredObjects(storageManager: TStorageManager;
   begin
     if ClassInIgnoreList(obj.ClassType) then
     begin
-      obj.storageId := -1 //use storageId to flag ignored.
+      obj.fStgId := -1 //use storageId to flag ignored.
     end else
     begin
-      obj.storageId := 0;
+      obj.fStgId := 0;
       objIdList.Add(obj);
       for i := 0 to obj.ChildCount -1 do
           AddToObjIdList(obj.Child[i]);
@@ -945,29 +930,31 @@ procedure SaveStoredObjects(storageManager: TStorageManager;
   end;
 
 var
-  i: integer;
-  objId: integer;
+  i           : integer;
+  objId       : integer;
+  savedDecSep : Char;
 begin
   if not Assigned(storageManager) then Exit;
+
+  savedDecSep := FormatSettings.DecimalSeparator;
+  FormatSettings.DecimalSeparator := '.';
   storageManager.fCurrLevel := 0;
   objId := startIdx;
-
   objIdList := TList.Create;
   try
     //build objIdList but don't include the storagemanager
     //itself in the list, just its descendants
-
     //objIdList.Add(nil); // dummy for TStorageInfo
     for i := 0 to storageManager.ChildCount -1 do
       AddToObjIdList(storageManager.Child[i]);
-
     //it's OK to write storage now that we have object ids.
     for i := 0 to storageManager.ChildCount -1 do
       with TStorage(storageManager.Childs[i]) do
-          if storageId >= 0 then
+          if fStgId >= 0 then
             WriteStorageContent(objId);
   finally
     objIdList.Free;
+    FormatSettings.DecimalSeparator := savedDecSep;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1040,6 +1027,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TStorage.Free;
+begin
+  if Self = nil then Exit;
+  fStgState := ssDestroying;
+  inherited Free;
+end;
+//------------------------------------------------------------------------------
+
 procedure TStorage.SetName(const aName: string);
 begin
   fName := aName;
@@ -1091,7 +1086,6 @@ begin
     Result := self;
     Exit;
   end;
-
   Result := nil;
   for i := 0 to ChildCount -1 do
     begin
@@ -1105,12 +1099,11 @@ function TStorage.FindById(const objId: integer): TStorage;
 var
   i: integer;
 begin
-  if self.storageId = objId then
+  if self.fStgId = objId then
   begin
     Result := self;
     Exit;
   end;
-
   Result := nil;
   for i := 0 to ChildCount -1 do
     begin
@@ -1129,7 +1122,6 @@ begin
     Result := self;
     Exit;
   end;
-
   Result := nil;
   for i := 0 to ChildCount -1 do
     begin
@@ -1149,7 +1141,6 @@ begin
     Result := self;
     Exit;
   end;
-
   Result := nil;
   for i := 0 to ChildCount -1 do
     begin
@@ -1162,11 +1153,6 @@ end;
 procedure TStorage.BeginRead;
 begin
 end;
-//------------------------------------------------------------------------------
-
-//procedure TStorage.EndReadProperties;
-//begin
-//end;
 //------------------------------------------------------------------------------
 
 procedure TStorage.EndRead;
@@ -1296,7 +1282,7 @@ begin
   inc(fManager.fCurrLevel);
   for i := 0 to ChildCount -1 do
     with TStorage(fChilds[i]) do
-      if storageId >= 0 then
+      if fStgId >= 0 then
         WriteStorageContent(objId);
   dec(fManager.fCurrLevel);
   WriteStorageFooter;
@@ -1396,8 +1382,8 @@ begin
   //may need to notify parents of properties before destruction
   TStorage(fChilds[index]).Free;
 end;
-
 //------------------------------------------------------------------------------
+
 // TStorageManager
 //------------------------------------------------------------------------------
 
@@ -1512,14 +1498,11 @@ var
   fs: TFileStream;
 begin
   if ChildCount = 0 then Exit;
-
   fDesignFormScale := aScale;
   fXmlStr := ''; //empty the write buffer (just in case)
   DoBeforeWrite;
-
   if not (Child[0] is TStorageInfo) then
     InsertChild(0, TStorageInfo);
-
   SaveStoredObjects(self, 0, classesToIgnore);
   len := Length(fXmlStr);
   fs := TFileStream.Create(filename, fmCreate);
@@ -1546,7 +1529,6 @@ end;
 
 function TStorageManager.FindObjectByClass(storageClass: TStorageClass;
   parent: TStorage): TStorage;
-
   function FindByClass(so: TStorage): TStorage;
   var
     i: integer;
@@ -1563,7 +1545,6 @@ function TStorageManager.FindObjectByClass(storageClass: TStorageClass;
       Result := nil;
     end;
   end;
-
 begin
   if Assigned(parent) then
     Result := FindByClass(parent) else
@@ -1572,20 +1553,19 @@ end;
 //------------------------------------------------------------------------------
 
 function TStorageManager.FindObjectByLoadId(id: integer): TStorage;
-
   function FindById(so: TStorage): TStorage;
   var
     i, highI: integer;
   begin
-    if id = so.storageId then
+    if id = so.fStgId then
     begin
       Result := so;
       Exit;
     end;
     Result := nil;
     highI := so.ChildCount -1;
-    if (id < so.storageId) or (HighI < 0) then Exit;
-    if id >= so.Child[highI].storageId then
+    if (id < so.fStgId) or (HighI < 0) then Exit;
+    if id >= so.Child[highI].fStgId then
       Result := FindById(so.Child[highI])
     else
       for i := 0 to highI -1 do
@@ -1594,7 +1574,6 @@ function TStorageManager.FindObjectByLoadId(id: integer): TStorage;
        if Assigned(Result) then break;
       end;
   end;
-
 begin
   Result := FindById(self);
 end;
@@ -1602,7 +1581,6 @@ end;
 
 function TStorageManager.FindObjectByName(const name: string;
   parent: TStorage): TStorage;
-
   function FindByName(so: TStorage): TStorage;
   var
     i,highI: integer;
@@ -1620,7 +1598,6 @@ function TStorageManager.FindObjectByName(const name: string;
      if Assigned(Result) then break;
     end;
   end;
-
 begin
   if Assigned(parent) then
     Result := FindByName(parent) else
@@ -1669,14 +1646,14 @@ procedure EndStorageClassRegister;
 begin
   classList.Free;
 end;
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
 initialization
   InitStorageClassRegister;
   RegisterStorageClass(TStorageInfo);
+
 finalization
   EndStorageClassRegister;
-
 end.
-
