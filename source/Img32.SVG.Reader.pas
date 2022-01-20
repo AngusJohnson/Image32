@@ -2315,8 +2315,6 @@ var
   endStyle: TEndStyle;
   joinStyle: TJoinStyle;
   bounds: TRectD;
-
-  lines: TPathsD;
 begin
   if isClosed then
   begin

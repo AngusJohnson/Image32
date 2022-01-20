@@ -23,7 +23,6 @@ uses
   Img32, Img32.Vector;
 
 type
-  PMatrixD = ^TMatrixD;
   TMatrixD = array [0..2, 0..2] of double;
 
   //Matrix functions

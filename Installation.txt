@@ -1,22 +1,20 @@
 
 Image32 Installation and upgrade instructions
 
-1. If you are upgrading the Image32 library from
-   a version prior to version 3.0 then you'll first need to
-   uninstall the VCL_Image32 package if it was installed.
+1. Unzip the Library into an appropriate (empty) folder.
 
-2. Unzip the Library into an appropriate (empty) folder.
-
-3. Add the library's source folder to the Delphi IDE library path.
-    To do this in Delphi 10.3 select from the menu -
+2. Add the library's source folder to the Delphi IDE library path.
+    To do this in Delphi 10.4 select from the menu -
       Tools | Options | Language | Delphi | Library | Library Path
     To do this in Delphi 7 select from the menu -
       Tools | Environment Options | Library | Library Path
 
-4. Install the TImage32Panel control (optional)
+3. Install the TImage32Panel control (optional)
     In the Delphi IDE, choose File | Open Project and in 
     the "Files of Type" EditCombox select Delphi Packages
-    Then navigate to the library's source/packages folder and 
-    open the Img32_VCL package. Compile and install.
+    Navigate to the library's source/packages folder and 
+    open the Img32_Library.dpk runtime package and compile.
+    Then open Img32_VCL_Dsgn.dpk designtime package and 
+    compile and install.
       
-5. Test the install by opening and compiling a sample application.
+4. Test the install by compiling one or more sample applications.
