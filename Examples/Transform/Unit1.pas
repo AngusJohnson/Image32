@@ -11,7 +11,7 @@ type
   TTransformType = (ttAffineSkew, ttProjective,
     ttSplineV, ttSplineH, ttAffineRotate);
 
-  TTransformLayer32 = class(TRotatableLayer32)
+  TTransformLayer32 = class(TRotLayer32)
   private
     fImgCopy: TImage32;
   public
@@ -136,7 +136,7 @@ begin
   Image.Rotate(angleDelta);
   SymmetricCropTransparent(Image);
   PositionCenteredAt(mp);
-  DoNotifyRefresh;
+  Invalidate;
 end;
 
 //------------------------------------------------------------------------------
@@ -157,11 +157,12 @@ begin
   layeredImage.BackgroundColor := Color32(clBtnFace);
 
   //Layer 0: bottom 'hatched' design layer
-  layeredImage.AddLayer(TDesignerLayer32, nil, 'hatched');
+  layeredImage.AddLayer(TLayer32, nil, 'hatched');
 
   //Layer 1: for the transformed image
   transformLayer := TTransformLayer32(layeredImage.AddLayer(TTransformLayer32));
   //transformLayer.MasterImage.LoadFromResource('GRADIENT', 'PNG');
+
   transformLayer.Image.LoadFromResource('UNION_JACK', 'BMP');
   transformLayer.ImageBak.Assign(transformLayer.Image);
 
@@ -244,8 +245,6 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.ResetSkew(isVerticalSkew: Boolean);
-var
-  mp: TPointD;
 begin
   FreeAndNil(buttonGroup);
   FreeAndNil(rotateGroup);
@@ -320,8 +319,6 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.ResetRotate;
-var
-  mp: TPointD;
 begin
   FreeAndNil(buttonGroup);
   FreeAndNil(rotateGroup);
@@ -411,7 +408,6 @@ end;
 procedure TForm1.mnuVerticalSplineClick(Sender: TObject);
 var
   i: integer;
-  rec: TRect;
   pt: TPointD;
 begin
   with TMenuItem(Sender).Parent do

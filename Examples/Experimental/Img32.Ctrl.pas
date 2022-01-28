@@ -2641,7 +2641,7 @@ end;
 
 procedure TMemoCtrl.FillWordList;
 begin
-  Img32.Text.FillWordList(fText, fWordList, fUsableFont);
+  fWordList.SetText(fText, fUsableFont);
   fDoFullPaint := true;
 end;
 //------------------------------------------------------------------------------
@@ -2651,7 +2651,7 @@ begin
   inherited;
   if not Assigned(fUsableFont) then Exit;
   if fText <> '' then
-    UpdateWordList(fWordList, fUsableFont);
+    fWordList.ApplyNewFont(fUsableFont);
   fDoFullPaint := true;
 end;
 //------------------------------------------------------------------------------
@@ -3052,7 +3052,7 @@ begin
   if (Length(Text) = 0) then Exit;
   if (fWordList.Count = 0) then
     FillWordList else
-    UpdateWordList(fWordList, fUsableFont);
+    fWordList.ApplyNewFont(fUsableFont);
 end;
 //------------------------------------------------------------------------------
 
@@ -3289,7 +3289,7 @@ begin
   if fWordList.Count = 0 then
   begin
     fWordList.OnChanged := nil;
-    FillWordList(fText, fWordList, fUsableFont);
+    fWordList.SetText(fText, fUsableFont);
     fWordList.OnChanged := TextChanged;
   end;
 end;
@@ -3305,7 +3305,7 @@ procedure TEditCtrl.SetFont(font: TFontCache);
 begin
   inherited;
   if not Assigned(fUsableFont) then Exit;
-  UpdateWordList(fWordList, font);
+  fWordList.ApplyNewFont(font);
 end;
 //------------------------------------------------------------------------------
 
@@ -3682,7 +3682,7 @@ begin
 
   if (fWordList.Count = 0) and (Length(Text) > 0) then
     GetWordList else
-    UpdateWordList(fWordList, font);
+    fWordList.ApplyNewFont(font);
   SetInnerBounds(GetInnerBounds);
 end;
 //------------------------------------------------------------------------------

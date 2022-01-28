@@ -1,11 +1,11 @@
 object MainForm: TMainForm
   Left = 1082
-  Height = 705
+  Height = 799
   Top = 614
-  Width = 729
+  Width = 766
   Caption = 'Image32 Lazarus Demo'
-  ClientHeight = 705
-  ClientWidth = 729
+  ClientHeight = 799
+  ClientWidth = 766
   DesignTimePPI = 192
   OnCreate = FormCreate
   OnDestroy = FormDestroy
@@ -14,9 +14,9 @@ object MainForm: TMainForm
   Position = poDesktopCenter
   LCLVersion = '2.0.12.0'
   object btnRefresh: TButton
-    Left = 328
+    Left = 291
     Height = 70
-    Top = 591
+    Top = 712
     Width = 163
     Caption = '&Refresh'
     Default = True
@@ -24,9 +24,9 @@ object MainForm: TMainForm
     TabOrder = 0
   end
   object btnClose: TButton
-    Left = 523
+    Left = 486
     Height = 70
-    Top = 591
+    Top = 712
     Width = 163
     Cancel = True
     Caption = '&Close'

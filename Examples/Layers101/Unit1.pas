@@ -193,7 +193,7 @@ begin
   layeredImg32 := TLayeredImage32.Create; //sized in FormResize below.
 
   //add a hatched background design layer (see FormResize below).
-  layeredImg32.AddLayer(TDesignerLayer32);
+  layeredImg32.AddLayer(TLayer32);
 
   //create text rendering objects
   fontReader := FontManager.LoadFromResource('FONT_NSB', RT_RCDATA);
@@ -228,7 +228,7 @@ begin
   layeredImg32.SetSize(ClientWidth, ClientHeight);
 
   //and resize and repaint the hatched design background layer
-  with TDesignerLayer32(layeredImg32[0]) do
+  with TLayer32(layeredImg32[0]) do
   begin
     //nb: use SetSize not Resize which would waste
     //CPU cycles stretching any previous hatching

@@ -209,7 +209,7 @@ begin
     //metrics of how many lines of text will fit on left of image
     wordList := TWordInfoList.Create;
     try
-      FillWordList(essay, wordList, noto14Cache);
+      wordList.SetText(essay, noto14Cache);
       pageMetrics := GetPageMetrics(RectWidth(tmpRec), wordList);
       //calculate lines that will fit on left of image
       lineCnt := Trunc(RectHeight(tmpRec) / noto14Cache.LineHeight);

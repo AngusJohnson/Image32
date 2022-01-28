@@ -75,7 +75,7 @@ type
     transformedImage: TImage32;
     layeredImage: TLayeredImage32;
     rasterLayer: TRasterLayer32;
-    designLayer: TDesignerLayer32;
+    designLayer: TLayer32;
     clickedLayer: TLayer32;
     clickedPoint: TPoint;
     procedure ResizeLayeredImage;
@@ -150,7 +150,7 @@ begin
   rasterLayer := layeredImage.AddLayer(TRasterLayer32) as TRasterLayer32;
 
   //designer layer to display design quadrilaterals
-  designLayer := layeredImage.AddLayer(TDesignerLayer32) as TDesignerLayer32;
+  designLayer := layeredImage.AddLayer(TLayer32) as TLayer32;
 
   //non-layered image (on right side of form)
   transformedImage := TImage32.Create;

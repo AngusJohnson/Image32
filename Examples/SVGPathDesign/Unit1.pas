@@ -130,7 +130,7 @@ begin
   layeredImg32.SetSize(ClientWidth, ClientHeight - pnlBottom.Height);
 
   //add a hatched background design layer (drawn in FormResize).
-  layeredImg32.AddLayer(TDesignerLayer32);
+  layeredImg32.AddLayer(TLayer32);
 
   //get ready to load an SVG-DPath
   svgPathLayer := layeredImg32.AddLayer(TSvgPathLayer) as TSvgPathLayer;
@@ -423,7 +423,7 @@ begin
   h := ClientHeight - pnlBottom.Height;
   layeredImg32.SetSize(w, h);
   //and resize and repaint the hatched design background layer
-  with TDesignerLayer32(layeredImg32[0]) do
+  with TLayer32(layeredImg32[0]) do
   begin
     SetSize(w, h);
     HatchBackground(Image);

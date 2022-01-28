@@ -1,4 +1,4 @@
-unit main;
+﻿unit main;
 
 {$mode objfpc}{$H+}
 
@@ -92,10 +92,10 @@ var
   textRec, imageRec: TRect;
   matrix: TMatrixD;
   delta: TPoint;
-  nextX: double;
+  nextX, w: double;
   copyright, sillyText: UnicodeString;
 
-  glyphCache: TGlyphCache;
+  fontCache  : TFontCache;
   fontReader2: TFontReader;
   fontReader3: TFontReader;
 begin
@@ -116,22 +116,22 @@ begin
   if not fontReader2.IsValidFontFormat or
     not fontReader3.IsValidFontFormat then Exit;
 
-  glyphCache := TGlyphCache.Create(fontReader2, DpiAware(48));
+  fontCache := TFontCache.Create(fontReader2, DpiAware(48));
   try
     //and get the outline for some text ...
-    mainTxtPaths := glyphCache.GetTextGlyphs(0,0, sillyText, nextX);
+    mainTxtPaths := fontCache.GetTextOutline(0,0, sillyText, nextX);
     //bold the text a little
     mainTxtPaths := InflatePaths(mainTxtPaths, 2);
 
-    //now we have mainTxtPaths in one font we can reuse glyphCache,
+    //now we have mainTxtPaths in one font we can reuse font,
     //assigning it a new font and a new font height
-    glyphCache.FontReader := fontReader3;
-    glyphCache.FontHeight := DPIAware(10);
+    fontCache.FontReader := fontReader3;
+    fontCache.FontHeight := DPIAware(10);
 
     //now get the copyright text outline
-    copyTxtPaths := glyphCache.GetTextGlyphs(0,0, copyright, nextX);
+    copyTxtPaths := fontCache.GetTextOutline(0,0, copyright, nextX);
   finally
-    glyphCache.Free;
+    fontCache.Free;
     //fontReader2.free; //optional - otherwise done by FontManager
     //fontReader3.free; // "
   end;
@@ -179,9 +179,10 @@ begin
 
   //draw a simple copyright notice using a normal font (font_1)
   //and locate it in the bottom right corner of the display image
-  with GetBoundsD(copyTxtPaths) do
-    copyTxtPaths := OffsetPath(copyTxtPaths,
-      zoomImages[0].Width - Width -10, zoomImages[0].Height - 10);
+  w := GetBoundsD(copyTxtPaths).Right;
+  copyTxtPaths := OffsetPath(copyTxtPaths,
+      imageRec.Right - w,
+      zoomImages[0].Height - 10);
   DrawPolygon(zoomImages[0], copyTxtPaths, frNonZero, clBlack32);
 
   //center mainTxtPaths inside displayImg ...

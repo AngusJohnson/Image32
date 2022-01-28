@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Types, Classes, Graphics,
-  Controls, Forms,  Dialogs, Math, ComCtrls, Menus,    Img32.Storage,
+  Controls, Forms,  Dialogs, Math, ComCtrls, Menus,
   Img32, Img32.Layers, Img32.Text, Img32.Panels, ExtCtrls;
 
 type
@@ -64,7 +64,7 @@ type
     layeredImage       : TLayeredImage32;
     words              : TStringList;
     clickedLayer       : TLayer32;
-    targetLayer        : TRotatableLayer32;
+    targetLayer        : TRotLayer32;
     sizingButtonGroup  : TSizingGroupLayer32;
     rotatingButtonGroup: TRotatingGroupLayer32;
     arrowButtonGroup   : TGroupLayer32;
@@ -103,7 +103,7 @@ type
   protected
     procedure Draw; override;
   public
-    constructor Create(Parent: TStorage; const name: string = ''); override;
+    constructor Create(Parent: TLayer32; const name: string = ''); override;
     function Clone: TMyVectorLayer32;
   end;
 
@@ -123,8 +123,9 @@ implementation
 {$R Cursors.res} //rotation cursor
 
 uses
-  arrows, Img32.Draw, Img32.Extra, Img32.Vector, Img32.Fmt.BMP,
-  Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Transform, Img32.Resamplers;
+  arrows, Img32.Draw, Img32.Extra, Img32.Vector,
+  Img32.Fmt.BMP, Img32.Fmt.QOI, Img32.Fmt.PNG, Img32.Fmt.JPG,
+  Img32.Transform, Img32.Resamplers;
 
 var
   hsl: THsl;
@@ -160,9 +161,9 @@ end;
 // TMyVectorLayer32 - defines drawing behaviour for TVectorLayer32 objects
 //------------------------------------------------------------------------------
 
-constructor TMyVectorLayer32.Create(Parent: TStorage; const name: string = '');
+constructor TMyVectorLayer32.Create(Parent: TLayer32; const name: string = '');
 begin
-  inherited;
+  inherited Create(Parent, name);
   InitRandomColors;
   PenWidth := DPIAware(1);
   OuterMargin := DPIAware(5);
@@ -233,7 +234,6 @@ procedure TMainForm.FormCreate(Sender: TObject);
 var
   resStream: TResourceStream;
 begin
-
   //This TImage32Panel component allows very easy zooming and scrolling.
   //(The following would also be a little simpler if TImage32Panel was
   //installed in Delphi's IDE - using Image32's designtime package.)
@@ -249,7 +249,7 @@ begin
   layeredImage.Resampler := rBiLinearResampler;  //high quality (pretty fast)
   //layeredImage.Resampler := rBiCubicResampler; //best quality (slower)
 
-  layeredImage.AddLayer(TDesignerLayer32); //for background hatching
+  layeredImage.AddLayer(TLayer32); //for background hatching
 
   fontReader := FontManager.Load('Arial Bold');
   fontCache := TFontCache.Create(fontReader, DPIAware(48));
@@ -357,12 +357,12 @@ begin
   else if (clickedLayer = targetLayer) or
     (clickedLayer is TButtonDesignerLayer32) then Exit
 
-  else if (clickedLayer is TRotatableLayer32) then
+  else if (clickedLayer is TRotLayer32) then
   begin
     //nb: TMyRasterLayer32 and TMyVectorLayer32 are both TRotatableLayer32
     //so this is clicking on a new target layer
     DeleteAllControlButtons;
-    targetLayer := TRotatableLayer32(clickedLayer);
+    targetLayer := TRotLayer32(clickedLayer);
 
     if (clickedLayer is TMyArrowLayer32) then
       arrowButtonGroup := CreateButtonGroup(layeredImage.Root,
@@ -439,7 +439,7 @@ begin
     begin
       //Update rotatingButtonGroup and get the new angle
       newAngle := UpdateRotatingButtonGroup(clickedLayer);
-      TRotatableLayer32(targetLayer).Angle := newAngle;
+      TRotLayer32(targetLayer).Angle := newAngle;
     end;
   end
 
@@ -457,7 +457,7 @@ begin
       sizingButtonGroup.Offset(dx, dy)
     else if Assigned(rotatingButtonGroup) then
     begin
-      if TRotatableLayer32(targetLayer).AutoPivot then
+      if TRotLayer32(targetLayer).AutoPivot then
         rotatingButtonGroup.Offset(dx, dy);
     end
     else if Assigned(arrowButtonGroup) then
@@ -494,7 +494,7 @@ begin
   clickedLayer := nil;
 
   //create a text layer
-  targetLayer  := layeredImage.AddLayer(TMyTextLayer32) as TRotatableLayer32;
+  targetLayer  := layeredImage.AddLayer(TMyTextLayer32) as TRotLayer32;
   with TMyTextLayer32(targetLayer) do
     Init(Words[Random(Words.Count)], layeredImage.MidPoint);
   //add sizing buttons
@@ -511,7 +511,7 @@ begin
   clickedLayer := nil;
 
   //create a raster image layer
-  targetLayer := layeredImage.AddLayer(TMyRasterLayer32) as TRotatableLayer32;
+  targetLayer := layeredImage.AddLayer(TMyRasterLayer32) as TRotLayer32;
   with TMyRasterLayer32(targetLayer) as TMyRasterLayer32 do
     Init(OpenDialog1.FileName, layeredImage.MidPoint);
 
@@ -528,7 +528,7 @@ begin
   clickedLayer := nil;
 
   //create an arrow layer
-  targetLayer  := layeredImage.AddLayer(TMyArrowLayer32, nil, 'arrow') as TRotatableLayer32;
+  targetLayer  := layeredImage.AddLayer(TMyArrowLayer32, nil, 'arrow') as TRotLayer32;
   with TMyArrowLayer32(targetLayer) do
   begin
     Init(layeredImage.MidPoint);
@@ -565,7 +565,7 @@ begin
 
     pivot := targetLayer.MidPoint;
 
-    with TRotatableLayer32(targetLayer) do
+    with TRotLayer32(targetLayer) do
       if not AutoPivot then
         targetLayer.PivotPt := pivot;
 

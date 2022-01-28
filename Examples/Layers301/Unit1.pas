@@ -97,7 +97,7 @@ type
   private
     layeredImg32  : TLayeredImage32;
     clickedLayer  : TLayer32;
-    targetLayer   : TRotatableLayer32;
+    targetLayer   : TRotLayer32;
     buttonGroup   : TGroupLayer32;
     clickPoint    : TPoint;
     //this just speeds up clip resizing
@@ -110,7 +110,7 @@ type
 
     function MakeRandomRect(const mp:TPointD): TRectD;
     function MakeRandomSquare(const mp:TPointD): TRectD;
-    procedure SetTargetLayer(layer: TRotatableLayer32);
+    procedure SetTargetLayer(layer: TRotLayer32);
   public
   end;
 
@@ -319,7 +319,7 @@ begin
   layeredImg32.Resampler := rBilinearResampler;
 
   //prepare for a hatched background design layer (see FormResize below).
-  layeredImg32.AddLayer(TDesignerLayer32);
+  layeredImg32.AddLayer(TLayer32);
 
   fr := FontManager.Load('Arial');
   arial12 := TFontCache.Create(fr, DPIAware(12));
@@ -364,7 +364,7 @@ begin
   //resize layeredImg32 to pnlMain
   layeredImg32.SetSize(w, h);
   //resize and repaint the hatched design background layer
-  with TDesignerLayer32(layeredImg32[0]) do
+  with layeredImg32[0] do
   begin
     //nb: use SetSize not Resize which would waste
     //CPU cycles stretching any previous hatching
@@ -481,6 +481,7 @@ var
   img: TImage32;
 begin
   img := layeredImg32.GetMergedImage(false, updateRect);
+
   //only update 'updateRect' otherwise repainting can be quite slow
   if not IsEmptyRect(updateRect) then
     img.CopyToDc(updateRect, updateRect, canvas.Handle);
@@ -498,7 +499,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.SetTargetLayer(layer: TRotatableLayer32);
+procedure TMainForm.SetTargetLayer(layer: TRotLayer32);
 begin
   if targetLayer = layer then Exit;
   FreeAndNil(buttonGroup);
@@ -520,8 +521,8 @@ begin
   if Assigned(clickedLayer) then
   begin
     if (clickedLayer = targetLayer) or not
-      (clickedLayer is TRotatableLayer32) then Exit;
-    SetTargetLayer(clickedLayer as TRotatableLayer32);
+      (clickedLayer is TRotLayer32) then Exit;
+    SetTargetLayer(clickedLayer as TRotLayer32);
     Invalidate;
   end else if assigned(targetLayer) then
   begin
@@ -601,8 +602,8 @@ procedure TMainForm.mnuExitClick(Sender: TObject);
 begin
   if Assigned(targetLayer) then
   begin
-    if targetLayer.Parent is TRotatableLayer32 then
-      SetTargetLayer(TRotatableLayer32(targetLayer.Parent)) else
+    if targetLayer.Parent is TRotLayer32 then
+      SetTargetLayer(TRotLayer32(targetLayer.Parent)) else
       SetTargetLayer(nil);
   end else
     Close;
@@ -617,8 +618,8 @@ begin
   layer := TLayer32(targetLayer.Parent);
   FreeAndNil(targetLayer);
   FreeAndNil(buttonGroup);
-  if Assigned(layer) and (layer is TRotatableLayer32) then
-    SetTargetLayer(TRotatableLayer32(layer));
+  if Assigned(layer) and (layer is TRotLayer32) then
+    SetTargetLayer(TRotLayer32(layer));
   Invalidate;
 end;
 //------------------------------------------------------------------------------
