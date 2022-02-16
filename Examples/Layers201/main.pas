@@ -64,7 +64,7 @@ type
     layeredImage       : TLayeredImage32;
     words              : TStringList;
     clickedLayer       : TLayer32;
-    targetLayer        : TRotLayer32;
+    targetLayer        : TLayer32;
     sizingButtonGroup  : TSizingGroupLayer32;
     rotatingButtonGroup: TRotatingGroupLayer32;
     arrowButtonGroup   : TGroupLayer32;
@@ -73,8 +73,7 @@ type
     delayedMovePending : Boolean;
     delayedShift       : TShiftState;
     delayedPos         : TPoint;
-    doFullRepaint      : Boolean;
-    procedure PrepareNormalRepaint;
+    procedure SetTargetLayer(layer: TLayer32);
     procedure DeleteAllControlButtons;
     procedure AppOnIdle(Sender: TObject; var Done: Boolean);
     procedure DelayedMouseMove(Sender: TObject;
@@ -278,7 +277,6 @@ begin
   UseAppOnIdle := true;//false;//
   if UseAppOnIdle then
     Application.OnIdle := AppOnIdle;
-  doFullRepaint := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -311,9 +309,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.PrepareNormalRepaint;
+procedure TMainForm.SetTargetLayer(layer: TLayer32);
 begin
-  doFullRepaint := false;
+  DeleteAllControlButtons;
+  clickedLayer := nil;
+  targetLayer := layer;
+  if layer is TMyArrowLayer32 then
+  begin
+    with TMyArrowLayer32(layer) do
+      arrowButtonGroup := CreateButtonGroup(layeredImage.Root,
+        Paths[0], bsRound, DefaultButtonSize, clGreen32);
+  end else
+    sizingButtonGroup := CreateSizingButtonGroup(layer, ssCorners,
+      bsRound, DefaultButtonSize, clRed32);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -372,7 +380,7 @@ begin
       sizingButtonGroup := CreateSizingButtonGroup(targetLayer,
         ssCorners, bsRound, DefaultButtonSize, clRed32);
   end;
-  PrepareNormalRepaint;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -434,7 +442,7 @@ begin
     begin
       clickedLayer.Offset(-dx, -dy);     //undo button move above
       rotatingButtonGroup.Offset(dx,dy); //move the whole rotate group
-      targetLayer.PivotPt := clickedLayer.MidPoint;
+      TRotLayer32(targetLayer).PivotPt := clickedLayer.MidPoint;
     end else
     begin
       //Update rotatingButtonGroup and get the new angle
@@ -463,7 +471,7 @@ begin
     else if Assigned(arrowButtonGroup) then
       arrowButtonGroup.Offset(dx, dy);
   end;
-  PrepareNormalRepaint;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -472,70 +480,45 @@ var
   updateRec: TRect;
   img: TImage32;
 begin
-  if doFullRepaint then
-  begin
-    //this will repaint the whole of layeredImage
-    Image32Panel1.Image.Assign(layeredImage.GetMergedImage);
-    doFullRepaint := false;
-  end else
-  begin
-    //draw layeredImage onto the form's canvas. But to optimize performance,
-    //only draw whatever's changed since the last draw (hence updateRec).
-    img := layeredImage.GetMergedImage(false, updateRec);
-    Image32Panel1.CopyToImage(img, updateRec);
-  end;
+  //draw layeredImage onto the form's canvas. But to optimize performance,
+  //only draw whatever's changed since the last draw (hence updateRec).
+  img := layeredImage.GetMergedImage(false, updateRec);
+  Image32Panel1.CopyToImage(img, updateRec);
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuAddTextClick(Sender: TObject);
+var
+  layer: TLayer32;
 begin
-  //in case the sizing, rotating buttons etc are visible
-  DeleteAllControlButtons;
-  clickedLayer := nil;
-
-  //create a text layer
-  targetLayer  := layeredImage.AddLayer(TMyTextLayer32) as TRotLayer32;
-  with TMyTextLayer32(targetLayer) do
+  layer := layeredImage.AddLayer(TMyTextLayer32);
+  with TMyTextLayer32(layer) do
     Init(Words[Random(Words.Count)], layeredImage.MidPoint);
-  //add sizing buttons
-  sizingButtonGroup := CreateSizingButtonGroup(targetLayer, ssCorners,
-    bsRound, DefaultButtonSize, clRed32);
-  PrepareNormalRepaint;
+  SetTargetLayer(layer);
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuAddImageClick(Sender: TObject);
+var
+  layer: TLayer32;
 begin
   if not OpenDialog1.Execute then Exit;
-  DeleteAllControlButtons;
-  clickedLayer := nil;
-
   //create a raster image layer
-  targetLayer := layeredImage.AddLayer(TMyRasterLayer32) as TRotLayer32;
-  with TMyRasterLayer32(targetLayer) as TMyRasterLayer32 do
+  layer := layeredImage.AddLayer(TMyRasterLayer32) as TRotLayer32;
+  with TMyRasterLayer32(layer) do
     Init(OpenDialog1.FileName, layeredImage.MidPoint);
-
-  //add sizing buttons
-  sizingButtonGroup := CreateSizingButtonGroup(targetLayer, ssCorners,
-    bsRound, DefaultButtonSize, clRed32);
-  PrepareNormalRepaint;
+  SetTargetLayer(layer);
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuAddArrowClick(Sender: TObject);
+var
+  layer: TLayer32;
 begin
-  DeleteAllControlButtons;
-  clickedLayer := nil;
-
-  //create an arrow layer
-  targetLayer  := layeredImage.AddLayer(TMyArrowLayer32, nil, 'arrow') as TRotLayer32;
-  with TMyArrowLayer32(targetLayer) do
-  begin
+  layer  := layeredImage.AddLayer(TMyArrowLayer32, nil, 'arrow');
+  with TMyArrowLayer32(layer) do
     Init(layeredImage.MidPoint);
-    arrowButtonGroup := CreateButtonGroup(layeredImage.Root,
-      Paths[0], bsRound, DefaultButtonSize, clGreen32);
-  end;
-  PrepareNormalRepaint;
+  SetTargetLayer(layer);
 end;
 //------------------------------------------------------------------------------
 
@@ -566,16 +549,17 @@ begin
     pivot := targetLayer.MidPoint;
 
     with TRotLayer32(targetLayer) do
+    begin
       if not AutoPivot then
-        targetLayer.PivotPt := pivot;
-
-    displayAngle := targetLayer.Angle;
+        PivotPt := pivot;
+      displayAngle := Angle;
+    end;
     rotatingButtonGroup := CreateRotatingButtonGroup(
       targetLayer, pivot, DPIAware(10),
       clWhite32, clLime32, displayAngle, -Angle90);
     rotatingButtonGroup.AngleButton.CursorId := crRotate;
   end;
-  PrepareNormalRepaint;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -586,7 +570,7 @@ begin
   FreeAndNil(targetLayer);
   DeleteAllControlButtons;
   clickedLayer := nil;
-  PrepareNormalRepaint;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -595,14 +579,14 @@ begin
   if assigned(targetLayer) and
     (targetLayer.Index > 1) then //ie don't send behind the hatched layer :).
       targetLayer.SendBackOne;
-  PrepareNormalRepaint;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMainForm.mnuBringForwardOneClick(Sender: TObject);
 begin
   if assigned(targetLayer) then targetLayer.BringForwardOne;
-  PrepareNormalRepaint;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -613,7 +597,7 @@ begin
     TMyRasterLayer32(targetLayer).Clone
   else if targetLayer is TMyVectorLayer32 then
     TMyVectorLayer32(targetLayer).Clone;
-  PrepareNormalRepaint;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 

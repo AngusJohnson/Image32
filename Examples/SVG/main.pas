@@ -53,7 +53,8 @@ implementation
 {$R *.dfm}
 
 uses
-  Img32, Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.SVG, Img32.Text;
+  Img32, Img32.Vector, Img32.Draw,
+  Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.SVG, Img32.Text;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------

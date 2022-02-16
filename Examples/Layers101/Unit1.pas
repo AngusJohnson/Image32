@@ -207,7 +207,6 @@ begin
   finally
     resStream.Free;
   end;
-
   popupPoint := Point(layeredImg32.MidPoint);
 end;
 //------------------------------------------------------------------------------
@@ -256,8 +255,8 @@ begin
   newLayer := TMyVectorLayer32(layeredImg32.AddLayer(TMyVectorLayer32));
   with newLayer as TMyVectorLayer32 do
   begin
+    OuterMargin := dpiAware(5); //do this before setting paths :)
     Paths := Img32.Vector.Paths(Ellipse(rec));
-    OuterMargin := dpiAware(5);
   end;
   SetTargetLayer(newLayer);
 end;
@@ -278,8 +277,8 @@ begin
   newLayer := layeredImg32.AddLayer(TMyVectorLayer32);
   with newLayer as TMyVectorLayer32 do
   begin
+    OuterMargin := dpiAware(5); //do this before setting paths :)
     Paths := Img32.Vector.Paths(Rectangle(rec));
-    OuterMargin := dpiAware(5);
   end;
   SetTargetLayer(newLayer);
 end;
@@ -304,8 +303,8 @@ begin
   newLayer := layeredImg32.AddLayer(TMyVectorLayer32);
   with newLayer as TMyVectorLayer32 do
   begin
+    OuterMargin := dpiAware(5); //do this before setting paths :)
     Paths := tmp;
-    OuterMargin := dpiAware(5);
   end;
   SetTargetLayer(newLayer);
 end;

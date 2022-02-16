@@ -753,6 +753,7 @@ begin
     Ceil(fHeight + fOuterMargin *2));
   Image.UnBlockNotify;
   PositionAt(newBounds.Left, newBounds.Top);
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 

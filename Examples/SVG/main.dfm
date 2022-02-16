@@ -2,7 +2,7 @@ object Form1: TForm1
   Left = 298
   Top = 205
   Caption = 'Svg101'
-  ClientHeight = 470
+  ClientHeight = 469
   ClientWidth = 756
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -20,21 +20,22 @@ object Form1: TForm1
   object Splitter1: TSplitter
     Left = 180
     Top = 0
-    Height = 451
-    ExplicitHeight = 452
+    Width = 5
+    Height = 450
+    ExplicitHeight = 451
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 451
+    Top = 450
     Width = 756
     Height = 19
     Panels = <>
   end
   object ImagePanel: TImage32Panel
-    Left = 183
+    Left = 185
     Top = 0
-    Width = 573
-    Height = 451
+    Width = 571
+    Height = 450
     Align = alClient
     BevelInner = bvLowered
     BorderWidth = 12
@@ -61,7 +62,7 @@ object Form1: TForm1
     Left = 0
     Top = 0
     Width = 180
-    Height = 451
+    Height = 450
     Align = alLeft
     Color = 16316664
     ItemHeight = 14
