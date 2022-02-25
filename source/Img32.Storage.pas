@@ -171,7 +171,7 @@ const
   tab     = #9;
   spacesPerLevel = 2;
 
-{$IF COMPILERVERSION < 18}
+{.$IF COMPILERVERSION < 18}
 function UIntToStr(value: Cardinal): string;
 begin
   Result := Format('%d', [value]);
@@ -196,7 +196,7 @@ begin
   Val(S, Value, E);
   Result := E = 0;
 end;
-{$IFEND}
+{.$IFEND}
 
 //------------------------------------------------------------------------------
 // Read from XML string functions

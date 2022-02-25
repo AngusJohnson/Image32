@@ -27,13 +27,13 @@ type
   //etJoined : offsets both sides of a path, with joined ends
   //etPolygon: offsets only one side of a closed path
 
-  function InflatetPaths(const paths: TPaths;
-    delta: Double; jt: TJoinType; et: TEndType;
+  function InflatePaths(const paths: TPaths;
+    delta: Double; jt: TJoinType = jtRound; et: TEndType = etPolygon;
     miterLimit: double = 2.0;
     arcTolerance: double = 0.0): TPaths; overload;
 
   function InflatePaths(const paths: TPathsD;
-    delta: Double; jt: TJoinType; et: TEndType;
+    delta: Double; jt: TJoinType = jtRound; et: TEndType = etPolygon;
     miterLimit: double = 2.0; arcTolerance: double = 0.0;
     minEdgeLength: double = 0.0): TPathsD; overload;
 
@@ -45,8 +45,6 @@ uses
 const
   Tolerance           : Double = 1.0E-15;
   Two_Pi              : Double = 2 * PI;
-  Half_Pi             : Double = 0.5 * PI;
-  Quarter_Pi          : Double = 0.25 * PI;
 
 //------------------------------------------------------------------------------
 //  Miscellaneous offset support functions
@@ -87,19 +85,13 @@ var
   p: TPathD;
 begin
 	Result := -1;
+  lp := PointD(0, -MaxDouble);
 	for i := 0 to High(paths) do
-		if Length(paths[i]) > 0 then
-    begin
-			Result := i;
-			lp := paths[i][0];
-			break;
-		end;
-	if (Result < 0) then Exit;
-	for i := Result to High(paths) do
 	begin
 		p := paths[i];
 		for j := 0 to High(p) do
-			if (p[j].Y > lp.Y) or ((p[j].Y = lp.Y) and (p[j].X < lp.X)) then
+			if (p[j].Y < lp.Y) then continue
+      else if ((p[j].Y > lp.Y) or (p[j].X < lp.X)) then
       begin
 				Result := i;
 				lp := p[j];
@@ -168,8 +160,7 @@ type
     procedure OffsetPoint(j: Integer; var k: integer);
 
     procedure BuildNormals;
-    procedure DoOffset(const paths: TPathsD;
-      delta: double; joinType: TJoinType; endType: TEndType);
+    procedure DoGroupOffset(pathGroup: TPathGroup; delta: double);
     procedure OffsetPolygon;
     procedure OffsetOpenJoined;
     procedure OffsetOpenPath(endType: TEndType);
@@ -250,25 +241,22 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TClipperOffset.DoOffset(const paths: TPathsD;
-  delta: double; joinType: TJoinType; endType: TEndType);
+procedure TClipperOffset.DoGroupOffset(pathGroup: TPathGroup; delta: double);
 var
   i, lowestIdx: Integer;
   absDelta, arcTol, steps: Double;
   IsClosedPaths, isClockwise: Boolean;
 begin
-  fJoinType := joinType;
+  if pathgroup.endType <> etPolygon then delta := Abs(delta) / 2;
 
-  if endType <> etPolygon then delta := Abs(delta) / 2;
-
-  IsClosedPaths := (endType in [etPolygon, etJoined]);
+  IsClosedPaths := (pathgroup.endType in [etPolygon, etJoined]);
   if IsClosedPaths then
   begin
-    //th  e lowermost polygon must be an outer polygon. So we can use that as the
+    //the lowermost polygon must be an outer polygon. So we can use that as the
     //designated orientation for outer polygons (needed for tidy-up clipping)
-    lowestIdx := GetLowestPolygonIdx(paths);
+    lowestIdx := GetLowestPolygonIdx(pathgroup.paths);
     if lowestIdx < 0 then Exit;
-    isClockwise := Area(paths[lowestIdx]) > 0;
+    isClockwise := Area(pathgroup.paths[lowestIdx]) > 0;
     if not isClockwise then delta := -delta;
   end else
     isClockwise := true;
@@ -281,7 +269,7 @@ begin
     arcTol := Log10(2 + absDelta) * 0.25; //empirically derived
 
   //calculate a sensible number of steps (for 360 deg for the given offset
-  if (joinType = jtRound) or (endType = etRound) then
+  if (pathgroup.joinType = jtRound) or (pathgroup.endType = etRound) then
   begin
     //get steps per 180 degrees (see offset_triginometry2.svg)
     steps := PI / ArcCos(1 - arcTol / absDelta);
@@ -290,10 +278,10 @@ begin
   end;
 
   fOutPaths := nil;
-  for i := 0 to High(paths) do
+  for i := 0 to High(pathgroup.paths) do
   begin
-    fInPath := StripNearDuplicates(paths[i], FMinEdgeLen, IsClosedPaths);
-    if fInPath = nil then Exit;
+    fInPath := StripNearDuplicates(pathgroup.paths[i], FMinEdgeLen, IsClosedPaths);
+    if fInPath = nil then Continue;
 
     fNorms := nil;
     fOutPath := nil;
@@ -302,7 +290,7 @@ begin
 		//if a single vertex then build a circle or a square ...
     if Length(fInPath) = 1 then
     begin
-      if (endType = etRound) then
+      if (pathgroup.endType = etRound) then
       begin
         SetLength(fNorms, 2);
         fNorms[0] := PointD(1,0);
@@ -325,15 +313,15 @@ begin
     end else
     begin
       BuildNormals;
-      if endType = etPolygon then
+      if pathgroup.endType = etPolygon then
       begin
         OffsetPolygon;
       end
-      else if endType = etJoined then
+      else if pathgroup.endType = etJoined then
       begin
         OffsetOpenJoined;
       end else
-        OffsetOpenPath(endType);
+        OffsetOpenPath(pathgroup.endType);
     end;
 
     if fOutPathLen = 0 then Continue;
@@ -348,7 +336,7 @@ begin
     //clean up self-intersections ...
     with TClipperD.Create do
     try
-      AddPaths(fOutPaths, ptSubject);
+      AddSubject(fOutPaths);
       Execute(ctUnion, frPositive, fOutPaths);
     finally
       free;
@@ -464,7 +452,7 @@ begin
 
   if abs(delta) < Tolerance then
   begin
-    //if delta == 0, just copy paths to Result
+    //if delta ~= 0, just copy paths to Result
     for i := 0 to fInGroups.Count -1 do
       with TPathGroup(fInGroups[i]) do
           AppendPaths(fSolution, paths);
@@ -485,7 +473,8 @@ begin
   for i := 0 to fInGroups.Count -1 do
   begin
     group := TPathGroup(fInGroups[i]);
-    DoOffset(group.paths, delta, group.jointype, group.endtype);
+    fJoinType := group.joinType;
+    DoGroupOffset(group, delta);
   end;
 
   if fMergeGroups then
@@ -493,7 +482,7 @@ begin
     //clean up self-intersections ...
     with TClipperD.Create do
     try
-      AddPaths(fSolution, ptSubject);
+      AddSubject(fSolution);
       Execute(ctUnion, frPositive, fSolution);
     finally
       free;
@@ -593,7 +582,6 @@ begin
     end;
   end;
 
-  pt := fInPath[j];
   pt2.X := fNorms[j].X * fDelta;
   pt2.Y := fNorms[j].Y * fDelta;
   AddPoint(pt.X + pt2.X, pt.Y + pt2.Y);
@@ -653,19 +641,19 @@ end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-function InflatetPaths(const paths: TPaths;
+function InflatePaths(const paths: TPaths;
   delta: Double; jt: TJoinType; et: TEndType;
   miterLimit: double; arcTolerance: double): TPaths;
 var
   pp: TPathsD;
 const
-  scale = 100; invScale = 1/scale;
+  scale = 100; invScale = 0.01;
 begin
   pp := ScalePathsD(paths, scale, scale);
   with TClipperOffset.Create(miterLimit, arcTolerance) do
   try
     AddPaths(pp, jt, et);
-    pp := Execute(delta);
+    pp := Execute(delta * scale);
   finally
     free;
   end;

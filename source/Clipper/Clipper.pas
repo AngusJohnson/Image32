@@ -35,6 +35,11 @@ type
 
   TFillRule = Clipper.Core.TFillRule;
 
+function BooleanOp(clipType: TClipType; fillRule: TFillRule;
+  const subjects, clips: TPaths): TPaths; overload;
+function BooleanOp(clipType: TClipType; fillRule: TFillRule;
+  const subjects, clips: TPathsD; decimalPrec: integer = 2): TPathsD; overload;
+
 function Intersect(const subjects, clips: TPaths;
   fillRule: TFillRule): TPaths; overload;
 function Union(const subjects, clips: TPaths;
@@ -62,11 +67,11 @@ procedure AddPolyNodeToPaths(Poly: TPolyPath; var Paths: TPaths);
 var
   i: Integer;
 begin
-  if (Length(Poly.Path) > 0) then
+  if (Length(Poly.Polygon) > 0) then
   begin
     i := Length(Paths);
     SetLength(Paths, i +1);
-    Paths[i] := Poly.Path;
+    Paths[i] := Poly.Polygon;
   end;
   for i := 0 to Poly.ChildCount - 1 do
     AddPolyNodeToPaths(TPolyPath(Poly.Child[i]), Paths);
@@ -84,11 +89,11 @@ procedure AddPolyNodeToPathsD(Poly: TPolyPathD; var Paths: TPathsD);
 var
   i: Integer;
 begin
-  if (Length(Poly.Path) > 0) then
+  if (Length(Poly.Polygon) > 0) then
   begin
     i := Length(Paths);
     SetLength(Paths, i +1);
-    Paths[i] := Poly.Path;
+    Paths[i] := Poly.Polygon;
   end;
   for i := 0 to Poly.ChildCount - 1 do
     AddPolyNodeToPathsD(TPolyPathD(Poly.Child[i]), Paths);
@@ -103,119 +108,86 @@ end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-function Intersect(const subjects, clips: TPaths; fillRule: TFillRule): TPaths;
+function BooleanOp(clipType: TClipType; fillRule: TFillRule;
+  const subjects, clips: TPaths): TPaths;
 begin
   with TClipper.Create do
   try
-    AddPaths(subjects, ptSubject);
-    AddPaths(clips, ptClip);
-    Execute(ctIntersection, fillRule, Result);
+    AddSubject(subjects);
+    AddClip(clips);
+    Execute(clipType, fillRule, Result);
   finally
     Free;
   end;
 end;
 //------------------------------------------------------------------------------
 
-function Union(const subjects, clips: TPaths; fillRule: TFillRule): TPaths;
-begin
-  with TClipper.Create do
-  try
-    AddPaths(subjects, ptSubject);
-    AddPaths(clips, ptSubject);
-    Execute(ctUnion, fillRule, Result);
-  finally
-    Free;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function Difference(const subjects, clips: TPaths; fillRule: TFillRule): TPaths;
-begin
-  with TClipper.Create do
-  try
-    AddPaths(subjects, ptSubject);
-    AddPaths(clips, ptClip);
-    Execute(ctDifference, fillRule, Result);
-  finally
-    Free;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function XOR_(const subjects, clips: TPaths; fillRule: TFillRule): TPaths;
-begin
-  with TClipper.Create do
-  try
-    AddPaths(subjects, ptSubject);
-    AddPaths(clips, ptClip);
-    Execute(ctXor, fillRule, Result);
-  finally
-    Free;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function Intersect(const subjects, clips: TPathsD; fillRule: TFillRule; decimalPrec: integer = 2): TPathsD;
-var
-  scale: Double;
-begin
-  scale := Power(10,decimalPrec);
-  with TClipperD.Create(scale) do
-  try
-    AddPaths(subjects, ptSubject);
-    AddPaths(clips, ptClip);
-    Execute(ctIntersection, fillRule, Result);
-  finally
-    Free;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function Union(const subjects, clips: TPathsD; fillRule: TFillRule; decimalPrec: integer = 2): TPathsD;
-var
-  scale: Double;
-begin
-  scale := Power(10,decimalPrec);
-  with TClipperD.Create(scale) do
-  try
-    AddPaths(subjects, ptSubject);
-    AddPaths(clips, ptSubject);
-    Execute(ctUnion, fillRule, Result);
-  finally
-    Free;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function Difference(const subjects, clips: TPathsD; fillRule: TFillRule; decimalPrec: integer = 2): TPathsD;
+function BooleanOp(clipType: TClipType; fillRule: TFillRule;
+  const subjects, clips: TPathsD; decimalPrec: integer = 2): TPathsD;
 var
   scale: Double;
 begin
   scale := Power(10, decimalPrec);
   with TClipperD.Create(scale) do
   try
-    AddPaths(subjects, ptSubject);
-    AddPaths(clips, ptClip);
-    Execute(ctDifference, fillRule, Result);
+    AddSubject(subjects);
+    AddClip(clips);
+    Execute(clipType, fillRule, Result);
   finally
     Free;
   end;
 end;
 //------------------------------------------------------------------------------
 
-function XOR_(const subjects, clips: TPathsD; fillRule: TFillRule; decimalPrec: integer = 2): TPathsD;
-var
-  scale: Double;
+function Intersect(const subjects, clips: TPaths; fillRule: TFillRule): TPaths;
 begin
-  scale := Power(10,decimalPrec);
-  with TClipperD.Create(scale) do
-  try
-    AddPaths(subjects, ptSubject);
-    AddPaths(clips, ptClip);
-    Execute(ctXor, fillRule, Result);
-  finally
-    Free;
-  end;
+  Result := BooleanOp(ctIntersection, fillRule, subjects, clips);
+end;
+//------------------------------------------------------------------------------
+
+function Union(const subjects, clips: TPaths; fillRule: TFillRule): TPaths;
+begin
+  Result := BooleanOp(ctUnion, fillRule, subjects, clips);
+end;
+//------------------------------------------------------------------------------
+
+function Difference(const subjects, clips: TPaths; fillRule: TFillRule): TPaths;
+begin
+  Result := BooleanOp(ctDifference, fillRule, subjects, clips);
+end;
+//------------------------------------------------------------------------------
+
+function XOR_(const subjects, clips: TPaths; fillRule: TFillRule): TPaths;
+begin
+  Result := BooleanOp(ctXor, fillRule, subjects, clips);
+end;
+//------------------------------------------------------------------------------
+
+function Intersect(const subjects, clips: TPathsD;
+  fillRule: TFillRule; decimalPrec: integer = 2): TPathsD;
+begin
+  Result := BooleanOp(ctIntersection, fillRule, subjects, clips, decimalPrec);
+end;
+//------------------------------------------------------------------------------
+
+function Union(const subjects, clips: TPathsD;
+  fillRule: TFillRule; decimalPrec: integer = 2): TPathsD;
+begin
+  Result := BooleanOp(ctUnion, fillRule, subjects, clips, decimalPrec);
+end;
+//------------------------------------------------------------------------------
+
+function Difference(const subjects, clips: TPathsD;
+  fillRule: TFillRule; decimalPrec: integer = 2): TPathsD;
+begin
+  Result := BooleanOp(ctDifference, fillRule, subjects, clips, decimalPrec);
+end;
+//------------------------------------------------------------------------------
+
+function XOR_(const subjects, clips: TPathsD;
+  fillRule: TFillRule; decimalPrec: integer = 2): TPathsD;
+begin
+  Result := BooleanOp(ctXor, fillRule, subjects, clips, decimalPrec);
 end;
 
 //------------------------------------------------------------------------------

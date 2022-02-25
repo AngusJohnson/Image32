@@ -955,7 +955,7 @@ begin
   radius := radius *2;
   with rec do
     rec2 := RectD(Left, Top, Left + radius, Top + radius);
-  Result := MakePathD([rec.Left, rec.Bottom]);
+  Result := MakePath([rec.Left, rec.Bottom]);
   AppendPath(Result, arc(rec2, angle180, angle270));
   OffsetRect(rec2, rec.Width - radius, 0);
   p2 := arc(rec2, angle270, angle0);
@@ -1113,7 +1113,7 @@ begin
 
         if preferTick then
         begin
-          p := MakePathD([42,60, 88,12, 48,91, 10,64, 21,42]);
+          p := MakePath([42,60, 88,12, 48,91, 10,64, 21,42]);
           p := ScalePath(p, RectWidth(rec)/100);
           p := OffsetPath(p, rec.Left, rec.Top);
           DrawPolygon(Image, p, frEvenOdd, clDefDark32);
@@ -3185,7 +3185,7 @@ begin
     if ValueAlmostZero(selEndPt.Y - selStartPt.Y, 0.1)  then
     begin
       //single line selection
-      p := MakePathD([selStartPt.X, selStartPt.Y,
+      p := MakePath([selStartPt.X, selStartPt.Y,
         selEndPt.X, selEndPt.Y,
         selEndPt.X, selEndPt.Y + fLineHeight,
         selStartPt.X, selStartPt.Y + fLineHeight]);
@@ -3193,18 +3193,18 @@ begin
     end else
     begin
       //multi-line selection - we'll assume (pro tempore) that pt2 is below pt
-      p := MakePathD([selStartPt.X, selStartPt.Y, textRecD.Right, selStartPt.Y,
+      p := MakePath([selStartPt.X, selStartPt.Y, textRecD.Right, selStartPt.Y,
         textRecD.Right, selStartP2.Y, selStartPt.X, selStartP2.Y]);
       DrawPolygon(Image, p, frNonZero, $20000000);
       while (selStartP2.Y + 1 < selEndPt.Y) do
       begin
         selStartPt := PointD(textRecD.Left, selStartP2.Y);
         selStartP2 := PointD(textRecD.Left, selStartP2.Y + fLineHeight);
-        p := MakePathD([selStartPt.X, selStartPt.Y, textRecD.Right, selStartPt.Y,
+        p := MakePath([selStartPt.X, selStartPt.Y, textRecD.Right, selStartPt.Y,
           textRecD.Right, selStartP2.Y, selStartPt.X, selStartP2.Y]);
         DrawPolygon(Image, p, frNonZero, $20000000);
       end;
-      p := MakePathD([selEndPt.X, selEndPt.Y,
+      p := MakePath([selEndPt.X, selEndPt.Y,
         selEndPt.X, selEndPt.Y + fLineHeight,
         textRecD.Left, selEndPt.Y + fLineHeight,
         textRecD.Left, selEndPt.Y]);
@@ -5607,7 +5607,7 @@ begin
     d := rec2.Width * 0.3;
     InflateRect(rec2, -d, -d);
     with rec2 do
-      p := MakePathD([left-2, bottom, MidPoint.X, top+2, right+2, bottom]);
+      p := MakePath([left-2, bottom, MidPoint.X, top+2, right+2, bottom]);
     p2 := OffsetPath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);
@@ -5617,7 +5617,7 @@ begin
     rec2.Top := rec2.Bottom - rec2.Width;
     InflateRect(rec2, -d, -d);
     with rec2 do
-      p := MakePathD([left-2, top, MidPoint.X, bottom-2, right+2, top]);
+      p := MakePath([left-2, top, MidPoint.X, bottom-2, right+2, top]);
     p2 := OffsetPath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);
@@ -5655,7 +5655,7 @@ begin
     d := rec2.Height * 0.3;
     InflateRect(rec2, -d, -d);
     with rec2 do
-      p := MakePathD([right, top, left +2, MidPoint.Y+1, right, bottom+2]);
+      p := MakePath([right, top, left +2, MidPoint.Y+1, right, bottom+2]);
     p2 := OffsetPath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);
@@ -5665,7 +5665,7 @@ begin
     rec2.Left := rec2.Right - rec2.Height;
     InflateRect(rec2, -d, -d);
     with rec2 do
-      p := MakePathD([left, top, right -2, MidPoint.Y+1, left, bottom+2]);
+      p := MakePath([left, top, right -2, MidPoint.Y+1, left, bottom+2]);
     p2 := OffsetPath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);

@@ -59,7 +59,7 @@ begin
   layeredImage.BackgroundColor := Color32(clBtnFace);
 
   //path: for drawing a black line at the bottom of the image
-  path := MakePathI([0, ballsize*3-8, ballsize, ballsize*3 -8]);
+  path := MakePath([0, ballsize*3-8, ballsize, ballsize*3 -8]);
   with layeredImage.AddLayer(TLayer32) do
   begin
     SetInnerBounds(RectD(drawRec));

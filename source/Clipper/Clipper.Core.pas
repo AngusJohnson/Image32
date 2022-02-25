@@ -1,9 +1,9 @@
-unit Clipper.Core;
+﻿unit Clipper.Core;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  10.0 (release candidate 1)                                      *
-* Date      :  14 February 2022                                                *
+* Date      :  19 February 2022                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  Core Clipper Library module                                     *
@@ -23,9 +23,10 @@ const
   oneDegreeAsRadian = 0.01745329252;
 
 type
-  PPoint64 = ^TPoint64;
-  TPoint64 = record X, Y: Int64; end;
-  TPointD = record X, Y: double; end;
+  PPoint64  = ^TPoint64;
+  TPoint64  = record X, Y: Int64; end;
+  PPointD   = ^TPointD;
+  TPointD   = record X, Y: double; end;
 
   //TPath: a simple data structure to represent a series of vertices, whether
   //open (poly-line) or closed (polygon). A path may be simple or complex (self
@@ -73,7 +74,11 @@ type
   end;
 
   TClipType = (ctNone, ctIntersection, ctUnion, ctDifference, ctXor);
-  //Note: all clipping operations except for Difference are commutative.
+  //TPathType:
+  //  1. only subject paths may be open
+  //  2. for closed paths, all boolean clipping operations except for
+  //     Difference are commutative. (In other words, subjects and clips
+  //     could be swapped and the same solution will be returned.)
   TPathType = (ptSubject, ptClip);
   //By far the most widely used filling rules for polygons are EvenOdd
   //and NonZero, sometimes called Alternate and Winding respectively.
@@ -102,9 +107,9 @@ function DistanceFromLineSqrd(const pt, linePt1, linePt2: TPoint64): double; ove
 function DistanceFromLineSqrd(const pt, linePt1, linePt2: TPointD): double; overload;
 
 function SegmentsIntersect(const seg1a, seg1b, seg2a, seg2b: TPoint64): boolean;
-//SelfIntersects: returns the index of first of 4 consecutive points
+//SelfIntersectIdx: returns the index of first of 4 consecutive points
 //defining intersecting edges, otherwise returns -1;
-function SelfIntersects(const path: TPath): integer;
+function SelfIntersectIdx(const path: TPath): integer;
 function SplitSelfIntersect(var path: TPath; out extras: TPaths): Boolean;
 function CleanPath(const path: TPath): TPath;
 
@@ -134,7 +139,8 @@ function GetBounds(const paths: TPathsD): TRectD; overload;
 procedure InflateRect(var rec: TRect64; dx, dy: Int64); overload;
 procedure InflateRect(var rec: TRectD; dx, dy: double); overload;
 function UnionRect(const rec, rec2: TRect64): TRect64; overload;
-function UnionRect(const rec, rec2: TRectD): TRectD; overload;
+function UnionRect(const rec1, rec2: TRectD;
+  ValidateAsOpenPath: Boolean = false): TRectD; overload;
 function RotateRect(const rec: TRect64; angleRad: double): TRect64; overload;
 function RotateRect(const rec: TRectD; angleRad: double): TRectD; overload;
 procedure OffsetRect(var rec: TRect64; dx, dy: Int64); overload;
@@ -795,7 +801,7 @@ end;
 function GetBounds(const paths: TPathsD): TRectD;
 var
   i,j: Integer;
-  p: PPoint64;
+  p: PPointD;
 begin
   Result := RectD(MaxDouble, MaxDouble, -MaxDouble, -MaxDouble);
   for i := 0 to High(paths) do
@@ -811,10 +817,6 @@ begin
         inc(p);
       end;
     end;
-  result.Left := Floor(Result.Left);
-  result.Top := Floor(Result.Top);
-  result.Right := Ceil(Result.Right);
-  result.Bottom := Ceil(Result.Bottom);
   if Result.Left >= Result.Right then Result := nullRectD;
 end;
 //------------------------------------------------------------------------------
@@ -922,16 +924,29 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function UnionRect(const rec, rec2: TRectD): TRectD;
+function IsValidRec(const rec: TRectD; isOpen: Boolean): Boolean;
 begin
-  if rec.IsEmpty then result := rec2
-  else if rec2.IsEmpty then result := rec
+  if (rec.Height > 0) and (rec.Width > 0) then
+    Result := true
+  else
+    Result := isOpen and (rec.Height >= 0) and (rec.Width > 0) and
+      ((rec.Height > 0) or (rec.Width > 0)); //a neg. height or width is invalid
+end;
+//------------------------------------------------------------------------------
+
+function UnionRect(const rec1, rec2: TRectD;
+  ValidateAsOpenPath: Boolean = false): TRectD;
+var
+  rec1IsEmpty, rec2IsEmpty: boolean;
+begin
+  if not IsValidRec(rec1, ValidateAsOpenPath) then result := rec2
+  else if not IsValidRec(rec2, ValidateAsOpenPath) then result := rec1
   else
   begin
-    result.Left := min(rec.Left, rec2.Left);
-    result.Right := max(rec.Right, rec2.Right);
-    result.Top := min(rec.Top, rec2.Top);
-    result.Bottom := max(rec.Bottom, rec2.Bottom);
+    result.Left := min(rec1.Left, rec2.Left);
+    result.Right := max(rec1.Right, rec2.Right);
+    result.Top := min(rec1.Top, rec2.Top);
+    result.Bottom := max(rec1.Bottom, rec2.Bottom);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1122,8 +1137,8 @@ begin
   len := Length(path);
   while (len > 2) and
    (CrossProduct(path[len-2], path[len-1], path[0]) = 0) do dec(len);
-  if (len < 2) then Exit;
   SetLength(Result, len);
+  if (len < 2) then Exit;
   prev := path[len -1];
   j := 0;
   for i := 0 to len -2 do
@@ -1191,7 +1206,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SelfIntersects(const path: TPath): integer;
+function SelfIntersectIdx(const path: TPath): integer;
 var
   i, len: integer;
 begin
@@ -1243,7 +1258,7 @@ var
 begin
   Result := false;
   extras := nil;
-  j := SelfIntersects(path);
+  j := SelfIntersectIdx(path);
   while (j >= 0) and InternalSplitSelfIntersect(path, j, p, extra) do
   begin
     Result := true;
@@ -1260,7 +1275,7 @@ begin
     if ((a1 <> 0) and (a2 <> 0)) and
       ((a1 > 0) = (a2 > 0)) then
         AppendPath(extras, extra);
-    j := SelfIntersects(path);
+    j := SelfIntersectIdx(path);
   end;
 end;
 //------------------------------------------------------------------------------

@@ -202,6 +202,6 @@ end;
 initialization
   SetLength(defaultArrowBtns, 1);
   defaultArrowBtns[0] :=
-    MakePathI([0,100, 100,0, 100,50, 200,50, 200,150, 100,150, 100,200]);
+    MakePath([0,100, 100,0, 100,50, 200,50, 200,150, 100,150, 100,200]);
 
 end.

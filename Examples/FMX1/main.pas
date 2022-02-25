@@ -7,7 +7,7 @@ uses
   System.Rtti, Math, FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics,
   FMX.Dialogs, FMX.Layouts, FMX.ExtCtrls, FMX.Platform, FMX.Surfaces,
   FMX.StdCtrls, FMX.Controls.Presentation, Img32, Img32.FMX, Img32.Layers,
-  FMX.ListBox, System.ImageList, FMX.ImgList;
+  FMX.ListBox, System.ImageList, FMX.ImgList, Img32.Fmt.SVG;
 
 
 type
@@ -83,7 +83,7 @@ begin
   //create a fontReader to access truetype font files (*.ttf) that
   //have been stored as font resources and create a glyph cache too
   fontReader := TFontReader.Create;
-  fontCache := TFontCache.Create(fontReader, DPIAware(12));
+  fontCache := TFontCache.Create(fontReader, DPIAware(11));
   try
     //connect fontReader to a simple ttf font resource
     //and get 'copyright' glyph outline ...
@@ -95,7 +95,8 @@ begin
     //connect fontReader to a decorative ttf font resource
     //and get 'bigText' glyph outlines ...
     fontReader.LoadFromResource('FONT_2', RT_RCDATA);
-    fontCache.FontHeight := DPIAware(25);
+    //nb: fontCache automatically updates when fontReader changes
+    fontCache.FontHeight := DPIAware(50);
     if fontReader.IsValidFontFormat then
       bigTextGlyphs := fontCache.GetTextOutline(0, 0, rsBigText);
 
@@ -152,7 +153,7 @@ begin
   textRec := Img32.Vector.GetBounds(mainGlyphs);
   mainGlyphs := Img32.Vector.OffsetPath(mainGlyphs, -textRec.left, -textRec.top);
 
-  //scale and position copyright text
+  //reposition copyright text
   tmpRec := Img32.Vector.GetBounds(copyrightGlyphs);
   copyrightGlyphs := Img32.Vector.OffsetPath(copyrightGlyphs,
     rec.Right -tmpRec.Right -margin,
@@ -194,7 +195,6 @@ begin
       mainGlyphs := ScalePath(mainGlyphs, 0.9, 0.9);
       textRec := Img32.Vector.GetBounds(mainGlyphs);
     end;
-
   btnRefresh.Enabled := false;
   zoomIdx := 0;
   Timer1.Enabled := true;
@@ -210,7 +210,6 @@ var
   rec: TRectF;
 begin
   img := layeredImg32.GetMergedImage(false);
-
   //unfortunately we need an intermediate TBitmap object
   //to draw raster images onto an FMX canvas.
   bmp := TBitmap.Create;
