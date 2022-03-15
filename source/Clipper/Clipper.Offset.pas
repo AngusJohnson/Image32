@@ -2,8 +2,8 @@ unit Clipper.Offset;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  10.0 (release candidate 1)                                      *
-* Date      :  14 February 2022                                                *
+* Version   :  10.0 (beta) - aka Clipper2                                      *
+* Date      :  13 March 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  Offset paths and clipping solutions                             *
@@ -15,7 +15,7 @@ unit Clipper.Offset;
 interface
 
 uses
-  Clipper.Core;
+  SysUtils, Classes, Clipper.Core;
 
 type
 
@@ -27,20 +27,75 @@ type
   //etJoined : offsets both sides of a path, with joined ends
   //etPolygon: offsets only one side of a closed path
 
-  function InflatePaths(const paths: TPaths;
-    delta: Double; jt: TJoinType = jtRound; et: TEndType = etPolygon;
-    miterLimit: double = 2.0;
-    arcTolerance: double = 0.0): TPaths; overload;
+  TPathGroup = class
+	  paths     : TPathsD;
+    reversed  : Boolean;
+	  joinType  : TJoinType;
+	  endType   : TEndType;
+    constructor Create(jt: TJoinType; et: TEndType);
+  end;
 
-  function InflatePaths(const paths: TPathsD;
-    delta: Double; jt: TJoinType = jtRound; et: TEndType = etPolygon;
-    miterLimit: double = 2.0; arcTolerance: double = 0.0;
-    minEdgeLength: double = 0.0): TPathsD; overload;
+  TClipperOffset = class
+  private
+    fDelta       : Double;
+    fJoinType    : TJoinType;
+    fTmpLimit    : Double;
+    fMiterLimit  : Double;
+    fArcTolerance: Double;
+    FMinEdgeLen  : Double;
+    FMinLenSqrd  : Double;
+    fStepsPerRad : Double;
+    fNorms       : TPathD;
+    fInGroups    : TList;
+    fMergeGroups : Boolean;
+    fInPath      : TPathD;
+    fOutPath     : TPathD;
+    fOutPaths    : TPathsD;
+    fOutPathLen  : Integer;
+    fSolution    : TPathsD;
+
+    procedure AddPoint(x,y: double); overload;
+    procedure AddPoint(const pt: TPointD); overload;
+    procedure DoSquare(j, k: Integer);
+    procedure DoMiter(j, k: Integer; cosAplus1: Double);
+    procedure DoRound(j, k: integer; angle: double);
+    procedure OffsetPoint(j: Integer; var k: integer);
+
+    procedure BuildNormals;
+    procedure DoGroupOffset(pathGroup: TPathGroup; delta: double);
+    procedure OffsetPolygon;
+    procedure OffsetOpenJoined;
+    procedure OffsetOpenPath(endType: TEndType);
+  public
+    constructor Create(MiterLimit: double = 2.0; ArcTolerance: double = 0.0);
+    destructor Destroy; override;
+    procedure AddPath(const path: TPathD;
+      joinType: TJoinType; endType: TEndType);
+    procedure AddPaths(const paths: TPathsD;
+      joinType: TJoinType; endType: TEndType);
+    procedure Clear;
+    function Execute(delta: Double): TPathsD;
+
+    //MiterLimit: needed for mitered offsets (see offset_triginometry3.svg)
+    property MiterLimit: Double read fMiterLimit write fMiterLimit;
+    //ArcTolerance: needed for rounded offsets (See offset_triginometry2.svg)
+    property ArcTolerance: Double read fArcTolerance write fArcTolerance;
+    //MinEdgeLength: Very small edges are often at unexpected angles and these
+    //can become visible artefacts with offsetting. Consequently it's
+    //best to remove tiny edges before processing. (Default min length = 0.5)
+    property MinEdgeLength: Double read FMinEdgeLen write FMinEdgeLen;
+    //MergeGroups: A path group is one or more paths added via the AddPath or
+    //AddPaths methods. By default these path groups will be offset
+    //independently of other groups and this may cause overlaps (intersections).
+    //However, when MergeGroups is enabled, any overlapping offsets will be
+    //merged (via a clipping union operation) to remove overlaps.
+    property MergeGroups: Boolean read fMergeGroups write fMergeGroups;
+  end;
 
 implementation
 
 uses
-  SysUtils, Math, Classes, Clipper.Engine;
+  Math, Clipper.Engine;
 
 const
   Tolerance           : Double = 1.0E-15;
@@ -114,14 +169,6 @@ end;
 // TPathGroup methods
 //------------------------------------------------------------------------------
 
-type
-  TPathGroup = class
-	  paths     : TPathsD;
-	  joinType  : TJoinType;
-	  endType   : TEndType;
-    constructor Create(jt: TJoinType; et: TEndType);
-  end;
-
 constructor TPathGroup.Create(jt: TJoinType; et: TEndType);
 begin
   Self.joinType := jt;
@@ -131,64 +178,6 @@ end;
 //------------------------------------------------------------------------------
 // TClipperOffset methods
 //------------------------------------------------------------------------------
-
-type
-  TClipperOffset = class
-  private
-    fDelta       : Double;
-    fJoinType    : TJoinType;
-    fTmpLimit    : Double;
-    fMiterLimit  : Double;
-    fArcTolerance: Double;
-    FMinEdgeLen  : Double;
-    FMinLenSqrd  : Double;
-    fStepsPerRad : Double;
-    fNorms       : TPathD;
-    fInGroups    : TList;
-    fMergeGroups : Boolean;
-    fInPath      : TPathD;
-    fOutPath     : TPathD;
-    fOutPaths    : TPathsD;
-    fOutPathLen  : Integer;
-    fSolution    : TPathsD;
-
-    procedure AddPoint(x,y: double); overload;
-    procedure AddPoint(const pt: TPointD); overload;
-    procedure DoSquare(j, k: Integer);
-    procedure DoMiter(j, k: Integer; cosAplus1: Double);
-    procedure DoRound(j, k: integer; angle: double);
-    procedure OffsetPoint(j: Integer; var k: integer);
-
-    procedure BuildNormals;
-    procedure DoGroupOffset(pathGroup: TPathGroup; delta: double);
-    procedure OffsetPolygon;
-    procedure OffsetOpenJoined;
-    procedure OffsetOpenPath(endType: TEndType);
-  public
-    constructor Create(MiterLimit: double = 2.0; ArcTolerance: double = 0.0);
-    destructor Destroy; override;
-    procedure AddPath(const path: TPathD;
-      joinType: TJoinType; endType: TEndType);
-    procedure AddPaths(const paths: TPathsD;
-      joinType: TJoinType; endType: TEndType);
-    procedure Clear;
-    function Execute(delta: Double): TPathsD;
-
-    //MiterLimit: needed for mitered offsets (see offset_triginometry3.svg)
-    property MiterLimit: Double read fMiterLimit write fMiterLimit;
-    //ArcTolerance: needed for rounded offsets (See offset_triginometry2.svg)
-    property ArcTolerance: Double read fArcTolerance write fArcTolerance;
-    //MinEdgeLength: Very small edges are often at unexpected angles and these
-    //can become visible artefacts with offsetting. Consequently it's
-    //best to remove tiny edges before processing. (Default min length = 0.5)
-    property MinEdgeLength: Double read FMinEdgeLen write FMinEdgeLen;
-    //MergeGroups: A path group is one or more paths added via the AddPath or
-    //AddPaths methods. By default these path groups will be offset
-    //independently of other groups and this may cause overlaps (intersections).
-    //However, when MergeGroups is enabled, any overlapping offsets will be
-    //merged (via a clipping union operation) to remove overlaps.
-    property MergeGroups: Boolean read fMergeGroups write fMergeGroups;
-  end;
 
 constructor TClipperOffset.Create(MiterLimit: double; ArcTolerance: double);
 begin
@@ -243,9 +232,9 @@ end;
 
 procedure TClipperOffset.DoGroupOffset(pathGroup: TPathGroup; delta: double);
 var
-  i, lowestIdx: Integer;
+  i, len, lowestIdx: Integer;
   absDelta, arcTol, steps: Double;
-  IsClosedPaths, isClockwise: Boolean;
+  IsClosedPaths: Boolean;
 begin
   if pathgroup.endType <> etPolygon then delta := Abs(delta) / 2;
 
@@ -256,13 +245,17 @@ begin
     //designated orientation for outer polygons (needed for tidy-up clipping)
     lowestIdx := GetLowestPolygonIdx(pathgroup.paths);
     if lowestIdx < 0 then Exit;
-    isClockwise := Area(pathgroup.paths[lowestIdx]) > 0;
-    if not isClockwise then delta := -delta;
-  end else
-    isClockwise := true;
+    if Area(pathgroup.paths[lowestIdx]) < 0 then
+    begin
+      //more efficient than literally reversing paths
+      pathgroup.reversed := true;
+      delta := -delta;
+    end;
+  end;
 
   fDelta := delta;
   absDelta := Abs(fDelta);
+  fJoinType := pathGroup.joinType;
 
   if fArcTolerance > 0 then
     arcTol := fArcTolerance else
@@ -281,14 +274,16 @@ begin
   for i := 0 to High(pathgroup.paths) do
   begin
     fInPath := StripNearDuplicates(pathgroup.paths[i], FMinEdgeLen, IsClosedPaths);
-    if fInPath = nil then Continue;
+    len := Length(fInPath);
+    if (fInPath = nil) or
+      ((pathGroup.endType in [etPolygon, etJoined]) and (len < 3)) then Continue;
 
     fNorms := nil;
     fOutPath := nil;
     fOutPathLen := 0;
 
 		//if a single vertex then build a circle or a square ...
-    if Length(fInPath) = 1 then
+    if len = 1 then
     begin
       if (pathgroup.endType = etRound) then
       begin
@@ -328,8 +323,6 @@ begin
     SetLength(fOutPath, fOutPathLen);
     AppendPath(fOutPaths, fOutPath);
   end;
-  if not isClockwise then
-    fOutPaths := ReversePaths(fOutPaths);
 
   if not fMergeGroups then
   begin
@@ -337,7 +330,9 @@ begin
     with TClipperD.Create do
     try
       AddSubject(fOutPaths);
-      Execute(ctUnion, frPositive, fOutPaths);
+      if pathgroup.reversed then
+        Execute(ctUnion, frNegative, fOutPaths) else
+        Execute(ctUnion, frPositive, fOutPaths);
     finally
       free;
     end;
@@ -466,24 +461,25 @@ begin
     fTmpLimit := 2.0;
 
   if FMinEdgeLen < floatingPointTolerance then
-    FMinEdgeLen := defaultMinEdgeLen;
+    FMinEdgeLen := defaultMinimumEdgeLength;
   FMinLenSqrd := FMinEdgeLen * FMinEdgeLen;
 
   //nb: delta will depend on whether paths are polygons or open
   for i := 0 to fInGroups.Count -1 do
   begin
     group := TPathGroup(fInGroups[i]);
-    fJoinType := group.joinType;
     DoGroupOffset(group, delta);
   end;
 
-  if fMergeGroups then
+  if fMergeGroups and (fInGroups.Count > 0) then
   begin
     //clean up self-intersections ...
     with TClipperD.Create do
     try
       AddSubject(fSolution);
-      Execute(ctUnion, frPositive, fSolution);
+      if TPathGroup(fInGroups[0]).reversed then
+        Execute(ctUnion, frNegative, fSolution) else
+        Execute(ctUnion, frPositive, fSolution);
     finally
       free;
     end;
@@ -639,44 +635,6 @@ begin
   k := j;
 end;
 //------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-
-function InflatePaths(const paths: TPaths;
-  delta: Double; jt: TJoinType; et: TEndType;
-  miterLimit: double; arcTolerance: double): TPaths;
-var
-  pp: TPathsD;
-const
-  scale = 100; invScale = 0.01;
-begin
-  pp := ScalePathsD(paths, scale, scale);
-  with TClipperOffset.Create(miterLimit, arcTolerance) do
-  try
-    AddPaths(pp, jt, et);
-    pp := Execute(delta * scale);
-  finally
-    free;
-  end;
-  Result := ScalePaths(pp, invScale, invScale);
-end;
-//------------------------------------------------------------------------------
-
-function InflatePaths(const paths: TPathsD;
-  delta: Double; jt: TJoinType; et: TEndType;
-  miterLimit: double; arcTolerance: double;
-  minEdgeLength: double): TPathsD;
-var
-  co: TClipperOffset;
-begin
-  co := TClipperOffset.Create(miterLimit, arcTolerance);
-  try
-    co.AddPaths(paths, jt, et);
-    co.MinEdgeLength := minEdgeLength;
-    Result := co.Execute(delta);
-  finally
-    co.free;
-  end;
-end;
 //------------------------------------------------------------------------------
 
 end.
