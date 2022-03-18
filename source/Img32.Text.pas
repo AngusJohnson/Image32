@@ -544,7 +544,9 @@ type
 
   function DrawText(image: TImage32; x, y: double;
     const text: UnicodeString; font: TFontCache;
-    textColor: TColor32 = clBlack32): double; overload;
+    textColor: TColor32 = clBlack32;
+    useClearType: Boolean = false;
+    clearTypeBgColor: TColor32 = clWhite32): double; overload;
 
   function DrawText(image: TImage32; x, y: double;
     const text: UnicodeString; font: TFontCache;
@@ -2764,14 +2766,20 @@ end;
 //------------------------------------------------------------------------------
 
 function DrawText(image: TImage32; x, y: double; const text: UnicodeString;
-  font: TFontCache; textColor: TColor32 = clBlack32): double;
+  font: TFontCache; textColor: TColor32 = clBlack32;
+    useClearType: Boolean = false;
+    clearTypeBgColor: TColor32 = clWhite32): double;
 var
   glyphs: TPathsD;
 begin
   Result := 0;
   if (text = '') or not assigned(font) or not font.IsValidFont then Exit;
   glyphs := font.GetTextOutline(x,y, text, Result);
-  DrawPolygon(image, glyphs, frNonZero, textColor);
+  if useClearType then
+    DrawPolygon_ClearType(image, glyphs,
+      frNonZero, textColor, clearTypeBgColor)
+  else
+    DrawPolygon(image, glyphs, frNonZero, textColor);
 end;
 //------------------------------------------------------------------------------
 
