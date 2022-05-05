@@ -297,13 +297,13 @@ begin
   begin
     transformType := ttSplineV;
     with transformLayer.Image do
-      ctrlPoints := MakePathI([0, 0, Width div 2, 0, Width, 0]);
+      ctrlPoints := MakePath([0, 0, Width div 2, 0, Width, 0]);
     StatusBar1.SimpleText := ' VERT SPLINE TRANSFORM: Right click to add control points';
   end else
   begin
     transformType := ttSplineH;
     with transformLayer.Image do
-      ctrlPoints := MakePathI([0,0, 0,Height div 2, 0, Height]);
+      ctrlPoints := MakePath([0,0, 0,Height div 2, 0, Height]);
     StatusBar1.SimpleText := ' HORZ SPLINE TRANSFORM: Right click to add control points';
   end;
 
