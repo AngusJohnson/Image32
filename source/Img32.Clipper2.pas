@@ -1,4 +1,4 @@
-unit Img32.Clipper;
+unit Img32.Clipper2;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
