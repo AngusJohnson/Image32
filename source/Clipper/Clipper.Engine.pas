@@ -3,7 +3,7 @@ unit Clipper.Engine;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  10.0 (beta) - aka Clipper2                                      *
-* Date      :  4 May 2022                                                      *
+* Date      :  25 May 2022                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -15,7 +15,7 @@ interface
 {$I Clipper.inc}
 
 uses
-  Classes, SysUtils, Math, Clipper.Core;
+  Classes, Math, Clipper.Core;
 
 type
 
@@ -353,7 +353,6 @@ implementation
 {$OVERFLOWCHECKS OFF}
 
 resourcestring
-  rsClipper_OpenPathErr = 'Only subject paths can be open.';
   rsClipper_PolyTreeErr = 'The TPolyTree parameter must be assigned.';
   rsClipper_ClippingErr = 'Undefined clipping error';
   rsClipper_RoundingErr = 'The decimal rounding value is invalid';
@@ -363,12 +362,6 @@ const
 
 //------------------------------------------------------------------------------
 // Miscellaneous Functions ...
-//------------------------------------------------------------------------------
-
-procedure RaiseError(const msg: string); {$IFDEF INLINING} inline; {$ENDIF}
-begin
-  raise EClipperLibException.Create(msg);
-end;
 //------------------------------------------------------------------------------
 
 function IsOpen(e: PActive): Boolean; overload; {$IFDEF INLINING} inline; {$ENDIF}
@@ -600,38 +593,65 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function IsMaxima(e: PActive): Boolean;
+function IsMaxima(vertex: PVertex): Boolean; overload;
+  {$IFDEF INLINING} inline; {$ENDIF}
+begin
+  Result := vfLocMax in vertex.Flags;
+end;
+//------------------------------------------------------------------------------
+
+function IsMaxima(e: PActive): Boolean; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
 begin
   Result := vfLocMax in e.vertTop.Flags;
 end;
 //------------------------------------------------------------------------------
 
+function GetCurrYMaximaVertex(e: PActive): PVertex;
+var
+  goForward: boolean;
+begin
+  //nb: function not safe with open paths
+  Result := e.VertTop;
+{$IFDEF REVERSE_ORIENTATION}
+    goForward := e.WindDx > 0;
+{$ELSE}
+    goForward := e.WindDx < 0;
+{$ENDIF}
+  if goForward then
+    while Result.Next.Pt.Y = Result.Pt.Y do  Result := Result.Next
+  else
+    while Result.Prev.Pt.Y = Result.Pt.Y do  Result := Result.Prev;
+  if not IsMaxima(Result) then Result := nil; //not a maxima
+end;
+//------------------------------------------------------------------------------
+
 function GetMaximaPair(e: PActive): PActive;
 begin
-  if IsHorizontal(e) then
+  Result := e.NextInAEL;
+  while assigned(Result) do
   begin
-    //we can't be sure whether the MaximaPair is on the left or right, so ...
-    Result := e.PrevInAEL;
-    while assigned(Result) and (Result.CurrX >= e.Top.X) do
-    begin
-      if Result.vertTop = e.vertTop then Exit;  //Found!
-      Result := Result.PrevInAEL;
-    end;
-    Result := e.NextInAEL;
-    while assigned(Result) and (TopX(Result, e.Top.Y) <= e.Top.X) do
-    begin
-      if Result.vertTop = e.vertTop then Exit;  //Found!
-      Result := Result.NextInAEL;
-    end;
-  end else
+    if Result.vertTop = e.vertTop then Exit;  //Found!
+    Result := Result.NextInAEL;
+  end;
+  Result := nil;
+end;
+//------------------------------------------------------------------------------
+
+function GetHorzMaximaPair(horz: PActive; maxVert: PVertex): PActive;
+begin
+  //we can't be sure whether the MaximaPair is on the left or right, so ...
+  Result := horz.PrevInAEL;
+  while assigned(Result) and (Result.CurrX >= maxVert.Pt.X) do
   begin
-    Result := e.NextInAEL;
-    while assigned(Result) do
-    begin
-      if Result.vertTop = e.vertTop then Exit;  //Found!
-      Result := Result.NextInAEL;
-    end;
+    if Result.vertTop = maxVert then Exit;  //Found!
+    Result := Result.PrevInAEL;
+  end;
+  Result := horz.NextInAEL;
+  while assigned(Result) and (TopX(Result, horz.Top.Y) <= maxVert.Pt.X) do
+  begin
+    if Result.vertTop = maxVert then Exit;  //Found!
+    Result := Result.NextInAEL;
   end;
   Result := nil;
 end;
@@ -679,10 +699,10 @@ var
   i,j, cnt: integer;
 begin
   cnt := PointCount(op);
-  if cnt < 3 then
+  if (cnt < 3) and (not isOpen or (Cnt < 2)) then
   begin
     Result := false;
-    if not isOpen or (Cnt < 2) then Exit;
+    Exit;
   end;
 
   setLength(path, cnt);
@@ -766,14 +786,22 @@ end;
 
 function LocMinListSort(item1, item2: Pointer): Integer;
 var
-  dy: Int64;
+  q: Int64;
   lm1: PLocalMinima absolute item1;
   lm2: PLocalMinima absolute item2;
 begin
-  dy := lm2.Vertex.Pt.Y - lm1.Vertex.Pt.Y;
-  if dy < 0 then Result := -1
-  else if dy > 0 then Result := 1
-  else Result := lm2.Vertex.Pt.X - lm1.Vertex.Pt.X;
+  q := lm2.Vertex.Pt.Y - lm1.Vertex.Pt.Y;
+  if q < 0 then
+    Result := -1
+  else if q > 0 then
+    Result := 1
+  else
+  begin
+    q := lm2.Vertex.Pt.X - lm1.Vertex.Pt.X;
+    if q < 0 then Result := 1
+    else if q > 0 then Result := -1
+    else Result := 0;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -955,12 +983,25 @@ function IntersectListSort(node1, node2: Pointer): Integer;
 var
   i1: PIntersectNode absolute node1;
   i2: PIntersectNode absolute node2;
+  i: Int64;
 begin
-  result := i2.Pt.Y - i1.Pt.Y;
-  //Sort by X too. While not essential, this significantly speed up the
-  //secondary sort in ProcessIntersectList (which ensures edge adjacency).
-  if (result = 0) and (i1 <> i2) then
-    result := i1.Pt.X - i2.Pt.X;
+  //note to self - can't return int64 values :)
+  i := i2.Pt.Y - i1.Pt.Y;
+  if (i = 0) then
+  begin
+    if (i1 = i2) then
+    begin
+      Result := 0;
+      Exit;
+    end;
+    //Sort by X too. Not essential, but it significantly
+    //speeds up the secondary sort in ProcessIntersectList .
+    i := i1.Pt.X - i2.Pt.X;
+  end;
+
+  if i > 0 then Result := 1
+  else if i < 0 then Result := -1
+  else result := 0;
 end;
 //------------------------------------------------------------------------------
 
@@ -1319,6 +1360,7 @@ begin
     p := @paths[i][0];
     va0 := v; vaCurr := v;
     vaCurr.Pt := p^;
+    vaCurr.Prev := nil;
     inc(p);
     vaCurr.Flags := [];
     vaPrev := vaCurr;
@@ -1345,7 +1387,7 @@ begin
     vaPrev.Next := va0;
     va0.Prev := vaPrev;
     v := vaCurr; //ie get ready for next path
-    if isOpen and (va0.Next = va0.Prev) then Continue;
+    if isOpen and (va0.Next = va0) then Continue;
 
     //now find and assign local minima
     if (isOpen) then
@@ -1887,7 +1929,6 @@ begin
   while true do
   begin
     if Assigned(op2.Joiner) then Exit;
-
     if (CrossProduct(op2.Prev.Pt, op2.Pt, op2.Next.Pt) = 0) and
       (PointsEqual(op2.Pt,op2.Prev.Pt) or
       PointsEqual(op2.Pt,op2.Next.Pt) or
@@ -2897,19 +2938,19 @@ begin
       (IsOuter(e2.OutRec) <> IsFront(e2)) then
       SwapFrontBackSides(e2.OutRec)
     else
-      RaiseError(rsClipper_ClippingErr);
+      Raise EClipperLibException(rsClipper_ClippingErr);
   end
   else if not Assigned(e1.OutRec.Pts) then
   begin
     if Assigned(e2.OutRec.Pts) and
       ValidateClosedPathEx(e2.OutRec.Pts) then
-        RaiseError(rsClipper_ClippingErr); //e2 can't join onto nothing!
+        Raise EClipperLibException(rsClipper_ClippingErr); //e2 can't join onto nothing!
     UncoupleOutRec(e1);
     UncoupleOutRec(e2);
     Result := false;
   end
   else
-    RaiseError(rsClipper_ClippingErr); //e1 can't join onto nothing!
+    Raise EClipperLibException(rsClipper_ClippingErr); //e1 can't join onto nothing!
 end;
 //------------------------------------------------------------------------------
 
@@ -3189,17 +3230,29 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function HorzIsSpike(horzEdge: PActive): Boolean;
+var
+  nextPt: TPoint64;
+begin
+  nextPt := NextVertex(horzEdge).Pt;
+  Result := (horzEdge.Bot.X < horzEdge.Top.X) <> (horzEdge.Top.X < nextPt.X);
+end;
+//------------------------------------------------------------------------------
+
 function TrimHorz(horzEdge: PActive; preserveCollinear: Boolean): Boolean;
 var
   pt: TPoint64;
 begin
   Result := false;
   pt := NextVertex(horzEdge).Pt;
-  //trim 180 deg. spikes in closed paths
-  while ((pt.Y = horzEdge.top.Y) and
-    (not preserveCollinear or
-    ((pt.X < horzEdge.top.X) = (horzEdge.bot.X < horzEdge.top.X)))) do
+  while (pt.Y = horzEdge.top.Y) do
   begin
+    //always trim 180 deg. spikes (in closed paths)
+    //but otherwise break if preserveCollinear = true
+    if preserveCollinear and
+    ((pt.X < horzEdge.top.X) <> (horzEdge.bot.X < horzEdge.top.X)) then
+      break;
+
     horzEdge.VertTop := NextVertex(horzEdge);
     horzEdge.top := pt;
     Result := true;
@@ -3442,7 +3495,8 @@ var
   e: PActive;
   pt: TPoint64;
   op, op2: POutPt;
-  isLeftToRight, isMax, horzIsOpen: Boolean;
+  maxVertex: PVertex;
+  isLeftToRight, horzIsOpen: Boolean;
 begin
 (*******************************************************************************
 * Notes: Horizontal edges (HEs) at scanline intersections (ie at the top or    *
@@ -3461,27 +3515,39 @@ begin
 
   horzIsOpen := IsOpen(horzEdge);
   Y := horzEdge.Bot.Y;
-
+  maxVertex := nil;
   maxPair := nil;
-  isMax := IsMaxima(horzEdge);
 
-  //remove 180 deg.spikes and also with closed paths and not PreserveCollinear
-  //simplify consecutive horizontals into a 'single' edge ...
-  if not horzIsOpen and
-    not isMax and TrimHorz(horzEdge, FPreserveCollinear) then
-      isMax := IsMaxima(horzEdge);
-
-  if isMax and not IsOpenEnd(horzEdge) then
-    maxPair := GetMaximaPair(horzEdge);
+  if not horzIsOpen then
+  begin
+    maxVertex := GetCurrYMaximaVertex(horzEdge);
+    if Assigned(maxVertex) then
+    begin
+      maxPair := GetHorzMaximaPair(horzEdge, maxVertex);
+      //remove 180 deg.spikes and also simplify
+      //consecutive horizontals when PreserveCollinear = true
+      if (maxVertex <> horzEdge.VertTop) then
+          TrimHorz(horzEdge, FPreserveCollinear);
+    end;
+  end;
 
   isLeftToRight := ResetHorzDirection;
-  //nb: TrimHorz above hence not using Bot.X here
 
+  //nb: TrimHorz above hence not using Bot.X here
   if IsHotEdge(horzEdge) then
     AddOutPt(horzEdge, Point64(horzEdge.CurrX, Y));
 
   while true do //loop through consec. horizontal edges
   begin
+
+    if horzIsOpen and
+      IsMaxima(horzEdge) and not IsOpenEnd(horzEdge) then
+    begin
+      maxVertex := GetCurrYMaximaVertex(horzEdge);
+      if Assigned(maxVertex) then
+        maxPair := GetHorzMaximaPair(horzEdge, maxVertex);
+    end;
+
     if isLeftToRight  then
       e := horzEdge.NextInAEL else
       e := horzEdge.PrevInAEL;
@@ -3490,8 +3556,13 @@ begin
     begin
       if (e = maxPair) then
       begin
-        if IsHotEdge(horzEdge)  then
+        if IsHotEdge(horzEdge) then
         begin
+          while horzEdge.VertTop <> e.VertTop do
+          begin
+            AddOutPt(horzEdge, horzEdge.Top);
+            UpdateEdgeIntoAEL(horzEdge);
+          end;
           if isLeftToRight then
             op := AddLocalMaxPoly(horzEdge, e, horzEdge.Top) else
             op := AddLocalMaxPoly(e, horzEdge, horzEdge.Top);
@@ -3507,7 +3578,7 @@ begin
 
       //if horzEdge is a maxima, keep going until we reach
       //its maxima pair, otherwise check for Break conditions
-      if not isMax or IsOpenEnd(horzEdge) then
+      if (maxVertex <> horzEdge.VertTop) or IsOpenEnd(horzEdge) then
       begin
         //otherwise stop when 'e' is beyond the end of the horizontal line
         if (isLeftToRight and (e.CurrX > horzRight)) or
@@ -3567,20 +3638,26 @@ begin
     end; //we've reached the end of this horizontal
 
     //check if we've finished looping through consecutive horizontals
-    if isMax or (NextVertex(horzEdge).Pt.Y <> Y) then Break;
+    if horzIsOpen and IsOpenEnd(horzEdge) then
+    begin
+      if IsHotEdge(horzEdge) then
+        AddOutPt(horzEdge, horzEdge.Top);
+      DeleteFromAEL(horzEdge); //ie open at top
+      Exit;
+    end
+    else if (NextVertex(horzEdge).Pt.Y <> horzEdge.Top.Y) then
+      Break;
 
     //there must be a following (consecutive) horizontal
+
     if IsHotEdge(horzEdge) then
       AddOutPt(horzEdge, horzEdge.Top);
     UpdateEdgeIntoAEL(horzEdge);
-    isMax := IsMaxima(horzEdge);
 
-    if not horzIsOpen and not isMax and
-      TrimHorz(horzEdge, FPreserveCollinear) then
-        isMax := IsMaxima(horzEdge); //ie update after TrimHorz
+    if PreserveCollinear and HorzIsSpike(horzEdge) then
+      TrimHorz(horzEdge, true);
 
     isLeftToRight := ResetHorzDirection;
-    if isMax then maxPair := GetMaximaPair(horzEdge);
   end; //end while horizontal
 
   if IsHotEdge(horzEdge) then
@@ -3591,7 +3668,8 @@ begin
   end else
     op := nil;
 
-  if not isMax then
+  if (horzIsOpen and not IsOpenEnd(horzEdge)) or
+    (not horzIsOpen and (maxVertex <> horzEdge.VertTop)) then
   begin
     UpdateEdgeIntoAEL(horzEdge); //this is the end of an intermediate horiz.
     if IsOpen(horzEdge) then Exit;
@@ -3608,10 +3686,8 @@ begin
     end;
 
   end
-  else if not assigned(maxPair) then //ie open at top
-    DeleteFromAEL(horzEdge)
   else if IsHotEdge(horzEdge) then
-      AddLocalMaxPoly(horzEdge, maxPair, horzEdge.Top)
+    AddLocalMaxPoly(horzEdge, maxPair, horzEdge.Top)
   else
   begin
     DeleteFromAEL(maxPair);
@@ -3911,7 +3987,8 @@ end;
 function TClipper.Execute(clipType: TClipType; fillRule: TFillRule;
   var solutionTree: TPolyTree; out openSolutions: TPaths64): Boolean;
 begin
-  if not assigned(solutionTree) then RaiseError(rsClipper_PolyTreeErr);
+  if not assigned(solutionTree) then
+    Raise EClipperLibException(rsClipper_PolyTreeErr);
   solutionTree.Clear;
   openSolutions := nil;
   Result := true;
@@ -4003,7 +4080,7 @@ begin
   inherited Create;
   if (roundingDecimalPrecision < -8) or
     (roundingDecimalPrecision > 8) then
-      RaiseError(rsClipper_RoundingErr);
+      Raise EClipperLibException(rsClipper_RoundingErr);
   FScale := Math.Power(10, roundingDecimalPrecision);
   FInvScale := 1/FScale;
 end;
@@ -4186,7 +4263,7 @@ var
   open_Paths: TPaths64;
 begin
   if not assigned(solutionsTree) then
-    RaiseError(rsClipper_PolyTreeErr);
+    Raise EClipperLibException(rsClipper_PolyTreeErr);
 
   solutionsTree.Clear;
   solutionsTree.SetScale(FScale);
