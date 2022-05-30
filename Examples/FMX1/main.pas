@@ -50,7 +50,7 @@ implementation
 
 uses
   Img32.Vector, Img32.Transform, Img32.Draw, Img32.Extra,
-    Img32.Text, Img32.Clipper;
+    Img32.Text, Img32.Clipper2;
 
 ResourceString
   rsBigText = 'Image32 Rocks!';

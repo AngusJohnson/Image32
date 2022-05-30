@@ -2696,7 +2696,7 @@ procedure TMemoCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
       begin
         dec(fCursorWordIdx.X);
         while (fCursorWordIdx.X > 0) and
-          (fWordList[fCursorWordIdx.X].word = #32) do
+          (fWordList[fCursorWordIdx.X].aWord = #32) do
             dec(fCursorWordIdx.X);
       end else if fCursorWordIdx.Y > 0 then fCursorWordIdx.Y := 0
       else Result := false
@@ -2725,7 +2725,7 @@ procedure TMemoCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
     begin
       inc(fCursorWordIdx.X);
       fCursorWordIdx.Y := 0;
-      while (fWordList[fCursorWordIdx.X].word = #32) do
+      while (fWordList[fCursorWordIdx.X].aWord = #32) do
       begin
         if fCursorWordIdx.X = fWordList.Count -1 then break;
         inc(fCursorWordIdx.X);
@@ -2922,7 +2922,7 @@ begin
   while (i < wordIdx.X) do
     with fWordList[i] do
     begin
-      if word = #32 then
+      if aWord = #32 then
         x := x + width + spcW else
         x := x + width;
       inc(i);
@@ -2935,7 +2935,7 @@ begin
   end else
   begin
     wordInfo := fWordList[wordIdx.X];
-    chrOffs := fUsableFont.GetCharOffsets(wordInfo.word);
+    chrOffs := fUsableFont.GetCharOffsets(wordInfo.aWord);
     if wordIdx.Y >= wordInfo.length then
       x := x + chrOffs[wordInfo.length-1];
       x := x + chrOffs[wordIdx.Y];
@@ -2983,9 +2983,9 @@ begin
   while (Result.X < fWordList.Count) do
   begin
     wordInfo := fWordList[Result.X];
-    if wordInfo.word =  #10 then
+    if wordInfo.aWord =  #10 then
       break
-    else if wordInfo.word =  #32 then
+    else if wordInfo.aWord =  #32 then
       chrW := wordInfo.width + spcW else
       chrW := wordInfo.width;
 
@@ -3000,13 +3000,13 @@ begin
     Exit;
   end;
 
-  if wordInfo.word = #10 then
+  if wordInfo.aWord = #10 then
     Exit;
 
   //and calc the char offset.
-  offs := fUsableFont.GetCharOffsets(wordInfo.word);
+  offs := fUsableFont.GetCharOffsets(wordInfo.aWord);
 
-  if (wordInfo.word = #32) and
+  if (wordInfo.aWord = #32) and
     (x2 - x > (wordInfo.width + spcW)/2) then
       inc(Result.X)
   else
@@ -3319,7 +3319,7 @@ procedure TEditCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
       if (curr.Y = 0) and (curr.X > 0) then
       begin
         dec(curr.X);
-        while (curr.X > 0) and (fWordList[curr.X].word = #32) do
+        while (curr.X > 0) and (fWordList[curr.X].aWord = #32) do
           dec(curr.X);
       end else if curr.Y > 0 then curr.Y := 0
       else Result := false
@@ -3345,7 +3345,7 @@ procedure TEditCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
       inc(curr.X);
       if curr.X = fWordList.Count then Exit;
       curr.Y := 0;
-      while (fWordList[curr.X].word = #32) do
+      while (fWordList[curr.X].aWord = #32) do
       begin
         inc(curr.X);
         if curr.X = fWordList.Count then break;
@@ -3445,7 +3445,7 @@ begin
       begin
         wordInfo := fWordList[fCursorWordIdx.X];
         try
-          newWord := wordInfo.word;
+          newWord := wordInfo.aWord;
           Delete(newWord, fCursorWordIdx.Y+1, 1);
           fWordList.Edit(fUsableFont, fCursorWordIdx.X, newWord);
           if fCursorWordIdx.Y = wordInfo.length then
@@ -3474,8 +3474,8 @@ begin
           wordInfo := fWordList[fCursorWordIdx.X];
           with wordInfo do
           begin
-            newWord := copy(word, 1, fCursorWordIdx.Y);
-            newWord2 := copy(word, fCursorWordIdx.Y +1, length);
+            newWord := copy(aWord, 1, fCursorWordIdx.Y);
+            newWord2 := copy(aWord, fCursorWordIdx.Y +1, length);
             fWordList.Edit(fUsableFont, fCursorWordIdx.X, newWord);
             inc(fCursorWordIdx.X);
             fWordList.InsertWord(fUsableFont, fCursorWordIdx.X, newWord2);
@@ -3498,18 +3498,18 @@ begin
       end else if (fCursorWordIdx.Y > 0) then
       begin
         wordInfo := fWordList[fCursorWordIdx.X];
-        newWord := wordInfo.word;
+        newWord := wordInfo.aWord;
         insert(ch, newWord, fCursorWordIdx.Y +1);
         fWordList.Edit(fUsableFont, fCursorWordIdx.X, newWord);
       end else
       begin
         GetPrev(fCursorWordIdx, false);
-        newWord := fWordList[fCursorWordIdx.X].word;
+        newWord := fWordList[fCursorWordIdx.X].aWord;
         fWordList.Edit(fUsableFont, fCursorWordIdx.X, newWord + ch);
       end;
       wordInfo := fWordList[fCursorWordIdx.X];
 
-      if fCursorWordIdx.Y = High(wordInfo.word) then
+      if fCursorWordIdx.Y = High(wordInfo.aWord) then
       begin
         inc(fCursorWordIdx.X);
         fCursorWordIdx.Y := 0;
@@ -3633,7 +3633,7 @@ begin
   if j = fWordList.Count then Exit;
 
   wordInfo := fWordList[j];
-  chrOffs := fUsableFont.GetCharOffsets(wordInfo.word);
+  chrOffs := fUsableFont.GetCharOffsets(wordInfo.aWord);
   if wordIdx.Y >= wordInfo.length then
     Result.X := Result.X + chrOffs[wordInfo.length-1];
     Result.X := Result.X + chrOffs[wordIdx.Y];
@@ -3662,11 +3662,11 @@ begin
     inc(Result.X);
   end;
 
-  if (Result.X = fWordList.Count) or (wordInfo.word[1] < #32) then Exit;
+  if (Result.X = fWordList.Count) or (wordInfo.aWord[1] < #32) then Exit;
 
   //and calc the char offset.
   if not GetUsableFont then Exit;
-  offs := fUsableFont.GetCharOffsets(wordInfo.word);
+  offs := fUsableFont.GetCharOffsets(wordInfo.aWord);
 
   d := x - d;
   while (Result.Y < wordInfo.length-1) and

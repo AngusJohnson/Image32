@@ -60,7 +60,7 @@ implementation
 
 uses
   Img32.Vector, Img32.Draw, Img32.Extra, Img32.FMX,
-  Img32.Text, Img32.Clipper;
+  Img32.Text, Img32.Clipper2;
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions

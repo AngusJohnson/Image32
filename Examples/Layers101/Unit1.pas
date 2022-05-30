@@ -113,7 +113,7 @@ implementation
 
 uses
   Img32.Fmt.BMP, Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.SVG,
-  Img32.Vector, Img32.Extra, Img32.Clipper;
+  Img32.Vector, Img32.Extra, Img32.Clipper2;
 
 const
   margin = 100;

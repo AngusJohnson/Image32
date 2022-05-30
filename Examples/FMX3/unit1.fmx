@@ -1,0 +1,19 @@
+object Form1: TForm1
+  Left = 0
+  Top = 0
+  Caption = 'Form1'
+  ClientHeight = 630
+  ClientWidth = 420
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  DesignerMasterStyle = 0
+  object Layout1: TLayout
+    Align = Client
+    Size.Width = 420.000000000000000000
+    Size.Height = 630.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    OnPaint = Layout1Paint
+  end
+end
