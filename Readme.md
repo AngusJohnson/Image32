@@ -2,9 +2,9 @@
 
 ## A 2D graphics library written in Delphi Pascal
 
-Image32 is a comprehensive 2D graphics library written in Delphi Pascal. It provides an extensive range of image manipulation and drawing functions.<br>
+Image32 is a comprehensive 2D graphics library written entirely in Delphi Pascal, and without dependencies on other libraries. It provides an extensive range of image manipulation and drawing functions that includes text rendering through native parsing of truetype font files.<br>
 
-### Main features include 
+### Other significant features include 
   1. An extensive list of image manipulation functions 
   2. A polygon renderer that supports a very wide range of drawing options including tiled images, and linear and radial gradient fills
   3. Cross-platform support using either Delphi's FMX framework or the Lazarus pascal compiler
