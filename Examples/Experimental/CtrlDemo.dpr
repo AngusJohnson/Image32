@@ -10,13 +10,14 @@ uses
   Img32,
   Img32.Vector,
   Img32.Draw,
-  Img32.Layers,
-  Img32.Ctrl,
   Img32.Text,
   Img32.Extra,
   Img32.Fmt.BMP,
   Img32.Fmt.SVG,
-  Img32.SVG.Reader;
+  Img32.SVG.Reader,
+  Img32.Ctrl in 'Img32.Ctrl.pas',
+  Img32.Layers in 'Img32.Layers.pas',
+  Img32.Storage in 'Img32.Storage.pas';
 
 {$R Lorem.res}
 {$R Images.res}
