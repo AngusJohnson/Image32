@@ -10,43 +10,43 @@
             <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\Experimental\CtrlDemo.dproj">
-            <Dependencies/>
+            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\FMX3\fmx_svg.dproj">
-            <Dependencies/>
+            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\FMX1\FMX1.dproj">
-            <Dependencies/>
+            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\FMX2\FMX2.dproj">
-            <Dependencies/>
+            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\Layers101\Layers101.dproj">
-            <Dependencies/>
+            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\Layers201\Layers201.dproj">
-            <Dependencies/>
+            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\Layers301\Layers301.dproj">
-            <Dependencies/>
+            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\ProjectiveTransform\ProjectiveTransform.dproj">
-            <Dependencies/>
+            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\SimpleAnimation\SimpleAnimation.dproj">
-            <Dependencies/>
+            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\SVG\Svg101.dproj">
-            <Dependencies/>
+            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\SVGPathDesign\SvgPathDesign.dproj">
-            <Dependencies/>
+            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\Transform\Transform.dproj">
-            <Dependencies/>
+            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\Vectorize\Vectorize.dproj">
-            <Dependencies/>
+            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
     </ItemGroup>
     <ProjectExtensions>
@@ -74,121 +74,121 @@
     <Target Name="Img32_VCL_Dsgn:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="source\Packages\Img32_VCL_Dsgn.dproj" Targets="Make"/>
     </Target>
-    <Target Name="CtrlDemo">
+    <Target Name="CtrlDemo" DependsOnTargets="Img32_Library">
         <MSBuild Projects="Examples\Experimental\CtrlDemo.dproj"/>
     </Target>
-    <Target Name="CtrlDemo:Clean">
+    <Target Name="CtrlDemo:Clean" DependsOnTargets="Img32_Library:Clean">
         <MSBuild Projects="Examples\Experimental\CtrlDemo.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="CtrlDemo:Make">
+    <Target Name="CtrlDemo:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\Experimental\CtrlDemo.dproj" Targets="Make"/>
     </Target>
-    <Target Name="fmx_svg">
+    <Target Name="fmx_svg" DependsOnTargets="Img32_Library">
         <MSBuild Projects="Examples\FMX3\fmx_svg.dproj"/>
     </Target>
-    <Target Name="fmx_svg:Clean">
+    <Target Name="fmx_svg:Clean" DependsOnTargets="Img32_Library:Clean">
         <MSBuild Projects="Examples\FMX3\fmx_svg.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="fmx_svg:Make">
+    <Target Name="fmx_svg:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\FMX3\fmx_svg.dproj" Targets="Make"/>
     </Target>
-    <Target Name="FMX1">
+    <Target Name="FMX1" DependsOnTargets="Img32_Library">
         <MSBuild Projects="Examples\FMX1\FMX1.dproj"/>
     </Target>
-    <Target Name="FMX1:Clean">
+    <Target Name="FMX1:Clean" DependsOnTargets="Img32_Library:Clean">
         <MSBuild Projects="Examples\FMX1\FMX1.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="FMX1:Make">
+    <Target Name="FMX1:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\FMX1\FMX1.dproj" Targets="Make"/>
     </Target>
-    <Target Name="FMX2">
+    <Target Name="FMX2" DependsOnTargets="Img32_Library">
         <MSBuild Projects="Examples\FMX2\FMX2.dproj"/>
     </Target>
-    <Target Name="FMX2:Clean">
+    <Target Name="FMX2:Clean" DependsOnTargets="Img32_Library:Clean">
         <MSBuild Projects="Examples\FMX2\FMX2.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="FMX2:Make">
+    <Target Name="FMX2:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\FMX2\FMX2.dproj" Targets="Make"/>
     </Target>
-    <Target Name="Layers101">
+    <Target Name="Layers101" DependsOnTargets="Img32_Library">
         <MSBuild Projects="Examples\Layers101\Layers101.dproj"/>
     </Target>
-    <Target Name="Layers101:Clean">
+    <Target Name="Layers101:Clean" DependsOnTargets="Img32_Library:Clean">
         <MSBuild Projects="Examples\Layers101\Layers101.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="Layers101:Make">
+    <Target Name="Layers101:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\Layers101\Layers101.dproj" Targets="Make"/>
     </Target>
-    <Target Name="Layers201">
+    <Target Name="Layers201" DependsOnTargets="Img32_Library">
         <MSBuild Projects="Examples\Layers201\Layers201.dproj"/>
     </Target>
-    <Target Name="Layers201:Clean">
+    <Target Name="Layers201:Clean" DependsOnTargets="Img32_Library:Clean">
         <MSBuild Projects="Examples\Layers201\Layers201.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="Layers201:Make">
+    <Target Name="Layers201:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\Layers201\Layers201.dproj" Targets="Make"/>
     </Target>
-    <Target Name="Layers301">
+    <Target Name="Layers301" DependsOnTargets="Img32_Library">
         <MSBuild Projects="Examples\Layers301\Layers301.dproj"/>
     </Target>
-    <Target Name="Layers301:Clean">
+    <Target Name="Layers301:Clean" DependsOnTargets="Img32_Library:Clean">
         <MSBuild Projects="Examples\Layers301\Layers301.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="Layers301:Make">
+    <Target Name="Layers301:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\Layers301\Layers301.dproj" Targets="Make"/>
     </Target>
-    <Target Name="ProjectiveTransform">
+    <Target Name="ProjectiveTransform" DependsOnTargets="Img32_Library">
         <MSBuild Projects="Examples\ProjectiveTransform\ProjectiveTransform.dproj"/>
     </Target>
-    <Target Name="ProjectiveTransform:Clean">
+    <Target Name="ProjectiveTransform:Clean" DependsOnTargets="Img32_Library:Clean">
         <MSBuild Projects="Examples\ProjectiveTransform\ProjectiveTransform.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="ProjectiveTransform:Make">
+    <Target Name="ProjectiveTransform:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\ProjectiveTransform\ProjectiveTransform.dproj" Targets="Make"/>
     </Target>
-    <Target Name="SimpleAnimation">
+    <Target Name="SimpleAnimation" DependsOnTargets="Img32_Library">
         <MSBuild Projects="Examples\SimpleAnimation\SimpleAnimation.dproj"/>
     </Target>
-    <Target Name="SimpleAnimation:Clean">
+    <Target Name="SimpleAnimation:Clean" DependsOnTargets="Img32_Library:Clean">
         <MSBuild Projects="Examples\SimpleAnimation\SimpleAnimation.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="SimpleAnimation:Make">
+    <Target Name="SimpleAnimation:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\SimpleAnimation\SimpleAnimation.dproj" Targets="Make"/>
     </Target>
-    <Target Name="Svg101">
+    <Target Name="Svg101" DependsOnTargets="Img32_Library">
         <MSBuild Projects="Examples\SVG\Svg101.dproj"/>
     </Target>
-    <Target Name="Svg101:Clean">
+    <Target Name="Svg101:Clean" DependsOnTargets="Img32_Library:Clean">
         <MSBuild Projects="Examples\SVG\Svg101.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="Svg101:Make">
+    <Target Name="Svg101:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\SVG\Svg101.dproj" Targets="Make"/>
     </Target>
-    <Target Name="SvgPathDesign">
+    <Target Name="SvgPathDesign" DependsOnTargets="Img32_Library">
         <MSBuild Projects="Examples\SVGPathDesign\SvgPathDesign.dproj"/>
     </Target>
-    <Target Name="SvgPathDesign:Clean">
+    <Target Name="SvgPathDesign:Clean" DependsOnTargets="Img32_Library:Clean">
         <MSBuild Projects="Examples\SVGPathDesign\SvgPathDesign.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="SvgPathDesign:Make">
+    <Target Name="SvgPathDesign:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\SVGPathDesign\SvgPathDesign.dproj" Targets="Make"/>
     </Target>
-    <Target Name="Transform">
+    <Target Name="Transform" DependsOnTargets="Img32_Library">
         <MSBuild Projects="Examples\Transform\Transform.dproj"/>
     </Target>
-    <Target Name="Transform:Clean">
+    <Target Name="Transform:Clean" DependsOnTargets="Img32_Library:Clean">
         <MSBuild Projects="Examples\Transform\Transform.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="Transform:Make">
+    <Target Name="Transform:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\Transform\Transform.dproj" Targets="Make"/>
     </Target>
-    <Target Name="Vectorize">
+    <Target Name="Vectorize" DependsOnTargets="Img32_Library">
         <MSBuild Projects="Examples\Vectorize\Vectorize.dproj"/>
     </Target>
-    <Target Name="Vectorize:Clean">
+    <Target Name="Vectorize:Clean" DependsOnTargets="Img32_Library:Clean">
         <MSBuild Projects="Examples\Vectorize\Vectorize.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="Vectorize:Make">
+    <Target Name="Vectorize:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\Vectorize\Vectorize.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
