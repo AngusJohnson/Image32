@@ -1,4 +1,4 @@
-package Img32_Library;
+package Img32_FMX;
 
 {$R *.res}
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
@@ -13,8 +13,8 @@ package Img32_Library;
 {$LONGSTRINGS ON}
 {$OPENSTRINGS ON}
 {$OPTIMIZATION OFF}
-{$OVERFLOWCHECKS OFF}
-{$RANGECHECKS OFF}
+{$OVERFLOWCHECKS ON}
+{$RANGECHECKS ON}
 {$REFERENCEINFO ON}
 {$SAFEDIVIDE OFF}
 {$STACKFRAMES ON}
@@ -29,7 +29,8 @@ package Img32_Library;
 {$IMPLICITBUILD OFF}
 
 requires
-  rtl;
+  rtl,
+  fmx;
 
 contains
   Clipper in '..\Clipper\Clipper.pas',
@@ -52,7 +53,8 @@ contains
   Img32.Text in '..\Img32.Text.pas',
   Img32.Transform in '..\Img32.Transform.pas',
   Img32.Vector in '..\Img32.Vector.pas',
-  Img32.Storage in '..\Img32.Storage.pas';
+  Img32.Storage in '..\Img32.Storage.pas',
+  Img32.FMX in '..\Img32.FMX.pas';
 
 {$DESCRIPTION 'Image32 Library'}
 

@@ -1111,7 +1111,6 @@ var
 begin
   fOwner    := Parent as TSvgPathLayer;
   fSubPath  := subPath;
-  seg := nil;
   for i := 0 to subPath.Count -1 do
   begin
     case subPath[i].segType of
