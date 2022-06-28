@@ -6,6 +6,12 @@
         <Projects Include="source\Packages\Img32_Library.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="source\Packages\Img32_VCL.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="source\Packages\Img32_FMX.dproj">
+            <Dependencies/>
+        </Projects>
         <Projects Include="source\Packages\Img32_VCL_Dsgn.dproj">
             <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
@@ -13,13 +19,13 @@
             <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\FMX3\fmx_svg.dproj">
-            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
+            <Dependencies>source\Packages\Img32_FMX.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\FMX1\FMX1.dproj">
-            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
+            <Dependencies>source\Packages\Img32_FMX.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\FMX2\FMX2.dproj">
-            <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
+            <Dependencies>source\Packages\Img32_FMX.dproj</Dependencies>
         </Projects>
         <Projects Include="Examples\Layers101\Layers101.dproj">
             <Dependencies>source\Packages\Img32_Library.dproj</Dependencies>
@@ -65,6 +71,24 @@
     <Target Name="Img32_Library:Make">
         <MSBuild Projects="source\Packages\Img32_Library.dproj" Targets="Make"/>
     </Target>
+    <Target Name="Img32_VCL">
+        <MSBuild Projects="source\Packages\Img32_VCL.dproj"/>
+    </Target>
+    <Target Name="Img32_VCL:Clean">
+        <MSBuild Projects="source\Packages\Img32_VCL.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Img32_VCL:Make">
+        <MSBuild Projects="source\Packages\Img32_VCL.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Img32_FMX">
+        <MSBuild Projects="source\Packages\Img32_FMX.dproj"/>
+    </Target>
+    <Target Name="Img32_FMX:Clean">
+        <MSBuild Projects="source\Packages\Img32_FMX.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Img32_FMX:Make">
+        <MSBuild Projects="source\Packages\Img32_FMX.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Img32_VCL_Dsgn" DependsOnTargets="Img32_Library">
         <MSBuild Projects="source\Packages\Img32_VCL_Dsgn.dproj"/>
     </Target>
@@ -83,31 +107,31 @@
     <Target Name="CtrlDemo:Make" DependsOnTargets="Img32_Library:Make">
         <MSBuild Projects="Examples\Experimental\CtrlDemo.dproj" Targets="Make"/>
     </Target>
-    <Target Name="fmx_svg" DependsOnTargets="Img32_Library">
+    <Target Name="fmx_svg" DependsOnTargets="Img32_FMX">
         <MSBuild Projects="Examples\FMX3\fmx_svg.dproj"/>
     </Target>
-    <Target Name="fmx_svg:Clean" DependsOnTargets="Img32_Library:Clean">
+    <Target Name="fmx_svg:Clean" DependsOnTargets="Img32_FMX:Clean">
         <MSBuild Projects="Examples\FMX3\fmx_svg.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="fmx_svg:Make" DependsOnTargets="Img32_Library:Make">
+    <Target Name="fmx_svg:Make" DependsOnTargets="Img32_FMX:Make">
         <MSBuild Projects="Examples\FMX3\fmx_svg.dproj" Targets="Make"/>
     </Target>
-    <Target Name="FMX1" DependsOnTargets="Img32_Library">
+    <Target Name="FMX1" DependsOnTargets="Img32_FMX">
         <MSBuild Projects="Examples\FMX1\FMX1.dproj"/>
     </Target>
-    <Target Name="FMX1:Clean" DependsOnTargets="Img32_Library:Clean">
+    <Target Name="FMX1:Clean" DependsOnTargets="Img32_FMX:Clean">
         <MSBuild Projects="Examples\FMX1\FMX1.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="FMX1:Make" DependsOnTargets="Img32_Library:Make">
+    <Target Name="FMX1:Make" DependsOnTargets="Img32_FMX:Make">
         <MSBuild Projects="Examples\FMX1\FMX1.dproj" Targets="Make"/>
     </Target>
-    <Target Name="FMX2" DependsOnTargets="Img32_Library">
+    <Target Name="FMX2" DependsOnTargets="Img32_FMX">
         <MSBuild Projects="Examples\FMX2\FMX2.dproj"/>
     </Target>
-    <Target Name="FMX2:Clean" DependsOnTargets="Img32_Library:Clean">
+    <Target Name="FMX2:Clean" DependsOnTargets="Img32_FMX:Clean">
         <MSBuild Projects="Examples\FMX2\FMX2.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="FMX2:Make" DependsOnTargets="Img32_Library:Make">
+    <Target Name="FMX2:Make" DependsOnTargets="Img32_FMX:Make">
         <MSBuild Projects="Examples\FMX2\FMX2.dproj" Targets="Make"/>
     </Target>
     <Target Name="Layers101" DependsOnTargets="Img32_Library">
@@ -192,13 +216,13 @@
         <MSBuild Projects="Examples\Vectorize\Vectorize.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
-        <CallTarget Targets="Img32_Library;Img32_VCL_Dsgn;CtrlDemo;fmx_svg;FMX1;FMX2;Layers101;Layers201;Layers301;ProjectiveTransform;SimpleAnimation;Svg101;SvgPathDesign;Transform;Vectorize"/>
+        <CallTarget Targets="Img32_Library;Img32_VCL;Img32_FMX;Img32_VCL_Dsgn;CtrlDemo;fmx_svg;FMX1;FMX2;Layers101;Layers201;Layers301;ProjectiveTransform;SimpleAnimation;Svg101;SvgPathDesign;Transform;Vectorize"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="Img32_Library:Clean;Img32_VCL_Dsgn:Clean;CtrlDemo:Clean;fmx_svg:Clean;FMX1:Clean;FMX2:Clean;Layers101:Clean;Layers201:Clean;Layers301:Clean;ProjectiveTransform:Clean;SimpleAnimation:Clean;Svg101:Clean;SvgPathDesign:Clean;Transform:Clean;Vectorize:Clean"/>
+        <CallTarget Targets="Img32_Library:Clean;Img32_VCL:Clean;Img32_FMX:Clean;Img32_VCL_Dsgn:Clean;CtrlDemo:Clean;fmx_svg:Clean;FMX1:Clean;FMX2:Clean;Layers101:Clean;Layers201:Clean;Layers301:Clean;ProjectiveTransform:Clean;SimpleAnimation:Clean;Svg101:Clean;SvgPathDesign:Clean;Transform:Clean;Vectorize:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="Img32_Library:Make;Img32_VCL_Dsgn:Make;CtrlDemo:Make;fmx_svg:Make;FMX1:Make;FMX2:Make;Layers101:Make;Layers201:Make;Layers301:Make;ProjectiveTransform:Make;SimpleAnimation:Make;Svg101:Make;SvgPathDesign:Make;Transform:Make;Vectorize:Make"/>
+        <CallTarget Targets="Img32_Library:Make;Img32_VCL:Make;Img32_FMX:Make;Img32_VCL_Dsgn:Make;CtrlDemo:Make;fmx_svg:Make;FMX1:Make;FMX2:Make;Layers101:Make;Layers201:Make;Layers301:Make;ProjectiveTransform:Make;SimpleAnimation:Make;Svg101:Make;SvgPathDesign:Make;Transform:Make;Vectorize:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>
