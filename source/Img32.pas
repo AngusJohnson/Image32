@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.2                                                             *
-* Date      :  30 May 2022                                                     *
+* Date      :  2 July 2022                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -1225,7 +1225,7 @@ var
 begin
   //https://en.wikipedia.org/wiki/HSL_and_HSV and
   //http://en.wikipedia.org/wiki/HSL_color_space
-{$IF DEFINED(ANDROID) OR DEFINED(MACOS) OR DEFINED(MACOSX)}
+{$IF DEFINED(ANDROID)}
   color := SwapRedBlue(color);
 {$IFEND}
 
@@ -1288,7 +1288,7 @@ begin
     4: begin rgba.R := x + m; rgba.G := 0 + m; rgba.B := c + m; end;
     5: begin rgba.R := c + m; rgba.G := 0 + m; rgba.B := x + m; end;
   end;
-{$IF DEFINED(ANDROID) OR DEFINED(MACOS) OR DEFINED(MACOSX)}
+{$IF DEFINED(ANDROID)}
   Result := SwapRedBlue(Result);
 {$IFEND}
 end;

@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.2                                                             *
-* Date      :  30 May 2022                                                     *
+* Date      :  2 July 2022                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -1187,7 +1187,7 @@ begin
   //and in case the opacity has been set before the color
   if (alpha < 255) then
     color := (color and $FFFFFF) or alpha shl 24;
-{$IF DEFINED(ANDROID) OR DEFINED(MACOS) OR DEFINED(MACOSX)}
+{$IF DEFINED(ANDROID)}
   color := SwapRedBlue(color);
 {$IFEND}
   Result := true;
