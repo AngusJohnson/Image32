@@ -64,7 +64,7 @@ object Form1: TForm1
       Height = 118
       Orientation = trVertical
       PageSize = 0
-      Position = 3
+      Position = 7
       TabOrder = 0
       TickStyle = tsNone
       OnChange = TrackBar1Change

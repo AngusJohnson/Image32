@@ -136,7 +136,7 @@ end;
 
 procedure TForm1.DisplayImage;
 var
-  i: integer;
+  i, len: integer;
 begin
   rawPaths := nil;
   bezierPaths := nil;
@@ -179,7 +179,11 @@ begin
     //note: SmoothToBezier returns poly-bezier paths (not flattened paths)
     if TrackBar1.Position > 0 then
     begin
-      bezierPaths := SmoothToBezier(flattenedPaths, true, TrackBar1.Position, 2);
+      len := Length(flattenedPaths);
+      setLength(bezierPaths, len);
+      for i := 0 to len -1 do
+        bezierPaths[i] := GetSmoothPath(flattenedPaths[i],
+          true, TrackBar1.Position);
       //and finally 'flatten' the poly-beziers
       SetLength(flattenedPaths, Length(bezierPaths));
       for i := 0 to High(bezierPaths) do

@@ -143,9 +143,11 @@ function RamerDouglasPeucker(const paths: TPathsD;
   epsilon: double): TPathsD; overload;
 
 // GetSmoothPath - produces a series of cubic bezier control points.
+// Severity parameter range: 1- 10 (10 == max smoothing)
 // This function is very useful in the following combination:
 // RamerDouglasPeucker(), GetSmoothPath(), FlattenCBezier().
-function GetSmoothPath(const path: TPathD; pathIsClosed: Boolean): TPathD;
+function GetSmoothPath(const path: TPathD;
+  pathIsClosed: Boolean; severity: integer = 3): TPathD;
 
 //InterpolatePoints: smooths a simple line chart.
 //Points should be left to right and equidistant along the X axis
@@ -2039,7 +2041,8 @@ begin
 end;
 //---------------------------------------------------------------------------
 
-function GetSmoothPath(const path: TPathD; pathIsClosed: Boolean): TPathD;
+function GetSmoothPath(const path: TPathD;
+  pathIsClosed: Boolean; severity: integer): TPathD;
 var
   i, j, len, prev: integer;
   vec: TPointD;
@@ -2051,6 +2054,10 @@ begin
   Result := nil;
   len := Length(path);
   if len < 3 then Exit;
+
+  if severity < 1 then severity := 1 else
+  if severity > 10 then severity := 10;
+  severity := 13 - severity; //min 3 and max 12
 
   SetLength(Result, len *3 +1);
   prev := len-1;
@@ -2070,8 +2077,8 @@ begin
       unitVecs[j] := GetUnitVector(path[i], path[j]);
     end;
     vec := GetAvgUnitVector(unitVecs[i], unitVecs[j]);
-    angle := arccos(DotProdVecs(unitVecs[i], unitVecs[j]));
-    d := abs(Pi-angle)/TwoPi;
+    angle := arccos(Max(-1,Min(1,(DotProdVecs(unitVecs[i], unitVecs[j])))));
+    d := abs(Pi-angle)/(TwoPi * severity/3);
     d1 := pl[i] * d;
     d2 := pl[j] * d;
 
