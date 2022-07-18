@@ -147,7 +147,7 @@ function RamerDouglasPeucker(const paths: TPathsD;
 // This function is very useful in the following combination:
 // RamerDouglasPeucker(), GetSmoothPath(), FlattenCBezier().
 function GetSmoothPath(const path: TPathD;
-  pathIsClosed: Boolean; severity: integer = 3): TPathD;
+  pathIsClosed: Boolean; severity: integer = 10): TPathD;
 
 //InterpolatePoints: smooths a simple line chart.
 //Points should be left to right and equidistant along the X axis
