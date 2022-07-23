@@ -3,7 +3,7 @@ unit Img32.Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.2                                                             *
-* Date      :  18 July 2022                                                    *
+* Date      :  19 July 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -143,11 +143,10 @@ function RamerDouglasPeucker(const paths: TPathsD;
   epsilon: double): TPathsD; overload;
 
 // GetSmoothPath - produces a series of cubic bezier control points.
-// Severity parameter range: 1- 10 (10 == max smoothing)
 // This function is very useful in the following combination:
 // RamerDouglasPeucker(), GetSmoothPath(), FlattenCBezier().
 function GetSmoothPath(const path: TPathD;
-  pathIsClosed: Boolean; severity: integer = 10): TPathD;
+  pathIsClosed: Boolean; maxOffset: integer = 0): TPathD;
 
 //InterpolatePoints: smooths a simple line chart.
 //Points should be left to right and equidistant along the X axis
@@ -2027,8 +2026,8 @@ begin
   setLength(Result, len);
   for i := 0 to len -1 do
   begin
-    Result[i] := RamerDouglasPeucker(paths[i], epsilon);
-    if Result[i] <> nil then inc(j);
+    Result[j] := RamerDouglasPeucker(paths[i], epsilon);
+    if Result[j] <> nil then inc(j);
   end;
   setLength(Result, j);
 end;
@@ -2042,7 +2041,7 @@ end;
 //---------------------------------------------------------------------------
 
 function GetSmoothPath(const path: TPathD;
-  pathIsClosed: Boolean; severity: integer): TPathD;
+  pathIsClosed: Boolean; maxOffset: integer): TPathD;
 var
   i, j, len, prev: integer;
   vec: TPointD;
@@ -2054,10 +2053,6 @@ begin
   Result := nil;
   len := Length(path);
   if len < 3 then Exit;
-
-  if severity < 1 then severity := 1 else
-  if severity > 10 then severity := 10;
-  severity := 13 - severity; //min 3 and max 12
 
   SetLength(Result, len *3 +1);
   prev := len-1;
@@ -2077,10 +2072,17 @@ begin
       unitVecs[j] := GetUnitVector(path[i], path[j]);
     end;
     vec := GetAvgUnitVector(unitVecs[i], unitVecs[j]);
+
     angle := arccos(Max(-1,Min(1,(DotProdVecs(unitVecs[i], unitVecs[j])))));
-    d := abs(Pi-angle)/(TwoPi * severity/3);
+    d := abs(Pi-angle)/TwoPi;
     d1 := pl[i] * d;
     d2 := pl[j] * d;
+
+    if maxOffset > 0 then
+    begin
+      d1 := Min(maxOffset, d1);
+      d2 := Min(maxOffset, d2);
+    end;
 
     if i = 0 then
       Result[len*3-1] := OffsetPoint(path[0], -vec.X * d1, -vec.Y * d1)

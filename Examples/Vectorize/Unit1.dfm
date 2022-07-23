@@ -16,7 +16,6 @@ object Form1: TForm1
   Position = poDesktopCenter
   OnCreate = FormCreate
   OnDestroy = FormDestroy
-  OnKeyDown = FormKeyDown
   OnPaint = FormPaint
   OnResize = FormResize
   PixelsPerInch = 96
@@ -26,9 +25,14 @@ object Form1: TForm1
     Top = 409
     Width = 569
     Height = 26
-    Panels = <>
+    Panels = <
+      item
+        Width = 120
+      end
+      item
+        Width = 500
+      end>
     ParentFont = True
-    SimplePanel = True
     UseSystemFont = False
   end
   object pnlSmooth: TPanel
@@ -62,9 +66,10 @@ object Form1: TForm1
       Top = 56
       Width = 27
       Height = 118
+      Max = 50
       Orientation = trVertical
       PageSize = 0
-      Position = 7
+      Position = 30
       TabOrder = 0
       TickStyle = tsNone
       OnChange = TrackBar1Change
@@ -74,72 +79,12 @@ object Form1: TForm1
       Top = 256
       Width = 27
       Height = 118
-      Max = 5
       Orientation = trVertical
       PageSize = 0
-      Position = 2
+      Position = 4
       TabOrder = 1
       TickStyle = tsNone
       OnChange = TrackBar1Change
-    end
-  end
-  object pnlMemo: TPanel
-    Left = 0
-    Top = 0
-    Width = 512
-    Height = 409
-    Align = alClient
-    TabOrder = 2
-    Visible = False
-    object Panel3: TPanel
-      Left = 1
-      Top = 1
-      Width = 510
-      Height = 41
-      Align = alTop
-      TabOrder = 0
-      object btnCloseMemo: TButton
-        Left = 5
-        Top = 9
-        Width = 75
-        Height = 25
-        Cancel = True
-        Caption = '&Close'
-        Default = True
-        TabOrder = 0
-        OnClick = btnCloseMemoClick
-      end
-      object rbFlat: TRadioButton
-        Left = 186
-        Top = 13
-        Width = 188
-        Height = 17
-        Caption = 'Smoothed && &Flattened Paths'
-        Checked = True
-        TabOrder = 2
-        TabStop = True
-        OnClick = rbBeziersClick
-      end
-      object rbRaw: TRadioButton
-        Left = 95
-        Top = 13
-        Width = 85
-        Height = 17
-        Caption = '&Raw Paths'
-        TabOrder = 1
-        OnClick = rbBeziersClick
-      end
-    end
-    object Memo1: TMemo
-      Left = 1
-      Top = 42
-      Width = 510
-      Height = 366
-      Align = alClient
-      HideSelection = False
-      ReadOnly = True
-      ScrollBars = ssVertical
-      TabOrder = 1
     end
   end
   object MainMenu1: TMainMenu
@@ -153,8 +98,8 @@ object Form1: TForm1
         OnClick = Open1Click
       end
       object SaveAs1: TMenuItem
-        Caption = 'Save &As ...'
-        ShortCut = 16449
+        Caption = '&Save As ...'
+        ShortCut = 16467
         OnClick = SaveAs1Click
       end
       object N1: TMenuItem
@@ -169,36 +114,37 @@ object Form1: TForm1
     object View1: TMenuItem
       Caption = '&View'
       object mnuShowMonoImage: TMenuItem
-        Caption = 'Monochrome Im&age'
+        Caption = '&Monochrome Image'
         GroupIndex = 1
         RadioItem = True
-        ShortCut = 16461
+        ShortCut = 16458
         OnClick = mnuShowSimplifiedClick
       end
       object mnuShowRawPoly: TMenuItem
-        Caption = '&Raw Vector Polygons'
+        Caption = '&Raw Vectors'
         GroupIndex = 1
         RadioItem = True
-        ShortCut = 16466
+        ShortCut = 16459
         OnClick = mnuShowSimplifiedClick
       end
       object mnuShowSimplifiedSmoothed: TMenuItem
-        Caption = 'Smooth&ed && Simplified Polygons'
+        Caption = '&Smoothed && Simplified '
         Checked = True
         GroupIndex = 1
         RadioItem = True
-        ShortCut = 16467
+        ShortCut = 16460
         OnClick = mnuShowSimplifiedClick
       end
       object N3: TMenuItem
         Caption = '-'
         GroupIndex = 1
       end
-      object mnuShowPolygonCoordinates: TMenuItem
-        Caption = 'Show &Polygon Coordinates'
+      object mnuDisplayPolygonCoordinates: TMenuItem
+        AutoCheck = True
+        Caption = '&Display Polygon Coordinates'
         GroupIndex = 2
         ShortCut = 16464
-        OnClick = mnuShowPolygonCoordinatesClick
+        OnClick = mnuDisplayPolygonCoordinatesClick
       end
     end
   end
@@ -209,7 +155,7 @@ object Form1: TForm1
   end
   object SaveDialog1: TSaveDialog
     DefaultExt = '.png'
-    Filter = 'Image Files|*.bmp;*.jpg;*.png'
+    Filter = 'SVG Image|*.svg'
     Left = 112
     Top = 200
   end

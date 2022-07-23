@@ -1,8 +1,8 @@
 unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.2                                                             *
-* Date      :  30 May 2022                                                     *
+* Version   :  4.12                                                            *
+* Date      :  4 March 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -193,7 +193,7 @@ type
   function Size(cx, cy: integer): TSize;
   function SizeD(cx, cy: double): TSizeD;
   function IsClockwise(const path: TPathD): Boolean;
-  function Area(const path: TPathD): Double;
+  function Area(const path: TPathD): Double; overload;
   function RectsEqual(const rec1, rec2: TRect): Boolean;
   procedure OffsetRect(var rec: TRectD; dx, dy: double); overload;
   function MakeSquare(rec: TRect): TRect;
@@ -273,7 +273,7 @@ type
   function Distance(const path: TPathD; stopAt: integer = 0): double; overload;
   function GetDistances(const path: TPathD): TArrayOfDouble;
   function GetCumulativeDistances(const path: TPathD): TArrayOfDouble;
-  function PerpendicularDistSqrd(const pt, l1, line2: TPointD): double;
+  function PerpendicularDistSqrd(const pt, line1, line2: TPointD): double;
   function PointInPolygon(const pt: TPointD;
     const polygon: TPathD; fillRule: TFillRule): Boolean;
   function PointInPolygons(const pt: TPointD;
@@ -1318,17 +1318,23 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function PerpendicularDistSqrd(const pt, l1, line2: TPointD): double;
+function PerpendicularDistSqrd(const pt, line1, line2: TPointD): double;
 var
   a,b,c,d: double;
 begin
-  a := pt.X - l1.X;
-  b := pt.Y - l1.Y;
-  c := line2.X - l1.X;
-  d := line2.Y - l1.Y;
-  if (c = 0) and (d = 0) then
-    result := 0 else
-    result := Sqr(a * d - c * b) / (c * c + d * d);
+  if PointsEqual(line1, line2) then
+  begin
+    Result := DistanceSqrd(pt, line1);
+  end else
+  begin
+    a := pt.X - line1.X;
+    b := pt.Y - line1.Y;
+    c := line2.X - line1.X;
+    d := line2.Y - line1.Y;
+    if (c = 0) and (d = 0) then
+      result := 0 else
+      result := Sqr(a * d - c * b) / (c * c + d * d);
+  end;
 end;
 //------------------------------------------------------------------------------
 
