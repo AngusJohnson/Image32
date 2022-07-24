@@ -23,3 +23,7 @@ Extensive documentation can be found [**here**](http://www.angusj.com/delphi/ima
 
 ![svg1](https://user-images.githubusercontent.com/5280692/170443316-f5c88659-c0cd-4e68-8933-ddcfd2aa4b8a.png)<br>
 <a href="http://www.angusj.com/delphi/image32/Videos/svg101.mkv" target="_blank"><b>SVG101 video</b></a><br>
+
+![Vectorize](https://user-images.githubusercontent.com/5280692/180627317-5a10f862-6070-4753-ac3d-c714dfa4dc8f.png)<br>
+<a href="http://www.angusj.com/delphi/image32/Videos/vectorize.mkv" target="_blank"><b>Vectorize video</b></a><br>
+
