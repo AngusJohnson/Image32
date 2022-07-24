@@ -28,7 +28,7 @@ type
     TrackBar1: TTrackBar;
     TrackBar2: TTrackBar;
     lblSimplify: TLabel;
-    mnuDisplayPolygonCoordinates: TMenuItem;
+    mnuHighlightVertices: TMenuItem;
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -39,7 +39,7 @@ type
     procedure TrackBar1Change(Sender: TObject);
     procedure FormPaint(Sender: TObject);
     procedure FormResize(Sender: TObject);
-    procedure mnuDisplayPolygonCoordinatesClick(Sender: TObject);
+    procedure mnuHighlightVerticesClick(Sender: TObject);
     procedure pnlSmoothEnter(Sender: TObject);
   private
     masterImg, workImg: TImage32;
@@ -103,6 +103,10 @@ procedure TForm1.FormCreate(Sender: TObject);
 begin
   masterImg := TImage32.Create;
   masterImg.LoadFromResource('sample2', 'BMP');
+  OpenDialog1.InitialDir :=
+    ExtractFilePath(paramStr(0)) + 'sample_images';
+  ForceDirectories(OpenDialog1.InitialDir);
+  OpenDialog1.FileName := 'book.bmp';
   if masterImg.HasTransparency then
     masterImg.CropTransparentPixels;
   workImg := TImage32.Create;
@@ -225,7 +229,7 @@ begin
     StatusBar1.Panels[1].Text := ' Simplified & smoothed';
   end;
 
-  if mnuDisplayPolygonCoordinates.Checked then
+  if mnuHighlightVertices.Checked then
   begin
     DrawPolygon(workImg, flattenedPaths, frEvenOdd, $20660000);
     DrawLine(workImg, flattenedPaths, DPIAware(2), clMaroon32, esPolygon);
@@ -276,7 +280,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TForm1.mnuDisplayPolygonCoordinatesClick(Sender: TObject);
+procedure TForm1.mnuHighlightVerticesClick(Sender: TObject);
 begin
   DisplayImage;
 end;
@@ -284,8 +288,10 @@ end;
 
 procedure TForm1.SaveAs1Click(Sender: TObject);
 begin
+  SaveDialog1.InitialDir := OpenDialog1.InitialDir;
+  SaveDialog1.FileName :=
+    ChangeFileExt(ExtractFileName(OpenDialog1.FileName), '.svg');
   if not SaveDialog1.Execute then Exit;
-  //workImg.SaveToFile(SaveDialog1.FileName);
 
   with TSimpleSvgWriter.Create(frEvenOdd) do
   try

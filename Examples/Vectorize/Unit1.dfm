@@ -139,12 +139,12 @@ object Form1: TForm1
         Caption = '-'
         GroupIndex = 1
       end
-      object mnuDisplayPolygonCoordinates: TMenuItem
+      object mnuHighlightVertices: TMenuItem
         AutoCheck = True
-        Caption = '&Display Polygon Coordinates'
+        Caption = '&Highlight Vertices'
         GroupIndex = 2
         ShortCut = 16464
-        OnClick = mnuDisplayPolygonCoordinatesClick
+        OnClick = mnuHighlightVerticesClick
       end
     end
   end
