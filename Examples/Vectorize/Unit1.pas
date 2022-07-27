@@ -203,13 +203,13 @@ begin
       flattenedPaths := RamerDouglasPeucker(rawPaths,
         TrackBar2.Position * 0.5 * workImg.Width/masterImg.Width);
 
-    //note: SmoothToBezier returns poly-bezier paths (not flattened paths)
+    //note: SmoothToCubicBezier returns a bezier path (not a flattened path)
     if TrackBar1.Position > 0 then
     begin
       len := Length(flattenedPaths);
       setLength(bezierPaths, len);
       for i := 0 to len -1 do
-        bezierPaths[i] := GetSmoothPath(flattenedPaths[i],
+        bezierPaths[i] := SmoothToCubicBezier(flattenedPaths[i],
           true, TrackBar1.Position);
       //'flatten' the poly-beziers
       SetLength(flattenedPaths, Length(bezierPaths));

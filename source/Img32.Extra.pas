@@ -142,10 +142,10 @@ function RamerDouglasPeucker(const path: TPathD;
 function RamerDouglasPeucker(const paths: TPathsD;
   epsilon: double): TPathsD; overload;
 
-// GetSmoothPath - produces a series of cubic bezier control points.
+// SmoothToCubicBezier - produces a series of cubic bezier control points.
 // This function is very useful in the following combination:
-// RamerDouglasPeucker(), GetSmoothPath(), FlattenCBezier().
-function GetSmoothPath(const path: TPathD;
+// RamerDouglasPeucker(), SmoothToCubicBezier(), FlattenCBezier().
+function SmoothToCubicBezier(const path: TPathD;
   pathIsClosed: Boolean; maxOffset: integer = 0): TPathD;
 
 //InterpolatePoints: smooths a simple line chart.
@@ -2040,7 +2040,7 @@ begin
 end;
 //---------------------------------------------------------------------------
 
-function GetSmoothPath(const path: TPathD;
+function SmoothToCubicBezier(const path: TPathD;
   pathIsClosed: Boolean; maxOffset: integer): TPathD;
 var
   i, j, len, prev: integer;
@@ -2049,7 +2049,7 @@ var
   unitVecs: TPathD;
   d, angle, d1,d2: double;
 begin
-  // GetSmoothPath - returns cubic bezier control points
+  // SmoothToCubicBezier - returns cubic bezier control points
   Result := nil;
   len := Length(path);
   if len < 3 then Exit;
