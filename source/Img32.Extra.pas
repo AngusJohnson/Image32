@@ -3,7 +3,7 @@ unit Img32.Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.2                                                             *
-* Date      :  19 July 2022                                                    *
+* Date      :  28 July 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -166,7 +166,9 @@ implementation
 
 uses
   {$IFNDEF MSWINDOWS}
+  {$IFNDEF FPC}
   Img32.FMX,
+  {$ENDIF}
   {$ENDIF}
   Img32.Transform;
 

@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.2                                                             *
-* Date      :  2 July 2022                                                     *
+* Date      :  28 July 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -23,7 +23,6 @@ uses
   Types, SysUtils, Classes,
   {$IFDEF MSWINDOWS} Windows, {$IFDEF USING_VCL} Graphics,{$ENDIF}{$ENDIF}
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults, Character,{$ENDIF}
-  {$IFDEF USING_FMX} FMX.Types, FMX.Graphics,{$ENDIF}
   {$IFDEF UITYPES} UITypes,{$ENDIF} Math;
 
 type
@@ -111,17 +110,18 @@ type
 
   TInterfacedObj = class(TObject, IInterface)
   public
+  {$IFDEF FPC}
+    function  _AddRef: Integer;
+      {$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+    function  _Release: Integer;
+      {$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+    function QueryInterface(
+      {$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;
+      out obj) : longint;
+      {$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+  {$ELSE}
     function  _AddRef: Integer; stdcall;
     function  _Release: Integer; stdcall;
-  {$IFDEF FPC}
-    function QueryInterface(
-      {$IFDEF FPC_HAS_CONSTREF}constref
-      {$ELSE}const
-      {$ENDIF} iid : tguid;out obj) : longint;
-      {$IFNDEF WINDOWS}cdecl
-      {$ELSE}stdcall
-      {$ENDIF};
-  {$ELSE}
     function  QueryInterface(const IID: TGUID; out Obj): HResult; stdcall;
   {$ENDIF}
   end;
@@ -369,7 +369,7 @@ type
   PHsl = ^THsl;
   TArrayofHSL = array of THsl;
 
-  TTriState = (tsUnknown, tsYes, tsChecked = 1, tsNo, tsUnchecked = 2);
+  TTriState = (tsUnknown = 0, tsYes = 1, tsChecked = 1, tsNo = 2, tsUnchecked = 2);
 
   PPointD = ^TPointD;
   TPathD = array of TPointD;       //nb: watch for ambiguity with Clipper.pas
@@ -474,8 +474,7 @@ type
   procedure NormalizeAngle(var angle: double; tolerance: double = Pi/360);
   function GrayScale(color: TColor32): TColor32;
 
-  {$IFDEF MSWINDOWS}
-
+{$IFDEF MSWINDOWS}
   //DPIAware: Useful for DPIAware sizing of images and their container controls.
   //It scales values relative to the display's resolution (PixelsPerInch).
   //See https://docs.microsoft.com/en-us/windows/desktop/hidpi/high-DPIAware-desktop-application-development-on-windows
@@ -491,8 +490,7 @@ type
     DC6: HDC; p7, p8, p9, p10: Integer; p11: Windows.TBlendFunction): BOOL;
     stdcall; external 'msimg32.dll' name 'AlphaBlend';
   {$ENDIF}
-
-  {$ENDIF}
+{$ENDIF}
 
   //CreateResourceStream: handles both numeric and string names and types
   function CreateResourceStream(const resName: string;
@@ -1055,7 +1053,7 @@ end;
 
 function DPIAware(val: Integer): Integer;
 begin
-  result := Round( val * DpiAwareOne);
+  result := Round(val * DpiAwareOne);
 end;
 //------------------------------------------------------------------------------
 
@@ -3299,6 +3297,31 @@ end;
 // TInterfacedObj
 //------------------------------------------------------------------------------
 
+{$IFDEF FPC}
+function TInterfacedObj._AddRef: Integer;
+  {$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+begin
+  Result := -1;
+end;
+//------------------------------------------------------------------------------
+
+function TInterfacedObj._Release: Integer;
+  {$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
+begin
+  Result := -1;
+end;
+//------------------------------------------------------------------------------
+
+function TInterfacedObj.QueryInterface(
+  {$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;
+  out obj) : longint;
+begin
+  if GetInterface(IID, Obj) then Result := 0
+  else Result := E_NOINTERFACE;
+end;
+
+{$ELSE}
+
 function TInterfacedObj._AddRef: Integer; stdcall;
 begin
   Result := -1;
@@ -3311,15 +3334,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-{$IFDEF FPC}
-function TInterfacedObj.QueryInterface({$IFDEF FPC_HAS_CONSTREF}constref{$ELSE}const{$ENDIF} iid : tguid;out obj) : longint;
-{$ELSE}
-function TInterfacedObj.QueryInterface(const IID: TGUID; out Obj): HResult;
-{$ENDIF}
+function TInterfacedObj.QueryInterface(const IID: TGUID;
+  out Obj): HResult;
 begin
   if GetInterface(IID, Obj) then Result := 0
   else Result := E_NOINTERFACE;
 end;
+{$ENDIF}
 
 //------------------------------------------------------------------------------
 // Initialization and Finalization functions
