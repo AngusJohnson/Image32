@@ -2,8 +2,8 @@ unit Clipper;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  10.0 (beta) - aka Clipper2                                      *
-* Date      :  7 May 2022                                                      *
+* Version   :  Clipper2 - beta                                                 *
+* Date      :  27 July 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This module provides a simple interface to the Clipper Library  *
@@ -15,12 +15,14 @@ interface
 {$I Clipper.inc}
 
 uses
-  Clipper.Core, Clipper.Engine, Clipper.Offset;
+  Math, SysUtils, Clipper.Core, Clipper.Engine, Clipper.Offset;
 
-//Redeclare here a number of structures defined in
-//other units so those units won't need to be declared
-//just to use the following functions.
+// Redeclare here a number of structures defined in
+// other units so those units won't need to be declared
+// just to use the following functions.
 type
+  TClipper    = Clipper.Engine.TClipper64;
+  TClipper64  = Clipper.Engine.TClipper64;
   TPoint64    = Clipper.Core.TPoint64;
   TRect64     = Clipper.Core.TRect64;
   TPath64     = Clipper.Core.TPath64;
@@ -30,7 +32,7 @@ type
   TPathD      = Clipper.Core.TPathD;
   TPathsD     = Clipper.Core.TPathsD;
   TFillRule   = Clipper.Core.TFillRule;
-  TPolyTree   = Clipper.Engine.TPolyTree;
+  TPolyTree64 = Clipper.Engine.TPolyTree64;
   TPolyTreeD  = Clipper.Engine.TPolyTreeD;
   TJoinType   = Clipper.Offset.TJoinType;
   TEndType    = Clipper.Offset.TEndType;
@@ -48,10 +50,18 @@ const
   etSquare    = Clipper.Offset.etSquare;
   etRound     = Clipper.Offset.etRound;
 
+  ctNone          = Clipper.Core.ctNone;
+  ctIntersection  = Clipper.Core.ctIntersection;
+  ctUnion         = Clipper.Core.ctUnion;
+  ctDifference    = Clipper.Core.ctDifference;
+  ctXor           = Clipper.Core.ctXor;
+
 function BooleanOp(clipType: TClipType; fillRule: TFillRule;
   const subjects, clips: TPaths64): TPaths64; overload;
 function BooleanOp(clipType: TClipType; fillRule: TFillRule;
   const subjects, clips: TPathsD; decimalPrec: integer = 2): TPathsD; overload;
+procedure BooleanOp(clipType: TClipType; fillRule: TFillRule;
+  const subjects, clips: TPaths64; polytree: TPolyTree64); overload;
 
 function Intersect(const subjects, clips: TPaths64;
   fillRule: TFillRule): TPaths64; overload;
@@ -80,16 +90,24 @@ function InflatePaths(const paths: TPaths64; delta: Double;
   MiterLimit: double = 2.0): TPaths64; overload;
 function InflatePaths(const paths: TPathsD; delta: Double;
 jt: TJoinType = jtRound; et: TEndType = etPolygon;
-MiterLimit: double = 2.0): TPathsD; overload;
+miterLimit: double = 2.0; precision: integer = 2): TPathsD; overload;
 
 function MinkowskiSum(const pattern, path: TPath64;
   pathIsClosed: Boolean): TPaths64;
 
-function PolyTreeToPaths(PolyTree: TPolyTree): TPaths64;
+function PolyTreeToPaths(PolyTree: TPolyTree64): TPaths64;
 function PolyTreeDToPathsD(PolyTree: TPolyTreeD): TPathsD;
 
 function MakePath(const ints: TArrayOfInteger): TPath64; overload;
 function MakePath(const dbls: TArrayOfDouble): TPathD; overload;
+
+function TrimCollinear(const p: TPath64;
+  is_open_path: Boolean = false): TPath64; overload;
+function TrimCollinear(const path: TPathD;
+  precision: integer; is_open_path: Boolean = false): TPathD; overload;
+
+function PointInPolygon(const pt: TPoint64;
+  const polygon: TPath64): TPointInPolygonResult;
 
 implementation
 
@@ -127,7 +145,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure AddPolyNodeToPaths(Poly: TPolyPath; var Paths: TPaths64);
+procedure AddPolyNodeToPaths(Poly: TPolyPath64; var Paths: TPaths64);
 var
   i: Integer;
 begin
@@ -138,11 +156,11 @@ begin
     Paths[i] := Poly.Polygon;
   end;
   for i := 0 to Poly.ChildCount - 1 do
-    AddPolyNodeToPaths(TPolyPath(Poly.Child[i]), Paths);
+    AddPolyNodeToPaths(TPolyPath64(Poly.Child[i]), Paths);
 end;
 //------------------------------------------------------------------------------
 
-function PolyTreeToPaths(PolyTree: TPolyTree): TPaths64;
+function PolyTreeToPaths(PolyTree: TPolyTree64): TPaths64;
 begin
   Result := nil;
   AddPolyNodeToPaths(PolyTree, Result);
@@ -175,7 +193,7 @@ end;
 function BooleanOp(clipType: TClipType; fillRule: TFillRule;
   const subjects, clips: TPaths64): TPaths64;
 begin
-  with TClipper.Create do
+  with TClipper64.Create do
   try
     AddSubject(subjects);
     AddClip(clips);
@@ -194,6 +212,22 @@ begin
     AddSubject(subjects);
     AddClip(clips);
     Execute(clipType, fillRule, Result);
+  finally
+    Free;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure BooleanOp(clipType: TClipType; fillRule: TFillRule;
+  const subjects, clips: TPaths64; polytree: TPolyTree64);
+var
+  dummy: TPaths64;
+begin
+  with TClipper64.Create do
+  try
+    AddSubject(subjects);
+    AddClip(clips);
+    Execute(clipType, fillRule, polytree, dummy);
   finally
     Free;
   end;
@@ -273,6 +307,7 @@ var
 begin
   co := TClipperOffset.Create(MiterLimit);
   try
+    co.MergeGroups := true;
     co.AddPaths(paths, jt, et);
     Result := co.Execute(delta);
   finally
@@ -282,14 +317,19 @@ end;
 //------------------------------------------------------------------------------
 
 function InflatePaths(const paths: TPathsD; delta: Double;
-  jt: TJoinType; et: TEndType; MiterLimit: double): TPathsD;
+  jt: TJoinType; et: TEndType; miterLimit: double;
+  precision: integer): TPathsD;
 var
   pp: TPaths64;
-const
-  scale = 100; invScale = 0.01;
+  scale, invScale: double;
 begin
+  if (precision < -8) or (precision > 8) then
+    raise Exception.Create(rsClipper_RoundingErr);
+  scale := Power(10, precision);
+  invScale := 1/scale;
   pp := ScalePaths(paths, scale, scale);
-  with TClipperOffset.Create(MiterLimit) do
+
+  with TClipperOffset.Create(miterLimit) do
   try
     AddPaths(pp, jt, et);
     pp := Execute(delta * scale);
@@ -304,6 +344,78 @@ function MinkowskiSum(const pattern, path: TPath64;
   pathIsClosed: Boolean): TPaths64;
 begin
  Result := Clipper.Minkowski.MinkowskiSum(pattern, path, pathIsClosed);
+end;
+//------------------------------------------------------------------------------
+
+function TrimCollinear(const p: TPath64; is_open_path: Boolean = false): TPath64;
+var
+  i,j, len: integer;
+begin
+  len := Length(p);
+
+  i := 0;
+  if not is_open_path then
+  begin
+    while (i < len -1) and
+      (CrossProduct(p[len -1], p[i], p[i+1]) = 0) do inc(i);
+    while (i < len -1) and
+      (CrossProduct(p[len -2], p[len -1], p[i]) = 0) do dec(len);
+  end;
+  if (len - i < 3) then
+  begin
+    if not is_open_path or (len < 2) or PointsEqual(p[0], p[1]) then
+      Result := nil else
+      Result := p;
+    Exit;
+  end;
+
+  SetLength(Result, len -i);
+
+  Result[0] := p[i];
+  j := 0;
+  for i := i+1 to len -2 do
+    if CrossProduct(result[j], p[i], p[i+1]) <> 0 then
+    begin
+      inc(j);
+      result[j] := p[i];
+    end;
+
+  if is_open_path then
+  begin
+    inc(j);
+    result[j] := p[len-1];
+  end
+  else if CrossProduct(result[j], p[len-1], result[0]) <> 0 then
+  begin
+    inc(j);
+    result[j] := p[len-1];
+  end else
+  begin
+    while (j > 1) and
+      (CrossProduct(result[j-1], result[j], result[0]) = 0) do dec(j);
+    if j < 2 then j := -1;
+  end;
+  SetLength(Result, j +1);
+end;
+//------------------------------------------------------------------------------
+
+function TrimCollinear(const path: TPathD;
+  precision: integer; is_open_path: Boolean = false): TPathD;
+var
+  p: TPath64;
+  scale: double;
+begin
+  scale := power(10, precision);
+  p := ScalePath(path, scale);
+  p := TrimCollinear(p, is_open_path);
+  Result := ScalePathD(p, 1/scale);
+end;
+//------------------------------------------------------------------------------
+
+function PointInPolygon(const pt: TPoint64;
+  const polygon: TPath64): TPointInPolygonResult;
+begin
+  Result := Clipper.Core.PointInPolygon(pt, polygon);
 end;
 //------------------------------------------------------------------------------
 

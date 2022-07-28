@@ -2,8 +2,8 @@ unit Clipper.Minkowski;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  10.0 (beta) - aka Clipper2                                      *
-* Date      :  7 May 2022                                                      *
+* Version   :  Clipper2 - beta                                                 *
+* Date      :  20 June 2022                                                    *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  Minkowski Addition and Difference                               *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
@@ -87,7 +87,7 @@ begin
       quad[1] := tmp[i][h];
       quad[2] := tmp[i][(j)];
       quad[3] := tmp[g][(j)];
-      if not IsClockwise(quad) then
+      if not IsPositive(quad) then
         Result[k + j] := ReversePath(quad) else
         Result[k + j] := copy(quad, 0, 4);
       h := j;
