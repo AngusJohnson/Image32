@@ -122,7 +122,7 @@ implementation
 {$R Cursors.res} //rotation cursor
 
 uses
-  arrows, Img32.Draw, Img32.Extra, Img32.Vector,
+  arrows, Img32.Draw, Img32.Extra, Img32.Vector, Img32.Clipper2,
   Img32.Fmt.BMP, Img32.Fmt.QOI, Img32.Fmt.PNG, Img32.Fmt.JPG,
   Img32.Transform, Img32.Resamplers;
 

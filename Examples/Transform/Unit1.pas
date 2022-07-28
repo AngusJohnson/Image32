@@ -388,14 +388,14 @@ begin
         begin
           Image.Assign(ImageBak);
           if not SplineVertTransform(Image, ctrlPoints,
-            stQuadratic, clRed32, false, pt) then Exit;
+            stQuadratic, clRed32, pt) then Exit;
           PositionAt(pt.X, pt.Y);
         end;
       ttSplineH:
         begin
           Image.Assign(ImageBak);
           if not SplineHorzTransform(Image, ctrlPoints,
-            stQuadratic, clRed32, false, pt) then Exit;
+            stQuadratic, clRed32, pt) then Exit;
           PositionAt(pt.X, pt.Y);
         end;
     end;
