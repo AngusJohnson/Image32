@@ -1,0 +1,96 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>Arc</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
+
+    
+  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
+    <tr>
+      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
+      </td>
+      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32.Vector</a>
+      </td>
+      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
+      </td>
+    </tr>
+  </table>
+  <h1>Arc</h1>
+
+
+  <p class="Decl"><b>function</b> Arc(<b>const</b> rec: TRect; startAngle, endAngle: double): TPathD;</p>
+
+<br>
+
+  <p class="Body">The path follows an elliptical curve defined by the 'rec' parameter. Starting at 'startAngle' (where <span class="Number">0</span> degrees is at 3 o'clock) the <a href="../../Img32/Variables/Img32.htm"><b>ClockwiseRotationIsAnglePositive</b></a> variable will determine the direction in which 'endAngle' will be located. (Angles in this library are always expressed in Radians).<br><br></p>
+
+
+  <p class="Body"> <div class="Code">
+      <pre class="brush: delphi;">
+uses 
+  Img32, Img32.Fmt.PNG, Img32.Vector, Img32.Draw;
+...
+var
+  path, path2: TPathD;
+  rec: TRect;
+  img: TImage32;
+begin
+  img := TImage32.create(256,256);
+  rec := Rect(10,30, 256-10, 256-30);
+  path := Ellipse(rec);
+  DrawLine(img1, path, 20, clNavy32, esPolygon);
+  path := Arc(rec, 90 *Pi/180, 360 *Pi/180);
+  DrawLine(img1, path, 5, clYellow32, esRound);
+  img.SaveToFile('arc.png');
+  img.Free;
+      </pre></div> 
+    <table class="white">
+      <tr>
+  
+        <td>
+    <img src="../../../../Images/arc.png">
+  
+        </td>
+
+      </tr>
+
+    </table> </p>
+
+
+
+
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="Pie.htm">Pie</a>, <a href="../../Img32/Variables/Img32.htm">Img32</a></p>
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>

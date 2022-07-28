@@ -1,0 +1,152 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>TFontCache</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet" href="../../../../../Styles/Default.css" type="text/css">
+
+  <meta name="Ancestor" content="">
+
+    
+  <script type="text/javascript" src="../../../../../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
+    <tr>
+      <td class="Banner" nowrap=""><a href="../../../../_Body.htm" class="Banner"><img src="../../../../../Images/_Home.png" align="absmiddle">Index</a>
+      </td>
+      <td class="Banner" nowrap=""><a href="../../_Body.htm" class="Banner"><img src="../../../../../Images/_Unit.png" align="absmiddle">Img32.Text</a>
+      </td>
+      <td class="Banner" width="100%" align="right"><img src="../../../../../Images/_Project_Logo.png" align="absmiddle">
+      </td>
+    </tr>
+  </table>
+  <h1>TFontCache</h1>
+
+  <p class="Body"><span class="monobold">TFontCache</span> dramatically improves text rendering performance over directly accessing <span class="monobold">TFontReader</span> objects. Font files only need to be parsed once for each character accessed, and the glyph data returned is cached for later reuse.<br><br> <div class="Code">
+      <pre class="brush: delphi;">
+const
+  text = 'some text';
+var
+  image       : TImage32;
+  rec         : TRect;
+  arialReader  : TFontReader;
+  arial14Cache: TFontCache;
+begin
+  ... 
+  //The following line of code assumes compiling to the Windows platform.
+  //For cross-platform applications, consider storing the font in the
+  //application's resource section, and loading it from there.
+  arialReader := TFontReader.Create('Arial'); 
+  //create a font cache for arialReader (with font height 14)
+  arial14Cache := TFontCache.Create(arialReader, DpiAware(14));
+  try
+    //now do something with arial14Cache
+    DrawText(image, rec, text, taCenter, tvaMiddle, arial14Cache);
+  finally
+    //clean up
+    arialReader.Free;
+    arial14Cache.Free;
+  end;
+      </pre></div> </p>
+
+  <h2 id="Auto-Reference">Reference</h2>
+  <table>
+    <tr>
+      <th>Methods</th>
+      <th>Properties</th>
+    </tr>
+    <tr>
+      <td colspan="2" class="White">In TFontCache:
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Methods/Clear.htm">Clear</a>
+      </td>
+      <td><a href="Properties/Ascent.htm">Ascent</a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Methods/Create.htm">Create</a>
+      </td>
+      <td><a href="Properties/Descent.htm">Descent</a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Methods/Destroy.htm">Destroy</a>
+      </td>
+      <td><a href="Properties/FontHeight.htm">FontHeight</a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Methods/GetAngledTextGlyphs.htm">GetAngledTextGlyphs</a>
+      </td>
+      <td><a href="Properties/FontReader.htm">FontReader</a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Methods/GetCharInfo.htm">GetCharInfo</a>
+      </td>
+      <td><a href="Properties/InvertY.htm">InvertY</a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Methods/GetCharOffsets.htm">GetCharOffsets</a>
+      </td>
+      <td><a href="Properties/Kerning.htm">Kerning</a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Methods/GetTextOutline.htm">GetTextOutline</a>
+      </td>
+      <td><a href="Properties/LineHeight.htm">LineHeight</a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Methods/GetTextWidth.htm">GetTextWidth</a>
+      </td>
+      <td><a href="Properties/Scale.htm">Scale</a>
+      </td>
+    </tr>
+    <tr>
+      <td>
+      </td>
+      <td><a href="Properties/StrikeOut.htm">StrikeOut</a>
+      </td>
+    </tr>
+    <tr>
+      <td>
+      </td>
+      <td><a href="Properties/Underlined.htm">Underlined</a>
+      </td>
+    </tr>
+  </table>
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+
+</html>

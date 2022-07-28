@@ -1,0 +1,366 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../../../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>Img32</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <link rel="stylesheet" href="../../../Styles/Default.css" type="text/css">
+
+    
+  <script type="text/javascript" src="../../../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
+    <tr>
+      <td class="Banner" nowrap=""><a href="../../_Body.htm" class="Banner"><img src="../../../Images/_Home.png" align="absmiddle">Index</a>
+      </td>
+      <td class="Banner" width="100%" align="right"><img src="../../../Images/_Project_Logo.png" align="absmiddle">
+      </td>
+    </tr>
+  </table>
+  <h1>Img32</h1>
+
+
+  <p class="Body">This unit is the core of the Image32 library as it contains the <a href="./Classes/TImage32/_Body.htm"><b>TImage32</b></a> class that's used in just about every graphics operation. This unit also contains numerous type definitions and miscellaneous functions.</p>
+
+
+  <h2 id="Auto-Contents">Contents</h2>
+  <table>
+    <tr>
+      <th>Types</th>
+      <th>Classes</th>
+      <th>Routines</th>
+      <th>Variables</th>
+      <th>Constants</th>
+    </tr>
+    <tr>
+      <td><a href="Types/PARGB.htm">PARGB</a>
+      </td>
+      <td><a href="Classes/TImage32/_Body.htm">TImage32</a>
+      </td>
+      <td><a href="Routines/AdjustHue.htm">AdjustHue</a>
+      </td>
+      <td><a href="Variables/Img32.htm">Img32</a>
+      </td>
+      <td><a href="Constants/Img32.htm">Img32</a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/PArgbArray.htm">PArgbArray</a>
+      </td>
+      <td><a href="Classes/TImageFormat/_Body.htm">TImageFormat</a>
+      </td>
+      <td><a href="Routines/BlendBlueChannel.htm">BlendBlueChannel</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/PColor32.htm">PColor32</a>
+      </td>
+      <td><a href="Classes/TImageList32/_Body.htm">TImageList32</a>
+      </td>
+      <td><a href="Routines/BlendDarken.htm">BlendDarken</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/PPointD.htm">PPointD</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/BlendInvertedMask.htm">BlendInvertedMask</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TARGB.htm">TARGB</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/BlendLighten.htm">BlendLighten</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TArrayOfARGB.htm">TArrayOfARGB</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/BlendMask.htm">BlendMask</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TArrayOfByte.htm">TArrayOfByte</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/BlendToAlpha.htm">BlendToAlpha</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TArrayOfColor32.htm">TArrayOfColor32</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/BlendToOpaque.htm">BlendToOpaque</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TArrayOfDouble.htm">TArrayOfDouble</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/Color32.htm">Color32</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TArrayOfInteger.htm">TArrayOfInteger</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/CompareAlpha.htm">CompareAlpha</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TBlendFunction.htm">TBlendFunction</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/CompareHue.htm">CompareHue</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TColor32.htm">TColor32</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/CompareRGB.htm">CompareRGB</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TCompareFunction.htm">TCompareFunction</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/DpiAware.htm">DpiAware</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TCompareFunctionEx.htm">TCompareFunctionEx</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/GetBoolMask.htm">GetBoolMask</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/THsl.htm">THsl</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/GetByteMask.htm">GetByteMask</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TImageFormatClass.htm">TImageFormatClass</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/HslToRgb.htm">HslToRgb</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TPathD.htm">TPathD</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/InvertColor.htm">InvertColor</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TPathsD.htm">TPathsD</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/IsEmptyRect.htm">IsEmptyRect</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TPointD.htm">TPointD</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/NormalizeAngle.htm">NormalizeAngle</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TRectD.htm">TRectD</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/PointD.htm">PointD</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TTileFillStyle.htm">TTileFillStyle</a>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/RectD.htm">RectD</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/RectHeight.htm">RectHeight</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/RectWidth.htm">RectWidth</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/RegisterResampler.htm">RegisterResampler</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td>
+      </td>
+      <td>
+      </td>
+      <td><a href="Routines/RgbtoHsl.htm">RgbtoHsl</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+  </table>
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="Classes/TImage32/_Body.htm">TImage32</a></p>
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>

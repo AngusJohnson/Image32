@@ -1,0 +1,104 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>SmoothToCubicBezier</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
+
+    
+  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
+    <tr>
+      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
+      </td>
+      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32.Extra</a>
+      </td>
+      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
+      </td>
+    </tr>
+  </table>
+  <h1>SmoothToCubicBezier</h1>
+
+
+  <p class="Decl"><b>function</b> SmoothToCubicBezier(<b>const</b> path: TPathD; pathIsClosed: Boolean; maxOffset: integer = 0): TPathD;</p>
+  
+<br>
+
+  <p class="Body"> This function uses a custom algorithm to insert CBezier control points into the specified path. The resulting bezier path can then be very easily converted into a flattened path by using the <a href="../../Img32.Vector/Routines/FlattenCBezier.htm"><b>FlattenCBezier</b></a> function.<br><br> The algorithm uses the angle at each vertex to determine the amount of smoothing, with very wide angles being smoothed much more than very narrow angles. The <span class="monobold">maxOffset</span> parameter can be used to restrict the amount of smoothing applied. When this parameter is zero, smoothing is determined by the size of each angle (as a fraction of 180 degrees) multiplied by half the length of the adjacent edge. When <span class="monobold">maxOffset</span> is greater than zero, this value specifies the maximum distance allowed for each control point from its adjacent vertex.</p><br>
+
+
+  <table class="white">
+    <tr>
+  
+      <td>
+    maxOffset = 0<br>
+    <img src="../../../../Images/SmoothToCBezier1.png" align="right">
+  
+      </td>
+  
+      <td>
+    maxOffset = 10<br>
+    <img src="../../../../Images/SmoothToCBezier2.png" align="right">
+  
+      </td>
+
+    </tr>
+  </table>
+
+
+  <p class="Body"> There are many applications for path smoothing, but there's one application where path smoothing is particularly useful. When 'vectorizing' raster images, the rough paths that are frequently produced by <a href="../../Img32.Extra/Routines/Vectorize.htm"><b>Vectorize</b></a> are ideal for smoothing, especially when combined with <a href="../../Img32.Extra/Routines/RamerDouglasPeucker.htm"><b>RamerDouglasPeucker</b></a>. </p><br>
+
+
+
+  <table class="white">
+    <tr>
+  
+      <td>
+    Monochrome raster image:<br>
+    <img src="../../../../Images/SmoothLine1.png">
+  
+      </td>
+  
+      <td>
+    Vectorized, simplified and smoothed:<br>
+    <img src="../../../../Images/SmoothLine2.png">
+  
+      </td>
+
+    </tr>
+  </table>
+
+
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="RamerDouglasPeucker.htm">RamerDouglasPeucker</a>, <a href="Vectorize.htm">Vectorize</a>, <a href="../../Img32.Vector/Routines/FlattenCBezier.htm">FlattenCBezier</a></p>
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>

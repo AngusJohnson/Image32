@@ -1,0 +1,104 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>ArrowHead</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
+
+    
+  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
+    <tr>
+      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
+      </td>
+      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32.Vector</a>
+      </td>
+      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
+      </td>
+    </tr>
+  </table>
+  <h1>ArrowHead</h1>
+
+
+  <p class="Decl"><b>function</b> ArrowHead(<b>const</b> arrowTip, controlPt: TPointD; size: double; arrowStyle: TArrowStyle): TPathD;</p>
+
+<br>
+
+  <p class="Body">The controlPt's only function is to control the angle of the arrow.</p><br>
+
+
+  <p class="Body"> <div class="Code">
+      <pre class="brush: delphi;">
+uses
+  Img32, Img32.Fmt.PNG, Img32.Vector, Img32.Draw;
+...
+var
+  img: TImage32;
+  pts: array [0..3] of TPointD;
+  path, head, tail: TPathD;
+  lineWidth, arrowHeadSize: integer;
+begin
+  pts[0] := PointD(20,20);
+  pts[1] := PointD(130,20);
+  pts[2] := PointD(130,240);
+  pts[3] := PointD(240,240);
+  lineWidth := 5;
+  arrowHeadSize := GetDefaultArrowHeadSize(lineWidth);
+  //create a curved path and then shorten it to accommodate arrow heads
+  path := FlattenCBezier(pts[0], pts[1], pts[2], pts[3]);
+  path := ShortenPath(path, peBothEnds, arrowHeadSize);
+  //create the arrow heads
+  tail := ArrowHead(pts[0], path[0], arrowHeadSize, asCircle);
+  head := ArrowHead(pts[3], path[High(path)], arrowHeadSize, asFancy);
+
+  //draw the path and the arrow heads
+  img := TImage32.Create(256,256);
+  DrawLine(img, path, lineWidth, clBlack32, esRound);
+  DrawLine(img, tail, lineWidth, clBlack32, esPolygon);
+  DrawLine(img, head, lineWidth, clBlack32, esPolygon);
+  img.SaveToFile('arrow.png');
+  img.Free;
+      </pre></div> 
+    <table class="white">
+      <tr>
+  
+        <td><img src="../../../../Images/arrow.png">
+        </td>
+
+      </tr>
+
+    </table> </p>
+
+
+
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>

@@ -1,0 +1,73 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>Installation</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet" href="../Styles/Default.css">
+
+    
+  <script type="text/javascript" src="../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <script language="JavaScript1.2" src="../Scripts/menu_data.js"></script>
+  <script language="JavaScript1.2" src="../Scripts/menu_script.js"></script><br>
+
+  <h1>Installation</h1>
+
+
+  <p class="Body"> <b>Step1:</b><br><br> Extract the Img32 folder containing the library module to your preferred location in your file system using Windows Explorer.<br><br> <b>Step2:</b><br><br> Option1: To install Img32 for use in multiple projects:<br> In the Delphi IDE menu, select:<br> <span class="pascalcode"><b>Tools | Options | Delphi Options | Library</b></span><br> then choose your <span class="pascalcode"><b>Selected Platform</b></span> (eg 32bit Windows) and<br> add the Img32 folder (Step 1) to both <span class="pascalcode"><b>Library Path</b></span> and <span class="pascalcode"><b>Browsing Path</b></span>.<br><br> Option2: To install Img32 for use in a single project:<br> In the Delphi IDE menu, select:<br> <span class="pascalcode"><b>Project | Options | Delphi Compiler</b></span><br> then add the Img32 folder (Step 1) to <span class="pascalcode"><b>Search Path</b></span><br><br> </p>
+
+
+  <h2>What, no components!?</h2>
+
+  <p class="Body"> Well there is one feature rich image viewer, the <a href="Img32.Panels/_Body.htm"><b>TImage32Panel</b></a> component. While this component is likely to be very useful, the library has been designed so it's easy to draw images onto any component with a canvas, whether a TForm, a TImage or whatever.<br> However, if you do want to install the <span class="monobold">TImage32Panel</span> component into Delphi's IDE, then you'll need to install the library's runtime and designtime packages (in that order). These will be found in the <b>source/Packages</b> folder. <div class="Code">
+      <pre class="brush: delphi;">
+uses Img32;
+...
+img := TImage32.Create;
+//DO STUFF WITH img
+
+//Assumes a standard TImage (Image1) component has been 
+//dropped somewhere onto a form in the Delphi IDE.   
+Image1.Picture.Bitmap.SetSize(img.Width, img.Height);
+//if 'img' is semi-transparent then fill the target background
+Image1.Picture.Bitmap.Canvas.Brush.Color := clBtnFace;
+Image1.Picture.Bitmap.Canvas.FillRect(Image1.ClientRect);
+//now copy 'img' to Image1
+img.CopyToDc(Image1.Picture.Bitmap.Canvas.Handle);
+img.Free;
+      </pre></div> </p>
+
+
+
+
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="_Body.htm"><b>Index</b></a>, <a href="Img32.Panels/_Body.htm">Img32.Panels</a></p>
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>

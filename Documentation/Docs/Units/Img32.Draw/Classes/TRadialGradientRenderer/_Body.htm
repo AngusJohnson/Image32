@@ -1,0 +1,149 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>TRadialGradientRenderer</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <link rel="stylesheet" href="../../../../../Styles/Default.css" type="text/css">
+
+  <meta name="Ancestor" content="TCustomGradientRenderer">
+
+    
+  <script type="text/javascript" src="../../../../../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
+    <tr>
+      <td class="Banner" nowrap=""><a href="../../../../_Body.htm" class="Banner"><img src="../../../../../Images/_Home.png" align="absmiddle">Index</a>
+      </td>
+      <td class="Banner" nowrap=""><a href="../../_Body.htm" class="Banner"><img src="../../../../../Images/_Unit.png" align="absmiddle">Img32.Draw</a>
+      </td>
+      <td class="Banner" width="100%" align="right"><img src="../../../../../Images/_Project_Logo.png" align="absmiddle">
+      </td>
+    </tr>
+  </table>
+  <h1>TRadialGradientRenderer</h1>
+  <h2>Hierarchy</h2>
+  <p class="Hierarchy"></p>
+  <p class="Hierarchy">&nbsp;&nbsp;&nbsp;|</p>
+  <p class="Hierarchy"><a href="../TCustomRenderer/_Body.htm">TCustomRenderer</a></p>
+  <p class="Hierarchy">&nbsp;&nbsp;&nbsp;|</p>
+  <p class="Hierarchy"><a href="../TCustomGradientRenderer/_Body.htm">TCustomGradientRenderer</a></p>
+
+
+  <p class="Body"> 
+    <table class="white" style="margin-left: 0px;">
+
+      <tr>
+  
+        <td>
+    <div class="Code">
+            <pre class="brush: delphi;">
+uses Img32, Img32.Fmt.PNG, Img32.vector, Img32.Draw;
+  ...
+var
+  rec: TRect;
+  path: TPathD;
+  rgr: TRadialGradientRenderer;
+  img: TImage32;
+begin
+  img := TImage32.Create(256,256);
+  rec := Rect(86,86, 170,170);
+  path := Rectangle(img.Bounds);  
+  rgr := TSvgRadialGradientRenderer.Create;
+  rgr.SetParameters(rec, clFuchsia32, $FF3333FF, gfsMirror);
+  rgr.InsertColorStop(0.3, clRed32);
+  rgr.InsertColorStop(0.4, clYellow32);
+  rgr.InsertColorStop(0.5, clYellow32);
+  rgr.InsertColorStop(0.7, clLime32);
+  rgr.InsertColorStop(0.8, clAqua32);
+  DrawPolygon(img, path, frEvenOdd, rgr);
+  DrawLine(img, path, 3, clMaroon32, esPolygon);
+  img.SaveToFile('radial_gradient.png');
+  rgr.Free;
+  img.Free;
+end;
+            </pre></div>
+  
+        </td>
+
+      </tr>
+
+      <tr>
+  
+        <td>
+    <img src="../../../../../Images/RadialGradient.png">
+  
+        </td>
+
+      </tr>
+
+    </table> </p>
+
+
+  <h2 id="Auto-Reference">Reference</h2>
+  <table>
+    <tr>
+      <th>Methods</th>
+    </tr>
+    <tr>
+      <td colspan="1" class="White">In TRadialGradientRenderer:
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Methods/Initialize.htm">Initialize</a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Methods/InsertColorStop.htm">InsertColorStop</a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Methods/RenderProc.htm">RenderProc</a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Methods/SetGradientFillStyle.htm">SetGradientFillStyle</a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Methods/SetParameters.htm">SetParameters</a>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="1" class="White">In TCustomGradientRenderer:
+      </td>
+    </tr>
+    <tr>
+      <td><a href="../TCustomGradientRenderer/Methods/Clear.htm">Clear</a>
+      </td>
+    </tr>
+  </table>
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>

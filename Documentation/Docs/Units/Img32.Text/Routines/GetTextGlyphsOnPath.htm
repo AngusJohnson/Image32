@@ -1,0 +1,87 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>GetTextGlyphsOnPath</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
+
+    
+  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
+    <tr>
+      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
+      </td>
+      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32.Text</a>
+      </td>
+      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
+      </td>
+    </tr>
+  </table>
+  <h1>GetTextGlyphsOnPath</h1>
+
+
+  <p class="Decl"><b>function</b> GetTextGlyphsOnPath(<b>const</b> text: UnicodeString; <b>const</b> path: TPathD; TFontCache: <a href="../Classes/TFontCache/_Body.htm"><b>TFontCache</b></a>; textAlign: <a href="../Types/TTextAlign.htm"><b>TTextAlign</b></a>; perpendicOffset: integer = 0; charSpacing: double = 0): <a href="../../Img32/Types/TPathsD.htm"><b>TPathsD</b></a>;<br></p>
+
+
+  <p class="Body"> <img id="img" src="../../../../Images/GetTextGlyphsOnPath.png"><br><br> <div class="Code">
+      <pre class="brush: delphi;">
+var
+  img2: TImage32;
+  p: TPathD;
+  pp: TPathsD;
+  fr: TFontReader;
+  gc: TFontCache;
+begin
+  fr := TFontReader.Create('Arial');
+  gc := TFontCache.Create(fr, 20);
+  img2 := TImage32.Create(500,460);
+  try
+    p := MakePathD([50,400, 50,50, 450,400, 450,50]);
+    p := FlattenCBezier(p);
+    pp := GetTextGlyphsOnPath(
+      'The quick brown fox jumps over the lazy dog', p, gc, taCenter, 5, 3);
+    img2.Clear(clWhite32);
+    DrawLine(img2, p, 1, clRed32, esButt, jsAuto);
+    DrawPolygon(img2, pp, frNonZero, clBlack32);
+    img2.SaveToFile('c:\temp\tmp.png');
+  finally
+    img2.free;
+    gc.Free;
+    fr.Free;
+  end;
+      </pre></div> </p>
+
+
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="../Classes/TFontCache/_Body.htm">TFontCache</a>, <a href="../Types/TTextAlign.htm">TTextAlign</a>, <a href="../../Img32/Types/TPathsD.htm">TPathsD</a></p>
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>

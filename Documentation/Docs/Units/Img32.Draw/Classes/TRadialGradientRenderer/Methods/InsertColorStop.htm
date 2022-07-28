@@ -1,0 +1,119 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../../../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../../../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../../../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../../../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>InsertColorStop</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <link rel="stylesheet" href="../../../../../../Styles/Default.css" type="text/css">
+
+    
+  <script type="text/javascript" src="../../../../../../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
+    <tr>
+      <td class="Banner" nowrap=""><a href="../../../../../_Body.htm" class="Banner"><img src="../../../../../../Images/_Home.png" align="absmiddle">Index</a>
+      </td>
+      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../../../Images/_Unit.png" align="absmiddle">Img32.Draw</a>
+      </td>
+      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../../../Images/_Class.png" align="absmiddle">TRadialGradientRenderer</a>
+      </td>
+      <td class="Banner" width="100%" align="right"><img src="../../../../../../Images/_Project_Logo.png" align="absmiddle">
+      </td>
+    </tr>
+  </table>
+  <h1>TRadialGradientRenderer.InsertColorStop</h1>
+
+
+  <p class="Decl"><b>procedure</b> InsertColorStop(offsetFrac: single; color: TColor32);</p>
+
+<br>
+
+  <p class="Body">Apart from innermost and outermost gradient colors (see <a href="./SetParameters.htm"><b>SetParameters</b></a>), additional colors can be inserted into the color gradient. The innermost color's offset is 0 (zero) and the outermost color's offset is 1, so when inserting additional colors into the gradient, the 'offsetFrac' parameter needs to be between 0 and 1.<br><br> </p>
+
+
+  <p class="Body"> 
+    <table class="white">
+
+      <tr>
+  
+        <td>
+    <div class="Code">
+            <pre class="brush: delphi;">
+  uses Img32, Img32.Fmt.PNG, Img32.vector, Img32.Draw;
+  ...
+  var
+    img: TImage32;
+    path: TPathD;
+    rec: TRect;
+    radGradRend: TRadialGradientRenderer;
+  begin
+    img.SetSize(256,256);
+    rec := img.Bounds;
+    Windows.InflateRect(rec, -3,-3);
+    path := Pie(rec, angle15, -angle15);
+    
+    //do the drawing
+    DrawLine(img, path, 1, clBlack32, esPolygon);
+    radGradRend := TRadialGradientRenderer.Create;
+    radGradRend.SetParameters(rec, clFuchsia32, clBlue32);
+    radGradRend.InsertColorStop(0.3, clRed32);
+    radGradRend.InsertColorStop(0.4, clYellow32);
+    radGradRend.InsertColorStop(0.5, clYellow32);
+    radGradRend.InsertColorStop(0.7, clLime32);
+    radGradRend.InsertColorStop(0.8, clAqua32);
+    DrawPolygon(img, path, frNonZero, radGradRend);
+    radGradRend.Free;
+    DrawLine(img, path, 5, clMaroon32, esPolygon);
+
+    img.SaveToFile('pacman3.png');
+    img.Free;
+  end;
+            </pre></div>
+  
+        </td>
+
+      </tr>
+
+      <tr>
+  
+        <td>
+    <img src="../../../../../../Images/radial_gradient.png">
+  
+        </td>
+
+      </tr>
+
+    </table> </p>
+
+
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="SetParameters.htm">SetParameters</a></p>
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>

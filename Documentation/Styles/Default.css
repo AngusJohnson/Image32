@@ -1,0 +1,305 @@
+/*:root {
+  --color1: #009126;
+  --color2: #00CC35;
+}*/
+
+
+body { 
+  font-family: Verdana, Tahoma, serif;
+  font-size: 1em;
+  margin: 2px 0;
+}
+
+/*p.Hierarchy {
+	margin-top: 0;
+	margin-left : 40px;
+	margin-bottom : 0;
+	font-size : 100%;
+}*/
+
+li {
+  margin-top: 3px;
+  margin-bottom: 5px;
+}
+
+ol {
+  max-width: 860px;
+}
+
+ul {
+  max-width: 860px;
+}
+
+.Code {
+  font-family: Arial, Helvetica, sans-serif;
+  margin-left: 40px;  
+  margin-right: 40px;   
+  margin-top: 0px;
+  margin-bottom: 0px;
+}
+
+/*.syntaxhighlighter { 
+   overflow-y: hidden !important; 
+   overflow-x: auto !important; 
+ }*/
+ 
+.Comment {
+  margin-left: 40px;
+  margin-right: 20px;
+  font-size: 90%;  
+  font-weight: 500; /*ie semibold*/
+  font-style: italic;  
+  color: #206020;
+}
+
+.Number {
+  font-weight: 600; 
+  color: #008800;
+}
+
+.Maroon {
+  color: Maroon;
+}
+
+p.Decl {
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #E0E0E0;
+  padding-top: 3px;
+  padding-right: 10px;
+  padding-left: 10px;
+  padding-bottom: 3px;
+  margin-left: 40px; 
+  margin-top: 0px; 
+  margin-right: 20px; 
+  margin-bottom: 0px;
+  max-width: 860px;
+}
+
+p {
+  margin-left: 40px;
+	margin-right: 40px;
+  margin-top: 5pt;
+  margin-bottom: 5pt;
+  max-width: 860px;
+}
+
+hr {
+  margin-left: 40px; 
+  max-width: 860px;
+}
+
+h1 {
+  font-size: 150%;
+  margin-top: 5pt;
+  margin-bottom: 16pt;
+  margin-left: 20px;
+}
+
+h2 {
+  font-size: 120%;
+  margin-left: 40px;
+  margin-bottom: 4pt;
+  margin-top: 16px; 
+  padding-left: 0px;
+}
+
+h3 {
+  font-size: 110%;
+  margin-left: 40px;
+  margin-bottom: 4pt;
+  margin-top: 16px; 
+  padding-left: 0px;
+}
+
+table {  
+  border: none;
+  margin-left: 40px;
+	margin-right: 40px;
+  border-color: #FFFFFF; 
+  max-width: 900px;
+}
+
+th {  
+  font-family: Verdana, Arial, Helvetica, sans-serif;
+  background-color: #F0F0F0; 
+  text-align: left;
+  padding-right: 4pt; 
+}
+
+td {  
+  font-family: Verdana, Arial, Helvetica, sans-serif; 
+  font-size: 100%;
+  background-color: #F0F0F0;
+  padding-right: 4pt; 
+  min-width: 160px;
+}
+
+table .Code {
+  /*don't double indent code inside tables*/
+  margin-left: 0;  
+}
+
+p table {
+  margin-left: 0;  
+  /*don't double indent tables inside paragraphs*/
+}
+
+p.Decl table {
+  background-color: #E0E0E0;  
+  min-width: 400px;
+}
+
+p.Decl td {
+  background-color: #E0E0E0;  
+  min-width: 0;
+  padding-right:10px;   
+}
+
+p.Decl td.field {
+  padding-left:30px; 
+  width:auto; 
+  white-space:nowrap
+}
+
+p.Decl td.type {
+  width:100%; 
+}
+
+div td {
+  min-width: 10px;
+}
+
+.White td {  
+  font-family: Verdana, Arial, Helvetica, sans-serif; 
+  font-size: 100%;
+  background-color: #FFFFFF; 
+  padding-right: 4pt; 
+}
+
+table.Banner  { 
+  color: white; font-size: 100%; background-color: #009126; margin-top: 0; margin-right: 0; margin-left: 0; padding: 3pt 4pt; width: 100%; cellpadding: 0; cellspacing: 0; max-width: 940px;
+}
+
+td.Banner { 
+  background-color: #009126;
+  font-size: 100%;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  min-width: 100px;
+}
+
+th.Home {
+  background-color: #FFFFFF; 
+  padding: 4pt 0;
+  font-size: 120%; 
+  text-align: left;
+}
+
+table.menu { 
+  color: white; background-color: #009126; visibility: hidden; cursor: pointer; margin-top: 0; margin-right: 0; margin-left: 0; padding: 5px; position: static; border-style: none; max-width: 940px;
+}
+  
+table.menudrop  { 
+  color: white; background-color: #009126; visibility: hidden; cursor: pointer; margin-left: 0; margin-top: 5px; padding: 5px; position: absolute; border: 1px solid #444475;
+}
+
+table.menu td { 
+  font-size: 100%; background-color: #009126; white-space: nowrap; margin: 0; padding: 5px 15px 5px 5px; min-width: 100px;
+}
+
+table.menudrop td { 
+  font-size: 100%; background-color: #009126; white-space: nowrap; margin: 0; padding: 5px; 
+}
+
+a:link { color: blue; text-decoration: none }
+a:visited { color: blue; text-decoration: none }
+a:hover { color: black; text-decoration: none; background-color: #00CC35;}
+
+a:link.Banner { 
+  text-decoration: none;
+  color: white;
+}
+a:visited.Banner { 
+  text-decoration: none;
+  color : white;
+}
+a:hover.Banner {
+  background-color: #009126;
+  text-decoration: underline;
+  color: white;
+}
+a.Bold {
+  font-weight: bold;
+}
+
+li {  
+  list-style-position: outside; 
+  list-style-type: square;
+  margin-top: 3pt; margin-bottom: 3pt;
+  margin-left: 1em;
+}
+
+ul {
+  margin-top: 8pt;
+  margin-bottom : 8pt;
+}
+
+
+img {
+  margin: 0; 
+  border-width: 0; 
+  padding: 0; 
+}
+
+span.sub {  
+  font-size: 80%; 
+  vertical-align: sub;
+}
+
+span.monobold {
+  font-family: Lucida Console, Courier, monospace;
+  font-weight: 900; 
+  font-size: 110%;  
+}
+
+p.Hidden {
+  visibility: hidden; 
+}
+
+.Tree {  
+  margin: 0; 
+  padding: 0 5px; 
+  font-size: 1em;
+  min-width: 280px;
+}
+
+span.Menu {
+  font-weight: bold; 
+  color: #402000
+}
+
+.Copyright {font-size: 70%; color: #808090; text-align: center; font-family: Tahoma, Arial, sans-serif}
+
+.pascalcode {
+  font-family: "Courier New", Courier, mono;
+}
+
+div {
+  max-width: 900px;
+}
+
+#mainmenu  { position: static }
+
+div.cols5 {
+  -webkit-columns: 5 200px;
+  -moz-columns: 5 200px;
+  columns: 5 200px;
+  background-color: #EEE;
+  padding: 5px;
+}
+
+.cols5 p {
+  margin-top: 0;
+  margin-bottom: 5px;
+}
+

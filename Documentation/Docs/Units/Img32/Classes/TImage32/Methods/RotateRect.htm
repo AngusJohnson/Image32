@@ -1,0 +1,97 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../../../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../../../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../../../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../../../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>RotateRect</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <link rel="stylesheet" href="../../../../../../Styles/Default.css" type="text/css">
+
+    
+  <script type="text/javascript" src="../../../../../../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
+    <tr>
+      <td class="Banner" nowrap=""><a href="../../../../../_Body.htm" class="Banner"><img src="../../../../../../Images/_Home.png" align="absmiddle">Index</a>
+      </td>
+      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../../../Images/_Unit.png" align="absmiddle">Img32</a>
+      </td>
+      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../../../Images/_Class.png" align="absmiddle">TImage32</a>
+      </td>
+      <td class="Banner" width="100%" align="right"><img src="../../../../../../Images/_Project_Logo.png" align="absmiddle">
+      </td>
+    </tr>
+  </table>
+  <h1>TImage32.RotateRect</h1>
+
+
+  <p class="Decl"><b>procedure</b> RotateRect(<b>const</b> rec: TRect; angleRads: single; eraseColor: TColor32 = clNone32);</p>
+
+<br>
+
+  <p class="Body">Rotates part of an image, but also clips those parts of the rotated image that fall outside rec. The 'eraseColor' parameter indicates the color to back fill the rotated corners.</p>
+
+
+
+  <p class="Body"> 
+    <h3>Example</h3> <div class="Code">
+      <pre class="brush: delphi;">
+  uses Img32, Img32.Fmt.PNG;
+  ...
+  var
+    img: TImage32;
+    rec: TRect;
+  begin
+    img := TImage32.Create;
+    img.LoadFromFile('fruit.png');
+    rec := img.Bounds;
+    Windows.InflateRect(rec, -20,-20);
+    img.RotateRect(rec, angle45);
+    img.SaveToFile('fruit_rotrect45.png');
+    img.Free;
+  end;
+      </pre></div> 
+    <table class="white">
+
+      <tr>
+  
+        <td valign="top">Before:<br><img src="../../../../../../Images/fruit.png">
+        </td>
+  
+        <td>After:<br><img src="../../../../../../Images/fruit_rotrect45.png">
+        </td>
+
+      </tr>
+
+    </table> </p>
+
+
+
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>

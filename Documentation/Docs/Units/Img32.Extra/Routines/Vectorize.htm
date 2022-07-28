@@ -1,0 +1,105 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>Vectorize</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
+
+    
+  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
+    <tr>
+      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
+      </td>
+      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32.Extra</a>
+      </td>
+      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
+      </td>
+    </tr>
+  </table>
+  <h1>Vectorize</h1>
+
+
+  <p class="Decl"><b>function</b> Vectorize(img: TImage32; compareColor: TColor32; compareFunc: TCompareFunction; colorTolerance: Integer; roundingTolerance: integer = 2): TPathsD;</p>
+
+<br>
+
+  <p class="Body"> This function converts monochrome raster images into raw polygon vectors.<br><br> <b>compareFunc</b>: usually <a href="../../Img32/Routines/CompareRGB.htm"><b>CompareRGB</b></a>, <a href="../../Img32/Routines/CompareHue.htm"><b>CompareHue</b></a> or <a href="../../Img32/Routines/CompareAlpha.htm"><b>CompareAlpha</b></a>.<br> <b>colorTolerance</b>: This value will be passed to compareFunc.<br> <b>roundingTolerance</b>: specifies the minimum distance for adjacent pixels in returned paths.<br><br> <i>Vectorize</i> is usually just the first step in completely 'vectorizing' an image. Generally these raw polygon vectors are simplified using <a href="./RamerDouglasPeucker.htm"><b>RamerDouglasPeucker</b></a>, and smoothed with <a href="./SmoothToCubicBezier.htm"><b>SmoothToCubicBezier</b></a> before finally being 'flattened' using <a href="../../Img32.Vector/Routines/FlattenCBezier.htm"><b>FlattenCBezier</b></a>.<br><br> 
+    <table class="white" width="840px">
+      <tr>
+        <td>
+<div class="Code">
+            <pre class="brush: delphi;">
+//Example:
+//vectorize an image, filtering on non-transparency or dark colors 
+if img.HasTransparency then
+  rawPaths := Vectorize(img, $FF000000, CompareAlpha, $80) else  
+  rawPaths := Vectorize(img, $FF000000, CompareRGB, $80);
+
+//and simplify the result
+simplifiedPaths := RamerDouglasPeucker(rawPaths, 3);
+//then smooth the result
+bezierPaths := SmoothToCubicBezier(simplifiedPaths, true, TrackBar1.Position);
+//and finally flatten and draw the Bezier paths
+flattenedPaths := FlattenCBezier(bezierPaths);
+DrawPolygon(displayImg, flattenedPaths, frEvenOdd, clNavy32);
+            </pre></div>
+
+        </td>
+      </tr>
+    </table> </p>
+
+<br>
+
+  <table class="white">
+    <tr>
+  
+      <td>
+    Before:<br>
+    <img src="../../../../Images/SmoothLine1.png">
+  
+      </td>
+  
+      <td>
+    After:<br>
+    <img src="../../../../Images/SmoothLine2.png">
+  
+      </td>
+
+    </tr>
+  </table>
+
+
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="RamerDouglasPeucker.htm">RamerDouglasPeucker</a>, <a href="SmoothToCubicBezier.htm">SmoothToCubicBezier</a>, <a href="../../Img32.Vector/Routines/FlattenCBezier.htm">FlattenCBezier</a>, <a href="../../Img32/Routines/CompareAlpha.htm">CompareAlpha</a>, <a href="../../Img32/Routines/CompareHue.htm">CompareHue</a>, <a href="../../Img32/Routines/CompareRGB.htm">CompareRGB</a></p>
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>

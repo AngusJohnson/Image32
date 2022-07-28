@@ -1,0 +1,89 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>FloodFill</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
+
+    
+  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
+    <tr>
+      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
+      </td>
+      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32.Extra</a>
+      </td>
+      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
+      </td>
+    </tr>
+  </table>
+  <h1>FloodFill</h1>
+
+
+  <p class="Decl"><b>procedure</b> FloodFill(img: TImage32; x, y: Integer; newColor: TColor32; tolerance: Byte = <span class="Number">0</span>; compareFunc: TCompareFunctionEx = <b>nil</b>);</p>
+
+<br>
+
+  <p class="Body">FloodFill recolors pixels in the region defined by the starting pixel (x,y) and any adjacent pixels that closely match the starting pixel. Non-matching pixels form a barrier to further filling. If no CompareFunc is supplied, FloodFill will recolor pixels whose RGB values match the starting pixel within the specified tolerance.<br><br> Alternatively, the user can choose one of the predefined compare functions, <i>CompareRGBEx</i> or <i>CompareAlphaEx</i>, or even a custom compare function.</p>
+
+
+  <p class="Body"> <div class="Code">
+      <pre class="brush: delphi;">
+  uses Img32, Img32.Fmt.PNG, Img32.vector, Img32.Extra;
+  ...
+  var
+    img: TImage32;
+  begin
+    img := TImage32.Create;
+    img.LoadFromResource('BEETLE', 'PNG');
+    FloodFill(img, 90,130, clLime32, 64);
+    FloodFill(img, 140,110, clLime32, 64);
+    img.SaveToFile('floodfill.png');
+    img.Free;
+  end;
+      </pre></div> 
+    <table class="white">
+      <tr>
+  
+        <td>Before:<br><img src="../../../../Images/beetle.png">
+        </td>
+  
+        <td>After:<br><img src="../../../../Images/floodfill.png">
+        </td>
+  
+      </tr>
+
+    </table> </p>
+
+
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>

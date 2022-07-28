@@ -1,0 +1,295 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>QuickStart</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <link rel="stylesheet" href="../Styles/Default.css" type="text/css">
+
+    
+  <script type="text/javascript" src="../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <script language="JavaScript1.2" src="../Scripts/menu_data.js"></script>
+  <script language="JavaScript1.2" src="../Scripts/menu_script.js"></script><br>
+
+  <h1>QuickStart</h1>
+
+<b style="margin-left: 20px;">The TImage32 class is key.</b><br><br>
+
+  <p class="Body"> The <a href="./Units/Img32/Classes/TImage32/_Body.htm"><b>TImage32</b></a> object contains a single image, and all image operations act upon this object.<br> <div class="Code">
+      <pre class="brush: delphi;">
+  uses Img32;
+  ...
+  img := TImage32.Create;
+  //DO STUFF
+  img.Free;
+      </pre></div> </p>
+  <hr><br>
+
+
+<b style="margin-left: 20px;">Image storage, formats &amp; file access.</b><br><br>
+
+  <p class="Body"> The <a href="./_Body.htm"><b>Image32 Library</b></a> provides file access to BMP, PNG &amp; JPG storage via the Img32.Fmt.BMP, Img32.Fmt.PNG &amp; Img32.Fmt.JPG modules respectively.<br> <div class="Code">
+      <pre class="brush: delphi;">
+  uses Img32, Img32.Fmt.PNG;
+  ...
+  img := TImage32.Create;
+  img.LoadFromFile('beetle.png');
+  //DO STUFF
+  img.SaveToFile('beetle_modified.png');
+  img.Free;
+      </pre></div> </p>
+  <hr><br>
+
+<b style="margin-left: 20px;">Image processing</b><br><br>
+
+
+  <p class="Body"> The <a href="./_Body.htm"><b>Image32</b></a> library has an extensive list of classes and functions that manipulate images including: hue, luminance &amp; saturation adjustment; box blur &amp; Gaussian blur; erase color; blend merging images; crop; emboss; flip &amp; rotation; scaling; sharpen; skew; transformations; and special effects<br> </p>
+
+
+  <p class="Body"> <div class="Code">
+      <pre class="brush: delphi;">
+  uses Img32, Img32.Fmt.PNG;
+  ...
+var
+  img: TImage32;
+begin
+  img := TImage32.Create;
+  img.LoadFromFile('clipart.png');
+  //optionally select a resampler
+  //other than the default Bilinear one
+  img.Resampler := rBicubicResampler;
+  //angle parameters are always expressed
+  //in radians not degrees. Nevertheless
+  //many angles have predefined constants ...
+  img.Rotate(angle15);
+  img.SaveToFile('c:\temp\clipart_rot15.png');
+  img.Free;
+      </pre></div> 
+    <table class="white">
+      <tr>
+
+        <td style="margin: 0;">
+  <img style="vertical-align: -128px;" src="../Images/resampler1.png"> &#x2794;
+  <img style="vertical-align: -128px;" src="../Images/resampler4.png">
+
+        </td>
+
+      </tr>
+    </table> 
+    <hr><br> </p>
+
+
+  <p class="Body"> <div class="Code">
+      <pre class="brush: delphi;">
+  uses Img32, Img32.Extra, Img32.Fmt.PNG;
+  ...
+  img := TImage32.Create;
+  img.LoadFromFile('fruit.png');  
+  img.SaveToFile('c:\temp\fruit_before.png');
+  Sharpen(img, 3, 10);
+  img.SaveToFile('c:\temp\fruit_after.png');
+  img.Free;
+      </pre></div> 
+    <table class="white">
+      <tr>
+
+        <td style="margin: 0;">
+  <img style="vertical-align: -128px;" src="../Images/fruit.png"> &#x2794;
+  <img style="vertical-align: -128px;" src="../Images/fruit_sharp.png">
+
+        </td>
+
+      </tr>
+    </table> </p>
+  <hr><br>
+
+
+  <p class="Body"> <div class="Code">
+      <pre class="brush: delphi;">
+  uses Img32, Img32.Vector, 
+	Img32.Fmt.PNG, Img32.Transform;
+  ...
+  var
+    img: TImage32;
+    src, dst: TPathD;
+  begin
+    img := TImage32.Create;
+    img.LoadFromFile('clouds.png');
+    src := Rectangle(img.Bounds);
+    dst := CopyPath(src);
+    dst[1].Y := img.Height div 8;
+    dst[2].Y := img.Height * 7 div 8;
+    if ProjectiveTransform(img, src, dst, NullRect) then
+	  img.SaveToFile('c:\temp\clouds_proj.png');
+    img.Free;
+  end;
+      </pre></div> 
+    <table class="white">
+      <tr>
+
+        <td style="margin: 0;">
+  <img style="vertical-align: -90px;" src="../Images/clouds.png"> &#x2794;
+  <img style="vertical-align: -90px;" src="../Images/projective.png">
+
+        </td>
+
+      </tr>
+    </table> </p>
+  <hr><br>
+
+<b style="margin-left: 20px;">Polygon rendering</b><br><br>
+
+  <p class="Body"> <em>Img32</em> provides a large number of drawing tools.<br> The <a href="./Units/Img32.Draw/_Body.htm"><b>Img32.Draw</b></a> module provides functions for <a href="./Units/Img32.Draw/Routines/DrawLine.htm"><b>line</b></a>, <a href="./Units/Img32.Draw/Routines/DrawDashedLine.htm"><b>dashed line</b></a> &amp; <a href="./Units/Img32.Draw/Routines/DrawPolygon.htm"><b>polygon</b></a> drawing, and includes several renderers that produce: solid color; tiled image; and linear &amp; radial gradient renders.<br> The <a href="./Units/Img32.Vector/_Body.htm"><b>Img32.Vector</b></a> module also provides numerous functions for vector drawing, including: Rectangle; RoundRect; Ellipse; Pie &amp; Arc; Spline &amp; Bezier; Star; etc.<br> </p>
+
+
+  <p class="Body"> <div class="Code">
+      <pre class="brush: delphi;">
+      uses Img32, Img32.Fmt.PNG,
+        Img32.vector, Img32.Draw, Img32.Clipper;
+      ...
+      var
+        img: TImage32;
+        rec: TRect;
+        path: TPathD;
+        paths: TPathsD;
+        radGradRend: TRadialGradientRenderer;
+      begin
+        img := TImage32.Create;
+        img.SetSize(256,256);
+        rec := img.Bounds;
+        rec := Img32.Vector.InflateRect(rec, -50,-50);
+
+        //draw a gradient filled star
+        path := Star(PointD(128, 128), 50, 100, 7);
+        radGradRend := TRadialGradientRenderer.Create;
+        radGradRend.SetParameters(rec, clFuchsia32, clYellow32);
+        DrawPolygon(img, path, frNonZero, radGradRend);
+        radGradRend.Free;
+        DrawLine(img, path, 1, clBlack32, esPolygon);
+        //draw a dashed outline of the star
+        paths := InflatePath(path, 7, jsRound);
+        DrawDashedLine(img, paths,
+          [4,4], nil, 1, clBlack32, esPolygon);
+        img.SaveToFile('c:\temp\star.png');
+        img.Free;
+      end;
+      </pre></div> 
+    <table class="white">
+      <tr>
+    
+        <td>  
+      <img style="vertical-align: -128px;" src="../Images/star.png"> 
+    
+        </td>
+  
+      </tr>
+
+    </table> </p>
+  <hr><br>
+
+
+  <p class="Body"> <div class="Code">
+      <pre class="brush: delphi;">
+  uses Img32, Img32.Fmt.PNG, Img32.Text, 
+	Img32.Vector, Img32.Draw, Img32.Extra;
+	
+	...
+  var
+	  img: TImage32;
+	  textOutline: TPathsD;
+	  impactFont: TFontReader;
+	  impact48: TFontCache;
+  begin
+	img := TImage32.Create(400,150);
+	//Load Windows' Impact TTF font
+    impactFont := TFontReader.Create('Impact'); 
+	impact48 := TFontCache.Create(impactFont, DpiAware(48));
+    try
+	  textOutline := impact48.GetTextGlyphs(
+        20, 130, 'Image32');
+	  //draw textOutline using shadow &amp; 3D effects
+      DrawShadow(img, textOutline, frNonZero, 3);
+      DrawPolygon(img, textOutline, frNonZero, $FF00DD00);
+      Draw3D(img, textOutline, frNonZero, 3,4);
+      DrawLine(img, textOutline, 1, clBlack32, esPolygon);
+      img.SaveToFile('c:\temp\Image32.png');
+    finally
+      img.Free;
+      impact48.Free;
+      impactFont.Free;
+    end;
+  end;
+      </pre></div> 
+    <table class="white">
+      <tr>
+    
+        <td>  
+      <img src="../Images/text_3D.png"> 
+    
+        </td>
+  
+      </tr>
+
+    </table> </p>
+  <hr><br>
+
+
+<b style="margin-left: 20px;">What! No VCL.Graphics?</b><br><br>
+
+  <p class="Body"> This was a deliberate design decision so it'd be relatively easy to translate the <em>Img32</em> library into another language, and for a different operating system. But having said that, VCL.Graphics is still used in the Img32.Fmt.PNG and Img32.Fmt.JPG modules. </p><br>
+
+<b style="margin-left: 20px;">So how can I display images in Delphi forms?</b><br><br>
+
+  <p class="Body"> All drawing in Windows is performed using Device Contexts (DCs) and Delphi's VCL.Graphics encapsulates DCs in TCanvas objects, with the actual DC being the TCanvas.Handle. So, using TImage32's CopyToDC method, its image can be displayed in any TControl with a TCanvas property; and that includes TForm, TPanel and TImage components. <div class="Code">
+      <pre class="brush: delphi;">
+  uses Img32;
+  ...
+  img := TImage32.Create;
+  //DO STUFF WITH img
+  
+  //assuming a standard TImage (Image1) component has been 
+  //dropped somewhere onto a form in the Delphi IDE.   
+  Image1.Picture.Bitmap.SetSize(img.Width, img.Height);
+  //if 'img' is semi-transparent, prepare the target background
+  Image1.Picture.Bitmap.Canvas.Brush.Color := clBtnFace;
+  Image1.Picture.Bitmap.Canvas.FillRect(Image1.ClientRect);
+  //now copy 'img' to Image1
+  img.CopyToDc(Image1.Picture.Bitmap.Canvas.Handle);
+  img.Free;
+      </pre></div> </p>  
+
+  <p class="Body"> Otherwise use the accompanying <a href="Img32.Panels/_Body.htm"><b>Img32.Panels</b></a> unit which contains the TImage32Panel component. </p>
+
+
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="_Body.htm"><b>Index</b></a>, <a href="Img32.Panels/_Body.htm">Img32.Panels</a>, <a href="Units/Img32.Draw/_Body.htm">Img32.Draw</a>, <a href="Units/Img32.Draw/Routines/DrawDashedLine.htm">DrawDashedLine</a>, <a href="Units/Img32.Draw/Routines/DrawLine.htm">DrawLine</a>, <a href="Units/Img32.Draw/Routines/DrawPolygon.htm">DrawPolygon</a>, <a href="Units/Img32.Vector/_Body.htm">Img32.Vector</a>, <a href="Units/Img32/Classes/TImage32/_Body.htm">TImage32</a></p>
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>

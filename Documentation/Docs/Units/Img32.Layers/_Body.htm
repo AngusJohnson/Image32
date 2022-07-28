@@ -1,0 +1,368 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../../../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>Img32.Layers</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <link rel="stylesheet" href="../../../Styles/Default.css" type="text/css">
+
+    
+  <script type="text/javascript" src="../../../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
+    <tr>
+      <td class="Banner" nowrap=""><a href="../../_Body.htm" class="Banner"><img src="../../../Images/_Home.png" align="absmiddle">Index</a>
+      </td>
+      <td class="Banner" width="100%" align="right"><img src="../../../Images/_Project_Logo.png" align="absmiddle">
+      </td>
+    </tr>
+  </table>
+  <h1>Img32.Layers</h1>
+
+
+  <p class="Body">This unit contains the <a href="./Classes/TLayeredImage32/_Body.htm"><b>TLayeredImage32</b></a> class that provides a relatively easy way to manage multiple images that will at some stage be merged into a single image.<br><br> Each <a href="./Classes/TLayer32/_Body.htm"><b>TLayer32</b></a> in a TLayeredImage32 object represents a single image though layers can also contain other layers. Layers can be nested to any level. Child layers will be restricted to the bounds of their parent layers, except for childs of <a href="./Classes/TGroupLayer32/_Body.htm"><b>TGroupLayer32</b></a>.<br><br> While layers can have any position in the 2D plane, only those portions of layers that are within the bounds of their owner <b>TLayeredImage32</b> will be visible when all the images are merged (see <a href="./Classes/TLayeredImage32/Methods/GetMergedImage.htm"><b>TLayeredImage32.GetMergedImage</b></a>)<br><br> There are four basic layer classes that derive from <a href="./Classes/TLayer32/_Body.htm"><b>TLayer32</b></a>: <ol>
+	
+      <li><a href="./Classes/TVectorLayer32/_Body.htm"><b>TVectorLayer32</b></a> to display vector images</li>
+  
+      <li><a href="./Classes/TRasterLayer32/_Body.htm"><b>TRasterLayer32</b></a> to display raster images</li>	
+	
+      <li><a href="./Classes/TGroupLayer32/_Body.htm"><b>TGroupLayer32</b></a> to group layers together</li>
+	
+      <li><a href="./Classes/TDesignerLayer32/_Body.htm"><b>TDesignerLayer32</b></a>, layers with special features to aid interactive image design.</li>
+
+    </ol> </p>
+
+  <p class="Body"> All layers are contained in a nested tree structure under the very top group layer - <a href="./Classes/TLayeredImage32/Properties/Root.htm"><b>TLayeredImage32.Root</b></a> </p>
+
+<br><br>
+
+  <p class="Body"> 
+    <h3>Example</h3> <div class="Code">
+      <pre class="brush: delphi;">
+uses 
+  ...
+  Img32, Img32.Layers, Img32.Draw, 
+  Img32.Vector, Img32.Extra;
+
+type
+  TForm1 = class(TForm)
+	// Form's full declaration removed for brevity
+  public
+    layeredImage: TLayeredImage32;
+    vectorLayer : TLayer32;
+    buttongroup : TSizingGroupLayer32;
+    clickedLayer: TLayer32;
+    clickedPoint: TPoint;
+    procedure UpdateEllipseLayer(vecLayer: TVectorLayer32);
+  end;
+
+implementation
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  //create a TLayeredImage32 object
+  layeredImage := TLayeredImage32.Create(ClientWidth, ClientHeight);
+
+  //TDESIGNERLAYER32
+  with layeredImage.AddLayer(TDesignerLayer32) do
+  begin
+    SetSize(layeredImage.Width, layeredImage.Height);
+    HatchBackground(Image);
+  end;
+
+  //TVECTORLAYER32
+  //add a simple vector layer and draw an ellipse
+  vectorLayer := layeredImage.AddLayer(TVectorLayer32) ;
+  with vectorLayer do
+  begin
+    SetBounds(Rect(120, 120, 320, 220));
+    CursorId := crHandPoint;
+    UpdateEllipseLayer(vectorLayer as TVectorLayer32);
+  end;
+
+  //TGROUPLAYER32
+  //add a (designing) button group to size the vector layer
+  sizingbuttongroup := CreateSizingButtonGroup(vectorLayer,
+    ssCorners, bsRound, DefaultButtonSize, clRed32);
+end;
+
+procedure TForm1.FormDestroy(Sender: TObject);
+begin
+  layeredImage.Free;
+end;
+
+procedure TForm1.UpdateEllipseLayer(vecLayer: TVectorLayer32);
+var
+  rec: TRect;
+  pp: TPathsD;
+  margin: integer;
+begin
+  //draw an ellipse on vecLayer and update the
+  //hit-test mask so the layer will respond to clicking
+  with vecLayer do
+  begin
+    margin := 5;
+    rec := Rect(0, 0, Width, Height);
+    rec := Img32.Vector.InflateRect(rec, -margin, -margin);
+    SetLength(pp, 1);
+    pp[0] := Ellipse(rec);
+    DrawPolygon(Image, pp, frEvenOdd, $4000FFFF);
+    DrawLine(Image, pp, 5, $FF006666, esPolygon);
+    UpdateHitTestMask(pp, frEvenOdd);
+  end;
+end;
+
+procedure TForm1.FormMouseDown(Sender: TObject; 
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  clickedLayer := layeredImage.GetLayerAt(Types.Point(X,Y));
+  clickedPoint := Types.Point(X,Y);
+end;
+
+procedure TForm1.FormMouseMove(Sender: TObject; 
+  Shift: TShiftState; X,Y: Integer);
+var
+  layer: TLayer32;
+  dx, dy: integer;
+  rec: TRect;
+begin
+  if not (ssLeft in Shift) then
+  begin
+    layer := layeredImage.GetLayerAt(Types.Point(X,Y));
+    if Assigned(layer) then
+      Cursor := layer.CursorId else
+      Cursor := crDefault;
+  end;
+
+  if not Assigned(clickedLayer) then Exit;
+  dx := X - clickedPoint.X;
+  dy := Y - clickedPoint.Y;
+  clickedPoint := Types.Point(X,Y);
+
+  clickedLayer.Offset(dx, dy);
+  if clickedLayer = vectorLayer then
+    buttongroup.Offset(dx, dy) //move the sizing buttons too
+  else
+  begin
+    //update the sizing group with moved clickedLayer
+    rec := Rect(UpdateSizingButtonGroup(clickedLayer));
+    //and resize and repaint vectorLayer accordingly.
+    vectorLayer.SetBounds(rec);
+    UpdateEllipseLayer(vectorLayer as TVectorLayer32);
+  end;
+
+  Invalidate;
+end;
+
+procedure TForm1.FormMouseUp(Sender: TObject; 
+  Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
+begin
+  clickedLayer := nil;
+end;
+
+procedure TForm1.FormPaint(Sender: TObject);
+begin
+  with layeredImage.GetMergedImage do
+    CopyToDc(Self.Canvas.Handle);
+end;
+      </pre></div> 
+    <table class="white">
+      <tr>
+  
+        <td>
+  <img src="../../../Images/SimpleLayers.png">  
+  
+        </td>
+
+      </tr>
+
+    </table> </p>
+
+
+
+
+  <h2 id="Auto-Contents">Contents</h2>
+  <table>
+    <tr>
+      <th>Types</th>
+      <th>Classes</th>
+      <th>Routines</th>
+      <th>Variables</th>
+      <th>Constants</th>
+    </tr>
+    <tr>
+      <td><a href="Types/TArrayOfPointer.htm">TArrayOfPointer</a>
+      </td>
+      <td><a href="Classes/TButtonDesignerLayer32/_Body.htm">TButtonDesignerLayer32</a>
+      </td>
+      <td><a href="Routines/CreateButtonGroup.htm">CreateButtonGroup</a>
+      </td>
+      <td><a href="Variables/Img32.Layers.htm">Img32.Layers</a>
+      </td>
+      <td><a href="Constants/Img32.Layers.htm">Img32.Layers</a>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TButtonDesignerLayer32Class.htm">TButtonDesignerLayer32Class</a>
+      </td>
+      <td><a href="Classes/TButtonGroupLayer32/_Body.htm">TButtonGroupLayer32</a>
+      </td>
+      <td><a href="Routines/CreateRotatingButtonGroup.htm">CreateRotatingButtonGroup</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TGroupType.htm">TGroupType</a>
+      </td>
+      <td><a href="Classes/TDesignerLayer32/_Body.htm">TDesignerLayer32</a>
+      </td>
+      <td><a href="Routines/CreateSizingButtonGroup.htm">CreateSizingButtonGroup</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/THitTestRec.htm">THitTestRec</a>
+      </td>
+      <td><a href="Classes/TGroupLayer32/_Body.htm">TGroupLayer32</a>
+      </td>
+      <td><a href="Routines/UpdateRotatingButtonGroup.htm">UpdateRotatingButtonGroup</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TLayer32Class.htm">TLayer32Class</a>
+      </td>
+      <td><a href="Classes/THitTestLayer32/_Body.htm">THitTestLayer32</a>
+      </td>
+      <td><a href="Routines/UpdateSizingButtonGroup.htm">UpdateSizingButtonGroup</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TLayerHitTestEvent.htm">TLayerHitTestEvent</a>
+      </td>
+      <td><a href="Classes/TLayer32/_Body.htm">TLayer32</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td><a href="Types/TSizingStyle.htm">TSizingStyle</a>
+      </td>
+      <td><a href="Classes/TLayeredImage32/_Body.htm">TLayeredImage32</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td>
+      </td>
+      <td><a href="Classes/TRasterLayer32/_Body.htm">TRasterLayer32</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td>
+      </td>
+      <td><a href="Classes/TRotateLayer32/_Body.htm">TRotateLayer32</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td>
+      </td>
+      <td><a href="Classes/TRotatingGroupLayer32/_Body.htm">TRotatingGroupLayer32</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td>
+      </td>
+      <td><a href="Classes/TSizingGroupLayer32/_Body.htm">TSizingGroupLayer32</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+    <tr>
+      <td>
+      </td>
+      <td><a href="Classes/TVectorLayer32/_Body.htm">TVectorLayer32</a>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+      <td>
+      </td>
+    </tr>
+  </table>
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="Classes/TDesignerLayer32/_Body.htm">TDesignerLayer32</a>, <a href="Classes/TGroupLayer32/_Body.htm">TGroupLayer32</a>, <a href="Classes/TLayer32/_Body.htm">TLayer32</a>, <a href="Classes/TLayeredImage32/_Body.htm">TLayeredImage32</a>, <a href="Classes/TLayeredImage32/Methods/AddLayer.htm">TLayeredImage32.AddLayer</a>, <a href="Classes/TLayeredImage32/Methods/GetLayerAt.htm">TLayeredImage32.GetLayerAt</a>, <a href="Classes/TLayeredImage32/Methods/GetMergedImage.htm">TLayeredImage32.GetMergedImage</a>, <a href="Classes/TLayeredImage32/Properties/Root.htm">TLayeredImage32.Root</a>, <a href="Classes/TRasterLayer32/_Body.htm">TRasterLayer32</a>, <a href="Classes/TVectorLayer32/_Body.htm">TVectorLayer32</a></p>
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>

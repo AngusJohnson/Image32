@@ -1,0 +1,105 @@
+<html>
+
+<head>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
+  </script>
+    
+  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
+  </script>
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
+    
+  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
+  
+
+  <title>Rectangle</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+
+  <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
+
+    
+  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
+  </script>
+  
+</head>
+
+<body bgcolor="#FFFFFF">
+    
+  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
+    
+  <!-- DO NOT EDIT MANUALLY !!! -->
+  
+  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
+    <tr>
+      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
+      </td>
+      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32.Vector</a>
+      </td>
+      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
+      </td>
+    </tr>
+  </table>
+  <h1>Rectangle</h1>
+
+
+  <p class="Decl"><b>function</b> Rectangle(<b>const</b> rec: TRect): TPathD; <b>overload</b>;</p>
+
+
+  <p class="Decl"><b>function</b> Rectangle(<b>const</b> rec: TRectD): TPathD; <b>overload</b>;</p>
+
+
+  <p class="Decl"><b>function</b> Rectangle(l, t, r, b: double): TPathD; <b>overload</b>;</p>
+
+<br>
+
+  <p class="Body"> This function returns the points representing the rectangle's 4 corners: top-left, top-right, bottom-right &amp; bottom-left (in that order). </p>
+
+
+
+  <p class="Body"> <div class="Code">
+      <pre class="brush: delphi;">
+uses Img32, Img32.Fmt.PNG, 
+  Img32.Vector, Img32.Transform;
+...
+var
+  img: TImage32;
+  dst: TPathD;
+begin
+  img := TImage32.Create;
+  img.LoadFromFile('clouds.png');
+  
+  //setup the transformation geometry
+  dst := Rectangle(src.Bounds); 
+  dst[0].Y := 20;
+  dst[3].Y := img.Height-20; 
+  
+  //transform and save
+  ProjectiveTransform(img, dst);
+  img.SaveToFile('clouds_proj.png');
+  img.Free;
+end;
+      </pre></div> 
+    <table class="white">
+      <tr>
+
+        <td>
+  <img style="vertical-align: -90px;" src="../../../../Images/clouds.png"> &#x2794;
+  <img style="vertical-align: -90px;" src="../../../../Images/projective.png">
+
+        </td>
+
+      </tr>
+    </table> </p>
+<br>
+
+
+
+    
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
+  
+</body>
+
+</html>
