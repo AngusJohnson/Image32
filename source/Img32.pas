@@ -1271,11 +1271,12 @@ function HslToRgb(hslColor: THsl): TColor32;
 var
   rgba: TARGB absolute result;
   hsl: THsl absolute hslColor;
-  c, x, m: Integer;
+  c, x, m, a: Integer;
 begin
   //formula from https://www.rapidtables.com/convert/color/hsl-to-rgb.html
   c := (255 - abs(2 * hsl.lum - 255)) * hsl.sat div 255;
-  x := c * (255 - abs((hsl.hue mod 85) * 6 - 255)) div 255;
+  a := (hsl.hue mod 85) * 6 - 255;
+  x := c * (255 - abs(a)) div 255;
   m := hsl.lum - c div 2;
   rgba.A := hsl.alpha;
   case (hsl.hue * 6) shr 8 of
