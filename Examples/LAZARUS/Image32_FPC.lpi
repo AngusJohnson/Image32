@@ -6,7 +6,7 @@
     <General>
       <SessionStorage Value="InProjectDir"/>
       <MainUnit Value="0"/>
-      <Title Value="Image32_Laz_Demo"/>
+      <Title Value="Image32_FPC"/>
       <Scaled Value="True"/>
       <ResourceType Value="res"/>
       <UseXPManifest Value="True"/>
@@ -67,7 +67,7 @@
           <Version Value="11"/>
           <PathDelim Value="\"/>
           <Target>
-            <Filename Value="Image32_Laz_Demo"/>
+            <Filename Value="Image32_FPC"/>
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
@@ -109,7 +109,7 @@
     </RequiredPackages>
     <Units Count="2">
       <Unit0>
-        <Filename Value="Image32_Laz_Demo.pas"/>
+        <Filename Value="Image32_FPC.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit0>
       <Unit1>

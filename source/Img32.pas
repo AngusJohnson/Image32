@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.2                                                             *
-* Date      :  28 July 2022                                                    *
+* Date      :  29 July 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -17,11 +17,10 @@ unit Img32;
 interface
 
 {$I Img32.inc}
-{.$DEFINE USING_VCL}
 
 uses
   Types, SysUtils, Classes,
-  {$IFDEF MSWINDOWS} Windows, {$IFDEF USING_VCL} Graphics,{$ENDIF}{$ENDIF}
+  {$IFDEF MSWINDOWS} Windows,{$ENDIF} {$IFDEF USING_VCL_LCL} Graphics, Forms,{$ENDIF}
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults, Character,{$ENDIF}
   {$IFDEF UITYPES} UITypes,{$ENDIF} Math;
 
@@ -239,10 +238,10 @@ type
       x: Integer = 0; y: Integer = 0; transparent: Boolean = true); overload;
     procedure CopyToDc(const srcRect, dstRect: TRect; dstDc: HDC;
       transparent: Boolean = true); overload;
-  {$IFDEF USING_VCL}
+{$ENDIF}
+{$IFDEF USING_VCL_LCL}
     procedure CopyFromBitmap(bmp: TBitmap);
     procedure CopyToBitmap(bmp: TBitmap);
-  {$ENDIF}
 {$ENDIF}
     function CopyToClipBoard: Boolean;
     class function CanPasteFromClipBoard: Boolean;
@@ -474,7 +473,6 @@ type
   procedure NormalizeAngle(var angle: double; tolerance: double = Pi/360);
   function GrayScale(color: TColor32): TColor32;
 
-{$IFDEF MSWINDOWS}
   //DPIAware: Useful for DPIAware sizing of images and their container controls.
   //It scales values relative to the display's resolution (PixelsPerInch).
   //See https://docs.microsoft.com/en-us/windows/desktop/hidpi/high-DPIAware-desktop-application-development-on-windows
@@ -485,6 +483,7 @@ type
   function DPIAware(const rec: TRect): TRect; overload;
   function DPIAware(const rec: TRectD): TRectD; overload;
 
+{$IFDEF MSWINDOWS}
   {$IFDEF FPC}
   function AlphaBlend(DC: HDC; p2, p3, p4, p5: Integer;
     DC6: HDC; p7, p8, p9, p10: Integer; p11: Windows.TBlendFunction): BOOL;
@@ -1050,6 +1049,7 @@ begin
   Result.biCompression := BI_RGB;
 end;
 //------------------------------------------------------------------------------
+{$ENDIF}
 
 function DPIAware(val: Integer): Integer;
 begin
@@ -1094,7 +1094,6 @@ begin
   result.Bottom := rec.Bottom * DpiAwareOne;
 end;
 //------------------------------------------------------------------------------
-{$ENDIF}
 
 function GrayScale(color: TColor32): TColor32;
 var
@@ -2375,8 +2374,14 @@ begin
   //dstRec might be adjusted due to clipping ...
   RectWidthHeight(dstRec, dstW, dstH);
   RectWidthHeight(srcRec, srcW, srcH);
-  scaleX := dstW / srcW;
-  scaleY := dstH / srcH;
+
+  //watching out for insignificant scaling
+  if Abs(dstW - srcW) < 2 then
+     scaleX := 1 else
+     scaleX := dstW / srcW;
+  if Abs(dstH - srcH) < 2 then
+     scaleY := 1 else
+     scaleY := dstH / srcH;
 
   //check if the source rec has been clipped ...
   if not RectsEqual(srcRecClipped, srcRec) then
@@ -2589,32 +2594,7 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
-
-{$IFDEF USING_VCL}
-procedure TImage32.CopyFromBitmap(bmp: TBitmap);
-var
-  savedPF: TPixelFormat;
-begin
-  if not Assigned(bmp) then Exit;
-  savedPF := bmp.PixelFormat;
-  bmp.PixelFormat := pf32bit;
-  SetSize(bmp.Width, bmp.Height);
-  GetBitmapBits(bmp.Handle, Width * Height * 4, PixelBase);
-  bmp.PixelFormat := savedPF;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImage32.CopyToBitmap(bmp: TBitmap);
-begin
-  if not Assigned(bmp) then Exit;
-  bmp.PixelFormat := pf32bit;
-  bmp.SetSize(Width, Height);
-  bmp.AlphaFormat := afDefined;
-  SetBitmapBits(bmp.Handle, Width * Height * 4, PixelBase);
-end;
 {$ENDIF}
-{$ENDIF}
-//------------------------------------------------------------------------------
 
 function TImage32.CopyToClipBoard: Boolean;
 var
@@ -2682,6 +2662,60 @@ begin
     Break;
   end;
 end;
+//------------------------------------------------------------------------------
+
+{$IFDEF USING_VCL_LCL}
+procedure TImage32.CopyFromBitmap(bmp: TBitmap);
+var
+  savedPF: TPixelFormat;
+  {$IFNDEF MSWINDOWS}
+  i: integer;
+  pxDst, pxSrc: PColor32;
+  {$ENDIF}
+begin
+  if not Assigned(bmp) then Exit;
+  savedPF := bmp.PixelFormat;
+  bmp.PixelFormat := pf32bit;
+  SetSize(bmp.Width, bmp.Height);
+  {$IFDEF MSWINDOWS}
+  GetBitmapBits(bmp.Handle, Width * Height * 4, PixelBase);
+  {$ELSE}
+  for i := 0 to bmp.Height -1 do
+  begin
+    pxSrc := bmp.ScanLine[i];
+    pxDst := img.PixelRow[i];
+    Move(pxSrc^, pxDst^, bmp.Width * SizeOf(TColor32));
+  end;
+  {$ENDIF}
+  bmp.PixelFormat := savedPF;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.CopyToBitmap(bmp: TBitmap);
+{$IFNDEF MSWINDOWS}
+var
+  i: integer;
+  pxDst, pxSrc: PColor32;
+{$ENDIF}
+begin
+  if not Assigned(bmp) then Exit;
+  bmp.PixelFormat := pf32bit;
+  bmp.SetSize(Width, Height);
+  {$IFDEF MSWINDOWS}
+  {$IFNDEF FPC}
+  bmp.AlphaFormat := afDefined;
+  {$ENDIF}
+  SetBitmapBits(bmp.Handle, Width * Height * 4, PixelBase);
+  {$ELSE}
+  for i := 0 to bmp.Height -1 do
+  begin
+    pxDst := bmp.ScanLine[i];
+    pxSrc := img.PixelRow[i];
+    Move(pxSrc^, pxDst^, bmp.Width * SizeOf(TColor32));
+  end;
+  {$ENDIF}
+end;
+{$ENDIF}
 //------------------------------------------------------------------------------
 
 procedure TImage32.ConvertToBoolMask(reference: TColor32; tolerance: integer;
@@ -3384,6 +3418,15 @@ end;
 {$ENDIF}
 //------------------------------------------------------------------------------
 
+{$IFDEF USING_VCL_LCL}
+procedure GetScreenScale2;
+begin
+  DpiAwareOne := Screen.PixelsPerInch / 96;
+  dpiAware1   := Round(DpiAwareOne);
+end;
+{$ENDIF}
+//------------------------------------------------------------------------------
+
 procedure CleanUpImageFormatClassList;
 var
   i: integer;
@@ -3469,6 +3512,10 @@ initialization
 
 {$IFDEF MSWINDOWS}
   GetScreenScale;
+{$ELSE}
+  {$IFDEF USING_VCL_LCL}
+  GetScreenScale2;
+  {$ENDIF}
 {$ENDIF}
 
 finalization

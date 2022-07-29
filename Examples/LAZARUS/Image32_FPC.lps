@@ -3,14 +3,15 @@
   <ProjectSession>
     <PathDelim Value="\"/>
     <Version Value="11"/>
-    <BuildModes Active="Default"/>
-    <Units Count="44">
+    <BuildModes Active="Release"/>
+    <Units Count="47">
       <Unit0>
-        <Filename Value="Image32_Laz_Demo.pas"/>
+        <Filename Value="Image32_FPC.pas"/>
         <IsPartOfProject Value="True"/>
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="-1"/>
         <CursorPos Y="11"/>
-        <UsageCount Value="94"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="124"/>
       </Unit0>
       <Unit1>
         <Filename Value="main.pas"/>
@@ -18,62 +19,57 @@
         <ComponentName Value="MainForm"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
-        <EditorIndex Value="1"/>
-        <TopLine Value="109"/>
-        <CursorPos X="14" Y="135"/>
-        <UsageCount Value="94"/>
+        <EditorIndex Value="-1"/>
+        <UsageCount Value="124"/>
         <Bookmarks Count="1">
-          <Item0 Y="138" ID="2"/>
+          <Item0 Y="89" ID="2"/>
         </Bookmarks>
-        <Loaded Value="True"/>
-        <LoadedDesigner Value="True"/>
       </Unit1>
       <Unit2>
         <Filename Value="..\..\source\Image32_FMX.pas"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="2"/>
       </Unit2>
       <Unit3>
         <Filename Value="..\..\source\Image32_Ttf.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1268"/>
         <CursorPos X="58" Y="1277"/>
-        <UsageCount Value="22"/>
+        <UsageCount Value="19"/>
       </Unit3>
       <Unit4>
         <Filename Value="..\..\source\Clipper\ClipperCore.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="441"/>
         <CursorPos X="36" Y="455"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="2"/>
       </Unit4>
       <Unit5>
         <Filename Value="..\..\source\Clipper\Clipper.pas"/>
-        <EditorIndex Value="3"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="265"/>
         <CursorPos X="37" Y="280"/>
-        <UsageCount Value="11"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="25"/>
       </Unit5>
       <Unit6>
         <Filename Value="..\..\source\Image32_Vector.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="953"/>
         <CursorPos X="49" Y="963"/>
-        <UsageCount Value="11"/>
+        <UsageCount Value="8"/>
       </Unit6>
       <Unit7>
         <Filename Value="C:\lazarus\lcl\include\canvas.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1582"/>
         <CursorPos Y="1600"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="2"/>
       </Unit7>
       <Unit8>
         <Filename Value="..\..\source\Image32.pas"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="29" Y="21"/>
-        <UsageCount Value="15"/>
+        <UsageCount Value="12"/>
         <Bookmarks Count="1">
           <Item0 Y="1227" ID="9"/>
         </Bookmarks>
@@ -83,56 +79,56 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="1275"/>
         <CursorPos X="14" Y="1291"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="2"/>
       </Unit9>
       <Unit10>
         <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\win\wininc\base.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="408"/>
         <CursorPos X="31" Y="420"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="2"/>
       </Unit10>
       <Unit11>
         <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\inc\systemh.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="876"/>
         <CursorPos X="10" Y="890"/>
-        <UsageCount Value="10"/>
+        <UsageCount Value="7"/>
       </Unit11>
       <Unit12>
         <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\objpas\classes\classesh.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="846"/>
         <CursorPos X="14" Y="859"/>
-        <UsageCount Value="12"/>
+        <UsageCount Value="9"/>
       </Unit12>
       <Unit13>
         <Filename Value="..\..\source\Image32_PNG.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="209"/>
         <CursorPos X="32" Y="220"/>
-        <UsageCount Value="11"/>
+        <UsageCount Value="8"/>
       </Unit13>
       <Unit14>
         <Filename Value="C:\lazarus\lcl\include\custombitmap.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="32"/>
         <CursorPos Y="45"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="2"/>
       </Unit14>
       <Unit15>
         <Filename Value="C:\lazarus\lcl\include\rasterimage.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="303"/>
         <CursorPos X="50" Y="312"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="2"/>
       </Unit15>
       <Unit16>
         <Filename Value="C:\lazarus\lcl\include\sharedcustombitmap.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="23"/>
         <CursorPos Y="35"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="2"/>
       </Unit16>
       <Unit17>
         <Filename Value="C:\lazarus\components\lazutils\graphtype.pp"/>
@@ -140,33 +136,33 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="1294"/>
         <CursorPos Y="1306"/>
-        <UsageCount Value="5"/>
+        <UsageCount Value="2"/>
       </Unit17>
       <Unit18>
         <Filename Value="..\..\source\Image32_Extra.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1752"/>
         <CursorPos X="41" Y="1765"/>
-        <UsageCount Value="21"/>
+        <UsageCount Value="18"/>
       </Unit18>
       <Unit19>
         <Filename Value="..\..\source\Image32_Draw.pas"/>
         <EditorIndex Value="-1"/>
-        <UsageCount Value="12"/>
+        <UsageCount Value="9"/>
       </Unit19>
       <Unit20>
         <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\win\wininc\ascdef.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="67"/>
         <CursorPos Y="79"/>
-        <UsageCount Value="8"/>
+        <UsageCount Value="5"/>
       </Unit20>
       <Unit21>
         <Filename Value="..\..\source\Image32_Text.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1386"/>
         <CursorPos X="60" Y="1394"/>
-        <UsageCount Value="20"/>
+        <UsageCount Value="17"/>
         <Bookmarks Count="2">
           <Item0 Y="52" ID="1"/>
           <Item1 Y="1223" ID="9"/>
@@ -177,21 +173,21 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="345"/>
         <CursorPos X="3" Y="348"/>
-        <UsageCount Value="9"/>
+        <UsageCount Value="6"/>
       </Unit22>
       <Unit23>
         <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\inc\ustringh.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="125"/>
         <CursorPos Y="137"/>
-        <UsageCount Value="9"/>
+        <UsageCount Value="6"/>
       </Unit23>
       <Unit24>
         <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\win\wininc\struct.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="648"/>
         <CursorPos X="14" Y="657"/>
-        <UsageCount Value="10"/>
+        <UsageCount Value="7"/>
       </Unit24>
       <Unit25>
         <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\rtl-generics\src\generics.collections.pas"/>
@@ -199,88 +195,83 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="1170"/>
         <CursorPos X="32" Y="1182"/>
-        <UsageCount Value="9"/>
+        <UsageCount Value="6"/>
       </Unit25>
       <Unit26>
         <Filename Value="C:\lazarus\lcl\include\application.inc"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="427"/>
         <CursorPos Y="446"/>
-        <UsageCount Value="10"/>
+        <UsageCount Value="7"/>
       </Unit26>
       <Unit27>
         <Filename Value="C:\lazarus\lcl\interfaces\win32\win32object.inc"/>
         <EditorIndex Value="-1"/>
         <CursorPos Y="2"/>
-        <UsageCount Value="10"/>
+        <UsageCount Value="7"/>
       </Unit27>
       <Unit28>
         <Filename Value="..\..\source\Image32_SmoothPath.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1030"/>
         <CursorPos X="55" Y="1040"/>
-        <UsageCount Value="11"/>
+        <UsageCount Value="8"/>
       </Unit28>
       <Unit29>
         <Filename Value="..\..\source\Image32_Transform.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="3"/>
         <CursorPos X="44" Y="19"/>
-        <UsageCount Value="10"/>
+        <UsageCount Value="7"/>
       </Unit29>
       <Unit30>
         <Filename Value="..\..\source\Img32.Core.pas"/>
         <EditorIndex Value="-1"/>
         <TopLine Value="1134"/>
         <CursorPos X="6" Y="1149"/>
-        <UsageCount Value="10"/>
+        <UsageCount Value="7"/>
       </Unit30>
       <Unit31>
         <Filename Value="..\..\source\Img32.Text.pas"/>
-        <IsVisibleTab Value="True"/>
-        <EditorIndex Value="6"/>
-        <TopLine Value="3562"/>
-        <CursorPos X="37" Y="3576"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="3611"/>
+        <CursorPos X="5" Y="3636"/>
         <UsageCount Value="11"/>
-        <Loaded Value="True"/>
       </Unit31>
       <Unit32>
         <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\objpas\sysutils\sysstrh.inc"/>
         <EditorIndex Value="-1"/>
         <CursorPos X="18" Y="85"/>
-        <UsageCount Value="10"/>
+        <UsageCount Value="7"/>
       </Unit32>
       <Unit33>
         <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <EditorIndex Value="9"/>
-        <TopLine Value="3036"/>
-        <CursorPos X="47" Y="3058"/>
-        <UsageCount Value="12"/>
-        <Loaded Value="True"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="3032"/>
+        <CursorPos X="23" Y="3047"/>
+        <UsageCount Value="26"/>
       </Unit33>
       <Unit34>
         <Filename Value="..\..\source\Img32.Fmt.SVG.pas"/>
-        <EditorIndex Value="2"/>
-        <TopLine Value="14"/>
-        <CursorPos X="20" Y="29"/>
-        <UsageCount Value="11"/>
-        <Loaded Value="True"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="63" Y="8"/>
+        <UsageCount Value="25"/>
       </Unit34>
       <Unit35>
         <Filename Value="..\..\source\Img32.pas"/>
-        <EditorIndex Value="5"/>
-        <TopLine Value="1335"/>
-        <CursorPos X="32" Y="1350"/>
-        <UsageCount Value="12"/>
-        <Loaded Value="True"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1038"/>
+        <CursorPos Y="1061"/>
+        <UsageCount Value="27"/>
+        <Bookmarks Count="1">
+          <Item0 Y="3421" ID="9"/>
+        </Bookmarks>
       </Unit35>
       <Unit36>
         <Filename Value="..\..\source\Img32.SVG.HtmlHashConsts.inc"/>
-        <EditorIndex Value="10"/>
-        <TopLine Value="173"/>
-        <CursorPos X="3" Y="49"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="39" Y="17"/>
+        <UsageCount Value="24"/>
       </Unit36>
       <Unit37>
         <Filename Value="tiger.svg"/>
@@ -288,7 +279,7 @@
         <WindowIndex Value="-1"/>
         <TopLine Value="-1"/>
         <CursorPos X="-1" Y="-1"/>
-        <UsageCount Value="20"/>
+        <UsageCount Value="17"/>
         <DefaultSyntaxHighlighter Value="XML"/>
       </Unit37>
       <Unit38>
@@ -296,174 +287,80 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="55"/>
         <CursorPos X="3" Y="16"/>
-        <UsageCount Value="10"/>
+        <UsageCount Value="7"/>
       </Unit38>
       <Unit39>
         <Filename Value="..\..\source\Img32.Vector.pas"/>
-        <EditorIndex Value="8"/>
-        <TopLine Value="3370"/>
-        <CursorPos X="54" Y="3391"/>
-        <UsageCount Value="11"/>
-        <Loaded Value="True"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1112"/>
+        <CursorPos Y="1132"/>
+        <UsageCount Value="25"/>
       </Unit39>
       <Unit40>
         <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\inc\objpash.inc"/>
-        <EditorIndex Value="7"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="250"/>
         <CursorPos X="164" Y="261"/>
-        <UsageCount Value="11"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="8"/>
       </Unit40>
       <Unit41>
         <Filename Value="..\..\source\Clipper\ClipperOffset.pas"/>
-        <EditorIndex Value="4"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="105"/>
         <CursorPos X="3" Y="121"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="7"/>
       </Unit41>
       <Unit42>
         <Filename Value="..\..\source\Img32.Resamplers.pas"/>
-        <EditorIndex Value="11"/>
-        <TopLine Value="208"/>
-        <CursorPos X="52" Y="219"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="215"/>
+        <CursorPos X="52" Y="229"/>
+        <UsageCount Value="24"/>
       </Unit42>
       <Unit43>
         <Filename Value="..\..\source\Img32.Transform.pas"/>
-        <EditorIndex Value="12"/>
-        <TopLine Value="57"/>
-        <CursorPos X="32" Y="72"/>
-        <UsageCount Value="10"/>
-        <Loaded Value="True"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="53"/>
+        <CursorPos X="41" Y="68"/>
+        <UsageCount Value="24"/>
       </Unit43>
+      <Unit44>
+        <Filename Value="..\..\source\Img32.SVG.Core.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="257"/>
+        <CursorPos X="3" Y="269"/>
+        <UsageCount Value="21"/>
+      </Unit44>
+      <Unit45>
+        <Filename Value="..\..\source\Img32.SVG.Path.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="9"/>
+        <CursorPos X="50" Y="24"/>
+        <UsageCount Value="21"/>
+      </Unit45>
+      <Unit46>
+        <Filename Value="C:\lazarus\lcl\forms.pp"/>
+        <UnitName Value="Forms"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1025"/>
+        <CursorPos X="35" Y="1049"/>
+        <UsageCount Value="10"/>
+      </Unit46>
     </Units>
-    <JumpHistory Count="30" HistoryIndex="29">
-      <Position1>
-        <Filename Value="main.pas"/>
-        <Caret Line="135" Column="14" TopLine="109"/>
-      </Position1>
-      <Position2>
-        <Filename Value="..\..\source\Img32.Fmt.SVG.pas"/>
-        <Caret Line="26" Column="30" TopLine="14"/>
-      </Position2>
-      <Position3>
-        <Filename Value="..\..\source\Img32.Fmt.SVG.pas"/>
-        <Caret Line="29" Column="28" TopLine="14"/>
-      </Position3>
-      <Position4>
-        <Filename Value="..\..\source\Img32.Fmt.SVG.pas"/>
-        <Caret Line="451" Column="3" TopLine="443"/>
-      </Position4>
-      <Position5>
-        <Filename Value="..\..\source\Img32.Fmt.SVG.pas"/>
-        <Caret Line="29" Column="20" TopLine="14"/>
-      </Position5>
-      <Position6>
-        <Filename Value="..\..\source\Clipper\Clipper.pas"/>
-        <Caret Line="2865" Column="51" TopLine="2850"/>
-      </Position6>
-      <Position7>
-        <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <Caret Line="2940" Column="35" TopLine="2925"/>
-      </Position7>
-      <Position8>
-        <Filename Value="..\..\source\Clipper\Clipper.pas"/>
-        <Caret Line="2871" Column="43" TopLine="2850"/>
-      </Position8>
-      <Position9>
-        <Filename Value="..\..\source\Clipper\Clipper.pas"/>
-        <Caret Line="280" Column="37" TopLine="265"/>
-      </Position9>
-      <Position10>
-        <Filename Value="..\..\source\Clipper\Clipper.pas"/>
-        <Caret Line="281" Column="37" TopLine="265"/>
-      </Position10>
-      <Position11>
-        <Filename Value="..\..\source\Clipper\ClipperOffset.pas"/>
-        <Caret Line="121" Column="3" TopLine="105"/>
-      </Position11>
-      <Position12>
-        <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <Caret Line="3079" Column="31" TopLine="3064"/>
-      </Position12>
-      <Position13>
-        <Filename Value="..\..\source\Img32.SVG.HtmlHashConsts.inc"/>
-        <Caret Line="49" Column="3" TopLine="173"/>
-      </Position13>
-      <Position14>
-        <Filename Value="..\..\source\Img32.Resamplers.pas"/>
-        <Caret Line="219" Column="45" TopLine="208"/>
-      </Position14>
-      <Position15>
-        <Filename Value="..\..\source\Img32.Transform.pas"/>
-        <Caret Line="72" Column="32" TopLine="57"/>
-      </Position15>
-      <Position16>
-        <Filename Value="..\..\source\Img32.pas"/>
-        <Caret Line="1325" Column="6" TopLine="1310"/>
-      </Position16>
-      <Position17>
-        <Filename Value="..\..\source\Img32.pas"/>
-        <Caret Line="1327" Column="15" TopLine="1312"/>
-      </Position17>
-      <Position18>
-        <Filename Value="..\..\source\Img32.pas"/>
-        <Caret Line="1325" Column="6" TopLine="1310"/>
-      </Position18>
-      <Position19>
-        <Filename Value="..\..\source\Img32.pas"/>
-        <Caret Line="1327" Column="15" TopLine="1312"/>
-      </Position19>
-      <Position20>
-        <Filename Value="..\..\source\Img32.pas"/>
-        <Caret Line="1344" Column="35" TopLine="1329"/>
-      </Position20>
-      <Position21>
-        <Filename Value="..\..\source\Img32.pas"/>
-        <Caret Line="1350" Column="32" TopLine="1335"/>
-      </Position21>
-      <Position22>
-        <Filename Value="..\..\source\Img32.Text.pas"/>
-        <Caret Line="3095" Column="29" TopLine="3082"/>
-      </Position22>
-      <Position23>
-        <Filename Value="..\..\source\Img32.Text.pas"/>
-        <Caret Line="3089" Column="25" TopLine="3083"/>
-      </Position23>
-      <Position24>
-        <Filename Value="..\..\source\Img32.Text.pas"/>
-        <Caret Line="3092" Column="34" TopLine="3075"/>
-      </Position24>
-      <Position25>
-        <Filename Value="..\..\source\Clipper\Clipper.pas"/>
-        <Caret Line="280" Column="37" TopLine="265"/>
-      </Position25>
-      <Position26>
-        <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <Caret Line="3063" Column="37" TopLine="3035"/>
-      </Position26>
-      <Position27>
-        <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <Caret Line="3051" Column="31" TopLine="3037"/>
-      </Position27>
-      <Position28>
-        <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <Caret Line="3047" Column="23" TopLine="3033"/>
-      </Position28>
-      <Position29>
-        <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <Caret Line="2941" Column="13" TopLine="2941"/>
-      </Position29>
-      <Position30>
-        <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <Caret Line="3058" Column="47" TopLine="3036"/>
-      </Position30>
-    </JumpHistory>
+    <JumpHistory HistoryIndex="-1"/>
     <RunParams>
       <FormatVersion Value="2"/>
       <Modes Count="0" ActiveMode=""/>
     </RunParams>
   </ProjectSession>
+  <Debugging>
+    <Watches Count="2">
+      <Item1>
+        <Expression Value="scaleX"/>
+      </Item1>
+      <Item2>
+        <Expression Value="scaleY"/>
+      </Item2>
+    </Watches>
+  </Debugging>
 </CONFIG>

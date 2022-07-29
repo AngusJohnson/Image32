@@ -1,4 +1,4 @@
-program Image32_Laz_Demo;
+program Image32_FPC;
 
 uses
   Forms, Interfaces, main;
