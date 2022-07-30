@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.2                                                             *
-* Date      :  29 July 2022                                                    *
+* Date      :  30 July 2022                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -2323,15 +2323,21 @@ end;
 procedure TImage32.CopyInternal(src: TImage32;
   const srcRec, dstRec: TRect; blendFunc: TBlendFunction);
 var
-  i, j, srcRecWidth: Integer;
+  i, j, srcRecWidth, srcRecHeight: Integer;
   s, d: PColor32;
 begin
-  srcRecWidth := srcRec.Right - srcRec.Left;
+  // occasionally, due to rounding, srcRec and dstRec
+  // don't have exactly the same widths and heights, so ...
+  srcRecWidth :=
+    Min(srcRec.Right - srcRec.Left, dstRec.Right - dstRec.Left);
+  srcRecHeight :=
+    Min(srcRec.Bottom - srcRec.Top, dstRec.Bottom - dstRec.Top);
+
   s := @src.Pixels[srcRec.Top * src.Width + srcRec.Left];
   d := @Pixels[dstRec.top * Width + dstRec.Left];
 
   if assigned(blendFunc) then
-    for i := srcRec.Top to srcRec.Bottom -1 do
+    for i := srcRec.Top to srcRec.Top + srcRecHeight -1 do
     begin
       for j := 1 to srcRecWidth do
       begin
@@ -2343,7 +2349,7 @@ begin
     end
   else
     //simply overwrite src with dst (ie without blending)
-    for i := srcRec.Top to srcRec.Bottom -1 do
+    for i := srcRec.Top to srcRec.Top + srcRecHeight -1 do
     begin
       move(s^, d^, srcRecWidth * SizeOf(TColor32));
       inc(s, src.Width);
