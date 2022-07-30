@@ -1,7 +1,7 @@
 object MainForm: TMainForm
-  Left = 1082
+  Left = 844
   Height = 804
-  Top = 614
+  Top = 259
   Width = 766
   Caption = 'Image32 Lazarus Demo'
   ClientHeight = 804
@@ -14,20 +14,27 @@ object MainForm: TMainForm
   LCLVersion = '2.0.12.0'
   object Image1: TImage
     Left = 0
-    Height = 804
+    Height = 760
     Top = 0
     Width = 766
     Align = alClient
   end
   object btnClose: TButton
-    Left = 569
+    Left = 580
     Height = 70
-    Top = 717
+    Top = 671
     Width = 163
     Anchors = [akRight, akBottom]
     Cancel = True
     Caption = '&Close'
     OnClick = btnCloseClick
     TabOrder = 0
+  end
+  object StatusBar1: TStatusBar
+    Left = 0
+    Height = 44
+    Top = 760
+    Width = 766
+    Panels = <>
   end
 end

@@ -266,13 +266,6 @@ var
 
 implementation
 
-uses
-  Img32.SVG.Path;
-
-resourcestring
-  rsSvgPathRangeError = 'TSvgPath.GetPath range error';
-  rsSvgSubPathRangeError = 'TSvgSubPath.GetSeg range error';
-  rsSvgSegmentRangeError = 'TSvgSegment.GetVal range error';
 
 type
   TColorConst = record

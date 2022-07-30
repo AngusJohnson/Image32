@@ -2668,25 +2668,25 @@ end;
 procedure TImage32.CopyFromBitmap(bmp: TBitmap);
 var
   savedPF: TPixelFormat;
-  {$IFNDEF MSWINDOWS}
+{$IFNDEF MSWINDOWS}
   i: integer;
   pxDst, pxSrc: PColor32;
-  {$ENDIF}
+{$ENDIF}
 begin
   if not Assigned(bmp) then Exit;
   savedPF := bmp.PixelFormat;
   bmp.PixelFormat := pf32bit;
   SetSize(bmp.Width, bmp.Height);
-  {$IFDEF MSWINDOWS}
+{$IFDEF MSWINDOWS}
   GetBitmapBits(bmp.Handle, Width * Height * 4, PixelBase);
-  {$ELSE}
+{$ELSE}
   for i := 0 to bmp.Height -1 do
   begin
     pxSrc := bmp.ScanLine[i];
-    pxDst := img.PixelRow[i];
+    pxDst := PixelRow[i];
     Move(pxSrc^, pxDst^, bmp.Width * SizeOf(TColor32));
   end;
-  {$ENDIF}
+{$ENDIF}
   bmp.PixelFormat := savedPF;
 end;
 //------------------------------------------------------------------------------
@@ -2701,22 +2701,22 @@ begin
   if not Assigned(bmp) then Exit;
   bmp.PixelFormat := pf32bit;
   bmp.SetSize(Width, Height);
-  {$IFDEF MSWINDOWS}
+{$IFDEF MSWINDOWS}
   {$IFNDEF FPC}
   bmp.AlphaFormat := afDefined;
   {$ENDIF}
   SetBitmapBits(bmp.Handle, Width * Height * 4, PixelBase);
-  {$ELSE}
+{$ELSE}
   for i := 0 to bmp.Height -1 do
   begin
     pxDst := bmp.ScanLine[i];
-    pxSrc := img.PixelRow[i];
+    pxSrc := PixelRow[i];
     Move(pxSrc^, pxDst^, bmp.Width * SizeOf(TColor32));
   end;
-  {$ENDIF}
-end;
 {$ENDIF}
+end;
 //------------------------------------------------------------------------------
+{$ENDIF}
 
 procedure TImage32.ConvertToBoolMask(reference: TColor32; tolerance: integer;
   colorFunc: TCompareFunction; maskBg: TColor32; maskFg: TColor32);
@@ -2732,11 +2732,11 @@ begin
   b := @mask[0];
   for i := 0 to Width * Height -1 do
   begin
-    {$IFDEF PBYTE}
+  {$IFDEF PBYTE}
     if b^ = 0 then c^ := maskBg else c^ := maskFg;
-    {$ELSE}
+  {$ELSE}
     if b^ = #0 then c^ := maskBg else c^ := maskFg;
-    {$ENDIF}
+  {$ENDIF}
     inc(c); inc(b);
   end;
   Changed;
@@ -2757,11 +2757,11 @@ begin
   b := @mask[0];
   for i := 0 to Width * Height -1 do
   begin
-    {$IFDEF PBYTE}
+  {$IFDEF PBYTE}
     c^ := b^ shl 24;
-    {$ELSE}
+  {$ELSE}
     c^ := Ord(b^) shl 24;
-    {$ENDIF}
+  {$ENDIF}
     inc(c); inc(b);
   end;
   Changed;

@@ -6,6 +6,7 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, StdCtrls, ExtCtrls,
+  IntfGraphics, ComCtrls, GraphType,
   Img32, Img32.Text, Img32.Fmt.SVG, Img32.Vector, Img32.Draw;
 
 type
@@ -15,6 +16,7 @@ type
   TMainForm = class(TForm)
     btnClose: TButton;
     Image1: TImage;
+    StatusBar1: TStatusBar;
     procedure btnCloseClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -53,9 +55,7 @@ var
 begin
   penColor := clMaroon32;
 {$IFNDEF MSWINDOWS}
-  bkColor  := SwapRedBlue(bkColor);
   penColor := SwapRedBlue(penColor);
-  txtColor := SwapRedBlue(txtColor);
 {$ENDIF}
   img := TImage32.create;
   Image1.Picture.Bitmap.PixelFormat := pf32bit;
@@ -95,22 +95,21 @@ procedure TMainForm.DrawImage;
 var
   tmpImg: TImage32;
   tmpPath: TPathD;
-  dstRec: TRect;
+  textRec: TRect;
+  lRawImage: TRawImage;
+  lazImg: TLazIntfImage;
 begin
-  with Image1.Picture.Bitmap do
-    img.SetSize(Width, Height);
+  img.SetSize(Image1.Picture.Bitmap.Width, btnClose.Top - DpiAware(10));
   if img.IsEmpty then Exit;
-  img.Clear();
-
-  dstRec := img.Bounds;
-  dstRec.Bottom := btnClose.Top - 10;
 
   //load an SVG image stored as a resource (Img32)
   tmpImg := TImage32.Create(img.Width, img.Height);
-  try
+  try try
     tmpImg.LoadFromResource('IMAGE32', RT_RCDATA);
     // now stretch copy the resource image into 'img'
-    img.Copy(tmpImg, tmpImg.Bounds, dstRec);
+    img.Copy(tmpImg, tmpImg.Bounds, img.Bounds);
+  except
+  end;
   finally
     tmpImg.Free;
   end;
@@ -118,10 +117,23 @@ begin
   tmpPath := Img32.Vector.Rectangle(img.Bounds);
   DrawLine(img, tmpPath, 10, penColor, esPolygon);
 
-  dstRec := GetBounds(copyTxtPaths);
-  copyTxtPaths := OffsetPath(copyTxtPaths, 10- dstRec.Left, 10 - dstRec.Top);
+  textRec := GetBounds(copyTxtPaths);
+  copyTxtPaths := OffsetPath(copyTxtPaths, 10- textRec.Left, 10 - textRec.Top);
   DrawPolygon(img, copyTxtPaths, frNonZero, clBlack32);
-  img.CopyToBitmap(Image1.Picture.Bitmap);
+
+  lRawImage.Init;
+  lRawImage.Description.Init_BPP32_B8G8R8A8_BIO_TTB(img.Width, img.Height);
+  lRawImage.CreateData(False);
+  Move(img.PixelBase^, lRawImage.Data^,
+    img.Width * img.Height * SizeOf(TColor32));
+
+  lazImg := TLazIntfImage.Create(img.Width, img.Height);
+  try
+    lazImg.SetRawImage(lRawImage, true);
+    Image1.Picture.Bitmap.LoadFromIntfImage(lazImg);
+  finally
+    lazImg.Free;
+  end;
 end;
 //------------------------------------------------------------------------------
 
