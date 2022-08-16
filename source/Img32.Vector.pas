@@ -330,6 +330,9 @@ type
 
   function IsPathConvex(const path: TPathD): Boolean;
 
+  function NormalizeVector(const vec: TPointD): TPointD;
+  {$IFDEF INLINING} inline; {$ENDIF}
+
   //GetUnitVector: Used internally
   function GetUnitVector(const pt1, pt2: TPointD): TPointD;
 
@@ -1051,20 +1054,25 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetAvgUnitVector(const vec1, vec2: TPointD): TPointD;
+function NormalizeVector(const vec: TPointD): TPointD;
 var
   h, inverseHypot: Double;
 begin
-  Result := PointD((vec1.X + vec2.X) * 0.5, (vec1.Y + vec2.Y) * 0.5);
-  h := Hypot(Result.X, Result.Y);
+  h := Hypot(vec.X, vec.Y);
   if ValueAlmostZero(h, 0.001) then
   begin
     Result := NullPointD;
     Exit;
   end;
   inverseHypot := 1 / h;
-  Result.X := Result.X * inverseHypot;
-  Result.Y := Result.Y * inverseHypot;
+  Result.X := vec.X * inverseHypot;
+  Result.Y := vec.Y * inverseHypot;
+end;
+//------------------------------------------------------------------------------
+
+function GetAvgUnitVector(const vec1, vec2: TPointD): TPointD;
+begin
+  Result := NormalizeVector(PointD(vec1.X + vec2.X, vec1.Y + vec2.Y));
 end;
 //------------------------------------------------------------------------------
 
@@ -1874,9 +1882,10 @@ var
   highI   : cardinal;
   iLo,iHi : cardinal;
   norms   : TPathD;
-  ip      : TPointD;
+  vec     : TPointD;
+  pt, ptQ : TPointD;
   p       : TPathD;
-  a       : double;
+  a,a2    : double;
   growRec   : TGrowRec;
   absDelta  : double;
   pt1, pt2, pt3, pt4: TPointD;
@@ -1951,10 +1960,10 @@ begin
     growRec.aSin := CrossProduct(norms[prevI], norms[i]);
     growRec.aCos := DotProduct(norms[prevI], norms[i]);
 
-    if (growRec.aSin < 0) = (delta > 0) then
+    if ValueAlmostZero(growRec.aSin) or ((growRec.aSin < 0) = (delta > 0)) then
     begin //is concave
-      if SegmentsIntersect(pt1, pt2, pt3, pt4, ip) then
-        AddPoint(ip) else
+      if SegmentsIntersect(pt1, pt2, pt3, pt4, pt) then
+        AddPoint(pt) else
       begin
         AddPoint(pt2);
         AddPoint(pt3);
@@ -1975,14 +1984,39 @@ begin
     end
     else if (growRec.aCos < -0.001) and (growRec.aCos > -0.999) then
     begin
-      //see offset_triginometry5.svg
-      a := tan( ArcTan2(growRec.aSin, growRec.aCos)/4 ) * delta;
-      AddPoint(GetVector(pt2, norms[prevI], a));
-      AddPoint(GetVector(pt3, norms[i], -a));
+      // squaring off at delta distance from original vertex
+
+      // while a negative cos indicates an angle > 90, the angle here
+      // is the **angle of deviation**, so convexity will be > 270.
+      // And only convex angles > 270 degrees will need squaring since
+      // less obtuse angles can be safely mitered.
+
+      // using the reciprocal of unit normals (as unit vectors)
+      // get the average unit vector ...
+      vec := GetAvgUnitVector(
+        PointD(-norms[prevI].Y, norms[prevI].X),
+        PointD(norms[i].Y, -norms[i].X));
+      // now offset the original vertex delta units along unit vector
+      ptQ := OffsetPoint(path[i], delta * vec.X, delta * vec.Y);
+
+      // get perpendicular vertices
+      pt1 := OffsetPoint(ptQ, delta * vec.Y, delta * -vec.X);
+      pt2 := OffsetPoint(ptQ, delta * -vec.Y, delta * vec.X);
+      // get 2 vertices along one edge offset
+      pt3 := p[prevI*2];
+      pt4 := p[prevI*2 +1];
+      IntersectPoint(pt1,pt2,pt3,pt4, pt);
+      AddPoint(pt);
+      //get the second intersect point through reflecion
+      pt := ReflectPoint(pt, ptQ);
+      AddPoint(pt);
     end else
     begin
-      AddPoint(pt2);
-      AddPoint(pt3);
+      a := delta / (1 + growRec.aCos);
+      AddPoint(PointD(path[i].X + (norms[i].X + norms[prevI].X) * a,
+        path[i].Y + (norms[i].Y + norms[prevI].Y) * a));
+//      AddPoint(pt2);
+//      AddPoint(pt3);
     end;
     prevI := i;
   end;
