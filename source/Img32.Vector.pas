@@ -2,8 +2,8 @@ unit Img32.Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.2                                                            *
-* Date      :  28 July 2022                                                    *
+* Version   :  4.3                                                             *
+* Date      :  13 September 2022                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -412,7 +412,7 @@ type
   //With a positive delta, clockwise paths will expand and counter-clockwise
   //ones will contract. The reverse happens with negative deltas.
   function Grow(const path, normals: TPathD; delta: double; joinStyle: TJoinStyle;
-    miterLimOrRndScale: double; isOpen: Boolean = false): TPathD;
+    miterLim: double; isOpen: Boolean = false): TPathD;
 
   function ValueAlmostZero(val: double; epsilon: double = 0.001): Boolean;
   function ValueAlmostOne(val: double; epsilon: double = 0.001): Boolean;
@@ -1846,7 +1846,7 @@ end;
 //------------------------------------------------------------------------------
 
 function Grow(const path, normals: TPathD; delta: double;
-  joinStyle: TJoinStyle; miterLimOrRndScale: double; isOpen: Boolean): TPathD;
+  joinStyle: TJoinStyle; miterLim: double; isOpen: Boolean): TPathD;
 var
   resCnt, resCap: integer;
 
@@ -1885,9 +1885,10 @@ var
   vec     : TPointD;
   pt, ptQ : TPointD;
   p       : TPathD;
-  a,a2    : double;
+  a       : double;
   growRec   : TGrowRec;
   absDelta  : double;
+  almostNoAngle: Boolean;
   pt1, pt2, pt3, pt4: TPointD;
 begin
   Result := nil;
@@ -1924,7 +1925,6 @@ begin
 
   if joinStyle = jsRound then
   begin
-    if miterLimOrRndScale <= 0 then miterLimOrRndScale := 1;
     growRec.Radius := delta;
     growRec.StepsPerRad := CalcRoundingSteps(growRec.Radius)/(Pi *2);
     if delta < 0 then
@@ -1932,9 +1932,9 @@ begin
       GetSinCos(1/growRec.StepsPerRad, growRec.StepSin, growRec.StepCos);
   end else
   begin
-    if miterLimOrRndScale <= 0 then miterLimOrRndScale := DefaultMiterLimit
-    else if miterLimOrRndScale < 2 then miterLimOrRndScale := 2;
-    miterLimOrRndScale := 2 /(sqr(miterLimOrRndScale));
+    if miterLim <= 0 then miterLim := DefaultMiterLimit
+    else if miterLim < 2 then miterLim := 2;
+    miterLim := 2 /(sqr(miterLim));
     growRec.StepsPerRad := 0; //stop compiler warning.
   end;
 
@@ -1953,21 +1953,14 @@ begin
 
   for i := iLo to iHi do
   begin
-    pt1 := p[prevI*2];
-    pt2 := p[prevI*2+1];
-    pt3 := p[i*2];
-    pt4 := p[i*2+1];
     growRec.aSin := CrossProduct(norms[prevI], norms[i]);
     growRec.aCos := DotProduct(norms[prevI], norms[i]);
 
-    if ValueAlmostZero(growRec.aSin) or ((growRec.aSin < 0) = (delta > 0)) then
-    begin //is concave
-      if SegmentsIntersect(pt1, pt2, pt3, pt4, pt) then
-        AddPoint(pt) else
-      begin
-        AddPoint(pt2);
-        AddPoint(pt3);
-      end;
+    almostNoAngle := ValueAlmostZero(growRec.aCos -1);
+    if almostNoAngle or ((growRec.aSin * delta < 0)) then
+    begin //ie is concave
+      AddPoint(p[prevI*2+1]);
+      AddPoint(p[i*2]);
     end
     else if (joinStyle = jsRound) and
       (Abs(growRec.aSin) > 0.08) then //only round if angle > ~5 deg
@@ -1975,16 +1968,16 @@ begin
       AppendPath(DoRound(path[i], norms[prevI], growRec));
     end
     else if (joinStyle = jsMiter) and
-      (1 + growRec.aCos > miterLimOrRndScale) then
+      (1 + growRec.aCos > miterLim) then // nb: miterLim <= 2
     begin
       //within miter range
       a := delta / (1 + growRec.aCos);
       AddPoint(PointD(path[i].X + (norms[i].X + norms[prevI].X) * a,
         path[i].Y + (norms[i].Y + norms[prevI].Y) * a));
     end
-    else if (growRec.aCos < -0.001) and (growRec.aCos > -0.999) then
+    else if (growRec.aCos < -0.001) then
     begin
-      // squaring off at delta distance from original vertex
+      // do squaring when the *internal* angle is less than 90 degrees
 
       // while a negative cos indicates an angle > 90, the angle here
       // is the **angle of deviation**, so convexity will be > 270.
@@ -2012,11 +2005,10 @@ begin
       AddPoint(pt);
     end else
     begin
+      // the *internal* angle is >= 90 degrees so is safe to miter
       a := delta / (1 + growRec.aCos);
       AddPoint(PointD(path[i].X + (norms[i].X + norms[prevI].X) * a,
         path[i].Y + (norms[i].Y + norms[prevI].Y) * a));
-//      AddPoint(pt2);
-//      AddPoint(pt3);
     end;
     prevI := i;
   end;
