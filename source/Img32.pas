@@ -2706,10 +2706,13 @@ var
 begin
   if not Assigned(bmp) then Exit;
   bmp.PixelFormat := pf32bit;
-  bmp.SetSize(Width, Height);
+  bmp.Width := Width;
+  bmp.Height := Height;
 {$IFDEF MSWINDOWS}
   {$IFNDEF FPC}
+  {$IFDEF ALPHAFORMAT}
   bmp.AlphaFormat := afDefined;
+  {$ENDIF}
   {$ENDIF}
   SetBitmapBits(bmp.Handle, Width * Height * 4, PixelBase);
 {$ELSE}

@@ -1,10 +1,17 @@
 unit main;
 
+{$I Img32.inc}
+
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, StdCtrls,
-  Forms, Types, Menus, ExtCtrls, ComCtrls, ShellApi, Dialogs, Math,
+{$IFnDEF FPC}
+  ShellApi, Windows,
+{$ELSE}
+  LCLIntf, LCLType, LMessages,
+{$ENDIF}
+  Messages, SysUtils, Classes, Graphics, Controls, StdCtrls,
+  Forms, Types, Menus, ExtCtrls, ComCtrls, Dialogs, Math,
   Img32.Panels;
 
   //This sample app presumes that the TImage32Panel component
@@ -22,7 +29,6 @@ type
     PopupMenu11: TMenuItem;
     OpeninBrowser1: TMenuItem;
     StatusBar1: TStatusBar;
-    ImagePanel: TImage32Panel;
     ListBox1: TListBox;
     Splitter1: TSplitter;
     SaveAs1: TMenuItem;
@@ -38,6 +44,7 @@ type
     procedure OpeninBrowser1Click(Sender: TObject);
     procedure SaveAs1Click(Sender: TObject);
   protected
+    ImagePanel: TImage32Panel;
     folder: string;
     filename: string;
     procedure OpenFile(const filename: string);
@@ -50,7 +57,11 @@ var
 
 implementation
 
-{$R *.dfm}
+{$IFnDEF FPC}
+  {$R *.dfm}
+{$ELSE}
+  {$R *.lfm}
+{$ENDIF}
 
 uses
   Img32, Img32.Vector, Img32.Draw,
@@ -59,15 +70,26 @@ uses
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
+{$IFnDEF FPC}
+procedure OpenDocument(const filename: string);
+begin
+  ShellExecute(0, 'open', PChar(filename), nil, nil, SW_SHOWNORMAL);
+end;
+{$ENDIF}
+
 procedure TForm1.FormCreate(Sender: TObject);
 var
   rec: TRect;
 begin
+  ImagePanel := TImage32Panel.create(self);
+  ImagePanel.parent := self;
+  ImagePanel.Align := alClient;
+  ImagePanel.OnResize:= ImagePanelResize;
+  {$IFNDEF FPC}
   DragAcceptFiles(Handle, True);
-
+  {$ENDIF}
   ImagePanel.ParentBackground := false;
   ImagePanel.Color := clBtnFace;
-
   rec := ImagePanel.InnerClientRect;
   ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
 
@@ -88,7 +110,9 @@ end;
 
 procedure TForm1.FormDestroy(Sender: TObject);
 begin
+  {$IFnDEF FPC}
   DragAcceptFiles(Handle, False);
+  {$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -159,7 +183,7 @@ var
 begin
   if ListBox1.ItemIndex < 0 then Exit;
   fn := AppendSlash(folder) + ListBox1.Items[ListBox1.ItemIndex];
-  ShellExecute(handle, nil, 'notepad.exe', PChar(fn), nil, SW_SHOWNORMAL);
+   OpenDocument('notepad.exe');
 end;
 //------------------------------------------------------------------------------
 
@@ -169,7 +193,7 @@ var
 begin
   if ListBox1.ItemIndex < 0 then Exit;
   fn := AppendSlash(folder) + ListBox1.Items[ListBox1.ItemIndex];
-  ShellExecute(handle, nil, PChar(fn), nil, nil, SW_SHOWNORMAL);
+   OpenDocument(PChar(fn));
 end;
 //------------------------------------------------------------------------------
 
@@ -179,6 +203,7 @@ var
   filenameLen: Integer;
   filename: string;
 begin
+  {$IFnDEF FPC}
   Msg.Result := 0;
   hDrop:= Msg.wParam;
   filenameLen := DragQueryFile(hDrop, 0, nil, 0);
@@ -186,6 +211,7 @@ begin
   DragQueryFile(hDrop, 0, Pointer(filename), filenameLen+1);
   DragFinish(hDrop);
   OpenFile(fileName);
+  {$ENDIF}
 end;
 //------------------------------------------------------------------------------
 

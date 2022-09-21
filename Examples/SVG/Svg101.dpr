@@ -1,10 +1,14 @@
 program Svg101;
 
+{$I Img32.inc}
+
 uses
+  {$IFDEF FPC}
+  Interfaces,
+  {$ENDIF}
   Forms,
   main in 'main.pas' {Form1};
 
-{$I Img32.inc}
 {$R ..\resources.res}
 
 begin
