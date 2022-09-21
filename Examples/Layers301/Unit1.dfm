@@ -62,17 +62,17 @@ object MainForm: TMainForm
           RadioItem = True
           ShortCut = 16432
         end
-        object MnuShadow10: TMenuItem
+        object MnuShadow5: TMenuItem
           AutoCheck = True
-          Caption = '10'
+          Caption = '5'
           Checked = True
           GroupIndex = 1
           RadioItem = True
           ShortCut = 16433
         end
-        object MnuShadow25: TMenuItem
+        object MnuShadow10: TMenuItem
           AutoCheck = True
-          Caption = '25'
+          Caption = '10'
           GroupIndex = 1
           RadioItem = True
           ShortCut = 16434

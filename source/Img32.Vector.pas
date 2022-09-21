@@ -2344,7 +2344,7 @@ function GrowOpenLine(const line: TPathD; width: double;
   miterLimOrRndScale: double): TPathD;
 var
   len, x,y: integer;
-  halfWidth: double;
+  segLen, halfWidth: double;
   normals, lineL, lineR, arc: TPathD;
   invNorm: TPointD;
   growRec: TGrowRec;
@@ -2414,15 +2414,22 @@ begin
     AppendPath(Result, lineR);
   end else
   begin
-    //esSquare => extends both line ends by 1/2 lineWidth
+    lineL := Copy(line, 0, len);
     if endStyle = esSquare then
     begin
-      lineL := Copy(line, 0, len);
+      // esSquare => extends both line ends by 1/2 lineWidth
       AdjustPoint(lineL[0], lineL[1], width * 0.5);
       AdjustPoint(lineL[len-1], lineL[len-2], width * 0.5);
     end else
-      lineL := line;
-
+    begin
+      //esButt -> extend only very short end segments
+      segLen := Distance(lineL[0], lineL[1]);
+      if segLen < width * 0.5 then
+        AdjustPoint(lineL[0], lineL[1], width * 0.5 - segLen);
+      segLen := Distance(lineL[len-1], lineL[len-2]);
+      if segLen < width * 0.5 then
+        AdjustPoint(lineL[len-1], lineL[len-2], width * 0.5 - segLen);
+    end;
     //first grow the left side of the line => Result
     Result := Grow(lineL, normals,
       halfWidth, joinStyle, miterLimOrRndScale, true);

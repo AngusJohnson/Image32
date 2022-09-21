@@ -69,8 +69,8 @@ type
     N4: TMenuItem;
     ShadowDepth1: TMenuItem;
     MnuShadow0: TMenuItem;
+    MnuShadow5: TMenuItem;
     MnuShadow10: TMenuItem;
-    MnuShadow25: TMenuItem;
     procedure mnuExitClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -160,10 +160,10 @@ begin
 
   if MainForm.MnuShadow0.Checked then
     OuterMargin := dpiAware(0)
-  else if MainForm.MnuShadow10.Checked then
-    OuterMargin := dpiAware(10)
+  else if MainForm.MnuShadow5.Checked then
+    OuterMargin := dpiAware(5)
   else
-    OuterMargin := dpiAware(25);
+    OuterMargin := dpiAware(10);
 
   FrameWidth := DpiAware(10);
   if self is TMyStarLayer32 then
@@ -239,7 +239,7 @@ begin
   if name = 'rectangle' then
   begin
     //draw a drop shadow and then fill the layer's background
-    DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, $40000000);
+    DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, $33000000);
     Image.FillRect(Rect(rec), clBtnFace32);
     //and draw a pale 3D gray frame
     DrawEdge(Image, rec, clWhite32, $FFCCCCCC, dpiAware(2));
@@ -251,7 +251,7 @@ begin
   begin
     //draw drop shadow and fill the ellipse layer's background
     p := MakeEllipse(Rect(rec));
-    DrawShadow(Image, p, frNonZero, OuterMargin, angle45, $40000000);
+    DrawShadow(Image, p, frNonZero, OuterMargin, angle45, $33000000);
     DrawPolygon(Image, p, frNonZero, clBtnFace32);
     //and draw a pale 3D gray frame
     p := MakeEllipse(Rect(rec));
@@ -264,7 +264,7 @@ begin
   else //name = 'star'
   begin
     p := MakeStar(rec);
-    DrawShadow(Image, p, frNonZero, OuterMargin, angle45, $40000000);
+    DrawShadow(Image, p, frNonZero, OuterMargin, angle45, $33000000);
     DrawPolygon(Image, p, frNonZero, clBtnFace32);
     DrawEdge(Image, MakeStar(rec), clWhite32, $FFCCCCCC, dpiAwareOne*2);
     img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
