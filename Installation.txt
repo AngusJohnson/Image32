@@ -3,7 +3,8 @@ Image32 Installation and upgrade instructions
 
 1. Unzip the Library into an appropriate (empty) folder.
 
-2. Add the library's source folder to the Delphi IDE library path.
+2. Add the library's 'source' folder to the Delphi IDE library path
+   and add the 'source\clipper' subfolder too.
     To do this in Delphi 10.4 select from the menu -
       Tools | Options | Language | Delphi | Library | Library Path
     To do this in Delphi 7 select from the menu -
