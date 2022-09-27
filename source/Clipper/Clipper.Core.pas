@@ -2,8 +2,8 @@ unit Clipper.Core;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  Clipper2 - beta                                                 *
-* Date      :  27 July 2022                                                    *
+* Version   :  Clipper2 - ver.1.0.4                                            *
+* Date      :  3 September 2022                                                *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  Core Clipper Library module                                     *
 *              Contains structures and functions used throughout the library   *
@@ -30,7 +30,7 @@ type
   TPointD   = record
     X, Y: double;
 {$IFDEF USINGZ}
-    Z: double;
+    Z: Int64;
 {$ENDIF}
   end;
 
@@ -71,6 +71,7 @@ type
     Bottom : Int64;
     function Contains(const pt: TPoint64): Boolean; overload;
     function Contains(const rec: TRect64): Boolean; overload;
+    function AsPath: TPath64;
     property Width: Int64 read GetWidth;
     property Height: Int64 read GetHeight;
     property IsEmpty: Boolean read GetIsEmpty;
@@ -88,7 +89,9 @@ type
     Top    : double;
     Right  : double;
     Bottom : double;
-    function PtInside(const pt: TPointD): Boolean;
+    function Contains(const pt: TPointD): Boolean; overload;
+    function Contains(const rec: TRectD): Boolean; overload;
+    function AsPath: TPathD;
     property Width: double read GetWidth;
     property Height: double read GetHeight;
     property IsEmpty: Boolean read GetIsEmpty;
@@ -116,6 +119,8 @@ function CrossProduct(const pt1, pt2, pt3: TPoint64): double; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
 function CrossProduct(const pt1, pt2, pt3: TPointD): double; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
+function CrossProduct(const vec1, vec2: TPointD): double; overload;
+  {$IFDEF INLINING} inline; {$ENDIF}
 function CrossProduct(vec1x, vec1y, vec2x, vec2y: double): double; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
 
@@ -129,25 +134,30 @@ function DistanceSqr(const pt1, pt2: TPointD): double; overload;
 function DistanceFromLineSqrd(const pt, linePt1, linePt2: TPoint64): double; overload;
 function DistanceFromLineSqrd(const pt, linePt1, linePt2: TPointD): double; overload;
 
-function SegmentsIntersect(const s1a, s1b, s2a, s2b: TPoint64): boolean;
+function SegmentsIntersect(const s1a, s1b, s2a, s2b: TPoint64;
+  inclusive: Boolean = false): boolean; {$IFDEF INLINING} inline; {$ENDIF}
 
 function PointsEqual(const pt1, pt2: TPoint64): Boolean; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
-function PointsNearEqual(const pt1, pt2: TPointD; distanceSqrd: double): Boolean;
+function PointsNearEqual(const pt1, pt2: TPointD): Boolean; overload;
+  {$IFDEF INLINING} inline; {$ENDIF}
+function PointsNearEqual(const pt1, pt2: TPointD; distanceSqrd: double): Boolean; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
 
 {$IFDEF USINGZ}
 function Point64(const X, Y: Int64; Z: Int64 = 0): TPoint64; overload;
 {$IFDEF INLINING} inline; {$ENDIF}
-function Point64(const X, Y: Double; Z: double = 0.0): TPoint64; overload;
+function Point64(const X, Y: Double; Z: Int64 = 0): TPoint64; overload;
 {$IFDEF INLINING} inline; {$ENDIF}
-function PointD(const X, Y: Double; Z: double = 0.0): TPointD; overload;
+function PointD(const X, Y: Double; Z: Int64 = 0): TPointD; overload;
 {$IFDEF INLINING} inline; {$ENDIF}
 {$ELSE}
 function Point64(const X, Y: Int64): TPoint64; overload; {$IFDEF INLINING} inline; {$ENDIF}
 function Point64(const X, Y: Double): TPoint64; overload; {$IFDEF INLINING} inline; {$ENDIF}
 function PointD(const X, Y: Double): TPointD; overload; {$IFDEF INLINING} inline; {$ENDIF}
 {$ENDIF}
+
+function Negate(const pt: TPointD): TPointD; {$IFDEF INLINING} inline; {$ENDIF}
 
 function Point64(const pt: TPointD): TPoint64; overload; {$IFDEF INLINING} inline; {$ENDIF}
 function PointD(const pt: TPoint64): TPointD; overload;
@@ -164,6 +174,12 @@ function GetBounds(const paths: TArrayOfPaths): TRect64; overload;
 function GetBounds(const paths: TPaths64): TRect64; overload;
 function GetBounds(const paths: TPathsD): TRectD; overload;
 function GetBounds(const path: TPath64): TRect64; overload;
+
+function TranslatePoint(const pt: TPoint64; dx, dy: Int64): TPoint64; overload;
+function TranslatePoint(const pt: TPointD; dx, dy: double): TPointD; overload;
+
+procedure RotatePt(var pt: TPointD; const center: TPointD; sinA, cosA: double);
+procedure RotatePath(var path: TPathD; const center: TPointD; sinA, cosA: double);
 
 procedure InflateRect(var rec: TRect64; dx, dy: Int64); overload;
   {$IFDEF INLINING} inline; {$ENDIF}
@@ -204,11 +220,6 @@ function ScalePathsD(const paths: TPathsD; sx, sy: double): TPathsD; overload;
 function ScalePathsD(const paths: TPaths64; scale: double): TPathsD; overload;
 function ScalePathsD(const paths: TPathsD; scale: double): TPathsD; overload;
 
-function TranslatePath(const path: TPath64; dx, dy: Int64): TPath64; overload;
-function TranslatePath(const path: TPathD; dx, dy: double): TPathD; overload;
-function TranslatePaths(const paths: TPaths64; dx, dy: Int64): TPaths64; overload;
-function TranslatePaths(const paths: TPathsD; dx, dy: double): TPathsD; overload;
-
 function Path64(const pathD: TPathD): TPath64;
 function PathD(const path: TPath64): TPathD;
 function Paths64(const pathsD: TPathsD): TPaths64;
@@ -245,12 +256,16 @@ procedure AppendPaths(var paths: TPaths64; const extra: TPaths64); overload;
 procedure AppendPaths(var paths: TPathsD; const extra: TPathsD); overload;
 
 function ArrayOfPathsToPaths(const ap: TArrayOfPaths): TPaths64;
-function GetIntersectPoint(const ln1a, ln1b, ln2a, ln2b: TPoint64): TPointD;
+function GetIntersectPoint64(const ln1a, ln1b, ln2a, ln2b: TPoint64): TPoint64;
+function GetIntersectPointD(const ln1a, ln1b, ln2a, ln2b: TPoint64): TPointD; overload;
+function GetIntersectPointD(const ln1a, ln1b, ln2a, ln2b: TPointD): TPointD; overload;
 
 function PointInPolygon(const pt: TPoint64; const polygon: TPath64): TPointInPolygonResult;
 
 function RamerDouglasPeucker(const path: TPath64; epsilon: double): TPath64; overload;
 function RamerDouglasPeucker(const paths: TPaths64; epsilon: double): TPaths64; overload;
+function RamerDouglasPeucker(const path: TPathD; epsilon: double): TPathD; overload;
+function RamerDouglasPeucker(const paths: TPathsD; epsilon: double): TPathsD; overload;
 
 procedure GetSinCos(angle: double; out sinA, cosA: double);
 function Ellipse(const rec: TRect64; steps: integer = 0): TPath64; overload;
@@ -258,9 +273,16 @@ function Ellipse(const rec: TRectD; steps: integer = 0): TPathD; overload;
 
 const
   MaxInt64    = 9223372036854775807;
+  invalid64   = MaxInt64;
+  invalidD    = infinity;
+
+  NullPointD  : TPointD = (X: 0; Y: 0);
   NullRect64  : TRect64 = (left: 0; top: 0; right: 0; Bottom: 0);
+  InvalidPt64 : TPoint64 = (X: invalid64; Y: invalid64);
+  InvalidPtD :  TPointD = (X: invalidD; Y: invalidD);
+
   NullRectD   : TRectD = (left: 0; top: 0; right: 0; Bottom: 0);
-  Tolerance   : Double = 1.0E-15;
+  Tolerance   : Double = 1.0E-12;
 
 implementation
 
@@ -304,6 +326,16 @@ begin
   result := (rec.Left >= Left) and (rec.Right <= Right) and
     (rec.Top >= Top) and (rec.Bottom <= Bottom);
 end;
+//------------------------------------------------------------------------------
+
+function TRect64.AsPath: TPath64;
+begin
+  SetLength(Result, 4);
+  Result[0] := Point64(Left, Top);
+  Result[1] := Point64(Right, Top);
+  Result[2] := Point64(Right, Bottom);
+  Result[3] := Point64(Left, Bottom);
+end;
 
 //------------------------------------------------------------------------------
 // TRectD methods ...
@@ -333,10 +365,27 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TRectD.PtInside(const pt: TPointD): Boolean;
+function TRectD.Contains(const pt: TPointD): Boolean;
 begin
   result := (pt.X > Left) and (pt.X < Right) and
     (pt.Y > Top) and (pt.Y < Bottom);
+end;
+//------------------------------------------------------------------------------
+
+function TRectD.Contains(const rec: TRectD): Boolean;
+begin
+  result := (rec.Left >= Left) and (rec.Right <= Right) and
+    (rec.Top >= Top) and (rec.Bottom <= Bottom);
+end;
+//------------------------------------------------------------------------------
+
+function TRectD.AsPath: TPathD;
+begin
+  SetLength(Result, 4);
+  Result[0] := PointD(Left, Top);
+  Result[1] := PointD(Right, Top);
+  Result[2] := PointD(Right, Bottom);
+  Result[3] := PointD(Left, Bottom);
 end;
 
 //------------------------------------------------------------------------------
@@ -352,6 +401,13 @@ end;
 function PointsEqual(const pt1, pt2: TPoint64): Boolean;
 begin
   Result := (pt1.X = pt2.X) and (pt1.Y = pt2.Y);
+end;
+//------------------------------------------------------------------------------
+
+function PointsNearEqual(const pt1, pt2: TPointD): Boolean;
+begin
+  Result := (Abs(pt1.X - pt2.X) < Tolerance) and
+    (Abs(pt1.Y - pt2.Y) < Tolerance);
 end;
 //------------------------------------------------------------------------------
 
@@ -416,7 +472,7 @@ end;
 function ValueEqualOrBetween(val, end1, end2: Int64): Boolean;
 begin
   Result := (val = end1) or (val = end2) or
-    (val > end1) = (val < end2);
+    ((val > end1) = (val < end2));
 end;
 //------------------------------------------------------------------------------
 
@@ -425,7 +481,7 @@ begin
   Result.X := pt.X * scale;
   Result.Y := pt.Y * scale;
 {$IFDEF USINGZ}
-  Result.Z := pt.Z * scale;
+  Result.Z := pt.Z;
 {$ENDIF}
 end;
 //------------------------------------------------------------------------------
@@ -566,7 +622,7 @@ begin
     result[i].X := path[i].X * scale;
     result[i].Y := path[i].Y * scale;
 {$IFDEF USINGZ}
-    result[i].Z := path[i].Z * scale;
+    result[i].Z := path[i].Z;
 {$ENDIF}
   end;
 end;
@@ -582,7 +638,7 @@ begin
     result[i].X := path[i].X * scale;
     result[i].Y := path[i].Y * scale;
 {$IFDEF USINGZ}
-    result[i].Z := path[i].Z * scale;
+    result[i].Z := path[i].Z;
 {$ENDIF}
   end;
 end;
@@ -639,7 +695,7 @@ begin
       result[i][j].X := Round(paths[i][j].X * scale);
       result[i][j].Y := Round(paths[i][j].Y * scale);
 {$IFDEF USINGZ}
-      result[i][j].Z := Round(paths[i][j].Z * scale);
+      result[i][j].Z := paths[i][j].Z;
 {$ENDIF}
     end;
   end;
@@ -659,7 +715,7 @@ begin
       result[i][j].X := Round(paths[i][j].X * scale);
       result[i][j].Y := Round(paths[i][j].Y * scale);
 {$IFDEF USINGZ}
-      result[i][j].Z := Round(paths[i][j].Z * scale);
+      result[i][j].Z := paths[i][j].Z;
 {$ENDIF}
     end;
   end;
@@ -679,7 +735,7 @@ begin
       result[i][j].X := paths[i][j].X * scale;
       result[i][j].Y := paths[i][j].Y * scale;
 {$IFDEF USINGZ}
-      result[i][j].Z := paths[i][j].Z * scale;
+      result[i][j].Z := paths[i][j].Z;
 {$ENDIF}
     end;
   end;
@@ -699,86 +755,8 @@ begin
       result[i][j].X := paths[i][j].X * scale;
       result[i][j].Y := paths[i][j].Y * scale;
 {$IFDEF USINGZ}
-      result[i][j].Z := paths[i][j].Z * scale;
+      result[i][j].Z := paths[i][j].Z;
 {$ENDIF}
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function TranslatePath(const path: TPath64; dx, dy: Int64): TPath64;
-var
-  i: integer;
-begin
-  if (dx = 0) and (dy = 0) then
-  begin
-    result := path; // nb: reference counted
-    Exit;
-  end;
-
-  setlength(result, length(path));
-  for i := 0 to high(path) do
-  begin
-    result[i].X := path[i].X + dx;
-    result[i].Y := path[i].Y + dy;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function TranslatePath(const path: TPathD; dx, dy: double): TPathD;
-var
-  i: integer;
-begin
-  if (dx = 0) and (dy = 0) then
-  begin
-    result := path; // nb: reference counted
-    Exit;
-  end;
-
-  setlength(result, length(path));
-  for i := 0 to high(path) do
-  begin
-    result[i].X := path[i].X + dx;
-    result[i].Y := path[i].Y + dy;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function TranslatePaths(const paths: TPaths64; dx, dy: Int64): TPaths64;
-var
-  i,j: integer;
-begin
-  if (dx = 0) and (dy = 0) then
-  begin
-    result := paths; // nb: reference counted
-    Exit;
-  end;
-
-  setlength(result, length(paths));
-  for i := 0 to high(paths) do
-  begin
-    setlength(result[i], length(paths[i]));
-    for j := 0 to high(paths[i]) do
-    begin
-      result[i][j].X := paths[i][j].X + dx;
-      result[i][j].Y := paths[i][j].Y + dy;
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function TranslatePaths(const paths: TPathsD; dx, dy: double): TPathsD;
-var
-  i,j: integer;
-begin
-  setlength(result, length(paths));
-  for i := 0 to high(paths) do
-  begin
-    setlength(result[i], length(paths[i]));
-    for j := 0 to high(paths[i]) do
-    begin
-      result[i][j].X := paths[i][j].X + dx;
-      result[i][j].Y := paths[i][j].Y + dy;
     end;
   end;
 end;
@@ -994,15 +972,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Point64(const X, Y: Double; Z: double): TPoint64;
+function Point64(const X, Y: Double; Z: Int64): TPoint64;
 begin
   Result.X := Round(X);
   Result.Y := Round(Y);
-  Result.Z := Round(Z);
+  Result.Z := Z;
 end;
 //------------------------------------------------------------------------------
 
-function PointD(const X, Y: Double; Z: Double): TPointD;
+function PointD(const X, Y: Double; Z: Int64): TPointD;
 begin
   Result.X := X;
   Result.Y := Y;
@@ -1014,7 +992,7 @@ function Point64(const pt: TPointD): TPoint64;
 begin
   Result.X := Round(pt.X);
   Result.Y := Round(pt.Y);
-  Result.Z := Round(pt.Z);
+  Result.Z := pt.Z;
 end;
 //------------------------------------------------------------------------------
 
@@ -1063,6 +1041,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 {$ENDIF}
+
+function Negate(const pt: TPointD): TPointD;
+begin
+  Result.X := -pt.X;
+  Result.Y := -pt.Y;
+end;
+//------------------------------------------------------------------------------
 
 function Rect64(const left, top, right, bottom: Int64): TRect64;
 begin
@@ -1195,6 +1180,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TranslatePoint(const pt: TPoint64; dx, dy: Int64): TPoint64;
+begin
+  Result.X := pt.X + dx;
+  Result.Y := pt.Y + dy;
+end;
+//------------------------------------------------------------------------------
+
+function TranslatePoint(const pt: TPointD; dx, dy: double): TPointD;
+begin
+  Result.X := pt.X + dx;
+  Result.Y := pt.Y + dy;
+end;
+//------------------------------------------------------------------------------
 
 procedure InflateRect(var rec: TRect64; dx, dy: Int64);
 begin
@@ -1222,6 +1220,15 @@ begin
   tmpY := pt.Y-center.Y;
   pt.X := tmpX * cosA - tmpY * sinA + center.X;
   pt.Y := tmpX * sinA + tmpY * cosA + center.Y;
+end;
+//------------------------------------------------------------------------------
+
+procedure RotatePath(var path: TPathD; const center: TPointD; sinA, cosA: double);
+var
+  i: integer;
+begin
+  for i := 0 to High(path) do
+    RotatePt(path[i], center, sinA, cosA);
 end;
 //------------------------------------------------------------------------------
 
@@ -1407,6 +1414,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function CrossProduct(const vec1, vec2: TPointD): double;
+begin
+  result := (vec1.X * vec2.Y - vec1.Y * vec2.X);
+end;
+//------------------------------------------------------------------------------
+
 function CrossProduct(vec1x, vec1y, vec2x, vec2y: double): double;
 begin
   result := (vec1x * vec2y - vec1y * vec2x);
@@ -1496,15 +1509,96 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SegmentsIntersect(const s1a, s1b, s2a, s2b: TPoint64): boolean;
+function SegmentsIntersect(const s1a, s1b, s2a, s2b: TPoint64;
+  inclusive: Boolean): boolean;
 begin
-  // nb: result excludes overlapping collinear segments
-  result := (CrossProduct(s1a, s2a, s2b) * CrossProduct(s1b, s2a, s2b) < 0) and
-    (CrossProduct(s2a, s1a, s1b) * CrossProduct(s2b, s1a, s1b) < 0);
+  if inclusive then
+    result := (CrossProduct(s1a, s2a, s2b) * CrossProduct(s1b, s2a, s2b) <= 0) and
+      (CrossProduct(s2a, s1a, s1b) * CrossProduct(s2b, s1a, s1b) <= 0)
+  else
+    result := (CrossProduct(s1a, s2a, s2b) * CrossProduct(s1b, s2a, s2b) < 0) and
+      (CrossProduct(s2a, s1a, s1b) * CrossProduct(s2b, s1a, s1b) < 0);
 end;
 //------------------------------------------------------------------------------
 
-function GetIntersectPoint(const ln1a, ln1b, ln2a, ln2b: TPoint64): TPointD;
+function GetIntersectPoint64(const ln1a, ln1b, ln2a, ln2b: TPoint64): TPoint64;
+var
+  x, m1,b1,m2,b2: double;
+begin
+  // see http://astronomy.swin.edu.au/~pbourke/geometry/lineline2d/
+  if (ln1B.X = ln1A.X) then
+  begin
+    if (ln2B.X = ln2A.X) then exit; // parallel lines
+    m2 := (ln2B.Y - ln2A.Y)/(ln2B.X - ln2A.X);
+    b2 := ln2A.Y - m2 * ln2A.X;
+    Result.X := ln1A.X;
+    Result.Y := Round(m2*ln1A.X + b2);
+  end
+  else if (ln2B.X = ln2A.X) then
+  begin
+    m1 := (ln1B.Y - ln1A.Y)/(ln1B.X - ln1A.X);
+    b1 := ln1A.Y - m1 * ln1A.X;
+    Result.X := ln2A.X;
+    Result.Y := Round(m1*ln2A.X + b1);
+  end else
+  begin
+    m1 := (ln1B.Y - ln1A.Y)/(ln1B.X - ln1A.X);
+    b1 := ln1A.Y - m1 * ln1A.X;
+    m2 := (ln2B.Y - ln2A.Y)/(ln2B.X - ln2A.X);
+    b2 := ln2A.Y - m2 * ln2A.X;
+    if Abs(m1 - m2) > 1.0E-15 then
+    begin
+      x := (b2 - b1)/(m1 - m2);
+      Result.X := Round(x);
+      Result.Y := Round(m1 * x + b1);
+    end else
+    begin
+      Result.X := Round((ln1a.X + ln1b.X) * 0.5);
+      Result.Y := Round((ln1a.Y + ln1b.Y) * 0.5);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function GetIntersectPointD(const ln1a, ln1b, ln2a, ln2b: TPoint64): TPointD;
+var
+  m1,b1,m2,b2: double;
+begin
+  // see http://astronomy.swin.edu.au/~pbourke/geometry/lineline2d/
+  if (ln1B.X = ln1A.X) then
+  begin
+    if (ln2B.X = ln2A.X) then exit; // parallel lines
+    m2 := (ln2B.Y - ln2A.Y)/(ln2B.X - ln2A.X);
+    b2 := ln2A.Y - m2 * ln2A.X;
+    Result.X := ln1A.X;
+    Result.Y := m2*ln1A.X + b2;
+  end
+  else if (ln2B.X = ln2A.X) then
+  begin
+    m1 := (ln1B.Y - ln1A.Y)/(ln1B.X - ln1A.X);
+    b1 := ln1A.Y - m1 * ln1A.X;
+    Result.X := ln2A.X;
+    Result.Y := m1*ln2A.X + b1;
+  end else
+  begin
+    m1 := (ln1B.Y - ln1A.Y)/(ln1B.X - ln1A.X);
+    b1 := ln1A.Y - m1 * ln1A.X;
+    m2 := (ln2B.Y - ln2A.Y)/(ln2B.X - ln2A.X);
+    b2 := ln2A.Y - m2 * ln2A.X;
+    if Abs(m1 - m2) > 1.0E-15 then
+    begin
+      Result.X := (b2 - b1)/(m1 - m2);
+      Result.Y := m1 * Result.X + b1;
+    end else
+    begin
+      Result.X := (ln1a.X + ln1b.X) * 0.5;
+      Result.Y := (ln1a.Y + ln1b.Y) * 0.5;
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function GetIntersectPointD(const ln1a, ln1b, ln2a, ln2b: TPointD): TPointD; overload;
 var
   m1,b1,m2,b2: double;
 begin
@@ -1663,7 +1757,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function PerpendicDistFromLineSqrd(const pt, line1, line2: TPoint64): double;
+function PerpendicDistFromLineSqrd(const pt, line1, line2: TPoint64): double; overload;
 var
   a,b,c,d: double;
 begin
@@ -1687,6 +1781,49 @@ begin
   maxD := 0;
 	while (endIdx > startIdx) and
     PointsEqual(path[startIdx], path[endIdx]) do
+    begin
+      boolArray[endIdx] := false;
+      dec(endIdx);
+    end;
+  for i := startIdx +1 to endIdx -1 do
+  begin
+    // PerpendicDistFromLineSqrd - avoids expensive Sqrt()
+    d := PerpendicDistFromLineSqrd(path[i], path[startIdx], path[endIdx]);
+    if d <= maxD then Continue;
+    maxD := d;
+    idx := i;
+  end;
+  if maxD < epsilonSqrd then Exit;
+  boolArray[idx] := true;
+  if idx > startIdx + 1 then RDP(path, startIdx, idx, epsilonSqrd, boolArray);
+  if endIdx > idx + 1 then RDP(path, idx, endIdx, epsilonSqrd, boolArray);
+end;
+//------------------------------------------------------------------------------
+
+function PerpendicDistFromLineSqrd(const pt, line1, line2: TPointD): double; overload;
+var
+  a,b,c,d: double;
+begin
+  a := pt.X - line1.X;
+  b := pt.Y - line1.Y;
+  c := line2.X - line1.X;
+  d := line2.Y - line1.Y;
+  if (c = 0) and (d = 0) then
+    result := 0 else
+    result := Sqr(a * d - c * b) / (c * c + d * d);
+end;
+//------------------------------------------------------------------------------
+
+procedure RDP(const path: TPathD; startIdx, endIdx: integer;
+  epsilonSqrd: double; var boolArray: TArrayOfBoolean); overload;
+var
+  i, idx: integer;
+  d, maxD: double;
+begin
+  idx := 0;
+  maxD := 0;
+	while (endIdx > startIdx) and
+    PointsNearEqual(path[startIdx], path[endIdx]) do
     begin
       boolArray[endIdx] := false;
       dec(endIdx);
@@ -1734,6 +1871,44 @@ end;
 //------------------------------------------------------------------------------
 
 function RamerDouglasPeucker(const paths: TPaths64; epsilon: double): TPaths64;
+var
+  i, len: integer;
+begin
+  len := Length(paths);
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    Result[i] := RamerDouglasPeucker(paths[i], epsilon);
+end;
+//------------------------------------------------------------------------------
+
+function RamerDouglasPeucker(const path: TPathD; epsilon: double): TPathD; overload;
+var
+  i,j, len: integer;
+  boolArray: TArrayOfBoolean;
+begin
+  len := length(path);
+  if len < 5 then
+  begin
+    result := Copy(path, 0, len);
+    Exit;
+  end;
+  SetLength(boolArray, len); // already zero initialized
+  boolArray[0] := true;
+  boolArray[len -1] := true;
+  RDP(path, 0, len -1, Sqr(epsilon), boolArray);
+  j := 0;
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    if boolArray[i] then
+    begin
+      Result[j] := path[i];
+      inc(j);
+    end;
+  SetLength(Result, j);
+end;
+//------------------------------------------------------------------------------
+
+function RamerDouglasPeucker(const paths: TPathsD; epsilon: double): TPathsD; overload;
 var
   i, len: integer;
 begin

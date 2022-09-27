@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.3                                                             *
-* Date      :  21 September 2022                                               *
+* Date      :  27 September 2022                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -20,8 +20,15 @@ interface
 
 uses
   Types, SysUtils, Classes,
-  {$IFDEF MSWINDOWS} Windows,{$ENDIF} {$IFDEF USING_VCL_LCL} Graphics, Forms,{$ENDIF}
-  {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults, Character,{$ENDIF}
+  {$IFDEF MSWINDOWS} Windows,{$ENDIF}
+  {$IFDEF USING_VCL_LCL}
+    {$IFDEF USES_NAMESPACES} Vcl.Graphics, Vcl.Forms,
+    {$ELSE}Graphics, Forms,
+    {$ENDIF}
+  {$ENDIF}
+  {$IFDEF XPLAT_GENERICS}
+    Generics.Collections, Generics.Defaults, Character,
+  {$ENDIF}
   {$IFDEF UITYPES} UITypes,{$ENDIF} Math;
 
 type

@@ -2,8 +2,8 @@ unit Clipper.Engine;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  Clipper2 - beta                                                 *
-* Date      :  27 July 2022                                                    *
+* Version   :  Clipper2 - ver.1.0.4                                            *
+* Date      :  24 September 2022                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -18,7 +18,6 @@ uses
   Classes, Math, Clipper.Core;
 
 type
-
   //PathType:
   //  1. only subject paths may be open
   //  2. for closed paths, all boolean clipping operations except for
@@ -175,7 +174,7 @@ type
     FSucceeded          : Boolean;
     FReverseSolution    : Boolean;
   {$IFDEF USINGZ}
-    FZFunc              : TZCallback64;
+    fZCallback          : TZCallback64;
   {$ENDIF}
     procedure Reset;
     procedure InsertScanLine(const Y: Int64);
@@ -240,7 +239,7 @@ type
     procedure BuildTree(polytree: TPolyPathBase; out openPaths: TPaths64);
   {$IFDEF USINGZ}
     procedure SetZ( e1, e2: PActive; var intersectPt: TPoint64);
-    property  OnZFill : TZCallback64 read FZFunc write FZFunc;
+    property  ZCallback : TZCallback64 read fZCallback write fZCallback;
   {$ENDIF}
     property  Succeeded : Boolean read FSucceeded;
   public
@@ -269,7 +268,7 @@ type
     function  Execute(clipType: TClipType; fillRule: TFillRule;
       var solutionTree: TPolyTree64; out openSolutions: TPaths64): Boolean; overload; virtual;
   {$IFDEF USINGZ}
-    property  ZFillFunc;
+    property  ZCallback;
   {$ENDIF}
   end;
 
@@ -279,9 +278,9 @@ type
     FParent     : TPolyPathBase;
     FChildList  : TList;
     function    GetChildCnt: Integer;
-    function    GetChild(index: Integer): TPolyPathBase;
     function    GetIsHole: Boolean;
   protected
+    function    GetChild(index: Integer): TPolyPathBase;
     function    AddChild(const path: TPath64): TPolyPathBase; virtual; abstract;
     property    ChildList: TList read FChildList;
     property    Parent: TPolyPathBase read FParent write FParent;
@@ -290,16 +289,18 @@ type
     destructor  Destroy; override;
     procedure   Clear; virtual;
     property    IsHole: Boolean read GetIsHole;
-    property    ChildCount: Integer read GetChildCnt;
-    property    Child[index: Integer]: TPolyPathBase read GetChild;
+    property    Count: Integer read GetChildCnt;
+    property    Child[index: Integer]: TPolyPathBase read GetChild; default;
   end;
 
   TPolyPath64 = class(TPolyPathBase)
   {$IFDEF STRICT}strict{$ENDIF} private
     FPath : TPath64;
+    function    GetChild64(index: Integer): TPolyPath64;
   protected
     function AddChild(const path: TPath64): TPolyPathBase; override;
   public
+    property Child[index: Integer]: TPolyPath64 read GetChild64; default;
     property Polygon: TPath64 read FPath;
   end;
 
@@ -320,7 +321,10 @@ type
     FScale: double;
     FInvScale: double;
   {$IFDEF USINGZ}
-    FZFuncD : TZCallbackD;
+    fZCallback : TZCallbackD;
+    procedure ZCB(const bot1, top1, bot2, top2: TPoint64;
+      var intersectPt: TPoint64);
+    procedure CheckCallback;
   {$ENDIF}
   public
     procedure AddSubject(const pathD: TPathD); overload;
@@ -338,20 +342,20 @@ type
     function  Execute(clipType: TClipType; fillRule: TFillRule;
       var solutionsTree: TPolyTreeD; out openSolutions: TPathsD): Boolean; overload;
 {$IFDEF USINGZ}
-    procedure ProxyZFillFunc(const bot1, top1, bot2, top2: TPoint64;
-      var intersectPt: TPoint64);
-    property  ZFillFunc : TZCallbackD read FZFuncD write FZFuncD;
+    property  ZCallback : TZCallbackD read fZCallback write fZCallback;
 {$ENDIF}
   end;
 
   TPolyPathD = class(TPolyPathBase)
   {$IFDEF STRICT}strict{$ENDIF} private
     FPath   : TPathD;
+    function  GetChildD(index: Integer): TPolyPathD;
   protected
     FScale  : double;
     function  AddChild(const path: TPath64): TPolyPathBase; override;
   public
     property  Polygon: TPathD read FPath;
+    property Child[index: Integer]: TPolyPathD read GetChildD; default;
   end;
 
   TPolyTreeD = class(TPolyPathD)
@@ -380,6 +384,13 @@ const
 
 //------------------------------------------------------------------------------
 // Miscellaneous Functions ...
+//------------------------------------------------------------------------------
+
+function UnsafeGet(List: TList; Index: Integer): Pointer;
+  {$IFDEF INLINING} inline; {$ENDIF}
+begin
+  Result := List.List[Index];
+end;
 //------------------------------------------------------------------------------
 
 function IsOpen(e: PActive): Boolean; overload; {$IFDEF INLINING} inline; {$ENDIF}
@@ -506,6 +517,22 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function DblToInt64(val: double): Int64; {$IFDEF INLINE} inline; {$ENDIF}
+var
+  exp: integer;
+  i64: UInt64 absolute val;
+begin
+  //https://en.wikipedia.org/wiki/Double-precision_floating-point_format
+  Result := 0;
+  if i64 = 0 then Exit;
+  exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;
+  //nb: when exp == 1024 then val == INF or NAN.
+  if exp < 0 then Exit;
+  Result := ((i64 and $1FFFFFFFFFFFFF) shr (52 - exp)) or (UInt64(1) shl exp);
+  if val < 0 then Result := -Result;
+end;
+//------------------------------------------------------------------------------
+
 function GetIntersectPoint(e1, e2: PActive): TPoint64;
 var
   b1, b2, m: Double;
@@ -541,10 +568,13 @@ begin
     with e1^ do b1 := bot.X - bot.Y * dx;
     with e2^ do b2 := bot.X - bot.Y * dx;
     m := (b2-b1)/(e1.dx - e2.dx);
-    Result.Y := round(m);
+    //Result.Y := Round(m); //Round(m);
+    Result.Y := DblToInt64(m); //Round(m);
     if Abs(e1.dx) < Abs(e2.dx) then
-      Result.X := round(e1.dx * m + b1) else
-      Result.X := round(e2.dx * m + b2);
+      Result.X := DblToInt64(e1.dx * m + b1) else
+      Result.X := DblToInt64(e2.dx * m + b2);
+//      Result.X := Round(e1.dx * m + b1) else
+//      Result.X := Round(e2.dx * m + b2);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -999,46 +1029,22 @@ end;
 
 function EdgesAdjacentInAEL(node: PIntersectNode): Boolean;
   {$IFDEF INLINING} inline; {$ENDIF}
-begin
-  with node^ do
-    Result := (active1.nextInAEL = active2) or (active1.prevInAEL = active2);
-end;
-//------------------------------------------------------------------------------
-
-function IntersectListSort(node1, node2: Pointer): Integer;
 var
-  i1: PIntersectNode absolute node1;
-  i2: PIntersectNode absolute node2;
-  i: Int64;
+  active1, active2: PActive;
 begin
-  // note to self - can't return int64 values :)
-  i := i2.pt.Y - i1.pt.Y;
-  if (i = 0) then
-  begin
-    if (i1 = i2) then
-    begin
-      Result := 0;
-      Exit;
-    end;
-    // Sort by X too. Not essential, but it significantly
-    // speeds up the secondary sort in ProcessIntersectList .
-    i := i1.pt.X - i2.pt.X;
-  end;
-
-  if i > 0 then Result := 1
-  else if i < 0 then Result := -1
-  else result := 0;
+  active1 := node.active1;
+  active2 := node.active2;
+  Result := (active1.nextInAEL = active2) or (active1.prevInAEL = active2);
 end;
 //------------------------------------------------------------------------------
 
-function TestJoinWithPrev1(e: PActive; currY: int64): Boolean;
+function TestJoinWithPrev1(e: PActive): Boolean;
 begin
   // this is marginally quicker than TestJoinWithPrev2
   // but can only be used when e.PrevInAEL.currX is accurate
   Result := IsHotEdge(e) and not IsOpen(e) and
     Assigned(e.prevInAEL) and (e.prevInAEL.currX = e.currX) and
     IsHotEdge(e.prevInAEL) and not IsOpen(e.prevInAEL) and
-    (currY - e.top.Y > 1) and (currY - e.prevInAEL.top.Y > 1) and
     (CrossProduct(e.prevInAEL.top, e.bot, e.top) = 0);
 end;
 //------------------------------------------------------------------------------
@@ -1054,14 +1060,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TestJoinWithNext1(e: PActive; currY: Int64): Boolean;
+function TestJoinWithNext1(e: PActive): Boolean;
 begin
   // this is marginally quicker than TestJoinWithNext2
   // but can only be used when e.NextInAEL.currX is accurate
   Result := IsHotEdge(e) and Assigned(e.nextInAEL) and
     IsHotEdge(e.nextInAEL) and not IsOpen(e) and
     not IsOpen(e.nextInAEL) and
-    (currY - e.top.Y > 1) and (currY - e.nextInAEL.top.Y > 1) and
     (e.nextInAEL.currX = e.currX) and
     (CrossProduct(e.nextInAEL.top, e.bot, e.top) = 0);
 end;
@@ -1199,7 +1204,7 @@ begin
   end;
 
   for i := FLocMinList.Count -1 downto 0 do
-    InsertScanLine(PLocalMinima(FLocMinList[i]).vertex.pt.Y);
+    InsertScanLine(PLocalMinima(UnsafeGet(FLocMinList, i)).vertex.pt.Y);
   FCurrentLocMinIdx := 0;
   FActives := nil;
   FSel := nil;
@@ -1216,7 +1221,7 @@ end;
 
 procedure TClipperBase.SetZ(e1, e2: PActive; var intersectPt: TPoint64);
 begin
-  if not Assigned(FZFunc) then Exit;
+  if not Assigned(fZCallback) then Exit;
 
   // prioritize subject vertices over clip vertices
   // and pass the subject vertices before clip vertices in the callback
@@ -1226,14 +1231,14 @@ begin
     else if (XYCoordsEqual(intersectPt, e1.top)) then intersectPt.Z := e1.top.Z
     else if (XYCoordsEqual(intersectPt, e2.bot)) then intersectPt.Z := e2.bot.Z
     else if (XYCoordsEqual(intersectPt, e2.top)) then intersectPt.Z := e2.top.Z;
-    FZFunc(e1.bot, e1.top, e2.bot, e2.top, intersectPt);
+    fZCallback(e1.bot, e1.top, e2.bot, e2.top, intersectPt);
   end else
   begin
     if (XYCoordsEqual(intersectPt, e2.bot)) then intersectPt.Z := e2.bot.Z
     else if (XYCoordsEqual(intersectPt, e2.top)) then intersectPt.Z := e2.top.Z
     else if (XYCoordsEqual(intersectPt, e1.bot)) then intersectPt.Z := e1.bot.Z
     else if (XYCoordsEqual(intersectPt, e1.top)) then intersectPt.Z := e1.top.Z;
-    FZFunc(e2.bot, e2.top, e1.bot, e1.top, intersectPt);
+    fZCallback(e2.bot, e2.top, e1.bot, e1.top, intersectPt);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1293,7 +1298,7 @@ function TClipperBase.PopLocalMinima(Y: Int64;
 begin
   Result := false;
   if FCurrentLocMinIdx = FLocMinList.Count then Exit;
-  localMinima := PLocalMinima(FLocMinList[FCurrentLocMinIdx]);
+  localMinima := PLocalMinima(UnsafeGet(FLocMinList, FCurrentLocMinIdx));
   if (localMinima.vertex.pt.Y = Y) then
   begin
     inc(FCurrentLocMinIdx);
@@ -1318,20 +1323,21 @@ end;
 procedure TClipperBase.DisposeOutRecsAndJoiners;
 var
   i: Integer;
+  outrec: POutRec;
 begin
   // just in case joiners haven't already been disposed
   for i := 0 to FJoinerList.Count -1 do
-    if Assigned(FJoinerList[i]) then
-      Dispose(PJoiner(FJoinerList[i]));
+    if Assigned(UnsafeGet(FJoinerList, i)) then
+      Dispose(PJoiner(UnsafeGet(FJoinerList, i)));
   FJoinerList.Clear;
   FHorzTrials := nil;
 
   for i := 0 to FOutRecList.Count -1 do
-    with POutRec(FOutRecList[i])^ do
-    begin
-      if Assigned(pts) then DisposeOutPts(pts);
-      Dispose(POutRec(FOutRecList[i]));
-    end;
+  begin
+    outrec := UnsafeGet(FOutRecList, i);
+    if Assigned(outrec.pts) then DisposeOutPts(outrec.pts);
+    Dispose(outrec);
+  end;
   FOutRecList.Clear;
 end;
 //------------------------------------------------------------------------------
@@ -1341,10 +1347,10 @@ var
   i: Integer;
 begin
   for i := 0 to FLocMinList.Count -1 do
-    Dispose(PLocalMinima(FLocMinList[i]));
+    Dispose(PLocalMinima(UnsafeGet(FLocMinList, i)));
   FLocMinList.Clear;
   for i := 0 to FVertexArrayList.Count -1 do
-    FreeMem(FVertexArrayList[i]);
+    FreeMem(UnsafeGet(FVertexArrayList, i));
   FVertexArrayList.Clear;
 end;
 //------------------------------------------------------------------------------
@@ -1730,7 +1736,7 @@ begin
         AddLocalMinPoly(leftB, rightB, leftB.bot, true);
 
         if not IsHorizontal(leftB) and
-          TestJoinWithPrev1(leftB, botY) then
+          TestJoinWithPrev1(leftB) then
         begin
           op := AddOutPt(leftB.prevInAEL, leftB.bot);
           AddJoin(op, leftB.outrec.pts);
@@ -1745,7 +1751,7 @@ begin
       end;
 
       if not IsHorizontal(rightB) and
-        TestJoinWithNext1(rightB, botY) then
+        TestJoinWithNext1(rightB) then
       begin
         op := AddOutPt(rightB.nextInAEL, rightB.bot);
         AddJoin(rightB.outrec.pts, op);
@@ -1882,7 +1888,7 @@ begin
     if (CrossProduct(op2.prev.pt, op2.pt, op2.next.pt) = 0) and
       (PointsEqual(op2.pt,op2.prev.pt) or
       PointsEqual(op2.pt,op2.next.pt) or
-      not preserveCollinear or
+      not FPreserveCollinear or
       (DotProduct(op2.prev.pt, op2.pt, op2.next.pt) < 0)) then
     begin
       if op2 = outRec.pts then outRec.pts := op2.prev;
@@ -1914,11 +1920,11 @@ procedure TClipperBase.FixSelfIntersects(var op: POutPt);
     prevOp := splitOp.prev;
     nextNextOp := splitOp.next.next;
     Result := prevOp;
-    ip := Point64(Clipper.Core.GetIntersectPoint(
+    ip := Point64(Clipper.Core.GetIntersectPointD(
       prevOp.pt, splitOp.pt, splitOp.next.pt, nextNextOp.pt));
   {$IFDEF USINGZ}
-    if Assigned(FZFunc) then
-      FZFunc(prevOp.Pt, splitOp.Pt, splitOp.Next.Pt, nextNextOp.Pt, ip.Pt);
+    if Assigned(fZCallback) then
+      fZCallback(prevOp.Pt, splitOp.Pt, splitOp.Next.Pt, nextNextOp.Pt, ip);
   {$ENDIF}
     area1 := Area(op);
     area2 := AreaTriangle(ip, splitOp.pt, splitOp.next.pt);
@@ -1978,7 +1984,7 @@ begin
   op2 := op;
   while true do
   begin
-    // 3 edged polygons can't self-intersect
+    // triangles can't self-intersect
     if (op2.prev = op2.next.next) then
       Break
     else if SegmentsIntersect(op2.prev.pt, op2.pt,
@@ -2245,9 +2251,9 @@ var
 begin
   for i := 0 to FJoinerList.Count -1 do
   begin
-    if Assigned(FJoinerList[i]) then
+    if Assigned(UnsafeGet(FJoinerList, i)) then
     begin
-      joiner := FJoinerList[i];
+      joiner := UnsafeGet(FJoinerList, i);
       outrec := ProcessJoin(joiner);
       CleanCollinear(outRec);
     end;
@@ -2374,12 +2380,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function PointBetween(const pt, corner1, corner2: TPoint64): Boolean;
+function PointEqualOrBetween(const pt, corner1, corner2: TPoint64): Boolean;
   {$IFDEF INLINING} inline; {$ENDIF}
 begin
   // nb: points may not be collinear
   Result := ValueEqualOrBetween(pt.X, corner1.X, corner2.X) and
     ValueEqualOrBetween(pt.Y, corner1.Y, corner2.Y);
+end;
+//------------------------------------------------------------------------------
+
+function PointBetween(const pt, corner1, corner2: TPoint64): Boolean;
+  {$IFDEF INLINING} inline; {$ENDIF}
+begin
+  // nb: points may not be collinear
+  Result := ValueBetween(pt.X, corner1.X, corner2.X) and
+    ValueBetween(pt.Y, corner1.Y, corner2.Y);
 end;
 //------------------------------------------------------------------------------
 
@@ -2470,7 +2485,7 @@ begin
         // by inserting an extra vertex if needed
         if not PointsEqual(op1.prev.pt, op2.next.pt) then
         begin
-          if PointBetween(op1.prev.pt, op2.pt, op2.next.pt) then
+          if PointEqualOrBetween(op1.prev.pt, op2.pt, op2.next.pt) then
             op2.next := InsertOp(op1.prev.pt, op2) else
             op1.prev := InsertOp(op2.next.pt, op1.prev);
         end;
@@ -2494,18 +2509,23 @@ begin
         op1.prev := op2;
         op2.next := op1;
 
-        SafeDeleteOutPtJoiners(op2);
-        DisposeOutPt(op2);
-
         if (or1.idx < or2.idx) then
         begin
           or1.pts := op1;
           or2.pts := nil;
+          if Assigned(or1.owner) and
+            (not Assigned(or2.owner) or
+							(or2.owner.idx < or1.owner.idx)) then
+								or1.owner := or2.owner;
           or2.owner := or1
         end else
         begin
           or2.pts := op1;
           or1.pts := nil;
+          if Assigned(or2.owner) and
+            (not Assigned(or1.owner) or
+							(or1.owner.idx < or2.owner.idx)) then
+								or2.owner := or1.owner;
           or1.owner := or2;
         end;
       end;
@@ -2522,7 +2542,7 @@ begin
         // by inserting an extra vertex if needed
         if not PointsEqual(op1.next.pt, op2.prev.pt) then
         begin
-          if PointBetween(op2.prev.pt, op1.pt, op1.next.pt) then
+          if PointEqualOrBetween(op2.prev.pt, op1.pt, op1.next.pt) then
             op1.next := InsertOp(op2.prev.pt, op1) else
             op2.prev := InsertOp(op1.next.pt, op2.prev);
         end;
@@ -2546,19 +2566,27 @@ begin
         op1.next := op2;
         op2.prev := op1;
 
-        SafeDeleteOutPtJoiners(op2);
-        DisposeOutPt(op2);
+//        SafeDeleteOutPtJoiners(op2);
+//        DisposeOutPt(op2);
 
         if or1.idx < or2.idx then
         begin
           or1.pts := op1;
           or2.pts := nil;
+          if Assigned(or1.owner) and
+            (not Assigned(or2.owner) or
+							(or2.owner.idx < or1.owner.idx)) then
+								or1.owner := or2.owner;
           or2.owner := or1;
         end else
         begin
           Result := or2;
           or2.pts := op1;
           or1.pts := nil;
+          if Assigned(or2.owner) and
+            (not Assigned(or1.owner) or
+							(or1.owner.idx < or2.owner.idx)) then
+								or2.owner := or1.owner;
           or1.owner := or2;
         end;
       end;
@@ -2662,7 +2690,7 @@ begin
   SetDx(e);
   if IsHorizontal(e) then Exit;
   InsertScanLine(e.top.Y);
-  if TestJoinWithPrev1(e, e.bot.Y) then
+  if TestJoinWithPrev1(e) then
   begin
     op1 := AddOutPt(e.prevInAEL, e.bot);
     op2 := AddOutPt(e, e.bot);
@@ -2855,7 +2883,7 @@ begin
   begin
     Result := AddOutPt(e1, pt);
     {$IFDEF USINGZ}
-    SetZ(e1, e2, op.pt);
+    SetZ(e1, e2, Result.pt);
     {$ENDIF}
     SwapOutRecs(e1, e2);
   end
@@ -2863,7 +2891,7 @@ begin
   begin
     Result := AddOutPt(e2, pt);
     {$IFDEF USINGZ}
-    SetZ(e1, e2, op.pt);
+    SetZ(e1, e2, Result.pt);
     {$ENDIF}
     SwapOutRecs(e1, e2);
   end
@@ -3009,7 +3037,7 @@ var
   i: Integer;
 begin
   for i := 0 to FIntersectList.Count - 1 do
-    Dispose(PIntersectNode(FIntersectList[i]));
+    Dispose(PIntersectNode(UnsafeGet(FIntersectList,i)));
   FIntersectList.Clear;
 end;
 //------------------------------------------------------------------------------
@@ -3137,39 +3165,72 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function IntersectListSort(node1, node2: Pointer): Integer;
+var
+  pt1, pt2: PPoint64;
+  i: Int64;
+begin
+  if node1 = node2 then
+  begin
+    Result := 0;
+    Exit;
+  end;
+  pt1 := @PIntersectNode(node1).pt;
+  pt2 := @PIntersectNode(node2).pt;
+  i := pt2.Y - pt1.Y;
+  // note to self - can't return int64 values :)
+  if i > 0 then Result := 1
+  else if i < 0 then Result := -1
+  else if (pt1 = pt2) then Result := 0
+  else
+  begin
+    // Sort by X too. Not essential, but it significantly
+    // speeds up the secondary sort in ProcessIntersectList .
+    i := pt1.X - pt2.X;
+    if i > 0 then Result := 1
+    else if i < 0 then Result := -1
+    else Result := 0;
+  end;
+end;
+//------------------------------------------------------------------------------
+
 procedure TClipperBase.ProcessIntersectList;
 var
-  i, j, highI: Integer;
-  node: PIntersectNode;
+  i: Integer;
+  nodeQ: PIntersectNode;
+  nodeI, nodeJ: ^PIntersectNode;
   op1, op2: POutpt;
 begin
-  // The list of required intersections now needs to be processed in a specific
-  // order such that intersection points with the largest Y coords are processed
-  // before those with the smallest Y coords. However, it's critical that edges
-  // are adjacent at the time of intersection.
+  // The list of required intersections now needs to be processed in a
+  // specific order such that intersection points with the largest Y coords
+  // are processed before those with the smallest Y coords. However,
+  // it's critical that edges are adjacent at the time of intersection, but
+  // that can only be checked during processing (when edge positions change).
 
   // First we do a quicksort so that intersections will be processed
-  // generally from largest Y to smallest (as long as they're adjacent)
+  // mostly from largest Y to smallest
   FIntersectList.Sort(IntersectListSort);
 
-  highI := FIntersectList.Count - 1;
-  for i := 0 to highI do
+  nodeI := @FIntersectList.List[0];
+  for i := 0 to FIntersectList.Count - 1 do
   begin
-    // make sure edges are adjacent, otherwise
-    // change the intersection order before proceeding
-    if not EdgesAdjacentInAEL(FIntersectList[i]) then
+    // during processing, make sure edges are adjacent before
+    // proceeding, and swapping the order if they aren't adjacent.
+    if not EdgesAdjacentInAEL(nodeI^) then
     begin
-      j := i + 1;
-      while not EdgesAdjacentInAEL(FIntersectList[j]) do inc(j);
+      nodeJ := nodeI;
+      repeat
+        inc(nodeJ);
+      until EdgesAdjacentInAEL(nodeJ^);
+
       // now swap intersection order
-      node := FIntersectList[i];
-      FIntersectList[i] := FIntersectList[j];
-      FIntersectList[j] := node;
+      nodeQ := nodeI^;
+      nodeI^ := nodeJ^;
+      nodeJ^ := nodeQ;
     end;
 
     // now process the intersection
-    node := FIntersectList[i];
-    with node^ do
+    with nodeI^^ do
     begin
       IntersectEdges(active1, active2, pt);
       SwapPositionsInAEL(active1, active2);
@@ -3189,6 +3250,7 @@ begin
           AddJoin(op1, op2);
       end;
     end;
+    inc(nodeI);
   end;
   // Edges should once again be correctly ordered (left to right) in the AEL.
 end;
@@ -3221,11 +3283,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TrimHorz(horzEdge: PActive; preserveCollinear: Boolean): Boolean;
+procedure TrimHorz(horzEdge: PActive; preserveCollinear: Boolean);
 var
   pt: TPoint64;
+  wasTrimmed: Boolean;
 begin
-  Result := false;
+  wasTrimmed := false;
   pt := NextVertex(horzEdge).pt;
   while (pt.Y = horzEdge.top.Y) do
   begin
@@ -3237,11 +3300,11 @@ begin
 
     horzEdge.vertTop := NextVertex(horzEdge);
     horzEdge.top := pt;
-    Result := true;
+    wasTrimmed := true;
     if IsMaxima(horzEdge) then Break;
     pt := NextVertex(horzEdge).pt;
-    end;
-  if (Result) then SetDx(horzEdge); // +/-infinity
+  end;
+  if wasTrimmed then SetDx(horzEdge); // +/-infinity
 end;
 //------------------------------------------------------------------------------
 
@@ -3597,7 +3660,7 @@ begin
             AddTrialHorzJoin(op);
 
         if not IsHorizontal(e) and
-          TestJoinWithPrev1(e, Y) then
+          TestJoinWithPrev1(e) then
         begin
           op := AddOutPt(e.prevInAEL, pt);
           op2 := AddOutPt(e, pt);
@@ -3617,7 +3680,7 @@ begin
             AddTrialHorzJoin(op);
 
         if not IsHorizontal(e) and
-          TestJoinWithNext1(e, Y) then
+          TestJoinWithNext1(e) then
         begin
           op := AddOutPt(e, pt);
           op2 := AddOutPt(e.nextInAEL, pt);
@@ -3672,12 +3735,12 @@ begin
     UpdateEdgeIntoAEL(horzEdge); // this is the end of an intermediate horiz.
     if IsOpen(horzEdge) then Exit;
 
-    if isLeftToRight and TestJoinWithNext1(horzEdge, Y) then
+    if isLeftToRight and TestJoinWithNext1(horzEdge) then
     begin
       op2 := AddOutPt(horzEdge.nextInAEL, horzEdge.bot);
       AddJoin(op, op2);
     end
-    else if not isLeftToRight and TestJoinWithPrev1(horzEdge, Y) then
+    else if not isLeftToRight and TestJoinWithPrev1(horzEdge) then
     begin
       op2 := AddOutPt(horzEdge.prevInAEL, horzEdge.bot);
       AddJoin(op2, op);
@@ -3803,7 +3866,7 @@ begin
       SetLength(openPaths, FOutRecList.Count);
     for i := 0 to FOutRecList.Count -1 do
     begin
-      outRec := FOutRecList[i];
+      outRec := UnsafeGet(FOutRecList, i);
       if not assigned(outRec.pts) then Continue;
 
       if outRec.isOpen then
@@ -3840,27 +3903,36 @@ begin
     if pipResult <> pipOn then Break;
     op := op.next;
   until op = or1.pts;
-  Result := pipResult = pipInside;
+  if (pipResult = pipOn) then
+  begin
+     Result := Area(op) < Area(or2.pts);
+  end else
+    Result := pipResult = pipInside;
 end;
 //------------------------------------------------------------------------------
 
 function GetBounds(const path: TPath64): TRect64;
 var
   i: integer;
+  pX, pY: PInt64;
 begin
   if Length(path) = 0 then
   begin
     Result := NullRect64;
     Exit;
   end;
-
   result := Rect64(MaxInt64, MaxInt64, -MaxInt64, -MaxInt64);
+  pX := @path[0].X;
+  pY := @path[0].Y;
+
   for i := 0 to High(path) do
   begin
-    if (path[i].X < result.left) then result.left := path[i].X
-    else if (path[i].X > result.right) then result.right := path[i].X;
-    if (path[i].Y < result.top) then result.top := path[i].Y
-    else if (path[i].Y > result.bottom) then result.bottom := path[i].Y;
+
+    if (pX^ < result.left) then result.left := pX^;
+    if (pX^ > result.right) then result.right := pX^;
+    if (pY^ < result.top) then result.top := pY^;
+    if (pY^ > result.bottom) then result.bottom := pY^;
+    inc(pX, 2); inc(pY, 2);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -3940,7 +4012,7 @@ begin
 
     for i := 0 to FOutRecList.Count -1 do
     begin
-      outRec := FOutRecList[i];
+      outRec := UnsafeGet(FOutRecList, i);
       if not assigned(outRec.pts) then Continue;
 
       if outRec.isOpen then
@@ -3969,9 +4041,9 @@ begin
       begin
         j := outRec.owner.idx;
         outRec.idx := j;
-        FOutRecList[i] := FOutRecList[j];
+        FOutRecList[i] := UnsafeGet(FOutRecList, j);
         FOutRecList[j] := outRec;
-        outRec := FOutRecList[i];
+        outRec := UnsafeGet(FOutRecList, i);
         outRec.idx := i;
         outRec.owner := GetRealOutRec(outRec.owner);
         BuildPath(outRec.pts, FReverseSolution, false, outRec.path);
@@ -4001,7 +4073,7 @@ begin
   Result := Rect64(MaxInt64, MaxInt64, -MaxInt64, -MaxInt64);
   for i := 0 to FVertexArrayList.Count -1 do
   begin
-    vStart := FVertexArrayList[i];
+    vStart := UnsafeGet(FVertexArrayList, i);
     v := vStart;
     repeat
       if v.pt.X < Result.Left then Result.Left := v.pt.X
@@ -4131,12 +4203,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+type
+  PPolyPathBase = ^TPolyPathBase;
+
 procedure TPolyPathBase.Clear;
 var
   i: integer;
+  ppb: PPolyPathBase;
 begin
+  if FChildList.Count = 0 then Exit;
+  ppb := @FChildList.List[0];
   for i := 0 to FChildList.Count -1 do
-    TPolyPathBase(FChildList[i]).Free;
+  begin
+    ppb^.Free;
+    inc(ppb);
+  end;
   FChildList.Clear;
 end;
 //------------------------------------------------------------------------------
@@ -4180,6 +4261,12 @@ begin
   TPolyPath64(Result).FPath := path;;
   ChildList.Add(Result);
 end;
+//------------------------------------------------------------------------------
+
+function TPolyPath64.GetChild64(index: Integer): TPolyPath64;
+begin
+  Result := TPolyPath64(GetChild(index));
+end;
 
 //------------------------------------------------------------------------------
 // TClipperD methods
@@ -4197,20 +4284,34 @@ end;
 //------------------------------------------------------------------------------
 
 {$IFDEF USINGZ}
-procedure TClipperD.ProxyZFillFunc(const bot1, top1, bot2, top2: TPoint64;
+procedure TClipperD.CheckCallback;
+begin
+  // only when the user defined ZCallback function has been assigned
+  // do we assign the proxy callback ZCB to ClipperBase
+  if Assigned(ZCallback) then
+    inherited ZCallback := ZCB else
+    inherited ZCallback := nil;
+end;
+//------------------------------------------------------------------------------
+
+procedure TClipperD.ZCB(const bot1, top1, bot2, top2: TPoint64;
   var intersectPt: TPoint64);
 var
   tmp: TPointD;
 begin
-  // de-scale coordinates
+  if not assigned(fZCallback) then Exit;
+  // de-scale (x & y)
+  // temporarily convert integers to their initial float values
+  // this will slow clipping marginally but will make it much easier
+  // to understand the coordinates passed to the callback function
   tmp := ScalePoint(intersectPt, FInvScale);
-  FZFuncD(
+  //do the callback
+  fZCallback(
     ScalePoint(bot1, FInvScale),
     ScalePoint(top1, FInvScale),
     ScalePoint(bot2, FInvScale),
     ScalePoint(top2, FInvScale), tmp);
-  // re-scale
-  intersectPt.Z := Round(tmp.Z * FScale);
+  intersectPt.Z := tmp.Z;
 end;
 //------------------------------------------------------------------------------
 {$ENDIF}
@@ -4275,7 +4376,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-{$IFDEF USINGZ}
 function TClipperD.Execute(clipType: TClipType; fillRule: TFillRule;
   out closedSolutions: TPathsD): Boolean;
 var
@@ -4290,75 +4390,17 @@ function TClipperD.Execute(clipType: TClipType; fillRule: TFillRule;
 var
   solClosed, solOpen: TPaths64;
 begin
+{$IFDEF USINGZ}
+    CheckCallback;
+{$ENDIF}
   closedSolutions := nil;
   openSolutions := nil;
   try try
-    if Assigned(ZFillFunc) then
-      inherited ZFillFunc := ProxyZFillFunc else
-      inherited ZFillFunc := nil;
-    ExecuteInternal(clipType, fillRule);
+    ExecuteInternal(clipType, fillRule, false);
     Result := BuildPaths(solClosed, solOpen);
     if not Result then Exit;
     closedSolutions := ScalePathsD(solClosed, FInvScale);
     openSolutions := ScalePathsD(solOpen, FInvScale);
-  except
-    Result := false;
-  end;
-  finally
-    CleanUp;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function TClipperD.Execute(clipType: TClipType; fillRule: TFillRule;
-  var solutionsTree: TPolyTreeD; out openSolutions: TPathsD): Boolean;
-var
-  open_Paths: TPaths64;
-begin
-  if not assigned(solutionsTree) then RaiseError(rsClipper_PolyTreeErr);
-  solutionsTree.Clear;
-  FUsingPolytree := true;
-  solutionsTree.SetScale(fScale);
-  openSolutions := nil;
-  try try
-    if Assigned(ZFillFunc) then
-      inherited ZFillFunc := ProxyZFillFunc else
-      inherited ZFillFunc := nil;
-    ExecuteInternal(clipType, fillRule);
-    BuildTree(solutionsTree, open_Paths);
-    openSolutions := ScalePathsD(open_Paths, FInvScale);
-    Result := true;
-  except
-    Result := false;
-  end;
-  finally
-    CleanUp;
-  end;
-end;
-//------------------------------------------------------------------------------
-{$ELSE}
-
-function TClipperD.Execute(clipType: TClipType; fillRule: TFillRule;
-  out closedSolutions: TPathsD): Boolean;
-var
-  dummyP: TPathsD;
-begin
-  Result := Execute(clipType, fillRule, closedSolutions, dummyP);
-end;
-//------------------------------------------------------------------------------
-
-function TClipperD.Execute(clipType: TClipType; fillRule: TFillRule;
-  out closedSolutions, openSolutions: TPathsD): Boolean;
-var
-  closedP, openP: TPaths64;
-begin
-  closedSolutions := nil;
-  try try
-    ExecuteInternal(clipType, fillRule, false);
-    Result := BuildPaths(closedP, openP);
-    if not Result then Exit;
-    closedSolutions := ScalePathsD(closedP, FInvScale);
-    openSolutions := ScalePathsD(openP, FInvScale);
   except
     Result := false;
   end;
@@ -4375,9 +4417,12 @@ var
 begin
   if not assigned(solutionsTree) then
     Raise EClipperLibException(rsClipper_PolyTreeErr);
-
+{$IFDEF USINGZ}
+    CheckCallback;
+{$ENDIF}
   solutionsTree.Clear;
-  solutionsTree.SetScale(FScale);
+  FUsingPolytree := true;
+  solutionsTree.SetScale(fScale);
   openSolutions := nil;
   try try
     ExecuteInternal(clipType, fillRule, true);
@@ -4391,7 +4436,6 @@ begin
     ClearSolution;
   end;
 end;
-{$ENDIF}
 
 //------------------------------------------------------------------------------
 // TPolyPathD methods
@@ -4404,6 +4448,12 @@ begin
   TPolyPathD(Result).fScale := fScale;
   TPolyPathD(Result).FPath := ScalePathD(path, 1/FScale);
   ChildList.Add(Result);
+end;
+//------------------------------------------------------------------------------
+
+function TPolyPathD.GetChildD(index: Integer): TPolyPathD;
+begin
+  Result := TPolyPathD(GetChild(index));
 end;
 
 //------------------------------------------------------------------------------

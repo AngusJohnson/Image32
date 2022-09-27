@@ -55,6 +55,7 @@
               {$IF declared(FireMonkeyVersion)}   //defined in FMX.Types
                 {$DEFINE FMX}
               {$IFEND}        
+              {$DEFINE USES_NAMESPACES}
               {$DEFINE FORMATSETTINGS}
               {$DEFINE TROUNDINGMODE}   
               {$DEFINE UITYPES}                   //added UITypes unit

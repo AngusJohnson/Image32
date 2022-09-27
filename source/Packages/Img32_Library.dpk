@@ -33,25 +33,29 @@ requires
 
 contains
   Img32 in '..\Img32.pas',
-  Img32.Clipper in '..\Img32.Clipper.pas',
+  Img32.CQ in '..\Img32.CQ.pas',
   Img32.Draw in '..\Img32.Draw.pas',
   Img32.Extra in '..\Img32.Extra.pas',
   Img32.Fmt.BMP in '..\Img32.Fmt.BMP.pas',
+  Img32.Fmt.GIF in '..\Img32.Fmt.Gif.pas',
+  Img32.Fmt.JPG in '..\Img32.Fmt.JPG.pas',
+  Img32.Fmt.PNG in '..\Img32.Fmt.PNG.pas',
+  Img32.Fmt.QOI in '..\Img32.Fmt.QOI.pas',
   Img32.Fmt.SVG in '..\Img32.Fmt.SVG.pas',
   Img32.Layers in '..\Img32.Layers.pas',
   Img32.Resamplers in '..\Img32.Resamplers.pas',
+  Img32.Storage in '..\Img32.Storage.pas',
   Img32.SVG.Core in '..\Img32.SVG.Core.pas',
   Img32.SVG.Path in '..\Img32.SVG.Path.pas',
-  Img32.SVG.PathDesign in '..\Img32.SVG.PathDesign.pas',
   Img32.SVG.Reader in '..\Img32.SVG.Reader.pas',
-  Img32.SVG.Writer in '..\Img32.SVG.Writer.pas',
   Img32.Text in '..\Img32.Text.pas',
   Img32.Transform in '..\Img32.Transform.pas',
   Img32.Vector in '..\Img32.Vector.pas',
+  Img32.Clipper2 in '..\Img32.Clipper2.pas',
   Clipper in '..\Clipper\Clipper.pas',
-  ClipperCore in '..\Clipper\ClipperCore.pas',
-  ClipperOffset in '..\Clipper\ClipperOffset.pas';
+  Clipper.Core in '..\Clipper\Clipper.Core.pas',
+  Clipper.Engine in '..\Clipper\Clipper.Engine.pas',
+  Clipper.Offset in '..\Clipper\Clipper.Offset.pas',
+  Clipper.Minkowski in '..\Clipper\Clipper.Minkowski.pas';
 
 end.
-
-

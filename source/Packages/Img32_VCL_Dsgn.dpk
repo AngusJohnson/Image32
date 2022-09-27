@@ -1,7 +1,7 @@
 package Img32_VCL_Dsgn;
-
 {$R *.res}
 {$R '..\Img32.Panels.dcr'}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
 {$ALIGN 8}
 {$ASSERTIONS ON}
 {$BOOLEVAL OFF}
@@ -23,8 +23,9 @@ package Img32_VCL_Dsgn;
 {$WRITEABLECONST OFF}
 {$MINENUMSIZE 1}
 {$IMAGEBASE $400000}
-{$IMPLICITBUILD OFF}
 {$DEFINE DEBUG}
+{$ENDIF IMPLICITBUILDING}
+{$IMPLICITBUILD OFF}
 
 requires
   rtl,
@@ -35,5 +36,4 @@ contains
   Img32.Panels in '..\Img32.Panels.pas';
 
 end.
-
 

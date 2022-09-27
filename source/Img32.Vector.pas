@@ -3,7 +3,7 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.3                                                             *
-* Date      :  13 September 2022                                               *
+* Date      :  27 September 2022                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -1953,6 +1953,13 @@ begin
 
   for i := iLo to iHi do
   begin
+
+    if PointsNearEqual(path[i], path[prevI], 0.01) then
+    begin
+       prevI := i;
+       Continue;
+    end;
+
     growRec.aSin := CrossProduct(norms[prevI], norms[i]);
     growRec.aCos := DotProduct(norms[prevI], norms[i]);
 
