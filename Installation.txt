@@ -19,3 +19,4 @@ Image32 Installation and upgrade instructions
     compile and install.
       
 4. Test the install by compiling one or more sample applications.
+   Note: Some sample apps won't compile in older versions of Delphi (eg FMX apps.)
