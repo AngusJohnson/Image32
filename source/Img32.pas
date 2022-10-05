@@ -1522,27 +1522,42 @@ class procedure TImage32.RegisterImageFormatClass(ext: string;
 var
   i: Integer;
   imgFmtRec: PImgFmtRec;
+  isNewFormat: Boolean;
 begin
   if not Assigned(ImageFormatClassList) then CreateImageFormatList;
 
   if (ext = '') or (ext = '.') then Exit;
   if (ext[1] = '.') then Delete(ext, 1,1);
   if not IsAlphaChar(ext[1]) then Exit;
-  //avoid duplicates
+  isNewFormat := true;
+
+  // avoid duplicates but still allow overriding
   for i := 0 to imageFormatClassList.count -1 do
   begin
     imgFmtRec := PImgFmtRec(imageFormatClassList[i]);
-    if SameText(imgFmtRec.Fmt, ext) then Exit;
+    if SameText(imgFmtRec.Fmt, ext) then
+    begin
+      imgFmtRec.Obj := bm32ExClass; // replace prior class
+      if imgFmtRec.SortOrder = clipPriority then
+        Exit; // re-sorting isn't required
+      imgFmtRec.SortOrder := clipPriority;
+      isNewFormat := false;
+      Break;
+    end;
   end;
 
-  //ImageFormatClassList is sorted with lowest priority first in list
-  new(imgFmtRec);
-  imgFmtRec.Fmt := ext;
-  imgFmtRec.SortOrder := clipPriority;
-  imgFmtRec.Obj := bm32ExClass;
-  ImageFormatClassList.Add(imgFmtRec);
-  //sorting here is arguably inefficient, but there will be so few
-  //entries in the list that this inefficiency will be inconsequential.
+  if isNewFormat then
+  begin
+    new(imgFmtRec);
+    imgFmtRec.Fmt := ext;
+    imgFmtRec.SortOrder := clipPriority;
+    imgFmtRec.Obj := bm32ExClass;
+    ImageFormatClassList.Add(imgFmtRec);
+  end;
+
+  // Sort with lower priority before higher.
+  // Sorting here is arguably inefficient but, with so few
+  // entries, this inefficiency will be inconsequential.
 
 {$IFDEF XPLAT_GENERICS}
   ImageFormatClassList.Sort(TComparer<PImgFmtRec>.Construct(
