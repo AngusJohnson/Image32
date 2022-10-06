@@ -3,7 +3,7 @@ unit Img32.Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.3                                                             *
-* Date      :  27 September 2022                                               *
+* Date      :  6 October 2022                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -282,6 +282,7 @@ type
     constructor Create;
     destructor Destroy; override;
     procedure Clear;
+    function GetFont(const fontName: string): TFontReader;
 {$IFDEF MSWINDOWS}
     function Load(const fontName: string): TFontReader;
 {$ENDIF}
@@ -3451,11 +3452,28 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TFontManager.GetFont(const fontName: string): TFontReader;
+var
+  i: integer;
+begin
+  Result := nil;
+  for i := 0 to fFontList.Count -1 do
+    if SameText(TFontReader(fFontList[i]).fFontInfo.faceName, fontName) then
+    begin
+      Result := fFontList[i];
+      Exit;
+    end;
+end;
+//------------------------------------------------------------------------------
+
 {$IFDEF MSWINDOWS}
 function TFontManager.Load(const fontName: string): TFontReader;
 begin
   if fFontList.Count >= fMaxFonts then
     raise Exception.Create(rsTooManyFonts);
+
+  Result := GetFont(fontname);
+  if Assigned(Result) then Exit;
 
   Result := TFontReader.Create;
   try

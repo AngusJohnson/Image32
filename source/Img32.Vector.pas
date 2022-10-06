@@ -1849,6 +1849,8 @@ function Grow(const path, normals: TPathD; delta: double;
   joinStyle: TJoinStyle; miterLim: double; isOpen: Boolean): TPathD;
 var
   resCnt, resCap: integer;
+  norms : TPathD;
+  parallelOffsets : TPathD;
 
   procedure AddPoint(const pt: TPointD);
   begin
@@ -1861,6 +1863,42 @@ var
     inc(resCnt);
   end;
 
+  procedure DoMiter(i, prevI: integer; cosA: double);
+  var
+    a: double;
+  begin
+    a := delta / (1 + cosA); //see offset_triginometry4.svg
+    AddPoint(PointD(path[i].X + (norms[i].X + norms[prevI].X) * a,
+          path[i].Y + (norms[i].Y + norms[prevI].Y) * a));
+  end;
+  
+  procedure DoSquare(i, prevI: integer);
+  var
+    pt1, pt2, pt3, pt4: TPointD;
+    pt, ptQ : TPointD;
+    vec     : TPointD;
+  begin
+    // using the reciprocal of unit normals (as unit vectors)
+    // get the average unit vector ...
+    vec := GetAvgUnitVector(
+      PointD(-norms[prevI].Y, norms[prevI].X),
+      PointD(norms[i].Y, -norms[i].X));
+    // now offset the original vertex delta units along unit vector
+    ptQ := OffsetPoint(path[i], delta * vec.X, delta * vec.Y);
+
+    // get perpendicular vertices
+    pt1 := OffsetPoint(ptQ, delta * vec.Y, delta * -vec.X);
+    pt2 := OffsetPoint(ptQ, delta * -vec.Y, delta * vec.X);
+    // get 2 vertices along one edge offset
+    pt3 :=  parallelOffsets[prevI*2];
+    pt4 := parallelOffsets[prevI*2 +1];
+    IntersectPoint(pt1,pt2,pt3,pt4, pt);
+    AddPoint(pt);
+    //get the second intersect point through reflecion
+    pt := ReflectPoint(pt, ptQ);
+    AddPoint(pt);
+  end;
+  
   procedure AppendPath(const path: TPathD);
   var
     len: integer;
@@ -1881,15 +1919,9 @@ var
   len     : cardinal;
   highI   : cardinal;
   iLo,iHi : cardinal;
-  norms   : TPathD;
-  vec     : TPointD;
-  pt, ptQ : TPointD;
-  p       : TPathD;
-  a       : double;
   growRec   : TGrowRec;
   absDelta  : double;
   almostNoAngle: Boolean;
-  pt1, pt2, pt3, pt4: TPointD;
 begin
   Result := nil;
   if not Assigned(path) then exit;
@@ -1921,7 +1953,7 @@ begin
     norms := GetNormals(path);
 
   highI := len -1;
-  p := GetParallelOffests(path, norms, delta);
+  parallelOffsets := GetParallelOffests(path, norms, delta);
 
   if joinStyle = jsRound then
   begin
@@ -1944,7 +1976,7 @@ begin
   begin
     iLo := 1; iHi := highI -1;
     prevI := 0;
-    AddPoint(p[0]);
+    AddPoint(parallelOffsets[0]);
   end else
   begin
     iLo := 0; iHi := highI;
@@ -1966,60 +1998,30 @@ begin
     almostNoAngle := ValueAlmostZero(growRec.aCos -1);
     if almostNoAngle or ((growRec.aSin * delta < 0)) then
     begin //ie is concave
-      AddPoint(p[prevI*2+1]);
-      AddPoint(p[i*2]);
+      AddPoint(parallelOffsets[prevI*2+1]);
+      AddPoint(parallelOffsets[i*2]);
     end
     else if (joinStyle = jsRound) and
       (Abs(growRec.aSin) > 0.08) then //only round if angle > ~5 deg
     begin
       AppendPath(DoRound(path[i], norms[prevI], growRec));
     end
-    else if (joinStyle = jsMiter) and
-      (1 + growRec.aCos > miterLim) then // nb: miterLim <= 2
-    begin
-      //within miter range
-      a := delta / (1 + growRec.aCos);
-      AddPoint(PointD(path[i].X + (norms[i].X + norms[prevI].X) * a,
-        path[i].Y + (norms[i].Y + norms[prevI].Y) * a));
+    else if (joinStyle = jsMiter) then // nb: miterLim <= 2
+    begin                      
+      if (1 + growRec.aCos > miterLim) then //within miter range
+        DoMiter(i, prevI, growRec.aCos) else
+        DoSquare(i, prevI);
     end
-    else if (growRec.aCos < -0.001) then
-    begin
-      // do squaring when the *internal* angle is less than 90 degrees
-
-      // while a negative cos indicates an angle > 90, the angle here
-      // is the **angle of deviation**, so convexity will be > 270.
-      // And only convex angles > 270 degrees will need squaring since
-      // less obtuse angles can be safely mitered.
-
-      // using the reciprocal of unit normals (as unit vectors)
-      // get the average unit vector ...
-      vec := GetAvgUnitVector(
-        PointD(-norms[prevI].Y, norms[prevI].X),
-        PointD(norms[i].Y, -norms[i].X));
-      // now offset the original vertex delta units along unit vector
-      ptQ := OffsetPoint(path[i], delta * vec.X, delta * vec.Y);
-
-      // get perpendicular vertices
-      pt1 := OffsetPoint(ptQ, delta * vec.Y, delta * -vec.X);
-      pt2 := OffsetPoint(ptQ, delta * -vec.Y, delta * vec.X);
-      // get 2 vertices along one edge offset
-      pt3 := p[prevI*2];
-      pt4 := p[prevI*2 +1];
-      IntersectPoint(pt1,pt2,pt3,pt4, pt);
-      AddPoint(pt);
-      //get the second intersect point through reflecion
-      pt := ReflectPoint(pt, ptQ);
-      AddPoint(pt);
-    end else
-    begin
-      // the *internal* angle is >= 90 degrees so is safe to miter
-      a := delta / (1 + growRec.aCos);
-      AddPoint(PointD(path[i].X + (norms[i].X + norms[prevI].X) * a,
-        path[i].Y + (norms[i].Y + norms[prevI].Y) * a));
-    end;
+    // don't bother squaring angles that deviate < ~20 deg. because squaring 
+    // will be indistinguishable from mitering and just be a lot slower
+    else if (growRec.aCos > 0.9) then
+      DoMiter(i, prevI, growRec.aCos) 
+    else
+      DoSquare(i, prevI);
+      
     prevI := i;
   end;
-  if isOpen then AddPoint(p[highI*2-1]);
+  if isOpen then AddPoint(parallelOffsets[highI*2-1]);
   SetLength(Result, resCnt);
 end;
 //------------------------------------------------------------------------------
