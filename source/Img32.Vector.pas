@@ -337,7 +337,11 @@ type
   function GetUnitVector(const pt1, pt2: TPointD): TPointD;
 
   //GetUnitNormal: Used internally
-  function GetUnitNormal(const pt1, pt2: TPointD): TPointD;
+  function GetUnitNormal(const pt1, pt2: TPointD): TPointD; overload;
+  {$IFDEF INLINING} inline; {$ENDIF}
+  function GetUnitNormal(const pt1, pt2: TPointD; out norm: TPointD): Boolean; overload;
+  {$IFDEF INLINING} inline; {$ENDIF}
+
   function GetAvgUnitVector(const vec1, vec2: TPointD): TPointD;
   {$IFDEF INLINING} inline; {$ENDIF}
 
@@ -1036,21 +1040,25 @@ end;
 //------------------------------------------------------------------------------
 
 function GetUnitNormal(const pt1, pt2: TPointD): TPointD;
+begin
+  if not GetUnitNormal(pt1, pt2, Result) then
+    Result := NullPointD;
+end;
+//------------------------------------------------------------------------------
+
+function GetUnitNormal(const pt1, pt2: TPointD; out norm: TPointD): Boolean;
 var
   dx, dy, inverseHypot: Double;
 begin
-  if PointsNearEqual(pt1, pt2, 0.001) then
-  begin
-    Result := NullPointD;
-    Exit;
-  end;
+  result := not PointsNearEqual(pt1, pt2, 0.001);
+  if not result then Exit;
   dx := (pt2.X - pt1.X);
   dy := (pt2.Y - pt1.Y);
   inverseHypot := 1 / Hypot(dx, dy);
   dx := dx * inverseHypot;
   dy := dy * inverseHypot;
-  Result.X := dy;
-  Result.Y := -dx
+  norm.X := dy;
+  norm.Y := -dx
 end;
 //------------------------------------------------------------------------------
 
@@ -1330,39 +1338,29 @@ end;
 
 function GetNormals(const path: TPathD): TPathD;
 var
-  i,highI,j, len: cardinal;
-  pt: TPointD;
+  i, highI: integer;
+  last: TPointD;
 begin
-  len := length(path);
-  setLength(result, len);
-  if len = 0 then Exit;
-  pt := path[0];
-  //watch out for, and fix up duplicates at end of line
-  highI := len -1;
-  while (highI > 0) and PointsNearEqual(path[highI], pt, 0.001) do dec(highI);
-  if (highI = 0) then
+  highI := High(path);
+  setLength(result, highI+1);
+  if highI < 0 then Exit;
+
+  last := NullPointD;
+  for i := 0 to highI -1 do
   begin
-    //all points are equal!
-    for i := 0 to len -1 do result[i] := PointD(0,0);
-    Exit;
+    if GetUnitNormal(path[i], path[i+1], result[i]) then
+      last := result[i] else
+      result[i] := last;
   end;
-  result[highI] := GetUnitNormal(path[highI], pt);
-  //now fix up any duplicates at the end of the path
-  for j := highI +1 to len -1 do result[j] := result[j-1];
-  //with at least one valid vector, we can now
-  //safely get the remaining vectors
-  pt := path[highI];
-  for i := highI -1 downto 0 do
+  if GetUnitNormal(path[highI], path[0], result[highI]) then
+    last := result[highI];
+
+  for i := 0 to highI do
   begin
-    if (path[i].X <> pt.X) or (path[i].Y <> pt.Y) then
-    begin
-      result[i] := GetUnitNormal(path[i], pt);
-      if (Result[i].X = 0) and (Result[i].Y = 0) then
-        Result[i] := Result[i+1];
-      pt := path[i];
-    end else
-      result[i] := result[i+1]
+    if (result[i].X <> 0) or (result[i].Y <> 0) then Break;
+    result[i] := last;
   end;
+
 end;
 //------------------------------------------------------------------------------
 
@@ -1773,15 +1771,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetNormal(const pt, norm: TPointD; delta: double): TPointD;
+function ApplyNormal(const pt, norm: TPointD; delta: double): TPointD;
+  {$IFDEF INLINE} inline; {$ENDIF}
 begin
   result := PointD(pt.X + norm.X * delta, pt.Y + norm.Y * delta);
-end;
-//------------------------------------------------------------------------------
-
-function GetVector(const pt, norm: TPointD; delta: double): TPointD;
-begin
-  result := PointD(pt.X - norm.Y * delta, pt.Y + norm.X * delta);
 end;
 //------------------------------------------------------------------------------
 
@@ -1793,13 +1786,13 @@ begin
   len := Length(path);
   highI := len -1;
   SetLength(Result, len *2);
-  Result[0]  := GetNormal(path[0], norms[0], delta);
+  Result[0]  := ApplyNormal(path[0], norms[0], delta);
   for i := 1 to highI do
   begin
-    Result[i*2-1] := GetNormal(path[i], norms[i-1], delta);
-    Result[i*2]   := GetNormal(path[i], norms[i], delta);
+    Result[i*2-1] := ApplyNormal(path[i], norms[i-1], delta);
+    Result[i*2]   := ApplyNormal(path[i], norms[i], delta);
   end;
-  Result[highI*2+1] := GetNormal(path[0], norms[highI], delta);
+  Result[highI*2+1] := ApplyNormal(path[0], norms[highI], delta);
 end;
 //------------------------------------------------------------------------------
 
