@@ -2,8 +2,7 @@ unit Clipper.Offset;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  Clipper2 - ver.1.0.4                                            *
-* Date      :  25 September 2022                                               *
+* Date      :  15 October 2022                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * Purpose   :  Path Offset (Inflate/Shrink)                                    *
@@ -151,20 +150,18 @@ function GetUnitNormal(const pt1, pt2: TPoint64): TPointD;
 var
   dx, dy, inverseHypot: Double;
 begin
-  if (pt2.X = pt1.X) and (pt2.Y = pt1.Y) then
+  dx := (pt2.X - pt1.X);
+  dy := (pt2.Y - pt1.Y);
+  if (dx = 0) and (dy = 0) then
   begin
     Result.X := 0;
     Result.Y := 0;
-    Exit;
+  end else
+  begin
+    inverseHypot := 1 / Hypot(dx, dy);
+    Result.X := dy * inverseHypot;
+    Result.Y := -dx * inverseHypot; //ie left side of vector
   end;
-
-  dx := (pt2.X - pt1.X);
-  dy := (pt2.Y - pt1.Y);
-  inverseHypot := 1 / Hypot(dx, dy);
-  dx := dx * inverseHypot;
-  dy := dy * inverseHypot;
-  Result.X := dy;
-  Result.Y := -dx
 end;
 //------------------------------------------------------------------------------
 
@@ -715,15 +712,18 @@ begin
   begin
     if (fJoinType = jtRound) then
       DoRound(j, k, ArcTan2(sinA, cosA))
-    // only miter when the angle isn't too acute (and exceeds ML)
-    else if (fJoinType = jtMiter) and (cosA > fTmpLimit -1) then
+    else if (fJoinType = jtMiter) then
+    begin
+			// miter unless the angle is so acute the miter would exceeds ML
+      if (cosA > fTmpLimit -1) then DoMiter(j, k, cosA)
+      else DoSquare(j, k);
+    end
+    // don't bother squaring angles that deviate < ~20 degrees because
+    // squaring will be indistinguishable from mitering and just be a lot slower
+    else if (cosA > 0.9) then
       DoMiter(j, k, cosA)
-    // only do squaring when the angle of deviation > 90 degrees
-    else if (cosA < -0.001) then
-      DoSquare(j, k)
     else
-      // don't square shallow angles that are safe to miter
-      DoMiter(j, k, cosA);
+      DoSquare(j, k);
   end;
   k := j;
 end;

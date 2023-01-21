@@ -8,10 +8,24 @@ interface
 
 uses
   SysUtils, Classes, Types, Math,
-  Img32, Img32.SVG.Core, Img32.Vector, Img32.Transform, Img32.SVG.Reader;
+  Img32, Img32.SVG.Core, Img32.Vector,
+  Img32.Transform, Img32.SVG.Reader, AnsiStrings;
 
 implementation
 
+type
+ TAnsi = {$IFDEF RECORD_METHODS} record {$ELSE} object {$ENDIF}
+    text: PAnsiChar;
+    len : integer;
+    function AsUtf8String: AnsiString;
+  end;
+
+function TAnsi.AsUtf8String: AnsiString;
+begin
+  SetLength(Result, len);
+  if len > 0 then
+    Move(text^, Result[1], len);
+end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
@@ -331,7 +345,7 @@ begin
     end else
     begin
       AddName('Amplitude');
-      AddName('Arithmetic');
+      AddName('arithmetic');
       AddName('Arial');
       AddName('Atop');
       AddName('auto-start-reverse');
@@ -355,6 +369,7 @@ begin
       AddName('D');
       AddName('Darken');
       AddName('Defs');
+      AddName('diffuseConstant');
       AddName('Discrete');
       AddName('Display');
       AddName('Dx');
@@ -406,6 +421,7 @@ begin
       AddName('In2');
       AddName('Intercept');
       AddName('Italic');
+      AddName('kernelUnitLength');
       AddName('K1');
       AddName('K2');
       AddName('K3');
@@ -487,6 +503,7 @@ begin
       AddName('Style');
       AddName('Sub');
       AddName('Super');
+      AddName('surfaceScale');
       AddName('Svg');
       AddName('Switch');
       AddName('Symbol');
@@ -507,6 +524,7 @@ begin
       AddName('UserSpaceOnUse');
       AddName('Values');
       AddName('Viewbox');
+      AddName('Visibility');
       AddName('Width');
       AddName('X');
       AddName('X1');
@@ -547,8 +565,8 @@ begin
     sl.Insert(0, 'const');
     //sl.Insert(0, '  //nb: hash identifiers with appended underscores are case sensitive.');
     if hashHtmlEntities then
-      sl.SaveToFile('../Img32.SVG.HtmlHashConsts.inc') else
-      sl.SaveToFile('../Img32.SVG.HashConsts.inc');
+      sl.SaveToFile('./Img32.SVG.HtmlHashConsts.inc') else
+      sl.SaveToFile('./Img32.SVG.HashConsts.inc');
   finally
     sl.Free;
     slNames.Free;
@@ -559,5 +577,5 @@ end;
 
 initialization
   MakeHashesConsts(false);
-  MakeHashesConsts(true);
+  //MakeHashesConsts(true);
 end.
