@@ -2,17 +2,12 @@ unit Img32.Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.3                                                             *
-* Date      :  27 September 2022                                               *
+* Version   :  4.4                                                             *
+* Date      :  21 February 2023                                                *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2021                                         *
-*                                                                              *
-* Purpose   :  Miscellaneous routines for TImage32 that                        *
-*           :  don't obviously belong in other modules.                        *
-*                                                                              *
-* License   :  Use, modification & distribution is subject to                  *
-*              Boost Software License Ver 1                                    *
-*              http://www.boost.org/LICENSE_1_0.txt                            *
+* Copyright :  Angus Johnson 2019-2023                                         *
+* Purpose   :  Miscellaneous routines that don't belong in other modules.      *
+* License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
 interface
@@ -99,7 +94,7 @@ procedure FloodFill(img: TImage32; x, y: Integer; newColor: TColor32;
   tolerance: Byte = 0; compareFunc: TCompareFunctionEx = nil);
 
 procedure FastGaussianBlur(img: TImage32;
-  const rec: TRect; stdDev: integer; repeats: integer); overload;
+  const rec: TRect; stdDev: integer; repeats: integer = 2); overload;
 procedure FastGaussianBlur(img: TImage32;
   const rec: TRect; stdDevX, stdDevY: integer; repeats: integer); overload;
 
@@ -125,12 +120,16 @@ procedure GridBackground(img: TImage32; majorInterval, minorInterval: integer;
   fillColor: TColor32 = clWhite32;
   majColor: TColor32 = $30000000; minColor: TColor32 = $20000000);
 
-procedure ReplaceColor(img: TImage32; oldColor, newColor: TColor32);
+procedure ReplaceExactColor(img: TImage32; oldColor, newColor: TColor32);
 
 //EraseColor: Removes the specified color from the image, even from
 //pixels that are a blend of colors including the specified color.<br>
 //see https://stackoverflow.com/questions/9280902/
 procedure EraseColor(img: TImage32; color: TColor32);
+
+//FilterOnColor: Removes everything not nearly matching 'color'
+//This uses an algorithm that's very similar to the one in EraseColor.
+procedure FilterOnColor(img: TImage32; color: TColor32);
 
 //RedEyeRemove: Removes 'red eye' from flash photo images.
 procedure RedEyeRemove(img: TImage32; const rect: TRect);
@@ -158,7 +157,7 @@ procedure Draw3D(img: TImage32; const polygons: TPathsD;
   colorLt: TColor32 = $DDFFFFFF; colorDk: TColor32 = $80000000;
   angleRads: double = angle225); overload;
 
-function RainbowColor(fraction: double): TColor32;
+function RainbowColor(fraction: double; luminance: byte = 128): TColor32;
 function GradientColor(color1, color2: TColor32; frac: single): TColor32;
 function MakeDarker(color: TColor32; percent: cardinal): TColor32;
 function MakeLighter(color: TColor32; percent: cardinal): TColor32;
@@ -182,11 +181,19 @@ function RamerDouglasPeucker(const path: TPathD;
 function RamerDouglasPeucker(const paths: TPathsD;
   epsilon: double): TPathsD; overload;
 
+// SimplifyPath: Better than RDP when simplifying closed paths
+function SimplifyPath(const path: TPathD;
+  epsilon: double; isOpenPath: Boolean = false): TPathD;
+function SimplifyPaths(const paths: TPathsD;
+  epsilon: double; isOpenPath: Boolean = false): TPathsD;
+
 // SmoothToCubicBezier - produces a series of cubic bezier control points.
 // This function is very useful in the following combination:
 // RamerDouglasPeucker(), SmoothToCubicBezier(), FlattenCBezier().
 function SmoothToCubicBezier(const path: TPathD;
-  pathIsClosed: Boolean; maxOffset: integer = 0): TPathD;
+  pathIsClosed: Boolean; maxOffset: integer = 0): TPathD; overload;
+function SmoothToCubicBezier(const paths: TPathsD;
+  pathIsClosed: Boolean; maxOffset: integer = 0): TPathsD; overload;
 
 //InterpolatePoints: smooths a simple line chart.
 //Points should be left to right and equidistant along the X axis
@@ -785,7 +792,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure ReplaceColor(img: TImage32; oldColor, newColor: TColor32);
+procedure ReplaceExactColor(img: TImage32; oldColor, newColor: TColor32);
 var
   color: PColor32;
   i: Integer;
@@ -812,13 +819,27 @@ begin
   begin
     if bg.A > 0 then
     begin
-      if (bg.R > fg.R) then Q := DivTable[bg.R - fg.R, not fg.R]
-      else if (bg.R < fg.R) then Q := DivTable[fg.R - bg.R, fg.R]
-      else Q := 0;
-      if (bg.G > fg.G) then Q := Max(Q, DivTable[bg.G - fg.G, not fg.G])
-      else if (bg.G < fg.G) then Q := Max(Q, DivTable[fg.G - bg.G, fg.G]);
-      if (bg.B > fg.B) then Q := Max(Q, DivTable[bg.B - fg.B, not fg.B])
-      else if (bg.B < fg.B) then Q := Max(Q, DivTable[fg.B - bg.B, fg.B]);
+      // red
+      if (bg.R > fg.R) then
+        Q := DivTable[bg.R - fg.R, not fg.R]
+      else if (bg.R < fg.R) then
+        Q := DivTable[fg.R - bg.R, fg.R]
+      else
+        Q := 0;
+
+      // green
+      if (bg.G > fg.G) then
+        Q := Max(Q, DivTable[bg.G - fg.G, not fg.G])
+      else if (bg.G < fg.G) then
+        Q := Max(Q, DivTable[fg.G - bg.G, fg.G]);
+
+      // blue
+      if (bg.B > fg.B) then
+        Q := Max(Q, DivTable[bg.B - fg.B, not fg.B])
+      else if (bg.B < fg.B) then
+        Q := Max(Q, DivTable[fg.B - bg.B, fg.B]);
+
+      // Q = 255 - (erase frac * 255)
       if (Q > 0) then
       begin
         bg.A := MulTable[bg.A, Q];
@@ -827,6 +848,48 @@ begin
         bg.B := DivTable[bg.B - MulTable[fg.B, not Q], Q];
       end else
         bg.Color := clNone32;
+    end;
+    inc(bg);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure FilterOnColor(img: TImage32; color: TColor32);
+var
+  fg: TARGB absolute color;
+  bg: PARGB;
+  i: Integer;
+  Q: byte;
+begin
+  if fg.A = 0 then Exit;
+  bg := PARGB(img.PixelBase);
+  for i := 0 to img.Width * img.Height -1 do
+  begin
+    if bg.A > 0 then
+    begin
+      // red
+      if (bg.R > fg.R) then
+        Q := DivTable[bg.R - fg.R, not fg.R]
+      else if (bg.R < fg.R) then
+        Q := DivTable[fg.R - bg.R, fg.R]
+      else
+        Q := 0;
+
+      // green
+      if (bg.G > fg.G) then
+        Q := Max(Q, DivTable[bg.G - fg.G, not fg.G])
+      else if (bg.G < fg.G) then
+        Q := Max(Q, DivTable[fg.G - bg.G, fg.G]);
+
+      // blue
+      if (bg.B > fg.B) then
+        Q := Max(Q, DivTable[bg.B - fg.B, not fg.B])
+      else if (bg.B < fg.B) then
+        Q := Max(Q, DivTable[fg.B - bg.B, fg.B]);
+
+      Q := MulTable[bg.A, not Q];
+      bg.Color := color;
+      bg.A := Q; // note: fg.A is ignored
     end;
     inc(bg);
   end;
@@ -986,19 +1049,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RainbowColor(fraction: double): TColor32;
+function RainbowColor(fraction: double; luminance: byte = 128): TColor32;
 var
   hsl: THsl;
 begin
-  if (fraction > 0) and (fraction < 1) then
-  begin
-    hsl.hue := Round(fraction * 255);
-    hsl.sat := 255;
-    hsl.lum := 255;
-    hsl.alpha := 255;
-    Result := HslToRgb(hsl);
-  end else
-    result := clRed32
+  if (fraction < 0) or (fraction > 1) then
+    fraction := frac(fraction);
+
+  hsl.hue := Round(fraction * 255);
+  hsl.sat := 255;
+  hsl.lum := luminance;
+  hsl.alpha := 255;
+  Result := HslToRgb(hsl);
 end;
 //------------------------------------------------------------------------------
 
@@ -2086,6 +2148,122 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function GetNext(current, high: integer; var flags: array of Boolean): integer;
+begin
+  Result := current +1;
+  while (Result <= high) and flags[Result] do inc(Result);
+  if (Result <= high) then Exit;
+  Result := 0;
+  while (flags[Result]) do inc(Result);
+end;
+//---------------------------------------------------------------------------
+
+function GetPrior(current, high: integer; var flags: array of Boolean): integer;
+begin
+  Result := current;
+  if (Result = 0) then Result := high
+  else dec(Result);
+  while (Result > 0) and flags[Result] do dec(Result);
+  if not flags[Result] then Exit;
+  Result := high;
+  while flags[Result] do dec(Result);
+end;
+//---------------------------------------------------------------------------
+
+function SimplifyPath(const path: TPathD;
+  epsilon: double; isOpenPath: Boolean = false): TPathD;
+var
+  i,j, len, high: integer;
+  curr, prev, start, prev2, next, next2: integer;
+  epsSqr: double;
+  flags: array of boolean;
+  dsq: array of double;
+begin
+  Result := nil;
+  len := Length(path);
+  if (len < 4) then Exit;;
+  high := len -1;
+  epsSqr := Sqr(epsilon);
+  SetLength(flags, len);
+  SetLength(dsq, len);
+
+  curr := 0;
+  if (isOpenPath) then
+  begin
+    dsq[0] := MaxDouble;
+    dsq[high] := MaxDouble;
+  end else
+  begin
+    dsq[0] := PerpendicularDistSqrd(path[0], path[high], path[1]);
+    dsq[high] := PerpendicularDistSqrd(path[high], path[0], path[high - 1]);
+  end;
+
+  for i := 1 to high -1 do
+    dsq[i] := PerpendicularDistSqrd(path[i], path[i - 1], path[i + 1]);
+
+  while true do
+  begin
+    if (dsq[curr] > epsSqr) then
+    begin
+      start := curr;
+      repeat
+        curr := GetNext(curr, high, flags);
+      until (curr = start) or (dsq[curr] < epsSqr);
+      if (curr = start) then break;
+    end;
+
+    prev := GetPrior(curr, high, flags);
+    next := GetNext(curr, high, flags);
+    if (next = prev) then break;
+
+    if (dsq[next] < dsq[curr]) then
+    begin
+      flags[next] := true;
+      next := GetNext(next, high, flags);
+      next2 := GetNext(next, high, flags);
+      dsq[curr] := PerpendicularDistSqrd(
+        path[curr], path[prev], path[next]);
+      if (next <> high) or not isOpenPath then
+        dsq[next] := PerpendicularDistSqrd(
+          path[next], path[curr], path[next2]);
+      curr := next;
+    end else
+    begin
+      flags[curr] := true;
+      curr := next;
+      next := GetNext(next, high, flags);
+      prev2 := GetPrior(prev, high, flags);
+      dsq[curr] := PerpendicularDistSqrd(
+        path[curr], path[prev], path[next]);
+      if (prev <> 0) or not isOpenPath then
+        dsq[prev] := PerpendicularDistSqrd(
+          path[prev], path[prev2], path[curr]);
+    end;
+  end;
+  j := 0;
+  SetLength(Result, len);
+  for i := 0 to High do
+    if not flags[i] then
+    begin
+      Result[j] := path[i];
+      inc(j);
+    end;
+  SetLength(Result, j);
+end;
+//---------------------------------------------------------------------------
+
+function SimplifyPaths(const paths: TPathsD;
+  epsilon: double; isOpenPath: Boolean = false): TPathsD;
+var
+  i, len: integer;
+begin
+  len := Length(paths);
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    result[i] := SimplifyPath(paths[i], epsilon, isOpenPath);
+end;
+//---------------------------------------------------------------------------
+
 function DotProdVecs(const vec1, vec2: TPointD): double;
   {$IFDEF INLINE} inline; {$ENDIF}
 begin
@@ -2151,6 +2329,18 @@ begin
   dec(len);
   Result[len*3-1] := Result[len*3];
   SetLength(Result, Len*3 +1);
+end;
+//------------------------------------------------------------------------------
+
+function SmoothToCubicBezier(const paths: TPathsD;
+  pathIsClosed: Boolean; maxOffset: integer = 0): TPathsD;
+var
+  i, len: integer;
+begin
+  len := Length(paths);
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    Result[i] := SmoothToCubicBezier(paths[i], pathIsClosed, maxOffset);
 end;
 //------------------------------------------------------------------------------
 

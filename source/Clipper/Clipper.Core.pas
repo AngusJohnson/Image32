@@ -2,8 +2,9 @@ unit Clipper.Core;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Date      :  17 December 2022                                                *
-* Copyright :  Angus Johnson 2010-2022                                         *
+* Date      :  19 February 2023                                                *
+* Website   :  http://www.angusj.com                                           *
+* Copyright :  Angus Johnson 2010-2023                                         *
 * Purpose   :  Core Clipper Library module                                     *
 *              Contains structures and functions used throughout the library   *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
@@ -17,6 +18,7 @@ uses
   SysUtils, Classes, Math;
 
 type
+
   PPoint64  = ^TPoint64;
   TPoint64  = record
     X, Y: Int64;
@@ -100,19 +102,29 @@ type
     property MidPoint: TPointD read GetMidPoint;
   end;
 
+{$IFDEF FPC}
+  TPointerList = array of Pointer;
+  TListSortCompareFunc = function (Item1, Item2: Pointer): Integer;
+{$ELSE}
+{$IF COMPILERVERSION < 23} //PRIOR DELPHI XE2
+  TPointerList = array of Pointer;
+  TListSortCompareFunc = function (Item1, Item2: Pointer): Integer;
+{$IFEND}
+{$ENDIF}
+
   TListEx = class
   private
     fCount    : integer;
     fCapacity : integer;
     fList     : TPointerList;
   protected
-    function Add(item: Pointer): integer;
     function UnsafeGet(idx: integer): Pointer; // no range checking
     procedure UnsafeSet(idx: integer; val: Pointer);
   public
     constructor Create(capacity: integer = 0); virtual;
     destructor Destroy; override;
     procedure Clear; virtual;
+    function Add(item: Pointer): integer;
     procedure Swap(idx1, idx2: integer);
     procedure Sort(Compare: TListSortCompare);
     procedure Resize(count: integer);
@@ -122,7 +134,7 @@ type
 
   TClipType = (ctNone, ctIntersection, ctUnion, ctDifference, ctXor);
 
-  TPointInPolygonResult = (pipInside, pipOutside, pipOn);
+  TPointInPolygonResult = (pipOn, pipInside, pipOutside);
 
   EClipper2LibException = class(Exception);
 
@@ -181,7 +193,9 @@ function Point64(const X, Y: Double): TPoint64; overload; {$IFDEF INLINING} inli
 function PointD(const X, Y: Double): TPointD; overload; {$IFDEF INLINING} inline; {$ENDIF}
 {$ENDIF}
 
-function Negate(const pt: TPointD): TPointD; {$IFDEF INLINING} inline; {$ENDIF}
+function Negate(const pt: TPoint64): TPoint64; overload; {$IFDEF INLINING} inline; {$ENDIF}
+function Negate(const pt: TPointD): TPointD; overload; {$IFDEF INLINING} inline; {$ENDIF}
+function NegatePath(const path: TPathD): TPathD; overload; {$IFDEF INLINING} inline; {$ENDIF}
 
 function Point64(const pt: TPointD): TPoint64; overload; {$IFDEF INLINING} inline; {$ENDIF}
 function PointD(const pt: TPoint64): TPointD; overload;
@@ -227,7 +241,9 @@ function ScaleRect(const rec: TRect64; scale: double): TRect64; overload;
 function ScaleRect(const rec: TRectD; scale: double): TRectD; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
 
-function ScalePoint(const pt: TPoint64; scale: double): TPointD;
+function ScalePoint(const pt: TPoint64; scale: double): TPointD; overload;
+  {$IFDEF INLINING} inline; {$ENDIF}
+function ScalePoint(const pt: TPointD; scale: double): TPointD; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
 
 function ScalePath(const path: TPath64; sx, sy: double): TPath64; overload;
@@ -252,8 +268,10 @@ function ScalePathsD(const paths: TPathsD; scale: double): TPathsD; overload;
 
 function Path64(const pathD: TPathD): TPath64;
 function PathD(const path: TPath64): TPathD;
-function Paths64(const pathsD: TPathsD): TPaths64;
-function PathsD(const paths: TPaths64): TPathsD;
+function Paths64(const path: TPath64): TPaths64; overload;
+function Paths64(const pathsD: TPathsD): TPaths64; overload;
+function PathsD(const paths: TPaths64): TPathsD; overload;
+function PathsD(const path: TPathD): TPathsD; overload;
 
 function StripDuplicates(const path: TPath64; isClosedPath: Boolean = false): TPath64;
 function StripNearDuplicates(const path: TPathD;
@@ -270,6 +288,11 @@ function ReversePath(const path: TPathD): TPathD; overload;
 function ReversePaths(const paths: TPaths64): TPaths64; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
 function ReversePaths(const paths: TPathsD): TPathsD; overload;
+  {$IFDEF INLINING} inline; {$ENDIF}
+
+function ShiftPath(const path: TPath64; shift: integer): TPath64; overload;
+  {$IFDEF INLINING} inline; {$ENDIF}
+function ShiftPath(const path: TPathD; shift: integer): TPathD; overload;
   {$IFDEF INLINING} inline; {$ENDIF}
 
 procedure AppendPoint(var path: TPath64; const pt: TPoint64); overload;
@@ -377,8 +400,8 @@ end;
 
 function TRect64.Intersects(const rec: TRect64): Boolean;
 begin
-  Result := (Max(Left, rec.Left) < Min(Right, rec.Right)) and
-    (Max(Top, rec.Top) < Min(Bottom, rec.Bottom));
+  Result := (Max(Left, rec.Left) <= Min(Right, rec.Right)) and
+    (Max(Top, rec.Top) <= Min(Bottom, rec.Bottom));
 end;
 //------------------------------------------------------------------------------
 
@@ -445,8 +468,8 @@ end;
 
 function TRectD.Intersects(const rec: TRectD): Boolean;
 begin
-  Result := (Max(Left, rec.Left) < Min(Right, rec.Right)) and
-    (Max(Top, rec.Top) < Min(Bottom, rec.Bottom));
+  Result := (Max(Left, rec.Left) <= Min(Right, rec.Right)) and
+    (Max(Top, rec.Top) <= Min(Bottom, rec.Bottom));
 end;
 //------------------------------------------------------------------------------
 
@@ -708,6 +731,16 @@ end;
 //------------------------------------------------------------------------------
 
 function ScalePoint(const pt: TPoint64; scale: double): TPointD;
+begin
+  Result.X := pt.X * scale;
+  Result.Y := pt.Y * scale;
+{$IFDEF USINGZ}
+  Result.Z := pt.Z;
+{$ENDIF}
+end;
+//------------------------------------------------------------------------------
+
+function ScalePoint(const pt: TPointD; scale: double): TPointD;
 begin
   Result.X := pt.X * scale;
   Result.Y := pt.Y * scale;
@@ -1021,6 +1054,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function Paths64(const path: TPath64): TPaths64;
+begin
+  setLength(Result, 1);
+  Result[0] := path;
+end;
+//------------------------------------------------------------------------------
+
 function Paths64(const pathsD: TPathsD): TPaths64;
 var
   i, len: integer;
@@ -1042,6 +1082,14 @@ begin
     Result[i] := PathD(paths[i]);
 end;
 //------------------------------------------------------------------------------
+
+function PathsD(const path: TPathD): TPathsD;
+begin
+  setLength(Result, 1);
+  Result[0] := path;
+end;
+//------------------------------------------------------------------------------
+
 
 function ReversePath(const path: TPath64): TPath64;
 var
@@ -1097,6 +1145,41 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function ShiftPath(const path: TPath64; shift: integer): TPath64;
+var
+  diff, len: Integer;
+begin
+  Result := nil;
+  len := Length(path);
+  if len = 0 then Exit;
+  Result := Copy(path, 0, len);
+  shift := shift mod len;
+  if shift = 0 then Exit;
+  if shift < 0 then shift := len + shift;
+  diff := len - shift;
+  Move(path[shift], Result[0], diff *SizeOf(TPoint64));
+  Move(path[0], Result[diff], shift *SizeOf(TPoint64));
+end;
+//------------------------------------------------------------------------------
+
+function ShiftPath(const path: TPathD; shift: integer): TPathD;
+var
+  diff, len: Integer;
+begin
+  Result := nil;
+  len := Length(path);
+  if len = 0 then Exit;
+  Result := Copy(path, 0, len);
+  shift := shift mod len;
+  if shift = 0 then Exit;
+  if shift < 0 then shift := len + shift;
+  diff := len - shift;
+  Move(path[shift], Result[0], diff *SizeOf(TPointD));
+  Move(path[0], Result[diff], shift *SizeOf(TPointD));
+end;
+//------------------------------------------------------------------------------
+
+
 procedure AppendPoint(var path: TPath64; const pt: TPoint64);
 var
   len: Integer;
@@ -1135,6 +1218,7 @@ procedure AppendPath(var paths: TPaths64; const extra: TPath64);
 var
   len: Integer;
 begin
+  if not Assigned(extra) then Exit;
   len := length(paths);
   SetLength(paths, len +1);
   paths[len] := extra;
@@ -1145,6 +1229,7 @@ procedure AppendPath(var paths: TPathsD; const extra: TPathD);
 var
   len: Integer;
 begin
+  if not Assigned(extra) then Exit;
   len := length(paths);
   SetLength(paths, len +1);
   paths[len] := extra;
@@ -1273,10 +1358,31 @@ end;
 //------------------------------------------------------------------------------
 {$ENDIF}
 
+function Negate(const pt: TPoint64): TPoint64;
+begin
+  Result.X := -pt.X;
+  Result.Y := -pt.Y;
+end;
+//------------------------------------------------------------------------------
+
 function Negate(const pt: TPointD): TPointD;
 begin
   Result.X := -pt.X;
   Result.Y := -pt.Y;
+end;
+//------------------------------------------------------------------------------
+
+function NegatePath(const path: TPathD): TPathD;
+var
+  i: Integer;
+begin
+  Result := path;
+  for i := 0 to High(Result) do
+    with Result[i] do
+    begin
+      X := -X;
+      Y := -Y;
+    end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1359,7 +1465,7 @@ begin
         inc(p);
       end;
     end;
-  if Result.Left > Result.Right then Result := NullRect64;
+  if Result.Left = MaxInt64 then Result := NullRect64;
 end;
 //------------------------------------------------------------------------------
 
@@ -1382,7 +1488,7 @@ begin
         inc(p);
       end;
     end;
-  if Result.Left >= Result.Right then Result := nullRectD;
+  if Result.Left = MaxDouble then Result := NullRectD;
 end;
 //------------------------------------------------------------------------------
 
@@ -1853,53 +1959,58 @@ end;
 function PointInPolygon(const pt: TPoint64;
   const polygon: TPath64): TPointInPolygonResult;
 var
-  i, len, val: Integer;
-  isAbove: Boolean;
-  d: Double; // used to avoid integer overflow
-  curr, prev, first, last, stop: PPoint64;
+  len, val: Integer;
+  isAbove, startingAbove: Boolean;
+  d: Double; // avoids integer overflow
+  curr, prev, cbegin, cend, first: PPoint64;
 begin
   result := pipOutside;
   len := Length(polygon);
   if len < 3 then Exit;
 
-  i := len -1;
-  first := @polygon[0];
+  cbegin := @polygon[0];
+  cend := @polygon[len]; // stop is just past the last point (nb {$R-})
 
-  while (i >= 0) and (polygon[i].Y = pt.Y) do dec(i);
-  if i < 0 then Exit;
-  isAbove := polygon[i].Y < pt.Y;
+  first := cbegin;
+  while (first <> cend) and (first.Y = pt.Y) do inc(first);
+  if (first = cend) then Exit; // not a proper polygon
 
+  isAbove := first.Y < pt.Y;
+  startingAbove := isAbove;
   Result := pipOn;
-  last := @polygon[len-1];
-  stop := @polygon[len]; // stop is just past the last point (nb {$R-})
-
   curr := first;
+  inc(curr);
   val := 0;
-
-  while (curr <> stop) do
+  while true do
   begin
-    if isAbove then
+    if (curr = cend) then
     begin
-      while (curr <> stop) and (curr.Y < pt.Y) do inc(curr);
-      if (curr = stop) then break;
-    end else
-    begin
-      while (curr <> stop) and (curr.Y > pt.Y) do inc(curr);
-      if (curr = stop) then break;
+      if (cend = first) or (first = cbegin) then break;
+      cend := first;
+      curr := cbegin;
     end;
 
-    if curr <> first then
+    if isAbove then
     begin
-      prev := curr;
-      dec(prev);
+      while (curr <> cend) and (curr.Y < pt.Y) do inc(curr);
+      if (curr = cend) then Continue;
     end else
-      prev := last;
+    begin
+      while (curr <> cend) and (curr.Y > pt.Y) do inc(curr);
+      if (curr = cend) then Continue;
+    end;
+
+    if curr = cbegin then
+      prev := @polygon[len] else // NOT cend!
+      prev := curr;
+    dec(prev);
 
     if (curr.Y = pt.Y) then
     begin
       if (curr.X = pt.X) or ((curr.Y = prev.Y) and
         ((pt.X < prev.X) <> (pt.X < curr.X))) then Exit;
       inc(curr);
+      if (curr = first) then Break;
       Continue;
     end;
 
@@ -1917,6 +2028,20 @@ begin
     isAbove := not isAbove;
     inc(curr);
   end;
+
+  if (isAbove <> startingAbove) then
+  begin
+    cend := @polygon[len];
+    if (curr = cend) then curr := cbegin;
+    if curr = cbegin then
+      prev := cend else
+      prev := curr;
+    dec(prev);
+    d := CrossProduct(prev^, curr^, pt);
+    if d = 0 then Exit; // ie point on path
+    if (d < 0) = isAbove then val := 1 - val;
+  end;
+
   if val = 0 then
      result := pipOutside else
      result := pipInside;

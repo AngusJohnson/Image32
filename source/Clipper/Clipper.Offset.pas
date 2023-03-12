@@ -2,9 +2,9 @@ unit Clipper.Offset;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Date      :  15 October 2022                                                 *
+* Date      :  11 March 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2010-2022                                         *
+* Copyright :  Angus Johnson 2010-2023                                         *
 * Purpose   :  Path Offset (Inflate/Shrink)                                    *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -14,7 +14,7 @@ unit Clipper.Offset;
 interface
 
 uses
-  Classes, Clipper.Core;
+  Classes, Clipper.Core, Clipper.Engine;
 
 type
 
@@ -36,25 +36,31 @@ type
 
   TClipperOffset = class
   private
-    fGrpDelta    : Double;
-    fAbsGrpDelta : Double;
-    fMinLenSqrd  : double;
-    fJoinType    : TJoinType;
-    fTmpLimit    : Double;
-    fMiterLimit  : Double;
-    fArcTolerance: Double;
-    fStepsPerRad : Double;
-    fNorms       : TPathD;
-    fInGroups    : TList;
-    fMergeGroups : Boolean;
-    fInPath      : TPath64;
-    fOutPath     : TPath64;
-    fOutPaths    : TPaths64;
-    fOutPathLen  : Integer;
-    fSolution    : TPaths64;
+    fDelta        : Double;
+    fGroupDelta   : Double; //*0.5 for open paths; *-1.0 for neg areas
+    fAbsGrpDelta  : Double;
+    fMinLenSqrd   : double;
+    fJoinType     : TJoinType;
+    fEndType      : TEndType;
+    fTmpLimit     : Double;
+    fMiterLimit   : Double;
+    fArcTolerance : Double;
+    fStepsPerRad  : Double;
+    fNorms        : TPathD;
+    fGroupList    : TListEx;
+    fInPath       : TPath64;
+    fOutPath      : TPath64;
+    fOutPaths     : TPaths64;
+    fOutPathLen   : Integer;
+    fSolution     : TPaths64;
     fPreserveCollinear  : Boolean;
     fReverseSolution    : Boolean;
+{$IFDEF USINGZ}
+    fZCallback64 : TZCallback64;
+    procedure AddPoint(x,y: double; z: Int64); overload;
+{$ELSE}
     procedure AddPoint(x,y: double); overload;
+{$ENDIF}
     procedure AddPoint(const pt: TPoint64); overload;
       {$IFDEF INLINING} inline; {$ENDIF}
     procedure DoSquare(j, k: Integer);
@@ -63,10 +69,10 @@ type
     procedure OffsetPoint(j: Integer; var k: integer);
 
     procedure BuildNormals;
-    procedure DoGroupOffset(group: TGroup; groupDelta: double);
+    procedure DoGroupOffset(group: TGroup);
     procedure OffsetPolygon;
     procedure OffsetOpenJoined;
-    procedure OffsetOpenPath(endType: TEndType);
+    procedure OffsetOpenPath;
   public
     constructor Create(miterLimit: double = 2.0;
       arcTolerance: double = 0.0;
@@ -84,22 +90,19 @@ type
     property MiterLimit: Double read fMiterLimit write fMiterLimit;
     // ArcTolerance: needed for rounded offsets (See offset_triginometry2.svg)
     property ArcTolerance: Double read fArcTolerance write fArcTolerance;
-    // MergeGroups: A path group is one or more paths added via the AddPath or
-    // AddPaths methods. By default these path groups will be offset
-    // independently of other groups and this may cause overlaps (intersections).
-    // However, when MergeGroups is enabled, any overlapping offsets will be
-    // merged (via a clipping union operation) to remove overlaps.
-    property MergeGroups: Boolean read fMergeGroups write fMergeGroups;
     property PreserveCollinear: Boolean
       read fPreserveCollinear write fPreserveCollinear;
     property ReverseSolution: Boolean
       read fReverseSolution write fReverseSolution;
+{$IFDEF USINGZ}
+    property ZCallback: TZCallback64 read fZCallback64 write fZCallback64;
+{$ENDIF}
   end;
 
 implementation
 
 uses
-  Math, Clipper.Engine;
+  Math;
 
 const
   TwoPi     : Double = 2 * PI;
@@ -211,10 +214,9 @@ constructor TClipperOffset.Create(miterLimit: double;
   arcTolerance: double; PreserveCollinear: Boolean;
   ReverseSolution: Boolean);
 begin
-  fMergeGroups  := true;
   fMiterLimit   := MiterLimit;
   fArcTolerance := ArcTolerance;
-  fInGroups     := TList.Create;
+  fGroupList    := TListEx.Create;
   fPreserveCollinear := preserveCollinear;
   fReverseSolution := ReverseSolution;
 end;
@@ -223,7 +225,7 @@ end;
 destructor TClipperOffset.Destroy;
 begin
   Clear;
-  fInGroups.Free;
+  fGroupList.Free;
   inherited;
 end;
 //------------------------------------------------------------------------------
@@ -232,9 +234,9 @@ procedure TClipperOffset.Clear;
 var
   i: integer;
 begin
-  for i := 0 to fInGroups.Count -1 do
-    TGroup(UnsafeGet(fInGroups, i)).Free;
-  fInGroups.Clear;
+  for i := 0 to fGroupList.Count -1 do
+    TGroup(fGroupList[i]).Free;
+  fGroupList.Clear;
   fSolution := nil;
 end;
 //------------------------------------------------------------------------------
@@ -259,7 +261,7 @@ begin
   if Length(paths) = 0 then Exit;
   group := TGroup.Create(joinType, endType);
   AppendPaths(group.paths, paths);
-  fInGroups.Add(group);
+  fGroupList.Add(group);
 end;
 //------------------------------------------------------------------------------
 
@@ -267,6 +269,9 @@ function GetPerpendic(const pt: TPoint64; const norm: TPointD; delta: double): T
   {$IFDEF INLINING} inline; {$ENDIF}
 begin
   result := Point64(pt.X + norm.X * delta, pt.Y + norm.Y * delta);
+{$IFDEF USINGZ}
+  result.Z := pt.Z;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -274,20 +279,20 @@ function GetPerpendicD(const pt: TPoint64; const norm: TPointD; delta: double): 
   {$IFDEF INLINING} inline; {$ENDIF}
 begin
   result := PointD(pt.X + norm.X * delta, pt.Y + norm.Y * delta);
+{$IFDEF USINGZ}
+  result.Z := pt.Z;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
-procedure TClipperOffset.DoGroupOffset(group: TGroup; groupDelta: double);
+procedure TClipperOffset.DoGroupOffset(group: TGroup);
 var
-  i, len, lowestIdx: Integer;
-  r, arcTol, area, steps: Double;
-  IsClosedPaths: Boolean;
+  i,j, len, lowestIdx: Integer;
+  r, arcTol, area: Double;
+  rec: TRect64;
+  isJoined: Boolean;
 begin
-  if group.endType <> etPolygon then
-    groupDelta := Abs(groupDelta) * 0.5;
-
-  IsClosedPaths := (group.endType in [etPolygon, etJoined]);
-  if IsClosedPaths then
+  if group.endType = etPolygon then
   begin
     // the lowermost polygon must be an outer polygon. So we can use that as the
     // designated orientation for outer polygons (needed for tidy-up clipping)
@@ -295,35 +300,40 @@ begin
     if lowestIdx < 0 then Exit;
     // nb: don't use the default orientation here ...
     area := Clipper.Core.Area(group.paths[lowestIdx]);
-    if area = 0 then Exit;
+    //if area = 0 then Exit; // this is probably unhelpful (#430)
     group.reversed := (area < 0);
-    if group.reversed then groupDelta := -groupDelta;
+    if group.reversed then fGroupDelta := -fDelta
+    else fGroupDelta := fDelta;
   end else
+  begin
     group.reversed := false;
-
-  fGrpDelta := groupDelta;
-  fAbsGrpDelta := Abs(fGrpDelta);
+    fGroupDelta := Abs(fDelta) * 0.5;
+  end;
+  fAbsGrpDelta := Abs(fGroupDelta);
   fJoinType := group.joinType;
-
-  if fArcTolerance > 0 then
-    arcTol := fArcTolerance else
-    arcTol := Log10(2 + fAbsGrpDelta) * 0.25; // empirically derived
+  fEndType := group.endType;
 
   // calculate a sensible number of steps (for 360 deg for the given offset
   if (group.joinType = jtRound) or (group.endType = etRound) then
   begin
-    // get steps per 180 degrees (see offset_triginometry2.svg)
-    steps := PI / ArcCos(1 - arcTol / fAbsGrpDelta);
-    fStepsPerRad := steps  * InvTwoPi;
+		// arcTol - when fArcTolerance is undefined (0), the amount of
+		// curve imprecision that's allowed is based on the size of the
+		// offset (delta). Obviously very large offsets will almost always
+		// require much less precision. See also offset_triginometry2.svg
+    if fArcTolerance > 0.01 then
+      arcTol := Min(fAbsGrpDelta, fArcTolerance) else
+      arcTol := Log10(2 + fAbsGrpDelta) * 0.25; // empirically derived
+    fStepsPerRad := 0.5 / ArcCos(1 - arcTol / fAbsGrpDelta);
   end;
 
   fOutPaths := nil;
+  isJoined := fEndType in [etPolygon, etJoined];
   for i := 0 to High(group.paths) do
   begin
-    fInPath := StripDuplicates(group.paths[i], IsClosedPaths);
+    fInPath := StripDuplicates(group.paths[i], IsJoined);
     len := Length(fInPath);
-    if (fInPath = nil) or
-      ((group.endType in [etPolygon, etJoined]) and (len < 3)) then Continue;
+    if (len = 0) or ((len < 3) and (fEndType = etPolygon)) then
+      Continue;
 
     fNorms := nil;
     fOutPath := nil;
@@ -332,57 +342,51 @@ begin
 		//if a single vertex then build a circle or a square ...
     if len = 1 then
     begin
+      if fGroupDelta < 1 then Continue;
       if (group.endType = etRound) then
       begin
         r := fAbsGrpDelta;
-				if (group.endType = etPolygon) then
-          r := r * 0.5;
-        with fInPath[0] do
-          fOutPath := Path64(Ellipse(RectD(X-r, Y-r, X+r, Y+r)));
-      end else
-      begin
-        SetLength(fOutPath, 4);
         with fInPath[0] do
         begin
-          fOutPath[0] := Point64(X-fGrpDelta,Y-fGrpDelta);
-          fOutPath[1] := Point64(X+fGrpDelta,Y-fGrpDelta);
-          fOutPath[2] := Point64(X+fGrpDelta,Y+fGrpDelta);
-          fOutPath[3] := Point64(X-fGrpDelta,Y+fGrpDelta);
+          fOutPath := Path64(Ellipse(RectD(X-r, Y-r, X+r, Y+r)));
+{$IFDEF USINGZ}
+          for j := 0 to high(fOutPath) do
+            fOutPath[j].Z := Z;
+{$ENDIF}
         end;
+      end else
+      begin
+        j := Round(fGroupDelta);
+        with fInPath[0] do
+        begin
+          rec := Rect64(X -j, Y -j, X+j, Y+j);
+          fOutPath := rec.AsPath;
+{$IFDEF USINGZ}
+          for j := 0 to high(fOutPath) do
+            fOutPath[j].Z := Z;
+{$ENDIF}
+        end
       end;
       AppendPath(fOutPaths, fOutPath);
       Continue;
     end else
     begin
+      if (len = 2) and (group.endType = etJoined) then
+      begin
+        if fJoinType = jtRound then
+          fEndType := etRound else
+          fEndType := etSquare;
+      end;
+
       BuildNormals;
-      if group.endType = etPolygon then
-        OffsetPolygon
-      else if group.endType = etJoined then
-        OffsetOpenJoined
-      else
-        OffsetOpenPath(group.endType);
+      if fEndType = etPolygon then OffsetPolygon
+      else if fEndType = etJoined then OffsetOpenJoined
+      else OffsetOpenPath;
     end;
 
     if fOutPathLen = 0 then Continue;
     SetLength(fOutPath, fOutPathLen);
     AppendPath(fOutPaths, fOutPath);
-  end;
-
-  if not fMergeGroups then
-  begin
-    // clean up self-intersections ...
-    with TClipper64.Create do
-    try
-      PreserveCollinear := fPreserveCollinear;
-      // the solution should retain the orientation of the input
-      ReverseSolution := fReverseSolution <> group.reversed;
-      AddSubject(fOutPaths);
-      if group.reversed then
-        Execute(ctUnion, frNegative, fOutPaths) else
-        Execute(ctUnion, frPositive, fOutPaths);
-    finally
-      free;
-    end;
   end;
   // finally copy the working 'outPaths' to the solution
   AppendPaths(fSolution, fOutPaths);
@@ -419,25 +423,37 @@ begin
   fOutPath := nil;
   fOutPathLen := 0;
   fInPath := ReversePath(fInPath);
-  BuildNormals;
+
+  // Rebuild normals // BuildNormals;
+  fNorms := ReversePath(fNorms);
+  fNorms := ShiftPath(fNorms, 1);
+  fNorms := NegatePath(fNorms);
+
   OffsetPolygon;
 end;
 //------------------------------------------------------------------------------
 
-procedure TClipperOffset.OffsetOpenPath(endType: TEndType);
+procedure TClipperOffset.OffsetOpenPath;
 var
   i, k, highI: integer;
 begin
   highI := high(fInPath);
 
  // do the line start cap
-  case endType of
+  case fEndType of
     etButt:
       begin
+{$IFDEF USINGZ}
         with fInPath[0] do AddPoint(Point64(
-          X - fNorms[0].X * fGrpDelta,
-          Y - fNorms[0].Y * fGrpDelta));
-        AddPoint(GetPerpendic(fInPath[0], fNorms[0], fGrpDelta));
+          X - fNorms[0].X * fGroupDelta,
+          Y - fNorms[0].Y * fGroupDelta,
+          Z));
+{$ELSE}
+        with fInPath[0] do AddPoint(Point64(
+          X - fNorms[0].X * fGroupDelta,
+          Y - fNorms[0].Y * fGroupDelta));
+{$ENDIF}
+        AddPoint(GetPerpendic(fInPath[0], fNorms[0], fGroupDelta));
       end;
     etRound: DoRound(0,0, PI);
     else DoSquare(0, 0);
@@ -457,13 +473,20 @@ begin
   fNorms[0] := fNorms[highI];
 
  // do the line end cap
-  case endType of
+  case fEndType of
     etButt:
       begin
+{$IFDEF USINGZ}
         with fInPath[highI] do AddPoint(Point64(
-          X - fNorms[highI].X *fGrpDelta,
-          Y - fNorms[highI].Y *fGrpDelta));
-        AddPoint(GetPerpendic(fInPath[highI], fNorms[highI], fGrpDelta));
+          X - fNorms[highI].X *fGroupDelta,
+          Y - fNorms[highI].Y *fGroupDelta,
+          Z));
+{$ELSE}
+        with fInPath[highI] do AddPoint(Point64(
+          X - fNorms[highI].X *fGroupDelta,
+          Y - fNorms[highI].Y *fGroupDelta));
+{$ENDIF}
+        AddPoint(GetPerpendic(fInPath[highI], fNorms[highI], fGroupDelta));
       end;
     etRound: DoRound(highI,highI, PI);
     else DoSquare(highI, highI);
@@ -483,62 +506,67 @@ var
 begin
   fSolution := nil;
   Result := nil;
-  if fInGroups.Count = 0 then Exit;
+  if fGroupList.Count = 0 then Exit;
 
   fMinLenSqrd := 1;
   if abs(delta) < Tolerance then
   begin
     // if delta == 0, just copy paths to Result
-    for i := 0 to fInGroups.Count -1 do
+    for i := 0 to fGroupList.Count -1 do
     begin
-      group := TGroup(UnsafeGet(fInGroups, i));
+      group := TGroup(fGroupList[i]);
       AppendPaths(fSolution, group.paths);
     end;
     Result := fSolution;
     Exit;
   end;
 
+  fDelta := delta;
   // Miter Limit: see offset_triginometry3.svg
   if fMiterLimit > 1 then
     fTmpLimit := 2 / Sqr(fMiterLimit) else
     fTmpLimit := 2.0;
 
   // nb: delta will depend on whether paths are polygons or open
-  for i := 0 to fInGroups.Count -1 do
+  for i := 0 to fGroupList.Count -1 do
   begin
-    group := TGroup(UnsafeGet(fInGroups, i));
-    DoGroupOffset(group, delta);
+    group := TGroup(fGroupList[i]);
+    DoGroupOffset(group);
   end;
 
-  if fMergeGroups and (fInGroups.Count > 0) then
-  begin
-    // clean up self-intersections ...
-    with TClipper64.Create do
-    try
-      PreserveCollinear := fPreserveCollinear;
-      // the solution should retain the orientation of the input
-
-      ReverseSolution :=
-        fReverseSolution <> TGroup(fInGroups[0]).reversed;
-      AddSubject(fSolution);
-      if TGroup(UnsafeGet(fInGroups, 0)).reversed then
-        Execute(ctUnion, frNegative, fSolution) else
-        Execute(ctUnion, frPositive, fSolution);
-    finally
-      free;
-    end;
+  // clean up self-intersections ...
+  with TClipper64.Create do
+  try
+    PreserveCollinear := fPreserveCollinear;
+    // the solution should retain the orientation of the input
+    ReverseSolution :=
+      fReverseSolution <> TGroup(fGroupList[0]).reversed;
+    AddSubject(fSolution);
+    if TGroup(fGroupList[0]).reversed then
+      Execute(ctUnion, frNegative, fSolution) else
+      Execute(ctUnion, frPositive, fSolution);
+  finally
+    free;
   end;
   Result := fSolution;
 end;
 //------------------------------------------------------------------------------
 
+{$IFDEF USINGZ}
+procedure TClipperOffset.AddPoint(x,y: double; z: Int64);
+{$ELSE}
 procedure TClipperOffset.AddPoint(x,y: double);
+{$ENDIF}
 const
   BuffLength = 32;
 var
   pt: TPoint64;
 begin
+{$IFDEF USINGZ}
+  pt := Point64(Round(x),Round(y), z);
+{$ELSE}
   pt := Point64(Round(x),Round(y));
+{$ENDIF}
   if fOutPathLen = length(fOutPath) then
     SetLength(fOutPath, fOutPathLen + BuffLength);
   if (fOutPathLen > 0) and
@@ -550,7 +578,11 @@ end;
 
 procedure TClipperOffset.AddPoint(const pt: TPoint64);
 begin
+{$IFDEF USINGZ}
+  AddPoint(pt.X, pt.Y, pt.Z);
+{$ELSE}
   AddPoint(pt.X, pt.Y);
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -591,6 +623,9 @@ function ReflectPoint(const pt, pivot: TPointD): TPointD;
 begin
   Result.X := pivot.X + (pivot.X - pt.X);
   Result.Y := pivot.Y + (pivot.Y - pt.Y);
+{$IFDEF USINGZ}
+  Result.Z := pt.Z;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -616,28 +651,39 @@ begin
   ptQ := TranslatePoint(ptQ, fAbsGrpDelta * vec.X, fAbsGrpDelta * vec.Y);
 
   // get perpendicular vertices
-  pt1 := TranslatePoint(ptQ, fGrpDelta * vec.Y, fGrpDelta * -vec.X);
-  pt2 := TranslatePoint(ptQ, fGrpDelta * -vec.Y, fGrpDelta * vec.X);
+  pt1 := TranslatePoint(ptQ, fGroupDelta * vec.Y, fGroupDelta * -vec.X);
+  pt2 := TranslatePoint(ptQ, fGroupDelta * -vec.Y, fGroupDelta * vec.X);
 
   // get 2 vertices along one edge offset
-  pt3 := GetPerpendicD(fInPath[k], fNorms[k], fGrpDelta);
+  pt3 := GetPerpendicD(fInPath[k], fNorms[k], fGroupDelta);
 
   if (j = k) then
   begin
-    pt4.X := pt3.X + vec.X * fGrpDelta;
-    pt4.Y := pt3.Y + vec.Y * fGrpDelta;
+    pt4.X := pt3.X + vec.X * fGroupDelta;
+    pt4.Y := pt3.Y + vec.Y * fGroupDelta;
     // get the intersection point
     pt := IntersectPoint(pt1, pt2, pt3, pt4);
+{$IFDEF USINGZ}
+    with ReflectPoint(pt, ptQ) do AddPoint(X, Y, Z);
+    AddPoint(pt.X, pt.Y, pt.Z);
+{$ELSE}
     with ReflectPoint(pt, ptQ) do AddPoint(X, Y);
     AddPoint(pt.X, pt.Y);
+{$ENDIF}
   end else
   begin
-    pt4 := GetPerpendicD(fInPath[j], fNorms[k], fGrpDelta);
+    pt4 := GetPerpendicD(fInPath[j], fNorms[k], fGroupDelta);
     // get the intersection point
     pt := IntersectPoint(pt1, pt2, pt3, pt4);
+{$IFDEF USINGZ}
+    AddPoint(pt.X, pt.Y, ptQ.Z);
+    //get the second intersect point through reflecion
+    with ReflectPoint(pt, ptQ) do AddPoint(X, Y, ptQ.Z);
+{$ELSE}
     AddPoint(pt.X, pt.Y);
     //get the second intersect point through reflecion
     with ReflectPoint(pt, ptQ) do AddPoint(X, Y);
+{$ENDIF}
   end;
 end;
 //------------------------------------------------------------------------------
@@ -647,9 +693,15 @@ var
   q: Double;
 begin
   // see offset_triginometry4.svg
-  q := fGrpDelta / (cosA +1);
+  q := fGroupDelta / (cosA +1);
+{$IFDEF USINGZ}
+  AddPoint(fInPath[j].X + (fNorms[k].X + fNorms[j].X)*q,
+    fInPath[j].Y + (fNorms[k].Y + fNorms[j].Y)*q,
+    fInPath[j].Z);
+{$ELSE}
   AddPoint(fInPath[j].X + (fNorms[k].X + fNorms[j].X)*q,
     fInPath[j].Y + (fNorms[k].Y + fNorms[j].Y)*q);
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -658,29 +710,36 @@ var
   i, steps: Integer;
   stepSin, stepCos: double;
   pt: TPoint64;
-   pt2: TPointD;
+  offDist: TPointD;
 begin
-	// nb: even though angle may be negative this is a convex join
+	// nb: angles may be negative but this will always be a convex join
   pt := fInPath[j];
-  pt2 := PointD(fNorms[k].X * fGrpDelta, fNorms[k].Y * fGrpDelta);
-  if j = k then pt2 := Negate(pt2);
-  steps := Ceil(fStepsPerRad * abs(angle));
+  offDist := ScalePoint(fNorms[k], fGroupDelta);
+  if j = k then  offDist := Negate(offDist);
+{$IFDEF USINGZ}
+  AddPoint(pt.X + offDist.X, pt.Y + offDist.Y, pt.Z);
+{$ELSE}
+  AddPoint(pt.X + offDist.X, pt.Y + offDist.Y);
+{$ENDIF}
+  steps := Max(2, Floor(fStepsPerRad * abs(angle)));
   GetSinCos(angle / steps, stepSin, stepCos);
-  AddPoint(pt.X + pt2.X, pt.Y + pt2.Y);
-  for i := 0 to steps -1 do
+  for i := 2 to steps do
   begin
-    pt2 := PointD(pt2.X * stepCos - stepSin * pt2.Y,
-      pt2.X * stepSin + pt2.Y * stepCos);
-    AddPoint(pt.X + pt2.X, pt.Y + pt2.Y);
+    offDist := PointD(offDist.X * stepCos - stepSin * offDist.Y,
+      offDist.X * stepSin + offDist.Y * stepCos);
+{$IFDEF USINGZ}
+    AddPoint(pt.X + offDist.X, pt.Y + offDist.Y, pt.Z);
+{$ELSE}
+    AddPoint(pt.X + offDist.X, pt.Y + offDist.Y);
+{$ENDIF}
   end;
-  AddPoint(GetPerpendic(pt, fNorms[j], fGrpDelta));
+  AddPoint(GetPerpendic(pt, fNorms[j], fGroupDelta));
 end;
 //------------------------------------------------------------------------------
 
 procedure TClipperOffset.OffsetPoint(j: Integer; var k: integer);
 var
   sinA, cosA: Double;
-  almostNoAngle: Boolean;
 begin
   if PointsEqual(fInPath[j], fInPath[k]) then
   begin
@@ -698,33 +757,38 @@ begin
   if (sinA > 1.0) then sinA := 1.0
   else if (sinA < -1.0) then sinA := -1.0;
 
-  almostNoAngle := ValueAlmostZero(cosA - 1);
-  // when there's almost no angle of deviation or it's concave
-  if almostNoAngle or (sinA * fGrpDelta < 0) then
+
+  if (cosA > 0.99) then // almost straight - less than 8 degrees
   begin
-    //concave
-    AddPoint(GetPerpendic(fInPath[j], fNorms[k], fGrpDelta));
-    // create a simple self-intersection that will be cleaned up later
-    if not almostNoAngle then AddPoint(fInPath[j]);
-    AddPoint(GetPerpendic(fInPath[j], fNorms[j], fGrpDelta));
+    AddPoint(GetPerpendic(fInPath[j], fNorms[k], fGroupDelta));
+    if (cosA < 0.9998) then // greater than 1 degree (#424)
+      AddPoint(GetPerpendic(fInPath[j], fNorms[j], fGroupDelta)); // (#418)
   end
-  else // convex offset
+  else if (cosA > -0.99) and
+    (sinA * fGroupDelta < 0) then // is concave
   begin
-    if (fJoinType = jtRound) then
-      DoRound(j, k, ArcTan2(sinA, cosA))
-    else if (fJoinType = jtMiter) then
-    begin
-			// miter unless the angle is so acute the miter would exceeds ML
-      if (cosA > fTmpLimit -1) then DoMiter(j, k, cosA)
-      else DoSquare(j, k);
-    end
-    // don't bother squaring angles that deviate < ~20 degrees because
-    // squaring will be indistinguishable from mitering and just be a lot slower
-    else if (cosA > 0.9) then
-      DoMiter(j, k, cosA)
-    else
-      DoSquare(j, k);
-  end;
+    AddPoint(GetPerpendic(fInPath[j], fNorms[k], fGroupDelta));
+    // this extra point is the only (simple) way to ensure that
+    // path reversals are fully cleaned with the trailing clipper
+    AddPoint(fInPath[j]); // (#405)
+    AddPoint(GetPerpendic(fInPath[j], fNorms[j], fGroupDelta));
+  end
+  //else convex of one sort or another
+  else if (fJoinType = jtRound) then
+    DoRound(j, k, ArcTan2(sinA, cosA))
+  else if (fJoinType = jtMiter) then
+  begin
+    // miter unless the angle is so acute the miter would exceeds ML
+    if (cosA > fTmpLimit -1) then DoMiter(j, k, cosA)
+    else DoSquare(j, k);
+  end
+  // don't bother squaring angles that deviate < ~20 degrees because
+  // squaring will be indistinguishable from mitering and just be a lot slower
+  else if (cosA > 0.9) then
+    DoMiter(j, k, cosA)
+  else
+    DoSquare(j, k);
+
   k := j;
 end;
 //------------------------------------------------------------------------------

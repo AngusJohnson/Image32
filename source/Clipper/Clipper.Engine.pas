@@ -2,7 +2,7 @@ unit Clipper.Engine;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Date      :  21 January 2023                                                 *
+* Date      :  3 March 2023                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2023                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -240,9 +240,11 @@ type
     procedure SwapPositionsInAEL(e1, e2: PActive);
     function  AddOutPt(e: PActive; const pt: TPoint64): POutPt;
     procedure Split(e: PActive; const currPt: TPoint64);
-    procedure CheckJoinLeft(e: PActive; const currPt: TPoint64);
+    procedure CheckJoinLeft(e: PActive;
+      const pt: TPoint64; checkCurrX: Boolean = false);
       {$IFDEF INLINING} inline; {$ENDIF}
-    procedure CheckJoinRight(e: PActive; const currPt: TPoint64);
+    procedure CheckJoinRight(e: PActive;
+      const pt: TPoint64; checkCurrX: Boolean = false);
       {$IFDEF INLINING} inline; {$ENDIF}
     function  AddLocalMinPoly(e1, e2: PActive;
       const pt: TPoint64; IsNew: Boolean = false): POutPt;
@@ -311,6 +313,7 @@ type
     FChildList  : TList;
     function    GetChildCnt: Integer;
     function    GetIsHole: Boolean;
+    function    GetLevel: Integer;
   protected
     function    GetChild(index: Integer): TPolyPathBase;
     function    AddChild(const path: TPath64): TPolyPathBase; virtual; abstract;
@@ -323,6 +326,7 @@ type
     property    IsHole: Boolean read GetIsHole;
     property    Count: Integer read GetChildCnt;
     property    Child[index: Integer]: TPolyPathBase read GetChild; default;
+    property    Level: Integer read GetLevel;
   end;
 
   TPolyPath64 = class(TPolyPathBase)
@@ -410,7 +414,6 @@ resourcestring
 
 const
   DefaultClipperDScale = 100;
-
 
 //------------------------------------------------------------------------------
 // TLocMinList class
@@ -1887,6 +1890,10 @@ begin
   op2 := startOp;
   while true do
   begin
+    // trim if collinear AND one of
+    //   a duplicate point OR
+    //   not preserving collinear points OR
+    //   is a 180 degree 'spike'
     if (CrossProduct(op2.prev.pt, op2.pt, op2.next.pt) = 0) and
       (PointsEqual(op2.pt,op2.prev.pt) or
       PointsEqual(op2.pt,op2.next.pt) or
@@ -2139,46 +2146,59 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TClipperBase.CheckJoinLeft(e: PActive; const currPt: TPoint64);
+procedure TClipperBase.CheckJoinLeft(e: PActive;
+  const pt: TPoint64; checkCurrX: Boolean);
+var
+  prev: PActive;
 begin
-  if IsOpen(e) or not IsHotEdge(e) or
-    not Assigned(e.prevInAEL) or IsOpen(e.prevInAEL) or
-    not IsHotEdge(e.prevInAEL) or (e.currX <> e.prevInAEL.currX) or
-    (currPt.Y <= e.top.Y) or (currPt.Y <= e.prevInAEL.top.Y) or
-    (e.joinedWith <> jwNone) or
-    (currPt.Y < e.top.Y +2) or (currPt.Y < e.prevInAEL.top.Y +2) or
-    (CrossProduct(e.top, currPt, e.prevInAEL.top) <> 0) then Exit;
+  prev := e.prevInAEL;
+  if IsOpen(e) or not IsHotEdge(e) or not Assigned(prev) or
+    IsOpen(prev) or not IsHotEdge(prev) or
+    (pt.Y < e.top.Y +2) or (pt.Y < prev.top.Y +2) then Exit;
+  if checkCurrX then
+  begin
+    if DistanceFromLineSqrd(pt, prev.bot, prev.top) > 0.25 then Exit
+  end else if (e.currX <> prev.currX) then Exit;
 
-  if (e.outrec.idx = e.prevInAEL.outrec.idx) then
-    AddLocalMaxPoly(e.prevInAEL, e, currPt)
-  else if e.outrec.idx < e.prevInAEL.outrec.idx then
-    JoinOutrecPaths(e, e.prevInAEL)
+  if (CrossProduct(e.top, pt, prev.top) <> 0) then Exit;
+
+  if (e.outrec.idx = prev.outrec.idx) then
+    AddLocalMaxPoly(prev, e, pt)
+  else if e.outrec.idx < prev.outrec.idx then
+    JoinOutrecPaths(e, prev)
   else
-    JoinOutrecPaths(e.prevInAEL, e);
-  e.prevInAEL.joinedWith := jwRight;
+    JoinOutrecPaths(prev, e);
+  prev.joinedWith := jwRight;
   e.joinedWith := jwLeft;
 end;
 //------------------------------------------------------------------------------
 
-procedure TClipperBase.CheckJoinRight(e: PActive; const currPt: TPoint64);
+procedure TClipperBase.CheckJoinRight(e: PActive;
+  const pt: TPoint64; checkCurrX: Boolean);
+var
+  next: PActive;
 begin
-  if IsOpen(e) or not IsHotEdge(e) or
-    not Assigned(e.nextInAEL) or IsOpen(e.nextInAEL) or
-    not IsHotEdge(e.nextInAEL) or (e.currX <> e.nextInAEL.currX) or
-    (currPt.Y <= e.top.Y) or (currPt.Y <= e.nextInAEL.top.Y) or
-    (e.joinedWith <> jwNone) or
-    (currPt.Y < e.top.Y +2) or (currPt.Y < e.nextInAEL.top.Y +2) or
-    (CrossProduct(e.top, currPt, e.nextInAEL.top) <> 0) then Exit;
+  next := e.nextInAEL;
+  if IsOpen(e) or not IsHotEdge(e) or not Assigned(next) or
+    IsOpen(next) or not IsHotEdge(next) or
+    (pt.Y < e.top.Y +2) or (pt.Y < next.top.Y +2) then Exit;
 
-  if e.outrec.idx = e.nextInAEL.outrec.idx then
-    AddLocalMaxPoly(e, e.nextInAEL, currPt)
-  else if e.outrec.idx < e.nextInAEL.outrec.idx then
-    JoinOutrecPaths(e, e.nextInAEL)
+  if (checkCurrX) then
+  begin
+    if DistanceFromLineSqrd(pt, next.bot, next.top) > 0.25 then Exit
+  end
+  else if (e.currX <> next.currX) then Exit;
+
+  if (CrossProduct(e.top, pt, next.top) <> 0) then Exit;
+  if e.outrec.idx = next.outrec.idx then
+    AddLocalMaxPoly(e, next, pt)
+  else if e.outrec.idx < next.outrec.idx then
+    JoinOutrecPaths(e, next)
   else
-    JoinOutrecPaths(e.nextInAEL, e);
+    JoinOutrecPaths(next, e);
 
   e.joinedWith := jwRight;
-  e.nextInAEL.joinedWith := jwLeft;
+  next.joinedWith := jwLeft;
 end;
 //------------------------------------------------------------------------------
 
@@ -2591,7 +2611,7 @@ begin
      DoTopOfScanbeam(Y);
     while PopHorz(e) do DoHorizontal(e);
   end;
-  if Succeeded then ProcessHorzJoins;  
+  if Succeeded then ProcessHorzJoins;
 end;
 //------------------------------------------------------------------------------
 
@@ -2643,21 +2663,23 @@ end;
 
 function PointInOpPolygon(const pt: TPoint64; op: POutPt): TPointInPolygonResult;
 var
-  i, val: Integer;
+  val: Integer;
   op2: POutPt;
-  isAbove: Boolean;
-  d: Double; // used to avoid integer overflow
+  isAbove, startingAbove: Boolean;
+  d: double; // avoids integer overflow
 begin
   result := pipOutside;
   if (op = op.next) or (op.prev = op.next) then Exit;
+
   op2 := op;
   repeat
     if (op.pt.Y <> pt.Y) then break;
     op := op.next;
   until op = op2;
-  if (op = op2) then Exit;
-  // must be above or below to get here
+  if (op.pt.Y = pt.Y) then Exit; // not a proper polygon
+
   isAbove := op.pt.Y < pt.Y;
+  startingAbove := isAbove;
   Result := pipOn;
   val := 0;
   op2 := op.next;
@@ -2677,6 +2699,7 @@ begin
       if (op2.pt.X = pt.X) or ((op2.pt.Y = op2.prev.pt.Y) and
         ((pt.X < op2.prev.pt.X) <> (pt.X < op2.pt.X))) then Exit;
       op2 := op2.next;
+      if (op2 = op) then break;
       Continue;
     end;
 
@@ -2694,41 +2717,27 @@ begin
     isAbove := not isAbove;
     op2 := op2.next;
   end;
+
+  if (isAbove <> startingAbove) then
+  begin
+    d := CrossProduct(op2.prev.pt, op2.pt, pt);
+    if d = 0 then Exit; // ie point on path
+    if (d < 0) = isAbove then val := 1 - val;
+  end;
+
   if val = 0 then
      result := pipOutside else
      result := pipInside;
 end;
 //------------------------------------------------------------------------------
 
-function Path1InsidePath2(const or1, or2: POutRec): Boolean; overload;
+function Path1InsidePath2(const op1, op2: POutPt): Boolean;
 var
   op: POutPt;
   pipResult: TPointInPolygonResult;
   outsideCnt: integer;
 begin
-  // we need to make some accommodation for rounding errors
-  // so we won't jump if the first vertex is found outside
-  outsideCnt := 0;
-  op := or1.pts;
-  repeat
-    pipResult := PointInPolygon(op.pt, or2.path);
-    if pipResult = pipOutside then inc(outsideCnt)
-    else if pipResult = pipInside then dec(outsideCnt);
-    op := op.next;
-  until (op = or1.pts) or (Abs(outsideCnt) = 2);
-  // if path1's location is still equivocal then check its midpoint
-  if Abs(outsideCnt) > 1 then
-    Result := outsideCnt < 0 else
-    Result := PointInPolygon(GetBounds(op).MidPoint, or2.path) = pipInside;
-end;
-//------------------------------------------------------------------------------
-
-function Path1InsidePath2(const op1, op2: POutPt): Boolean; overload;
-var
-  op: POutPt;
-  pipResult: TPointInPolygonResult;
-  outsideCnt: integer;
-begin
+  // precondition - the twi paths or1 & pr2 don't intersect
   // we need to make some accommodation for rounding errors
   // so we won't jump if the first vertex is found outside
   outsideCnt := 0;
@@ -2836,7 +2845,6 @@ var
   i, j: integer;
   currY: Int64;
   hs1, hs2: PHorzSegment;
-  join: PHorzJoin;
 begin
   j := 0;
   for i := 0 to FHorzSegList.Count -1 do
@@ -2875,9 +2883,9 @@ begin
         while (hs2.leftOp.prev.pt.Y = currY) and
           (hs2.leftOp.prev.pt.X <= hs1.leftOp.pt.X) do
             hs2.leftOp := hs2.leftOp.prev;
-        join := PHorzJoin(FHorzJoinList.Add(
+        FHorzJoinList.Add(
           DuplicateOp(hs1.leftOp, true),
-          DuplicateOp(hs2.leftOp, false)));
+          DuplicateOp(hs2.leftOp, false));
       end else
       begin
         while (hs1.leftOp.prev.pt.Y = currY) and
@@ -2886,9 +2894,9 @@ begin
         while (hs2.leftOp.next.pt.Y = currY) and
           (hs2.leftOp.next.pt.X <= hs1.leftOp.pt.X) do
             hs2.leftOp := hs2.leftOp.next;
-        join := PHorzJoin(FHorzJoinList.Add(
+        FHorzJoinList.Add(
           DuplicateOp(hs2.leftOp, true),
-          DuplicateOp(hs1.leftOp, false)));
+          DuplicateOp(hs1.leftOp, false));
       end;
     end;
   end;
@@ -2926,6 +2934,7 @@ begin
         or1.pts := op1;
         or1.pts.outrec := or1;
       end;
+
       if FUsingPolytree then
       begin
         if Path1InsidePath2(or2.pts, or1.pts) then
@@ -2999,8 +3008,8 @@ begin
         ip.Y := topY else
         ip.Y := fBotY;
       if (absDx1 < absDx2)  then
-        ip.X := TopX(e1, topY) else
-        ip.X := TopX(e2, topY);
+        ip.X := TopX(e1, ip.Y) else
+        ip.X := TopX(e2, ip.Y);
     end;
   end;
   new(node);
@@ -3160,8 +3169,8 @@ begin
       SwapPositionsInAEL(active1, active2);
       active1.currX := pt.X;
       active2.currX := pt.X;
-      CheckJoinLeft(active2, pt);
-      CheckJoinRight(active1, pt);
+      CheckJoinLeft(active2, pt, true);
+      CheckJoinRight(active1, pt, true);
     end;
     inc(nodeI);
   end;
@@ -3618,7 +3627,7 @@ begin
 
   while Assigned(outrec.owner) do
     if (outrec.owner.bounds.Contains(outrec.bounds) and
-      Path1InsidePath2(outrec, outrec.owner)) then
+      Path1InsidePath2(outrec.pts, outrec.owner.pts)) then
         break // found - owner contain outrec!
     else
       outrec.owner := outrec.owner.owner;
@@ -3645,7 +3654,7 @@ begin
       if Assigned(split) and (split <> outrec) and
         (split <> outrec.owner) and CheckBounds(split) and
         (split.bounds.Contains(outrec.bounds) and
-          Path1InsidePath2(outrec, split)) then
+          Path1InsidePath2(outrec.pts, split.pts)) then
       begin
         RecursiveCheckOwners(split, polytree);
         outrec.owner := split; //found in split
@@ -3870,18 +3879,25 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function  TPolyPathBase.GetIsHole: Boolean;
+function TPolyPathBase.GetLevel: Integer;
 var
   pp: TPolyPathBase;
 begin
-  pp := FParent;
-  result := assigned(pp);
-  if not Result then Exit;
-  while assigned(pp) do
+  Result := 0;
+  pp := Parent;
+  while Assigned(pp) do
   begin
-    result := not result;
-    pp := pp.FParent;
+    inc(Result);
+    pp := pp.Parent;
   end;
+end;
+//------------------------------------------------------------------------------
+
+function  TPolyPathBase.GetIsHole: Boolean;
+begin
+  if not Assigned(Parent) then
+    Result := false else
+    Result := not Odd(GetLevel);
 end;
 //------------------------------------------------------------------------------
 
