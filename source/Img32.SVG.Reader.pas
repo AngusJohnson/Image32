@@ -2,8 +2,8 @@ unit Img32.SVG.Reader;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.3                                                             *
-* Date      :  27 September 2022                                               *
+* Version   :  4.4                                                             *
+* Date      :  14 March 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -318,6 +318,7 @@ type
   protected
     text      : UTF8String;
     procedure GetPaths(const drawDat: TDrawData); override;
+    function  GetBounds: TRectD; override;
   public
     constructor Create(parent: TSvgElement; svgEl: TSvgTreeEl); override;
   end;
@@ -1373,7 +1374,7 @@ end;
 
 function TFilterElement.GetRelFracLimit: double;
 begin
-  //always assume fractional values below 2.5 are relative
+  // assume fractional values below 2.5 are always relative
   Result := 2.5;
 end;
 //------------------------------------------------------------------------------
@@ -2070,6 +2071,7 @@ begin
 
   if not (filled or stroked) or not hasPaths then Exit;
   drawDat.bounds := GetBoundsD(drawPathsF);
+  if drawDat.bounds.IsEmpty then drawDat.bounds := GetBounds;
 
   img := image;
   clipRec2 := NullRect;
@@ -2781,6 +2783,7 @@ end;
 procedure TTextElement.GetPaths(const drawDat: TDrawData);
 var
   i         : integer;
+  dy        : double;
   el        : TSvgElement;
   di        : TDrawData;
   topTextEl : TTextElement;
@@ -2791,6 +2794,7 @@ begin
 
   if Self is TTSpanElement then
   begin
+    // nb: don't use GetTopTextElement here
     el := fParent;
     while (el is TTSpanElement) do
       el := el.fParent;
@@ -2819,6 +2823,23 @@ begin
       currentPt.Y := elRectWH.top.rawVal else
       currentPt.Y := 0;
     startX := currentPt.X;
+    topTextEl := nil;
+end;
+
+  if (di.fontInfo.textLength > 0) and
+    Assigned(fReader.fFontCache) then
+  begin
+    with fReader.fFontCache.FontReader.FontInfo do
+      dy := descent/ (ascent + descent);
+    if not Assigned(topTextEl) then
+      topTextEl := GetTopTextElement;
+    with fDrawData.bounds do
+    begin
+      Left := topTextEl.currentPt.X;
+      Bottom := topTextEl.currentPt.Y + di.fontInfo.size * dy;
+      Right := Left + di.fontInfo.textLength;
+      Top  := Bottom - di.fontInfo.size;
+    end;
   end;
 
   for i := 0 to fChilds.Count -1 do
@@ -2908,6 +2929,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function IsBlankText(const text: UnicodeString): Boolean;
+var
+  i: integer;
+begin
+  Result := false;
+  for i := 1 to Length(text) do
+    if (text[i] > #32) and (text[i] <> #160) then Exit;
+  Result := true;
+end;
+//------------------------------------------------------------------------------
+
 procedure TSubtextElement.GetPaths(const drawDat: TDrawData);
 var
   el : TSvgElement;
@@ -2941,7 +2973,13 @@ begin
   {$ENDIF}
   s := FixSpaces(s);
 
-  drawPathsC := fReader.fFontCache.GetTextOutline(0, 0, s, tmpX);
+ if IsBlankText(s) then
+  begin
+    drawPathsC := nil;
+    tmpX := drawDat.fontInfo.textLength;
+  end else
+    drawPathsC := fReader.fFontCache.GetTextOutline(0, 0, s, tmpX);
+
   //by not changing the fontCache.FontHeight, the quality of
   //small font render improves very significantly (though of course
   //this requires additional glyph scaling and offsetting).
@@ -2953,6 +2991,8 @@ begin
     X := X + tmpX * scale;
   end;
 
+  if not Assigned(drawPathsC) then Exit;
+
   with drawDat.fontInfo do
     if baseShift.rawVal = 0 then
       bs := 0 else
@@ -2963,6 +3003,21 @@ begin
   MatrixTranslate(mat, offsetX, topTextEl.currentPt.Y - bs);
   MatrixApply(mat, drawPathsC);
   drawPathsF := drawPathsC;
+end;
+//------------------------------------------------------------------------------
+
+function  TSubtextElement.GetBounds: TRectD;
+var
+  textEl: TTextElement;
+begin
+  textEl := TTextElement(fParent);
+{$IFDEF UNICODE}
+  if IsBlankText(UTF8ToUnicodeString(text)) then
+{$ELSE}
+  if IsBlankText(Utf8Decode(text)) then
+{$ENDIF}
+    Result := textEl.fDrawData.bounds else
+    Result := inherited GetBounds;
 end;
 
 //------------------------------------------------------------------------------
