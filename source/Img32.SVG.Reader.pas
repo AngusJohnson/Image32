@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  14 March 2023                                                   *
+* Date      :  16 March 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -721,7 +721,7 @@ end;
 
 function MergeColorAndOpacity(color: TColor32; opacity: double): TColor32;
 begin
-  if (opacity < 0) or (opacity >= 1.0) then Result := color
+  if (opacity < 0) or (opacity >= 1.0) then Result := color or $FF000000
   else if opacity = 0 then Result := clNone32
   else Result := (color and $FFFFFF) + Round(opacity * 255) shl 24;
 end;
@@ -2851,7 +2851,7 @@ end;
 procedure TTextElement.ResetTmpPt;
 begin
   startX    := 0;
-  currentPt := InvalidPointD;
+  currentPt := InvalidPointD;//NullPointD;
 end;
 //------------------------------------------------------------------------------
 
@@ -2864,6 +2864,9 @@ begin
     UpdateDrawInfo(drawDat, self);
     //get child paths
     GetPaths(drawDat);
+
+    if not IsValid(currentPt) then //Exit;
+      currentPt := NullPointD;
 
     case drawDat.FontInfo.align of
       staCenter:
@@ -3038,14 +3041,25 @@ end;
 // TTextPathElement
 //------------------------------------------------------------------------------
 
+function GetPathDistance(const path: TPathD): double;
+var
+  i: integer;
+begin
+  Result := 0;
+  for i := 1 to High(path) do
+    Result := Result + Distance(path[i-1], path[i]);
+end;
+//------------------------------------------------------------------------------
+
 procedure TTextPathElement.GetPaths(const drawDat: TDrawData);
 var
   parentTextEl, topTextEl: TTextElement;
   el: TSvgElement;
   isFirst: Boolean;
   s: UnicodeString;
-  i, len, charsThatFit: integer;
+  i, dy, len, charsThatFit: integer;
   d, fontScale, spacing: double;
+  pathDist: double;
   utf8: UTF8String;
   mat: TMatrixD;
   tmpPath: TPathD;
@@ -3114,9 +3128,25 @@ begin
   fontScale := drawDat.FontInfo.size/fReader.fFontCache.FontHeight;
   spacing := spacing /fontScale;
 
+  if topTextEl.offset.Y.IsValid then
+    dy := Round(topTextEl.offset.Y.rawVal * fontScale) else
+    dy := 0;
+
   //adjust glyph spacing when fFontInfo.textLength is assigned.
   len := Length(s);
-  if (len > 1) and (drawDat.FontInfo.textLength > 0) then
+
+  if (len > 1) and (drawDat.FontInfo.textLength = 0) and
+    (TPathElement(el).fsvgPaths.count = 1) then
+      with TPathElement(el) do
+      begin
+        Flatten(0, fontScale, tmpPath, isClosed);
+        pathDist := GetPathDistance(tmpPath);
+        d := fReader.fFontCache.GetTextWidth(s);
+        spacing := (pathDist/fontScale) - d;
+        spacing := spacing / (len -1);
+      end
+
+  else if (len > 1) and (drawDat.FontInfo.textLength > 0) then
   begin
     d := fReader.fFontCache.GetTextWidth(s);
     spacing := (drawDat.FontInfo.textLength/fontScale) - d;
@@ -3135,7 +3165,7 @@ begin
       MatrixApply(mat, tmpPath);
       AppendPath(self.drawPathsC,
         GetTextOutlineOnPath(s, tmpPath, fReader.fFontCache,
-          taLeft, 0, spacing, charsThatFit));
+          taLeft, dy, spacing, charsThatFit));
       if charsThatFit = Length(s) then Break;
       Delete(s, 1, charsThatFit);
     end;

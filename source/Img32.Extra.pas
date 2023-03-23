@@ -120,15 +120,15 @@ procedure GridBackground(img: TImage32; majorInterval, minorInterval: integer;
   fillColor: TColor32 = clWhite32;
   majColor: TColor32 = $30000000; minColor: TColor32 = $20000000);
 
-procedure ReplaceExactColor(img: TImage32; oldColor, newColor: TColor32);
+procedure SwapColor(img: TImage32; oldColor, newColor: TColor32);
 
-//EraseColor: Removes the specified color from the image, even from
+//RemoveColor: Removes the specified color from the image, even from
 //pixels that are a blend of colors including the specified color.<br>
 //see https://stackoverflow.com/questions/9280902/
-procedure EraseColor(img: TImage32; color: TColor32);
+procedure RemoveColor(img: TImage32; color: TColor32);
 
 //FilterOnColor: Removes everything not nearly matching 'color'
-//This uses an algorithm that's very similar to the one in EraseColor.
+//This uses an algorithm that's very similar to the one in RemoveColor.
 procedure FilterOnColor(img: TImage32; color: TColor32);
 
 //RedEyeRemove: Removes 'red eye' from flash photo images.
@@ -792,7 +792,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure ReplaceExactColor(img: TImage32; oldColor, newColor: TColor32);
+procedure SwapColor(img: TImage32; oldColor, newColor: TColor32);
 var
   color: PColor32;
   i: Integer;
@@ -806,7 +806,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure EraseColor(img: TImage32; color: TColor32);
+procedure RemoveColor(img: TImage32; color: TColor32);
 var
   fg: TARGB absolute color;
   bg: PARGB;
@@ -820,34 +820,28 @@ begin
     if bg.A > 0 then
     begin
       // red
-      if (bg.R > fg.R) then
-        Q := DivTable[bg.R - fg.R, not fg.R]
-      else if (bg.R < fg.R) then
-        Q := DivTable[fg.R - bg.R, fg.R]
-      else
-        Q := 0;
-
+      if (bg.R > fg.R) then Q := bg.R - fg.R
+      else if (bg.R < fg.R) then Q := DivTable[fg.R - bg.R, fg.R]
+      else Q := 0;
       // green
-      if (bg.G > fg.G) then
-        Q := Max(Q, DivTable[bg.G - fg.G, not fg.G])
-      else if (bg.G < fg.G) then
-        Q := Max(Q, DivTable[fg.G - bg.G, fg.G]);
-
+      if (bg.G > fg.G) then Q := Max(Q, bg.G - fg.G)
+      else if (bg.G < fg.G) then Q := Max(Q, DivTable[fg.G - bg.G, fg.G]);
       // blue
-      if (bg.B > fg.B) then
-        Q := Max(Q, DivTable[bg.B - fg.B, not fg.B])
-      else if (bg.B < fg.B) then
-        Q := Max(Q, DivTable[fg.B - bg.B, fg.B]);
+      if (bg.B > fg.B) then Q := Max(Q, bg.B - fg.B)
+      else if (bg.B < fg.B) then Q := Max(Q, DivTable[fg.B - bg.B, fg.B]);
 
-      // Q = 255 - (erase frac * 255)
-      if (Q > 0) then
+      // weight Q toward either fully opaque or fully translucent
+      Q := Sigmoid[Q];
+
+      if (Q = 0) then
+        bg.Color := clNone32
+      else if (Q < 255) then
       begin
         bg.A := MulTable[bg.A, Q];
-        bg.R := DivTable[bg.R - MulTable[fg.R, not Q], Q];
-        bg.G := DivTable[bg.G - MulTable[fg.G, not Q], Q];
-        bg.B := DivTable[bg.B - MulTable[fg.B, not Q], Q];
-      end else
-        bg.Color := clNone32;
+        bg.R := DivTable[bg.R - MulTable[not Q, fg.R], Q];
+        bg.G := DivTable[bg.G - MulTable[not Q, fg.G], Q];
+        bg.B := DivTable[bg.B - MulTable[not Q, fg.B], Q];
+      end;
     end;
     inc(bg);
   end;
@@ -869,7 +863,7 @@ begin
     begin
       // red
       if (bg.R > fg.R) then
-        Q := DivTable[bg.R - fg.R, not fg.R]
+        Q := bg.R - fg.R
       else if (bg.R < fg.R) then
         Q := DivTable[fg.R - bg.R, fg.R]
       else
@@ -877,15 +871,18 @@ begin
 
       // green
       if (bg.G > fg.G) then
-        Q := Max(Q, DivTable[bg.G - fg.G, not fg.G])
+        Q := Max(Q, bg.G - fg.G)
       else if (bg.G < fg.G) then
         Q := Max(Q, DivTable[fg.G - bg.G, fg.G]);
 
       // blue
       if (bg.B > fg.B) then
-        Q := Max(Q, DivTable[bg.B - fg.B, not fg.B])
+        Q := Max(Q, bg.B - fg.B)
       else if (bg.B < fg.B) then
         Q := Max(Q, DivTable[fg.B - bg.B, fg.B]);
+
+      // weight Q toward either fully opaque or fully translucent
+      Q := Sigmoid[Q];
 
       Q := MulTable[bg.A, not Q];
       bg.Color := color;
@@ -930,7 +927,7 @@ begin
     DrawPolygon(mask, path, frNonZero, radGrad);
     cutout.CopyBlend(mask, mask.Bounds, cutout.Bounds, BlendMask);
     // now remove red from the cutout
-    EraseColor(cutout, clRed32);
+    RemoveColor(cutout, clRed32);
     // finally replace the cutout ...
     img.CopyBlend(cutout, cutout.Bounds, cutoutRec, BlendToOpaque);
   finally

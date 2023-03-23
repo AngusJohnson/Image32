@@ -549,6 +549,9 @@ var
   //DivTable[a,b] = a * 255/b (for a &lt;= b)
   DivTable: array [Byte,Byte] of Byte;
 
+  //Sigmoid: weight byte values towards each end
+  Sigmoid: array[Byte] of Byte;
+
   dpiAware1   : integer = 1;
   DpiAwareOne : double  = 1.0;
 
@@ -3424,6 +3427,7 @@ begin
   for j := 0 to 255 do DivTable[0, j] := 0;
   for i := 0 to 255 do DivTable[i, 0] := 0;
   for i := 1 to 255 do
+  begin
     for j := 1 to 255 do
     begin
       MulTable[i, j] := Round(i * j * div255);
@@ -3431,6 +3435,13 @@ begin
         DivTable[i, j] := 255 else
         DivTable[i, j] := Round(i * $FF / j);
     end;
+  end;
+
+  sigmoid[128] := 128;
+  for i := 1 to 127 do
+    sigmoid[128+i] := 128 + Round(127 * sin(angle90 * i/127));
+  for i := 0 to 127 do
+    sigmoid[i] := 255- sigmoid[255-i];
 end;
 //------------------------------------------------------------------------------
 
