@@ -3,7 +3,7 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  12 March 2023                                                   *
+* Date      :  24 March 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 *                                                                              *
@@ -1926,7 +1926,6 @@ var
   iLo,iHi : cardinal;
   growRec   : TGrowRec;
   absDelta  : double;
-  almostNoAngle: Boolean;
 begin
   Result := nil;
   if not Assigned(path) then exit;
@@ -1999,18 +1998,26 @@ begin
 
     growRec.aSin := CrossProduct(norms[prevI], norms[i]);
     growRec.aCos := DotProduct(norms[prevI], norms[i]);
+    if (growRec.aSin > 1.0) then growRec.aSin := 1.0
+    else if (growRec.aSin < -1.0) then growRec.aSin := -1.0;
+
     growRec.pt := path[i];
     growRec.norm1 := norms[prevI];
     growRec.norm2 := norms[i];
 
-    almostNoAngle := ValueAlmostZero(growRec.aCos -1);
-    if almostNoAngle or ((growRec.aSin * delta < 0)) then
+    if (growRec.aCos > 0.99) then // almost straight - less than 8 degrees
+    begin
+      AddPoint(parallelOffsets[prevI*2+1]);
+      if (growRec.aCos < 0.9998) then // greater than 1 degree
+        AddPoint(parallelOffsets[i*2]);
+    end
+    else if (growRec.aCos > -0.99) and (growRec.aSin * delta < 0) then
     begin //ie is concave
       AddPoint(parallelOffsets[prevI*2+1]);
+      AddPoint(path[i]);
       AddPoint(parallelOffsets[i*2]);
     end
-    else if (joinStyle = jsRound) and
-      (Abs(growRec.aSin) > 0.08) then //only round if angle > ~5 deg
+    else if (joinStyle = jsRound) then
     begin
       AppendPath(DoRound(growRec));
     end
@@ -2026,8 +2033,7 @@ begin
     else if (growRec.aCos > 0.9) then
       DoMiter(growRec)
     else
-      DoSquare(growRec,
-        parallelOffsets[prevI*2], parallelOffsets[prevI*2 +1]);
+      DoSquare(growRec, parallelOffsets[prevI*2], parallelOffsets[prevI*2 +1]);
 
     prevI := i;
   end;
@@ -2364,20 +2370,21 @@ function GrowOpenLine(const line: TPathD; width: double;
 var
   len, x,y: integer;
   segLen, halfWidth: double;
-  normals, lineL, lineR, arc: TPathD;
+  normals, line2, lineL, lineR, arc: TPathD;
   invNorm: TPointD;
   growRec: TGrowRec;
 begin
   Result := nil;
-  len := length(line);
+  line2 := StripNearDuplicates(line, 0.5, false);
+  len := length(line2);
   if len = 0 then Exit;
   if width < MinStrokeWidth then
     width := MinStrokeWidth;
   halfWidth := width * 0.5;
   if len = 1 then
   begin
-    x := Round(line[0].X);
-    y := Round(line[0].Y);
+    x := Round(line2[0].X);
+    y := Round(line2[0].Y);
     SetLength(result, 1);
     result := Ellipse(RectD(x -halfWidth, y -halfWidth,
       x +halfWidth, y +halfWidth));
@@ -2399,11 +2406,11 @@ begin
       joinStyle := jsSquare;
   end;
 
-  normals := GetNormals(line);
+  normals := GetNormals(line2);
   if endStyle = esRound then
   begin
     //grow the line's left side of the line => line1
-    lineL := Grow(line, normals,
+    lineL := Grow(line2, normals,
       halfWidth, joinStyle, miterLimOrRndScale, true);
     //build the rounding at the start => result
     invNorm.X := -normals[0].X;
@@ -2415,7 +2422,7 @@ begin
     growRec.aSin := invNorm.X * normals[0].Y - invNorm.Y * normals[0].X;
     growRec.aCos := invNorm.X * normals[0].X + invNorm.Y * normals[0].Y;
     growRec.Radius := halfWidth;
-    growRec.pt := line[0];
+    growRec.pt := line2[0];
     growRec.norm1 := invNorm;
     growRec.norm2 := normals[0];
     Result := DoRound(growRec);
@@ -2426,19 +2433,19 @@ begin
     invNorm.X := -normals[0].X; invNorm.Y := -normals[0].Y;
     growRec.aSin := invNorm.X * normals[0].Y - invNorm.Y * normals[0].X;
     growRec.aCos := invNorm.X * normals[0].X + invNorm.Y * normals[0].Y;
-    growRec.pt := line[High(line)];
+    growRec.pt := line2[High(line2)];
     growRec.norm1 := invNorm;
     growRec.norm2 := normals[0];
     arc := DoRound(growRec);
     //grow the line's right side of the line
-    lineR := Grow(ReversePath(line), normals,
+    lineR := Grow(ReversePath(line2), normals,
       halfWidth, joinStyle, miterLimOrRndScale, true);
     //join arc and line2 into result
     AppendPath(Result, arc);
     AppendPath(Result, lineR);
   end else
   begin
-    lineL := Copy(line, 0, len);
+    lineL := Copy(line2, 0, len);
     if endStyle = esSquare then
     begin
       // esSquare => extends both line ends by 1/2 lineWidth
@@ -2474,19 +2481,20 @@ var
   rec: TRectD;
   skipHole: Boolean;
 begin
-  rec := GetBoundsD(line);
+  line2 := StripNearDuplicates(line, 0.5, true);
+  rec := GetBoundsD(line2);
   skipHole := (rec.Width <= width) or (rec.Height <= width);
   if skipHole then
   begin
     SetLength(Result, 1);
-    norms := GetNormals(line);
-    Result[0] := Grow(line, norms, width/2, joinStyle, miterLimOrRndScale);
+    norms := GetNormals(line2);
+    Result[0] := Grow(line2, norms, width/2, joinStyle, miterLimOrRndScale);
   end else
   begin
     SetLength(Result, 2);
-    norms := GetNormals(line);
-    Result[0] := Grow(line, norms, width/2, joinStyle, miterLimOrRndScale);
-    line2 := ReversePath(line);
+    norms := GetNormals(line2);
+    Result[0] := Grow(line2, norms, width/2, joinStyle, miterLimOrRndScale);
+    line2 := ReversePath(line2);
     norms := ReverseNormals(norms);
     Result[1] := Grow(line2, norms, width/2, joinStyle, miterLimOrRndScale);
   end;

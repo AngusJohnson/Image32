@@ -362,6 +362,7 @@ begin
       AddName('Class');
       AddName('Clip-path');
       AddName('Clippath');
+      AddName('collapse');
       AddName('Color');
       AddName('CurrentColor');
       AddName('Cx');
@@ -415,12 +416,14 @@ begin
       AddName('GradientUnits');
       AddName('Gramma');
       AddName('Height');
+      AddName('hidden');
       AddName('Href');
       AddName('Id');
       AddName('In');
       AddName('In2');
       AddName('Intercept');
       AddName('Italic');
+      AddName('Justify');
       AddName('kernelUnitLength');
       AddName('K1');
       AddName('K2');
@@ -525,6 +528,7 @@ begin
       AddName('Values');
       AddName('Viewbox');
       AddName('Visibility');
+      AddName('visible');
       AddName('Width');
       AddName('X');
       AddName('X1');
@@ -537,6 +541,7 @@ begin
       AddName('Z');
     end;
 
+    //check for hash collisions
     sl.Duplicates := dupError;
     sl.Sorted := true;
     for i := 0 to slNames.Count -1 do
@@ -544,10 +549,9 @@ begin
         sl.Add(Format('%8.8x;',[GetHashedNameCaseSens(slNames[i])]))
       else
         sl.Add(Format('%8.8x;',[GetHashedName(slNames[i])]));
-
-    //Yay! No hash collisions :)
-
+    //Yay! No collisions :)
     sl.Clear;
+
     for i := 0 to slNames.Count -1 do
       if Assigned(slNames.Objects[i]) then
       begin

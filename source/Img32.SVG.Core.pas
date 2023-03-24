@@ -93,7 +93,7 @@ type
 
   TSvgItalicSyle  = (sfsUndefined, sfsNone, sfsItalic);
   TFontDecoration = (fdUndefined, fdNone, fdUnderline, fdStrikeThrough);
-  TSvgTextAlign = (staUndefined, staLeft, staCenter, staRight);
+  TSvgTextAlign = (staUndefined, staLeft, staCenter, staRight, staJustify);
 
   TSVGFontInfo = record
     family      : TTtfFontFamily;

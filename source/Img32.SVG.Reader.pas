@@ -558,7 +558,7 @@ const
     fillRule: frNonZero; fillEl: '';
     strokeColor: clInvalid; strokeOpacity: InvalidD;
     strokeWidth: (rawVal: InvalidD; unitType: utNumber);
-    strokeCap: esPolygon; strokeJoin: jsAuto; strokeMitLim: 0.0; strokeEl : '';
+    strokeCap: esPolygon; strokeJoin: jsMiter; strokeMitLim: 0.0; strokeEl : '';
     dashArray: nil; dashOffset: 0;
     fontInfo: (family: ttfUnknown; size: 0; spacing: 0.0;
     textLength: 0; italic: sfsUndefined; weight: -1; align: staUndefined;
@@ -3135,7 +3135,7 @@ begin
   //adjust glyph spacing when fFontInfo.textLength is assigned.
   len := Length(s);
 
-  if (len > 1) and (drawDat.FontInfo.textLength = 0) and
+  if (len > 1) and (drawDat.FontInfo.align = staJustify) and
     (TPathElement(el).fsvgPaths.count = 1) then
       with TPathElement(el) do
       begin
@@ -3765,8 +3765,9 @@ procedure TextAlign_Attrib(aOwnerEl: TSvgElement; const value: UTF8String);
 begin
   with aOwnerEl.fDrawData.FontInfo do
     case GetHash(value) of
-      hMiddle : align := staCenter;
-      hEnd    : align := staRight;
+      hMiddle   : align := staCenter;
+      hEnd      : align := staRight;
+      hJustify  : align := staJustify;
       else align := staLeft;
     end;
 end;
