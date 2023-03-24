@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  16 March 2023                                                   *
+* Date      :  25 March 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -555,7 +555,7 @@ const
   emptyDrawInfo: TDrawData =
     (currentColor: clInvalid;
     fillColor: clInvalid; fillOpacity: InvalidD;
-    fillRule: frNonZero; fillEl: '';
+    fillRule: frNegative; fillEl: '';
     strokeColor: clInvalid; strokeOpacity: InvalidD;
     strokeWidth: (rawVal: InvalidD; unitType: utNumber);
     strokeCap: esPolygon; strokeJoin: jsMiter; strokeMitLim: 0.0; strokeEl : '';
@@ -628,7 +628,8 @@ begin
   begin
     if currentColor <> clInvalid then
       thisElement.fReader.currentColor := currentColor;
-    drawDat.fillRule := fillRule;
+    if fillRule <> frNegative then
+      drawDat.fillRule := fillRule;
     if (fillColor = clCurrent) then
       drawDat.fillColor := thisElement.fReader.currentColor
     else if (fillColor <> clInvalid) then
@@ -825,6 +826,8 @@ begin
   if fChilds.Count = 0 then Exit;
 
   UpdateDrawInfo(drawDat, self);
+  if drawDat.fillRule = frNegative then
+    drawDat.fillRule := frNonZero;
 
   maskEl := FindRefElement(drawDat.maskElRef);
   clipEl := FindRefElement(drawDat.clipElRef);
@@ -2269,6 +2272,8 @@ begin
   if not assigned(drawPathsF) then Exit;
   if drawDat.fillColor = clCurrent then
     drawDat.fillColor := fReader.currentColor;
+  if drawDat.fillRule = frNegative then
+    drawDat.fillRule := frNonZero;
 
   fillPaths := MatrixApply(drawPathsF, drawDat.matrix);
   if (drawDat.fillEl <> '') then

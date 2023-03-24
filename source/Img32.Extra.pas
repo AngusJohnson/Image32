@@ -3,7 +3,7 @@ unit Img32.Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  21 February 2023                                                *
+* Date      :  25 March 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 * Purpose   :  Miscellaneous routines that don't belong in other modules.      *
@@ -2478,7 +2478,7 @@ end;
 procedure BoxBlurH(var src, dst: TArrayOfColor32; w,h, stdDev: integer);
 var
   i,j, ti, li, ri, re, ovr: integer;
-  fv, lv, val: TWeightedColor;
+  fv, val: TWeightedColor;
   rc: TColor32;
 begin
   ovr := Max(0, stdDev - w);
@@ -2490,14 +2490,15 @@ begin
     re := ti +w -1; // idx of last pixel in row
     rc := src[re];  // color of last pixel in row
     fv.Reset;
-    lv.Reset;
+    //lv.Reset;
     val.Reset;
     fv.Add(src[ti], 1);
-    lv.Add(rc, 1);
+    //lv.Add(clNone32, 1);
     val.Add(src[ti], stdDev +1);
     for j := 0 to stdDev -1 - ovr do
       val.Add(src[ti + j]);
-    if ovr > 0 then val.Add(rc, ovr);
+    if ovr > 0 then
+      val.Add(rc, ovr);
     for j := 0 to stdDev do
     begin
       if ri > re then
@@ -2521,7 +2522,7 @@ begin
     while ti <= re do
     begin
       if ti > re then Break;
-      val.Add(lv);
+      val.Add(clNone32);
       val.Subtract(src[li]); inc(li);
       dst[ti] := val.Color;
       inc(ti);
@@ -2533,7 +2534,7 @@ end;
 procedure BoxBlurV(var src, dst: TArrayOfColor32; w, h, stdDev: integer);
 var
   i,j, ti, li, ri, re, ovr: integer;
-  fv, lv, val: TWeightedColor;
+  fv, val: TWeightedColor;
   rc: TColor32;
 begin
   ovr := Max(0, stdDev - h);
@@ -2543,12 +2544,10 @@ begin
     li := ti;
     ri := ti + stdDev * w;
     fv.Reset;
-    lv.Reset;
     val.Reset;
     re := ti +w *(h-1); // idx of last pixel in column
     rc := src[re];      // color of last pixel in column
     fv.Add(src[ti]);
-    lv.Add(rc, 1);
     val.Add(src[ti], stdDev +1);
     for j := 0 to stdDev -1 -ovr do
       val.Add(src[ti + j *w]);
@@ -2575,7 +2574,7 @@ begin
     end;
     while ti <= re do
     begin
-      val.Add(lv);
+      val.Add(clNone32);
       val.Subtract(src[li]); inc(li, w);
       dst[ti] := val.Color;
       inc(ti, w);
