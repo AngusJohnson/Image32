@@ -1,52 +1,21 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
 
   <title>Img32.CQ</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
   <link rel="stylesheet" href="../../../Styles/Default.css" type="text/css">
-
-    
-  <script type="text/javascript" src="../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../Menu/menu.js"></script><script type="text/javascript" src="../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../_Body.htm" class="Banner"><img src="../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../_Body.htm">Index</a><span class="active">Img32.CQ</span>
+  </div><br><br>
+
   <h1>Img32.CQ</h1>
-
-
-  <p class="Body">This unit provides several functions that reduce the number of colors in an image.<br><br> Color reduction is often needed for image segmentation, where images are partitioned into multiple regions or objects, usually by grouping adjacent pixels with similar colors or intensities. Vectorization (eg when converting raster images to SVG format) is one example of this process.<br><br> Historically image color reduction was essential for a couple of reasons: 1: because most displays had limited color resolutions, commonly 256 colors; 2. because early computers had very small hard drives as file storage was expensive, and compressed image file formats were yet to be invented. Reducing colors was the mainstay for smaller image files.<br><br> Note: CQ stands for <a href="https://en.wikipedia.org/wiki/Color_quantization">Color Quantization</a>, the process of reducing the number of distinct colors in an image.</p><br>
-
-
-  <p class="Body"> <div class="Code">
+  <p>This unit provides several functions that reduce the number of colors in an image.<br><br> Color reduction is often needed for image segmentation, where images are partitioned into multiple regions or objects, usually by grouping adjacent pixels with similar colors or intensities. Vectorization (eg when converting raster images to SVG format) is one example of this process.<br><br> Historically image color reduction was essential for a couple of reasons: 1: because most displays had limited color resolutions, commonly 256 colors; 2. because early computers had very small hard drives as file storage was expensive, and compressed image file formats were yet to be invented. Reducing colors was the mainstay for smaller image files.<br><br> Note: CQ stands for <a href="https://en.wikipedia.org/wiki/Color_quantization">Color Quantization</a>, the process of reducing the number of distinct colors in an image.</p><br>
+  <p> 
+    <div class="code">
       <pre class="brush: delphi;">
 uses Img32, Img32.CQ, Img32.Fmt.BMP;
 ...
@@ -63,73 +32,37 @@ begin
   img.SaveToFile('beetle_16.bmp');
   img.Free;
 end;
-      </pre></div> </p>
-
-
+      </pre>
+    </div> </p>
   <h2 id="Auto-Contents">Contents</h2>
-  <table>
-    <tr>
-      <th>Routines</th>
-      <th>Constants</th>
-    </tr>
-    <tr>
-      <td><a href="Routines/ApplyPalette.htm">ApplyPalette</a>
-      </td>
-      <td><a href="Constants/Img32.CQ.htm">Img32.CQ</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Routines/BlackWhitePal.htm">BlackWhitePal</a>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Routines/CreateLogPalette.htm">CreateLogPalette</a>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Routines/CreatePalette.htm">CreatePalette</a>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Routines/CreatePaletteEx.htm">CreatePaletteEx</a>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Routines/DefaultMacPal16.htm">DefaultMacPal16</a>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Routines/DefaultWinPal16.htm">DefaultWinPal16</a>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Routines/ReduceColors.htm">ReduceColors</a>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Routines/TrimPalette.htm">TrimPalette</a>
-      </td>
-      <td>
-      </td>
-    </tr>
-  </table>
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
+  <div class="autoTblContainer">
+    <div class="autoTbl">
+      <div><b>Routines</b>
+      </div>
+      <div><span><a href="Routines/ApplyPalette.htm">ApplyPalette</a></span>
+<span><a href="Routines/BlackWhitePal.htm">BlackWhitePal</a></span>
+<span><a href="Routines/CreateLogPalette.htm">CreateLogPalette</a></span>
+<span><a href="Routines/CreatePalette.htm">CreatePalette</a></span>
+<span><a href="Routines/CreatePaletteEx.htm">CreatePaletteEx</a></span>
+<span><a href="Routines/DefaultMacPal16.htm">DefaultMacPal16</a></span>
+<span><a href="Routines/DefaultWinPal16.htm">DefaultWinPal16</a></span>
+<span><a href="Routines/ReduceColors.htm">ReduceColors</a></span>
+<span><a href="Routines/TrimPalette.htm">TrimPalette</a></span>
+
+      </div><br>
+    </div>
+  </div>
+  <div class="autoTblContainer">
+    <div class="autoTbl">
+      <div><b>Constants</b>
+      </div>
+      <div><span><a href="Constants/Img32.CQ.htm">Img32.CQ</a></span>
+
+      </div><br>
+    </div>
+  </div>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+
 </body>
 
 </html>

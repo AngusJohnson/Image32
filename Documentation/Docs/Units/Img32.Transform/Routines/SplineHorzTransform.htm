@@ -1,59 +1,23 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
 
   <title>SplineHorzTransform</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
   <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
-
-    
-  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32.Transform</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Transform</a><span class="active">SplineHorzTransform</span>
+  </div><br><br>
+
   <h1>SplineHorzTransform</h1>
+  <p class="Decl"><b>function</b> SplineHorzTransform(img: TImage32; <b>const</b> leftSpline: TPathD; splineType: <a href="../../Img32.Vector/Types/TSplineType.htm">TSplineType</a>; backColor: TColor32; reverseFill: Boolean; <b>out</b> offset: TPoint): Boolean;</p><br class="half">
 
-
-  <p class="Decl"><b>function</b> SplineHorzTransform(img: TImage32; <b>const</b> leftSpline: TPathD; splineType: <a href="../../Img32.Vector/Types/TSplineType.htm">TSplineType</a>; backColor: TColor32; reverseFill: Boolean; <b>out</b> offset: TPoint): Boolean;</p>
-
-<br>
-
-  <p class="Body">Deforms an image in the horizontal plane. 'leftSpline' control points (either <a href="../../Img32.Vector/Routines/FlattenQSpline.htm"><b>FlattenQSpline</b></a> or <a href="../../Img32.Vector/Routines/FlattenCSpline.htm"><b>FlattenCSpline</b></a> points) define the left (curved) edge of the transformed image.<br><br> 'backColor' and 'reverseFill' are only meaningful when the splines induce image overlap (see <a href="./SplineVertTransform.htm"><b>SplineVertTransform</b></a> for an example). Normal rendering is from top to bottom unless reverseFill = true, in which case rendering will be from bottom to top. If 'backColor' = clNone32, then the image will be rendered on 'back' regions as if the image is double sided, otherwise 'back' regions will be filled with 'backColor'.<br><br> The returned 'offset', is the offset of the top-left corner of the transformed (and resized) image (using the same axes as the spline coordinates) so that the transformed image can easily be aligned with the supplied control points. </p>
-
-
-  <p class="Body"> <div class="Code">
-      <pre class="brush: delphi;">
+  <p>Deforms an image in the horizontal plane. 'leftSpline' control points (either <a href="../../Img32.Vector/Routines/FlattenQSpline.htm"><b>FlattenQSpline</b></a> or <a href="../../Img32.Vector/Routines/FlattenCSpline.htm"><b>FlattenCSpline</b></a> points) define the left (curved) edge of the transformed image.<br><br> 'backColor' and 'reverseFill' are only meaningful when the splines induce image overlap (see <a href="./SplineVertTransform.htm"><b>SplineVertTransform</b></a> for an example). Normal rendering is from top to bottom unless reverseFill = true, in which case rendering will be from bottom to top. If 'backColor' = clNone32, then the image will be rendered on 'back' regions as if the image is double sided, otherwise 'back' regions will be filled with 'backColor'.<br><br> The returned 'offset', is the offset of the top-left corner of the transformed (and resized) image (using the same axes as the spline coordinates) so that the transformed image can easily be aligned with the supplied control points. </p>
+  <div class="code">
+    <pre class="brush: delphi;">
   uses Img32, Img32.Fmt.PNG, Img32.Transform;
   ...
 var
@@ -66,34 +30,15 @@ begin
   SplineHorzTransform(img, leftPath, stCubic, clNone32, false, pt);
   img.SaveToFile('wavy_flag5.png');
   img.Free;
-      </pre></div> 
-    <table class="white">
-      <tr>
-  
-        <td>
-  Before:<br><img src="../../../../Images/union_jack.png">
-  
-        </td>
-  
-        <td>
-  After:<br><img src="../../../../Images/union_jack5.png">
-  
-        </td>
+    </pre>
+  </div>
+  <div><span class="floatLeft"> <b>Before:</b><br><img src="../../../../Images/union_jack.png"> </span><span class="floatLeft"> <b>After:</b><br><img src="../../../../Images/union_jack5.png"> </span>
 
-      </tr>
-    </table> </p>
-<br>
-
-
-
-
-
-
+  </div>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="../../Img32.Layers/_Body.htm">Img32.Layers</a>, <a href="SplineVertTransform.htm">SplineVertTransform</a>, <a href="../../Img32.Vector/Routines/FlattenCSpline.htm">FlattenCSpline</a>, <a href="../../Img32.Vector/Routines/FlattenQSpline.htm">FlattenQSpline</a>, <a href="../../Img32.Vector/Types/TSplineType.htm">TSplineType</a></p>
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+
 </body>
 
 </html>

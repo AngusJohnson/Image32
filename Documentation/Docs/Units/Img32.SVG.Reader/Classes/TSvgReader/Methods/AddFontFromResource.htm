@@ -1,85 +1,34 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
 
   <title>AddFontFromResource</title>
 
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <link rel="stylesheet" href="../../../../../../Styles/Default.css" type="text/css">
-
-    
-  <script type="text/javascript" src="../../../../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../../../../_Body.htm" class="Banner"><img src="../../../../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../../../Images/_Unit.png" align="absmiddle">Img32.SVG.Reader</a>
-      </td>
-      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../../../Images/_Class.png" align="absmiddle">TSvgReader</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../../../_Body.htm">Index</a><a class="ancestor" href="../../../_Body.htm">Img32.SVG.Reader</a><a class="ancestor" href="../_Body.htm">TSvgReader</a><span class="active">AddFontFromResource</span>
+  </div><br><br>
+
   <h1>TSvgReader.AddFontFromResource</h1>
-
-
   <p class="Decl"><b>function</b> AddFontFromResource(<b>const</b> resName: <b>string</b>; resType: PChar): Boolean;</p>
-
-
-  <p class="Body">Loads a font into the TSvgReader object, so it's available for text rendering. At least one font must be registered to display text in in SVG image. Multiple fonts will better support the variety of font styles (bold, italic) and font families (serif, sans-serif and monospace), and the TSvgReader object will choose the best one from those available.</p>
-
-
-  <p class="Body"> 
-    <table class="white">
-  
-      <tr>
-        <td><b>Example:</b>
-        </td>
-      </tr>
-  
-      <tr>
-        <td width="1000px">
-    <div class="Code">
-            <pre class="brush: delphi;">
+  <p>Loads a font into the TSvgReader object, so it's available for text rendering. At least one font must be registered to display text in in SVG image. Multiple fonts will better support the variety of font styles (bold, italic) and font families (serif, sans-serif and monospace), and the TSvgReader object will choose the best one from those available.</p>
+  <div class="code"><b>Example:</b><br>
+    <pre class="brush: delphi;">
   {$R Font_Liberation_Sans.res}
   ...
   
   svgReader.AddFontFromResource(
     'Liberation_Sans_Regular', RT_RCDATA);
-            </pre></div>
-  
-        </td>
-      </tr>
+    </pre>
 
-    </table> </p>
+  </div>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
 
-
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
 </body>
 
 </html>

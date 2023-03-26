@@ -1,0 +1,42 @@
+<html>
+
+<head>
+
+  <title>ReplaceExactColor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
+<script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
+</head>
+
+<body bgcolor="#FFFFFF">
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Extra</a><span class="active">ReplaceExactColor</span>
+  </div><br><br>
+
+  <h1>ReplaceExactColor</h1>
+  <p class="Decl"><b>procedure</b> ReplaceExactColor(img: TImage32; oldColor, newColor: TColor32);</p><br class="half">
+
+  <p>Replaces a color with another, but only where pixels exactly match <i>oldColor</i>.<br><br> Note: Be careful when using this procedure in antialiased drawings as <i>oldColor</i> will mostly remain where antialiasing has blended this with adjacent colors. </p>
+  <h3>Example</h3>
+  <div class="code">
+    <pre class="brush: delphi;">
+  uses Img32, Img32.Extra, Img32.Fmt.PNG;
+  ...
+  img := TImage32.Create;
+  img.LoadFromFile('beetle_aq.png');
+  //make aqua colored pixels transparent, but unlike EraseColor, 
+  //here there's no accommodation for blended colors
+  ReplaceColor(img, clAqua32, clNone32); 
+  img.SaveToFile('beetle3.png');
+  img.Free;
+    </pre>
+  </div>
+  <div><span class="floatLeft"> <b>Before:</b><br><img src="../../../../Images/beetle_aq.png"> </span><span class="floatLeft"> <b>After:</b><br> <img src="../../../../Images/erase_color_3.png"> <img src="../../../../Images/erase_color_4.png"> </span>
+
+  </div>
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="RemoveColor.htm">RemoveColor</a></p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+
+</body>
+
+</html>

@@ -1,97 +1,31 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
 
   <title>BoxDownSampling</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
   <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
-
-    
-  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32.Resamplers</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Resamplers</a><span class="active">BoxDownSampling</span>
+  </div><br><br>
+
   <h1>BoxDownSampling</h1>
-
-
   <p class="Decl"><b>procedure</b> BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer);</p>
+  <p>As the name implies, <span class="monobold">BoxDownSampling</span> is only intended for down-sampling images, and it's consistently better at this than general purpose resamplers. The general purpose resamplers - eg bilinear and bicubic resamplers - are prone to 'pixelation' when shrinking images.<br><br> However <span class="monobold">BoxDownSampling</span> is very inferior to general purpose resamplers when up-sampling and when performing other kinds of transformations (eg rotating, and skewing images), so it should not be used for these purposes.<br> </p>
+  <div><img src="../../../../Images/boxDS_or.png" style="width:256px; height:256px; float:left;"><span style="float:left; max-width:450px;"><b>Original image</b><br> Original size - 512 x 512px.<br><br><br>Zoom in to better see the differences.</span>
 
-<br>
+  </div>
+  <div><img src="../../../../Images/boxDS_bc.png" style="width:256px; height:256px; float:left;"><span style="float:left; max-width:450px;"><b>Bicubic downsampling</b><br>Note pixelation.<br><br><br>So the results of downsampling can be more easily seen, the original image was shrunk to 1/4 its original size then returned to its original size using bicubic resampling for both transformations.</span>
 
-  <p class="Body">As the name implies, <span class="monobold">BoxDownSampling</span> is only intended for image down-sampling (ie shrinking images) where it avoids the pixelation produced with other resamplers. However, while <span class="monobold">BoxDownSampling</span> avoids pixelation, it does tend toward undue blurring. Also, because <span class="monobold">BoxDownSampling</span> is inferior to other resamplers when performing other transformations (ie when enlarging, rotating, and skewing images), it's not intended as a general purpose resampler.<br><br> 
-    <table class="white">
+  </div>
+  <div><img src="../../../../Images/boxDS_ds.png" style="width:256px; height:256px; float:left;"><span style="float:left; max-width:450px;"><b>BoxDownSampling</b><br>Note mild blurring.<br><br><br>Again the original image was shrunk to 1/4 its original size, though this time using the BoxDownSampling function. However it was returned to its original size using bicubic resampling.</span>
 
-      <tr>
-  
-        <td><img src="../../../../Images/boxDS_or.png">
-        </td>
-  
-        <td>Original image (512 x 512px)
-        </td>
-
-      </tr>
-
-      <tr>
-  
-        <td><img src="../../../../Images/boxDS_bc.png">
-        </td>
-  
-        <td>Bicubic downsampling: note pixelation<br>
-  The original image was resized to 1/4 its original size using bicubic resampling and then reenlarged back to the original size (again using bicubic resampling) so the results of downsampling can be more easily seen.
-  
-        </td>
-
-      </tr>
-
-      <tr>
-  
-        <td><img src="../../../../Images/boxDS_ds.png">
-        </td>
-  
-        <td>BoxDownSampling: note mild blurring<br>
-  The original image was resized to 1/4 its original size using the BoxDownSampling function and then reenlarged to the original size (using bicubic resampling) so the results of downsampling can be more easily seen.
-  
-        </td>
-
-      </tr>
-
-    </table> </p>
-
-<br>
-
-  <p class="Body"> <div class="Code">
-      <pre class="brush: delphi;">
+  </div><br>
+  <div class="code">
+    <pre class="brush: delphi;">
   uses Img32, Img32.Fmt.PNG, 
   Img32.Extra, Img32.Resamplers;	
 	...
@@ -137,12 +71,10 @@ begin
     img3.free;
   end;
 end;
-      </pre></div> </p>
+    </pre>
+  </div>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
 
-
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
 </body>
 
 </html>

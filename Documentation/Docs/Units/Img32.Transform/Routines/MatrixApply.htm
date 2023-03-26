@@ -1,64 +1,27 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
 
   <title>MatrixApply</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
   <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
-
-    
-  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32.Transform</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Transform</a><span class="active">MatrixApply</span>
+  </div><br><br>
+
   <h1>MatrixApply</h1>
-
-
   <p class="Decl"><b>procedure</b> MatrixApply(<b>const</b> matrix: TMatrixD; var pt: TPointD); overload;<br><br></p>
 
   <p class="Decl"><b>procedure</b> MatrixApply(<b>const</b> matrix: TMatrixD; var path: TPathD); overload;<br><br></p>
 
-  <p class="Decl"><b>procedure</b> MatrixApply(<b>const</b> matrix: TMatrixD; var paths: TPathsD); overload;</p>
+  <p class="Decl"><b>procedure</b> MatrixApply(<b>const</b> matrix: TMatrixD; var paths: TPathsD); overload;</p><br class="half">
 
-<br>
-
-  <p class="Body">Applies a matrix transformation either to a single coordinate, or to a series of path coordinates.</p>
-
-
-
-  <p class="Body"> <div class="Code">
-      <pre class="brush: delphi;">
+  <p>Applies a matrix transformation either to a single coordinate, or to a series of path coordinates.</p>
+  <div class="code">
+    <pre class="brush: delphi;">
 uses Img32, Img32.Fmt.PNG, Img32.Vector;
 ...
 var
@@ -87,23 +50,13 @@ begin
   img.SaveToFile('Rotate4Buttons.png');
   img.Free;
 end;
-      </pre></div> 
-    <table class="white">
-      <tr>
-  
-        <td>
-  <img style="vertical-align: -90px;" src="../../../../Images/matrix.png">
+    </pre>
+  </div>
+  <div><img style="vertical-align: -90px;" src="../../../../Images/matrix.png">
 
-        </td>
+  </div>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
 
-      </tr>
-    </table> </p>
-<br>
-
-
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
 </body>
 
 </html>

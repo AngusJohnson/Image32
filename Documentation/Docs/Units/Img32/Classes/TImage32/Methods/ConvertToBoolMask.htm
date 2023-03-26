@@ -1,61 +1,24 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
 
   <title>ConvertToBoolMask</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
   <link rel="stylesheet" href="../../../../../../Styles/Default.css" type="text/css">
-
-    
-  <script type="text/javascript" src="../../../../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../../../../_Body.htm" class="Banner"><img src="../../../../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../../../Images/_Unit.png" align="absmiddle">Img32</a>
-      </td>
-      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../../../Images/_Class.png" align="absmiddle">TImage32</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../../../_Body.htm">Index</a><a class="ancestor" href="../../../_Body.htm">Img32</a><a class="ancestor" href="../_Body.htm">TImage32</a><span class="active">ConvertToBoolMask</span>
+  </div><br><br>
+
   <h1>TImage32.ConvertToBoolMask</h1>
+  <p class="Decl"><b>procedure</b> ConvertToBoolMask(reference: TColor32; tolerance: integer; colorFunc: TCompareFunction; maskBg: TColor32 = clWhite32; maskFg: TColor32 = clBlack32);</p><br class="half">
 
+  <p>Converts a colored image into a 2 colored mask image (default black on white).<br><br> The 'reference' color is compared with each pixel in the image using the supplied 'colorFunc' function. Matching pixels will be colored with 'maskFg' (default = black) and non-matching pixels will be colored 'maskBg' (default = white). The meaning of 'tolerance' will depend on the function. For example, using the CompareRGB function, pixels that deviate no more that 'tolerance' from the reference color in each of the three color channels will be considered a match. </p><br>
 
-  <p class="Decl"><b>procedure</b> ConvertToBoolMask(reference: TColor32; tolerance: integer; colorFunc: TCompareFunction; maskBg: TColor32 = clWhite32; maskFg: TColor32 = clBlack32);</p>
-
-<br>
-
-  <p class="Body">Converts a colored image into a 2 colored mask image (default black on white).<br><br> The 'reference' color is compared with each pixel in the image using the supplied 'colorFunc' function. Matching pixels will be colored with 'maskFg' (default = black) and non-matching pixels will be colored 'maskBg' (default = white). The meaning of 'tolerance' will depend on the function. For example, using the CompareRGB function, pixels that deviate no more that 'tolerance' from the reference color in each of the three color channels will be considered a match. </p>
-
-<br>
-
-  <p class="Body"> <div class="Code">
+  <p> 
+    <div class="code">
       <pre class="brush: delphi;">
   uses Img32, Img32.Fmt.PNG, Img32.Vector, Img32.Extra;
   ...
@@ -80,35 +43,15 @@
     img.SaveToFile('.\beetle3.png');
     
     img.Free;
-      </pre></div> </p>
+      </pre>
+    </div> </p>
+  <div><span style="float:left;"> Original:<br> <img src="../../../../../../Images/beetle.png"> </span><span style="float:left;"> Masked:<br> <img src="../../../../../../Images/beetle2.png"> </span><span style="float:left;"> Masked &amp; Vectorised:<br> <img src="../../../../../../Images/beetle3.png"> </span>
 
-
-  <table class="white">
-
-    <tr>
-  
-      <td>Original:<br><img src="../../../../../../Images/beetle.png">
-      </td>
-  
-      <td>Masked:<br><img src="../../../../../../Images/beetle2.png">
-      </td>
-  
-      <td>Masked  &amp; Vectorised:<br><img src="../../../../../../Images/beetle3.png">
-      </td>
-
-    </tr>
-
-  </table>
-
-
-
-
-
+  </div>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="ConvertToAlphaMask.htm">ConvertToAlphaMask</a>, <a href="SetRGB.htm">SetRGB</a>, <a href="../../../Routines/GetBoolMask.htm">GetBoolMask</a></p>
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+
 </body>
 
 </html>

@@ -1,152 +1,72 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
 
   <title>Img32.Draw</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
   <link rel="stylesheet" href="../../../Styles/Default.css" type="text/css">
-
-    
-  <script type="text/javascript" src="../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../Menu/menu.js"></script><script type="text/javascript" src="../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../_Body.htm" class="Banner"><img src="../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../_Body.htm">Index</a><span class="active">Img32.Draw</span>
+  </div><br><br>
+
   <h1>Img32.Draw</h1>
-
-
-  <p class="Body">This unit is needed whenever line (<a href="./Routines/DrawLine.htm"><b>DrawLine</b></a> and <a href="./Routines/DrawDashedLine.htm"><b>DrawDashedLine</b></a>) or polygon rendering (<a href="./Routines/DrawPolygon.htm"><b>DrawPolygon</b></a>) is required.<br></p>
-
-
+  <p>This unit is needed whenever line (<a href="./Routines/DrawLine.htm"><b>DrawLine</b></a> and <a href="./Routines/DrawDashedLine.htm"><b>DrawDashedLine</b></a>) or polygon rendering (<a href="./Routines/DrawPolygon.htm"><b>DrawPolygon</b></a>) is required.<br></p>
   <h2 id="Auto-Contents">Contents</h2>
-  <table>
-    <tr>
-      <th>Types</th>
-      <th>Classes</th>
-      <th>Routines</th>
-    </tr>
-    <tr>
-      <td><a href="Types/TBoundsProc.htm">TBoundsProc</a>
-      </td>
-      <td><a href="Classes/TBarycentricRenderer/_Body.htm">TBarycentricRenderer</a>
-      </td>
-      <td><a href="Routines/DrawAlphaMask.htm">DrawAlphaMask</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TFillRule.htm">TFillRule</a>
-      </td>
-      <td><a href="Classes/TColorRenderer/_Body.htm">TColorRenderer</a>
-      </td>
-      <td><a href="Routines/DrawBoolMask.htm">DrawBoolMask</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TGradientFillStyle.htm">TGradientFillStyle</a>
-      </td>
-      <td><a href="Classes/TCustomGradientRenderer/_Body.htm">TCustomGradientRenderer</a>
-      </td>
-      <td><a href="Routines/DrawDashedLine.htm">DrawDashedLine</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Classes/TCustomRenderer/_Body.htm">TCustomRenderer</a>
-      </td>
-      <td><a href="Routines/DrawInvertedDashedLine.htm">DrawInvertedDashedLine</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Classes/TImageRenderer/_Body.htm">TImageRenderer</a>
-      </td>
-      <td><a href="Routines/DrawInvertedLine.htm">DrawInvertedLine</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Classes/TLinearGradientRenderer/_Body.htm">TLinearGradientRenderer</a>
-      </td>
-      <td><a href="Routines/DrawLine.htm">DrawLine</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Classes/TRadialGradientRenderer/_Body.htm">TRadialGradientRenderer</a>
-      </td>
-      <td><a href="Routines/DrawPoint.htm">DrawPoint</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Classes/TSvgRadialGradientRenderer/_Body.htm">TSvgRadialGradientRenderer</a>
-      </td>
-      <td><a href="Routines/DrawPolygon.htm">DrawPolygon</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td>
-      </td>
-      <td><a href="Routines/DrawPolygon_ClearType.htm">DrawPolygon_ClearType</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td>
-      </td>
-      <td><a href="Routines/ErasePolygon.htm">ErasePolygon</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td>
-      </td>
-      <td><a href="Routines/Rasterize.htm">Rasterize</a>
-      </td>
-    </tr>
-  </table>
+  <div class="autoTblContainer">
+    <div class="autoTbl">
+      <div><b>Types</b>
+      </div>
+      <div><span><a href="Types/TBoundsProc.htm">TBoundsProc</a></span>
+<span><a href="Types/TFillRule.htm">TFillRule</a></span>
+<span><a href="Types/TGradientFillStyle.htm">TGradientFillStyle</a></span>
+
+      </div><br>
+    </div>
+  </div>
+  <div class="autoTblContainer">
+    <div class="autoTbl">
+      <div><b>Classes</b>
+      </div>
+      <div><span><a href="Classes/TBarycentricRenderer/_Body.htm">TBarycentricRenderer</a></span>
+<span><a href="Classes/TColorRenderer/_Body.htm">TColorRenderer</a></span>
+<span><a href="Classes/TCustomGradientRenderer/_Body.htm">TCustomGradientRenderer</a></span>
+<span><a href="Classes/TCustomRenderer/_Body.htm">TCustomRenderer</a></span>
+<span><a href="Classes/TImageRenderer/_Body.htm">TImageRenderer</a></span>
+<span><a href="Classes/TLinearGradientRenderer/_Body.htm">TLinearGradientRenderer</a></span>
+<span><a href="Classes/TRadialGradientRenderer/_Body.htm">TRadialGradientRenderer</a></span>
+<span><a href="Classes/TSvgRadialGradientRenderer/_Body.htm">TSvgRadialGradientRenderer</a></span>
+
+      </div><br>
+    </div>
+  </div>
+  <div class="autoTblContainer">
+    <div class="autoTbl">
+      <div><b>Routines</b>
+      </div>
+      <div><span><a href="Routines/DrawAlphaMask.htm">DrawAlphaMask</a></span>
+<span><a href="Routines/DrawBoolMask.htm">DrawBoolMask</a></span>
+<span><a href="Routines/DrawDashedLine.htm">DrawDashedLine</a></span>
+<span><a href="Routines/DrawInvertedDashedLine.htm">DrawInvertedDashedLine</a></span>
+<span><a href="Routines/DrawInvertedLine.htm">DrawInvertedLine</a></span>
+<span><a href="Routines/DrawInvertedPoint.htm">DrawInvertedPoint</a></span>
+<span><a href="Routines/DrawInvertedPolygon.htm">DrawInvertedPolygon</a></span>
+<span><a href="Routines/DrawLine.htm">DrawLine</a></span>
+<span><a href="Routines/DrawPoint.htm">DrawPoint</a></span>
+<span><a href="Routines/DrawPolygon.htm">DrawPolygon</a></span>
+<span><a href="Routines/DrawPolygon_ClearType.htm">DrawPolygon_ClearType</a></span>
+<span><a href="Routines/ErasePolygon.htm">ErasePolygon</a></span>
+<span><a href="Routines/Rasterize.htm">Rasterize</a></span>
+
+      </div><br>
+    </div>
+  </div>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="Routines/DrawDashedLine.htm">DrawDashedLine</a>, <a href="Routines/DrawLine.htm">DrawLine</a>, <a href="Routines/DrawPolygon.htm">DrawPolygon</a></p>
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+
 </body>
 
 </html>

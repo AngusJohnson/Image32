@@ -1,59 +1,23 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
 
   <title>BlendMask</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
   <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
-
-    
-  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32</a><span class="active">BlendMask</span>
+  </div><br><br>
+
   <h1>BlendMask</h1>
+  <p class="Decl"><b>function</b> BlendMask(bgColor, mask: TColor32): TColor32;</p><br class="half">
 
-
-  <p class="Decl"><b>function</b> BlendMask(bgColor, mask: TColor32): TColor32;</p>
-
-<br>
-
-  <p class="Body">A callback function that can be passed as a parameter to the <a href="../Classes/TImage32/Methods/CopyBlend.htm"><b>TImage32.CopyBlend</b></a> method.<br> This function uses the mask to either preserve or remove the background image. Whereever the mask is fully opaque (alpha = 255), the background image will be preserved; and whereever the mask is fully translucent, the background will be erased.</p>
-
-
-  <p class="Body"> <div class="Code">
-      <pre class="brush: delphi;">
+  <p>A callback function that can be passed as a parameter to the <a href="../Classes/TImage32/Methods/CopyBlend.htm"><b>TImage32.CopyBlend</b></a> method.<br> This function uses the mask to either preserve or remove the background image. Whereever the mask is fully opaque (alpha = 255), the background image will be preserved; and whereever the mask is fully translucent, the background will be erased.</p>
+  <div class="code">
+    <pre class="brush: delphi;">
 uses Img32, Img32.Fmt.PNG;
 ...
 img := TImage32.Create;
@@ -64,34 +28,15 @@ img.CopyBlend(img2, img2.Bounds,
   img.Bounds, BlendMask);
 img.SaveToFile('./lenna_fading.png');
 img.Free;
-      </pre></div> 
-    <table class="white">
-      <tr>
+    </pre>
+  </div>
+  <div><span class="floatLeft"> <b>Before:</b><br> <img src="../../../../Images/lenna.png"> <span class="plusImg"><img src="../../../../Images/plus.png"></span> <img src="../../../../Images/green_blur.png"> </span><span class="floatLeft"> <b>After:</b><br><img src="../../../../Images/blend_mask.png"> </span>
 
-        <td>
-  Before:<br>
-  <img src="../../../../Images/lenna.png">&nbsp;
-  <img src="../../../../Images/green_blur.png">
-
-        </td>
-
-        <td>
-  After:<br>
-  <img src="../../../../Images/blend_mask.png">
-
-        </td>
-
-      </tr>
-    </table> </p>
-
-
-
-
+  </div>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="../Classes/TImage32/Methods/CopyBlend.htm">TImage32.CopyBlend</a>, <a href="BlendBlueChannel.htm">BlendBlueChannel</a>, <a href="BlendInvertedMask.htm">BlendInvertedMask</a></p>
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+
 </body>
 
 </html>

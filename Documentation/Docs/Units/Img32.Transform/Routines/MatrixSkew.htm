@@ -1,60 +1,24 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
 
   <title>MatrixSkew</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
   <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
-
-    
-  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32.Transform</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Transform</a><span class="active">MatrixSkew</span>
+  </div><br><br>
+
   <h1>MatrixSkew</h1>
+  <p class="Decl"><b>procedure</b> MatrixSkew(<b>var</b> matrix: TMatrixD; angleX, angleY: double);</p><br class="half">
 
-
-  <p class="Decl"><b>procedure</b> MatrixSkew(<b>var</b> matrix: TMatrixD; angleX, angleY: double);</p>
-
+  <p>Adds an affine skew to the supplied matrix.<br> <span class="monobold">dx</span> is the horizontal skew angle (in radians).<br> And likewise, <span class="monobold">dy</span> is the vertical skew angle.<br><br> <i>For example, if dx = 0.3927 (~22.5 degrees), dy = 0 and the matrix is applied to the coordinate [20,10], then the transformed coordinate will become roughly [20 + 5, 10] or [25, 10].</i> </p>
 <br>
-
-  <p class="Body">Adds an affine skew to the supplied matrix.<br> <span class="monobold">dx</span> is the horizontal skew angle (in radians).<br> And likewise, <span class="monobold">dy</span> is the vertical skew angle.<br><br> <i>For example, if dx = 0.3927 (~22.5 degrees), dy = 0 and the matrix is applied to the coordinate [20,10], then the transformed coordinate will become roughly [20 + 5, 10] or [25, 10].</i> </p>
-<br>
-
-
-  <p class="Body"> <div class="Code">
-      <pre class="brush: delphi;">
+  <div class="code">
+    <pre class="brush: delphi;">
 uses Img32, Img32.Fmt.PNG, 
   Img32.Vector, Img32.Transform;
 ...
@@ -76,23 +40,12 @@ begin
   img.SaveToFile('beetle_affine.png');
   img.Free;
 end;
-      </pre></div> 
-    <table class="white">
-      <tr>
-  
-        <td>
-  <img style="vertical-align: -90px;" src="../../../../Images/beetle_aq.png"> &#x2794;
-  <img style="vertical-align: -90px;" src="../../../../Images/affine.png">
+    </pre>
+  </div>
+  <div><img style="vertical-align: -90px;" src="../../../../Images/beetle_aq.png"><span class="plusImg"><img src="../../../../Images/right_arrow.png"></span><img style="vertical-align: -90px;" src="../../../../Images/affine.png">
+  </div>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
 
-        </td>
-
-      </tr>
-    </table> </p>
-
-
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
 </body>
 
 </html>

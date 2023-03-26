@@ -1,62 +1,22 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
-  
   <title>Img32.Text</title>
-  
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  
   <link rel="stylesheet" href="../../../Styles/Default.css" type="text/css">
-
-    
-  <script type="text/javascript" src="../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../Menu/menu.js"></script><script type="text/javascript" src="../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../_Body.htm" class="Banner"><img src="../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../_Body.htm">Index</a><span class="active">Img32.Text</span>
+  </div><br><br>
+
   <h1>Img32.Text</h1>
+  <p>This unit is required when drawing text, and can be used cross-platform. Only TrueType fonts are supported, and these can be loaded either indirectly via operating system function calls, or directly from TTF files or compiled application resources. The unit contains three important classes - <a href="./Classes/TFontReader/_Body.htm"><b>TFontReader</b></a>, <a href="./Classes/TFontManager/_Body.htm"><b>TFontManager</b></a> and <a href="./Classes/TFontCache/_Body.htm"><b>TFontCache</b></a>.<br><br> <span class="monobold">TFontReader</span> objects return <i>raw</i> glyph information primarily though its <a href="./Classes/TFontReader/Methods/GetGlyphInfo.htm"><b>GetGlyphInfo</b></a> method and its <a href="./Classes/TFontReader/Properties/FontInfo.htm"><b>FontInfo</b></a> property. However because directly accessing this data is slow, this is best circumvented by using <span class="monobold">TFontCache</span> objects. <span class="monobold">TFontCache</span> objects not only dramatically speed up text rendering, the class also provides numerous methods to greatly simplify displaying text.<br><br> The <span class="monobold">TFontManager</span> class is intended primarily as a single instance class that's instantiated automatically, and accessed via the <a href="./Routines/FontManager.htm"><b>FontManager</b></a> function. As its name implies, it manages font (ie <span class="monobold">TFontReader</span>) construction and destruction. Multiple instances of <span class="monobold">TFontManager</span> are permitted and may be useful on occasions.</p>
+  <div class="code">
+<b>Example:</b><br>
 
-
-  <p class="Body">This unit is required when drawing text, and can be used cross-platform. Only TrueType fonts are supported, and these can be loaded either indirectly via operating system function calls, or directly from TTF files or compiled application resources. The unit contains three important classes - <a href="./Classes/TFontReader/_Body.htm"><b>TFontReader</b></a>, <a href="./Classes/TFontManager/_Body.htm"><b>TFontManager</b></a> and <a href="./Classes/TFontCache/_Body.htm"><b>TFontCache</b></a>.<br><br> <span class="monobold">TFontReader</span> objects return <i>raw</i> glyph information primarily though its <a href="./Classes/TFontReader/Methods/GetGlyphInfo.htm"><b>GetGlyphInfo</b></a> method and its <a href="./Classes/TFontReader/Properties/FontInfo.htm"><b>FontInfo</b></a> property. However because directly accessing this data is slow, this is best circumvented by using <span class="monobold">TFontCache</span> objects. <span class="monobold">TFontCache</span> objects not only dramatically speed up text rendering, the class also provides numerous methods to greatly simplify displaying text.<br><br> The <span class="monobold">TFontManager</span> class is intended primarily as a single instance class that's instantiated automatically, and accessed via the <a href="./Routines/FontManager.htm"><b>FontManager</b></a> function. As its name implies, it manages font (ie <span class="monobold">TFontReader</span>) construction and destruction. Multiple instances of <span class="monobold">TFontManager</span> are permitted and may be useful on occasions.</p>
-
-
-  <p class="Body"> 
-    <table class="white">
-  
-      <tr>
-        <td><b>Example:</b>
-        </td>
-      </tr>
-  
-      <tr>
-        <td width="1000px">
-    <div class="Code">
-            <pre class="brush: delphi;">
+    <pre class="brush: delphi;">
   var
     font            : TFontReader;
     notoSans14      : TFontCache;
@@ -94,15 +54,9 @@
     finally
       notoSans14.Free;
     end;
-            </pre></div>
-  
-        </td>
-      </tr>
-
-    </table> </p>
-
-
-  <p class="Body"> See Examples FMX2 for a more complete example.<br><br> <img id="img" src="../../../Images/android.png" width="270px" height="540px"> 
+    </pre>
+  </div>
+  <p> See Examples FMX2 for a more complete example.<br><br> <img id="img" src="../../../Images/android.png" width="270px" height="540px"> 
     <!--
 <script>
   // override screen scaling that blurs text ...  
@@ -120,125 +74,61 @@
   img.height = h;
 </script>
 --> </p>
-
-
   <h2 id="Auto-Contents">Contents</h2>
-  <table>
-    <tr>
-      <th>Types</th>
-      <th>Classes</th>
-      <th>Routines</th>
-    </tr>
-    <tr>
-      <td><a href="Types/PGlyphInfo.htm">PGlyphInfo</a>
-      </td>
-      <td><a href="Classes/TFontCache/_Body.htm">TFontCache</a>
-      </td>
-      <td><a href="Routines/DrawAngledText.htm">DrawAngledText</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TArrayOfTKern.htm">TArrayOfTKern</a>
-      </td>
-      <td><a href="Classes/TFontManager/_Body.htm">TFontManager</a>
-      </td>
-      <td><a href="Routines/DrawText.htm">DrawText</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TFontFormat.htm">TFontFormat</a>
-      </td>
-      <td><a href="Classes/TFontReader/_Body.htm">TFontReader</a>
-      </td>
-      <td><a href="Routines/DrawVerticalText.htm">DrawVerticalText</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TFontInfo.htm">TFontInfo</a>
-      </td>
-      <td><a href="Classes/TWordInfoList/_Body.htm">TWordInfoList</a>
-      </td>
-      <td><a href="Routines/FillWordList.htm">FillWordList</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TGlyphInfo.htm">TGlyphInfo</a>
-      </td>
-      <td>
-      </td>
-      <td><a href="Routines/FontManager.htm">FontManager</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TGlyphMetrics.htm">TGlyphMetrics</a>
-      </td>
-      <td>
-      </td>
-      <td><a href="Routines/GetFontFolder.htm">GetFontFolder</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TMacStyle.htm">TMacStyle</a>
-      </td>
-      <td>
-      </td>
-      <td><a href="Routines/GetInstalledTtfFilenames.htm">GetInstalledTtfFilenames</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TMacStyles.htm">TMacStyles</a>
-      </td>
-      <td>
-      </td>
-      <td><a href="Routines/GetPageMetrics.htm">GetPageMetrics</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TTable_Glyf.htm">TTable_Glyf</a>
-      </td>
-      <td>
-      </td>
-      <td><a href="Routines/GetTextGlyphsOnPath.htm">GetTextGlyphsOnPath</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TTable_Hmtx.htm">TTable_Hmtx</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TTextAlign.htm">TTextAlign</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TTextPageMetrics.htm">TTextPageMetrics</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TTextVAlign.htm">TTextVAlign</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-  </table>
+  <div class="autoTblContainer">
+    <div class="autoTbl">
+      <div><b>Types</b>
+      </div>
+      <div><span><a href="Types/PGlyphInfo.htm">PGlyphInfo</a></span>
+<span><a href="Types/TArrayOfTKern.htm">TArrayOfTKern</a></span>
+<span><a href="Types/TFontFormat.htm">TFontFormat</a></span>
+<span><a href="Types/TFontInfo.htm">TFontInfo</a></span>
+<span><a href="Types/TGlyphInfo.htm">TGlyphInfo</a></span>
+<span><a href="Types/TGlyphMetrics.htm">TGlyphMetrics</a></span>
+<span><a href="Types/TMacStyle.htm">TMacStyle</a></span>
+<span><a href="Types/TMacStyles.htm">TMacStyles</a></span>
+<span><a href="Types/TTable_Glyf.htm">TTable_Glyf</a></span>
+<span><a href="Types/TTable_Hmtx.htm">TTable_Hmtx</a></span>
+<span><a href="Types/TTextAlign.htm">TTextAlign</a></span>
+<span><a href="Types/TTextPageMetrics.htm">TTextPageMetrics</a></span>
+<span><a href="Types/TTextVAlign.htm">TTextVAlign</a></span>
+
+      </div><br>
+    </div>
+  </div>
+  <div class="autoTblContainer">
+    <div class="autoTbl">
+      <div><b>Classes</b>
+      </div>
+      <div><span><a href="Classes/TFontCache/_Body.htm">TFontCache</a></span>
+<span><a href="Classes/TFontManager/_Body.htm">TFontManager</a></span>
+<span><a href="Classes/TFontReader/_Body.htm">TFontReader</a></span>
+<span><a href="Classes/TWordInfoList/_Body.htm">TWordInfoList</a></span>
+
+      </div><br>
+    </div>
+  </div>
+  <div class="autoTblContainer">
+    <div class="autoTbl">
+      <div><b>Routines</b>
+      </div>
+      <div><span><a href="Routines/DrawAngledText.htm">DrawAngledText</a></span>
+<span><a href="Routines/DrawText.htm">DrawText</a></span>
+<span><a href="Routines/DrawVerticalText.htm">DrawVerticalText</a></span>
+<span><a href="Routines/FillWordList.htm">FillWordList</a></span>
+<span><a href="Routines/FontManager.htm">FontManager</a></span>
+<span><a href="Routines/GetFontFolder.htm">GetFontFolder</a></span>
+<span><a href="Routines/GetInstalledTtfFilenames.htm">GetInstalledTtfFilenames</a></span>
+<span><a href="Routines/GetPageMetrics.htm">GetPageMetrics</a></span>
+<span><a href="Routines/GetTextGlyphsOnPath.htm">GetTextGlyphsOnPath</a></span>
+
+      </div><br>
+    </div>
+  </div>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="Classes/TFontCache/_Body.htm">TFontCache</a>, <a href="Classes/TFontManager/_Body.htm">TFontManager</a>, <a href="Classes/TFontReader/_Body.htm">TFontReader</a>, <a href="Classes/TFontReader/Methods/GetGlyphInfo.htm">TFontReader.GetGlyphInfo</a>, <a href="Classes/TFontReader/Properties/FontInfo.htm">TFontReader.FontInfo</a>, <a href="Routines/FontManager.htm">FontManager</a></p>
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+
 </body>
 
 </html>

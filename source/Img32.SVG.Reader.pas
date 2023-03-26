@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  25 March 2023                                                   *
+* Date      :  26 March 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -4794,7 +4794,9 @@ var
   bestFontReader: TFontReader;
   fi: TFontInfo;
 begin
-  fi.fontFamily := svgFontInfo.family;
+  if svgFontInfo.family = ttfUnknown then
+    fi.fontFamily := ttfSansSerif else
+    fi.fontFamily := svgFontInfo.family;
   fi.faceName := ''; //just match to a family here, not to a specific facename
   fi.macStyles := [];
   if svgFontInfo.italic = sfsItalic then

@@ -1,79 +1,37 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
 
   <title>GetAngle</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
   <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
-
-    
-  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32.Vector</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Vector</a><span class="active">GetAngle</span>
+  </div><br><br>
+
   <h1>GetAngle</h1>
-
-
   <p class="Decl"><b>function</b> GetAngle(<b>const</b> origin, pt: TPoint): double; <b>overload;</b><br><br></p>
 
   <p class="Decl"><b>function</b> GetAngle(<b>const</b> origin, pt: TPointD): double; <b>overload;</b><br><br></p>
 
   <p class="Decl"><b>function</b> GetAngle(<b>const</b> pt1, pt2, pt3: TPoint): double; <b>overload;</b><br><br></p>
 
-  <p class="Decl"><b>function</b> GetAngle(<b>const</b> pt1, pt2, pt3: TPointD): double; <b>overload;</b></p>
+  <p class="Decl"><b>function</b> GetAngle(<b>const</b> pt1, pt2, pt3: TPointD): double; <b>overload;</b></p><br class="half">
 
-<br>
-
-  <p class="Body"> The result's range will be between -<span class="monobold">PI</span> and +<span class="monobold">PI</span>.<br><br> When there are two parameters (origin &amp; pt): 
+  <p> The result's range will be between -<span class="monobold">PI</span> and +<span class="monobold">PI</span>.<br><br> When there are two parameters (origin &amp; pt): 
     <ul>
-  
       <li>when result = <span class="Number">0</span>, <span class="monobold">pt</span> is horizontal with and on the right of <span class="monobold">origin</span></li>
-  
       <li>otherwise the resulting angle will depend on the <a href="../../Img32/Variables/Img32.htm"><b>ClockwiseRotationIsAnglePositive</b></a> variable.</li>
 
     </ul><br> </p>
-
-
-  <p class="Body"> When there are three parameters (pt1, pt2 &amp; pt3), the result will again depend on <a href="../../Img32/Variables/Img32.htm"><b>ClockwiseRotationIsAnglePositive</b></a>. </p>
-
-
-
+  <p> When there are three parameters (pt1, pt2 &amp; pt3), the result will again depend on <a href="../../Img32/Variables/Img32.htm"><b>ClockwiseRotationIsAnglePositive</b></a>. </p>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="../../Img32/Variables/Img32.htm">Img32</a></p>
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+
 </body>
 
 </html>

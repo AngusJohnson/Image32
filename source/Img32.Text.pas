@@ -1942,9 +1942,7 @@ end;
 function TFontReader.GetGlyphInfo(unicode: Word; out paths: TPathsD;
   out nextX: integer; out glyphMetrics: TGlyphMetrics): Boolean;
 var
-  i,j, glyphIdx: integer;
-  pt2: TPointEx;
-  bez: TPathD;
+  glyphIdx: integer;
   tbl_hmtx: TFontTable_Hmtx;
   pathsEx: TPathsEx;
   altFontReader: TFontReader;
@@ -2076,9 +2074,8 @@ end;
 
 procedure TFontReader.GetFontFamily;
 var
-  dummy, giT, giI, giM: integer;
-  glyphsT, glyphsI, glyphsM: TPathsD;
-  gmT, gmI, gmM: TGlyphMetrics;
+  giT, giI, giM: integer;
+  gmI, gmM: TGlyphMetrics;
   hmtxI, hmtxM: TFontTable_Hmtx;
   pathsEx: TPathsEx;
   paths: TPathsD;

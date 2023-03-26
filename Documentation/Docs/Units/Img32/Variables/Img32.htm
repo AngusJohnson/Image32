@@ -1,88 +1,60 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
 
   <title>Img32</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
   <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
-
-    
-  <script type="text/javascript" src="../../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../../_Body.htm" class="Banner"><img src="../../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" nowrap=""><a href="../_Body.htm" class="Banner"><img src="../../../../Images/_Unit.png" align="absmiddle">Img32</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32</a><span class="active">Img32</span>
+  </div><br><br>
+
   <h1>Img32</h1>
+  <div class="Comment">//Resampling function identifiers
+  </div>
 
-<div class="Comment">//Resampling function identifiers</div>
+  <p>rNearestResampler : integer;</p>
 
-  <p class="Body">rNearestResampler : integer;</p>
+  <p>rBiLinearResampler : integer;</p>
 
-  <p class="Body">rBiLinearResampler : integer;</p>
+  <p>rBiCubicResampler : integer;</p>
 
-  <p class="Body">rBiCubicResampler : integer;</p>
+  <p>DefaultResampler: integer;</p><br>
 
-  <p class="Body">DefaultResampler: integer;</p>
+  <div class="Comment">//Both MulTable and DivTable are used in blend functions<br>MulTable[a,b] = a * b / 255
+  </div>
 
-<br>
-<div class="Comment">//Both MulTable and DivTable are used in blend functions<br>MulTable[a,b] = a * b / 255</div>
+  <p>MulTable: <b>array</b> [Byte, Byte] <b>of</b> Byte;</p>
 
-  <p class="Body">MulTable: <b>array</b> [Byte, Byte] <b>of</b> Byte;</p>
-<div class="Comment">//DivTable[a,b] = a * 255/b (for a &lt;= b)</div>
+  <div class="Comment">//DivTable[a,b] = a * 255/b (for a &lt;= b)
+  </div>
 
-  <p class="Body">DivTable: <b>array</b> [Byte, Byte] <b>of</b> Byte;</p>
+  <p>DivTable: <b>array</b> [Byte, Byte] <b>of</b> Byte;</p><br>
+  <p> 
+    <div class="Comment">//Screen scale is the measure of the primary display's pixel density relative to the former 'standard' 96 pixels per inch (aka dots per inch). Most modern screens - including desktop, tablet and phone screens - now have higher pixel densities than 96ppi. Nevertheless, understanding and accommodating varying screen scales is particularly important to avoid problems when images are scaled as this degrades image quality. (And this is particularly noticeable when rendering text.) To accommodate screen scaling, two useful variables have been defined - <span class="monobold">DpiAware1</span> and <span class="monobold">DpiAwareOne</span> (see below). These two variables (integer and double respectively) are automatically initialized on application startup and represent the screen's scale relative to 96ppi. These variables can be used either directly or indirectly via the <a href="../Routines/DpiAware.htm"><b>DpiAware</b></a> function. <b>DpiAware</b> function scales values relative to the screen's geometry.
 
-<br>
+    </div></p>
+  <p>DpiAwareOne: double; 
+    <div class="Comment">//Equivalent to ScreenScale (works cross-platform)
+    </div></p>
 
-  <p class="Body"> <div class="Comment">//Screen scale is the measure of the primary display's pixel density relative to the former 'standard' 96 pixels per inch (aka dots per inch). Most modern screens - including desktop, tablet and phone screens - now have higher pixel densities than 96ppi. Nevertheless, understanding and accommodating varying screen scales is particularly important to avoid problems when images are scaled as this degrades image quality. (And this is particularly noticeable when rendering text.) To accommodate screen scaling, two useful variables have been defined - <span class="monobold">DpiAware1</span> and <span class="monobold">DpiAwareOne</span> (see below). These two variables (integer and double respectively) are automatically initialized on application startup and represent the screen's scale relative to 96ppi. These variables can be used either directly or indirectly via the <a href="../Routines/DpiAware.htm"><b>DpiAware</b></a> function. <b>DpiAware</b> function scales values relative to the screen's geometry. </div></p>
+  <p>DpiAware1: integer; 
+    <div class="Comment">// DpiAware1 = Round(DpiAwareOne)
+    </div></p><br>
 
+  <p>
+    <div class="Comment">//ClockwiseRotationIsAnglePositive: this variable sets the behavior for all rotation routines within the library.<br>
+//Default = true.
+    </div></p>
 
-  <p class="Body">DpiAwareOne: double; <div class="Comment">//Equivalent to ScreenScale (works cross-platform)</div></p>
-
-  <p class="Body">DpiAware1: integer; <div class="Comment">// DpiAware1 = Round(DpiAwareOne)</div></p>
-
-<br>
-
-  <p class="Body"><div class="Comment">//ClockwiseRotationIsAnglePositive: this variable sets the behavior for all rotation routines within the library.<br> //Default = true.</div></p>
-
-  <p class="Body">ClockwiseRotationIsAnglePositive: Boolean;</p>
-
-
+  <p>ClockwiseRotationIsAnglePositive: Boolean;</p>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="../Routines/DpiAware.htm">DpiAware</a></p>
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+
 </body>
 
 </html>

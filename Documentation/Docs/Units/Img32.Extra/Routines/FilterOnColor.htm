@@ -1,0 +1,41 @@
+<html>
+
+<head>
+
+  <title>FilterOnColor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
+<script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
+</head>
+
+<body bgcolor="#FFFFFF">
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Extra</a><span class="active">FilterOnColor</span>
+  </div><br><br>
+
+  <h1>FilterOnColor</h1>
+  <p class="Decl"><b>procedure</b> FilterOnColor(img: TImage32; color: TColor32);</p><br class="half">
+
+  <p>Removes everything except the specified color from an image, while also preserving where the color is blended with other colors.<br> This function is the opposite of the <a href="./RemoveColor.htm"><b>RemoveColor</b></a> function.</p>
+  <h3>Example</h3>
+
+  <div class="code">
+    <pre class="brush: delphi;">
+uses Img32, Img32.Extra, Img32.Fmt.PNG;
+...
+img := TImage32.Create;
+img.LoadFromFile('beetle_aq.png');
+FilterOnColor(img, $FFE45600); 
+img.SaveToFile('FilterOnColor.png');
+img.Free;
+    </pre>
+  </div>
+  <div><span class="floatLeft"> <b>Before:</b><br><img src="../../../../Images/beetle_aq.png"> </span><span class="floatLeft"> <b>After:</b><br><img src="../../../../Images/FilterOnColor.png"> </span>
+
+  </div>
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="RemoveColor.htm">RemoveColor</a></p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+
+</body>
+
+</html>

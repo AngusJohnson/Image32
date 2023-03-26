@@ -3,7 +3,7 @@ unit Img32.Draw;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  12 March 2023                                                   *
+* Date      :  26 March 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 *                                                                              *
@@ -2095,6 +2095,7 @@ var
 begin
   if not assigned(polygon) then exit;
   setLength(polygons, 1);
+  polygons[0] := polygon;
   DrawInvertedPolygon(img, polygons, fillRule);
 end;
 // ------------------------------------------------------------------------------

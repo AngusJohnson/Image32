@@ -1,745 +1,133 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
 
   <title>Img32.Vector</title>
-
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
   <link rel="stylesheet" href="../../../Styles/Default.css" type="text/css">
-
-    
-  <script type="text/javascript" src="../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../Menu/menu.js"></script><script type="text/javascript" src="../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../_Body.htm" class="Banner"><img src="../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../_Body.htm">Index</a><span class="active">Img32.Vector</span>
+  </div><br><br>
+
   <h1>Img32.Vector</h1>
-
-
-  <p class="Body">This unit is almost always needed when performing line and polygon drawing, as both lines and polygons depend on vector definitions (<a href="../Img32/Types/TPathD.htm"><b>TPathD</b></a> and <a href="../Img32/Types/TPathsD.htm"><b>TPathsD</b></a>).<br><br> This unit provides a whole host of functions to facilitate vector drawing, including: <a href="./Routines/MakePath.htm"><b>MakePath</b></a>; <a href="./Routines/OffsetPath.htm"><b>OffsetPath</b></a>; <a href="./Routines/Ellipse.htm"><b>Ellipse</b></a> &amp; <a href="./Routines/Arc.htm"><b>Arc</b></a>; <b>Bezier</b> &amp; <b>Spline</b> functions; and <a href="./Routines/Rectangle.htm"><b>Rectangle</b></a> &amp; <a href="./Routines/RoundRect.htm"><b>RoundRect</b></a>. </p>
-
-
+  <p>This unit is almost always needed when performing line and polygon drawing, as both lines and polygons depend on vector definitions (<a href="../Img32/Types/TPathD.htm"><b>TPathD</b></a> and <a href="../Img32/Types/TPathsD.htm"><b>TPathsD</b></a>).<br><br> This unit provides a whole host of functions to facilitate vector drawing, including: <a href="./Routines/MakePath.htm"><b>MakePath</b></a>; <a href="./Routines/OffsetPath.htm"><b>OffsetPath</b></a>; <a href="./Routines/Ellipse.htm"><b>Ellipse</b></a> &amp; <a href="./Routines/Arc.htm"><b>Arc</b></a>; <b>Bezier</b> &amp; <b>Spline</b> functions; and <a href="./Routines/Rectangle.htm"><b>Rectangle</b></a> &amp; <a href="./Routines/RoundRect.htm"><b>RoundRect</b></a>. </p>
   <h2 id="Auto-Contents">Contents</h2>
-  <table>
-    <tr>
-      <th>Types</th>
-      <th>Routines</th>
-      <th>Variables</th>
-      <th>Constants</th>
-    </tr>
-    <tr>
-      <td><a href="Types/TArrowStyle.htm">TArrowStyle</a>
-      </td>
-      <td><a href="Routines/AppendPath.htm">AppendPath</a>
-      </td>
-      <td><a href="Variables/Img32.Vector.htm">Img32.Vector</a>
-      </td>
-      <td><a href="Constants/Img32.Vector.htm">Img32.Vector</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TEndStyle.htm">TEndStyle</a>
-      </td>
-      <td><a href="Routines/AppendPaths.htm">AppendPaths</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TJoinStyle.htm">TJoinStyle</a>
-      </td>
-      <td><a href="Routines/Arc.htm">Arc</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TPathEnd.htm">TPathEnd</a>
-      </td>
-      <td><a href="Routines/Area.htm">Area</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TRectWH.htm">TRectWH</a>
-      </td>
-      <td><a href="Routines/ArrowHead.htm">ArrowHead</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TSizeD.htm">TSizeD</a>
-      </td>
-      <td><a href="Routines/Average.htm">Average</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Types/TSplineType.htm">TSplineType</a>
-      </td>
-      <td><a href="Routines/Circle.htm">Circle</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/ClosestPointOnLine.htm">ClosestPointOnLine</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/ClosestPointOnSegment.htm">ClosestPointOnSegment</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/CopyPaths.htm">CopyPaths</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/Distance.htm">Distance</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/DistanceSqrd.htm">DistanceSqrd</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/Ellipse.htm">Ellipse</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/FlattenCBezier.htm">FlattenCBezier</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/FlattenCSpline.htm">FlattenCSpline</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/FlattenQBezier.htm">FlattenQBezier</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/FlattenQSpline.htm">FlattenQSpline</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetAngle.htm">GetAngle</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetBounds.htm">GetBounds</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetBoundsD.htm">GetBoundsD</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetClosestPtOnRotatedEllipse.htm">GetClosestPtOnRotatedEllipse</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetCumulativeDistances.htm">GetCumulativeDistances</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetDashedOutline.htm">GetDashedOutline</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetDashedPath.htm">GetDashedPath</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetDefaultArrowHeadSize.htm">GetDefaultArrowHeadSize</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetDistances.htm">GetDistances</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetEllipticalAngleFromPoint.htm">GetEllipticalAngleFromPoint</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetLineEllipseIntersects.htm">GetLineEllipseIntersects</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetNormals.htm">GetNormals</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetPointAtAngleAndDist.htm">GetPointAtAngleAndDist</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetPtOnEllipseFromAngle.htm">GetPtOnEllipseFromAngle</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetPtOnRotatedEllipseFromAngle.htm">GetPtOnRotatedEllipseFromAngle</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetRotatedRectBounds.htm">GetRotatedRectBounds</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetUnitNormal.htm">GetUnitNormal</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetUnitVector.htm">GetUnitVector</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/GetVectors.htm">GetVectors</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/Grow.htm">Grow</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/InflateRect.htm">InflateRect</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/IntersectPoint.htm">IntersectPoint</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/IntersectRect.htm">IntersectRect</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/IsPointInEllipse.htm">IsPointInEllipse</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/MakePath.htm">MakePath</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/OffsetPath.htm">OffsetPath</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/OffsetPoint.htm">OffsetPoint</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/OffsetRect.htm">OffsetRect</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/OpenPathToFlatPolygon.htm">OpenPathToFlatPolygon</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/Outline.htm">Outline</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/Paths.htm">Paths</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/Pie.htm">Pie</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/PointInPolygon.htm">PointInPolygon</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/PointInPolygons.htm">PointInPolygons</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/Rectangle.htm">Rectangle</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/RectsEqual.htm">RectsEqual</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/RectsOverlap.htm">RectsOverlap</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/RectWH.htm">RectWH</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/ReversePath.htm">ReversePath</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/RotatedEllipse.htm">RotatedEllipse</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/RotatePath.htm">RotatePath</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/RotatePoint.htm">RotatePoint</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/RoundRect.htm">RoundRect</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/ScalePath.htm">ScalePath</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/ScaleRect.htm">ScaleRect</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/ShortenPath.htm">ShortenPath</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/Star.htm">Star</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/StripNearDuplicates.htm">StripNearDuplicates</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/UnionRect.htm">UnionRect</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/ValueAlmostOne.htm">ValueAlmostOne</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Routines/ValueAlmostZero.htm">ValueAlmostZero</a>
-      </td>
-      <td>
-      </td>
-      <td>
-      </td>
-    </tr>
-  </table>
+  <div class="autoTblContainer">
+    <div class="autoTbl">
+      <div><b>Types</b>
+      </div>
+      <div><span><a href="Types/TArrowStyle.htm">TArrowStyle</a></span>
+<span><a href="Types/TEndStyle.htm">TEndStyle</a></span>
+<span><a href="Types/TJoinStyle.htm">TJoinStyle</a></span>
+<span><a href="Types/TPathEnd.htm">TPathEnd</a></span>
+<span><a href="Types/TRectWH.htm">TRectWH</a></span>
+<span><a href="Types/TSizeD.htm">TSizeD</a></span>
+<span><a href="Types/TSplineType.htm">TSplineType</a></span>
+
+      </div><br>
+    </div>
+  </div>
+  <div class="autoTblContainer">
+    <div class="autoTbl">
+      <div><b>Routines</b>
+      </div>
+      <div><span><a href="Routines/AppendPath.htm">AppendPath</a></span>
+<span><a href="Routines/AppendPaths.htm">AppendPaths</a></span>
+<span><a href="Routines/Arc.htm">Arc</a></span>
+<span><a href="Routines/Area.htm">Area</a></span>
+<span><a href="Routines/ArrowHead.htm">ArrowHead</a></span>
+<span><a href="Routines/Average.htm">Average</a></span>
+<span><a href="Routines/Circle.htm">Circle</a></span>
+<span><a href="Routines/ClosestPointOnLine.htm">ClosestPointOnLine</a></span>
+<span><a href="Routines/ClosestPointOnSegment.htm">ClosestPointOnSegment</a></span>
+<span><a href="Routines/CopyPaths.htm">CopyPaths</a></span>
+<span><a href="Routines/Distance.htm">Distance</a></span>
+<span><a href="Routines/DistanceSqrd.htm">DistanceSqrd</a></span>
+<span><a href="Routines/Ellipse.htm">Ellipse</a></span>
+<span><a href="Routines/FlattenCBezier.htm">FlattenCBezier</a></span>
+<span><a href="Routines/FlattenCSpline.htm">FlattenCSpline</a></span>
+<span><a href="Routines/FlattenQBezier.htm">FlattenQBezier</a></span>
+<span><a href="Routines/FlattenQSpline.htm">FlattenQSpline</a></span>
+<span><a href="Routines/GetAngle.htm">GetAngle</a></span>
+<span><a href="Routines/GetBounds.htm">GetBounds</a></span>
+<span><a href="Routines/GetBoundsD.htm">GetBoundsD</a></span>
+<span><a href="Routines/GetClosestPtOnRotatedEllipse.htm">GetClosestPtOnRotatedEllipse</a></span>
+<span><a href="Routines/GetCumulativeDistances.htm">GetCumulativeDistances</a></span>
+<span><a href="Routines/GetDashedOutline.htm">GetDashedOutline</a></span>
+<span><a href="Routines/GetDashedPath.htm">GetDashedPath</a></span>
+<span><a href="Routines/GetDefaultArrowHeadSize.htm">GetDefaultArrowHeadSize</a></span>
+<span><a href="Routines/GetDistances.htm">GetDistances</a></span>
+<span><a href="Routines/GetEllipticalAngleFromPoint.htm">GetEllipticalAngleFromPoint</a></span>
+<span><a href="Routines/GetLineEllipseIntersects.htm">GetLineEllipseIntersects</a></span>
+<span><a href="Routines/GetNormals.htm">GetNormals</a></span>
+<span><a href="Routines/GetPointAtAngleAndDist.htm">GetPointAtAngleAndDist</a></span>
+<span><a href="Routines/GetPtOnEllipseFromAngle.htm">GetPtOnEllipseFromAngle</a></span>
+<span><a href="Routines/GetPtOnRotatedEllipseFromAngle.htm">GetPtOnRotatedEllipseFromAngle</a></span>
+<span><a href="Routines/GetRotatedRectBounds.htm">GetRotatedRectBounds</a></span>
+<span><a href="Routines/GetUnitNormal.htm">GetUnitNormal</a></span>
+<span><a href="Routines/GetUnitVector.htm">GetUnitVector</a></span>
+<span><a href="Routines/GetVectors.htm">GetVectors</a></span>
+<span><a href="Routines/Grow.htm">Grow</a></span>
+<span><a href="Routines/InflateRect.htm">InflateRect</a></span>
+<span><a href="Routines/IntersectPoint.htm">IntersectPoint</a></span>
+<span><a href="Routines/IntersectRect.htm">IntersectRect</a></span>
+<span><a href="Routines/IsPointInEllipse.htm">IsPointInEllipse</a></span>
+<span><a href="Routines/MakePath.htm">MakePath</a></span>
+<span><a href="Routines/OffsetPath.htm">OffsetPath</a></span>
+<span><a href="Routines/OffsetPoint.htm">OffsetPoint</a></span>
+<span><a href="Routines/OffsetRect.htm">OffsetRect</a></span>
+<span><a href="Routines/OpenPathToFlatPolygon.htm">OpenPathToFlatPolygon</a></span>
+<span><a href="Routines/Outline.htm">Outline</a></span>
+<span><a href="Routines/Paths.htm">Paths</a></span>
+<span><a href="Routines/Pie.htm">Pie</a></span>
+<span><a href="Routines/PointInPolygon.htm">PointInPolygon</a></span>
+<span><a href="Routines/PointInPolygons.htm">PointInPolygons</a></span>
+<span><a href="Routines/Rectangle.htm">Rectangle</a></span>
+<span><a href="Routines/RectsEqual.htm">RectsEqual</a></span>
+<span><a href="Routines/RectsOverlap.htm">RectsOverlap</a></span>
+<span><a href="Routines/RectWH.htm">RectWH</a></span>
+<span><a href="Routines/ReversePath.htm">ReversePath</a></span>
+<span><a href="Routines/RotatedEllipse.htm">RotatedEllipse</a></span>
+<span><a href="Routines/RotatePath.htm">RotatePath</a></span>
+<span><a href="Routines/RotatePoint.htm">RotatePoint</a></span>
+<span><a href="Routines/RoundRect.htm">RoundRect</a></span>
+<span><a href="Routines/ScalePath.htm">ScalePath</a></span>
+<span><a href="Routines/ScaleRect.htm">ScaleRect</a></span>
+<span><a href="Routines/ShortenPath.htm">ShortenPath</a></span>
+<span><a href="Routines/Star.htm">Star</a></span>
+<span><a href="Routines/StripNearDuplicates.htm">StripNearDuplicates</a></span>
+<span><a href="Routines/UnionRect.htm">UnionRect</a></span>
+<span><a href="Routines/ValueAlmostOne.htm">ValueAlmostOne</a></span>
+<span><a href="Routines/ValueAlmostZero.htm">ValueAlmostZero</a></span>
+
+      </div><br>
+    </div>
+  </div>
+  <div class="autoTblContainer">
+    <div class="autoTbl">
+      <div><b>Variables</b>
+      </div>
+      <div><span><a href="Variables/Img32.Vector.htm">Img32.Vector</a></span>
+
+      </div><br>
+    </div>
+  </div>
+  <div class="autoTblContainer">
+    <div class="autoTbl">
+      <div><b>Constants</b>
+      </div>
+      <div><span><a href="Constants/Img32.Vector.htm">Img32.Vector</a></span>
+
+      </div><br>
+    </div>
+  </div>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="Routines/Arc.htm">Arc</a>, <a href="Routines/Ellipse.htm">Ellipse</a>, <a href="Routines/MakePath.htm">MakePath</a>, <a href="Routines/OffsetPath.htm">OffsetPath</a>, <a href="Routines/Rectangle.htm">Rectangle</a>, <a href="Routines/RoundRect.htm">RoundRect</a>, <a href="../Img32/Types/TPathD.htm">TPathD</a>, <a href="../Img32/Types/TPathsD.htm">TPathsD</a></p>
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+
 </body>
 
 </html>

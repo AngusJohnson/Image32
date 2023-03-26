@@ -1,17 +1,6 @@
 <html>
 
 <head>
-    
-  <script type="text/javascript" src="../../../../../Scripts/SyntaxHighlighter/scripts/shCore.js">
-  </script>
-    
-  <script type="text/javascript" src="../../../../../Scripts/SyntaxHighlighter/scripts/shBrushDelphi.js">
-  </script>
-    
-  <link type="text/css" rel="stylesheet" href="../../../../../Scripts/SyntaxHighlighter/styles/shCore.css">
-    
-  <link type="text/css" rel="stylesheet" href="../../../../../Scripts/SyntaxHighlighter/styles/shThemeDefault.css">
-  
 
   <title>TVectorLayer32</title>
 
@@ -20,271 +9,244 @@
   <link rel="stylesheet" href="../../../../../Styles/Default.css" type="text/css">
 
   <meta name="Ancestor" content="TRotateLayer32">
-
-    
-  <script type="text/javascript" src="../../../../../Scripts/bootstrap.js">
-  </script>
-  
+<script type="text/javascript" src="../../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-    
-  <!-- THIS FILE HAS BEEN AUTOMATICALLY PROCESSED FROM A SOURCE COPY -->
-    
-  <!-- DO NOT EDIT MANUALLY !!! -->
-  
-  <table class="Banner" cellspacing="0" cellpadding="0" border="0" bordercolorlight="#303080" bordercolordark="#7070B0">
-    <tr>
-      <td class="Banner" nowrap=""><a href="../../../../_Body.htm" class="Banner"><img src="../../../../../Images/_Home.png" align="absmiddle">Index</a>
-      </td>
-      <td class="Banner" nowrap=""><a href="../../_Body.htm" class="Banner"><img src="../../../../../Images/_Unit.png" align="absmiddle">Img32.Layers</a>
-      </td>
-      <td class="Banner" width="100%" align="right"><img src="../../../../../Images/_Project_Logo.png" align="absmiddle">
-      </td>
-    </tr>
-  </table>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../../_Body.htm">Index</a><a class="ancestor" href="../../_Body.htm">Img32.Layers</a><span class="active">TVectorLayer32</span>
+  </div><br><br>
+
   <h1>TVectorLayer32</h1>
-  <h2>Hierarchy</h2>
-  <p class="Hierarchy"></p>
-  <p class="Hierarchy">&nbsp;&nbsp;&nbsp;|</p>
-  <p class="Hierarchy"><a href="../TLayer32/_Body.htm">TLayer32</a></p>
-  <p class="Hierarchy">&nbsp;&nbsp;&nbsp;|</p>
-  <p class="Hierarchy"><a href="../THitTestLayer32/_Body.htm">THitTestLayer32</a></p>
-  <p class="Hierarchy">&nbsp;&nbsp;&nbsp;|</p>
-  <p class="Hierarchy"><a href="../TRotateLayer32/_Body.htm">TRotateLayer32</a></p>
+  <h2>Ancestors</h2>
+  <div class="Hierarchy">&nbsp;&nbsp;&nbsp;|
+  </div>
+  <div class="Hierarchy"><a href="../TLayer32/_Body.htm">TLayer32</a>
+  </div>
+  <div class="Hierarchy">&nbsp;&nbsp;&nbsp;|
+  </div>
+  <div class="Hierarchy"><a href="../THitTestLayer32/_Body.htm">THitTestLayer32</a>
+  </div>
+  <div class="Hierarchy">&nbsp;&nbsp;&nbsp;|
+  </div>
+  <div class="Hierarchy"><a href="../TRotateLayer32/_Body.htm">TRotateLayer32</a>
+  </div><br><br>
 
-<br>
+  <p><span class="monobold">TVectorLayer32</span> is designed to display vector images of all kinds, whether open paths (lines or curves) or closed paths (polygons). Initially the layer will size and position according to <span class="monobold">Paths</span>, when it's assigned. But when the layer is repositioned or resized, or even rotated, <span class="monobold">Paths</span> will update automatically.<br><br> Because paths may be open or closed, and have an almost unlimited variety of brush and pen drawing styles, all drawing is delegated to the <a href="./Properties/OnDraw.htm"><b>OnDraw</b></a> event.</p><br>
 
-  <p class="Body"><span class="monobold">TVectorLayer32</span> is designed to display vector images of all kinds, whether open paths (lines or curves) or closed paths (polygons). Initially the layer will size and position according to <span class="monobold">Paths</span>, when it's assigned. But when the layer is repositioned or resized, or even rotated, <span class="monobold">Paths</span> will update automatically.<br><br> Because paths may be open or closed, and have an almost unlimited variety of brush and pen drawing styles, all drawing is delegated to the <a href="./Properties/OnDraw.htm"><b>OnDraw</b></a> event.</p>
-
-<br><br>
-
-  <p class="Body"> 
-    <table class="white">
-      <tr>
-    
-        <td>  
-      <img src="../../../../../Images/sizing.png"> 
-    
-        </td>
-  
-      </tr>
-
-    </table> </p>
-
-
+  <div><img src="../../../../../Images/sizing.png">
+  </div>
   <h2 id="Auto-Reference">Reference</h2>
-  <table>
-    <tr>
-      <th>Methods</th>
-      <th>Properties</th>
-    </tr>
-    <tr>
-      <td colspan="2" class="White">In TVectorLayer32:
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Methods/Rotate.htm">Rotate</a>
-      </td>
-      <td><a href="Properties/Angle.htm">Angle</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Methods/UpdateHitTestMask.htm">UpdateHitTestMask</a>
-      </td>
-      <td><a href="Properties/AutoCenterPivot.htm">AutoCenterPivot</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="Methods/UpdateHitTestMaskFromImage.htm">UpdateHitTestMaskFromImage</a>
-      </td>
-      <td><a href="Properties/Margin.htm">Margin</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Properties/OnDraw.htm">OnDraw</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Properties/Paths.htm">Paths</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="Properties/PivotPt.htm">PivotPt</a>
-      </td>
-    </tr>
-    <tr>
-      <td colspan="2" class="White">In TRotateLayer32:
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TRotateLayer32/Methods/ResetAngle.htm">ResetAngle</a>
-      </td>
-      <td><a href="../TRotateLayer32/Properties/AutoPivot.htm">AutoPivot</a>
-      </td>
-    </tr>
-    <tr>
-      <td colspan="2" class="White">In THitTestLayer32:
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="../THitTestLayer32/Properties/HitTestEnabled.htm">HitTestEnabled</a>
-      </td>
-    </tr>
-    <tr>
-      <td colspan="2" class="White">In TLayer32:
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/AddChild.htm">AddChild</a>
-      </td>
-      <td><a href="../TLayer32/Properties/BlendFunc.htm">BlendFunc</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/BringForwardOne.htm">BringForwardOne</a>
-      </td>
-      <td><a href="../TLayer32/Properties/Child.htm">Child</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/BringToFront.htm">BringToFront</a>
-      </td>
-      <td><a href="../TLayer32/Properties/ChildCount.htm">ChildCount</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/ClearChildren.htm">ClearChildren</a>
-      </td>
-      <td><a href="../TLayer32/Properties/ClipPath.htm">ClipPath</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/Create.htm">Create</a>
-      </td>
-      <td><a href="../TLayer32/Properties/CursorId.htm">CursorId</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/DeleteChild.htm">DeleteChild</a>
-      </td>
-      <td><a href="../TLayer32/Properties/Height.htm">Height</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/Destroy.htm">Destroy</a>
-      </td>
-      <td><a href="../TLayer32/Properties/Image.htm">Image</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/InsertChild.htm">InsertChild</a>
-      </td>
-      <td><a href="../TLayer32/Properties/Index.htm">Index</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/Invalidate.htm">Invalidate</a>
-      </td>
-      <td><a href="../TLayer32/Properties/InnerBounds.htm">InnerBounds</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/MakeAbsolute.htm">MakeAbsolute</a>
-      </td>
-      <td><a href="../TLayer32/Properties/InnerRect.htm">InnerRect</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/MakeRelative.htm">MakeRelative</a>
-      </td>
-      <td><a href="../TLayer32/Properties/Left.htm">Left</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/Offset.htm">Offset</a>
-      </td>
-      <td><a href="../TLayer32/Properties/Location.htm">Location</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/PositionAt.htm">PositionAt</a>
-      </td>
-      <td><a href="../TLayer32/Properties/MidPoint.htm">MidPoint</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/PositionCenteredAt.htm">PositionCenteredAt</a>
-      </td>
-      <td><a href="../TLayer32/Properties/Name.htm">Name</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/SendBackOne.htm">SendBackOne</a>
-      </td>
-      <td><a href="../TLayer32/Properties/Opacity.htm">Opacity</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/SendToBack.htm">SendToBack</a>
-      </td>
-      <td><a href="../TLayer32/Properties/OuterBounds.htm">OuterBounds</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/SetInnerBounds.htm">SetInnerBounds</a>
-      </td>
-      <td><a href="../TLayer32/Properties/Parent.htm">Parent</a>
-      </td>
-    </tr>
-    <tr>
-      <td><a href="../TLayer32/Methods/SetSize.htm">SetSize</a>
-      </td>
-      <td><a href="../TLayer32/Properties/Root.htm">Root</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="../TLayer32/Properties/RootOwner.htm">RootOwner</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="../TLayer32/Properties/Top.htm">Top</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="../TLayer32/Properties/UserData.htm">UserData</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="../TLayer32/Properties/Visible.htm">Visible</a>
-      </td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td><a href="../TLayer32/Properties/Width.htm">Width</a>
-      </td>
-    </tr>
-  </table>
-    
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2019 Angus Johnson &nbsp; - &nbsp; Image32 ver. 4.2 &nbsp; - &nbsp; Documentation last updated on 27 July 2022 <br><br> </p>
-  
+  <p>
+    <table class="autoTbl">
+      <tr>
+        <th>Methods</th>
+        <th style="width: 100%;">Properties</th>
+      </tr>
+      <tr>
+        <td colspan="2" class="ancestor">In TVectorLayer32:
+        </td>
+      </tr>
+      <tr>
+        <td><a href="Methods/Rotate.htm">Rotate</a>
+        </td>
+        <td><a href="Properties/Angle.htm">Angle</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="Methods/UpdateHitTestMask.htm">UpdateHitTestMask</a>
+        </td>
+        <td><a href="Properties/AutoCenterPivot.htm">AutoCenterPivot</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="Methods/UpdateHitTestMaskFromImage.htm">UpdateHitTestMaskFromImage</a>
+        </td>
+        <td><a href="Properties/Margin.htm">Margin</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+        </td>
+        <td><a href="Properties/OnDraw.htm">OnDraw</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+        </td>
+        <td><a href="Properties/Paths.htm">Paths</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+        </td>
+        <td><a href="Properties/PivotPt.htm">PivotPt</a>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" class="ancestor">In TRotateLayer32:
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TRotateLayer32/Methods/ResetAngle.htm">ResetAngle</a>
+        </td>
+        <td><a href="../TRotateLayer32/Properties/AutoPivot.htm">AutoPivot</a>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" class="ancestor">In THitTestLayer32:
+        </td>
+      </tr>
+      <tr>
+        <td>
+        </td>
+        <td><a href="../THitTestLayer32/Properties/HitTestEnabled.htm">HitTestEnabled</a>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" class="ancestor">In TLayer32:
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/AddChild.htm">AddChild</a>
+        </td>
+        <td><a href="../TLayer32/Properties/BlendFunc.htm">BlendFunc</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/BringForwardOne.htm">BringForwardOne</a>
+        </td>
+        <td><a href="../TLayer32/Properties/Child.htm">Child</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/BringToFront.htm">BringToFront</a>
+        </td>
+        <td><a href="../TLayer32/Properties/ChildCount.htm">ChildCount</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/ClearChildren.htm">ClearChildren</a>
+        </td>
+        <td><a href="../TLayer32/Properties/ClipPath.htm">ClipPath</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/Create.htm">Create</a>
+        </td>
+        <td><a href="../TLayer32/Properties/CursorId.htm">CursorId</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/DeleteChild.htm">DeleteChild</a>
+        </td>
+        <td><a href="../TLayer32/Properties/Height.htm">Height</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/Destroy.htm">Destroy</a>
+        </td>
+        <td><a href="../TLayer32/Properties/Image.htm">Image</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/InsertChild.htm">InsertChild</a>
+        </td>
+        <td><a href="../TLayer32/Properties/Index.htm">Index</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/Invalidate.htm">Invalidate</a>
+        </td>
+        <td><a href="../TLayer32/Properties/InnerBounds.htm">InnerBounds</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/MakeAbsolute.htm">MakeAbsolute</a>
+        </td>
+        <td><a href="../TLayer32/Properties/InnerRect.htm">InnerRect</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/MakeRelative.htm">MakeRelative</a>
+        </td>
+        <td><a href="../TLayer32/Properties/Left.htm">Left</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/Offset.htm">Offset</a>
+        </td>
+        <td><a href="../TLayer32/Properties/Location.htm">Location</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/PositionAt.htm">PositionAt</a>
+        </td>
+        <td><a href="../TLayer32/Properties/MidPoint.htm">MidPoint</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/PositionCenteredAt.htm">PositionCenteredAt</a>
+        </td>
+        <td><a href="../TLayer32/Properties/Name.htm">Name</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/SendBackOne.htm">SendBackOne</a>
+        </td>
+        <td><a href="../TLayer32/Properties/Opacity.htm">Opacity</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/SendToBack.htm">SendToBack</a>
+        </td>
+        <td><a href="../TLayer32/Properties/OuterBounds.htm">OuterBounds</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/SetInnerBounds.htm">SetInnerBounds</a>
+        </td>
+        <td><a href="../TLayer32/Properties/Parent.htm">Parent</a>
+        </td>
+      </tr>
+      <tr>
+        <td><a href="../TLayer32/Methods/SetSize.htm">SetSize</a>
+        </td>
+        <td><a href="../TLayer32/Properties/Root.htm">Root</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+        </td>
+        <td><a href="../TLayer32/Properties/RootOwner.htm">RootOwner</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+        </td>
+        <td><a href="../TLayer32/Properties/Top.htm">Top</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+        </td>
+        <td><a href="../TLayer32/Properties/UserData.htm">UserData</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+        </td>
+        <td><a href="../TLayer32/Properties/Visible.htm">Visible</a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+        </td>
+        <td><a href="../TLayer32/Properties/Width.htm">Width</a>
+        </td>
+      </tr>
+    </table></p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+
 </body>
 
 </html>

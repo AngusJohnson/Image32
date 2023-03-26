@@ -1,0 +1,27 @@
+<html>
+
+<head>
+
+  <title>SimplifyPaths</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
+<script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
+</head>
+
+<body bgcolor="#FFFFFF">
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Extra</a><span class="active">SimplifyPaths</span>
+  </div><br><br>
+
+  <h1>SimplifyPaths</h1>
+  <p class="Decl"><b>function</b> SimplifyPaths(<b>const</b> path: TPathD; epsilon: double; isOpenPath: Boolean = false): TPathD; <b>overload;</b><br><br></p>
+
+  <p class="Decl"><b>function</b> SimplifyPaths(<b>const</b> path: TPathsD; epsilon: double; isOpenPath: Boolean = false): TPathD; <b>overload;</b></p><br class="half">
+
+  <p>This function removes vertices that contribute very little to a path's shape. The <span class="monobold2">epsilon</span> parameter specifies the minimum distance a vertex can be from an imaginary line drawn between its two adjacent vertices.<br><br> This function is especially useful following <a href="./Vectorize.htm"><b>vectorize</b></a>, that converts monochrome raster images into vector images. This is demonstrated in the <b>VectorizeImage</b> example. It's also very useful following <a href="../../Img32.Clipper/Routines/InflatePath.htm"><b>InflatePaths</b></a>. </p>
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="../../Img32.Clipper/Routines/InflatePath.htm">InflatePath</a>, <a href="SmoothToCubicBezier.htm">SmoothToCubicBezier</a>, <a href="Vectorize.htm">Vectorize</a></p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+
+</body>
+
+</html>
