@@ -2,8 +2,8 @@ unit Img32.Panels;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.3                                                             *
-* Date      :  21 September 2022                                               *
+* Version   :  4.4                                                             *
+* Date      :  26 March 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Component that displays images on a TPanel descendant           *
@@ -15,7 +15,7 @@ interface
 uses
   SysUtils, Classes, Windows, Messages, Types, Graphics,
   Controls, Forms, ExtCtrls, Themes, uxTheme, Math, ShellApi, ClipBrd,
-  Img32;
+  Img32, Img32.Extra;
 
 {$I Img32.inc}
 
@@ -23,7 +23,7 @@ const
   WM_MOUSEHWHEEL = $020E;
 type
   TShowScrollBtns = (ssbFocused, ssAlways, ssNever);
-
+  TPanelBkgType = (pbtSolidColor, pbtChessBoard);
   //TDrawImageEvent: template for TBaseImgPanel's OnDrawImage event property.
   //nb: with scaling, srcRect & dstRect may have different widths +/- heights.
   TDrawImageEvent = procedure (Sender: TObject;
@@ -67,6 +67,10 @@ type
     fLastDistance: integer;
     fLastLocation: TPoint;
 {$ENDIF}
+    fBkgType   : TPanelBkgType;
+    fBkgChBrdColor1 : TColor32;
+    fBkgChBrdColor2 : TColor32;
+    fBkgChBrdSize : Integer;
     procedure UpdateOffsetDelta(resetOrigin: Boolean);
     function  GetMinScrollBtnSize: integer;
     function  GetDstOffset: TPoint;
@@ -82,6 +86,10 @@ type
     procedure SetAutoCenter(value: Boolean);
     procedure SetAllowZoom(value: Boolean);
     procedure SetShowScrollButtons(value: TShowScrollBtns);
+    procedure SetBkgType(value : TPanelBkgType);
+    procedure SetBkgChBrdColor1(value : TColor32);
+    procedure SetBkgChBrdColor2(value : TColor32);
+    procedure SetBkgChBrdSize(value : Integer);
 {$IFDEF GESTURES}
     procedure Gesture(Sender: TObject;
       const EventInfo: TGestureEventInfo; var Handled: Boolean);
@@ -143,6 +151,13 @@ type
     property AllowKeyScroll: Boolean read fAllowKeyScroll write fAllowKeyScroll;
     property AllowScrnScroll: Boolean read fAllowScrnScroll write fAllowScrnScroll;
     property AllowZoom: Boolean read fAllowZoom write SetAllowZoom;
+
+    //Hatched background option
+    property BkgType        : TPanelBkgType read fBkgType        write SetBkgType;
+    property BkgChBrdColor1 : TColor32      read fBkgChBrdColor1 write SetBkgChBrdColor1;
+    property BkgChBrdColor2 : TColor32      read fBkgChBrdColor2 write SetBkgChBrdColor2;
+    property BkgChBrdSize   : Integer       read fBkgChBrdSize   write SetBkgChBrdSize;
+
     //OnKeyDown: optional event for custom keyboard actions
     property OnKeyDown: TKeyEvent read fOnKeyDown write fOnKeyDown;
     property OnKeyUp: TKeyEvent read fOnKeyUp write fOnKeyUp;
@@ -219,14 +234,15 @@ const
   MaxImageScale = 1000;
   tolerance = 0.01;
 
-type
-  PColor32 = ^TColor32;
-  TColor32 = Cardinal;
-  TARGB = record
-    case boolean of
-      false: (B, G, R, A: byte);
-      true: (color: TColor);
-  end;
+// this already defined in Img32
+//type
+//  PColor32 = ^TColor32;
+//  TColor32 = Cardinal;
+//  TARGB = record
+//    case boolean of
+//      false: (B, G, R, A: byte);
+//      true: (color: TColor);
+//  end;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -394,6 +410,11 @@ begin
   fScaleMin := 0.05;
   fScaleMax := 20;
   fImageSize := Size(200,200);
+
+  fBkgType        := pbtSolidColor;
+  fBkgChBrdColor1 := clLiteBtn32;
+  fBkgChBrdColor2 := clWhite32;
+  fBkgChBrdSize   := 10;
 end;
 //------------------------------------------------------------------------------
 
@@ -596,7 +617,7 @@ begin
 
   if (fImageSize.cx = 0) or (fImageSize.cy = 0) then Exit;
 
-  btnMin      := GetMinScrollBtnSize;
+  btnMin        := GetMinScrollBtnSize;
   innerRec      := GetInnerClientRect;
   innerClientW  := innerRec.Right - innerRec.Left;
   innerClientH  := innerRec.Bottom - innerRec.Top;
@@ -648,7 +669,34 @@ begin
   Invalidate;
 end;
 //------------------------------------------------------------------------------
-
+procedure TBaseImgPanel.SetBkgType(value : TPanelBkgType);
+begin
+  if value = fBkgType then Exit;
+  fBkgType := value;
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+procedure TBaseImgPanel.SetBkgChBrdColor1(value : TColor32);
+begin
+  if value = fBkgChBrdColor1 then Exit;
+  fBkgChBrdColor1 := value;
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+procedure TBaseImgPanel.SetBkgChBrdColor2(value : TColor32);
+begin
+  if value = fBkgChBrdColor2 then Exit;
+  fBkgChBrdColor2 := value;
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+procedure TBaseImgPanel.SetBkgChBrdSize(value : Integer);
+begin
+  if value = fBkgChBrdSize then Exit;
+  fBkgChBrdSize := value;
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
 function TBaseImgPanel.ClientToImage(const clientPt: TPoint): TPoint;
 var
   marg: integer;
@@ -734,7 +782,7 @@ begin
     end;
   end;
 
-  if not (fScrollbarHorz.MouseDown or fScrollbarVert.MouseDown) then  
+  if not (fScrollbarHorz.MouseDown or fScrollbarVert.MouseDown) then
     inherited;
 
   if TabStop and not Focused and CanFocus then
@@ -754,11 +802,11 @@ begin
   inDrawRegion := PtInRect(rec, Point(X,Y));
 
   if inDrawRegion and
-    not (fScrollbarHorz.MouseDown or fScrollbarVert.MouseDown) then  
+    not (fScrollbarHorz.MouseDown or fScrollbarVert.MouseDown) then
   begin
-    if fScrollbarVert.MouseOver or fScrollbarHorz.MouseOver then 
+    if fScrollbarVert.MouseOver or fScrollbarHorz.MouseOver then
     begin
-      Invalidate;          
+      Invalidate;
       fScrollbarHorz.MouseOver := false;
       fScrollbarVert.MouseOver := false;
     end;
@@ -779,7 +827,7 @@ begin
         if (Y < rec.Bottom) then
         begin
           cursor := crSizeNS;
-          if not fScrollbarVert.MouseOver then Invalidate;          
+          if not fScrollbarVert.MouseOver then Invalidate;
           fScrollbarVert.MouseOver := true;
         end else
           cursor := crDefault;
@@ -829,7 +877,7 @@ begin
       dec(srcOffset, Round((X - MouseDownPos) / fScale));
       MouseDownPos := X;
     end;
-  end else 
+  end else
   begin
     Exit; //ie exit here if NOT scrolling
   end;
@@ -884,6 +932,22 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TBaseImgPanel.Paint;
+
+  procedure DrawCheesBoard(rec: TRect);
+  var
+    tImage : TImage32;
+    x, y, s: Integer;
+    ra, rb : TRect;
+  begin
+    tImage := TImage32.Create(rec.Width, rec.Height);
+    try
+      HatchBackground(timage,
+        fBkgChBrdColor1, fBkgChBrdColor2, DpiAware(fBkgChBrdSize));
+      tImage.CopyToDc(rec, rec, canvas.Handle);
+    finally
+      tImage.Free;
+    end;
+  end;
 
   procedure DrawFrame(rec: TRect; tlColor, brColor: TColor; width: integer);
   var
@@ -975,6 +1039,12 @@ begin
       Canvas.Brush.Color := TControl(parent).Color else
       Canvas.Brush.Color := self.Color;
     Canvas.FillRect(innerRec);
+  end;
+
+  // draw cheesboard
+  if fBkgType = pbtChessBoard then
+  begin
+    DrawCheesBoard(innerRec);
   end;
 
   //draw the image

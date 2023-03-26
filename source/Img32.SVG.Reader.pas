@@ -849,7 +849,11 @@ begin
     try
       DrawChildren(tmpImg, drawDat);
       with TClipPathElement(clipEl) do
-        EraseOutsidePaths(tmpImg, clipPaths, fDrawData.fillRule, clipRec);
+      begin
+        if fDrawData.fillRule = frNegative then
+          EraseOutsidePaths(tmpImg, clipPaths, frNonZero, clipRec) else
+          EraseOutsidePaths(tmpImg, clipPaths, fDrawData.fillRule, clipRec);
+      end;
       image.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlpha);
     finally
       tmpImg.Free;
@@ -1516,7 +1520,7 @@ begin
         begin
           Result := AddNamedImage(name);
           Result.Copy(fSrcImg, fFilterBounds, Result.Bounds);
-          Result.SetRGB(clNone32, Result.Bounds);
+          Result.SetRGB(clBlack32, Result.Bounds);
         end;
         Exit;
       end;
@@ -1559,7 +1563,8 @@ begin
         hfeSpecularLighting : TFeSpecLightElement(fChilds[i]).Apply;
       end;
     end;
-    fSrcImg.Copy(fLastImg, fLastImg.Bounds, fFilterBounds);
+    if Assigned(fLastImg) then
+      fSrcImg.Copy(fLastImg, fLastImg.Bounds, fFilterBounds);
   finally
     Clear;
   end;
@@ -1855,7 +1860,7 @@ begin
     dstImg.ReduceOpacity(alpha);
   if stdDev > 0 then
     FastGaussianBlur(dstImg, dstRec,
-      Ceil(stdDev *0.75 * ParentFilterEl.fScale) , 0);
+      Ceil(stdDev *0.75 * ParentFilterEl.fScale) , 1);
   dstImg.CopyBlend(dropShadImg, dropShadImg.Bounds, dstRec, BlendToAlpha);
 end;
 
@@ -1904,8 +1909,7 @@ begin
 
   //FastGaussianBlur is a very good approximation and also very much faster.
   //Empirically stdDev * PI/4 more closely emulates other renderers.
-  FastGaussianBlur(dstImg, dstRec,
-    Ceil(stdDev * PI/4 * ParentFilterEl.fScale), fReader.fBlurQuality);
+  FastGaussianBlur(dstImg, dstRec, Ceil(stdDev * PI/4 * ParentFilterEl.fScale));
 end;
 
 //------------------------------------------------------------------------------
@@ -2167,7 +2171,11 @@ begin
     TMaskElement(maskEl).ApplyMask(img, drawDat)
   else if Assigned(clipPathEl) then
     with TClipPathElement(clipPathEl) do
-      EraseOutsidePaths(img, clipPaths, fDrawData.fillRule, clipRec2);
+    begin
+      if fDrawData.fillRule = frNegative then
+        EraseOutsidePaths(img, clipPaths, frNonZero, clipRec2) else
+        EraseOutsidePaths(img, clipPaths, fDrawData.fillRule, clipRec2);
+    end;
 
   if usingTempImage and (img <> image) then
     image.CopyBlend(img, clipRec2, clipRec2, BlendToAlpha);

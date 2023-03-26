@@ -2478,8 +2478,7 @@ end;
 procedure BoxBlurH(var src, dst: TArrayOfColor32; w,h, stdDev: integer);
 var
   i,j, ti, li, ri, re, ovr: integer;
-  fv, val: TWeightedColor;
-  rc: TColor32;
+  val: TWeightedColor;
 begin
   ovr := Max(0, stdDev - w);
   for i := 0 to h -1 do
@@ -2488,24 +2487,21 @@ begin
     li := ti;
     ri := ti +stdDev;
     re := ti +w -1; // idx of last pixel in row
-    rc := src[re];  // color of last pixel in row
-    fv.Reset;
-    //lv.Reset;
+    //rc := src[re];  // color of last pixel in row
     val.Reset;
-    fv.Add(src[ti], 1);
-    //lv.Add(clNone32, 1);
     val.Add(src[ti], stdDev +1);
     for j := 0 to stdDev -1 - ovr do
       val.Add(src[ti + j]);
     if ovr > 0 then
-      val.Add(rc, ovr);
+      val.Add(clNone32, ovr);
     for j := 0 to stdDev do
     begin
-      if ri > re then
-        val.Add(rc) else
+      if ri <= re then
+      begin
         val.Add(src[ri]);
+        val.Subtract(clNone32);
+      end;
       inc(ri);
-      val.Subtract(fv);
       if ti <= re then
         dst[ti] := val.Color;
       inc(ti);
@@ -2534,8 +2530,7 @@ end;
 procedure BoxBlurV(var src, dst: TArrayOfColor32; w, h, stdDev: integer);
 var
   i,j, ti, li, ri, re, ovr: integer;
-  fv, val: TWeightedColor;
-  rc: TColor32;
+  val: TWeightedColor;
 begin
   ovr := Max(0, stdDev - h);
   for i := 0 to w -1 do
@@ -2543,22 +2538,20 @@ begin
     ti := i;
     li := ti;
     ri := ti + stdDev * w;
-    fv.Reset;
     val.Reset;
     re := ti +w *(h-1); // idx of last pixel in column
-    rc := src[re];      // color of last pixel in column
-    fv.Add(src[ti]);
     val.Add(src[ti], stdDev +1);
     for j := 0 to stdDev -1 -ovr do
       val.Add(src[ti + j *w]);
-    if ovr > 0 then val.Add(rc, ovr);
+    if ovr > 0 then val.Add(clNone32, ovr);
     for j := 0 to stdDev do
     begin
-      if ri > re then
-        val.Add(rc) else
+      if ri <= re then
+      begin
         val.Add(src[ri]);
+        val.Subtract(clNone32);
+      end;
       inc(ri, w);
-      val.Subtract(fv);
       if ti <= re then
         dst[ti] := val.Color;
       inc(ti, w);
