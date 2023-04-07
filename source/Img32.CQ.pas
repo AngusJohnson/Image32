@@ -3,7 +3,7 @@ unit Img32.CQ;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  7 April 2023                                                    *
+* Date      :  8 April 2023                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Color reduction for TImage32                                    *
@@ -20,6 +20,10 @@ uses
   SysUtils, Classes, Types, Math, Img32, Img32.Vector;
 
 type
+
+  TArrayOfArrayOfColor32 = array of TArrayOfColor32;
+  TArrayOfArrayOfInteger = array of TArrayOfInteger;
+
   //Octree Color Quantization:
   //https://web.archive.org/web/20140605161956/ -->
   // <-- http://www.microsoft.com/msj/archive/S3F1.aspx
@@ -58,14 +62,15 @@ type
       constructor Create;
       destructor  Destroy; override;
       procedure   Reset(aMaxColors: integer);
-      procedure   Reduce;
+      function    Reduce: Boolean;
       procedure   BuildTree(image: TImage32; maxColors: integer = 256);
       procedure   Add(color: TColor32);
       procedure   GetNearest(var color: TColor32);
       procedure   GetPalette(out colors: TArrayOfColor32;
         out freq: TArrayOfInteger);
       property Count: integer read Leaves;
-      property PixelCount: integer read TotalCount;
+      // ColoredPxlCount: because semi-transparent pixels are ignored
+      property ColoredPxlCount: integer read TotalCount;
   end;
 
 function MakePalette(image: TImage32;
@@ -87,10 +92,12 @@ function MakeAndApplyPalette(image: TImage32;
 
 function CreatePaletteOctree(image: TImage32): TOctree;
 
-//TrimPalette: reduces the palette size
-function TrimPalette(const palette: TArrayOfColor32;
-  const colorFrequency: TArrayOfInteger;
-  newSize: integer): TArrayOfColor32;
+//GetPalettes: gets (very efficiently) multiple palettes for an image
+//and returns the total number of opaque pixels
+function GetPalettes(image: TImage32;
+  const sizesNeeded: array of integer;
+  out palettes: TArrayOfArrayOfColor32;
+  out frequencies: TArrayOfArrayOfInteger): integer;
 
 {$IFDEF MSWINDOWS}
 function CreateLogPalette(const palColors: TArrayOfColor32): TMaxLogPalette;
@@ -105,13 +112,9 @@ function GetNearestPaletteColor(color: TColor32;
 function GetColorDistance(color1, color2: TColor32): integer;
 {$IFDEF INLINE} inline; {$ENDIF}
 
-function MaxRgbDifference(color1, color2: TColor32): integer;
-{$IFDEF INLINE} inline; {$ENDIF}
-
 //DrawPalette: Useful for debugging
 procedure DrawPalette(image: TImage32; const palette: TArrayOfColor32);
-
-//SavePalette: Useful for debugging
+//SavePalette: Also useful for debugging
 procedure SavePalette(const filename: string; const palette: TArrayOfColor32);
 
 procedure QuickSort(var intArray: array of Integer; l, r: Integer);
@@ -124,15 +127,14 @@ function BlackWhitePal: TArrayOfColor32;
 function DefaultMacPal16: TArrayOfColor32;
 function DefaultWinPal16: TArrayOfColor32;
 
+var
+  OpacityThreshold: byte = $E0;
+
 implementation
 
 resourcestring
-  rsTrimPalette  = 'TrimPalette: Invalid length of ''freq''.';
+  rsTrimPalette  = 'TrimPalette: Invalid frequency length';
   rsTrimPalette2 = 'TrimPalette: Invalid value for ''newSize''.';
-  rsTrimPaletteByFrac  =
-    'TrimPaletteByFraction: Invalid length of ''colorFrequency'' array.';
-  rsTrimPaletteByFrac2 =
-    'TrimPaletteByFraction: Invalid ''fraction'' value.';
 
 type
   PARGBArray = ^TARGBArray;
@@ -190,16 +192,6 @@ var
   c2: TARGB absolute color2;
 begin
   result := Sqr(c2.R - c1.R) + Sqr(c2.G - c1.G) + Sqr(c2.B - c1.B);
-end;
-//------------------------------------------------------------------------------
-
-function MaxRgbDifference(color1, color2: TColor32): integer;
-var
-  argb1: TARGB absolute color1;
-  argb2: TARGB absolute color2;
-begin
-  result := Max(abs(argb2.R - argb1.R),
-    Max(abs(argb2.G - argb1.G), abs(argb2.B - argb1.B)));
 end;
 //------------------------------------------------------------------------------
 
@@ -442,15 +434,16 @@ begin
   for i := 0 to image.Width * image.Height - 1 do
   begin
     //ignore transparent and semi-transparent colors
-    if pc.A >= $C0 then Add(pc.Color);
+    if pc.A >= OpacityThreshold then Add(pc.Color);
     inc(pc);
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TOctree.Reduce;
+function TOctree.Reduce: Boolean;
 var
-  lvl, i,j, childCnt: integer;
+  lvl, i,j,k,n, childCnt: integer;
+  c1,c2,c3: TColor32;
   node, node2: TOctNode;
 begin
   //find the lowest level with a reducible node ...
@@ -460,9 +453,10 @@ begin
   //reduce the most recently added node at level 'i' ...
   node := Reducible8[lvl];
 
-  if not assigned(node) then //ie we're at Level 0 (top)
+  if not assigned(node) then
   begin
-    //get the least used color
+    //We're now at Level 0 (top) and reducing the palette below 8 colors.
+    //So first, find the least used color
     j := -1;
     for i := 0 to 7 do
     begin
@@ -470,17 +464,33 @@ begin
       if not assigned(node) then Continue;
       if (j < 0) or (node.Count < top.Childs[j].Count) then j := i;
     end;
-    //merge this color with a neighbor
+    //now merge this color with its nearest neighbor
     i := j -1;
     while (i >= 0) and not assigned(top.Childs[i]) do dec(i);
-    if i < 0 then
+    k := j +1;
+    while (k < 8) and not assigned(top.Childs[k]) do inc(k);
+    if (i >= 0) and (k < 8) then
     begin
-      i := j +1;
-      while (i < 8) and not assigned(top.Childs[i]) do inc(i);
+      top.Childs[i].Get(c1,n);
+      top.Childs[j].Get(c2,n);
+      top.Childs[k].Get(c3,n);
+      if GetColorDistance(c1, c2) < GetColorDistance(c2, c3) then
+        node := top.Childs[i] else
+        node := top.Childs[k];
+    end
+    else if (i >= 0) then
+      node := top.Childs[i]
+    else if (k < 8) then
+      node := top.Childs[k]
+    else
+    begin
+      Result := false; //ie can't reduce to zero colors.
+      Exit;
     end;
-    node := top.Childs[i];
+
     node2 := top.Childs[j];
     top.Childs[j] := nil;
+
     Inc (node.TotalR, node2.TotalR);
     Inc (node.TotalG, node2.TotalG);
     Inc (node.TotalB, node2.TotalB);
@@ -507,35 +517,36 @@ begin
       end;
     Dec(Leaves, childCnt -1);
   end;
+  Result := true;
+end;
+//------------------------------------------------------------------------------
+
+procedure AddColor(octree: TOctree; color: TColor32;
+  var node: TOctNode; level: integer);
+begin
+  if not Assigned(node) then
+  begin
+    node:= TOctNode.Create(level +1);
+    if node.IsLeaf then
+    begin
+      Inc(octree.Leaves);
+    end else
+    begin
+      node.Next  := octree.Reducible8[node.level];
+      octree.Reducible8[node.level] := node;
+    end;
+  end;
+
+  if node.IsLeaf then node.Add(color)
+  else AddColor(octree, color, node.Childs[GetIndex(color, node.level)], node.level);
 end;
 //------------------------------------------------------------------------------
 
 procedure TOctree.Add(color: TColor32);
-
- procedure AddColor(var node: TOctNode; level: integer);
- begin
-   if not Assigned(node) then
-   begin
-     node:= TOctNode.Create(level +1);
-     if node.IsLeaf then
-     begin
-       Inc(Leaves);
-     end else
-     begin
-       node.Next  := Reducible8[node.level];
-       Reducible8[node.level] := node;
-     end;
-   end;
-   if node.IsLeaf then
-     node.Add(color) else
-     AddColor(node.Childs[GetIndex(color, node.level)], node.level);
- end;
-
 begin
   inc(TotalCount);
-  AddColor(Top, 0);
-//  while (Leaves > MaxColors) do
-//    Reduce;
+  AddColor(self, color, Top, 0);
+  //while (Leaves > 256) do Reduce;
 end;
 //------------------------------------------------------------------------------
 
@@ -770,7 +781,7 @@ begin
   for i := 0 to image.Width * image.Height - 1 do
   begin
     //ignore transparent and semi-transparent colors
-    if pc.A >= $C0 then
+    if pc.A >= OpacityThreshold then
       Result.Add(pc.Color);
     inc(pc);
   end;
@@ -889,12 +900,45 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TrimPalette(const palette: TArrayOfColor32;
-  const colorFrequency: TArrayOfInteger; newSize: integer): TArrayOfColor32;
+function GetPalettes(image: TImage32;
+  const sizesNeeded: array of integer;
+  out palettes: TArrayOfArrayOfColor32;
+  out frequencies: TArrayOfArrayOfInteger): integer;
+var
+  i, len: integer;
+  octree: TOctree;
+  sizes: TArrayOfInteger;
 begin
-  Result := TrimPalette(palette, colorFrequency, newSize);
+  len := Length(sizesNeeded);
+  SetLength(sizes, len);
+  SetLength(palettes, len);
+  SetLength(frequencies, len);
+  if len = 0 then
+  begin
+    Result := 0;
+    Exit;
+  end;
+
+  //first make sure sizes are in ascending order
+  for i := 0 to len -1 do
+    sizes[i] := sizesNeeded[i];
+  QuickSort(sizes, 0, len -1);
+
+  octree := CreatePaletteOctree(image);
+  try
+    Result := octree.ColoredPxlCount;
+    i := len -1;
+    while (i > 0) and (octree.Count < sizes[i]) do dec(i);
+    for i := i downto 0 do
+    begin
+      while (octree.Count > sizes[i]) and octree.Reduce do;
+      octree.GetPalette(palettes[i], frequencies[i]);
+    end;
+  finally
+    octree.Free;
+  end;
 end;
-//------------------------------------------------------------------------------
+//---------------------------------------------------------------------------
 
 {$IFDEF MSWINDOWS}
 function CreateLogPalette(const palColors: TArrayOfColor32): TMaxLogPalette;
@@ -999,17 +1043,6 @@ begin
     Mul7Div16Table[i] := Round(i * SevenDiv16);
   end;
 end;
-
-(*
-  debugging
-  i := Length(pal);
-  img := TImage32.Create(i * 16, 16);
-  for i := 0 to i -1 do
-    DrawPolygon(img, Rectangle(i * 16, 0, (i +1) * 16, 16),
-      Img32.Vector.frEvenOdd, pal[i]);
-  img.SaveToFile('tmp.png');
-  img.Free;
-*)
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
