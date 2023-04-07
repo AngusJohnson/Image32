@@ -3,7 +3,7 @@ unit Img32.Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  25 March 2023                                                   *
+* Date      :  7 April 2023                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 * Purpose   :  Miscellaneous routines that don't belong in other modules.      *
@@ -131,6 +131,8 @@ procedure RemoveColor(img: TImage32; color: TColor32);
 //This uses an algorithm that's very similar to the one in RemoveColor.
 procedure FilterOnColor(img: TImage32; color: TColor32);
 
+procedure FilterOnAlpha(img: TImage32; alpha: byte; tolerance: byte);
+
 //RedEyeRemove: Removes 'red eye' from flash photo images.
 procedure RedEyeRemove(img: TImage32; const rect: TRect);
 
@@ -189,10 +191,17 @@ function SimplifyPaths(const paths: TPathsD;
 
 // SmoothToCubicBezier - produces a series of cubic bezier control points.
 // This function is very useful in the following combination:
-// RamerDouglasPeucker(), SmoothToCubicBezier(), FlattenCBezier().
+// SimplifyPath(), SmoothToCubicBezier(), FlattenCBezier().
 function SmoothToCubicBezier(const path: TPathD;
   pathIsClosed: Boolean; maxOffset: integer = 0): TPathD; overload;
 function SmoothToCubicBezier(const paths: TPathsD;
+  pathIsClosed: Boolean; maxOffset: integer = 0): TPathsD; overload;
+
+// SmoothToCubicBezier2 - similar to SmoothToCubicBezier but is
+// insensitive to join angles
+function SmoothToCubicBezier2(const path: TPathD;
+  pathIsClosed: Boolean; maxOffset: integer = 0): TPathD; overload;
+function SmoothToCubicBezier2(const paths: TPathsD;
   pathIsClosed: Boolean; maxOffset: integer = 0): TPathsD; overload;
 
 //InterpolatePoints: smooths a simple line chart.
@@ -888,6 +897,20 @@ begin
       bg.Color := color;
       bg.A := Q; // note: fg.A is ignored
     end;
+    inc(bg);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure FilterOnAlpha(img: TImage32; alpha: byte; tolerance: byte);
+var
+  bg: PARGB;
+  i: Integer;
+begin
+  bg := PARGB(img.PixelBase);
+  for i := 0 to img.Width * img.Height -1 do
+  begin
+    if abs(bg.A - alpha) > tolerance then bg.A := 0;
     inc(bg);
   end;
 end;
@@ -2028,7 +2051,7 @@ begin
   highI := High(poly);
   while  (HighI >= 0) and PointsEqual(poly[highI], poly[0]) do dec(highI);
   if highI < 1 then Exit;
-  tolSqrd := Sqr(Max(2.02, Min(16.1, tolerance + 0.01)));
+  tolSqrd := Sqr(Max(1, Min(16.1, tolerance + 0.01)));
   SetLength(Result, highI +1);
   prev := poly[highI];
   Result[0] := prev;
@@ -2052,7 +2075,9 @@ begin
     TurnsLeft(result[j], Result[0], Result[1]) then
       SetLength(Result, j +1) else
       SetLength(Result, j);
-  if Abs(Area(Result)) < Length(Result) * tolerance/2 then Result := nil;
+  if (tolerance > 0) and
+    (Abs(Area(Result)) < Length(Result) * tolerance/2) then
+      Result := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -2341,6 +2366,77 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function SmoothToCubicBezier2(const path: TPathD;
+  pathIsClosed: Boolean; maxOffset: integer): TPathD;
+var
+  i, j, len, prev: integer;
+  vec: TPointD;
+  pl: TArrayOfDouble;
+  unitVecs: TPathD;
+  d1,d2: double;
+begin
+  // SmoothToCubicBezier2 - returns cubic bezier control points
+  Result := nil;
+  len := Length(path);
+  if len < 3 then Exit;
+
+  SetLength(Result, len *3 +1);
+  prev := len-1;
+  SetLength(pl, len);
+  SetLength(unitVecs, len);
+  pl[0] := Distance(path[prev], path[0]);
+  unitVecs[0] := GetUnitVector(path[prev], path[0]);
+  for i := 0 to len -1 do
+  begin
+    if i = prev then
+    begin
+      j := 0;
+    end else
+    begin
+      j := i +1;
+      pl[j] := Distance(path[i], path[j]);
+      unitVecs[j] := GetUnitVector(path[i], path[j]);
+    end;
+    vec := GetAvgUnitVector(unitVecs[i], unitVecs[j]);
+
+    d1 := pl[i]/2;
+    d2 := pl[j]/2;
+
+    if maxOffset > 0 then
+    begin
+      d1 := Min(maxOffset, d1);
+      d2 := Min(maxOffset, d2);
+    end;
+
+    if i = 0 then
+      Result[len*3-1] := OffsetPoint(path[0], -vec.X * d1, -vec.Y * d1)
+    else
+      Result[i*3-1] := OffsetPoint(path[i], -vec.X * d1, -vec.Y * d1);
+    Result[i*3] := path[i];
+    Result[i*3+1] := OffsetPoint(path[i], vec.X * d2, vec.Y * d2);
+  end;
+  Result[len*3] := path[0];
+
+  if pathIsClosed then Exit;
+  Result[1] := Result[0];
+  dec(len);
+  Result[len*3-1] := Result[len*3];
+  SetLength(Result, Len*3 +1);
+end;
+//------------------------------------------------------------------------------
+
+function SmoothToCubicBezier2(const paths: TPathsD;
+  pathIsClosed: Boolean; maxOffset: integer = 0): TPathsD;
+var
+  i, len: integer;
+begin
+  len := Length(paths);
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    Result[i] := SmoothToCubicBezier2(paths[i], pathIsClosed, maxOffset);
+end;
+//------------------------------------------------------------------------------
+
 function HermiteInterpolation(y1, y2, y3, y4: double;
   mu, tension: double): double;
 var
@@ -2450,11 +2546,14 @@ begin
     end;
   end;
 end;
+
 //------------------------------------------------------------------------------
 // FastGaussian blur - and support functions
 //------------------------------------------------------------------------------
+
 //http://blog.ivank.net/fastest-gaussian-blur.html
 //https://www.peterkovesi.com/papers/FastGaussianSmoothing.pdf
+
 function BoxesForGauss(stdDev, boxCnt: integer): TArrayOfInteger;
 var
   i, wl, wu, m: integer;
@@ -2475,10 +2574,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure FastGaussianBlur(img: TImage32;
+  const rec: TRect; stdDev: integer; repeats: integer);
+begin
+  FastGaussianBlur(img, rec, stdDev, stdDev, repeats);
+end;
+//------------------------------------------------------------------------------
+
 procedure BoxBlurH(var src, dst: TArrayOfColor32; w,h, stdDev: integer);
 var
   i,j, ti, li, ri, re, ovr: integer;
-  val: TWeightedColor;
+  fv, val: TWeightedColor;
+  ce: TColor32;
 begin
   ovr := Max(0, stdDev - w);
   for i := 0 to h -1 do
@@ -2487,21 +2594,19 @@ begin
     li := ti;
     ri := ti +stdDev;
     re := ti +w -1; // idx of last pixel in row
-    //rc := src[re];  // color of last pixel in row
-    val.Reset;
-    val.Add(src[ti], stdDev +1);
+    ce := src[re];  // color of last pixel in row
+    fv.Reset(src[ti]);
+    val.Reset(src[ti], stdDev +1);
     for j := 0 to stdDev -1 - ovr do
       val.Add(src[ti + j]);
-    if ovr > 0 then
-      val.Add(clNone32, ovr);
+    if ovr > 0 then val.Add(clNone32, ovr);
     for j := 0 to stdDev do
     begin
-      if ri <= re then
-      begin
+      if ri > re then
+        val.Add(ce) else
         val.Add(src[ri]);
-        val.Subtract(clNone32);
-      end;
       inc(ri);
+      val.Subtract(fv);
       if ti <= re then
         dst[ti] := val.Color;
       inc(ti);
@@ -2530,7 +2635,8 @@ end;
 procedure BoxBlurV(var src, dst: TArrayOfColor32; w, h, stdDev: integer);
 var
   i,j, ti, li, ri, re, ovr: integer;
-  val: TWeightedColor;
+  fv, val: TWeightedColor;
+  ce: TColor32;
 begin
   ovr := Max(0, stdDev - h);
   for i := 0 to w -1 do
@@ -2538,20 +2644,20 @@ begin
     ti := i;
     li := ti;
     ri := ti + stdDev * w;
-    val.Reset;
     re := ti +w *(h-1); // idx of last pixel in column
-    val.Add(src[ti], stdDev +1);
+    ce := src[re];      // color of last pixel in column
+    fv.Reset(src[ti]);
+    val.Reset(src[ti], stdDev +1);
     for j := 0 to stdDev -1 -ovr do
       val.Add(src[ti + j *w]);
     if ovr > 0 then val.Add(clNone32, ovr);
     for j := 0 to stdDev do
     begin
-      if ri <= re then
-      begin
+      if ri > re then
+        val.Add(ce) else
         val.Add(src[ri]);
-        val.Subtract(clNone32);
-      end;
       inc(ri, w);
+      val.Subtract(fv);
       if ti <= re then
         dst[ti] := val.Color;
       inc(ti, w);
@@ -2573,13 +2679,6 @@ begin
       inc(ti, w);
     end;
   end;
-end;
-//------------------------------------------------------------------------------
-
-procedure FastGaussianBlur(img: TImage32;
-  const rec: TRect; stdDev: integer; repeats: integer);
-begin
-  FastGaussianBlur(img, rec, stdDev, stdDev, repeats);
 end;
 //------------------------------------------------------------------------------
 

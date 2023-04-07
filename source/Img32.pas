@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  12 March 2023                                                   *
+* Date      :  7 April 2023                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -221,7 +221,7 @@ type
     procedure SetSize(newWidth, newHeight: Integer; color: TColor32 = 0);
     //Resize: is very similar to Scale()
     procedure Resize(newWidth, newHeight: Integer);
-    //ScaleToFit: The new image will be scaled to fit within 'rec'
+    //ScaleToFit: The image will be scaled proportionally
     procedure ScaleToFit(width, height: integer);
     //ScaleToFitCentered: The new image will be scaled and also centred
     procedure ScaleToFitCentered(width, height: integer); overload;
@@ -1909,12 +1909,9 @@ begin
   fPixels := nil; //forces a blank image
   SetLength(fPixels, fwidth * fheight);
   fIsPremultiplied := false;
-  if color > 0 then
-  begin
-    BlockNotify;
-    Clear(color);
-    UnblockNotify;
-  end;
+  BlockNotify;
+  Clear(color);
+  UnblockNotify;
   Resized;
 end;
 //------------------------------------------------------------------------------
@@ -2018,7 +2015,7 @@ procedure TImage32.ScaleToFit(width, height: integer);
 var
   sx, sy: double;
 begin
-  if IsEmpty or (width <= 0) or (height <= 0) then Exit;
+  if IsEmpty or (width < 2) or (height < 2) then Exit;
   sx := width / self.Width;
   sy := height / self.Height;
   if sx <= sy then
@@ -3437,11 +3434,11 @@ begin
     end;
   end;
 
-  sigmoid[128] := 128;
+  Sigmoid[128] := 128;
   for i := 1 to 127 do
-    sigmoid[128+i] := 128 + Round(127 * sin(angle90 * i/127));
+    Sigmoid[128+i] := 128 + Round(127 * sin(angle90 * i/127));
   for i := 0 to 127 do
-    sigmoid[i] := 255- sigmoid[255-i];
+    Sigmoid[i] := 255- Sigmoid[255-i];
 end;
 //------------------------------------------------------------------------------
 

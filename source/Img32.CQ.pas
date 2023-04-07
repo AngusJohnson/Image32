@@ -2,8 +2,8 @@ unit Img32.CQ;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.3                                                             *
-* Date      :  27 September 2022                                               *
+* Version   :  4.4                                                             *
+* Date      :  7 April 2023                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 * Purpose   :  Color reduction for TImage32                                    *
@@ -19,72 +19,7 @@ uses
   {$IFDEF MSWINDOWS} Windows,{$ENDIF}
   SysUtils, Classes, Types, Math, Img32, Img32.Vector;
 
-function MakePalette(image: TImage32;
-  MaxColors: integer): TArrayOfColor32; overload;
-function MakePalette(image: TImage32; MaxColors: integer;
-  out frequencies: TArrayOfInteger): TArrayOfColor32; overload;
-
-procedure ApplyPalette(image: TImage32;
-  const palette: TArrayOfColor32; UseDithering: Boolean = true);
-
-//MakeAndApplyPalette: This is *much* faster than calling MakePalette and
-//ApplyPalette separately as it uses the internally constructed Octree
-//structure to apply palette colors to the image.
-function MakeAndApplyPalette(image: TImage32;
-  MaxColors: integer; UseDithering: Boolean): TArrayOfColor32; overload;
-function MakeAndApplyPalette(image: TImage32;
-  MaxColors: integer; UseDithering: Boolean;
-  out frequencies: TArrayOfInteger): TArrayOfColor32; overload;
-
-//TrimPalette: reduces the palette size
-function TrimPalette(const palette: TArrayOfColor32;
-  const colorFrequency: TArrayOfInteger;
-  newSize: integer): TArrayOfColor32; overload;
-function TrimPalette(const palette: TArrayOfColor32;
-  const colorFrequency: TArrayOfInteger;
-  fraction: double): TArrayOfColor32; overload;
-
-{$IFDEF MSWINDOWS}
-function CreateLogPalette(const palColors: TArrayOfColor32): TMaxLogPalette;
-{$ENDIF}
-
-//GetNearestPaletteColor: This function is relatively slow so be
-//careful how you use it :).
-function GetNearestPaletteColor(color: TColor32;
-  const palette: TArrayOfColor32): TColor32;
-
-//GetColorDistance: returns Euclidean distance squared
-function GetColorDistance(color1, color2: TColor32): integer;
-{$IFDEF INLINE} inline; {$ENDIF}
-
-function MaxRgbDifference(color1, color2: TColor32): integer;
-{$IFDEF INLINE} inline; {$ENDIF}
-
-//DrawPalette: Useful for debugging
-procedure DrawPalette(image: TImage32; const palette: TArrayOfColor32);
-
-procedure QuickSort(var intArray: array of Integer; l, r: Integer);
-procedure QuickSortDesc(var intArray: array of Integer; l, r: Integer);
-
-
-//https://en.wikipedia.org/wiki/List_of_software_palettes
-
-function BlackWhitePal: TArrayOfColor32;
-function DefaultMacPal16: TArrayOfColor32;
-function DefaultWinPal16: TArrayOfColor32;
-
-implementation
-
-resourcestring
-  rsTrimPalette  = 'TrimPalette: Invalid length of ''freq''.';
-  rsTrimPalette2 = 'TrimPalette: Invalid value for ''newSize''.';
-  rsTrimPaletteByFrac  =
-    'TrimPaletteByFraction: Invalid length of ''colorFrequency'' array.';
-  rsTrimPaletteByFrac2 =
-    'TrimPaletteByFraction: Invalid ''fraction'' value.';
-
 type
-
   //Octree Color Quantization:
   //https://web.archive.org/web/20140605161956/ -->
   // <-- http://www.microsoft.com/msj/archive/S3F1.aspx
@@ -115,22 +50,91 @@ type
   TOctree = class
     protected
       Leaves     : integer;
-      MaxColors  : integer;
       Top        : TOctNode;
       TotalCount : integer;
       Reducible8 : TOctNodes8;
-      procedure  Reduce;
-      procedure  Delete(var node: TOctNode);
+      procedure   Delete(var node: TOctNode);
     public
-      constructor Create(aMaxColors: integer);
+      constructor Create;
       destructor  Destroy; override;
+      procedure   Reset(aMaxColors: integer);
+      procedure   Reduce;
+      procedure   BuildTree(image: TImage32; maxColors: integer = 256);
       procedure   Add(color: TColor32);
       procedure   GetNearest(var color: TColor32);
       procedure   GetPalette(out colors: TArrayOfColor32;
         out freq: TArrayOfInteger);
+      property Count: integer read Leaves;
       property PixelCount: integer read TotalCount;
   end;
 
+function MakePalette(image: TImage32;
+  MaxColors: integer): TArrayOfColor32; overload;
+function MakePalette(image: TImage32; MaxColors: integer;
+  out frequencies: TArrayOfInteger): TArrayOfColor32; overload;
+
+procedure ApplyPalette(image: TImage32;
+  const palette: TArrayOfColor32; UseDithering: Boolean = true);
+
+//MakeAndApplyPalette: This is *much* faster than calling MakePalette and
+//ApplyPalette separately as it uses the internally constructed Octree
+//structure to apply palette colors to the image.
+function MakeAndApplyPalette(image: TImage32;
+  MaxColors: integer; UseDithering: Boolean): TArrayOfColor32; overload;
+function MakeAndApplyPalette(image: TImage32;
+  MaxColors: integer; UseDithering: Boolean;
+  out frequencies: TArrayOfInteger): TArrayOfColor32; overload;
+
+function CreatePaletteOctree(image: TImage32): TOctree;
+
+//TrimPalette: reduces the palette size
+function TrimPalette(const palette: TArrayOfColor32;
+  const colorFrequency: TArrayOfInteger;
+  newSize: integer): TArrayOfColor32;
+
+{$IFDEF MSWINDOWS}
+function CreateLogPalette(const palColors: TArrayOfColor32): TMaxLogPalette;
+{$ENDIF}
+
+//GetNearestPaletteColor: This function is relatively slow so be
+//careful how you use it :).
+function GetNearestPaletteColor(color: TColor32;
+  const palette: TArrayOfColor32): TColor32;
+
+//GetColorDistance: returns Euclidean distance squared
+function GetColorDistance(color1, color2: TColor32): integer;
+{$IFDEF INLINE} inline; {$ENDIF}
+
+function MaxRgbDifference(color1, color2: TColor32): integer;
+{$IFDEF INLINE} inline; {$ENDIF}
+
+//DrawPalette: Useful for debugging
+procedure DrawPalette(image: TImage32; const palette: TArrayOfColor32);
+
+//SavePalette: Useful for debugging
+procedure SavePalette(const filename: string; const palette: TArrayOfColor32);
+
+procedure QuickSort(var intArray: array of Integer; l, r: Integer);
+procedure QuickSortDesc(var intArray: array of Integer; l, r: Integer);
+
+
+//https://en.wikipedia.org/wiki/List_of_software_palettes
+
+function BlackWhitePal: TArrayOfColor32;
+function DefaultMacPal16: TArrayOfColor32;
+function DefaultWinPal16: TArrayOfColor32;
+
+implementation
+
+resourcestring
+  rsTrimPalette  = 'TrimPalette: Invalid length of ''freq''.';
+  rsTrimPalette2 = 'TrimPalette: Invalid value for ''newSize''.';
+  rsTrimPaletteByFrac  =
+    'TrimPaletteByFraction: Invalid length of ''colorFrequency'' array.';
+  rsTrimPaletteByFrac2 =
+    'TrimPaletteByFraction: Invalid ''fraction'' value.';
+
+type
   PARGBArray = ^TARGBArray;
   TARGBArray = array [0 .. $FFFFFF -1] of TARGB;
 
@@ -139,7 +143,12 @@ type
   PByteArray = ^TByteArray;
 
 const
-  NullOctNodes8 : TOctNodes8 = (nil, nil, nil, nil, nil, nil, nil, nil);
+  //LeafLevel: with a generally maximum 256 color palette,
+  //it's very inefficient to use a LeafLevel > 4.
+  LeafLevel = 4;
+
+  NullOctNodes8 : TOctNodes8 =
+    (nil, nil, nil, nil, nil, nil, nil, nil);
 
   MonoPal2: array [0..1] of TColor32 = (
     $FF000000, $FFFFFFFF);
@@ -308,7 +317,7 @@ end;
 
 function TOctNode.GetIsLeaf: Boolean;
 begin
-  result := (Count > 0) or (Level = 8);
+  result := (Count > 0) or (Level = LeafLevel);
 end;
 //------------------------------------------------------------------------------
 
@@ -399,9 +408,8 @@ end;
 // TOctree methods
 //------------------------------------------------------------------------------
 
-constructor TOctree.Create(aMaxColors: integer);
+constructor TOctree.Create;
 begin
-  MaxColors := aMaxColors;
   Leaves := 0;
   Top := TOctNode.Create(0);
   Reducible8 := NullOctNodes8;
@@ -415,46 +423,76 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TOctree.Reset(aMaxColors: integer);
+begin
+  Delete(Top);
+  Leaves := 0;
+  Top := TOctNode.Create(0);
+  Reducible8 := NullOctNodes8;
+end;
+//------------------------------------------------------------------------------
+
+procedure TOctree.BuildTree(image: TImage32; maxColors: integer = 256);
+var
+  i: integer;
+  pc: PARGB;
+begin
+  Reset(maxColors);
+  pc := PARGB(image.PixelBase);
+  for i := 0 to image.Width * image.Height - 1 do
+  begin
+    //ignore transparent and semi-transparent colors
+    if pc.A >= $C0 then Add(pc.Color);
+    inc(pc);
+  end;
+end;
+//------------------------------------------------------------------------------
+
 procedure TOctree.Reduce;
 var
-  i,j, childCnt: integer;
+  lvl, i,j, childCnt: integer;
   node, node2: TOctNode;
 begin
   //find the lowest level with a reducible node ...
-  i := 7;
-  while (i > 0) and not Assigned(Reducible8[i]) do Dec(i);
+  lvl := LeafLevel -1;
+  while (lvl > 0) and not Assigned(Reducible8[lvl]) do Dec(lvl);
 
   //reduce the most recently added node at level 'i' ...
-  node := Reducible8[i];
+  node := Reducible8[lvl];
 
-  if not assigned(node) then
+  if not assigned(node) then //ie we're at Level 0 (top)
   begin
-    //ie we're at the 'top' node
+    //get the least used color
+    j := -1;
     for i := 0 to 7 do
     begin
-      if assigned(node) then break
-      else if not assigned(top.Childs[i]) then Continue;
       node := top.Childs[i];
-      for j := i +1 to 7 do
-      begin
-        if not assigned(top.Childs[j]) then Continue;
-        node2 := top.Childs[j];
-        //now merge siblings
-        top.Childs[j] := nil;
-        Inc (node.TotalR, node2.TotalR);
-        Inc (node.TotalG, node2.TotalG);
-        Inc (node.TotalB, node2.TotalB);
-        Inc (node.Count, node2.Count);
-        node2.Free;
-        Dec(Leaves, 1);
-        break;
-      end;
+      if not assigned(node) then Continue;
+      if (j < 0) or (node.Count < top.Childs[j].Count) then j := i;
     end;
+    //merge this color with a neighbor
+    i := j -1;
+    while (i >= 0) and not assigned(top.Childs[i]) do dec(i);
+    if i < 0 then
+    begin
+      i := j +1;
+      while (i < 8) and not assigned(top.Childs[i]) do inc(i);
+    end;
+    node := top.Childs[i];
+    node2 := top.Childs[j];
+    top.Childs[j] := nil;
+    Inc (node.TotalR, node2.TotalR);
+    Inc (node.TotalG, node2.TotalG);
+    Inc (node.TotalB, node2.TotalB);
+    Inc (node.Count, node2.Count);
+    node2.Free;
+    Dec(Leaves, 1);
   end else
   begin
-    Reducible8[i] := node.Next;
+    node := Reducible8[lvl];
+    Reducible8[lvl] := node.Next;
     node.TotalR   := 0; node.TotalG := 0; node.TotalB := 0;
-    node.Count    := 0; childCnt      := 0;
+    node.Count    := 0; childCnt    := 0;
 
     //now merge the leaves into the parent node ...
     for i:= 0 to 7 do
@@ -464,8 +502,7 @@ begin
         Inc (node.TotalG, node.Childs[i].TotalG);
         Inc (node.TotalB, node.Childs[i].TotalB);
         Inc (node.Count, node.Childs[i].Count);
-        node.Childs[i].Free;
-        node.Childs[i]:= nil;
+        FreeAndNil(node.Childs[i]);
         inc(childCnt);
       end;
     Dec(Leaves, childCnt -1);
@@ -474,8 +511,6 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TOctree.Add(color: TColor32);
-var
-  argb: TARGB absolute color;
 
  procedure AddColor(var node: TOctNode; level: integer);
  begin
@@ -491,19 +526,16 @@ var
        Reducible8[node.level] := node;
      end;
    end;
-
    if node.IsLeaf then
      node.Add(color) else
      AddColor(node.Childs[GetIndex(color, node.level)], node.level);
  end;
 
 begin
-  if GetAlpha(color) < $80 then Exit;
   inc(TotalCount);
-  color := color and $FFFFFF;
   AddColor(Top, 0);
-  while (Leaves > MaxColors) do
-    Reduce;
+//  while (Leaves > MaxColors) do
+//    Reduce;
 end;
 //------------------------------------------------------------------------------
 
@@ -728,19 +760,17 @@ end;
 // CreatePalette...
 //------------------------------------------------------------------------------
 
-function CreatePaletteOctree(image: TImage32;
-  MaxColors: integer): TOctree;
+function CreatePaletteOctree(image: TImage32): TOctree;
 var
   i: integer;
   pc: PARGB;
 begin
-  MaxColors := Max(2, Min(256, MaxColors));
-  Result := TOctree.Create(MaxColors);
+  Result := TOctree.Create;
   pc := PARGB(image.PixelBase);
   for i := 0 to image.Width * image.Height - 1 do
   begin
     //ignore transparent and semi-transparent colors
-    if pc.A >= $80 then
+    if pc.A >= $C0 then
       Result.Add(pc.Color);
     inc(pc);
   end;
@@ -756,8 +786,9 @@ var
   octree: TOctree;
 begin
   result := nil;
-  octree := CreatePaletteOctree(image, MaxColors);
+  octree := CreatePaletteOctree(image);
   try
+    while octree.Leaves > MaxColors do octree.Reduce;
     octree.GetPalette(result, frequencies);
     if UseDithering then
     begin
@@ -802,10 +833,11 @@ function MakePalette(image: TImage32; MaxColors: integer;
 var
   octree: TOctree;
 begin
-  MaxColors := Max(2, Min(512, MaxColors));
+  MaxColors := Max(2, Min(256, MaxColors));
   result := nil;
-  octree := CreatePaletteOctree(image, MaxColors);
+  octree := CreatePaletteOctree(image);
   try
+    while octree.Leaves > MaxColors do octree.Reduce;
     octree.GetPalette(result, frequencies);
   finally
     octree.Free;
@@ -859,63 +891,8 @@ end;
 
 function TrimPalette(const palette: TArrayOfColor32;
   const colorFrequency: TArrayOfInteger; newSize: integer): TArrayOfColor32;
-var
-  i,j, minFrequency, len: integer;
-  sortedFreq: TArrayOfInteger;
 begin
-  len := Length(palette);
-  if Length(colorFrequency) <> len + 1 then
-    raise Exception.Create(rsTrimPalette)
-  else if (newSize <= 0) then
-    raise Exception.Create(rsTrimPalette2)
-  else if (newSize >= len) or (len = 0) then
-  begin
-    Result := palette;
-    Exit;
-  end;
-
-  sortedFreq := Copy(colorFrequency, 0, len);
-  QuickSortDesc(sortedFreq, 0, len -1);
-  minFrequency := sortedFreq[newSize] +1;
-  SetLength(Result, newSize);
-  j := 0;
-  for i := 0 to len -1 do
-    if colorFrequency[i] >= minFrequency then
-    begin
-      Result[j] := palette[i];
-      inc(j);
-    end;
-  SetLength(Result, j);
-end;
-//------------------------------------------------------------------------------
-
-function TrimPalette(const palette: TArrayOfColor32;
-  const colorFrequency: TArrayOfInteger; fraction: double): TArrayOfColor32;
-var
-  i,j, minFrequency, len: integer;
-begin
-  len := Length(palette);
-  fraction := fraction / len;
-  if Length(colorFrequency) <> len + 1 then
-    raise Exception.Create(rsTrimPaletteByFrac)
-  else if (fraction >= 0.25) or (fraction <= 0.0) then
-    raise Exception.Create(rsTrimPaletteByFrac2)
-  else if (len = 0) then
-  begin
-    Result := nil;
-    Exit;
-  end;
-
-  minFrequency := Round(fraction * colorFrequency[len]);
-  SetLength(Result, len);
-  j := 0;
-  for i := 0 to len -1 do
-    if colorFrequency[i] >= minFrequency then
-    begin
-      Result[j] := palette[i];
-      inc(j);
-    end;
-  SetLength(Result, j);
+  Result := TrimPalette(palette, colorFrequency, newSize);
 end;
 //------------------------------------------------------------------------------
 
@@ -956,6 +933,20 @@ begin
   end;
 end;
 
+//------------------------------------------------------------------------------
+
+procedure SavePalette(const filename: string; const palette: TArrayOfColor32);
+var
+  tmpImg: TImage32;
+begin
+  tmpImg := TImage32.Create;
+  try
+    DrawPalette(tmpImg, palette);
+    tmpImg.SaveToFile(filename);
+  finally
+    tmpImg.Free;
+  end;
+end;
 //------------------------------------------------------------------------------
 
 function BlackWhitePal: TArrayOfColor32;

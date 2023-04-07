@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  26 March 2023                                                   *
+* Date      :  7 April 2023                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -120,6 +120,8 @@ type
     fRootElement      : TSvgRootElement;
     fFontCache        : TFontCache;
     fUsePropScale     : Boolean;
+    fSimpleDraw       : Boolean;
+    fSimpleDrawList   : TList;
     function  LoadInternal: Boolean;
     function  GetIsEmpty: Boolean;
     procedure SetBlurQuality(quality: integer);
@@ -156,12 +158,25 @@ type
     property  KeepAspectRatio: Boolean
       read fUsePropScale write fUsePropScale;
     property  RootElement     : TSvgRootElement read fRootElement;
+    //RecordSimpleDraw: record simple drawing instructions
+    property  RecordSimpleDraw: Boolean read fSimpleDraw write fSimpleDraw;
+    //SimpleDrawList: list of PSimpleDrawData records;
+    property  SimpleDrawList  : TList read fSimpleDrawList;
   end;
+
+  PSimpleDrawData = ^TSimpleDrawData;
+  TSimpleDrawData = record
+    paths     : TPathsD;
+    fillRule  : TFillRule;
+    color     : TColor32;
+    tag       : integer;
+  end;
+
 
 implementation
 
 uses
-  Img32.Extra;
+  Img32.Extra, Img32.Clipper2;
 
 type
   TFourDoubles = array [0..3] of double;
@@ -174,6 +189,11 @@ type
   //-------------------------------------
 
   TShapeElement = class(TSvgElement)
+  private
+    procedure SimpleDrawFill(const paths: TPathsD;
+      fillRule: TFillRule; color: TColor32);
+    procedure SimpleDrawStroke(const paths: TPathsD; width: double;
+      joinStyle: TJoinStyle; endStyle: TEndStyle; color: TColor32);
   protected
     hasPaths    : Boolean;
     drawPathsO  : TPathsD; //open only
@@ -2310,11 +2330,20 @@ begin
     end;
   end
   else if drawDat.fillColor = clInvalid then
-    DrawPolygon(img, fillPaths, drawDat.fillRule, clBlack32)
+  begin
+    if fReader.RecordSimpleDraw then
+      SimpleDrawFill(fillPaths, drawDat.fillRule, clBlack32);
+    DrawPolygon(img, fillPaths, drawDat.fillRule, clBlack32);
+  end
   else
     with drawDat do
+    begin
+      if fReader.RecordSimpleDraw then
+        SimpleDrawFill(fillPaths, fillRule,
+          MergeColorAndOpacity(fillColor, fillOpacity));
       DrawPolygon(img, fillPaths, fillRule,
         MergeColorAndOpacity(fillColor, fillOpacity));
+    end;
 end;
 //------------------------------------------------------------------------------
 
@@ -2402,11 +2431,48 @@ begin
     end;
   end
   else if (joinStyle = jsMiter) then
+  begin
+    if fReader.RecordSimpleDraw then
+      SimpleDrawStroke(strokePaths, scaledStrokeWidth,
+        joinStyle, endStyle, strokeClr);
     DrawLine(img, strokePaths, scaledStrokeWidth,
-      strokeClr, endStyle, joinStyle, drawDat.strokeMitLim)
-  else
+      strokeClr, endStyle, joinStyle, drawDat.strokeMitLim);
+  end else
+  begin
+    if fReader.RecordSimpleDraw then
+      SimpleDrawStroke(strokePaths, scaledStrokeWidth,
+        joinStyle, endStyle, strokeClr);
     DrawLine(img, strokePaths, scaledStrokeWidth,
       strokeClr, endStyle, joinStyle, roundingScale);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TShapeElement.SimpleDrawFill(const paths: TPathsD;
+  fillRule: TFillRule; color: TColor32);
+var
+  sdd: PSimpleDrawData;
+begin
+  if TARGB(color).A < 128 then Exit;
+  new(sdd);
+  sdd.paths := paths;
+  sdd.fillRule := fillRule;
+  sdd.color := color or $FF000000;
+  fReader.SimpleDrawList.Add(sdd);
+end;
+//------------------------------------------------------------------------------
+
+procedure TShapeElement.SimpleDrawStroke(const paths: TPathsD;
+  width: double; joinStyle: TJoinStyle; endStyle: TEndStyle; color: TColor32);
+var
+  sdd: PSimpleDrawData;
+begin
+  if TARGB(color).A < 128 then Exit;
+  new(sdd);
+  sdd.paths := InflatePaths(paths, width, joinStyle, endStyle);
+  sdd.fillRule := frNonZero;
+  sdd.color := color or $FF000000;
+  fReader.SimpleDrawList.Add(sdd);
 end;
 
 //------------------------------------------------------------------------------
@@ -4589,11 +4655,12 @@ begin
   fLinGradRenderer  := TLinearGradientRenderer.Create;
   fRadGradRenderer  := TSvgRadialGradientRenderer.Create;
   fImgRenderer      := TImageRenderer.Create;
-
   fIdList             := TStringList.Create;
   fIdList.Duplicates  := dupIgnore;
   fIdList.CaseSensitive := false;
   fIdList.Sorted      := True;
+  fSimpleDrawList    := TList.Create;
+
 
   fBlurQuality        := 1; //0: draft (faster); 1: good; 2: excellent (slow)
   currentColor        := clBlack32;
@@ -4612,11 +4679,15 @@ begin
   fRadGradRenderer.Free;
   fImgRenderer.Free;
   FreeAndNil(fFontCache);
+  fSimpleDrawList.Free;
+
   inherited;
 end;
 //------------------------------------------------------------------------------
 
 procedure TSvgReader.Clear;
+var
+  i: integer;
 begin
   FreeAndNil(fRootElement);
   fSvgParser.Clear;
@@ -4627,6 +4698,9 @@ begin
   fImgRenderer.Image.Clear;
   currentColor := clBlack32;
   userSpaceBounds := NullRectD;
+  for i := 0 to fSimpleDrawList.Count -1 do
+    Dispose(PSimpleDrawData(fSimpleDrawList[i]));
+  fSimpleDrawList.Clear;
 end;
 //------------------------------------------------------------------------------
 

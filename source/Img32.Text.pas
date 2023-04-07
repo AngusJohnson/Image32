@@ -3,7 +3,7 @@ unit Img32.Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  26 March 2023                                                   *
+* Date      :  7 April 2023                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -2075,7 +2075,6 @@ end;
 procedure TFontReader.GetFontFamily;
 var
   giT, giI, giM: integer;
-  gmI, gmM: TGlyphMetrics;
   hmtxI, hmtxM: TFontTable_Hmtx;
   pathsEx: TPathsEx;
   paths: TPathsD;
@@ -2097,7 +2096,7 @@ begin
 
   GetGlyphHorzMetrics(giI, hmtxI);
   GetGlyphHorzMetrics(giM, hmtxM);
-  if gmI.hmtx.advanceWidth = gmM.hmtx.advanceWidth then
+  if hmtxI.advanceWidth = hmtxM.advanceWidth then
   begin
     fFontInfo.FontFamily := ttfMonospace;
     Exit;
@@ -2655,14 +2654,9 @@ end;
 procedure TFontCache.UpdateScale;
 begin
   if IsValidFont and (fFontHeight > 0) then
-  begin
-    fScale := fFontHeight / fFontReader.FontInfo.unitsPerEm;
-    NotifyRecipients(inStateChange);
-  end else
-  begin
+    fScale := fFontHeight / fFontReader.FontInfo.unitsPerEm else
     fScale := 1;
-    NotifyRecipients(inDestroy);
-  end;
+  NotifyRecipients(inStateChange);
 end;
 //------------------------------------------------------------------------------
 
@@ -3684,7 +3678,8 @@ end;
 //------------------------------------------------------------------------------
 
 function TFontManager.FindReaderContainingGlyph(missingUnicode: Word;
-  fntFamily: TTtfFontFamily; out fntReader: TFontReader; out index: integer): Boolean;
+  fntFamily: TTtfFontFamily; out fntReader: TFontReader;
+  out index: integer): Boolean;
 var
   i: integer;
 begin
@@ -3695,7 +3690,7 @@ begin
   begin
     index := GetGlyphIdxFromCmapIdx(missingUnicode);
     if index = 0 then Continue;
-    fntReader := TFontReader(fFontList[i]);
+    fntReader := TFontReader(self.fFontList[i]);
 
     // if a font family is specified, then only return true
     // when finding the glyph within that font family
