@@ -59,7 +59,7 @@ implementation
 {$R Image.res}
 
 uses
-  Img32.Draw, Img32.Vector, Img32.Extra,
+  Img32.Draw, Img32.Vector, Img32.Extra, Img32.Vectorizer,
   Img32.Fmt.BMP, Img32.Fmt.JPG, Img32.Fmt.PNG;
 
  const
@@ -102,7 +102,7 @@ end;
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   masterImg := TImage32.Create;
-  masterImg.LoadFromResource('sample2', 'BMP');
+  masterImg.LoadFromResource('book', 'BMP');
   OpenDialog1.InitialDir :=
     ExtractFilePath(paramStr(0)) + 'sample_images';
   ForceDirectories(OpenDialog1.InitialDir);
@@ -172,12 +172,14 @@ begin
     Exit;
   end;
 
-  //get the raw vectors (either using transparency or filtering on black)
+  // 1. Vectorize:
+  // converts simple (2 color) raster images into vector images
   if masterImg.HasTransparency then
     rawPaths := Vectorize(masterImg, $FF000000, CompareAlpha, $80) else
     rawPaths := Vectorize(masterImg, $FF000000, CompareRGB, $44);
   vectorBounds := GetBounds(rawPaths);
 
+  // 1b. scale the raw vector image
   with GetDisplaySize do workImg.SetSize(cx, cy);
   scale := Min(
     (workImg.Width - Margin*2) / RectWidth(vectorBounds),
@@ -194,16 +196,15 @@ begin
     StatusBar1.Panels[1].Text := ' Raw Vectors (no smoothing or simplification)';
   end else
   begin
-    //RamerDouglasPeucker: simplifies raw vectors (removes extraneous vertices)
-    //nb: the 'epsilon' value may need to be increased when the image was
-    //enlarged before vectorizing, effectively making pixel dimensions >1.
-    //Epsilon should be +1 greater than meaningful pixel size.
+    // 2. SimplifyPaths:
+    // removes vertices that contribute very little  to a path's shape.
     if TrackBar2.Position = 0 then
       flattenedPaths := CopyPaths(rawPaths) else
-      flattenedPaths := RamerDouglasPeucker(rawPaths,
+      flattenedPaths := SimplifyPaths(rawPaths,
         TrackBar2.Position * 0.5 * workImg.Width/masterImg.Width);
 
-    //note: SmoothToCubicBezier returns a bezier path (not a flattened path)
+    // 3. SmoothToCubicBezier:
+    // returns a bezier path, NOT a flattened path
     if TrackBar1.Position > 0 then
     begin
       len := Length(flattenedPaths);
@@ -211,14 +212,18 @@ begin
       for i := 0 to len -1 do
         bezierPaths[i] := SmoothToCubicBezier(flattenedPaths[i],
           true, TrackBar1.Position);
-      //'flatten' the poly-beziers
+      // 4. FlattenCBezier:
+      // converts poly-beziers into normal paths
       SetLength(flattenedPaths, Length(bezierPaths));
       for i := 0 to High(bezierPaths) do
         flattenedPaths[i] := FlattenCBezier(bezierPaths[i]);
-      //and optionally reduce the number of points again
-      flattenedPaths := RamerDouglasPeucker(flattenedPaths,
-        (0.2 + TrackBar2.Position/8));
     end;
+
+    //and optionally reduce the number of points again
+    if (TrackBar1.Position > 0) and (TrackBar1.Position > 0) then
+      //flattenedPaths := RamerDouglasPeucker(flattenedPaths,
+      flattenedPaths := SimplifyPaths(flattenedPaths,
+        (0.2 + TrackBar2.Position/8));
 
     lblSmooth.Caption :=
       Format('Smooth'#10'Amount'#10'(%d)',[TrackBar1.Position]);
@@ -231,15 +236,17 @@ begin
 
   if mnuHighlightVertices.Checked then
   begin
+//    DrawPolygon(workImg, flattenedPaths, frEvenOdd, $20660000);
+//    DrawLine(workImg, flattenedPaths, DPIAware(2), clMaroon32, esPolygon);
     DrawPolygon(workImg, flattenedPaths, frEvenOdd, $20660000);
     DrawLine(workImg, flattenedPaths, DPIAware(2), clMaroon32, esPolygon);
 
     for i := 0 to High(flattenedPaths) do
       for j := 0 to High(flattenedPaths[i]) do
-          DrawPoint(workImg, flattenedPaths[i][j], DPIAware(2.5), $FF000066);
+          DrawPoint(workImg, flattenedPaths[i][j], DPIAware(2.5), clNavy32);
   end else
   begin
-    DrawPolygon(workImg, flattenedPaths, frEvenOdd, clNavy32);
+    DrawPolygon(workImg, flattenedPaths, frEvenOdd, $FF660033);
   end;
   Invalidate;
 end;
@@ -255,13 +262,13 @@ end;
 
 procedure TForm1.pnlSmoothEnter(Sender: TObject);
 begin
-  pnlSmooth.Color := clGradientInactiveCaption;
+  //pnlSmooth.Color := clGradientInactiveCaption;
 end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.pnlSmoothExit(Sender: TObject);
 begin
-  pnlSmooth.Color := clBtnFace;
+  //pnlSmooth.Color := clBtnFace;
 end;
 //------------------------------------------------------------------------------
 
