@@ -1030,7 +1030,7 @@ begin
 
   memDc := CreateCompatibleDC(0);
   try
-    SelectObject(memDc, hdl);
+    if SelectObject(memDc, hdl) = 0 then Exit;
     //get the required size of the font data (file)
     cnt := Windows.GetFontData(memDc, 0, 0, nil, 0);
     result := cnt <> $FFFFFFFF;

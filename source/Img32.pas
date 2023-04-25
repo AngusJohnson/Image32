@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  7 April 2023                                                    *
+* Date      :  24 April 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -180,7 +180,7 @@ type
     fOnResize: TNotifyEvent;
     fUpdateCnt: integer;
     fAntiAliased: Boolean;
-    fNotifyBlocked: Boolean;
+    fNotifyBlockCnt: integer;
     function GetPixel(x,y: Integer): TColor32;
     procedure SetPixel(x,y: Integer; color: TColor32);
     function GetIsBlank: Boolean;
@@ -204,14 +204,17 @@ type
       const srcRec, dstRec: TRect; blendFunc: TBlendFunction);
     procedure  Changed; virtual;
     procedure  Resized; virtual;
+    function   SetPixels(const newPixels: TArrayOfColor32): Boolean;
     property   UpdateCount: integer read fUpdateCnt;
   public
     constructor Create(width: Integer = 0; height: Integer = 0); overload;
     constructor Create(src: TImage32); overload;
     constructor Create(src: TImage32; const srcRec: TRect); overload;
     destructor Destroy; override;
+    //BeginUpdate/EndUpdate: postpones calls to OnChange event (can be nested)
     procedure BeginUpdate;
     procedure EndUpdate;
+    //BlockUpdate/UnBlockUpdate: blocks calls to OnChange event (can be nested)
     procedure BlockNotify;
     procedure UnblockNotify;
 
@@ -1668,16 +1671,26 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TImage32.SetPixels(const newPixels: TArrayOfColor32): Boolean;
+var
+  len: integer;
+begin
+  len := Length(newPixels);
+  Result := (len > 0)and (len = Width * height);
+  if Result then fPixels := System.Copy(newPixels, 0, len);
+end;
+//------------------------------------------------------------------------------
+
 procedure TImage32.BeginUpdate;
 begin
-  if fNotifyBlocked then Exit;
+  if fNotifyBlockCnt > 0 then Exit;
   inc(fUpdateCnt);
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.EndUpdate;
 begin
-  if fNotifyBlocked then Exit;
+  if fNotifyBlockCnt > 0 then Exit;
   dec(fUpdateCnt);
   if fUpdateCnt = 0 then Changed;
 end;
@@ -1685,17 +1698,15 @@ end;
 
 procedure TImage32.BlockNotify;
 begin
-  if fUpdateCnt <> 0 then Exit;
+  inc(fNotifyBlockCnt);
   inc(fUpdateCnt);
-  fNotifyBlocked := true;
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.UnblockNotify;
 begin
-  if not fNotifyBlocked then Exit;
+  dec(fNotifyBlockCnt);
   dec(fUpdateCnt);
-  fNotifyBlocked := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -1874,7 +1885,7 @@ var
 begin
   RectWidthHeight(rec, w, h);
   if (w = Width) and (h = Height) then Exit;
-  newPixels := CopyPixels(rec);
+  newPixels := CopyPixels(rec); // get pixels **before** resizing
   BlockNotify;
   try
     SetSize(w, h);

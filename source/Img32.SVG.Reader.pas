@@ -172,7 +172,6 @@ type
     tag       : integer;
   end;
 
-
 implementation
 
 uses
@@ -2455,7 +2454,7 @@ var
 begin
   if TARGB(color).A < 128 then Exit;
   new(sdd);
-  sdd.paths := paths;
+  sdd.paths := CopyPaths(paths);
   sdd.fillRule := fillRule;
   sdd.color := color or $FF000000;
   fReader.SimpleDrawList.Add(sdd);
@@ -2469,7 +2468,7 @@ var
 begin
   if TARGB(color).A < 128 then Exit;
   new(sdd);
-  sdd.paths := InflatePaths(paths, width, joinStyle, endStyle);
+  sdd.paths := InflatePaths(paths, width, joinStyle, ClipperEndType(endStyle));
   sdd.fillRule := frNonZero;
   sdd.color := color or $FF000000;
   fReader.SimpleDrawList.Add(sdd);

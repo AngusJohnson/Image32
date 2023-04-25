@@ -100,7 +100,7 @@ begin
     if fontReader.IsValidFontFormat then
       bigTextGlyphs := fontCache.GetTextOutline(0, 0, rsBigText);
 
-    bigTextGlyphs := InflatePaths(bigTextGlyphs, 1.5, jsAuto, esPolygon);
+    bigTextGlyphs := InflatePaths(bigTextGlyphs, 1.5, jsAuto);
     matrix := IdentityMatrix;
     MatrixScale(matrix, 1, 1.75); //stretched vertically
     MatrixSkew(matrix, -0.25, 0); //and italicized too.

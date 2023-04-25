@@ -29,8 +29,10 @@ type
     class function IsValidImageStream(stream: TStream): Boolean; override;
     function LoadFromStream(stream: TStream;
       img32: TImage32; imgIndex: integer = 0): Boolean; override;
-    function SaveToFile(const filename: string; img32: TImage32): Boolean; override;
-    procedure SaveToStream(stream: TStream; img32: TImage32); override;
+    function SaveToFile(const filename: string;
+      img32: TImage32; quality: integer = 0): Boolean; override;
+    procedure SaveToStream(stream: TStream;
+      img32: TImage32; quality: integer = 0); override;
     class function CopyToClipboard(img32: TImage32): Boolean; override;
     class function CanPasteFromClipboard: Boolean; override;
     class function PasteFromClipboard(img32: TImage32): Boolean; override;
@@ -104,14 +106,16 @@ end;
 // Saving (writing) Jpeg images to file ...
 //------------------------------------------------------------------------------
 
-function TImageFormat_FMX.SaveToFile(const filename: string; img32: TImage32): Boolean;
+function TImageFormat_FMX.SaveToFile(const filename: string;
+  img32: TImage32; quality: integer): Boolean;
 begin
   Ext := ExtractFileExt(filename);
   result := inherited;
 end;
 //------------------------------------------------------------------------------
 
-procedure TImageFormat_FMX.SaveToStream(stream: TStream; img32: TImage32);
+procedure TImageFormat_FMX.SaveToStream(stream: TStream;
+  img32: TImage32; quality: integer);
 var
   cm: TBitmapCodecManager;
   surf: TBitmapSurface;

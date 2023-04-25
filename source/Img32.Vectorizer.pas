@@ -262,6 +262,7 @@ begin
   next := ap.next;
   if currActive.isAscending then
   begin
+    dec(x);
     if (x = ap.X) and (x = next.X) and (next <> ap) then
     begin
       ap.Y := y; // collinear so just move currActive.pt
