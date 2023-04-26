@@ -2,7 +2,7 @@ unit Clipper.Engine;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Date      :  3 March 2023                                                    *
+* Date      :  23 April 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2023                                         *
 * Purpose   :  This is the main polygon clipping module                        *
@@ -257,8 +257,8 @@ type
     procedure DoSplitOp(outrec: POutRec; splitOp: POutPt);
     procedure FixSelfIntersects(outrec: POutRec);
     function  CheckBounds(outrec: POutRec): Boolean;
+    function  CheckSplitOwner(outrec: POutRec): Boolean;
     procedure RecursiveCheckOwners(outrec: POutRec; polytree: TPolyPathBase);
-    procedure DeepCheckOwners(outrec: POutRec; polytree: TPolyPathBase);
   protected
     FUsingPolytree : Boolean;
     procedure AddPath(const path: TPath64;
@@ -401,16 +401,16 @@ type
     property  Scale: double read FScale;
   end;
 
+resourcestring
+  rsClipper_PolyTreeErr = 'The TPolyTree parameter must be assigned.';
+  rsClipper_ClippingErr = 'Undefined clipping error';
+
 implementation
 
 //OVERFLOWCHECKS OFF is a necessary workaround for a compiler bug that very
 //occasionally reports incorrect overflow errors in Delphi versions before 10.2.
 //see https://forums.embarcadero.com/message.jspa?messageID=871444
 {$OVERFLOWCHECKS OFF}
-
-resourcestring
-  rsClipper_PolyTreeErr = 'The TPolyTree parameter must be assigned.';
-  rsClipper_ClippingErr = 'Undefined clipping error';
 
 const
   DefaultClipperDScale = 100;
@@ -536,10 +536,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function IsOpenEnd(e: PActive): Boolean; overload; {$IFDEF INLINING} inline; {$ENDIF}
+//function IsOpenEnd(e: PActive): Boolean; overload; {$IFDEF INLINING} inline; {$ENDIF}
+//begin
+//  Result := e.locMin.isOpen and
+//    (e.vertTop.flags * [vfOpenStart, vfOpenEnd] <> []);
+//end;
+//------------------------------------------------------------------------------
+
+function IsOpenEnd(v: PVertex): Boolean; overload; {$IFDEF INLINING} inline; {$ENDIF}
 begin
-  Result := e.locMin.isOpen and
-    (e.vertTop.flags * [vfOpenStart, vfOpenEnd] <> []);
+  Result := (v.flags * [vfOpenStart, vfOpenEnd] <> []);
 end;
 //------------------------------------------------------------------------------
 
@@ -1958,7 +1964,7 @@ begin
   // the area of the triangle containing splitOp & splitOp.next.
   // So the only way for these areas to have the same sign is if
   // the split triangle is larger than the path containing prevOp or
-  // if there's more than one self=intersection.
+  // if there's more than one self-intersection.
   area2 := AreaTriangle(ip, splitOp.pt, splitOp.next.pt);
   absArea2 := abs(area2);
 
@@ -2035,9 +2041,9 @@ begin
 
   if (IsFront(e1) = IsFront(e2)) then
   begin
-    if IsOpenEnd(e1) then
+    if IsOpenEnd(e1.vertTop) then
       SwapFrontBackSides(e1.outrec)
-    else if IsOpenEnd(e2) then
+    else if IsOpenEnd(e2.vertTop) then
       SwapFrontBackSides(e2.outrec)
     else
     begin
@@ -2118,7 +2124,7 @@ begin
   e2.outrec.pts := nil;
   SetOwner(e2.outrec, e1.outrec);
 
-  if IsOpenEnd(e1) then
+  if IsOpenEnd(e1.vertTop) then
   begin
     e2.outrec.pts := e1.outrec.pts;
     e1.outrec.pts := nil;
@@ -2153,8 +2159,10 @@ var
 begin
   prev := e.prevInAEL;
   if IsOpen(e) or not IsHotEdge(e) or not Assigned(prev) or
-    IsOpen(prev) or not IsHotEdge(prev) or
-    (pt.Y < e.top.Y +2) or (pt.Y < prev.top.Y +2) then Exit;
+    IsOpen(prev) or not IsHotEdge(prev) then Exit;
+  if ((pt.Y < e.top.Y +2) or (pt.Y < prev.top.Y +2)) and
+    ((e.bot.Y > pt.Y) or (prev.bot.Y > pt.Y)) then Exit; // (#490)
+
   if checkCurrX then
   begin
     if DistanceFromLineSqrd(pt, prev.bot, prev.top) > 0.25 then Exit
@@ -2180,8 +2188,9 @@ var
 begin
   next := e.nextInAEL;
   if IsOpen(e) or not IsHotEdge(e) or not Assigned(next) or
-    IsOpen(next) or not IsHotEdge(next) or
-    (pt.Y < e.top.Y +2) or (pt.Y < next.top.Y +2) then Exit;
+    not IsHotEdge(next) or IsOpen(next) then Exit;
+  if ((pt.Y < e.top.Y +2) or (pt.Y < next.top.Y +2)) and
+    ((e.bot.Y > pt.Y) or (next.bot.Y > pt.Y)) then Exit; // (#490)
 
   if (checkCurrX) then
   begin
@@ -2269,7 +2278,7 @@ begin
   InsertScanLine(e.top.Y);
 
   CheckJoinLeft(e, e.bot);
-  CheckJoinRight(e, e.bot);
+  CheckJoinRight(e, e.bot, true); // (#500)
 end;
 //------------------------------------------------------------------------------
 
@@ -2942,7 +2951,10 @@ begin
         else if Path1InsidePath2(or1.pts, or2.pts) then
           SetOwner(or1, or2)
         else
+        begin
+          AddSplit(or1, or2); //(#498)
           or2.owner := or1;
+        end;
       end else
         or2.owner := or1;
     end else
@@ -3359,7 +3371,7 @@ begin
 
       // if horzEdge is a maxima, keep going until we reach
       // its maxima pair, otherwise check for Break conditions
-      if (maxVertex <> horzEdge.vertTop) or IsOpenEnd(horzEdge) then
+      if (maxVertex <> horzEdge.vertTop) or IsOpenEnd(horzEdge.vertTop) then
       begin
         // otherwise stop when 'e' is beyond the end of the horizontal line
         if (isLeftToRight and (e.currX > horzRight)) or
@@ -3410,7 +3422,7 @@ begin
     end; // we've reached the end of this horizontal
 
     // check if we've finished looping through consecutive horizontals
-    if horzIsOpen and IsOpenEnd(horzEdge) then
+    if horzIsOpen and IsOpenEnd(horzEdge.vertTop) then
     begin
       if IsHotEdge(horzEdge) then
       begin
@@ -3488,7 +3500,7 @@ begin
   eNext := e.nextInAEL;
   Result := eNext;
 
-  if IsOpenEnd(e) then
+  if IsOpenEnd(e.vertTop) then
   begin
     if IsHotEdge(e) then AddOutPt(e, e.top);
     if not IsHorizontal(e) then
@@ -3607,6 +3619,28 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TClipperBase.CheckSplitOwner(outrec: POutRec): Boolean;
+var
+  i     : integer;
+  split : POutrec;
+begin
+  for i := 0 to High(outrec.owner.splits) do
+  begin
+    split := GetRealOutRec(outrec.owner.splits[i]);
+    if Assigned(split) and (split <> outrec) and
+      (split <> outrec.owner) and CheckBounds(split) and
+      (split.bounds.Contains(outrec.bounds) and
+        Path1InsidePath2(outrec.pts, split.pts)) then
+    begin
+      outrec.owner := split;
+      Result := True;
+      Exit;
+    end;
+  end;
+  Result := false;
+end;
+//------------------------------------------------------------------------------
+
 procedure TClipperBase.RecursiveCheckOwners(outrec: POutRec; polytree: TPolyPathBase);
 begin
   // pre-condition: outrec will have valid bounds
@@ -3616,54 +3650,24 @@ begin
     outrec.bounds.IsEmpty then
       Exit;
 
-  while Assigned(outrec.owner) and
-    (not Assigned(outrec.owner.pts) or
-    not CheckBounds(outrec.owner)) do
-      outrec.owner := outrec.owner.owner;
-
-  if Assigned(outrec.owner) and
-    not Assigned(outrec.owner.polypath) then
-      RecursiveCheckOwners(outrec.owner, polytree);
-
   while Assigned(outrec.owner) do
-    if (outrec.owner.bounds.Contains(outrec.bounds) and
-      Path1InsidePath2(outrec.pts, outrec.owner.pts)) then
-        break // found - owner contain outrec!
-    else
-      outrec.owner := outrec.owner.owner;
+  begin
+    if Assigned(outrec.owner.splits) and
+      CheckSplitOwner(outrec) then Break;
+    if Assigned(outrec.owner.pts) and
+      CheckBounds(outrec.owner) and
+      (outrec.owner.bounds.Contains(outrec.bounds) and
+      Path1InsidePath2(outrec.pts, outrec.owner.pts)) then break;
+    outrec.owner := outrec.owner.owner;
+  end;
 
   if Assigned(outrec.owner) then
-    outrec.polypath := outrec.owner.polypath.AddChild(outrec.path) else
-    outrec.polypath := polytree.AddChild(outrec.path);
-end;
-//------------------------------------------------------------------------------
-
-procedure TClipperBase.DeepCheckOwners(outrec: POutRec; polytree: TPolyPathBase);
-var
-  i     : integer;
-  split : POutrec;
-begin
-  RecursiveCheckOwners(outrec, polytree);
-
-  while Assigned(outrec.owner) and Assigned(outrec.owner.splits) do
   begin
-    split := nil;
-    for i := 0 to High(outrec.owner.splits) do
-    begin
-      split := GetRealOutRec(outrec.owner.splits[i]);
-      if Assigned(split) and (split <> outrec) and
-        (split <> outrec.owner) and CheckBounds(split) and
-        (split.bounds.Contains(outrec.bounds) and
-          Path1InsidePath2(outrec.pts, split.pts)) then
-      begin
-        RecursiveCheckOwners(split, polytree);
-        outrec.owner := split; //found in split
-        break; // inner 'for' loop
-      end else
-        split := nil;
-    end;
-    if not Assigned(split) then break;
-  end;
+    if not Assigned(outrec.owner.polypath) then
+      RecursiveCheckOwners(outrec.owner, polytree);
+    outrec.polypath := outrec.owner.polypath.AddChild(outrec.path)
+  end else
+    outrec.polypath := polytree.AddChild(outrec.path);
 end;
 //------------------------------------------------------------------------------
 
@@ -3704,7 +3708,7 @@ begin
       end;
 
       if CheckBounds(outrec) then
-        DeepCheckOwners(outrec, polytree);
+        RecursiveCheckOwners(outrec, polytree);
     end;
     setLength(openPaths, cntOpen);
     Result := FSucceeded;

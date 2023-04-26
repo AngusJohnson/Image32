@@ -45,6 +45,7 @@ contains
   Clipper.Core in '..\Clipper\Clipper.Core.pas',
   Clipper.Engine in '..\Clipper\Clipper.Engine.pas',
   Clipper.Offset in '..\Clipper\Clipper.Offset.pas',
-  Clipper.Minkowski in '..\Clipper\Clipper.Minkowski.pas';
+  Clipper.Minkowski in '..\Clipper\Clipper.Minkowski.pas',
+  Clipper.RectClip in '..\Clipper\Clipper.RectClip.pas';
 
 end.

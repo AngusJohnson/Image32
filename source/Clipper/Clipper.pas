@@ -2,7 +2,7 @@ unit Clipper;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Date      :  9 February 2023                                                 *
+* Date      :  21 April 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2023                                         *
 * Purpose   :  This module provides a simple interface to the Clipper Library  *
@@ -14,7 +14,7 @@ interface
 {$I Clipper.inc}
 
 uses
-  Math, SysUtils,
+  Math, SysUtils, Classes,
   Clipper.Core, Clipper.Engine, Clipper.Offset, Clipper.RectClip;
 
 // Redeclare here a number of structures defined in
@@ -97,20 +97,22 @@ function InflatePaths(const paths: TPathsD; delta: Double;
 
 // RectClip: for closed paths only (otherwise use RectClipLines)
 //           much faster when only clipping convex polygons
-function RectClip(const rect: TRect64; const path: TPath64;
+function ExecuteRectClip(const rect: TRect64; const path: TPath64;
   convexOnly: Boolean = false): TPath64; overload;
-function RectClip(const rect: TRect64; const paths: TPaths64;
+function ExecuteRectClip(const rect: TRect64; const paths: TPaths64;
   convexOnly: Boolean = false): TPaths64; overload;
-function RectClip(const rect: TRectD; const path: TPathD;
+function ExecuteRectClip(const rect: TRectD; const path: TPathD;
   convexOnly: Boolean = false; precision: integer = 2): TPathD; overload;
-function RectClip(const rect: TRectD; const paths: TPathsD;
+function ExecuteRectClip(const rect: TRectD; const paths: TPathsD;
   convexOnly: Boolean = false; precision: integer = 2): TPathsD; overload;
 
-function RectClipLines(const rect: TRect64; const path: TPath64): TPaths64; overload;
-function RectClipLines(const rect: TRect64; const paths: TPaths64): TPaths64; overload;
-function RectClipLines(const rect: TRectD; const path: TPathD;
+function ExecuteRectClipLines(const rect: TRect64;
+  const path: TPath64): TPaths64; overload;
+function ExecuteRectClipLines(const rect: TRect64;
+  const paths: TPaths64): TPaths64; overload;
+function ExecuteRectClipLines(const rect: TRectD; const path: TPathD;
   precision: integer = 2): TPathsD; overload;
-function RectClipLines(const rect: TRectD; const paths: TPathsD;
+function ExecuteRectClipLines(const rect: TRectD; const paths: TPathsD;
   precision: integer = 2): TPathsD; overload;
 
 function TranslatePath(const path: TPath64; dx, dy: Int64): TPath64; overload;
@@ -126,6 +128,10 @@ function MinkowskiSum(const pattern, path: TPathD;
 function PolyTreeToPaths64(PolyTree: TPolyTree64): TPaths64;
 function PolyTreeToPathsD(PolyTree: TPolyTreeD): TPathsD;
 
+//ShowPolyTreeStructure: only useful when debugging
+procedure ShowPolyTreeStructure(polytree: TPolyTree64; strings: TStrings); overload;
+procedure ShowPolyTreeStructure(polytree: TPolyTreeD; strings: TStrings); overload;
+
 function MakePath(const ints: array of Int64): TPath64; overload;
 function MakePathD(const dbls: array of double): TPathD; overload;
 
@@ -138,10 +144,10 @@ function PointInPolygon(const pt: TPoint64; const polygon: TPath64):
   TPointInPolygonResult; {$IFDEF INLINE} inline; {$ENDIF}
 
 function SimplifyPath(const path: TPath64;
-  epsilon: double; isOpenPath: Boolean = false): TPath64;
+  epsilon: double; isClosedPath: Boolean = false): TPath64;
   {$IFDEF INLINE} inline; {$ENDIF}
 function SimplifyPaths(const paths: TPaths64;
-  epsilon: double; isOpenPath: Boolean = false): TPaths64;
+  epsilon: double; isClosedPaths: Boolean = false): TPaths64;
   {$IFDEF INLINE} inline; {$ENDIF}
 
 implementation
@@ -151,6 +157,38 @@ uses
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
+
+{$IFDEF USINGZ}
+function MakePath(const ints: array of Int64): TPath64;
+var
+  i, len: integer;
+begin
+  len := length(ints) div 3;
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+  begin
+    Result[i].X := ints[i*3];
+    Result[i].Y := ints[i*3 +1];
+    Result[i].z := ints[i*3 +2];
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function MakePathD(const dbls: array of double): TPathD; overload;
+var
+  i, len: integer;
+begin
+  len := length(dbls) div 3;
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+  begin
+    Result[i].X := dbls[i*3];
+    Result[i].Y := dbls[i*3 +1];
+    Result[i].Z := Round(dbls[i*3 +2]);
+  end;
+end;
+//------------------------------------------------------------------------------
+{$ELSE}
 
 function MakePath(const ints: array of Int64): TPath64;
 var
@@ -179,6 +217,7 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
+{$ENDIF}
 
 procedure AddPolyNodeToPaths(Poly: TPolyPath64; var Paths: TPaths64);
 var
@@ -344,7 +383,7 @@ begin
   co := TClipperOffset.Create(MiterLimit, ArcTolerance);
   try
     co.AddPaths(paths, jt, et);
-    Result := co.Execute(delta);
+    co.Execute(delta, Result);
   finally
     co.free;
   end;
@@ -366,7 +405,7 @@ begin
   with TClipperOffset.Create(miterLimit, ArcTolerance) do
   try
     AddPaths(pp, jt, et);
-    pp := Execute(delta * scale);
+    Execute(delta * scale, pp); // reuse pp to receive the solution.
   finally
     free;
   end;
@@ -374,21 +413,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RectClip(const rect: TRect64;
+function ExecuteRectClip(const rect: TRect64;
   const path: TPath64; convexOnly: Boolean): TPath64;
 var
   paths: TPaths64;
 begin
   SetLength(paths, 1);
   paths[0] := path;
-  paths := RectClip(rect, paths, convexOnly);
+  paths := ExecuteRectClip(rect, paths, convexOnly);
   if Assigned(paths) then
     Result := paths[0] else
     Result := nil;
 end;
 //------------------------------------------------------------------------------
 
-function RectClip(const rect: TRect64;
+function ExecuteRectClip(const rect: TRect64;
   const paths: TPaths64; convexOnly: Boolean): TPaths64;
 begin
   Result := nil;
@@ -402,7 +441,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RectClip(const rect: TRectD; const path: TPathD;
+function ExecuteRectClip(const rect: TRectD; const path: TPathD;
   convexOnly: Boolean; precision: integer): TPathD;
 var
   scale: double;
@@ -415,12 +454,12 @@ begin
   scale := Math.Power(10, precision);
   rec := Rect64(ScaleRect(rect, scale));
   tmpPath := ScalePath(path, scale);
-  tmpPath := RectClip(rec, tmpPath, convexOnly);
+  tmpPath := ExecuteRectClip(rec, tmpPath, convexOnly);
   Result := ScalePathD(tmpPath, 1/scale);
 end;
 //------------------------------------------------------------------------------
 
-function RectClip(const rect: TRectD; const paths: TPathsD;
+function ExecuteRectClip(const rect: TRectD; const paths: TPathsD;
   convexOnly: Boolean; precision: integer): TPathsD;
 var
   scale: double;
@@ -442,7 +481,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RectClipLines(const rect: TRect64; const path: TPath64): TPaths64; overload;
+function ExecuteRectClipLines(const rect: TRect64; const path: TPath64): TPaths64;
 var
   tmp: TPaths64;
 begin
@@ -458,7 +497,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RectClipLines(const rect: TRect64; const paths: TPaths64): TPaths64; overload;
+function ExecuteRectClipLines(const rect: TRect64; const paths: TPaths64): TPaths64;
 begin
   Result := nil;
   if rect.IsEmpty then Exit;
@@ -471,7 +510,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RectClipLines(const rect: TRectD;
+function ExecuteRectClipLines(const rect: TRectD;
   const path: TPathD; precision: integer): TPathsD;
 var
   scale: double;
@@ -485,12 +524,12 @@ begin
   scale := Math.Power(10, precision);
   rec := Rect64(ScaleRect(rect, scale));
   tmpPath := ScalePath(path, scale);
-  tmpPaths := RectClipLines(rec, tmpPath);
+  tmpPaths := ExecuteRectClipLines(rec, tmpPath);
   Result := ScalePathsD(tmpPaths, 1/scale);
 end;
 //------------------------------------------------------------------------------
 
-function RectClipLines(const rect: TRectD; const paths: TPathsD;
+function ExecuteRectClipLines(const rect: TRectD; const paths: TPathsD;
   precision: integer = 2): TPathsD;
 var
   scale: double;
@@ -580,6 +619,65 @@ begin
  Result := Clipper.Minkowski.MinkowskiSum(pattern, path, pathIsClosed);
 end;
 //------------------------------------------------------------------------------
+
+procedure ShowPolyPathStructure64(pp: TPolyPath64; level: integer; strings: TStrings);
+var
+  i: integer;
+  spaces, caption: string;
+begin
+  spaces := StringOfChar(' ', level * 2);
+  if pp.IsHole then
+    caption := 'Hole' else
+    caption := 'Outer';
+  if (pp.Count > 0) then
+  begin
+    strings.Add(Format('%s%s (%d)',[spaces, caption, pp.Count]));
+    for i := 0 to pp.Count -1 do
+      ShowPolyPathStructure64(pp.child[i], level + 1, strings);
+  end else
+    strings.Add(spaces + caption);
+end;
+//------------------------------------------------------------------------------
+
+procedure ShowPolyTreeStructure(polytree: TPolyTree64; strings: TStrings);
+var
+  i: integer;
+begin
+  strings.Add('Polytree Root');
+  for i := 0 to polytree.Count -1 do
+    ShowPolyPathStructure64(polytree[i], 1, strings);
+end;
+//------------------------------------------------------------------------------
+
+procedure ShowPolyPathStructureD(pp: TPolyPathD; level: integer; strings: TStrings);
+var
+  i: integer;
+  spaces, caption: string;
+begin
+  spaces := StringOfChar(' ', level * 2);
+  if pp.IsHole then
+    caption := 'Hole ' else
+    caption := 'Outer ';
+  if (pp.Count > 0) then
+  begin
+    strings.Add(Format('%s%s (%d)',[spaces + caption, pp.Count]));
+    for i := 0 to pp.Count -1 do
+      ShowPolyPathStructureD(pp.child[i], level + 1, strings);
+  end else
+    strings.Add(spaces + caption);
+end;
+//------------------------------------------------------------------------------
+
+procedure ShowPolyTreeStructure(polytree: TPolyTreeD; strings: TStrings);
+var
+  i: integer;
+begin
+  strings.Add('Polytree Root');
+  for i := 0 to polytree.Count -1 do
+    ShowPolyPathStructureD(polytree[i], 1, strings);
+end;
+//------------------------------------------------------------------------------
+
 
 function TrimCollinear(const p: TPath64; isOpenPath: Boolean = false): TPath64;
 var
@@ -691,7 +789,7 @@ begin
 end;
 
 function SimplifyPath(const path: TPath64;
-  epsilon: double; isOpenPath: Boolean = false): TPath64;
+  epsilon: double; isClosedPath: Boolean = false): TPath64;
 var
   i,j, len, high: integer;
   curr, prev, start, prev2, next, next2: integer;
@@ -708,14 +806,14 @@ begin
   SetLength(dsq, len);
 
   curr := 0;
-  if (isOpenPath) then
-  begin
-    dsq[0] := MaxDouble;
-    dsq[high] := MaxDouble;
-  end else
+  if (isClosedPath) then
   begin
     dsq[0] := PerpendicDistFromLineSqrd(path[0], path[high], path[1]);
     dsq[high] := PerpendicDistFromLineSqrd(path[high], path[0], path[high - 1]);
+  end else
+  begin
+    dsq[0] := MaxDouble;
+    dsq[high] := MaxDouble;
   end;
 
   for i := 1 to high -1 do
@@ -743,7 +841,7 @@ begin
       next2 := GetNext(next, high, flags);
       dsq[curr] := PerpendicDistFromLineSqrd(
         path[curr], path[prev], path[next]);
-      if (next <> high) or not isOpenPath then
+      if (next <> high) or isClosedPath then
         dsq[next] := PerpendicDistFromLineSqrd(
           path[next], path[curr], path[next2]);
       curr := next;
@@ -755,7 +853,7 @@ begin
       prev2 := GetPrior(prev, high, flags);
       dsq[curr] := PerpendicDistFromLineSqrd(
         path[curr], path[prev], path[next]);
-      if (prev <> 0) or not isOpenPath then
+      if (prev <> 0) or isClosedPath then
         dsq[prev] := PerpendicDistFromLineSqrd(
           path[prev], path[prev2], path[curr]);
     end;
@@ -772,14 +870,14 @@ begin
 end;
 
 function SimplifyPaths(const paths: TPaths64;
-  epsilon: double; isOpenPath: Boolean = false): TPaths64;
+  epsilon: double; isClosedPaths: Boolean = false): TPaths64;
 var
   i, len: integer;
 begin
   len := Length(paths);
   SetLength(Result, len);
   for i := 0 to len -1 do
-    result[i] := SimplifyPath(paths[i], epsilon, isOpenPath);
+    result[i] := SimplifyPath(paths[i], epsilon, isClosedPaths);
 end;
 
 end.
