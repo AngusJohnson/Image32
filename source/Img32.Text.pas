@@ -3,7 +3,7 @@ unit Img32.Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  7 April 2023                                                    *
+* Date      :  1 May 2023                                                      *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -1796,8 +1796,8 @@ begin
       for j := 0 to High(pathsEx[i]) do
         with pathsEx[i][j].pt do
         begin
-          xx := m * ((a/m)*X + (c/m)*Y + e);
-          y := m * ((b/n)*X + (d/n)*Y + f);
+          xx :=a*X + c*Y + m*e;
+          y := b*X + d*Y + n*f; // (#23)
           X := xx;
         end;
   end;

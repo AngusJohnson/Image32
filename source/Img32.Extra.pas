@@ -3,7 +3,7 @@ unit Img32.Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  7 April 2023                                                    *
+* Date      :  1 May 2023                                                      *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 * Purpose   :  Miscellaneous routines that don't belong in other modules.      *
@@ -184,6 +184,10 @@ function SimplifyPath(const path: TPathD;
 function SimplifyPaths(const paths: TPathsD;
   epsilon: double; isOpenPath: Boolean = false): TPathsD;
 
+// SimplifyPathEx: this is mainly useful following Vectorize()
+function SimplifyPathEx(const path: TPathD): TPathD;
+function SimplifyPathsEx(const paths: TPathsD): TPathsD;
+
 // SmoothToCubicBezier - produces a series of cubic bezier control points.
 // This function is very useful in the following combination:
 // SimplifyPath(), SmoothToCubicBezier(), FlattenCBezier().
@@ -243,6 +247,19 @@ type
   TColor32Array = array [0.. maxint div SizeOf(TColor32) -1] of TColor32;
   PWeightedColorArray = ^TWeightedColorArray;
   TWeightedColorArray = array [0.. $FFFFFF] of TWeightedColor;
+
+  // SimplifyPathsEx structures
+  PVertex = ^TVertex;
+  TVertex = record
+    pt    : TPointD;
+    uvec  : TPointD;
+    dist  : double;
+    perpD : double;
+    next  : PVertex;
+    prev:  PVertex;
+  end;
+  TArrayOfVertices = array of TVertex;
+
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions
@@ -1812,7 +1829,171 @@ begin
   for i := 0 to len -1 do
     result[i] := SimplifyPath(paths[i], epsilon, isOpenPath);
 end;
+
 //---------------------------------------------------------------------------
+// SimplifyPathEx support functions
+//---------------------------------------------------------------------------
+
+function GetVertex(base: PVertex; offset: integer): PVertex; inline;
+begin
+  Result := base;
+  inc(Result, offset);
+end;
+//---------------------------------------------------------------------------
+
+procedure InitVertex(currV, loV, highV: PVertex; const pt: TPointD);
+var
+  prev, prevPrev: PVertex;
+begin
+  currV.pt := pt;
+  if currV <> loV then
+  begin
+    currV.prev := GetVertex(currV, -1);
+    prev := currV.prev;
+    if prev <> loV then
+      prevPrev := GetVertex(prev, -1) else
+      prevPrev := highV;
+    prev.dist := Distance(prev.pt, pt);
+    prev.uvec := GetUnitVector(prev.pt, pt);
+    prev.perpD := PerpendicularDistSqrd(prev.pt, prevPrev.pt, currV.pt);
+  end else
+  begin
+    currV.prev := highV;
+    prevPrev := GetVertex(highV, -1);
+    highV.dist := Distance(highV.pt, pt);
+    highV.uvec := GetUnitVector(highV.pt, pt);
+    highV.perpD := PerpendicularDistSqrd(highV.pt, prevPrev.pt, currV.pt);
+  end;
+
+  if currV = highV then
+    currV.next := loV else
+    currV.next := GetVertex(currV, 1);
+end;
+//---------------------------------------------------------------------------
+
+function RemoveVertex(vertex: PVertex): PVertex;
+begin
+  if vertex.next = vertex then
+    Result := nil else
+    Result := vertex.next;
+  vertex.prev.next := vertex.next;
+  vertex.next.prev := vertex.prev;
+end;
+//---------------------------------------------------------------------------
+
+function Delete(e: PVertex; var start: PVertex): PVertex;
+begin
+  Result := e.next;
+  e := RemoveVertex(e);
+  Result.dist := Distance(Result.pt, Result.next.pt);
+  Result.uvec := GetUnitVector(Result.pt, Result.next.pt);
+  Result.perpD := PerpendicularDistSqrd(Result.pt, Result.prev.pt, Result.next.pt);
+  start := e;
+end;
+//---------------------------------------------------------------------------
+
+procedure Delete1(e: PVertex; frac: double; var start: PVertex);
+begin
+  e.pt := OffsetPoint(e.pt, e.uvec.X * e.dist * frac, e.uvec.Y * e.dist * frac);
+  RemoveVertex(e.next);
+  e.prev.dist := Distance(e.prev.pt, e.pt);
+  e.prev.uvec := GetUnitVector(e.prev.pt, e.pt);
+  e.prev.perpD := PerpendicularDistSqrd(e.prev.pt, e.prev.prev.pt, e.pt);
+
+  e.dist := Distance(e.pt, e.next.pt);
+  e.uvec := GetUnitVector(e.pt, e.next.pt);
+  e.perpD := PerpendicularDistSqrd(e.pt, e.prev.pt, e.next.pt);
+  start := e.prev;
+end;
+//---------------------------------------------------------------------------
+
+function Delete2(e: PVertex; var start: PVertex): PVertex;
+begin
+  Result := e.prev;
+  RemoveVertex(Result.next);
+  RemoveVertex(Result.next);
+  Result.dist := Distance(Result.pt, Result.next.pt);
+  Result.uvec := GetUnitVector(Result.pt, Result.next.pt);
+  Result.perpD := PerpendicularDistSqrd(Result.pt, Result.prev.pt, Result.next.pt);
+  start := Result.prev;
+end;
+//---------------------------------------------------------------------------
+
+function SimplifyPathEx(const path: TPathD): TPathD;
+var
+  i, len: integer;
+  vecs, currV, highV: PVertex;
+const
+  maxLen = 10;
+  minLen = 1.2;
+begin
+  Result := nil;
+  len := Length(path);
+  if len < 3 then Exit;
+  GetMem(vecs, len * sizeOf(TVertex));
+  try
+    currV := vecs;
+    // set second last and last vertex pts.
+    highV := GetVertex(vecs, len -2);
+    highV.pt := path[len -2];
+    inc(highV);
+    highV.pt := path[len -1];
+    // now init all vertices
+    for i := 0 to len -1 do
+    begin
+      InitVertex(currV, vecs, highV, path[i]);
+      inc(currV);
+    end;
+
+    currV := vecs;
+    while (currV <> highV) and (currV.next <> currV.prev) do
+    begin
+      if (currV.dist > currV.next.dist) or (currV.dist >= maxLen) then
+        currV := currV.next
+      else if currV.dist < minLen then
+        currV := Delete(currV, highV)
+      else if currV.perpD < 0.2 then
+        currV := Delete(currV, highV)
+      else if (DotProduct(currV.prev.uvec, currV.next.next.uvec) > 0.9) and
+        (currV.prev.dist + currV.next.next.dist > 10 * (currV.dist + currV.next.dist)) then
+          currV := Delete2(currV, highV)
+      else if (DotProduct(currV.prev.uvec, currV.next.uvec) > 0.9) then
+        Delete1(currV, currV.next.dist /
+          (currV.prev.dist + currV.next.dist), highV)
+      else if (DotProduct(currV.prev.uvec, currV.uvec) > 0.9) then
+        currV := Delete(currV, highV)
+      else
+        currV := currV.next
+    end;
+
+    i := 0;
+    SetLength(Result, len);
+    currV.prev.next := nil;
+    while Assigned(currV) do
+    begin
+      Result[i] := currV.pt;
+      inc(i);
+      currV := currV.next;
+    end;
+    SetLength(Result, i);
+  finally
+    FreeMem(vecs);
+  end;
+end;
+//---------------------------------------------------------------------------
+
+function SimplifyPathsEx(const paths: TPathsD): TPathsD;
+var
+  i, len: integer;
+begin
+  len := Length(paths);
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    Result[i] := SimplifyPathEx(paths[i]);
+end;
+//---------------------------------------------------------------------------
+//---------------------------------------------------------------------------
+
 
 function DotProdVecs(const vec1, vec2: TPointD): double;
   {$IFDEF INLINE} inline; {$ENDIF}

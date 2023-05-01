@@ -3,7 +3,7 @@ unit Img32.Vectorizer;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  20 April 2023                                                   *
+* Date      :  1 May 2023                                                      *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 * Purpose   :  Converts raster images to vector paths                          *
@@ -73,7 +73,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function CountPath(pt: PPt): integer;
+function GetVertexCount(pt: PPt): integer;
 var
   pt2: PPt;
 begin
@@ -91,7 +91,7 @@ function ConvertToPathD(pt: PPt): TPathD;
 var
   i, len: integer;
 begin
-  len := CountPath(pt);
+  len := GetVertexCount(pt);
   SetLength(Result, len);
   for i := 0 to len -1 do
   begin
