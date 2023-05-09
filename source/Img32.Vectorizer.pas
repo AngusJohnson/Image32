@@ -410,7 +410,8 @@ begin
   finally
     free;
   end;
-  Result := SimplifyPaths(Result, 0.25);
+  Result := SimplifyPathsEx(Result);
+  //Result := SimplifyPaths(Result, 0.25);
 end;
 //------------------------------------------------------------------------------
 

@@ -864,7 +864,7 @@ end;
 
 procedure TWeightedColor.Add(c: TColor32; w: Integer);
 var
-  a: Integer;
+  a: Int64;
   argb: TARGB absolute c;
 begin
   inc(fAddCount, w);
@@ -889,7 +889,7 @@ end;
 
 procedure TWeightedColor.Subtract(c: TColor32; w: Integer);
 var
-  a: Integer;
+  a: Int64;
   argb: TARGB absolute c;
 begin
   dec(fAddCount, w);
