@@ -26,9 +26,9 @@ type
     pnlSmooth: TPanel;
     lblSmooth: TLabel;
     TrackBar1: TTrackBar;
-    TrackBar2: TTrackBar;
-    lblSimplify: TLabel;
     mnuHighlightVertices: TMenuItem;
+    lblSimplify: TLabel;
+    TrackBar2: TTrackBar;
     procedure Exit1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -153,7 +153,7 @@ end;
 procedure TForm1.DisplayImage;
 var
   i,j, len: integer;
-  scale: double;
+  scale, simplifyTol: double;
   vectorBounds: TRect;
 begin
   rawPaths := nil;
@@ -172,19 +172,20 @@ begin
     Exit;
   end;
 
-  // 1. Vectorize:
+  with GetDisplaySize do workImg.SetSize(cx, cy);
+  simplifyTol := TrackBar2.Position * 0.5 * workImg.Width/masterImg.Width;
+
+  // 1. Vectorize (now includes vector simplification):
   // converts simple (2 color) raster images into vector images
   if masterImg.HasTransparency then
-    rawPaths := Vectorize(masterImg, $FF000000, CompareAlpha, $80) else
-    rawPaths := Vectorize(masterImg, $FF000000, CompareRGB, $44);
+    rawPaths := Vectorize(masterImg, $FF000000, CompareAlpha, $80, simplifyTol) else
+    rawPaths := Vectorize(masterImg, $FF000000, CompareRGB, $44, simplifyTol);
   vectorBounds := GetBounds(rawPaths);
 
-  // 1b. scale the raw vector image
-  with GetDisplaySize do workImg.SetSize(cx, cy);
+  // 1b. scale the vector image
   scale := Min(
     (workImg.Width - Margin*2) / RectWidth(vectorBounds),
     (workImg.Height - Margin*2) / RectHeight(vectorBounds));
-
   rawPaths := ScalePath(rawPaths, scale);
   rawPaths := OffsetPath(rawPaths,
     margin -vectorBounds.Left, margin -vectorBounds.Top);
@@ -196,34 +197,23 @@ begin
     StatusBar1.Panels[1].Text := ' Raw Vectors (no smoothing or simplification)';
   end else
   begin
-    // 2. SimplifyPaths:
-    // removes vertices that contribute very little  to a path's shape.
-    if TrackBar2.Position = 0 then
-      flattenedPaths := CopyPaths(rawPaths) else
-      flattenedPaths := SimplifyPaths(rawPaths,
-        TrackBar2.Position * 0.5 * workImg.Width/masterImg.Width);
 
-    // 3. SmoothToCubicBezier:
+    // 2. SmoothToCubicBezier and flatten result
     // returns a bezier path, NOT a flattened path
     if TrackBar1.Position > 0 then
     begin
-      len := Length(flattenedPaths);
+      len := Length(rawPaths);
       setLength(bezierPaths, len);
       for i := 0 to len -1 do
-        bezierPaths[i] := SmoothToCubicBezier(flattenedPaths[i],
+        bezierPaths[i] := SmoothToCubicBezier(rawPaths[i],
           true, TrackBar1.Position);
-      // 4. FlattenCBezier:
-      // converts poly-beziers into normal paths
+      // flatten beziers
       SetLength(flattenedPaths, Length(bezierPaths));
       for i := 0 to High(bezierPaths) do
         flattenedPaths[i] := FlattenCBezier(bezierPaths[i]);
-    end;
-
-    //and optionally reduce the number of points again
-    if (TrackBar1.Position > 0) and (TrackBar1.Position > 0) then
-      //flattenedPaths := RamerDouglasPeucker(flattenedPaths,
-      flattenedPaths := SimplifyPaths(flattenedPaths,
-        (0.2 + TrackBar2.Position/8));
+    end
+    else
+      flattenedPaths := CopyPaths(rawPaths);
 
     lblSmooth.Caption :=
       Format('Smooth'#10'Amount'#10'(%d)',[TrackBar1.Position]);
@@ -236,8 +226,6 @@ begin
 
   if mnuHighlightVertices.Checked then
   begin
-//    DrawPolygon(workImg, flattenedPaths, frEvenOdd, $20660000);
-//    DrawLine(workImg, flattenedPaths, DPIAware(2), clMaroon32, esPolygon);
     DrawPolygon(workImg, flattenedPaths, frEvenOdd, $20660000);
     DrawLine(workImg, flattenedPaths, DPIAware(2), clMaroon32, esPolygon);
 

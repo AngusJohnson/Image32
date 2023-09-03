@@ -31,33 +31,6 @@ object Form1: TForm1
     Height = 19
     Panels = <>
   end
-  object ImagePanel: TImage32Panel
-    Left = 185
-    Top = 0
-    Width = 571
-    Height = 450
-    Align = alClient
-    BevelInner = bvLowered
-    BorderWidth = 12
-    Color = clBtnFace
-    DoubleBuffered = True
-    ParentBackground = False
-    ParentDoubleBuffered = False
-    TabOrder = 1
-    TabStop = True
-    Touch.InteractiveGestures = [igZoom, igPan, igPressAndTap]
-    OnResize = ImagePanelResize
-    AutoCenter = True
-    FocusedColor = clActiveCaption
-    UnFocusedColor = clBtnFace
-    Scale = 1.000000000000000000
-    ScaleMin = 0.050000000000000000
-    ScaleMax = 20.000000000000000000
-    ShowScrollButtons = ssbFocused
-    AllowKeyScroll = True
-    AllowScrnScroll = True
-    AllowZoom = True
-  end
   object ListBox1: TListBox
     Left = 0
     Top = 0
@@ -67,7 +40,7 @@ object Form1: TForm1
     Color = 16316664
     ItemHeight = 14
     PopupMenu = PopupMenu1
-    TabOrder = 2
+    TabOrder = 1
     Visible = False
     OnClick = ListBox1Click
   end
@@ -106,11 +79,13 @@ object Form1: TForm1
     Left = 303
     Top = 56
     object PopupMenu11: TMenuItem
-      Caption = '&Open in Notepad'
+      Caption = '&Open in Text Editor'
+      ShortCut = 120
       OnClick = PopupMenu11Click
     end
     object OpeninBrowser1: TMenuItem
       Caption = '&Open in Browser'
+      ShortCut = 121
       OnClick = OpeninBrowser1Click
     end
   end

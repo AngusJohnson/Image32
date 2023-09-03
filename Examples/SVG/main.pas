@@ -6,7 +6,7 @@ interface
 
 uses
 {$IFnDEF FPC}
-  ShellApi, Windows,
+  ShellApi, shlwapi, Windows,
 {$ELSE}
   LCLIntf, LCLType, LMessages,
 {$ENDIF}
@@ -44,9 +44,9 @@ type
     procedure OpeninBrowser1Click(Sender: TObject);
     procedure SaveAs1Click(Sender: TObject);
   protected
-    ImagePanel: TImage32Panel;
     folder: string;
     filename: string;
+    ImagePanel: TImage32Panel;
     procedure OpenFile(const filename: string);
     procedure WMDropFiles(var Msg: TMessage); message WM_DROPFILES;
     procedure DrawCurrentItem;
@@ -71,6 +71,28 @@ uses
 //------------------------------------------------------------------------------
 
 {$IFnDEF FPC}
+function GetDefaultTextEditor: string;
+var
+  exeFileBuffer: array[0..1024] of char;
+  len: DWORD;
+begin
+  len := 1024;
+  if AssocQueryString(0, ASSOCSTR_EXECUTABLE,
+      '.txt', nil, @exeFileBuffer[0], @len) = S_OK then
+    SetString(Result, exeFileBuffer, len -1) else
+    Result := '';
+end;
+//------------------------------------------------------------------------------
+
+procedure OpenDocumentWithDefaultTxt(const filename: string);
+var
+  txtEditor: string;
+begin
+  txtEditor := GetDefaultTextEditor;
+  ShellExecute(0, 'open', PChar(txtEditor), PChar('"'+filename+'"'), nil, SW_SHOWNORMAL);
+end;
+//------------------------------------------------------------------------------
+
 procedure OpenDocument(const filename: string);
 begin
   ShellExecute(0, 'open', PChar(filename), nil, nil, SW_SHOWNORMAL);
@@ -85,6 +107,7 @@ begin
   ImagePanel.parent := self;
   ImagePanel.Align := alClient;
   ImagePanel.OnResize:= ImagePanelResize;
+  ImagePanel.BkgType := pbtChessBoard;
   {$IFNDEF FPC}
   DragAcceptFiles(Handle, True);
   {$ENDIF}
@@ -93,7 +116,7 @@ begin
   rec := ImagePanel.InnerClientRect;
   ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
 
-  FontManager.Load('Arial');
+//  FontManager.Load('Segoe UI');
   FontManager.Load('Arial Bold');
   FontManager.Load('Arial Italic');
   FontManager.Load('Arial Bold Italic');
@@ -102,7 +125,13 @@ begin
   FontManager.Load('Times New Roman Italic');
   FontManager.Load('Times New Roman Bold Italic');
 
-  OpenFile('.\SVGs\*.svg');
+  FontManager.Load('Symbol');
+  FontManager.Load('Webdings');
+  FontManager.Load('Wingdings');
+  FontManager.Load('Segoe UI Symbol');
+
+  OpenFile('.\Sample SVGs 1\textpath2.svg');
+  //OpenFile('.\*.svg');
   ListSVGFilesInFolder;
   DrawCurrentItem;
 end;
@@ -161,6 +190,8 @@ var
 begin
   self.filename := ExtractFileName(filename);
   folder := ExtractFilePath(filename);
+  if (folder = '') or (folder[1] = '.') then
+    folder := ExpandFileName(folder);
   OpenDialog1.InitialDir := folder;
   ListSVGFilesInFolder;
   i := ListBox1.Items.IndexOf(self.filename);
@@ -183,7 +214,7 @@ var
 begin
   if ListBox1.ItemIndex < 0 then Exit;
   fn := AppendSlash(folder) + ListBox1.Items[ListBox1.ItemIndex];
-   OpenDocument('notepad.exe');
+  OpenDocumentWithDefaultTxt(fn);
 end;
 //------------------------------------------------------------------------------
 
@@ -225,15 +256,24 @@ procedure TForm1.DrawCurrentItem;
 var
   svgFilenameAndPath: string;
   rec: TRect;
+  size: TSize;
 begin
   if ListBox1.ItemIndex < 0 then Exit;
+
+  filename := ListBox1.Items[ListBox1.ItemIndex];
+  svgFilenameAndPath := AppendSlash(folder) + filename;
   rec := ImagePanel.InnerClientRect;
+  size := GetImageSize(svgFilenameAndPath);
+  size.cx := DPIAware(size.cx);
+  size.cy := DPIAware(size.cy);
+  if (size.cx > RectWidth(rec)) and
+    (size.cy > RectHeight(rec)) then
+    rec := Rect(0,0,size.cx, size.cy);
+
   ImagePanel.Image.BeginUpdate;
   Screen.Cursor := crHourGlass;
   try
     ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
-    filename := ListBox1.Items[ListBox1.ItemIndex];
-    svgFilenameAndPath := AppendSlash(folder) + filename;
     ImagePanel.Image.LoadFromFile(svgFilenameAndPath);
   finally
     ImagePanel.Image.EndUpdate;

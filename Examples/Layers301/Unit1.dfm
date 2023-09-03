@@ -2,29 +2,32 @@ object MainForm: TMainForm
   Left = 387
   Top = 152
   Caption = 'Layers301'
-  ClientHeight = 410
-  ClientWidth = 455
+  ClientHeight = 820
+  ClientWidth = 910
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -12
+  Font.Height = -24
   Font.Name = 'Tahoma'
   Font.Style = []
   Menu = MainMenu1
-  OldCreateOrder = False
   Position = poMainFormCenter
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnKeyDown = FormKeyDown
   OnPaint = FormPaint
   OnResize = FormResize
-  PixelsPerInch = 96
-  TextHeight = 14
+  PixelsPerInch = 192
+  TextHeight = 29
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 384
-    Width = 455
-    Height = 26
+    Top = 768
+    Width = 910
+    Height = 52
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
     Panels = <>
     ParentFont = True
     SimplePanel = True
@@ -32,6 +35,8 @@ object MainForm: TMainForm
       'Selecting a layer before adding a new one will create a nested c' +
       'hild layer'
     UseSystemFont = False
+    ExplicitTop = 767
+    ExplicitWidth = 896
   end
   object MainMenu1: TMainMenu
     Left = 112

@@ -2,87 +2,116 @@ object Form1: TForm1
   Left = 514
   Top = 310
   Caption = 'Image32: Vectorize'
-  ClientHeight = 435
-  ClientWidth = 569
+  ClientHeight = 870
+  ClientWidth = 1138
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -13
+  Font.Height = -26
   Font.Name = 'Tahoma'
   Font.Style = []
   KeyPreview = True
   Menu = MainMenu1
-  OldCreateOrder = False
   Position = poDesktopCenter
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnPaint = FormPaint
   OnResize = FormResize
-  PixelsPerInch = 96
-  TextHeight = 16
+  PixelsPerInch = 192
+  TextHeight = 31
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 409
-    Width = 569
-    Height = 26
+    Top = 818
+    Width = 1138
+    Height = 52
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
     Panels = <
       item
-        Width = 120
+        Width = 240
       end
       item
-        Width = 500
+        Width = 1000
       end>
     ParentFont = True
     UseSystemFont = False
+    ExplicitTop = 817
+    ExplicitWidth = 1124
   end
   object pnlSmooth: TPanel
-    Left = 512
+    Left = 1024
     Top = 0
-    Width = 57
-    Height = 409
+    Width = 114
+    Height = 818
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
     Align = alRight
     ParentBackground = False
     TabOrder = 1
     OnEnter = pnlSmoothEnter
     OnExit = pnlSmoothExit
+    ExplicitLeft = 1010
+    ExplicitHeight = 817
     object lblSmooth: TLabel
-      Left = 6
-      Top = 6
-      Width = 44
-      Height = 32
+      Left = 12
+      Top = 412
+      Width = 91
+      Height = 62
+      Margins.Left = 6
+      Margins.Top = 6
+      Margins.Right = 6
+      Margins.Bottom = 6
       Alignment = taCenter
       Caption = 'Smooth'#10'Amount'
     end
     object lblSimplify: TLabel
-      Left = 5
-      Top = 206
-      Width = 45
-      Height = 32
+      Left = 10
+      Top = 36
+      Width = 91
+      Height = 62
+      Margins.Left = 6
+      Margins.Top = 6
+      Margins.Right = 6
+      Margins.Bottom = 6
       Alignment = taCenter
       Caption = 'Simplify'#10'Amount'
     end
     object TrackBar1: TTrackBar
-      Left = 15
-      Top = 56
-      Width = 27
-      Height = 118
+      Left = 30
+      Top = 512
+      Width = 54
+      Height = 236
+      Margins.Left = 6
+      Margins.Top = 6
+      Margins.Right = 6
+      Margins.Bottom = 6
       Max = 50
       Orientation = trVertical
       PageSize = 0
-      Position = 30
-      TabOrder = 0
+      Position = 17
+      TabOrder = 1
+      ThumbLength = 40
       TickStyle = tsNone
       OnChange = TrackBar1Change
     end
     object TrackBar2: TTrackBar
-      Left = 15
-      Top = 256
-      Width = 27
-      Height = 118
+      Left = 38
+      Top = 144
+      Width = 54
+      Height = 236
+      Margins.Left = 6
+      Margins.Top = 6
+      Margins.Right = 6
+      Margins.Bottom = 6
       Orientation = trVertical
       PageSize = 0
-      Position = 4
-      TabOrder = 1
+      Position = 3
+      TabOrder = 0
+      ThumbLength = 40
       TickStyle = tsNone
       OnChange = TrackBar1Change
     end

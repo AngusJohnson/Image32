@@ -194,7 +194,7 @@ var
   rec: TRectD;
 begin
   rec := RectD(0,0,Width,Height);
-  if Name = 'rectangle' then
+  if Copy(Name,1,9) = 'rectangle' then
   begin
     //don't worry about hittesting for rectangles because the
     //default hittest region is the layer's rectangular bounds :)
@@ -236,7 +236,7 @@ begin
   delta.Y := (rec.Height - textRect.Height) / 2;
   Image.Clear;
 
-  if name = 'rectangle' then
+  if copy(name, 1, 9) = 'rectangle' then
   begin
     //draw a drop shadow and then fill the layer's background
     DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, $33000000);
@@ -443,6 +443,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+var recCnt: integer = 1;
+
 procedure TMainForm.mnuAddRectangleClick(Sender: TObject);
 var
   newLayer: TMyVectorLayer32;
@@ -453,7 +455,8 @@ begin
     rec := MakeRandomRect(layeredImg32.MidPoint);
 
   newLayer := layeredImg32.AddLayer(
-    TMyVectorLayer32, targetLayer, 'rectangle') as TMyVectorLayer32;
+    TMyVectorLayer32, targetLayer, 'rectangle ' + inttostr(recCnt)) as TMyVectorLayer32;
+  inc(recCnt);
   newLayer.SetInnerBounds(rec);
   newLayer.UpdateHitTestAndClipPath;
   SetTargetLayer(newLayer);
