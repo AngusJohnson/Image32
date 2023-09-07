@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  1 May 2023                                                      *
+* Date      :  7 September 2023                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -1947,9 +1947,7 @@ begin
 
   BlockNotify;
   try
-    if (newWidth < Width) and (newHeight < Height) then
-      BoxDownSampling(self, newWidth, newHeight)
-    else if fResampler = 0 then
+    if fResampler = 0 then
       NearestNeighborResize(newWidth, newHeight)
     else
       ResamplerResize(newWidth, newHeight);
@@ -2728,31 +2726,15 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.CopyToBitmap(bmp: TBitmap);
-{$IFNDEF MSWINDOWS}
-var
-  i: integer;
-  pxDst, pxSrc: PColor32;
-{$ENDIF}
 begin
   if not Assigned(bmp) then Exit;
   bmp.PixelFormat := pf32bit;
+  //bmp.AlphaFormat := afDefined;
   bmp.Width := Width;
   bmp.Height := Height;
-{$IFDEF MSWINDOWS}
-  {$IFNDEF FPC}
-  {$IFDEF ALPHAFORMAT}
-  bmp.AlphaFormat := afDefined;
-  {$ENDIF}
-  {$ENDIF}
-  SetBitmapBits(bmp.Handle, Width * Height * 4, PixelBase);
-{$ELSE}
-  for i := 0 to bmp.Height -1 do
-  begin
-    pxDst := bmp.ScanLine[i];
-    pxSrc := PixelRow[i];
-    Move(pxSrc^, pxDst^, bmp.Width * SizeOf(TColor32));
-  end;
-{$ENDIF}
+  bmp.Canvas.Brush.Color := 0;
+  bmp.Canvas.FillRect(types.Rect(0, 0, Width, Height));
+  CopyToDc(bmp.Canvas.Handle, 0,0, true);
 end;
 //------------------------------------------------------------------------------
 {$ENDIF}
