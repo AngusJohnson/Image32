@@ -256,7 +256,8 @@ type
 {$ENDIF}
 {$IFDEF USING_VCL_LCL}
     procedure CopyFromBitmap(bmp: TBitmap);
-    procedure CopyToBitmap(bmp: TBitmap);
+    //CopyToBitmap: blend copies self over the bitmap's existing image
+    procedure CopyToBitmap(bmp: TBitmap; dstLeft: integer = 0; dstTop: integer = 0);
 {$ENDIF}
     function CopyToClipBoard: Boolean;
     class function CanPasteFromClipBoard: Boolean;
@@ -2725,16 +2726,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.CopyToBitmap(bmp: TBitmap);
+procedure TImage32.CopyToBitmap(bmp: TBitmap; dstLeft: integer; dstTop: integer);
 begin
-  if not Assigned(bmp) then Exit;
-  bmp.PixelFormat := pf32bit;
-  //bmp.AlphaFormat := afDefined;
-  bmp.Width := Width;
-  bmp.Height := Height;
-  bmp.Canvas.Brush.Color := 0;
-  bmp.Canvas.FillRect(types.Rect(0, 0, Width, Height));
-  CopyToDc(bmp.Canvas.Handle, 0,0, true);
+  if Assigned(bmp) then
+    CopyToDc(bmp.Canvas.Handle, dstLeft, dstTop, HasTransparency);
 end;
 //------------------------------------------------------------------------------
 {$ENDIF}
