@@ -253,11 +253,11 @@ type
       x: Integer = 0; y: Integer = 0; transparent: Boolean = true); overload;
     procedure CopyToDc(const srcRect, dstRect: TRect; dstDc: HDC;
       transparent: Boolean = true); overload;
-{$ENDIF}
 {$IFDEF USING_VCL_LCL}
     procedure CopyFromBitmap(bmp: TBitmap);
     //CopyToBitmap: blend copies self over the bitmap's existing image
     procedure CopyToBitmap(bmp: TBitmap; dstLeft: integer = 0; dstTop: integer = 0);
+{$ENDIF}
 {$ENDIF}
     function CopyToClipBoard: Boolean;
     class function CanPasteFromClipBoard: Boolean;
@@ -2629,6 +2629,28 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
+
+{$IFDEF USING_VCL_LCL}
+procedure TImage32.CopyFromBitmap(bmp: TBitmap);
+var
+  savedPF: TPixelFormat;
+begin
+  if not Assigned(bmp) then Exit;
+  savedPF := bmp.PixelFormat;
+  bmp.PixelFormat := pf32bit;
+  SetSize(bmp.Width, bmp.Height);
+  GetBitmapBits(bmp.Handle, Width * Height * 4, PixelBase);
+  bmp.PixelFormat := savedPF;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.CopyToBitmap(bmp: TBitmap; dstLeft: integer; dstTop: integer);
+begin
+  if Assigned(bmp) then
+    CopyToDc(bmp.Canvas.Handle, dstLeft, dstTop, HasTransparency);
+end;
+//------------------------------------------------------------------------------
+{$ENDIF}
 {$ENDIF}
 
 function TImage32.CopyToClipBoard: Boolean;
@@ -2698,41 +2720,6 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
-
-{$IFDEF USING_VCL_LCL}
-procedure TImage32.CopyFromBitmap(bmp: TBitmap);
-var
-  savedPF: TPixelFormat;
-{$IFNDEF MSWINDOWS}
-  i: integer;
-  pxDst, pxSrc: PColor32;
-{$ENDIF}
-begin
-  if not Assigned(bmp) then Exit;
-  savedPF := bmp.PixelFormat;
-  bmp.PixelFormat := pf32bit;
-  SetSize(bmp.Width, bmp.Height);
-{$IFDEF MSWINDOWS}
-  GetBitmapBits(bmp.Handle, Width * Height * 4, PixelBase);
-{$ELSE}
-  for i := 0 to bmp.Height -1 do
-  begin
-    pxSrc := bmp.ScanLine[i];
-    pxDst := PixelRow[i];
-    Move(pxSrc^, pxDst^, bmp.Width * SizeOf(TColor32));
-  end;
-{$ENDIF}
-  bmp.PixelFormat := savedPF;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImage32.CopyToBitmap(bmp: TBitmap; dstLeft: integer; dstTop: integer);
-begin
-  if Assigned(bmp) then
-    CopyToDc(bmp.Canvas.Handle, dstLeft, dstTop, HasTransparency);
-end;
-//------------------------------------------------------------------------------
-{$ENDIF}
 
 procedure TImage32.ConvertToBoolMask(reference: TColor32; tolerance: integer;
   colorFunc: TCompareFunction; maskBg: TColor32; maskFg: TColor32);
