@@ -3,7 +3,7 @@ unit Img32.Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  7 April 2023                                                    *
+* Date      :  9 September 2023                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2021                                         *
 *                                                                              *
@@ -850,8 +850,8 @@ begin
   begin
     fAlphaTot := a;
     fColorTotB := (a * argb.B);
-    fColorTotG := (a * argb.B);
-    fColorTotR := (a * argb.B);
+    fColorTotG := (a * argb.G);
+    fColorTotR := (a * argb.R);
   end;
 end;
 //------------------------------------------------------------------------------
