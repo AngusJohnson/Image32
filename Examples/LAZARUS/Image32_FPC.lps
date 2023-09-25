@@ -77,13 +77,13 @@
         </CompilerOptions>
       </Item2>
     </BuildModes>
-    <Units Count="53">
+    <Units Count="56">
       <Unit0>
         <Filename Value="Image32_FPC.pas"/>
         <IsPartOfProject Value="True"/>
         <EditorIndex Value="-1"/>
-        <CursorPos Y="9"/>
-        <UsageCount Value="143"/>
+        <CursorPos X="62"/>
+        <UsageCount Value="146"/>
       </Unit0>
       <Unit1>
         <Filename Value="main.pas"/>
@@ -91,14 +91,16 @@
         <ComponentName Value="MainForm"/>
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
-        <TopLine Value="96"/>
-        <CursorPos X="30" Y="139"/>
-        <UsageCount Value="143"/>
-        <Bookmarks Count="1">
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="1"/>
+        <TopLine Value="113"/>
+        <CursorPos X="34" Y="132"/>
+        <UsageCount Value="146"/>
+        <Bookmarks Count="2">
           <Item0 Y="89" ID="2"/>
+          <Item1 X="18" Y="120" ID="9"/>
         </Bookmarks>
         <Loaded Value="True"/>
-        <LoadedDesigner Value="True"/>
       </Unit1>
       <Unit2>
         <Filename Value="..\..\source\Image32_FMX.pas"/>
@@ -321,25 +323,23 @@
       </Unit32>
       <Unit33>
         <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <IsVisibleTab Value="True"/>
-        <EditorIndex Value="1"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="4536"/>
-        <CursorPos X="17" Y="4549"/>
-        <UsageCount Value="25"/>
-        <Loaded Value="True"/>
+        <CursorPos X="37" Y="4551"/>
+        <UsageCount Value="26"/>
       </Unit33>
       <Unit34>
         <Filename Value="..\..\source\Img32.Fmt.SVG.pas"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="12"/>
-        <CursorPos X="28" Y="27"/>
+        <TopLine Value="375"/>
+        <CursorPos Y="399"/>
         <UsageCount Value="24"/>
       </Unit34>
       <Unit35>
         <Filename Value="..\..\source\Img32.pas"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="290"/>
-        <CursorPos X="14" Y="302"/>
+        <TopLine Value="1491"/>
+        <CursorPos X="37" Y="1508"/>
         <UsageCount Value="36"/>
         <Bookmarks Count="1">
           <Item0 Y="3421" ID="9"/>
@@ -405,8 +405,8 @@
       <Unit44>
         <Filename Value="..\..\source\Img32.SVG.Core.pas"/>
         <EditorIndex Value="-1"/>
-        <TopLine Value="1792"/>
-        <CursorPos X="42" Y="1800"/>
+        <TopLine Value="263"/>
+        <CursorPos Y="267"/>
         <UsageCount Value="21"/>
       </Unit44>
       <Unit45>
@@ -467,56 +467,105 @@
         <CursorPos X="52" Y="698"/>
         <UsageCount Value="10"/>
       </Unit52>
+      <Unit53>
+        <Filename Value="..\source\img32.pas"/>
+        <UnitName Value="Img32"/>
+        <TopLine Value="3030"/>
+        <CursorPos X="19" Y="3055"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+      </Unit53>
+      <Unit54>
+        <Filename Value="..\source\Img32.Fmt.SVG.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="443"/>
+        <CursorPos Y="455"/>
+        <UsageCount Value="10"/>
+      </Unit54>
+      <Unit55>
+        <Filename Value="..\source\Img32.Vector.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="419"/>
+        <CursorPos X="3" Y="435"/>
+        <UsageCount Value="10"/>
+      </Unit55>
     </Units>
-    <JumpHistory Count="12" HistoryIndex="11">
+    <JumpHistory Count="19" HistoryIndex="18">
       <Position1>
         <Filename Value="main.pas"/>
-        <Caret Line="160" Column="83" TopLine="142"/>
+        <Caret Line="104" TopLine="97"/>
       </Position1>
       <Position2>
-        <Filename Value="main.pas"/>
-        <Caret Line="128" TopLine="120"/>
+        <Filename Value="..\source\img32.pas"/>
+        <Caret Line="2291" TopLine="2279"/>
       </Position2>
       <Position3>
-        <Filename Value="main.pas"/>
-        <Caret Line="124" Column="3" TopLine="109"/>
+        <Filename Value="..\source\img32.pas"/>
+        <Caret Line="2291" TopLine="2279"/>
       </Position3>
       <Position4>
-        <Filename Value="main.pas"/>
-        <Caret Line="98" Column="10" TopLine="81"/>
+        <Filename Value="..\source\img32.pas"/>
+        <Caret Line="2489" TopLine="2473"/>
       </Position4>
       <Position5>
         <Filename Value="main.pas"/>
-        <Caret Line="121" Column="89" TopLine="99"/>
+        <Caret Line="107" Column="18" TopLine="92"/>
       </Position5>
       <Position6>
         <Filename Value="main.pas"/>
-        <Caret Line="108" TopLine="99"/>
       </Position6>
       <Position7>
-        <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <Caret Line="2268" Column="43" TopLine="2253"/>
+        <Filename Value="..\source\img32.pas"/>
+        <Caret Line="1097" TopLine="1081"/>
       </Position7>
       <Position8>
-        <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <Caret Line="347" Column="15" TopLine="346"/>
+        <Filename Value="..\source\img32.pas"/>
+        <Caret Line="298" Column="12" TopLine="282"/>
       </Position8>
       <Position9>
-        <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <Caret Line="141" Column="17" TopLine="119"/>
+        <Filename Value="..\source\img32.pas"/>
+        <Caret Line="3064" Column="58" TopLine="3050"/>
       </Position9>
       <Position10>
-        <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <Caret Line="4636" Column="39" TopLine="4632"/>
+        <Filename Value="..\source\img32.pas"/>
+        <Caret Line="299" TopLine="283"/>
       </Position10>
       <Position11>
-        <Filename Value="main.pas"/>
-        <Caret Line="105" TopLine="99"/>
+        <Filename Value="..\source\img32.pas"/>
+        <Caret Line="3070" Column="22" TopLine="3053"/>
       </Position11>
       <Position12>
-        <Filename Value="..\..\source\Img32.SVG.Reader.pas"/>
-        <Caret Line="4545" Column="39" TopLine="4536"/>
+        <Filename Value="main.pas"/>
+        <Caret Line="118" TopLine="94"/>
       </Position12>
+      <Position13>
+        <Filename Value="..\source\img32.pas"/>
+        <Caret Line="3055" Column="19" TopLine="3030"/>
+      </Position13>
+      <Position14>
+        <Filename Value="main.pas"/>
+        <Caret Line="106" Column="9" TopLine="90"/>
+      </Position14>
+      <Position15>
+        <Filename Value="main.pas"/>
+        <Caret Line="111" Column="29" TopLine="97"/>
+      </Position15>
+      <Position16>
+        <Filename Value="main.pas"/>
+        <Caret Line="106" TopLine="97"/>
+      </Position16>
+      <Position17>
+        <Filename Value="main.pas"/>
+        <Caret Line="118" TopLine="94"/>
+      </Position17>
+      <Position18>
+        <Filename Value="main.pas"/>
+        <Caret Line="97" Column="9" TopLine="85"/>
+      </Position18>
+      <Position19>
+        <Filename Value="main.pas"/>
+        <Caret Line="10" Column="35"/>
+      </Position19>
     </JumpHistory>
     <RunParams>
       <FormatVersion Value="2"/>
@@ -530,7 +579,7 @@
         <WatchScope Value="wpsLocal"/>
         <WatchKind Value="wpkWrite"/>
         <Source Value="..\..\source\Img32.SVG.Core.pas"/>
-        <Line Value="1816"/>
+        <Line Value="1812"/>
       </Item1>
     </BreakPoints>
     <Watches Count="2">

@@ -7,7 +7,7 @@ interface
 uses
   Classes, SysUtils, Forms, Controls, Graphics, StdCtrls, ExtCtrls,
   IntfGraphics, ComCtrls, GraphType,
-  Img32, Img32.Text, Img32.Fmt.SVG, Img32.Vector, Img32.Draw;
+  Img32, Img32.Text, Img32.Fmt.BMP, Img32.Fmt.SVG, Img32.Vector, Img32.Draw;
 
 type
 
@@ -60,7 +60,7 @@ begin
   img := TImage32.create;
   Image1.Picture.Bitmap.PixelFormat := pf32bit;
 
-  copyright := UnicodeString('© 2022 Angus Johnson');
+  copyright := UnicodeString('© 2023 Angus Johnson');
   // Create a TFontReader object to access a truetype font stored as font
   // resource. This can be destroyed here, otherwise the FontManager
   // will automatically destroy it on close.
@@ -93,47 +93,40 @@ end;
 
 procedure TMainForm.DrawImage;
 var
+  w, h, dx, dy: integer;
   tmpImg: TImage32;
   tmpPath: TPathD;
-  textRec: TRect;
-  lRawImage: TRawImage;
-  lazImg: TLazIntfImage;
+  textRec, dstRec: TRect;
 begin
-  img.SetSize(Image1.Picture.Bitmap.Width, btnClose.Top - DpiAware(10));
+  w := Image1.Picture.Bitmap.Width;
+  h := btnClose.Top - DpiAware(10);
+  img.SetSize(w, h);
   if img.IsEmpty then Exit;
+  img.LoadFromResource('IMAGE32', RT_RCDATA);
 
-  //load an SVG image stored as a resource (Img32)
-  tmpImg := TImage32.Create(img.Width, img.Height);
-  try try
-    tmpImg.LoadFromResource('IMAGE32', RT_RCDATA);
-    // now stretch copy the resource image into 'img'
-    img.Copy(tmpImg, tmpImg.Bounds, img.Bounds);
-  except
-  end;
+  // this just re-centers the imported SVG image ...
+  dx := (w - img.Width) div 2;
+  dy := (h - img.Height) div 2;
+  tmpImg := TImage32.Create(img);
+  try
+    img.SetSize(w,h);
+    img.Copy(tmpImg, tmpImg.Bounds,
+      Rect(dx, dy, dx + tmpImg.Width, dy + tmpImg.Height));
   finally
-    tmpImg.Free;
+    tmpImg.free;
   end;
 
+  // now box outline the whole image and add a copyright notice :)
   tmpPath := Img32.Vector.Rectangle(img.Bounds);
   DrawLine(img, tmpPath, 10, penColor, esPolygon);
-
   textRec := GetBounds(copyTxtPaths);
   copyTxtPaths := OffsetPath(copyTxtPaths, 10- textRec.Left, 10 - textRec.Top);
   DrawPolygon(img, copyTxtPaths, frNonZero, clBlack32);
 
-  lRawImage.Init;
-  lRawImage.Description.Init_BPP32_B8G8R8A8_BIO_TTB(img.Width, img.Height);
-  lRawImage.CreateData(False);
-  Move(img.PixelBase^, lRawImage.Data^,
-    img.Width * img.Height * SizeOf(TColor32));
-
-  lazImg := TLazIntfImage.Create(img.Width, img.Height);
-  try
-    lazImg.SetRawImage(lRawImage, true);
-    Image1.Picture.Bitmap.LoadFromIntfImage(lazImg);
-  finally
-    lazImg.Free;
-  end;
+  // finally draw 'img' onto the Image1 component ...
+  Image1.Picture.Bitmap.PixelFormat:= pf32bit;
+  Image1.Picture.Bitmap.SetSize(img.Width, img.Height);
+  img.CopyToDc(Image1.Picture.Bitmap.Canvas.Handle);
 end;
 //------------------------------------------------------------------------------
 

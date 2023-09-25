@@ -3,17 +3,17 @@
 //Must be disabled to compile the experimental 'CtrlDemo' in Examples
 {$DEFINE NO_STORAGE}   
 
-//USING_VCL_LCL - using either Delphi or Lazarus Component Libraries
-//Adds a few extra library features (eg copying to and from TBitmap objects)
-//Enabled is recommended unless you're compiling console applications.
-{$DEFINE USING_VCL_LCL} 
+//USING_VCL - using Delphi Visual Component Libraries
+//is required if using the TImage32Panel component
+//and adds a few extra library features (eg copying to and from TBitmap objects)
+{$DEFINE USING_VCL} 
 
 {$IFDEF FPC}
   {$MODE DELPHI}
   {$DEFINE ABSTRACT_CLASSES}
   {$DEFINE RECORD_METHODS}
   {$DEFINE PBYTE}
-  {$DEFINE UITYPES}
+  {.$DEFINE UITYPES}
   {$DEFINE NESTED_TYPES}
   {$IFNDEF DEBUG}
     {$DEFINE INLINE}

@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  7 September 2023                                                *
+* Date      :  25 September 2023                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -17,7 +17,7 @@ interface
 uses
   Types, SysUtils, Classes,
   {$IFDEF MSWINDOWS} Windows,{$ENDIF}
-  {$IFDEF USING_VCL_LCL}
+  {$IFDEF USING_VCL}
     {$IFDEF USES_NAMESPACES} Vcl.Graphics, Vcl.Forms,
     {$ELSE}Graphics, Forms,
     {$ENDIF}
@@ -253,7 +253,7 @@ type
       x: Integer = 0; y: Integer = 0; transparent: Boolean = true); overload;
     procedure CopyToDc(const srcRect, dstRect: TRect; dstDc: HDC;
       transparent: Boolean = true); overload;
-{$IFDEF USING_VCL_LCL}
+{$IFDEF USING_VCL}
     procedure CopyFromBitmap(bmp: TBitmap);
     //CopyToBitmap: blend copies self over the bitmap's existing image
     procedure CopyToBitmap(bmp: TBitmap; dstLeft: integer = 0; dstTop: integer = 0);
@@ -293,6 +293,7 @@ type
     procedure AdjustLuminance(percent: Integer);   //ie +/- 100%
     procedure AdjustSaturation(percent: Integer);  //ie +/- 100%
 
+    function GetOpaqueBounds: TRect;
     //CropTransparentPixels: Trims transparent edges until each edge contains
     //at least one opaque or semi-opaque pixel.
     function CropTransparentPixels: TRect;
@@ -2630,7 +2631,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-{$IFDEF USING_VCL_LCL}
+{$IFDEF USING_VCL}
 procedure TImage32.CopyFromBitmap(bmp: TBitmap);
 var
   savedPF: TPixelFormat;
@@ -3051,13 +3052,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImage32.CropTransparentPixels: TRect;
+function TImage32.GetOpaqueBounds: TRect;
 var
   x,y, x1,x2,y1,y2: Integer;
   found: Boolean;
 begin
   y1 := 0; y2 := 0;
   found := false;
+  Result := NullRect;
   for y := 0 to Height -1 do
   begin
     for x := 0 to Width -1 do
@@ -3071,10 +3073,7 @@ begin
   end;
 
   if not found then
-  begin
-    SetSize(0, 0);
     Exit;
-  end;
 
   found := false;
   for y := Height -1 downto 0 do
@@ -3099,7 +3098,15 @@ begin
       end;
 
   Result := Types.Rect(x1, y1, x2+1, y2+1);
-  Crop(Result);
+end;
+//------------------------------------------------------------------------------
+
+function TImage32.CropTransparentPixels: TRect;
+begin
+  Result := GetOpaqueBounds;
+  if IsEmptyRect(Result) then
+     SetSize(0,0) else
+     Crop(Result);
 end;
 //------------------------------------------------------------------------------
 
@@ -3435,15 +3442,6 @@ end;
 {$ENDIF}
 //------------------------------------------------------------------------------
 
-{$IFDEF USING_VCL_LCL}
-procedure GetScreenScale2;
-begin
-  DpiAwareOne := Screen.PixelsPerInch / 96;
-  dpiAware1   := Round(DpiAwareOne);
-end;
-{$ENDIF}
-//------------------------------------------------------------------------------
-
 procedure CleanUpImageFormatClassList;
 var
   i: integer;
@@ -3529,10 +3527,6 @@ initialization
 
 {$IFDEF MSWINDOWS}
   GetScreenScale;
-{$ELSE}
-  {$IFDEF USING_VCL_LCL}
-  GetScreenScale2;
-  {$ENDIF}
 {$ENDIF}
 
 finalization
