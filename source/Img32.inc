@@ -3,16 +3,17 @@
 //Must be disabled to compile the experimental 'CtrlDemo' in Examples
 {$DEFINE NO_STORAGE}   
 
-//USING_VCL - using Delphi Visual Component Libraries
+//USING_VCL_LCL - using either Delphi Visual Component Library or Lazarus Component Library
 //is required if using the TImage32Panel component
 //and adds a few extra library features (eg copying to and from TBitmap objects)
-{$DEFINE USING_VCL} 
+{$DEFINE USING_VCL_LCL} 
 
 {$IFDEF FPC}
   {$MODE DELPHI}
   {$DEFINE ABSTRACT_CLASSES}
   {$DEFINE RECORD_METHODS}
   {$DEFINE PBYTE}
+  {$DEFINE NEWPOSFUNC}
   {.$DEFINE UITYPES}
   {$DEFINE NESTED_TYPES}
   {$IFNDEF DEBUG}
@@ -63,6 +64,7 @@
               {$DEFINE STYLESERVICES}             //added StyleServices unit
               {$IF COMPILERVERSION >= 24}       //DelphiXE3
                 {$LEGACYIFEND ON}
+                {$DEFINE NEWPOSFUNC}
                 {$DEFINE ZEROBASEDSTR}
                 {$IF COMPILERVERSION >= 25}     //DelphiXE4
                   {$LEGACYIFEND ON}               //avoids compiler warning

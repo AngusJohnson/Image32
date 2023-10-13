@@ -15,7 +15,10 @@ interface
 {$I Img32.inc}
 
 uses
-  {$IFDEF MSWINDOWS} Windows, {$ENDIF} SysUtils, Classes, Math,
+  {$IFDEF MSWINDOWS} Windows,
+  {$IFNDEF NEWPOSFUNC} StrUtils, {$ENDIF}
+  {$ENDIF}
+  SysUtils, Classes, Math,
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults, {$ENDIF}
   Img32, Img32.Vector, Img32.SVG.Reader;
 
@@ -122,7 +125,13 @@ begin
   end;
   i := Pos('<svg ', s);
   if i < 1 then Exit;
+
+  {$IFNDEF NEWPOSFUNC}
+  j := PosEx('>', s, i);        
+  {$ELSE}
   j := Pos('>', s, i);          //watch out for inside '>'
+  {$ENDIF}
+
   if j < i then Exit;
   s := Lowercase(Copy(s, i + 5, j - i -5));
   i := Pos('width="', s);       //watch out for space before =

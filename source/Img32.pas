@@ -17,7 +17,7 @@ interface
 uses
   Types, SysUtils, Classes,
   {$IFDEF MSWINDOWS} Windows,{$ENDIF}
-  {$IFDEF USING_VCL}
+  {$IFDEF USING_VCL_LCL}
     {$IFDEF USES_NAMESPACES} Vcl.Graphics, Vcl.Forms,
     {$ELSE}Graphics, Forms,
     {$ENDIF}
@@ -253,11 +253,10 @@ type
       x: Integer = 0; y: Integer = 0; transparent: Boolean = true); overload;
     procedure CopyToDc(const srcRect, dstRect: TRect; dstDc: HDC;
       transparent: Boolean = true); overload;
-{$IFDEF USING_VCL}
-    procedure CopyFromBitmap(bmp: TBitmap);
-    //CopyToBitmap: blend copies self over the bitmap's existing image
-    procedure CopyToBitmap(bmp: TBitmap; dstLeft: integer = 0; dstTop: integer = 0);
 {$ENDIF}
+{$IFDEF USING_VCL_LCL}
+    procedure CopyFromBitmap(bmp: TBitmap);
+    procedure CopyToBitmap(bmp: TBitmap);
 {$ENDIF}
     function CopyToClipBoard: Boolean;
     class function CanPasteFromClipBoard: Boolean;
@@ -582,7 +581,7 @@ var
 implementation
 
 uses
-  Img32.Vector, Img32.Resamplers, Img32.Transform;
+  Img32.Vector, Img32.Resamplers, Img32.Transform, Img32.Fmt.BMP;
 
 resourcestring
   rsImageTooLarge = 'Image32 error: the image is too large.';
@@ -2631,24 +2630,41 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-{$IFDEF USING_VCL}
+{$IFDEF USING_VCL_LCL}
 procedure TImage32.CopyFromBitmap(bmp: TBitmap);
 var
-  savedPF: TPixelFormat;
+  ms: TMemoryStream;
+  bmpFormat: TImageFormat_BMP;
 begin
-  if not Assigned(bmp) then Exit;
-  savedPF := bmp.PixelFormat;
-  bmp.PixelFormat := pf32bit;
-  SetSize(bmp.Width, bmp.Height);
-  GetBitmapBits(bmp.Handle, Width * Height * 4, PixelBase);
-  bmp.PixelFormat := savedPF;
+  ms := TMemoryStream.create;
+  bmpFormat := TImageFormat_BMP.Create;
+  try
+    bmp.SaveToStream(ms);
+    ms.Position := 0;
+    bmpFormat.LoadFromStream(ms, self);
+  finally
+    ms.Free;
+    bmpFormat.Free;
+  end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.CopyToBitmap(bmp: TBitmap; dstLeft: integer; dstTop: integer);
+procedure TImage32.CopyToBitmap(bmp: TBitmap);
+var
+  ms: TMemoryStream;
+  bmpFormat: TImageFormat_BMP;
 begin
-  if Assigned(bmp) then
-    CopyToDc(bmp.Canvas.Handle, dstLeft, dstTop, HasTransparency);
+  ms := TMemoryStream.create;
+  bmpFormat := TImageFormat_BMP.Create;
+  try
+     bmpFormat.IncludeFileHeaderInSaveStream := true;
+     bmpFormat.SaveToStream(ms, self);
+     ms.Position := 0;
+     bmp.LoadFromStream(ms);
+  finally
+    ms.Free;
+    bmpFormat.Free;
+  end;
 end;
 //------------------------------------------------------------------------------
 {$ENDIF}
