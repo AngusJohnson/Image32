@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  7 April 2023                                                    *
+* Date      :  14 October 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2022                                         *
 *                                                                              *
@@ -577,7 +577,7 @@ const
     fillRule: frNegative; fillEl: '';
     strokeColor: clInvalid; strokeOpacity: InvalidD;
     strokeWidth: (rawVal: InvalidD; unitType: utNumber);
-    strokeCap: esPolygon; strokeJoin: jsMiter; strokeMitLim: 0.0; strokeEl : '';
+    strokeCap: esPolygon; strokeJoin: jsAuto; strokeMitLim: 0.0; strokeEl : '';
     dashArray: nil; dashOffset: 0;
     fontInfo: (family: ttfUnknown; size: 0; spacing: 0.0;
     textLength: 0; italic: sfsUndefined; weight: -1; align: staUndefined;
@@ -3464,12 +3464,17 @@ begin
 {$ELSE}
   fChilds         := TList.Create;
 {$ENDIF}
-  fParserEl          := svgEl;
+  fParserEl       := svgEl;
   self.fParent    := parent;
-  fDrawData       := emptyDrawInfo;
   elRectWH.Init;
+  fDrawData       := emptyDrawInfo;
   if Assigned(parent) then
+  begin
+    fDrawData.strokeCap := parent.fDrawData.strokeCap;
+    fDrawData.strokeJoin := parent.fDrawData.strokeJoin;
     fReader := parent.fReader;
+  end
+  else
 end;
 //------------------------------------------------------------------------------
 

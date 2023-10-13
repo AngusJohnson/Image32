@@ -2396,7 +2396,7 @@ begin
     Exit;
   end;
 
-  if endStyle in [esPolygon, esClosed] then
+  if endStyle = esPolygon then
   begin
     case joinStyle of
       jsSquare, jsMiter : endStyle := esSquare;
