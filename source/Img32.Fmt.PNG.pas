@@ -36,7 +36,7 @@ type
 var
   CF_PNG: Cardinal = 0;     //Windows Clipboard
   CF_IMAGEPNG: Cardinal = 0;
-{$ENDIF} //DELPHI_PNG - undefined in old versions
+{$IFEND} //DELPHI_PNG - undefined in old versions
 
 implementation
 
@@ -328,6 +328,6 @@ initialization
   TImage32.RegisterImageFormatClass('PNG', TImageFormat_PNG, cpHigh);
   CF_PNG     := RegisterClipboardFormat('PNG');
   CF_IMAGEPNG := RegisterClipboardFormat('image/png');
-{$ENDIF}
+{$IFEND}
 
 end.
