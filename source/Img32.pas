@@ -2656,7 +2656,7 @@ begin
   bmpFormat := TImageFormat_BMP.Create;
   try
      bmpFormat.IncludeFileHeaderInSaveStream := true;
-     bmpFormat.SaveToStream(ms, Self);
+     bmpFormat.SaveToStream(ms, self);
      ms.Position := 0;
      bmp.PixelFormat := pf32bit;
      {$IF DEFINED(USING_VCL)}
