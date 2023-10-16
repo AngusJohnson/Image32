@@ -20,7 +20,9 @@ uses
   {$ENDIF}
   SysUtils, Classes, Math,
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults, {$ENDIF}
-  Img32, Img32.Vector, Img32.SVG.Reader;
+  Img32, Img32.Vector, Img32.SVG.Reader
+  {$IF DEFINED(USING_LCL)}, Types{$IFEND}
+  ;
 
 type
   TImageFormat_SVG = class(TImageFormat)

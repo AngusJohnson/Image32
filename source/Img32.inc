@@ -6,7 +6,17 @@
 //USING_VCL_LCL - using either Delphi Visual Component Library or Lazarus Component Library
 //is required if using the TImage32Panel component
 //and adds a few extra library features (eg copying to and from TBitmap objects)
-{$DEFINE USING_VCL_LCL} 
+{$IF DEFINED(FPC)}
+  {$DEFINE USING_LCL}
+{$ELSEIF declared(FireMonkeyVersion)}
+  {$DEFINE USING_FMX}
+{$ELSE}
+  {$DEFINE USING_VCL}
+{$ENDIF}
+
+{$IF DEFINED(USING_VCL) or DEFINED(USING_LCL)}
+  {$DEFINE USING_VCL_LCL}
+{$ENDIF} 
 
 {$IFDEF FPC}
   {$MODE DELPHI}

@@ -1,0 +1,6 @@
+# Radstudio build files
+*.dcu
+# RadStudio backup files
+/source/__history
+/source/__recovery
+/source/backup

@@ -82,9 +82,7 @@ const
   {$ZEROBASEDSTRINGS OFF}
 {$ENDIF}
 
-{$IFNDEF MSWINDOWS}
-  RT_BITMAP = PChar(2);
-{$ENDIF}
+RT_BITMAP = PChar(2);
 
 type
   TClipboardPriority = (cpLow, cpMedium, cpHigh);
@@ -254,10 +252,10 @@ type
     procedure CopyToDc(const srcRect, dstRect: TRect; dstDc: HDC;
       transparent: Boolean = true); overload;
 {$ENDIF}
-{$IFDEF USING_VCL_LCL}
+{$IF DEFINED(USING_VCL_LCL)}
     procedure CopyFromBitmap(bmp: TBitmap);
     procedure CopyToBitmap(bmp: TBitmap);
-{$ENDIF}
+{$IFEND}
     function CopyToClipBoard: Boolean;
     class function CanPasteFromClipBoard: Boolean;
     function PasteFromClipBoard: Boolean;
@@ -2493,8 +2491,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-{$IFDEF MSWINDOWS}
-
+{$IF DEFINED (MSWINDOWS)}
 procedure TImage32.CopyFromDC(srcDc: HDC; const srcRect: TRect);
 var
   bi: TBitmapInfoHeader;
@@ -2628,9 +2625,10 @@ begin
     DeleteDc(memDc);
   end;
 end;
+{$IFEND}
 //------------------------------------------------------------------------------
 
-{$IFDEF USING_VCL_LCL}
+{$IF DEFINED(USING_VCL_LCL)}
 procedure TImage32.CopyFromBitmap(bmp: TBitmap);
 var
   ms: TMemoryStream;
@@ -2660,6 +2658,10 @@ begin
      bmpFormat.IncludeFileHeaderInSaveStream := true;
      bmpFormat.SaveToStream(ms, self);
      ms.Position := 0;
+     bmp.PixelFormat := pf32bit;
+     {$IF DEFINED(USING_VCL)}
+     bmp.AlphaFormat := afDefined;
+     {$IFEND}
      bmp.LoadFromStream(ms);
   finally
     ms.Free;
@@ -2667,8 +2669,7 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
-{$ENDIF}
-{$ENDIF}
+{$IFEND}
 
 function TImage32.CopyToClipBoard: Boolean;
 var

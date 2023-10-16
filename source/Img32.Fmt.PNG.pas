@@ -14,10 +14,10 @@ interface
 
 {$I Img32.inc}
 
-{$IFDEF DELPHI_PNG}
+{$IF DEFINED(USING_VCL) AND DEFINED(DELPHI_PNG)}
 uses
-  SysUtils, Classes, Windows,
-  {$IFDEF FPC} Graphics {$ELSE} Math, PngImage {$ENDIF}, Img32;
+  SysUtils, Classes,
+  {$IFDEF FPC} Graphics {$ELSE} Windows, Math, PngImage {$ENDIF}, Img32;
 
 type
   TImageFormat_PNG = class(TImageFormat)
@@ -36,11 +36,11 @@ type
 var
   CF_PNG: Cardinal = 0;     //Windows Clipboard
   CF_IMAGEPNG: Cardinal = 0;
-{$ENDIF} //DELPHI_PNG - undefined in old versions
+{$IFEND} //DELPHI_PNG - undefined in old versions
 
 implementation
 
-{$IFDEF DELPHI_PNG}
+{$IF DEFINED(USING_VCL) AND DEFINED(DELPHI_PNG)}
 resourcestring
   s_cf_png_error      = 'TImage32 - PNG clipboard format error';
   s_cf_imagepng_error = 'TImage32 - image/png clipboard format error';
@@ -328,6 +328,6 @@ initialization
   TImage32.RegisterImageFormatClass('PNG', TImageFormat_PNG, cpHigh);
   CF_PNG     := RegisterClipboardFormat('PNG');
   CF_IMAGEPNG := RegisterClipboardFormat('image/png');
-{$ENDIF}
+{$IFEND}
 
 end.
