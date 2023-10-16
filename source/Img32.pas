@@ -2659,7 +2659,7 @@ begin
      bmpFormat.SaveToStream(ms, self);
      ms.Position := 0;
      bmp.PixelFormat := pf32bit;
-     {$IF DEFINED(USING_VCL)}
+     {$IF DEFINED(USING_VCL) AND DEFINED(ALPHAFORMAT)}
      bmp.AlphaFormat := afDefined;
      {$IFEND}
      bmp.LoadFromStream(ms);
