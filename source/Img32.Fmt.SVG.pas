@@ -30,6 +30,7 @@ type
     class function IsValidImageStream(stream: TStream): Boolean; override;
     function LoadFromStream(stream: TStream;
       img32: TImage32; imgIndex: integer = 0): Boolean; override;
+    // SaveToStream: not implemented for SVG streams
     procedure SaveToStream(stream: TStream;
       img32: TImage32; quality: integer = 0); override;
     class function CanCopyToClipboard: Boolean; override;

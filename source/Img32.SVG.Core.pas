@@ -362,16 +362,21 @@ end;
 
 function GetXmlEncoding(memory: Pointer; len: integer): TSvgEncoding;
 var
-  p: PUTF8Char;
+  p, p1: PUTF8Char;
 begin
   Result := eUnknown;
   if (len < 4) or not Assigned(memory) then Exit;
   p := PUTF8Char(memory);
+  p1 := (p + 1);
   case p^ of
-    #$EF: if ((p +1)^ = #$BB) and ((p +2)^ = #$BF) then Result := eUtf8;
-    #$FF: if ((p +1)^ = #$FE) then Result := eUnicodeLE;
-    #$FE: if ((p +1)^ = #$FF) then Result := eUnicodeBE;
-    else if ((p +1)^ = #0) then Result := eUnicodeLE;
+    #$EF: if (p1^ = #$BB) then
+      if ((p +2)^ = #$BF) then
+        Result := eUtf8 else
+        Exit;
+    #$FF: if (p1^ = #$FE) or (p1^ = #0) then
+      Result := eUnicodeLE;
+    #$FE: if (p1^ = #$FF) then
+      Result := eUnicodeBE;
   end;
 end;
 //------------------------------------------------------------------------------

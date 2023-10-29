@@ -25,8 +25,9 @@ type
     class function IsValidImageStream(stream: TStream): Boolean; override;
     function LoadFromStream(stream: TStream;
       img32: TImage32; imgIndex: integer = 0): Boolean; override;
+    // SaveToStream: the compressionQuality parameter is ignored here
     procedure SaveToStream(stream: TStream;
-      img32: TImage32; quality: integer = 0); override;
+      img32: TImage32; compressionQuality: integer = 0); override;
     class function CanCopyToClipboard: Boolean; override;
     class function CopyToClipboard(img32: TImage32): Boolean; override;
     class function CanPasteFromClipboard: Boolean; override;
@@ -86,7 +87,7 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TImageFormat_PNG.SaveToStream(stream: TStream;
-  img32: TImage32; quality: integer = 0);
+  img32: TImage32; compressionQuality: integer = 0);
 var
   png: TPortableNetworkGraphic;
 begin
@@ -186,7 +187,7 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TImageFormat_PNG.SaveToStream(stream: TStream;
-  img32: TImage32; quality: integer = 0);
+  img32: TImage32; compressionQuality: integer = 0);
 var
   i,j: integer;
   png: TPngImage;

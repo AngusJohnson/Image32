@@ -32,10 +32,12 @@ type
     class function IsValidImageStream(stream: TStream): Boolean; override;
     function LoadFromStream(stream: TStream;
       img32: TImage32; imgIndex: integer = 0): Boolean; override;
+    // SaveToFile: compressionQuality parameter is ignored here
     function SaveToFile(const filename: string;
-      img32: TImage32; quality: integer = 0): Boolean; override;
+      img32: TImage32; compressionQuality: integer = 0): Boolean; override;
+    // SaveToStream: the compressionQuality parameter is ignored here
     procedure SaveToStream(stream: TStream;
-      img32: TImage32; quality: integer = 0); override;
+      img32: TImage32; compressionQuality: integer = 0); override;
 {$IFDEF MSWINDOWS}
     class function CanCopyToClipboard: Boolean; override;
     class function CopyToClipboard(img32: TImage32): Boolean; override;
@@ -750,7 +752,7 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TImageFormat_BMP.SaveToStream(stream: TStream;
-  img32: TImage32; quality: integer = 0);
+  img32: TImage32; compressionQuality: integer = 0);
 var
   bfh: TBitmapFileHeader;
   bih: TBitmapV4Header;
@@ -853,7 +855,7 @@ end;
 //------------------------------------------------------------------------------
 
 function TImageFormat_BMP.SaveToFile(const filename: string;
-  img32: TImage32; quality: integer = 0): Boolean;
+  img32: TImage32; compressionQuality: integer = 0): Boolean;
 var
   SaveStateIncludeFileHeader: Boolean;
   stream: TFilestream;
