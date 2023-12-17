@@ -158,7 +158,7 @@ var
   i,j, len: integer;
   scale, simplifyTol: double;
   vectorBounds: TRect;
-  tmpColors: TArrayOfColor32;
+  //tmpColors: TArrayOfColor32;
 begin
   rawPaths := nil;
   bezierPaths := nil;
@@ -172,16 +172,18 @@ begin
     workImg.Assign(masterImg); //shows the raw image only
     with GetDisplaySize do
       workImg.ScaleToFit(cx-margin*2, cy-margin*2);
-
-    tmpColors := GetColorMask(workImg, clBlack32, CompareRGB, $32);
-    Move(tmpColors[0], workImg.Pixels[0], Length(tmpColors) * SizeOf(TColor32));
+//    // otherwise, show as a monochrome image
+//    tmpColors := GetColorMask(workImg, clBlack32, CompareRGB, $32);
+//    Move(tmpColors[0], workImg.Pixels[0], Length(tmpColors) * SizeOf(TColor32));
     StatusBar1.Panels[0].Text := '';
     StatusBar1.Panels[1].Text := ' Raw raster image';
     Exit;
   end;
 
   with GetDisplaySize do workImg.SetSize(cx, cy);
-  simplifyTol := TrackBar2.Position * 0.5;// * workImg.Width/masterImg.Width;
+  if mnuShowRawPoly.Checked then
+    simplifyTol := 0 else
+    simplifyTol := TrackBar2.Position * 0.5;
 
   // 1. Vectorize (now includes vector simplification):
   // converts simple (2 color) raster images into vector images

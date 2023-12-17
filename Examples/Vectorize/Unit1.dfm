@@ -143,7 +143,7 @@ object Form1: TForm1
     object View1: TMenuItem
       Caption = '&View'
       object mnuShowMonoImage: TMenuItem
-        Caption = '&Monochrome Image'
+        Caption = '&Raster Image'
         GroupIndex = 1
         RadioItem = True
         ShortCut = 16458
