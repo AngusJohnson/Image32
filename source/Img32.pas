@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  25 September 2023                                               *
+* Date      :  17 December 2023                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -218,6 +218,7 @@ type
 
     procedure Assign(src: TImage32);
     procedure AssignTo(dst: TImage32);
+
     //SetSize: Erases any current image, and fills with the specified color.
     procedure SetSize(newWidth, newHeight: Integer; color: TColor32 = 0);
     //Resize: is very similar to Scale()
@@ -442,6 +443,9 @@ type
 
   function GetByteMask(img: TImage32; reference: TColor32;
     compareFunc: TCompareFunctionEx): TArrayOfByte;
+
+  function GetColorMask(img: TImage32; reference: TColor32;
+    compareFunc: TCompareFunction; tolerance: Integer): TArrayOfColor32;
 
   {$IFDEF MSWINDOWS}
   //Color32: Converts a Graphics.TColor value into a TColor32 value.
@@ -1198,6 +1202,29 @@ begin
       pa^ := #0;
   {$ENDIF}
     inc(pc); inc(pa);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function GetColorMask(img: TImage32; reference: TColor32;
+  compareFunc: TCompareFunction; tolerance: Integer): TArrayOfColor32;
+var
+  i: integer;
+  pDstPxl: PColor32;
+  pSrcPxl: PColor32;
+begin
+  result := nil;
+  if not assigned(img) or img.IsEmpty then Exit;
+  if not Assigned(compareFunc) then compareFunc := CompareRGB;
+  SetLength(Result, img.Width * img.Height);
+  pDstPxl := @Result[0];
+  pSrcPxl := img.PixelBase;
+  for i := 0 to img.Width * img.Height -1 do
+  begin
+    if compareFunc(reference, pSrcPxl^, tolerance) then
+      pDstPxl^ := clWhite32 else
+      pDstPxl^ := clBlack32;
+    inc(pSrcPxl); inc(pDstPxl);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2216,7 +2243,7 @@ begin
   pc := PARGB(PixelBase);
   for i := 0 to Width * Height -1 do
   begin
-    if pc.A < 255 then Exit;
+    if pc.A < 128 then Exit;
     inc(pc);
   end;
   result := false;
