@@ -782,6 +782,7 @@ begin
     else if palCnt > 2 then BitCount := 4
     else BitCount := 1;
   end;
+  BitCount := 32; // Other bit formats are not yet fully supported.
 
   if fIncludeFileHeaderInSaveStream then
   begin
