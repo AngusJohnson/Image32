@@ -8,13 +8,13 @@
 //and adds a few extra library features (eg copying to and from TBitmap objects)
 {$IF DEFINED(FPC)}
   {$DEFINE USING_LCL}
-{$ELSEIF declared(FireMonkeyVersion)}
+  {$DEFINE USING_VCL_LCL}
+{$ELSEIF declared(FireMonkeyVersion) OR DEFINED(FRAMEWORK_FMX)}
+  {$DEFINE USING_FMX}
+{$ELSEIF DEFINED(MACOS)}
   {$DEFINE USING_FMX}
 {$ELSE}
   {$DEFINE USING_VCL}
-{$IFEND}
-
-{$IF DEFINED(USING_VCL) or DEFINED(USING_LCL)}
   {$DEFINE USING_VCL_LCL}
 {$IFEND}
 
