@@ -3,9 +3,9 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  14 October 2023                                                   *
+* Date      :  7 March 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2023                                         *
+* Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
 * Purpose   :  Vector drawing for TImage32                                     *
 *                                                                              *
@@ -2374,7 +2374,7 @@ function GrowOpenLine(const line: TPathD; width: double;
   miterLimOrRndScale: double): TPathD;
 var
   len, x,y: integer;
-  segLen, halfWidth: double;
+  segLen, halfWidth, rndScale: double;
   normals, line2, lineL, lineR, arc: TPathD;
   invNorm: TPointD;
   growRec: TGrowRec;
@@ -2429,8 +2429,11 @@ begin
     invNorm.X := -normals[0].X;
     invNorm.Y := -normals[0].Y;
     //get the rounding parameters
+    if miterLimOrRndScale > 0 then
+      rndScale := miterLimOrRndScale else
+      rndScale := 1;
     growRec.StepsPerRad :=
-      CalcRoundingSteps(halfWidth * miterLimOrRndScale)/(Pi*2);
+      CalcRoundingSteps(halfWidth * rndScale)/(Pi*2);
     GetSinCos(1/growRec.StepsPerRad, growRec.StepSin, growRec.StepCos);
     growRec.aSin := invNorm.X * normals[0].Y - invNorm.Y * normals[0].X;
     growRec.aCos := invNorm.X * normals[0].X + invNorm.Y * normals[0].Y;
@@ -2452,7 +2455,7 @@ begin
     arc := DoRound(growRec);
     //grow the line's right side of the line
     lineR := Grow(ReversePath(line2), normals,
-      halfWidth, joinStyle, miterLimOrRndScale, true);
+      halfWidth, joinStyle, rndScale, true);
     //join arc and line2 into result
     AppendPath(Result, arc);
     AppendPath(Result, lineR);
