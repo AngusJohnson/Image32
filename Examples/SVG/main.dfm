@@ -2,47 +2,60 @@ object Form1: TForm1
   Left = 298
   Top = 205
   Caption = 'Svg101'
-  ClientHeight = 469
-  ClientWidth = 756
+  ClientHeight = 854
+  ClientWidth = 1420
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -12
+  Font.Height = -24
   Font.Name = 'Tahoma'
   Font.Style = []
   Menu = MainMenu1
-  OldCreateOrder = False
   Position = poDesktopCenter
   OnCreate = FormCreate
   OnDestroy = FormDestroy
-  PixelsPerInch = 96
-  TextHeight = 14
+  PixelsPerInch = 192
+  TextHeight = 29
   object Splitter1: TSplitter
-    Left = 180
+    Left = 348
     Top = 0
-    Width = 5
-    Height = 450
-    ExplicitHeight = 451
+    Width = 10
+    Height = 778
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 450
-    Width = 756
-    Height = 19
+    Top = 778
+    Width = 1420
+    Height = 76
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
     Panels = <>
+    ExplicitTop = 777
+    ExplicitWidth = 1406
   end
   object ListBox1: TListBox
     Left = 0
     Top = 0
-    Width = 180
-    Height = 450
+    Width = 348
+    Height = 778
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
     Align = alLeft
     Color = 16316664
-    ItemHeight = 14
+    ItemHeight = 29
     PopupMenu = PopupMenu1
     TabOrder = 1
     Visible = False
     OnClick = ListBox1Click
+    ExplicitHeight = 777
   end
   object MainMenu1: TMainMenu
     Left = 248

@@ -5,13 +5,16 @@ unit main;
 interface
 
 uses
-{$IFnDEF FPC}
-  ShellApi, shlwapi, Windows,
-{$ELSE}
+{$IFDEF FPC}
   LCLIntf, LCLType, LMessages,
+{$ELSE}
+  Windows,
 {$ENDIF}
-  Messages, SysUtils, Classes, Graphics, Controls, StdCtrls,
-  Forms, Types, Menus, ExtCtrls, ComCtrls, Dialogs, Math,
+{$IFDEF UNICODE}
+  ShlWApi,
+{$ENDIF}
+  ShellApi, Messages, SysUtils, Classes, Graphics, Controls,
+  StdCtrls, Forms, Types, Menus, ExtCtrls, ComCtrls, Dialogs, Math,
   Img32.Panels;
 
   //This sample app presumes that the TImage32Panel component
@@ -70,7 +73,21 @@ uses
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
-{$IFnDEF FPC}
+{$IFDEF FPC}
+procedure OpenDocumentWithDefaultTxt(const filename: string);
+begin
+  ShellExecute(0, PChar ('open'), 'Notepad.exe', PChar (filename), nil, 1);
+end;
+//------------------------------------------------------------------------------
+
+{$ELSE}
+
+procedure OpenDocument(const filename: string);
+begin
+  ShellExecute(0, 'open', PChar(filename), nil, nil, SW_SHOWNORMAL);
+end;
+
+{$IFDEF UNICODE}
 function GetDefaultTextEditor: string;
 var
   exeFileBuffer: array[0..1024] of char;
@@ -93,10 +110,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure OpenDocument(const filename: string);
+{$ELSE}
+
+procedure OpenDocumentWithDefaultTxt(const filename: string);
 begin
-  ShellExecute(0, 'open', PChar(filename), nil, nil, SW_SHOWNORMAL);
+  ShellExecute(0, PChar ('open'), 'Notepad.exe', PChar (filename), nil, 1);
 end;
+//------------------------------------------------------------------------------
+
+{$ENDIF}
 {$ENDIF}
 
 procedure TForm1.FormCreate(Sender: TObject);
@@ -256,19 +278,12 @@ procedure TForm1.DrawCurrentItem;
 var
   svgFilenameAndPath: string;
   rec: TRect;
-  size: TSize;
 begin
   if ListBox1.ItemIndex < 0 then Exit;
 
   filename := ListBox1.Items[ListBox1.ItemIndex];
   svgFilenameAndPath := AppendSlash(folder) + filename;
   rec := ImagePanel.InnerClientRect;
-  size := GetImageSize(svgFilenameAndPath);
-  size.cx := DPIAware(size.cx);
-  size.cy := DPIAware(size.cy);
-  if (size.cx > RectWidth(rec)) and
-    (size.cy > RectHeight(rec)) then
-    rec := Rect(0,0,size.cx, size.cy);
 
   ImagePanel.Image.BeginUpdate;
   Screen.Cursor := crHourGlass;
