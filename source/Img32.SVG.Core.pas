@@ -303,7 +303,7 @@ type
     c4: ansichar;
   end;
 
-function Chr64ToVal(c: ansiChar): integer;
+function Chr64ToVal(c: ansiChar): integer; {$IFDEF INLINE} inline; {$ENDIF}
 begin
   case c of
     '+': result := 62;
@@ -316,19 +316,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FrstChr(c: PFourChars): ansichar;
+function FrstChr(c: PFourChars): ansichar; {$IFDEF INLINE} inline; {$ENDIF}
 begin
   result := ansichar(Chr64ToVal(c.c1) shl 2 or Chr64ToVal(c.c2) shr 4);
 end;
 //------------------------------------------------------------------------------
 
-function ScndChr(c: PFourChars): ansichar;
+function ScndChr(c: PFourChars): ansichar; {$IFDEF INLINE} inline; {$ENDIF}
 begin
   result := ansichar(Chr64ToVal(c.c2) shl 4 or Chr64ToVal(c.c3) shr 2);
 end;
 //------------------------------------------------------------------------------
 
-function ThrdChr(c: PFourChars): ansichar;
+function ThrdChr(c: PFourChars): ansichar; {$IFDEF INLINE} inline; {$ENDIF}
 begin
   result := ansichar( Chr64ToVal(c.c3) shl 6 or Chr64ToVal(c.c4) );
 end;
