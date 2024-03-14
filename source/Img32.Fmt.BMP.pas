@@ -487,7 +487,7 @@ begin
     isTopDown := bih.biHeight < 0;
     bih.biHeight := abs(bih.biHeight);
 
-    if (bih.biBitCount < 32) and
+    if //(bih.biBitCount < 32) and
       ((bih.biCompression and BI_BITFIELDS) = BI_BITFIELDS) then
     begin
       stream.Position := bihStart + 40;

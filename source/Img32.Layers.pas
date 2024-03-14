@@ -466,10 +466,8 @@ const
 
 implementation
 
-  {$IFNDEF MSWINDOWS}
-  {$IFNDEF FPC}
+  {$IFDEF USING_FMX}
   uses Img32.FMX;
-  {$ENDIF}
   {$ENDIF}
 
 resourcestring

@@ -11,8 +11,6 @@
   {$DEFINE USING_VCL_LCL}
 {$ELSEIF declared(FireMonkeyVersion) OR DEFINED(FRAMEWORK_FMX)}
   {$DEFINE USING_FMX}
-{$ELSEIF DEFINED(MACOS)}
-  {$DEFINE USING_FMX}
 {$ELSE}
   {$DEFINE USING_VCL}
   {$DEFINE USING_VCL_LCL}
@@ -63,14 +61,11 @@
           {$IF COMPILERVERSION >= 21}           //Delphi 2010
             {$DEFINE GESTURES}                    //added screen gesture support
             {$IF COMPILERVERSION >= 23}         //DelphiXE2
-              {$IF declared(FireMonkeyVersion)}   //defined in FMX.Types
-                {$DEFINE FMX}
-              {$IFEND}        
               {$DEFINE USES_NAMESPACES}
               {$DEFINE FORMATSETTINGS}
               {$DEFINE TROUNDINGMODE}   
               {$DEFINE UITYPES}                   //added UITypes unit
-              {$DEFINE XPLAT_GENERICS}            //reasonable cross-platform & generics support
+              {$DEFINE XPLAT_GENERICS}            //cross-platform generics support
               {$DEFINE STYLESERVICES}             //added StyleServices unit
               {$IF COMPILERVERSION >= 24}       //DelphiXE3
                 {$LEGACYIFEND ON}

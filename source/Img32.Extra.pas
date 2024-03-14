@@ -233,10 +233,8 @@ function CurveFit(const paths: TPathsD; closed: Boolean;
 implementation
 
 uses
-  {$IFNDEF MSWINDOWS}
-  {$IFNDEF FPC}
+  {$IFDEF USING_FMX}
   Img32.FMX,
-  {$ENDIF}
   {$ENDIF}
   Img32.Transform;
 
