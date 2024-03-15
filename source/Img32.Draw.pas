@@ -1834,7 +1834,7 @@ var
 begin
   if not assigned(lines) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
-  lines2 := Outline(lines, lineWidth, joinStyle, endStyle, miterLimit);
+  lines2 := RoughOutline(lines, lineWidth, joinStyle, endStyle, miterLimit);
 
   if img.AntiAliased then
     cr := TColorRenderer.Create(color) else
@@ -1860,7 +1860,7 @@ var
 begin
   if (not assigned(lines)) or (not assigned(renderer)) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
-  lines2 := Outline(lines, lineWidth, joinStyle, endStyle, miterLimit);
+  lines2 := RoughOutline(lines, lineWidth, joinStyle, endStyle, miterLimit);
   if renderer.Initialize(img) then
   begin
     Rasterize(lines2, img.bounds, frNonZero, renderer);
@@ -1878,7 +1878,7 @@ var
 begin
   if not assigned(lines) then exit;
   if (lineWidth < MinStrokeWidth) then lineWidth := MinStrokeWidth;
-  lines2 := Outline(lines, lineWidth, joinStyle, endStyle, 2);
+  lines2 := RoughOutline(lines, lineWidth, joinStyle, endStyle, 2);
   ir := TInverseRenderer.Create;
   try
     if ir.Initialize(img) then
@@ -1916,7 +1916,7 @@ begin
     else
       endStyle := esButt;
   end;
-  lines := Outline(lines, lineWidth, joinStyle, endStyle);
+  lines := RoughOutline(lines, lineWidth, joinStyle, endStyle);
   cr := TColorRenderer.Create(color);
   try
     if cr.Initialize(img) then
@@ -1958,7 +1958,7 @@ begin
 
   lines := GetDashedPath(line, endStyle = esPolygon, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
-  lines := Outline(lines, lineWidth, joinStyle, endStyle);
+  lines := RoughOutline(lines, lineWidth, joinStyle, endStyle);
   if renderer.Initialize(img) then
   begin
     Rasterize(lines, img.bounds, frNonZero, renderer);
@@ -1997,7 +1997,7 @@ begin
 
   lines := GetDashedPath(line, endStyle = esPolygon, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
-  lines := Outline(lines, lineWidth, joinStyle, endStyle);
+  lines := RoughOutline(lines, lineWidth, joinStyle, endStyle);
   renderer := TInverseRenderer.Create;
   try
     if renderer.Initialize(img) then

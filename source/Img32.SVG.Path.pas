@@ -3,7 +3,7 @@ unit Img32.SVG.Path;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  15 March 2024                                                   *
+* Date      :  16 March 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -1599,9 +1599,19 @@ begin
   Result := GetBoundsD(p);
 
   //watch out for straight horizontal or vertical lines
-  if not IsEmptyRect(Result) then Exit;
-  p := Grow(p, nil, 1, jsSquare, 0);
-  Result := GetBoundsD(p);
+  if IsEmptyRect(Result) then
+  begin
+    if Result.Width = 0 then
+    begin
+      Result.Left := Result.Left - 0.5;
+      Result.Right := Result.Left + 1.0;
+    end
+    else if Result.Height = 0 then
+    begin
+      Result.Top := Result.Top - 0.5;
+      Result.Bottom := Result.Top + 1.0;
+    end;
+  end;
 end;
 //------------------------------------------------------------------------------
 
