@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  13 March 2024                                                   *
+* Date      :  15 March 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -924,6 +924,8 @@ var
   dstRecD: TRectD;
 begin
   dstRecD := Self.elRectWH.GetRectD(0,0);
+  drawDat.matrix := MatrixMultiply(drawDat.matrix, fDrawData.matrix);
+
   MatrixApply(drawDat.matrix, dstRecD);
   DrawRefElImage(refEl, image, Rect(dstRecD));
 end;
@@ -1153,6 +1155,8 @@ begin
       DrawChildren(img, drawDat);
     end;
   end
+  else if el is TImageElement then
+    el.Draw(img, drawDat)
   else if el is TShapeElement then
     el.Draw(img, drawDat);
 end;
