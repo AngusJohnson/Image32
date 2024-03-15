@@ -3,9 +3,9 @@ unit Img32.SVG.Path;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  14 October 2023                                                   *
+* Date      :  15 March 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2021                                         *
+* Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
 * Purpose   :  Essential structures and functions to read SVG Path elements    *
 *                                                                              *
@@ -1592,7 +1592,7 @@ begin
   for i := 0 to Count -1 do
     with fSubPaths[i] do
     begin
-      AppendPath(p, GetFirstPt);
+      AppendToPath(p, GetFirstPt);
       for j := 0 to High(fSegs) do
         AppendPath(p, fSegs[j].fCtrlPts);
     end;

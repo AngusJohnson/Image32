@@ -3,9 +3,9 @@ unit Img32.Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  17 December 2023                                                *
+* Date      :  15 March 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2023                                         *
+* Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Miscellaneous routines that don't belong in other modules.      *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -393,7 +393,7 @@ begin
   p := path;
   if closePath and not PointsNearEqual(p[0], p[highI], 0.01) then
   begin
-    AppendPath(p, p[0]);
+    AppendToPath(p, p[0]);
     inc(highI);
   end;
   for i := 1 to highI do

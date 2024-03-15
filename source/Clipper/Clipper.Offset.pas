@@ -2,7 +2,7 @@ unit Clipper.Offset;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Date      :  8 March 2024                                                    *
+* Date      :  14 March 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2024                                         *
 * Purpose   :  Path Offset (Inflate/Shrink)                                    *
@@ -537,16 +537,28 @@ begin
   if Assigned(fDeltaCallback64) then
     fGroupDelta := fDeltaCallback64(fInPath, fNorms, 0, 0);
 
-  // do the line start cap
-  if Abs(fGroupDelta) < Tolerance then
+  if (Abs(fGroupDelta) < Tolerance) and
+    not Assigned(fDeltaCallback64) then
   begin
-    AddPoint(fInPath[0]);
-  end else
-  case fEndType of
-    etButt: DoBevel(0, 0);
-    etRound: DoRound(0,0, PI);
-    else DoSquare(0, 0);
+    inc(highI);
+    SetLength(fOutPath, highI);
+    Move(fInPath[0], fOutPath, highI + SizeOf(TPointD));
+    fOutPathLen := highI;
+    Exit;
   end;
+
+  // do the line start cap
+  if Assigned(fDeltaCallback64) then
+    fGroupDelta := fDeltaCallback64(fInPath, fNorms, 0, 0);
+
+  if (Abs(fGroupDelta) < Tolerance) then
+    AddPoint(fInPath[0])
+  else
+    case fEndType of
+      etButt: DoBevel(0, 0);
+      etRound: DoRound(0,0, PI);
+      else DoSquare(0, 0);
+    end;
 
   // offset the left side going forward
   k := 0;
@@ -576,8 +588,8 @@ begin
   end;
 
   // offset the left side going back
-  k := 0;
-  for i := highI downto 1 do //and stop at 1!
+  k := highI;
+  for i := highI -1 downto 1 do //and stop at 1!
     OffsetPoint(i, k);
 
   UpdateSolution;
@@ -939,7 +951,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TClipperOffset.OffsetPoint(j: Integer; var k: integer);
+  procedure TClipperOffset.OffsetPoint(j: Integer; var k: integer);
 var
   sinA, cosA: Double;
 begin
