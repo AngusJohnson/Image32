@@ -1046,8 +1046,8 @@ begin
 
   if (dx <> 0) or (dy <> 0) then
   begin
-    drawPathsC := OffsetPath(drawPathsC, dx, dy);
-    drawPathsO := OffsetPath(drawPathsO, dx, dy);
+    drawPathsC := TranslatePath(drawPathsC, dx, dy);
+    drawPathsO := TranslatePath(drawPathsO, dx, dy);
   end;
 
   drawPathsF := CopyPaths(drawPathsC);
@@ -1340,7 +1340,7 @@ begin
     if C.X.HasFontUnits then
       cp := C.GetPoint(drawDat.fontInfo.size, GetRelFracLimit) else
       cp := C.GetPoint(rec2, GetRelFracLimit);
-    cp := OffsetPoint(cp, rec2.Left, rec2.Top);
+    cp := TranslatePoint(cp, rec2.Left, rec2.Top);
   end else
     cp := rec2.MidPoint;
   MatrixApply(fDrawData.matrix, cp);
@@ -1353,7 +1353,7 @@ begin
     if F.X.HasFontUnits then
       fp := F.GetPoint(drawDat.fontInfo.size, GetRelFracLimit) else
       fp := F.GetPoint(rec2, GetRelFracLimit);
-    fp := OffsetPoint(fp, rec2.Left, rec2.Top);
+    fp := TranslatePoint(fp, rec2.Left, rec2.Top);
     MatrixApply(fDrawData.matrix, fp);
     MatrixApply(drawDat.matrix, fp);
   end else
@@ -1440,7 +1440,7 @@ begin
       pt2.X := rec2.Width else
       pt2.X := endPt.X.GetValue(rec2.Width, GetRelFracLimit);
     pt2.Y := endPt.Y.GetValue(rec2.Height, GetRelFracLimit);
-    pt2 := OffsetPoint(pt2, rec2.Left, rec2.Top);
+    pt2 := TranslatePoint(pt2, rec2.Left, rec2.Top);
 
     MatrixApply(fDrawData.matrix, pt2);
     MatrixApply(drawDat.matrix, pt2);
@@ -2448,6 +2448,7 @@ begin
         with TPatternElement(refEl), fReader do
           if PrepareRenderer(ImageRenderer, drawDat) then
             DrawPolygon(img, fillPaths, drawDat.fillRule, ImageRenderer);
+//        fReader.ImageRenderer.fImage.SaveToFile('c:\temp\test.png');
       end;
     end;
   end
@@ -2974,9 +2975,9 @@ begin
     else if TBaseElement(fChilds[i]) is TSubTextElement then
       with TSubTextElement(fChilds[i]) do
       begin
-        drawPathsC := OffsetPath(drawPathsC, dx, 0);
-        drawPathsO := OffsetPath(drawPathsO, dx, 0);
-        drawPathsF := OffsetPath(drawPathsF, dx, 0);
+        drawPathsC := TranslatePath(drawPathsC, dx, 0);
+        drawPathsO := TranslatePath(drawPathsO, dx, 0);
+        drawPathsF := TranslatePath(drawPathsF, dx, 0);
       end;
 end;
 //------------------------------------------------------------------------------
@@ -3498,6 +3499,7 @@ var
 begin
   Result := false;
 
+  //scale.cx := 1; scale.cy := 1;
   scale := ExtractScaleFromMatrix(drawDat.matrix);
   if units = hUserSpaceOnUse then
     rec := fReader.userSpaceBounds else

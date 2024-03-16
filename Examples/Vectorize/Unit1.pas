@@ -196,7 +196,7 @@ begin
 
   // 1b. offset and scale the vector image
 
-  rawPaths := OffsetPath(rawPaths,
+  rawPaths := TranslatePath(rawPaths,
     margin -vectorBounds.Left, margin -vectorBounds.Top);
 
   scale := Min(

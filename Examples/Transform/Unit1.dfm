@@ -2,16 +2,15 @@ object Form1: TForm1
   Left = 523
   Top = 233
   Caption = 'Transform'
-  ClientHeight = 381
-  ClientWidth = 370
+  ClientHeight = 762
+  ClientWidth = 740
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -11
+  Font.Height = -22
   Font.Name = 'Tahoma'
   Font.Style = []
   Menu = MainMenu1
-  OldCreateOrder = False
   PopupMenu = PopupMenu1
   OnCreate = FormCreate
   OnDblClick = FormDblClick
@@ -20,17 +19,23 @@ object Form1: TForm1
   OnMouseMove = pnlMainMouseMove
   OnPaint = FormPaint
   OnResize = FormResize
-  PixelsPerInch = 96
-  TextHeight = 13
+  PixelsPerInch = 192
+  TextHeight = 27
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 362
-    Width = 370
-    Height = 19
+    Top = 724
+    Width = 740
+    Height = 38
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
     Panels = <>
     ParentFont = True
     SimplePanel = True
     UseSystemFont = False
+    ExplicitTop = 723
+    ExplicitWidth = 726
   end
   object MainMenu1: TMainMenu
     Left = 112

@@ -3,9 +3,9 @@ unit Img32.Ctrl;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  0.0 (Experimental)                                              *
-* Date      :  12 December 2021                                                *
+* Date      :  16 March 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2021                                         *
+* Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
 * Purpose   :  Drawing controls (buttons, labels, edits, tabs, pages etc.)     *
 *              This unit is EXPERIMENTAL. To do this properly would be a huge  *
@@ -290,6 +290,7 @@ type
     procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
+    destructor Destroy; override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
     procedure ReceiveNotification(Sender: TObject; notify: TImg32Notification); override;
     procedure ScrollItemIndexIntoView;
@@ -325,6 +326,7 @@ type
     procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
+    destructor Destroy; override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
     procedure ReceiveNotification(Sender: TObject; notify: TImg32Notification); override;
     procedure AddItem(const text: string);
@@ -927,13 +929,13 @@ begin
     Img32.Vector.InflateRect(rec2, -Round(padding), -Round(padding));
   if (GetAlpha(textColor) < 3) or (Trim(caption) = '') then Exit;
   pp := font.GetTextOutline(rec2, caption, taCenter, tvaMiddle, ulIdx);
-  if pressed then pp := OffsetPath(pp, bevHeight, bevHeight);
-  pp := OffsetPath(pp, textOffX, textOffY);
+  if pressed then pp := TranslatePath(pp, bevHeight, bevHeight);
+  pp := TranslatePath(pp, textOffX, textOffY);
 
   dx := font.LineHeight/24;
-  pp := OffsetPath(pp, -dx, -dx);
+  pp := TranslatePath(pp, -dx, -dx);
   DrawPolygon(Image, pp, frNonZero, clWhite32);
-  pp := OffsetPath(pp, dx, dx);
+  pp := TranslatePath(pp, dx, dx);
   DrawPolygon(Image, pp, frNonZero, textColor);
 end;
 //------------------------------------------------------------------------------
@@ -1102,7 +1104,7 @@ begin
       begin
         d := Ceil(d/6);
         Img32.Vector.InflateRect(rec2, -d, -d);
-        rec2.BottomRight := OffsetPoint(rec2.BottomRight, 1,1);
+        rec2.BottomRight := TranslatePoint(rec2.BottomRight, 1,1);
         DrawPolygon(Image, Rectangle(rec2), frNonZero, clLiteGray32);
       end;
     tsYes :
@@ -1115,11 +1117,11 @@ begin
         begin
           p := MakePath([42,60, 88,12, 48,91, 10,64, 21,42]);
           p := ScalePath(p, RectWidth(rec)/100);
-          p := OffsetPath(p, rec.Left, rec.Top);
+          p := TranslatePath(p, rec.Left, rec.Top);
           DrawPolygon(Image, p, frEvenOdd, clDefDark32);
         end else
         begin
-          rec2.BottomRight := OffsetPoint(rec2.BottomRight, 1,1);
+          rec2.BottomRight := TranslatePoint(rec2.BottomRight, 1,1);
           DrawLine(Image, rec2.TopLeft, rec2.BottomRight, pw, clDefDark32);
           DrawLine(Image, PointD(rec2.Left, rec2.Bottom),
             PointD(rec2.Right, rec2.Top), pw, clDefDark32);
@@ -1639,9 +1641,9 @@ begin
   OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
   pp := fUsableFont.GetTextOutline(rec, caption, taLeft, tvaTop, ulIdx);
   dx := fUsableFont.LineHeight/24;
-  pp := OffsetPath(pp, -dx, -dx);
+  pp := TranslatePath(pp, -dx, -dx);
   DrawPolygon(Image, pp, frNonZero, clWhite32);
-  pp := OffsetPath(pp, dx, dx);
+  pp := TranslatePath(pp, dx, dx);
   DrawPolygon(Image, pp, frNonZero, clBlack32);
 end;
 //------------------------------------------------------------------------------
@@ -2011,6 +2013,13 @@ begin
   fColor := clWhite32;
   fMaxVisible := 6;
   fAutoSize := true;
+end;
+//------------------------------------------------------------------------------
+
+destructor TListCtrl.Destroy;
+begin
+  SetImgList(nil);
+  inherited;
 end;
 //------------------------------------------------------------------------------
 
@@ -2532,6 +2541,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+destructor TPopMenuCtrl.Destroy;
+begin
+  SetImgList(nil);
+  inherited;
+end;
+//------------------------------------------------------------------------------
+
 procedure TPopMenuCtrl.SetInnerBounds(const newBounds: TRectD);
 var
   rec: TRectD;
@@ -3031,8 +3047,8 @@ begin
   //fScrollOffsetY := fScrollOffsetY + dy;
   //fTopLine := Round(fScrollOffsetY/fLineHeight);
   fTopLine := Round(ScrollV.Position/fLineHeight);
-  if fTopLine >= Length(fPageMetrics.wordListOffsets) then
-    fTopLine := High(fPageMetrics.wordListOffsets);
+  if fTopLine >= Length(fPageMetrics.WordListOffsets) then
+    fTopLine := High(fPageMetrics.WordListOffsets);
   fDoFullPaint := true;
   Invalidate;
 end;
@@ -3068,7 +3084,7 @@ begin
   InflateRect(rec, d, d);
   om := Round(OuterMargin);
   OffsetRect(rec, Round(om-TextMargin.X+10), Round(om-TextMargin.Y -6));
-  Invalidate(rec);
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -3154,7 +3170,7 @@ begin
     if scrollShowing then
       textRecD.Right := textRecD.Right - ScrollV.Width;
 
-    rec := UpdateInfo.updateRegion;
+    rec := UpdateInfo.priorPosition;
     ri := Rect(rec);
     Image.Copy(fBuffer, ri, ri);
     //Image.FillRect(ri, clRed32);
@@ -3216,10 +3232,10 @@ begin
 
   bottomline := fTopLine + GetVisibleLines -1;
   if bottomline < FPageMetrics.lineCount -1 then
-    i := fPageMetrics.wordListOffsets[bottomline +1] else
+    i := fPageMetrics.WordListOffsets[bottomline +1] else
     i := fWordList.Count;
   if not IsValid(fCursorWordIdx) or
-    (fCursorWordIdx.X < fPageMetrics.wordListOffsets[fTopLine]) or
+    (fCursorWordIdx.X < fPageMetrics.WordListOffsets[fTopLine]) or
     (fCursorWordIdx.X >= i) then Exit;
 
   i := Ceil(fLineHeight * 0.1);
@@ -3237,8 +3253,8 @@ begin
     fCursorMoved := false;    //reset
   end;
 
-  selStartPt := OffsetPoint(selStartPt, OuterMargin, OuterMargin);
-  selEndPt := OffsetPoint(selEndPt, OuterMargin, OuterMargin);
+  selStartPt := TranslatePoint(selStartPt, OuterMargin, OuterMargin);
+  selEndPt := TranslatePoint(selEndPt, OuterMargin, OuterMargin);
   DrawLine(Image, selStartPt, selEndPt, i, clDefDark32);
 
 end;
@@ -3720,7 +3736,7 @@ begin
 
   lh := fLineHeight /10;
   selStartPt := WordIdxToPos(fCursorWordIdx);
-  selEndPt := OffsetPoint(selStartPt, 0, fLineHeight- lh);
+  selEndPt := TranslatePoint(selStartPt, 0, fLineHeight- lh);
   selStartPt.Y := selStartPt.Y + lh;
   DrawLine(Image, selStartPt, selEndPt, lh, clDefDark32);
 end;
@@ -3973,6 +3989,7 @@ end;
 
 destructor TImageBtnCtrl.Destroy;
 begin
+  SetImgList(nil);
   inherited;
 end;
 //------------------------------------------------------------------------------
@@ -4249,9 +4266,9 @@ begin
 
     pp := fUsableFont.GetTextOutline(Rect(rec), caption, taLeft, tvaMiddle, i);
     dx := fUsableFont.LineHeight/24;
-    pp := OffsetPath(pp, -dx, -dx);
+    pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
-    pp := OffsetPath(pp, dx, dx);
+    pp := TranslatePath(pp, dx, dx);
     DrawPolygon(Image, pp, frNonZero, clBlack32);
   end else
   begin
@@ -4267,9 +4284,9 @@ begin
 
     pp := fUsableFont.GetTextOutline(Rect(rec), fText, taRight, tvaMiddle);
     dx := fUsableFont.LineHeight/24;
-    pp := OffsetPath(pp, -dx, -dx);
+    pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
-    pp := OffsetPath(pp, dx, dx);
+    pp := TranslatePath(pp, dx, dx);
     DrawPolygon(Image, pp, frNonZero, clBlack32);
   end;
 end;
@@ -4347,9 +4364,9 @@ begin
 
     pp := fUsableFont.GetTextOutline(Rect(rec), fText, taLeft, tvaMiddle);
     dx := fUsableFont.LineHeight/24;
-    pp := OffsetPath(pp, -dx, -dx);
+    pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
-    pp := OffsetPath(pp, dx, dx);
+    pp := TranslatePath(pp, dx, dx);
     DrawPolygon(Image, pp, frNonZero, clBlack32);
   end else
   begin
@@ -4364,9 +4381,9 @@ begin
 
     pp := fUsableFont.GetTextOutline(Rect(rec), fText, taRight, tvaMiddle);
     dx := fUsableFont.LineHeight/24;
-    pp := OffsetPath(pp, -dx, -dx);
+    pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
-    pp := OffsetPath(pp, dx, dx);
+    pp := TranslatePath(pp, dx, dx);
     DrawPolygon(Image, pp, frNonZero, clBlack32);
   end;
 end;
@@ -4432,7 +4449,7 @@ procedure TPanelCtrl.DoScroll(dx, dy: double);
 var
   i: integer;
 begin
-  fScrollOffset := OffsetPoint(fScrollOffset, dx, dy);
+  fScrollOffset := TranslatePoint(fScrollOffset, dx, dy);
   for i := 0 to ChildCount -1 do
     if not (Child[i] is TScrollCtrl) then
       Child[i].Offset(-dx, -dy);
@@ -5608,7 +5625,7 @@ begin
     InflateRect(rec2, -d, -d);
     with rec2 do
       p := MakePath([left-2, bottom, MidPoint.X, top+2, right+2, bottom]);
-    p2 := OffsetPath(p, -bhDiv2, -bhDiv2);
+    p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);
 
@@ -5618,7 +5635,7 @@ begin
     InflateRect(rec2, -d, -d);
     with rec2 do
       p := MakePath([left-2, top, MidPoint.X, bottom-2, right+2, top]);
-    p2 := OffsetPath(p, -bhDiv2, -bhDiv2);
+    p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);
 
@@ -5656,7 +5673,7 @@ begin
     InflateRect(rec2, -d, -d);
     with rec2 do
       p := MakePath([right, top, left +2, MidPoint.Y+1, right, bottom+2]);
-    p2 := OffsetPath(p, -bhDiv2, -bhDiv2);
+    p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);
 
@@ -5666,7 +5683,7 @@ begin
     InflateRect(rec2, -d, -d);
     with rec2 do
       p := MakePath([left, top, right -2, MidPoint.Y+1, left, bottom+2]);
-    p2 := OffsetPath(p, -bhDiv2, -bhDiv2);
+    p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);
 

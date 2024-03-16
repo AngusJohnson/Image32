@@ -30,7 +30,7 @@ var
   rec: TRectD;
 begin
   rec := Img32.Vector.GetBoundsD(defaultArrowBtns);
-  Self.Paths := OffsetPath(defaultArrowBtns,
+  Self.Paths := TranslatePath(defaultArrowBtns,
     centerPt.X - rec.Left - rec.Width/2,
     centerPt.Y -rec.Top - rec.Height/2);
 end;

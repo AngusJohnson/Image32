@@ -400,7 +400,7 @@ begin
       mp3 := MidPoint(rec3);
 
       RotatePoint(pt, mp, PI/6);
-      numGlyphs[j] := OffsetPath(numGlyphs[j], pt.X -mp3.X, pt.Y -mp3.y);
+      numGlyphs[j] := TranslatePath(numGlyphs[j], pt.X -mp3.X, pt.Y -mp3.y);
       DrawPolygon(imgClockface, numGlyphs[j], frEvenOdd, clBlack32);
     end else if ((i-1) mod 5 <> 0) and ((i+1) mod 5 <> 0) then
     begin
@@ -444,7 +444,7 @@ procedure TMainForm.Timer1Timer(Sender: TObject);
 
   procedure DrawShadow(path: TPathD; handwidth: double);
   begin
-    path := OffsetPath(path, handWidth/4, handWidth/3);
+    path := TranslatePath(path, handWidth/4, handWidth/3);
     DrawPolygon(imgMain, path, frNonZero, $30000000);
   end;
 

@@ -400,8 +400,8 @@ begin
   begin
     isShrinking := (group.endType = etPolygon) and
       (group.reversed = ((fGroupDelta < 0) = group.isHoleList[i]));
-    if (isShrinking and (Abs(group.areasList[i]) < minArea)) then
-      Continue;
+//    if (isShrinking and (Abs(group.areasList[i]) < minArea)) then
+//      Continue;
 
     fInPath := group.paths[i];
     fNorms := nil;

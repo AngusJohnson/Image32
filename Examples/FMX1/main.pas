@@ -151,11 +151,11 @@ begin
   scale := (rec.Width - margin*2) / textRec.Width;
   mainGlyphs := Img32.Vector.ScalePath(bigTextGlyphs, scale);
   textRec := Img32.Vector.GetBounds(mainGlyphs);
-  mainGlyphs := Img32.Vector.OffsetPath(mainGlyphs, -textRec.left, -textRec.top);
+  mainGlyphs := TranslatePath(mainGlyphs, -textRec.left, -textRec.top);
 
   //reposition copyright text
   tmpRec := Img32.Vector.GetBounds(copyrightGlyphs);
-  copyrightGlyphs := Img32.Vector.OffsetPath(copyrightGlyphs,
+  copyrightGlyphs := TranslatePath(copyrightGlyphs,
     rec.Right -tmpRec.Right -margin,
     rec.Bottom -tmpRec.Top -margin *2);
 

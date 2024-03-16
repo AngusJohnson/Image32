@@ -3,7 +3,7 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  15 March 2024                                                   *
+* Date      :  16 March 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -23,7 +23,16 @@ uses
 
 type
   TArrowStyle = (asNone, asSimple, asFancy, asDiamond, asCircle, asTail);
-  TJoinStyle  = (jsAuto, jsSquare, jsMiter, jsRound);
+  // TJoinStyle:
+  //   jsSquare - Convex joins will be truncated using a 'squaring' edge.
+  //   The mid-points of these squaring edges will also be exactly the offset
+  //  (ie delta) distance away from their origins (ie the starting vertices).
+  //  jsButt - joins are similar to 'squared' joins except that squaring
+  //  won't occur at a fixed distance. While bevelled joins may not be as
+  //  pretty as squared joins, bevelling will be much faster than squaring.
+  //  And perhaps this is why bevelling (rather than squaring) is preferred
+  //  in numerous graphics display formats (including SVG & PDF documents).
+  TJoinStyle  = (jsAuto, jsSquare, jsButt, jsMiter, jsRound);
   TEndStyle   = (esPolygon = 0, esClosed = 0, esButt, esSquare, esRound);
   TPathEnd    = (peStart, peEnd, peBothEnds);
   TSplineType = (stQuadratic, stCubic);
@@ -158,14 +167,14 @@ type
     patternOffset: PDouble; lineWidth: double;
     joinStyle: TJoinStyle; endStyle: TEndStyle): TPathsD;
 
-  function OffsetPoint(const pt: TPoint; dx, dy: integer): TPoint; overload;
-  function OffsetPoint(const pt: TPointD; dx, dy: double): TPointD; overload;
+  function TranslatePoint(const pt: TPoint; dx, dy: integer): TPoint; overload;
+  function TranslatePoint(const pt: TPointD; dx, dy: double): TPointD; overload;
 
-  function OffsetPath(const path: TPathD;
+  function TranslatePath(const path: TPathD;
     dx, dy: double): TPathD; overload;
-  function OffsetPath(const paths: TPathsD;
+  function TranslatePath(const paths: TPathsD;
     dx, dy: double): TPathsD; overload;
-  function OffsetPath(const ppp: TArrayOfPathsD;
+  function TranslatePath(const ppp: TArrayOfPathsD;
     dx, dy: double): TArrayOfPathsD; overload;
 
   function Paths(const path: TPathD): TPathsD;
@@ -389,8 +398,8 @@ type
 
   function IsPointInEllipse(const ellipseRec: TRect; const pt: TPoint): Boolean;
 
-  //GetIntersectsEllipseAndLine: Gets the intersection of an ellipse and
-  //a line. The function result = true when the line either touches
+  //GetLineEllipseIntersects: Gets the intersection of a line and
+  //an ellipse. The function succeeds when the line either touches
   //tangentially or passes through the ellipse. If the line touches
   //tangentially, the coordintates returned in pt1 and pt2 will match.
   function GetLineEllipseIntersects(const ellipseRec: TRect;
@@ -410,9 +419,9 @@ type
   function GetClosestPtOnRotatedEllipse(const ellipseRect: TRectD;
     ellipseRotation: double; const pt: TPointD): TPointD;
 
-  // RoughOutline: these are **rough** because outlines are untidy
-  // with numerous self-intersections and negative area regions but
-  // these functions are much faster that Img32.Clipper2.InflatePaths.
+  // RoughOutline: these are **rough** because outlines are untidy with
+  // numerous self-intersections and negative area regions. Nevertheless
+  // these functions are **much** faster that Img32.Clipper.InflatePaths.
   // (These two functions are really only intended for internal use.)
   function RoughOutline(const line: TPathD; lineWidth: double;
     joinStyle: TJoinStyle; endStyle: TEndStyle;
@@ -420,6 +429,10 @@ type
   function RoughOutline(const lines: TPathsD; lineWidth: double;
     joinStyle: TJoinStyle; endStyle: TEndStyle;
     miterLimOrRndScale: double = 0): TPathsD; overload;
+
+  // Grow: only intended for internal use
+  function Grow(const path, normals: TPathD; delta: double;
+    joinStyle: TJoinStyle; miterLim: double; isOpen: Boolean = false): TPathD;
 
   function ValueAlmostZero(val: double; epsilon: double = 0.001): Boolean;
   function ValueAlmostOne(val: double; epsilon: double = 0.001): Boolean;
@@ -1115,21 +1128,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function OffsetPoint(const pt: TPoint; dx, dy: integer): TPoint;
+function TranslatePoint(const pt: TPoint; dx, dy: integer): TPoint;
 begin
   result.x := pt.x + dx;
   result.y := pt.y + dy;
 end;
 //------------------------------------------------------------------------------
 
-function OffsetPoint(const pt: TPointD; dx, dy: double): TPointD;
+function TranslatePoint(const pt: TPointD; dx, dy: double): TPointD;
 begin
   result.x := pt.x + dx;
   result.y := pt.y + dy;
 end;
 //------------------------------------------------------------------------------
 
-function OffsetPath(const path: TPathD; dx, dy: double): TPathD;
+function TranslatePath(const path: TPathD; dx, dy: double): TPathD;
 var
   i, len: integer;
 begin
@@ -1143,7 +1156,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function OffsetPath(const paths: TPathsD;
+function TranslatePath(const paths: TPathsD;
   dx, dy: double): TPathsD;
 var
   i,len: integer;
@@ -1151,18 +1164,18 @@ begin
   len := length(paths);
   setLength(result, len);
   for i := 0 to len -1 do
-    result[i] := OffsetPath(paths[i], dx, dy);
+    result[i] := TranslatePath(paths[i], dx, dy);
 end;
 //------------------------------------------------------------------------------
 
-function OffsetPath(const ppp: TArrayOfPathsD; dx, dy: double): TArrayOfPathsD;
+function TranslatePath(const ppp: TArrayOfPathsD; dx, dy: double): TArrayOfPathsD;
 var
   i,len: integer;
 begin
   len := length(ppp);
   setLength(result, len);
   for i := 0 to len -1 do
-    result[i] := OffsetPath(ppp[i], dx, dy);
+    result[i] := TranslatePath(ppp[i], dx, dy);
 end;
 //------------------------------------------------------------------------------
 
@@ -1727,8 +1740,8 @@ begin
   //offset ellipseRect so it's centered over the coordinate origin
   dx := ellipseRec.Left + a; dy := ellipseRec.Top + b;
   offsetRect(rec, -dx, -dy);
-  pt1 := OffsetPoint(linePt1, -dx, -dy);
-  pt2 := OffsetPoint(linePt2, -dx, -dy);
+  pt1 := TranslatePoint(linePt1, -dx, -dy);
+  pt2 := TranslatePoint(linePt2, -dx, -dy);
   //equation of ellipse = (x*x)/(a*a) + (y*y)/(b*b) = 1
   //equation of line = y = mx + c;
   if (pt1.X = pt2.X) then //vertical line (ie infinite slope)
@@ -1765,8 +1778,8 @@ begin
     pt2.Y := m * pt2.X + c;
   end;
   //finally reverse initial offset
-  linePt1 := OffsetPoint(pt1, dx, dy);
-  linePt2 := OffsetPoint(pt2, dx, dy);
+  linePt1 := TranslatePoint(pt1, dx, dy);
+  linePt2 := TranslatePoint(pt2, dx, dy);
 end;
 //------------------------------------------------------------------------------
 
@@ -2096,7 +2109,7 @@ begin
   //the results of this function have been derived empirically
   //and may need further adjustment
   if radius < 0.55 then result := 4
-  else result := Pi * Sqrt(radius);
+  else result := Pi * Sqrt(radius *2);
 end;
 //------------------------------------------------------------------------------
 
@@ -2151,6 +2164,53 @@ var
       AddPoint(PointD(
         path[j].x + delta * norms[j].x,
         path[j].y + delta * norms[j].y));
+    end;
+  end;
+
+  procedure DoSquare(j, k: Integer);
+  var
+    vec, ptQ, ptR, ptS, ptT, ptU, ip: TPointD;
+    absDelta: double;
+  begin
+    if k = j then
+    begin
+      vec.X := norms[j].Y;     //squaring a line end
+      vec.Y := -norms[j].X;
+    end else
+    begin
+      // using the reciprocal of unit normals (as unit vectors)
+      // get the average unit vector ...
+      vec := GetAvgUnitVector(
+        PointD(-norms[k].Y, norms[k].X),
+        PointD(norms[j].Y, -norms[j].X));
+    end;
+
+    absDelta := Abs(delta);
+    ptQ := PointD(path[j].X + absDelta * vec.X, path[j].Y + absDelta * vec.Y);
+
+    ptR := PointD(ptQ.X + delta * vec.Y, ptQ.Y + delta * -vec.X);
+    ptS := ReflectPoint(ptR, ptQ);
+
+    // get 2 vertices along one edge offset
+    ptT := PointD(
+      path[k].X + norms[k].X * delta,
+      path[k].Y + norms[k].Y * delta);
+
+    if (j = k) then
+    begin
+      ptU.X := ptT.X + vec.X * delta;
+      ptU.Y := ptT.Y + vec.Y * delta;
+      ip := IntersectPoint(ptR, ptS, ptT, ptU);
+      AddPoint(ReflectPoint(ip, ptQ));
+      AddPoint(ip);
+    end else
+    begin
+      ptU := PointD(
+        path[j].X + norms[k].X * delta,
+        path[j].Y + norms[k].Y * delta);
+      ip := IntersectPoint(ptR, ptS, ptT, ptU);
+      AddPoint(ip);
+      AddPoint(ReflectPoint(ip, ptQ));
     end;
   end;
 
@@ -2214,7 +2274,7 @@ begin
       delta := MinStrokeWidth/2;
   end;
   if absDelta < 1 then
-    joinStyle := jsSquare
+    joinStyle := jsButt
   else if joinStyle = jsAuto then
   begin
     if delta < AutoWidthThreshold / 2 then
@@ -2293,12 +2353,12 @@ begin
     begin
       if (1 + acos > miterLim) then
         DoMiter(j, k, acos) else
-        DoBevel(j, k);
+        DoSquare(j, k);
     end
     else if (joinStyle = jsRound) then
-    begin
-      DoRound(j, k);
-    end
+      DoRound(j, k)
+    else if (joinStyle = jsSquare) then
+      DoSquare(j, k)
     else
       DoBevel(j, k);
     k := j;
@@ -2474,10 +2534,12 @@ var
     begin
       if (1 + acos > miterLim) then
         DoMiter(j, k, acos) else
-        DoBevel(j, k);
+        DoSquare(j, k);
     end
     else if (joinStyle = jsRound) then
       DoRound(j, k)
+    else if (joinStyle = jsSquare) then
+      DoSquare(j, k)
     else
       DoBevel(j, k);
     k := j;
@@ -2503,12 +2565,12 @@ begin
     Exit;
   end;
 
-  Assert(endStyle <> esClosed);
+  //Assert(endStyle <> esClosed);
 
   //with very narrow lines, don't get fancy with joins and line ends
   if (delta <= 1) then
   begin
-    joinStyle := jsSquare;
+    joinStyle := jsButt;
     if endStyle = esRound then endStyle := esSquare;
   end
   else if joinStyle = jsAuto then
@@ -3045,7 +3107,7 @@ begin
     angle := endAngle - startAngle + angle360 else
     angle := endAngle - startAngle;
   //steps = (No. steps for a whole ellipse) * angle/(2*Pi)
-  steps := Round(CalcRoundingSteps((rec.width + rec.height) * scale));
+  steps := Round(CalcRoundingSteps((rec.width + rec.height)/2 * scale));
   steps := steps div 2; /////////////////////////////////
   if steps < 2 then steps := 2;
   SetLength(Result, Steps +1);
@@ -3096,46 +3158,46 @@ begin
     asSimple:
       begin
         setLength(result, 3);
-        basePt := OffsetPoint(arrowTip, -unitVec.X * size, -unitVec.Y * size);
+        basePt := TranslatePoint(arrowTip, -unitVec.X * size, -unitVec.Y * size);
         result[0] := arrowTip;
-        result[1] := OffsetPoint(basePt, -unitVec.Y * sDiv50, unitVec.X * sDiv50);
-        result[2] := OffsetPoint(basePt, unitVec.Y * sDiv50, -unitVec.X * sDiv50);
+        result[1] := TranslatePoint(basePt, -unitVec.Y * sDiv50, unitVec.X * sDiv50);
+        result[2] := TranslatePoint(basePt, unitVec.Y * sDiv50, -unitVec.X * sDiv50);
       end;
     asFancy:
       begin
         setLength(result, 4);
-        basePt := OffsetPoint(arrowTip,
+        basePt := TranslatePoint(arrowTip,
           -unitVec.X * sDiv120, -unitVec.Y * sDiv120);
-        result[0] := OffsetPoint(basePt, -unitVec.Y *sDiv50, unitVec.X *sDiv50);
-        result[1] := OffsetPoint(arrowTip, -unitVec.X *size, -unitVec.Y *size);
-        result[2] := OffsetPoint(basePt, unitVec.Y *sDiv50, -unitVec.X *sDiv50);
+        result[0] := TranslatePoint(basePt, -unitVec.Y *sDiv50, unitVec.X *sDiv50);
+        result[1] := TranslatePoint(arrowTip, -unitVec.X *size, -unitVec.Y *size);
+        result[2] := TranslatePoint(basePt, unitVec.Y *sDiv50, -unitVec.X *sDiv50);
         result[3] := arrowTip;
       end;
     asDiamond:
       begin
         setLength(result, 4);
-        basePt := OffsetPoint(arrowTip, -unitVec.X * sDiv60, -unitVec.Y * sDiv60);
+        basePt := TranslatePoint(arrowTip, -unitVec.X * sDiv60, -unitVec.Y * sDiv60);
         result[0] := arrowTip;
-        result[1] := OffsetPoint(basePt, -unitVec.Y * sDiv50, unitVec.X * sDiv50);
-        result[2] := OffsetPoint(arrowTip, -unitVec.X * sDiv120, -unitVec.Y * sDiv120);
-        result[3] := OffsetPoint(basePt, unitVec.Y * sDiv50, -unitVec.X * sDiv50);
+        result[1] := TranslatePoint(basePt, -unitVec.Y * sDiv50, unitVec.X * sDiv50);
+        result[2] := TranslatePoint(arrowTip, -unitVec.X * sDiv120, -unitVec.Y * sDiv120);
+        result[3] := TranslatePoint(basePt, unitVec.Y * sDiv50, -unitVec.X * sDiv50);
       end;
     asCircle:
       begin
-        basePt := OffsetPoint(arrowTip, -unitVec.X * sDiv50, -unitVec.Y * sDiv50);
+        basePt := TranslatePoint(arrowTip, -unitVec.X * sDiv50, -unitVec.Y * sDiv50);
         with Point(basePt) do
           result := Ellipse(RectD(x - sDiv50, y - sDiv50, x + sDiv50, y + sDiv50));
       end;
     asTail:
       begin
         setLength(result, 6);
-        basePt := OffsetPoint(arrowTip, -unitVec.X * sDiv60, -unitVec.Y * sDiv60);
-        result[0] := OffsetPoint(arrowTip, -unitVec.X * sDiv50, -unitVec.Y * sDiv50);
-        result[1] := OffsetPoint(arrowTip, -unitVec.Y * sDiv40, unitVec.X * sDiv40);
-        result[2] := OffsetPoint(basePt, -unitVec.Y * sDiv40, unitVec.X * sDiv40);
-        result[3] := OffsetPoint(arrowTip, -unitVec.X * sDiv120, -unitVec.Y * sDiv120);
-        result[4] := OffsetPoint(basePt, unitVec.Y * sDiv40, -unitVec.X * sDiv40);
-        result[5] := OffsetPoint(arrowTip, unitVec.Y * sDiv40, -unitVec.X * sDiv40);
+        basePt := TranslatePoint(arrowTip, -unitVec.X * sDiv60, -unitVec.Y * sDiv60);
+        result[0] := TranslatePoint(arrowTip, -unitVec.X * sDiv50, -unitVec.Y * sDiv50);
+        result[1] := TranslatePoint(arrowTip, -unitVec.Y * sDiv40, unitVec.X * sDiv40);
+        result[2] := TranslatePoint(basePt, -unitVec.Y * sDiv40, unitVec.X * sDiv40);
+        result[3] := TranslatePoint(arrowTip, -unitVec.X * sDiv120, -unitVec.Y * sDiv120);
+        result[4] := TranslatePoint(basePt, unitVec.Y * sDiv40, -unitVec.X * sDiv40);
+        result[5] := TranslatePoint(arrowTip, unitVec.Y * sDiv40, -unitVec.X * sDiv40);
       end;
   end;
 end;

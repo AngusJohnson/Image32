@@ -594,8 +594,8 @@ begin
   y := depth * y;
   blurSize := Max(1,Round(depth / 2));
   Img32.Vector.InflateRect(rec, Ceil(depth*2), Ceil(depth*2));
-  polys := OffsetPath(polygons, -rec.Left, -rec.Top);
-  shadowPolys := OffsetPath(polys, x, y);
+  polys := TranslatePath(polygons, -rec.Left, -rec.Top);
+  shadowPolys := TranslatePath(polys, x, y);
   RectWidthHeight(rec, w, h);
   shadowImg := TImage32.Create(w, h);
   try
@@ -629,7 +629,7 @@ var
   glowImg: TImage32;
 begin
   rec := GetBounds(polygons);
-  glowPolys := OffsetPath(polygons,
+  glowPolys := TranslatePath(polygons,
     blurRadius -rec.Left +1, blurRadius -rec.Top +1);
   Img32.Vector.InflateRect(rec, blurRadius +1, blurRadius +1);
   RectWidthHeight(rec, w, h);
@@ -1017,7 +1017,7 @@ begin
   RectWidthHeight(outsideBounds, w,h);
   mask := TImage32.Create(w, h);
   try
-    p := OffsetPath(path, -outsideBounds.Left, -outsideBounds.top);
+    p := TranslatePath(path, -outsideBounds.Left, -outsideBounds.top);
     DrawPolygon(mask, p, fillRule, clBlack32);
     img.CopyBlend(mask, mask.Bounds, outsideBounds, BlendMask);
   finally
@@ -1037,7 +1037,7 @@ begin
   RectWidthHeight(outsideBounds, w,h);
   mask := TImage32.Create(w, h);
   try
-    pp := OffsetPath(paths, -outsideBounds.Left, -outsideBounds.top);
+    pp := TranslatePath(paths, -outsideBounds.Left, -outsideBounds.top);
     DrawPolygon(mask, pp, fillRule, clBlack32);
     img.CopyBlend(mask, mask.Bounds, outsideBounds, BlendMask);
   finally
@@ -1072,14 +1072,14 @@ begin
   if IsEmptyRect(rec) then Exit;
   if not ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
   GetSinCos(angleRads, y, x);
-  paths := OffsetPath(polygons, -rec.Left, -rec.Top);
+  paths := TranslatePath(polygons, -rec.Left, -rec.Top);
   RectWidthHeight(rec, w, h);
   tmp := TImage32.Create(w, h);
   try
     if GetAlpha(colorLt) > 0 then
     begin
       tmp.Clear(colorLt);
-      paths2 := OffsetPath(paths, -height*x, -height*y);
+      paths2 := TranslatePath(paths, -height*x, -height*y);
       EraseInsidePaths(tmp, paths2, fillRule);
       FastGaussianBlur(tmp, tmp.Bounds, Round(blurRadius), 0);
       EraseOutsidePaths(tmp, paths, fillRule, tmp.Bounds);
@@ -1088,7 +1088,7 @@ begin
     if GetAlpha(colorDk) > 0 then
     begin
       tmp.Clear(colorDk);
-      paths2 := OffsetPath(paths, height*x, height*y);
+      paths2 := TranslatePath(paths, height*x, height*y);
       EraseInsidePaths(tmp, paths2, fillRule);
       FastGaussianBlur(tmp, tmp.Bounds, Round(blurRadius), 0);
       EraseOutsidePaths(tmp, paths, fillRule, tmp.Bounds);
@@ -2032,11 +2032,11 @@ begin
     end;
 
     if i = 0 then
-      Result[len*3-1] := OffsetPoint(path[0], -vec.X * d1, -vec.Y * d1)
+      Result[len*3-1] := TranslatePoint(path[0], -vec.X * d1, -vec.Y * d1)
     else
-      Result[i*3-1] := OffsetPoint(path[i], -vec.X * d1, -vec.Y * d1);
+      Result[i*3-1] := TranslatePoint(path[i], -vec.X * d1, -vec.Y * d1);
     Result[i*3] := path[i];
-    Result[i*3+1] := OffsetPoint(path[i], vec.X * d2, vec.Y * d2);
+    Result[i*3+1] := TranslatePoint(path[i], vec.X * d2, vec.Y * d2);
   end;
   Result[len*3] := path[0];
 
@@ -2103,11 +2103,11 @@ begin
     end;
 
     if i = 0 then
-      Result[len*3-1] := OffsetPoint(path[0], -vec.X * d1, -vec.Y * d1)
+      Result[len*3-1] := TranslatePoint(path[0], -vec.X * d1, -vec.Y * d1)
     else
-      Result[i*3-1] := OffsetPoint(path[i], -vec.X * d1, -vec.Y * d1);
+      Result[i*3-1] := TranslatePoint(path[i], -vec.X * d1, -vec.Y * d1);
     Result[i*3] := path[i];
-    Result[i*3+1] := OffsetPoint(path[i], vec.X * d2, vec.Y * d2);
+    Result[i*3+1] := TranslatePoint(path[i], vec.X * d2, vec.Y * d2);
   end;
   Result[len*3] := path[0];
 

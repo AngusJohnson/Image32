@@ -2,8 +2,8 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'FMX2'
-  ClientHeight = 480
-  ClientWidth = 320
+  ClientHeight = 508
+  ClientWidth = 566
   Position = DesktopCenter
   FormFactor.Width = 320
   FormFactor.Height = 480
@@ -16,8 +16,8 @@ object MainForm: TMainForm
   DesignerMasterStyle = 0
   object TabControl1: TTabControl
     Align = Client
-    Size.Width = 320.000000000000000000
-    Size.Height = 480.000000000000000000
+    Size.Width = 566.000000000000000000
+    Size.Height = 508.000000000000000000
     Size.PlatformDefault = False
     TabHeight = 30.000000000000000000
     TabIndex = 0
@@ -25,12 +25,12 @@ object MainForm: TMainForm
     TabPosition = Bottom
     OnChange = TabControl1Change
     Sizes = (
-      320s
-      450s
-      320s
-      450s
-      320s
-      450s)
+      566s
+      478s
+      566s
+      478s
+      566s
+      478s)
     object TabItem1: TTabItem
       CustomIcon = <
         item
@@ -83,8 +83,8 @@ object MainForm: TMainForm
   end
   object Layout1: TLayout
     Align = Client
-    Size.Width = 320.000000000000000000
-    Size.Height = 480.000000000000000000
+    Size.Width = 566.000000000000000000
+    Size.Height = 508.000000000000000000
     Size.PlatformDefault = False
     TabOrder = 0
     OnPaint = Layout1Paint

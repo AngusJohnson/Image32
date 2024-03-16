@@ -2,31 +2,36 @@ object MainForm: TMainForm
   Left = 392
   Top = 208
   Caption = 'Layers201'
-  ClientHeight = 431
-  ClientWidth = 423
+  ClientHeight = 862
+  ClientWidth = 846
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -11
+  Font.Height = -22
   Font.Name = 'MS Sans Serif'
   Font.Style = []
   Menu = MainMenu1
-  OldCreateOrder = False
   PopupMenu = PopupMenu1
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnPaint = FormPaint
   OnResize = FormResize
-  PixelsPerInch = 96
-  TextHeight = 13
+  PixelsPerInch = 192
+  TextHeight = 26
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 412
-    Width = 423
-    Height = 19
+    Top = 824
+    Width = 846
+    Height = 38
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
     Panels = <>
     SimplePanel = True
     SimpleText = '  Use <Shift> to Scroll, Ctrl> to Zoom, and <Num> to Scale'
+    ExplicitTop = 823
+    ExplicitWidth = 832
   end
   object MainMenu1: TMainMenu
     Left = 32

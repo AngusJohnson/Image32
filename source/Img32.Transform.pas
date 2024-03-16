@@ -549,7 +549,7 @@ begin
   dec(rec.Top, margins.Top);
   inc(rec.Right, margins.Right);
   inc(rec.Bottom, margins.Bottom);
-  dstPts2 := OffsetPath(dstPts, -rec.Left, -rec.Top);
+  dstPts2 := TranslatePath(dstPts, -rec.Left, -rec.Top);
 
   mat := GetProjectionMatrix(srcPts, dstPts2);
   RectWidthHeight(rec, w, h);

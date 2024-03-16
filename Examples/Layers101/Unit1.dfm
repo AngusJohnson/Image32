@@ -2,16 +2,15 @@ object MainForm: TMainForm
   Left = 404
   Top = 201
   Caption = 'Layers101'
-  ClientHeight = 411
-  ClientWidth = 455
+  ClientHeight = 822
+  ClientWidth = 910
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -12
+  Font.Height = -24
   Font.Name = 'Tahoma'
   Font.Style = []
   Menu = MainMenu1
-  OldCreateOrder = False
   PopupMenu = PopupMenu1
   OnCreate = FormCreate
   OnDestroy = FormDestroy
@@ -21,17 +20,23 @@ object MainForm: TMainForm
   OnMouseUp = pnlMainMouseUp
   OnPaint = FormPaint
   OnResize = FormResize
-  PixelsPerInch = 96
-  TextHeight = 14
+  PixelsPerInch = 192
+  TextHeight = 29
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 385
-    Width = 455
-    Height = 26
+    Top = 770
+    Width = 910
+    Height = 52
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
     Panels = <>
     ParentFont = True
     SimplePanel = True
     UseSystemFont = False
+    ExplicitTop = 769
+    ExplicitWidth = 896
   end
   object MainMenu1: TMainMenu
     Left = 112
@@ -162,7 +167,9 @@ object MainForm: TMainForm
   end
   object OpenDialog1: TOpenDialog
     DefaultExt = '*.png'
-    Filter = 'Image Files (BMP, PNG, JPG, SVG)|*.bmp;*.png;*.jpg;*.svg'
+    Filter = 
+      'Image Files (BMP, PNG, JPG, QOI, SVG)|*.bmp;*.png;*.jpg;*.qoi;*.' +
+      'svg'
     Left = 128
     Top = 144
   end

@@ -999,7 +999,7 @@ begin
   Types.IntersectRect(clipRec2, clipRec, GetBounds(paths));
   if IsEmptyRect(clipRec2) then Exit;
 
-  paths2 := OffsetPath(paths, -clipRec2.Left, -clipRec2.Top);
+  paths2 := TranslatePath(paths, -clipRec2.Left, -clipRec2.Top);
 
   // Delphi's Round() function is *much* faster than Trunc(),
   // and even a little faster than __Trunc() above (except
@@ -2132,7 +2132,7 @@ begin
   RectWidthHeight(rec, w, h);
   tmpImg := TImage32.Create(w *3, h);
   try
-    tmpPolygons := OffsetPath(polygons, -rec.Left, -rec.Top);
+    tmpPolygons := TranslatePath(polygons, -rec.Left, -rec.Top);
     tmpPolygons := ScalePath(tmpPolygons, 3, 1);
     cr := TColorRenderer.Create(clBlack32);
     try

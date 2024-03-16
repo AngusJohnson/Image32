@@ -974,7 +974,7 @@ begin
   while assigned(layer) do
   begin
     if not (layer is TGroupLayer32) then
-      Result := OffsetPoint(Result, layer.Left, layer.Top);
+      Result := TranslatePoint(Result, layer.Left, layer.Top);
     layer := layer.Parent;
   end;
 end;
@@ -1126,7 +1126,7 @@ begin
     if Assigned(fClipImage) then
       fClipImage.SetSize(Image.Width, Image.Height) else
       fClipImage := TImage32.Create(Image.Width, Image.Height);
-    pp := OffsetPath(path, fOuterMargin, fOuterMargin);
+    pp := TranslatePath(path, fOuterMargin, fOuterMargin);
     DrawPolygon(fClipImage, pp, frEvenOdd, clWhite32);
   end else
     FreeAndNil(fClipImage);
@@ -1305,7 +1305,7 @@ begin
 
   if (self is TGroupLayer32) then
     pt2 := pt else
-    pt2 := OffsetPoint(pt, -Left, -Top);
+    pt2 := TranslatePoint(pt, -Left, -Top);
 
   //if 'pt2' is outside the clip mask then don't continue
   if Assigned(fClipImage) then
@@ -1658,9 +1658,9 @@ end;
 procedure TVectorLayer32.Offset(dx,dy: double);
 begin
   inherited;
-  fPaths := OffsetPath(fPaths, dx,dy);
+  fPaths := TranslatePath(fPaths, dx,dy);
   if fAutoPivot and not PointsEqual(fPivotPt, InvalidPointD) then
-    fPivotPt := OffsetPoint(fPivotPt, dx,dy);
+    fPivotPt := TranslatePoint(fPivotPt, dx,dy);
 end;
 //------------------------------------------------------------------------------
 
@@ -1805,7 +1805,7 @@ end;
 procedure TRasterLayer32.Offset(dx,dy: double);
 begin
   inherited;
-  fSavedMidPt := OffsetPoint(fSavedMidPt, dx,dy);
+  fSavedMidPt := TranslatePoint(fSavedMidPt, dx,dy);
 end;
 //------------------------------------------------------------------------------
 
@@ -1956,7 +1956,7 @@ begin
   begin
     SetInnerBounds(rec2);
     q := DPIAware(2);
-    pt := OffsetPoint(pivot, -Left, -Top);
+    pt := TranslatePoint(pivot, -Left, -Top);
     DrawDashedLine(Image, Circle(pt, dist - q),
       dashes, nil, q, clRed32, esPolygon);
   end;
@@ -2661,7 +2661,7 @@ begin
     rec := RectD(mp.X -radius, mp.Y -radius, mp.X +radius,mp.Y +radius);
     designer := DesignLayer;
     designer.SetInnerBounds(rec);
-    pt2 := OffsetPoint(mp, -rec.Left, -rec.Top);
+    pt2 := TranslatePoint(mp, -rec.Left, -rec.Top);
     DrawDashedLine(designer.Image,
       Circle(pt2, radius -dpiAwareOne),
       dashes, nil, DPIAware(2), clRed32, esPolygon);

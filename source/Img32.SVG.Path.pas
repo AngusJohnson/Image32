@@ -418,22 +418,22 @@ end;
 function TSvgPathSeg.DescaleAndOffset(const pt: TPointD): TPointD;
 begin
   Result := pt;
-  OffsetPoint(Result, -parent.PathOffset.X, -parent.PathOffset.Y);
+  TranslatePoint(Result, -parent.PathOffset.X, -parent.PathOffset.Y);
   Result := ScalePoint(Result, 1/Owner.Scale);
 end;
 //------------------------------------------------------------------------------
 
 function TSvgPathSeg.DescaleAndOffset(const p: TPathD): TPathD;
 begin
-  Result := OffsetPath(p, -parent.PathOffset.X, -parent.PathOffset.Y);
+  Result := TranslatePath(p, -parent.PathOffset.X, -parent.PathOffset.Y);
   Result := ScalePath(Result, 1/Owner.Scale);
 end;
 //------------------------------------------------------------------------------
 
 procedure TSvgPathSeg.Offset(dx, dy: double);
 begin
-  fFirstPt := OffsetPoint(fFirstPt, dx, dy);
-  fCtrlPts := OffsetPath(fCtrlPts, dx, dy);
+  fFirstPt := TranslatePoint(fFirstPt, dx, dy);
+  fCtrlPts := TranslatePath(fCtrlPts, dx, dy);
 end;
 //------------------------------------------------------------------------------
 
@@ -564,7 +564,7 @@ begin
       dy := ai.startPos.Y - startPos.Y;
       OffsetRect(rec, dx, dy);
       startPos := ai.startPos;
-      endPos := OffsetPoint(endPos, dx, dy);
+      endPos := TranslatePoint(endPos, dx, dy);
     end;
   end;
   SetCtrlPtsFromArcInfo;
@@ -670,8 +670,8 @@ begin
   with fArcInfo do
   begin
     OffsetRect(rec, dx, dy);
-    startPos := OffsetPoint(startPos, dx, dy);
-    endPos := OffsetPoint(endPos, dx, dy);
+    startPos := TranslatePoint(startPos, dx, dy);
+    endPos := TranslatePoint(endPos, dx, dy);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1287,7 +1287,6 @@ procedure TSvgSubPath.Offset(dx, dy: double);
 var
   i: integer;
 begin
-  //fPathOffset := OffsetPoint(pathOffset, dx,dy); //DON'T DO THIS!
   for i := 0 to High(fSegs) do fSegs[i].Offset(dx, dy);
 end;
 //------------------------------------------------------------------------------

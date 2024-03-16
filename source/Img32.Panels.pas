@@ -325,13 +325,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function OffsetPoint(const pt: TPoint; dx, dy: integer): TPoint;
-begin
-  Result.X := pt.X + dx;
-  Result.Y := pt.Y + dy;
-end;
-//------------------------------------------------------------------------------
-
 function LeftMouseBtnDown: Boolean;
 begin
   Result := (GetKeyState(VK_LBUTTON) shr 8 > 0);

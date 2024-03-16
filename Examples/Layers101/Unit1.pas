@@ -112,7 +112,7 @@ implementation
 {$R FONT.RES}
 
 uses
-  Img32.Fmt.BMP, Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.SVG,
+  Img32.Fmt.BMP, Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.QOI, Img32.Fmt.SVG,
   Img32.Vector, Img32.Extra, Img32.Clipper2;
 
 const
@@ -159,7 +159,7 @@ begin
     PenWidth := DpiAware(1.5);
   end;
 
-  p := OffsetPath(Paths, -Left+OuterMargin, -Top+OuterMargin);
+  p := TranslatePath(Paths, -Left+OuterMargin, -Top+OuterMargin);
   DrawPolygon(Image, p, frEvenOdd, BrushColor);
   DrawLine(Image, p, PenWidth, PenColor, esPolygon);
   UpdateHitTestMask(p);
@@ -296,7 +296,7 @@ begin
   tmp := ScalePath(tmp, 1, 2.0);
   rec := Img32.Vector.GetBoundsD(tmp);
   with popupPoint do
-    tmp := OffsetPath(tmp,
+    tmp := TranslatePath(tmp,
       X - rec.Left - rec.Width/2,
       Y -rec.Top - rec.Height/2);
 

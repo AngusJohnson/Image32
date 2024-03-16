@@ -205,7 +205,7 @@ begin
     buttonGroup.Offset(Round(dx), Round(dy))
   else if Assigned(rotateGroup) then
     rotateGroup.Offset(Round(dx), Round(dy));
-  ctrlPoints := OffsetPath(ctrlPoints, dx, dy);
+  ctrlPoints := TranslatePath(ctrlPoints, dx, dy);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -258,7 +258,7 @@ begin
   end;
   //now make fPts relative to the canvas surface
   with transformLayer do
-    ctrlPoints := OffsetPath(ctrlPoints, Left, Top);
+    ctrlPoints := TranslatePath(ctrlPoints, Left, Top);
 
   buttonGroup := CreateButtonGroup(layeredImage.Root,
     ctrlPoints, bsRound, DefaultButtonSize, clGreen32);
@@ -278,7 +278,7 @@ begin
   ctrlPoints := Rectangle(transformLayer.InnerRect);
   //now make fPts relative to the canvas surface
   with transformLayer do
-    ctrlPoints := OffsetPath(ctrlPoints, Left, Top);
+    ctrlPoints := TranslatePath(ctrlPoints, Left, Top);
 
   buttonGroup := CreateButtonGroup(layeredImage.Root, ctrlPoints,
     bsRound, DefaultButtonSize, clGreen32);
@@ -309,7 +309,7 @@ begin
 
   //now make fPts relative to the canvas surface
   with transformLayer do
-    ctrlPoints := OffsetPath(ctrlPoints, Left, Top);
+    ctrlPoints := TranslatePath(ctrlPoints, Left, Top);
   buttonGroup := CreateButtonGroup(layeredImage.Root, ctrlPoints,
     bsRound, DefaultButtonSize, clGreen32);
 
@@ -511,7 +511,7 @@ begin
     dx := pt.X - clickPoint.X;
     dy := pt.Y - clickPoint.Y;
     clickPoint := pt;
-    ctrlPoints := OffsetPath(ctrlPoints, dx, dy);
+    ctrlPoints := TranslatePath(ctrlPoints, dx, dy);
     clickedLayer.Offset(dx, dy);
     if Assigned(buttonGroup) then buttonGroup.Offset(dx, dy);
     if Assigned(rotateGroup) and not allowRotatePivotMove then
