@@ -178,7 +178,7 @@ begin
   textPath := arial12.GetTextOutline(0, 0, name);
   textRect := Img32.Vector.GetBoundsD(textPath);
   textPath := TranslatePath(textPath, -textRect.Left, -textRect.Top);
-  OffsetRect(textRect, -textRect.Left, -textRect.Top);
+  TranslateRect(textRect, -textRect.Left, -textRect.Top);
 end;
 //------------------------------------------------------------------------------
 
@@ -230,7 +230,7 @@ var
   delta: TPointD;
 begin
   rec := RectD(0,0, Width, Height);
-  OffsetRect(rec, OuterMargin, OuterMargin);
+  TranslateRect(rec, OuterMargin, OuterMargin);
   //preparing to center text
   delta.X := (rec.Width - textRect.Width) / 2;
   delta.Y := (rec.Height - textRect.Height) / 2;

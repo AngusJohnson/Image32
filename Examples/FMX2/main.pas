@@ -190,7 +190,7 @@ begin
       //draw an image at the top right
       imgBooks.Scale(w / imgBooks.Width);
       imageRec := imgBooks.Bounds;
-      OffsetRect(imageRec, imgBooks.Width + innermargin, innermargin);
+      TranslateRect(imageRec, imgBooks.Width + innermargin, innermargin);
       imgMain.CopyBlend(imgBooks,
         imgBooks.Bounds, imageRec, BlendToOpaque);
       h := imgBooks.Height;

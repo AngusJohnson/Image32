@@ -959,7 +959,7 @@ begin
     rec2 := RectD(Left, Top, Left + radius, Top + radius);
   Result := MakePath([rec.Left, rec.Bottom]);
   AppendPath(Result, arc(rec2, angle180, angle270));
-  OffsetRect(rec2, rec.Width - radius, 0);
+  TranslateRect(rec2, rec.Width - radius, 0);
   p2 := arc(rec2, angle270, angle0);
   AppendPath(Result, p2);
   AppendPoint(Result, rec.BottomRight);
@@ -1638,7 +1638,7 @@ begin
   if ulIdx > 0 then Delete(caption, ulIdx, 1);
 
   rec := Rect(InnerRect);
-  OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
+  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   pp := fUsableFont.GetTextOutline(rec, caption, taLeft, tvaTop, ulIdx);
   dx := fUsableFont.LineHeight/24;
   pp := TranslatePath(pp, -dx, -dx);
@@ -1704,7 +1704,7 @@ begin
   if not (Parent is TPanelCtrl) then Exit;
   Image.Clear(Color);
   rec := Rect(InnerRect);
-  OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
+  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   bh := fBevelHeight;
   DrawEdge(Image, rec, clWhite32, clSilver32, bh);
   i := DPIAware(5);
@@ -1881,7 +1881,7 @@ begin
   bh := fBevelHeight;
 
   rec := InnerRect;
-  OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
+  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   image.FillRect(Rect(rec), color);
   DrawEdge(Image, rec, clSilver32, clWhite32, bh);
 
@@ -2224,7 +2224,7 @@ begin
 
   Image.Clear;
   recI := Rect(InnerRect);
-  OffsetRect(recI, Round(OuterMargin), Round(OuterMargin));
+  TranslateRect(recI, Round(OuterMargin), Round(OuterMargin));
   Image.Clear(recI, color);
   DrawEdge(Image, recI, clSilver32, clWhite32, fBevelHeight);
 
@@ -2296,9 +2296,9 @@ begin
 
       DrawText(Image, recI, fItems[i],
         taLeft, tvaMiddle, fUsableFont, clWhite32);
-      OffsetRect(rec, hbh, hbh);
+      TranslateRect(rec, hbh, hbh);
       DrawText(Image, recI, fItems[i], taLeft, tvaMiddle, fUsableFont);
-      OffsetRect(rec, -hbh, itemH -hbh);
+      TranslateRect(rec, -hbh, itemH -hbh);
 
       if Assigned(img) then
         rec.Left := rec.Left - img.Width - spaceW*2;
@@ -3083,7 +3083,7 @@ begin
   rec.BottomRight := PointD(rec.Left, rec.Top + fLineHeight);
   InflateRect(rec, d, d);
   om := Round(OuterMargin);
-  OffsetRect(rec, Round(om-TextMargin.X+10), Round(om-TextMargin.Y -6));
+  TranslateRect(rec, Round(om-TextMargin.X+10), Round(om-TextMargin.Y -6));
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -3111,7 +3111,7 @@ begin
     image.Clear;
     fCursorMoved := false; //unset fast redraw
     rec  := InnerRect;
-    OffsetRect(rec, outerMargin, outerMargin);
+    TranslateRect(rec, outerMargin, outerMargin);
     ri := Rect(rec);
     image.FillRect(ri, color);
     DrawEdge(Image, rec, clSilver32, clWhite32, bh);
@@ -3165,7 +3165,7 @@ begin
   end else
   begin
     textRecD  := InnerRect;
-    OffsetRect(textRecD, outerMargin, outerMargin);
+    TranslateRect(textRecD, outerMargin, outerMargin);
     InflateRect(textRecD, -TextMargin.X, -TextMargin.Y);
     if scrollShowing then
       textRecD.Right := textRecD.Right - ScrollV.Width;
@@ -3175,7 +3175,7 @@ begin
     Image.Copy(fBuffer, ri, ri);
     //Image.FillRect(ri, clRed32);
 
-//    OffsetRect(fSelectRect, -OuterMargin, -OuterMargin);
+//    TranslateRect(fSelectRect, -OuterMargin, -OuterMargin);
 //    if fCursorMoved and not fullRefresh and
 //      not fSelectRect.IsEmpty then
 //        Invalidate(fSelectRect); //invalidate old selection
@@ -3726,7 +3726,7 @@ begin
   begin
     rec := InnerRect;
     om := Round(OuterMargin);
-    OffsetRect(rec, om, om);
+    TranslateRect(rec, om, om);
     DrawShadowRect(Image, Rect(rec), OuterMargin);
     DrawLine(Image, Rectangle(rec), FocusLineWidth, clDefDark32, esPolygon);
   end;
@@ -3860,7 +3860,7 @@ begin
   bh := fBevelHeight;
   hbh := bh /2;
   rec := InnerRect;
-  OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
+  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
 
   if GetUsableFont then txt := fText else txt := '';
   Image.Clear;
@@ -3909,7 +3909,7 @@ begin
   bh := fBevelHeight;
   hbh := bh /2;
   rec := InnerRect;
-  OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
+  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   p := GetRoundedRectPath(rec);
 
 
@@ -3950,7 +3950,7 @@ begin
   bh := fBevelHeight;
   hbh := bh /2;
   rec := InnerRect;
-  OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
+  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   image.Clear;
   InflateRect(rec, -hbh, -hbh);
   ellip := Ellipse(rec);
@@ -4033,7 +4033,7 @@ begin
 
   pad := Round(fPadding);
   rec := InnerRect;
-  OffsetRect(rec, OuterMargin, OuterMargin);
+  TranslateRect(rec, OuterMargin, OuterMargin);
   p := Rectangle(rec);
 
   //if HasFocus and not fPressed then
@@ -4076,7 +4076,7 @@ begin
           end else
           begin
             InflateRect(rec, -pad, -pad);
-            OffsetRect(rec, pDelta, pDelta);
+            TranslateRect(rec, pDelta, pDelta);
           end;
           DrawText(Image, Rect(rec), fText, taLeft, tvaMiddle, fUsableFont);
         end;
@@ -4094,7 +4094,7 @@ begin
           end else
           begin
             InflateRect(rec, -pad, -pad);
-            OffsetRect(rec, pDelta, pDelta);
+            TranslateRect(rec, pDelta, pDelta);
           end;
           DrawText(Image, Rect(rec), fText, taCenter, tvaTop, fUsableFont);
         end;
@@ -4112,7 +4112,7 @@ begin
           end else
           begin
             InflateRect(rec, -pad -bh, -pad -bh);
-            OffsetRect(rec, pDelta, pDelta);
+            TranslateRect(rec, pDelta, pDelta);
           end;
           DrawText(Image, Rect(rec), fText, taRight, tvaMiddle, fUsableFont);
         end;
@@ -4130,7 +4130,7 @@ begin
           end else
           begin
             InflateRect(rec, -pad, -pad);
-            OffsetRect(rec, pDelta, pDelta);
+            TranslateRect(rec, pDelta, pDelta);
           end;
           DrawText(Image, Rect(rec), fText, taCenter, tvaBottom, fUsableFont);
         end;
@@ -4243,9 +4243,9 @@ begin
   bh := fBevelHeight;
   j := fUsableFont.LineHeight - bh;
   rec := InnerRect;
-  OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
+  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   rec.Bottom := rec.Top + j;
-  OffsetRect(rec, 0, (Height-j) /2);
+  TranslateRect(rec, 0, (Height-j) /2);
   if fTextPos = tphRight then
     rec.Right := rec.Left + j else
     rec.Left := rec.Right - j;
@@ -4260,7 +4260,7 @@ begin
     if HasFocus then
       DrawLine(Image, Rectangle(rec), FocusLineWidth, clDefDark32, esPolygon);
     rec := InnerRect;
-    OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
+    TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
     rec.Left := rec.Left + j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
@@ -4278,7 +4278,7 @@ begin
       DrawLine(Image, Rectangle(rec), FocusLineWidth, clDefDark32, esPolygon);
 
     rec := InnerRect;
-    OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
+    TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
     rec.Right := rec.Right - j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
@@ -4340,9 +4340,9 @@ begin
   bh := fBevelHeight;
   j := fUsableFont.LineHeight - bh;
   rec := InnerRect;
-  OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
+  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   rec.Bottom := rec.Top + j;
-  OffsetRect(rec, 0, (Height-j) /2);
+  TranslateRect(rec, 0, (Height-j) /2);
   if fTextPos = tphRight then
     rec.Right := rec.Left + j else
     rec.Left := rec.Right - j;
@@ -4358,7 +4358,7 @@ begin
     if HasFocus then
       DrawLine(Image, p, FocusLineWidth, clDefDark32, esPolygon);
     rec := InnerRect;
-    OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
+    TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
     rec.Left := rec.Left + j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
@@ -4375,7 +4375,7 @@ begin
     if HasFocus then
       DrawLine(Image, p, FocusLineWidth, clDefDark32, esPolygon);
     rec := InnerRect;
-    OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
+    TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
     rec.Right := rec.Right - j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
@@ -4560,7 +4560,7 @@ begin
 
   rec := InnerRect;
   om := OuterMargin;
-  OffsetRect(rec, om, om);
+  TranslateRect(rec, om, om);
 
   bh := Round(BevelHeight);
   hbh := Round(BevelHeight/2);
@@ -4633,7 +4633,7 @@ begin
   om := Round(OuterMargin);
   rec := Rect(0,0, Ceil(Width),Ceil(Height));
   if (om > 0) then
-    Types.OffsetRect(rec, om, om);
+    TranslateRect(rec, om, om);
   Img32.Vector.InflateRect(rec, -bhi, -bhi);
   //rec.Top := fMetrics.bounds.Bottom + om;
   if Assigned(fOnPaint) then fOnPaint(Self);
@@ -4911,7 +4911,7 @@ var
   rec2: TRect;
 begin
   rec := InnerRect;
-  OffsetRect(rec, Round(OuterMargin), Round(OuterMargin));
+  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   rec2 := Rect(rec);
   //hatch the background.
   HatchBackground(Image, rec2, clWhite32, clBtnFace32, DPIAware(2));
@@ -5065,7 +5065,7 @@ var
 begin
   Image.Clear;
   rec := InnerRect;
-  OffsetRect(rec, OuterMargin, OuterMargin);
+  TranslateRect(rec, OuterMargin, OuterMargin);
   recI := Rect(rec);
   HatchBackground(Image, recI, clWhite32, clBtnFace32, DPIAware(2));
 
@@ -5106,7 +5106,7 @@ begin
 
   if not GetUsableFont then Exit;
   if fPressed then
-    OffsetRect(rec, DPIAwareOne, DPIAwareOne);
+    TranslateRect(rec, DPIAwareOne, DPIAwareOne);
   DrawText(Image, Rect(rec),
     Floattostr(fPosition), taCenter, tvaMiddle, fUsableFont);
 end;
@@ -5612,7 +5612,7 @@ begin
   if fDeltaScale = 0 then fDeltaScale := 1;
 
   rec := InnerRect;
-  OffsetRect(rec, OuterMargin, OuterMargin);
+  TranslateRect(rec, OuterMargin, OuterMargin);
   recI := Rect(rec);
   HatchBackground(Image, recI, clWhite32, clBtnFace32, DPIAware(2));
 

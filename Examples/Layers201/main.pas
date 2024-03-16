@@ -152,7 +152,7 @@ begin
   result.MasterImage.Assign(MasterImage);
   result.Angle := Angle;
   b := InnerBounds;
-  OffsetRect(b, 50,50);
+  TranslateRect(b, 50,50);
   result.SetInnerBounds(b);
 end;
 

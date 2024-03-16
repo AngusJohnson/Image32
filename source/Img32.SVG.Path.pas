@@ -562,7 +562,7 @@ begin
     begin
       dx := ai.startPos.X - startPos.X;
       dy := ai.startPos.Y - startPos.Y;
-      OffsetRect(rec, dx, dy);
+      TranslateRect(rec, dx, dy);
       startPos := ai.startPos;
       endPos := TranslatePoint(endPos, dx, dy);
     end;
@@ -669,7 +669,7 @@ begin
   inherited;
   with fArcInfo do
   begin
-    OffsetRect(rec, dx, dy);
+    TranslateRect(rec, dx, dy);
     startPos := TranslatePoint(startPos, dx, dy);
     endPos := TranslatePoint(endPos, dx, dy);
   end;

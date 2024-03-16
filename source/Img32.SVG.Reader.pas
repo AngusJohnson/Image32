@@ -1986,7 +1986,7 @@ begin
   off := offset.GetPoint(RectD(pfe.fObjectBounds), GetRelFracLimit);
   off := ScalePoint(off, pfe.fScale);
   dstOffRec := dstRec;
-  with Point(off) do Types.OffsetRect(dstOffRec, X, Y);
+  with Point(off) do TranslateRect(dstOffRec, X, Y);
   dstImg.Copy(srcImg, srcRec, dstOffRec);
   dstImg.SetRGB(floodColor);
   alpha := GetAlpha(floodColor);
@@ -2102,7 +2102,7 @@ begin
   off := offset.GetPoint(RectD(pfe.fObjectBounds), GetRelFracLimit);
   off := ScalePoint(off, pfe.fScale);
   dstOffRec := dstRec;
-  with Point(off) do Types.OffsetRect(dstOffRec, X, Y);
+  with Point(off) do TranslateRect(dstOffRec, X, Y);
 
   if srcImg = dstImg then
   begin

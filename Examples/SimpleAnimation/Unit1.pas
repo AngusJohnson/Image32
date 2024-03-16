@@ -148,7 +148,7 @@ begin
   Canvas.FillRect(ClientRect);
 
   //center the animation in the form clientrect
-  Types.OffsetRect(drawRec,
+  TranslateRect(drawRec,
     -drawRec.Left + (ClientWidth - layeredImage.Width) div 2,
     -drawRec.Top + (ClientHeight - layeredImage.Height) div 2);
 
