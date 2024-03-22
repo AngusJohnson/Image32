@@ -1958,12 +1958,17 @@ begin
 
   lines := GetDashedPath(line, endStyle = esPolygon, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
+
   case joinStyle of
+    jsAuto:
+      if endStyle = esRound then
+        joinStyle := jsRound else
+        joinStyle := jsSquare;
     jsSquare, jsMiter:
       endStyle := esSquare;
     jsRound:
       endStyle := esRound;
-    else
+    jsButt:
       endStyle := esButt;
   end;
   lines := RoughOutline(lines, lineWidth, joinStyle, endStyle);
