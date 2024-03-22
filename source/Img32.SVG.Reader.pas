@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  15 March 2024                                                   *
+* Date      :  23 March 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -118,7 +118,6 @@ type
     fClassStyles      : TClassStylesList;
     fLinGradRenderer  : TLinearGradientRenderer;
     fRadGradRenderer  : TSvgRadialGradientRenderer;
-    fImgRenderer      : TImageRenderer;
     fRootElement      : TSvgElement;
     fFontCache        : TFontCache;
     fUsePropScale     : Boolean;
@@ -133,7 +132,6 @@ type
     procedure GetBestFontForFontCache(const svgFontInfo: TSVGFontInfo);
     property  RadGradRenderer: TSvgRadialGradientRenderer read fRadGradRenderer;
     property  LinGradRenderer: TLinearGradientRenderer read fLinGradRenderer;
-    property  ImageRenderer  : TImageRenderer read fImgRenderer;
     property  BackgndImage   : TImage32 read fBackgndImage;
     property  TempImage      : TImage32 read fTempImage;
   public
@@ -403,11 +401,13 @@ type
 
   TPatternElement = class(TFillElement)
   protected
-    pattBoxWH : TRectWH;
+    ImgRenderer : TImageRenderer;
+    pattBoxWH   : TRectWH;
     function PrepareRenderer(renderer: TImageRenderer;
       drawDat: TDrawData): Boolean; virtual;
   public
     constructor Create(parent: TBaseElement; svgEl: TSvgTreeEl); override;
+    destructor Destroy; override;
   end;
 
   //nb: gradients with objectBoundingBox should not be applied to
@@ -2034,15 +2034,11 @@ end;
 procedure TFeGaussElement.Apply;
 begin
   if not GetSrcAndDst or (stdDev = InvalidD) then Exit;
-
   if srcImg <> dstImg then
     dstImg.Copy(srcImg, srcRec, dstRec);
 
-  ////True GaussianBlur is visually optimal, but it's also *extremely* slow.
-  //GaussianBlur(dstImg, dstRec, Ceil(stdDev *PI * ParentFilterEl.fScale));
-
-  //FastGaussianBlur is a very good approximation and also very much faster.
-  //Empirically stdDev * PI/4 more closely emulates other renderers.
+  // FastGaussianBlur is a very good approximation and also very much faster.
+  // Empirically stdDev * PI/4 more closely emulates other renderers.
   FastGaussianBlur(dstImg, dstRec, Ceil(stdDev * PI/4 * ParentFilterEl.fScale));
 end;
 
@@ -2445,10 +2441,9 @@ begin
       end
       else if refEl is TPatternElement then
       begin
-        with TPatternElement(refEl), fReader do
-          if PrepareRenderer(ImageRenderer, drawDat) then
-            DrawPolygon(img, fillPaths, drawDat.fillRule, ImageRenderer);
-//        fReader.ImageRenderer.fImage.SaveToFile('c:\temp\test.png');
+        with TPatternElement(refEl) do
+          if PrepareRenderer(ImgRenderer, drawDat) then
+            DrawPolygon(img, fillPaths, drawDat.fillRule, ImgRenderer);
       end;
     end;
   end
@@ -2546,12 +2541,12 @@ begin
         fReader.LinGradRenderer, endStyle, joinStyle, roundingScale);
     end
     else if refEl is TPatternElement then
-    begin
       with TPatternElement(refEl) do
-        PrepareRenderer(fReader.ImageRenderer, drawDat);
-      DrawLine(img, strokePaths,  scaledStrokeWidth,
-        fReader.ImageRenderer, endStyle, joinStyle, roundingScale);
-    end;
+      begin
+        PrepareRenderer(imgRenderer, drawDat);
+        DrawLine(img, strokePaths,  scaledStrokeWidth,
+          imgRenderer, endStyle, joinStyle, roundingScale);
+      end;
   end
   else if (joinStyle = jsMiter) then
   begin
@@ -3479,10 +3474,18 @@ end;
 constructor TPatternElement.Create(parent: TBaseElement; svgEl: TSvgTreeEl);
 begin
   inherited;
+  imgRenderer := TImageRenderer.Create;
   elRectWH.Init;
   pattBoxWH.Width   := InvalidD;
   pattBoxWH.Height  := InvalidD;
   fDrawData.visible := false;
+end;
+//------------------------------------------------------------------------------
+
+destructor TPatternElement.Destroy;
+begin
+  imgRenderer.Free;
+  inherited;
 end;
 //------------------------------------------------------------------------------
 
@@ -4815,7 +4818,6 @@ begin
   fClassStyles        := TClassStylesList.Create;
   fLinGradRenderer  := TLinearGradientRenderer.Create;
   fRadGradRenderer  := TSvgRadialGradientRenderer.Create;
-  fImgRenderer      := TImageRenderer.Create;
   fIdList             := TStringList.Create;
   fIdList.Duplicates  := dupIgnore;
   fIdList.CaseSensitive := false;
@@ -4838,7 +4840,6 @@ begin
 
   fLinGradRenderer.Free;
   fRadGradRenderer.Free;
-  fImgRenderer.Free;
   FreeAndNil(fFontCache);
   fSimpleDrawList.Free;
 
@@ -4856,7 +4857,6 @@ begin
   fClassStyles.Clear;
   fLinGradRenderer.Clear;
   fRadGradRenderer.Clear;
-  fImgRenderer.Image.Clear;
   currentColor := clBlack32;
   userSpaceBounds := NullRectD;
   for i := 0 to fSimpleDrawList.Count -1 do
