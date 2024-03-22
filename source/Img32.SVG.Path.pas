@@ -276,7 +276,6 @@ implementation
 resourcestring
   rsSvgPathRangeError = 'TSvgPath.GetPath range error';
   rsSvgSubPathRangeError = 'TSvgSubPath.GetSeg range error';
-  //rsSvgSegmentRangeError = 'TSvgSegment.GetVal range error';
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions ...

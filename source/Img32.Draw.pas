@@ -3,7 +3,7 @@ unit Img32.Draw;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  16 March 2024                                                   *
+* Date      :  23 March 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -21,8 +21,8 @@ interface
 // MemCheck may be useful for debugging (adds a minimal cost to performance)
 {.$DEFINE MemCheck}
 
-// UseTrunc makes rendering thread safe, so it's generally preferred
-// over Round and SetRoundMode().
+// UseTrunc makes rendering thread safe,
+// so it's generally preferred over Round and SetRoundMode().
 // See https://github.com/AngusJohnson/Image32/issues/45
 {$DEFINE UseTrunc}
 

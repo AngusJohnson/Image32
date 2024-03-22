@@ -2414,6 +2414,7 @@ procedure TShapeElement.DrawFilled(img: TImage32; drawDat: TDrawData);
 var
   refEl: TBaseElement;
   fillPaths: TPathsD;
+  rec: TRect;
 begin
   if not assigned(drawPathsF) then Exit;
   if drawDat.fillColor = clCurrent then
@@ -2443,7 +2444,11 @@ begin
       begin
         with TPatternElement(refEl) do
           if PrepareRenderer(ImgRenderer, drawDat) then
+          begin
+            rec := img32.Vector.GetBounds(fillPaths);
+            ImgRenderer.Offset := rec.TopLeft;
             DrawPolygon(img, fillPaths, drawDat.fillRule, ImgRenderer);
+          end;
       end;
     end;
   end
@@ -3502,8 +3507,8 @@ var
 begin
   Result := false;
 
-  //scale.cx := 1; scale.cy := 1;
   scale := ExtractScaleFromMatrix(drawDat.matrix);
+
   if units = hUserSpaceOnUse then
     rec := fReader.userSpaceBounds else
     rec := drawDat.bounds;
@@ -3539,7 +3544,6 @@ begin
   mat := IdentityMatrix;
   MatrixScale(mat, scale.cx * sx, scale.cy * sy);
 
-  //recWH.Left := 0; recWH.Top := 0;
   if (refEl <> '') then
   begin
     el := FindRefElement(refEl);
