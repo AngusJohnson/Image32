@@ -519,9 +519,15 @@ end;
 function MirrorD(d: double; colorCnt: integer): integer;
 begin
   dec(colorCnt);
+{$IFDEF UseTrunc} // used in TSvgRadialGradientRenderer.RenderProc
+  if Odd(Trunc(d)) then
+    result := Trunc((1 - frac(d)) * colorCnt) else
+    result := Trunc(frac(d)  * colorCnt);
+{$ELSE}
   if Odd(Round(d)) then
     result := Round((1 - frac(d)) * colorCnt) else
     result := Round(frac(d)  * colorCnt);
+{$ENDIF}
 end;
 // ------------------------------------------------------------------------------
 
@@ -549,9 +555,15 @@ end;
 function RepeatD(d: double; colorCnt: integer): integer;
 begin
   dec(colorCnt);
+{$IFDEF UseTrunc} // used in TSvgRadialGradientRenderer.RenderProc
+  if (d < 0) then
+    result := Trunc((1 + frac(d)) * colorCnt) else
+    result := Trunc(frac(d)  * colorCnt);
+{$ELSE}
   if (d < 0) then
     result := Round((1 + frac(d)) * colorCnt) else
     result := Round(frac(d)  * colorCnt);
+{$ENDIF}
 end;
 // ------------------------------------------------------------------------------
 
@@ -1601,7 +1613,7 @@ end;
 procedure TSvgRadialGradientRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
 var
   i: integer;
-  q,m,c, qa,qb,qc,qs: double;
+  q,qq, m,c, qa,qb,qc,qs: double;
   dist, dist2: double;
   color: TARGB;
   pDst: PColor32;
@@ -1617,7 +1629,10 @@ begin
     if (pt.X = fFocusPt.X) then //vertical line
     begin
       // let x = pt.X, then y*y = b*b(1 - Sqr(pt.X)/aa)
-      q := Sqrt(fBB*(1 - Sqr(pt.X)/fAA));
+      qq := (1 - Sqr(pt.X)/fAA);
+      if (qq > 1) then qq := 1
+      else if (qq < 0) then qq := 0;
+      q := Sqrt(fBB*qq);
       ellipsePt.X := pt.X;
       if pt.Y >= fFocusPt.Y then
         ellipsePt.Y := q else
