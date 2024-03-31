@@ -3,9 +3,9 @@ unit Img32.CQ;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  4 July 2023                                                     *
+* Date      :  16 March 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2021                                         *
+* Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Color reduction for TImage32                                    *
 *           :  Uses Octree Color Quantization & Floyd / Steinberg Dithering    *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
@@ -1078,8 +1078,8 @@ begin
   begin
     image.FillRect(rec, palette[i] or $FF000000);
     if (i + 1) mod w = 0 then
-      Types.OffsetRect(rec, -15 * w, 16) else
-      Types.OffsetRect(rec, 16, 0);
+      TranslateRect(rec, -15 * w, 16) else
+      TranslateRect(rec, 16, 0);
   end;
 end;
 

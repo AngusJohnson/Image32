@@ -666,7 +666,7 @@ begin
   for i := 1 to cnt do
   begin
     img.Copy(tile, tileRec, dstRec);
-    Types.OffsetRect(dstRec, srcW, 0);
+    TranslateRect(dstRec, srcW, 0);
   end;
   cnt := Ceil(dstH / srcH) -1;
   srcRec := Img32.Vector.Rect(rec.Left, rec.Top,
@@ -674,7 +674,7 @@ begin
   dstRec := srcRec;
   for i := 1 to cnt do
   begin
-    Types.OffsetRect(dstRec, 0, srcH);
+    TranslateRect(dstRec, 0, srcH);
     img.Copy(img, srcRec, dstRec);
   end;
 end;

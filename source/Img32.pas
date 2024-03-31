@@ -2083,7 +2083,7 @@ begin
       Scale(sx);
       if height = self.Height then Exit;
       rec2 := Bounds;
-      Types.OffsetRect(rec2, 0, (height - self.Height) div 2);
+      TranslateRect(rec2, 0, (height - self.Height) div 2);
       tmp := TImage32.Create(self);
       try
         SetSize(width, height);
@@ -2096,7 +2096,7 @@ begin
       Scale(sy);
       if width = self.Width then Exit;
       rec2 := Bounds;
-      Types.OffsetRect(rec2, (width - self.Width) div 2, 0);
+      TranslateRect(rec2, (width - self.Width) div 2, 0);
       tmp := TImage32.Create(self);
       try
         SetSize(width, height);
@@ -2450,7 +2450,7 @@ begin
     RectWidthHeight(srcRecClipped, w, h);
     RectWidthHeight(srcRec, srcW, srcH);
     ScaleRect(dstRec, w / srcW, h / srcH);
-    Types.OffsetRect(dstRec,
+    TranslateRect(dstRec,
       srcRecClipped.Left - srcRec.Left,
       srcRecClipped.Top - srcRec.Top);
   end;
@@ -2480,7 +2480,7 @@ begin
     RectWidthHeight(dstRecClipped, w, h);
     RectWidthHeight(dstRec, dstW, dstH);
     ScaleRect(srcRecClipped, w / dstW, h / dstH);
-    Types.OffsetRect(srcRecClipped,
+    TranslateRect(srcRecClipped,
       dstRecClipped.Left - dstRec.Left,
       dstRecClipped.Top - dstRec.Top);
   end;

@@ -1192,7 +1192,7 @@ begin
   //that fMergeImage will then merge with its parent fMergeImage until root.
 
   if not (self is TGroupLayer32) then
-    Types.OffsetRect(updateRect, -Floor(fLeft), -Floor(fTop));
+    TranslateRect(updateRect, -Floor(fLeft), -Floor(fTop));
 
   if (self is TGroupLayer32) or (ChildCount = 0) then
   begin
@@ -1234,7 +1234,7 @@ begin
         //childs of group layers are positioned
         //independently of the group layer's positioning
         if (self is TGroupLayer32) then
-          Types.OffsetRect(dstRect, Floor(-self.Left), Floor(-self.Top));
+          TranslateRect(dstRect, Floor(-self.Left), Floor(-self.Top));
           Types.IntersectRect(dstRect, dstRect, self.Image.Bounds);
       end;
 
@@ -1249,9 +1249,9 @@ begin
     end;
 
     if (self is TGroupLayer32) then
-      Types.OffsetRect(srcRect, Floor(fLeft), Floor(fTop))
+      TranslateRect(srcRect, Floor(fLeft), Floor(fTop))
     else //nb: offsetting **dstRect** below
-      Types.OffsetRect(dstRect,
+      TranslateRect(dstRect,
         Round(fOuterMargin), Round(fOuterMargin));
 
     //DRAW THE CHILD  ONTO THE PARENT'S IMAGE
@@ -1268,7 +1268,7 @@ begin
           //use the clipping mask to 'trim' childLayer's image
           rec := fClipImage.Bounds;
           rec2 := rec;
-          Types.OffsetRect(rec2,
+          TranslateRect(rec2,
             Floor(childLayer.fOuterMargin -childLayer.Left -fOuterMargin),
             Floor(childLayer.fOuterMargin -childLayer.Top -fOuterMargin));
           childImg2.CopyBlend(fClipImage, rec, rec2, BlendMask);

@@ -270,7 +270,8 @@ type
 
   function RectsEqual(const rec1, rec2: TRect): Boolean;
 
-  procedure OffsetRect(var rec: TRectD; dx, dy: double); overload;
+  procedure TranslateRect(var rec: TRect; dx, dy: integer); overload;
+  procedure TranslateRect(var rec: TRectD; dx, dy: double); overload;
 
   function MakeSquare(rec: TRect): TRect;
 
@@ -812,7 +813,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure OffsetRect(var rec: TRectD; dx, dy: double);
+procedure TranslateRect(var rec: TRect; dx, dy: integer);
+begin
+  rec.Left := rec.Left + dx;
+  rec.Top := rec.Top + dy;
+  rec.Right := rec.Right + dx;
+  rec.Bottom := rec.Bottom + dy;
+end;
+//------------------------------------------------------------------------------
+
+procedure TranslateRect(var rec: TRectD; dx, dy: double);
 begin
   rec.Left := rec.Left + dx;
   rec.Top := rec.Top + dy;
@@ -1712,7 +1722,7 @@ begin
   dx := ellipseRec.Left + a;
   dy := ellipseRec.Top + b;
   rec := RectD(ellipseRec);
-  OffsetRect(rec, -dx, -dy);
+  TranslateRect(rec, -dx, -dy);
   x := pt.X -dx; y := pt.Y -dy;
   //first make sure pt is inside rect
   Result := (abs(x) <= a) and (abs(y) <= b);
@@ -1739,7 +1749,7 @@ begin
   b := rec.Height *0.5;
   //offset ellipseRect so it's centered over the coordinate origin
   dx := ellipseRec.Left + a; dy := ellipseRec.Top + b;
-  offsetRect(rec, -dx, -dy);
+  TranslateRect(rec, -dx, -dy);
   pt1 := TranslatePoint(linePt1, -dx, -dy);
   pt2 := TranslatePoint(linePt2, -dx, -dy);
   //equation of ellipse = (x*x)/(a*a) + (y*y)/(b*b) = 1
