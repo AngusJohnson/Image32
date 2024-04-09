@@ -3,9 +3,9 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  17 December 2023                                                *
+* Date      :  10 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2023                                         *
+* Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  The core module of the Image32 library                          *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -195,6 +195,7 @@ type
     function GetBounds: TRect;
     function GetMidPoint: TPointD;
   protected
+    procedure ResetColorCount;
     function  RectHasTransparency(rec: TRect): Boolean;
     function  CopyPixels(rec: TRect): TArrayOfColor32;
     //CopyInternal: Internal routine (has no scaling or bounds checking)
@@ -1667,7 +1668,7 @@ begin
     dst.fResampler := fResampler;
     dst.fIsPremultiplied := fIsPremultiplied;
     dst.fAntiAliased := fAntiAliased;
-    dst.fColorCount := 0;
+    dst.ResetColorCount;
     try
       dst.SetSize(Width, Height);
       if (Width > 0) and (Height > 0) then
@@ -1684,7 +1685,7 @@ end;
 procedure TImage32.Changed;
 begin
   if fUpdateCnt <> 0 then Exit;
-  fColorCount := 0;
+  ResetColorCount;
   if Assigned(fOnChange) then fOnChange(Self);
 end;
 //------------------------------------------------------------------------------
@@ -1798,6 +1799,12 @@ begin
     inc(c, Width - rw);
   end;
   Changed;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.ResetColorCount;
+begin
+  fColorCount := 0;
 end;
 //------------------------------------------------------------------------------
 

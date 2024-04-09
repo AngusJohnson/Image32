@@ -3,7 +3,7 @@ unit Img32.CQ;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  16 March 2024                                                   *
+* Date      :  10 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Color reduction for TImage32                                    *
@@ -90,6 +90,7 @@ type
       destructor  Destroy; override;
       procedure   Reset;
       procedure   BuildTree(image: TImage32);
+      procedure   ApplyPalette(image: TImage32);
       function    GetColorFreqArray: TArrayOfColFreq;
       property    ColorCount: cardinal read fLeaves;
       // PixelCount: = Sum( leaves[ 0 .. n-1 ].Count )
@@ -343,12 +344,16 @@ end;
 
 function RoundDownNearestPower2(val: Cardinal): Cardinal;
 begin
-  Result := val or val shr 1;
-  Result := Result or Result shr 2;
-  Result := Result or Result shr 3;
-  Result := Result or Result shr 4;
-  Result := Result or Result shr 16;
-  Result := Result - Result shr 1;
+  if (val and (val - 1)) > 0 then
+  begin
+    Result := val or val shr 1;
+    Result := Result or (Result shr 2);
+    Result := Result or (Result shr 3);
+    Result := Result or (Result shr 4);
+    Result := Result or (Result shr 16);
+    Result := Result - (Result shr 1);
+  end else
+    Result := val;
 end;
 //------------------------------------------------------------------------------
 
@@ -627,6 +632,25 @@ begin
     if pc.A >= OpacityThreshold then Add(pc.Color);
     inc(pc);
   end;
+end;
+//------------------------------------------------------------------------------
+
+type TImg32 = class(TImage32);
+
+procedure TOctree.ApplyPalette(image: TImage32);
+var
+  i: integer;
+  pc: PARGB;
+begin
+  pc := PARGB(image.PixelBase);
+  for i := 0 to image.Width * image.Height -1 do
+  begin
+    if pc.A < OpacityThreshold then
+      pc.Color := clNone32 else
+      fTop.GetNodeColor(pc.Color);
+    inc(pc);
+  end;
+  TImg32(image).ResetColorCount;
 end;
 //------------------------------------------------------------------------------
 
@@ -985,6 +1009,7 @@ begin
     if octree.fReduceType = rtSimple then
     begin
       Result := octree.BasicReduce(maxColors);
+      octree.ApplyPalette(image);
       Exit;
     end;
 
@@ -1043,6 +1068,7 @@ begin
   finally
     octree.Free;
   end;
+  TImg32(image).ResetColorCount;
 end;
 //------------------------------------------------------------------------------
 
