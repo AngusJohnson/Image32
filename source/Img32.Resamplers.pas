@@ -3,9 +3,9 @@ unit Img32.Resamplers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.3                                                             *
-* Date      :  17 December 2023                                                *
+* Date      :  13 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2021                                         *
+* Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  For image transformations (scaling, rotating etc.)              *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -15,7 +15,7 @@ interface
 {$I Img32.inc}
 
 uses
-  SysUtils, Classes, Img32;
+  SysUtils, Classes, Math, Img32;
 
 //BoxDownSampling: As the name implies, this routine is only intended for
 //image down-sampling (ie when shrinking images) where it generally performs
@@ -26,9 +26,9 @@ uses
 procedure BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer);
 
 (* The following functions are registered in the initialization section below
-function NearestResampler(img: TImage32; x256, y256: Integer): TColor32;
-function BilinearResample(img: TImage32; x256, y256: Integer): TColor32;
-function BicubicResample(img: TImage32; x256, y256: Integer): TColor32;
+function NearestResampler(img: TImage32; x, y: double): TColor32;
+function BilinearResample(img: TImage32; x, y: double): TColor32;
+function BicubicResample (img: TImage32; x, y: double): TColor32;
 *)
 
 implementation
@@ -40,94 +40,101 @@ uses
 // NearestNeighbor resampler
 //------------------------------------------------------------------------------
 
-function NearestResampler(img: TImage32; x256, y256: Integer): TColor32;
+function NearestResampler(img: TImage32; x, y: double): TColor32;
+var
+  xx, yy: integer;
 begin
-  if (x256 < -$7f) then
+  if (x < -0.5) or (x -0.5 >= img.Width) or
+     (y < -0.5) or (y -0.5 >= img.Height) then
   begin
     Result := clNone32;
     Exit;
   end;
-
-  if (y256 < -$7f) then
-  begin
-    Result := clNone32;
-    Exit;
-  end;
-
-  if (x256 and $FF > $7F) then inc(x256, $100);
-  x256 := x256 shr 8;
-  if y256 and $FF > $7F then inc(y256, $100);
-  y256 := y256 shr 8;
-
-  if (x256 < 0) or (x256 >= img.Width) or
-    (y256 < 0) or (y256 >= img.Height) then
-      Result := clNone32 else
-      Result := img.Pixels[y256 * img.Width + x256];
+  xx := Min(Max(0, Round(x)), img.Width -1);
+  yy := Min(Max(0, Round(y)), img.Height -1);
+  Result := img.Pixels[xx + yy * img.Width];
 end;
 
 //------------------------------------------------------------------------------
 // BiLinear resampler
 //------------------------------------------------------------------------------
 
-function BilinearResample(img: TImage32; x256, y256: Integer): TColor32;
+function BilinearResample(img: TImage32; x, y: double): TColor32;
 var
-  xi,yi, weight: Integer;
   iw, ih: integer;
+  xx, yy, xR, yB: integer;
+  weight: Cardinal;
   pixels: TArrayOfColor32;
-  color: TWeightedColor;
-  xf, yf: cardinal;
+  weightedColor: TWeightedColor;
+  xf, yf: double;
 begin
   iw := img.Width;
   ih := img.Height;
   pixels := img.Pixels;
 
-  if (x256 <= -$100) or (x256 >= iw *$100) or
-     (y256 <= -$100) or (y256 >= ih *$100) then
+  if (x < -1) or (x >= iw + 1) or
+     (y < -1) or (y >= ih + 1) then
   begin
     result := clNone32;
     Exit;
   end;
 
-  if x256 < 0 then xi := -1
-  else xi := x256 shr 8;
+  if x < 0 then
+    xf := frac(1+x) else
+    xf := frac(x);
+  if y < 0 then
+    yf := frac(1+y) else
+    yf := frac(y);
 
-  if y256 < 0 then yi := -1
-  else yi := y256 shr 8;
-
-  xf := x256 and $FF;
-  yf := y256 and $FF;
-
-  color.Reset;
-
-  weight := (($100 - xf) * ($100 - yf)) shr 8;        //top-left
-  if weight > 0 then
+  xx := Floor(x);
+  yy := Floor(y);
+  xR := xx +1;
+  yB := yy +1;
+  if xx >= iw -1 then
   begin
-    if (xi < 0) or (yi < 0) then color.AddWeight(weight)
-    else color.Add(pixels[xi + yi * iw], weight);
+    xx := iw -1;
+    xR := xx;
+  end;
+  if yy >= ih -1 then
+  begin
+    yy := ih -1;
+    yB := yy;
   end;
 
-  weight := (xf * ($100 - yf)) shr 8;                 //top-right
+  weightedColor.Reset;
+
+  weight := Round((1-xf) * (1-yf) * 256);      //top-left
   if weight > 0 then
   begin
-    if ((xi+1) >= iw) or (yi < 0) then color.AddWeight(weight)
-    else color.Add(pixels[(xi+1) + yi * iw], weight);
+    if (x < 0) or (y < 0) then
+      weightedColor.AddWeight(weight) else
+      weightedColor.Add(pixels[xx + yy * iw], weight);
   end;
 
-  weight := (($100 - xf) * yf) shr 8;                 //bottom-left
+  weight := Round(xf * (1-yf) * 256);         //top-right
   if weight > 0 then
   begin
-    if (xi < 0) or ((yi+1) >= ih) then color.AddWeight(weight)
-    else color.Add(pixels[(xi) + (yi+1) * iw], weight);
+    if (x > iw) or (y < 0) then
+      weightedColor.AddWeight(weight) else
+      weightedColor.Add(pixels[xR + yy * iw], weight);
   end;
 
-  weight := (xf * yf) shr 8;                          //bottom-right
+  weight := Round((1-xf) * yf * 256);          //bottom-left
   if weight > 0 then
   begin
-    if (xi + 1 >= iw) or (yi + 1 >= ih) then color.AddWeight(weight)
-    else color.Add(pixels[(xi+1) + (yi+1) * iw], weight);
+    if (x < 0) or (y > ih) then
+      weightedColor.AddWeight(weight) else
+      weightedColor.Add(pixels[xx + yB * iw], weight);
   end;
 
-  Result := color.Color;
+  weight := Round(xf * yf * 256);              //bottom-right
+  if weight > 0 then
+  begin
+    if (x > iw) or (y > ih) then
+      weightedColor.AddWeight(weight) else
+      weightedColor.Add(pixels[xR + yB * iw], weight);
+  end;
+  Result := weightedColor.Color;
 end;
 
 //------------------------------------------------------------------------------
@@ -135,7 +142,7 @@ end;
 //------------------------------------------------------------------------------
 
 type
-  TBiCubicEdgeAdjust = (eaNone, eaOne, eaTwo, eaThree, eaFour);
+  TBiCubicEdgeAdjust = (eaNone, eaSingle, eaOne, eaTwo, eaThree, eaFour);
 
 var
   byteFrac: array [0..255] of double;
@@ -153,15 +160,16 @@ var
   res: TARGB absolute Result;
 const
   clTrans: TColor32 = clNone32;
+  clDebug: TColor32 = clBlack32;
 begin
   case bce of
     eaOne:
       begin
         a := @clTrans;
         b := @clTrans;
-        c := PARGB(aclr);
         Inc(aclr);
-        d := PARGB(aclr);
+        c := PARGB(aclr);
+        d := c;
       end;
     eaTwo:
       begin
@@ -169,14 +177,12 @@ begin
         b := a;
         Inc(aclr);
         c := PARGB(aclr);
-        Inc(aclr);
-        d := PARGB(aclr);
+        d := c;
       end;
     eaThree:
       begin
         a := PARGB(aclr);
-        Inc(aclr);
-        b := PARGB(aclr);
+        b := a;
         Inc(aclr);
         c := PARGB(aclr);
         d := c;
@@ -184,8 +190,7 @@ begin
     eaFour:
       begin
         a := PARGB(aclr);
-        Inc(aclr);
-        b := PARGB(aclr);
+        b := a;
         c := @clTrans;
         d := @clTrans;
       end;
@@ -245,54 +250,71 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function BicubicResample(img: TImage32; x256, y256: Integer): TColor32;
+function BicubicResample(img: TImage32; x, y: double): TColor32;
 var
-  i, dx,dy, pi, iw, w,h: Integer;
+  i, dx, dy, pi, iw, ih, last: Integer;
+  xFrac,yFrac: Byte;
   c: array[0..3] of TColor32;
-  x, y: Integer;
   bceX, bceY: TBiCubicEdgeAdjust;
 begin
-  Result := clNone32;
 
   iw := img.Width;
-  w := iw -1;
-  h := img.Height -1;
+  ih := img.Height;
+  last := iw * ih;
 
-  x := Abs(x256) shr 8;
-  y := Abs(y256) shr 8;
+  Result := clNone32;
+  if (x <= -1) or (x >= iw +1) or
+    (y <= -1) or (y >= ih +1) then Exit;
 
-  if (x256 < -$FF) or (x > w) or  (y256 < -$FF) or (y > h) then Exit;
+  if x < 0 then
+    xFrac := Round(frac(1+x) *255) else
+    xFrac := Round(frac(x) *255);
+  if y < 0 then
+    yFrac := Round(frac(1+y) *255) else
+    yFrac := Round(frac(y) *255);
 
-  if (x256 < 0) then bceX := eaOne
-  else if (x = 0) then bceX := eaTwo
-  else if (x256 > w shl 8) then bceX := eaFour
-  else if (x256 > (w -1) shl 8) then bceX := eaThree
+  if x < 0 then bceX := eaOne
+  else if (x < 1) and (iw > 1) then bceX := eaTwo
+  else if x > iw then bceX := eaFour
+  else if iw = 1 then bceX := eaSingle
+  else if x > iw -1 then bceX := eaThree
   else bceX := eaNone;
 
-  if (bceX = eaOne) or (bceX = eaTwo) then dx := 1
-  else dx := 0;
-
-  if (y256 < 0) then bceY := eaOne
-  else if y = 0 then bceY := eaTwo
-  else if y = h -1 then bceY := eaThree
-  else if y = h then bceY := eaFour
+  if y < 0 then bceY := eaOne
+  else if (y < 1) and (ih > 1) then bceY := eaTwo
+  else if y > ih then bceY := eaFour
+  else if ih = 1 then bceY := eaSingle
+  else if y > ih -1 then bceY := eaThree
   else bceY := eaNone;
 
-  if (bceY = eaOne) or (bceY = eaTwo) then dy := 1
-  else dy := 0;
+  if (x < 0) then
+    x := 0
+  else if (iw > 1) and (x >= 1) then
+    x := x - 1;
 
-  pi := (y -1 +dy) * iw + (x -1 + dx);
+  if (y < 0) then
+    y := 0
+  else if (ih > 1) and (y >= 1) then
+    y := y - 1;
 
-  if bceY = eaFour then dx := 2
-  else if bceY = eaThree then dx := 1
-  else dx := 0;
+  pi := Floor(y) * iw + Floor(x);
 
-  for i := dy to 3 -dx do
+  if bceY = eaSingle then
   begin
-    c[i] := CubicHermite(@img.Pixels[pi], x256 and $FF, bceX);
-    inc(pi, iw);
+    if bceX = eaSingle then
+      Result := img.Pixels[pi] else
+      Result := CubicHermite(@img.Pixels[pi], xFrac, bceX);
+  end else
+  begin
+    for i := 0 to 3 do
+    begin
+      if bceX = eaSingle then
+        c[i] := img.Pixels[pi] else
+        c[i] := CubicHermite(@img.Pixels[pi], xFrac, bceX);
+      inc(pi, iw);
+    end;
+    Result := CubicHermite(@c[0], yFrac, bceY);
   end;
-  Result := CubicHermite(@c[dy], y256 and $FF, bceY);
 end;
 
 //------------------------------------------------------------------------------

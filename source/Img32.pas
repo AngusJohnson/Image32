@@ -164,7 +164,7 @@ type
 
   TTileFillStyle = (tfsRepeat, tfsMirrorHorz, tfsMirrorVert, tfsRotate180);
 
-  TResamplerFunction = function(img: TImage32; x256, y256: integer): TColor32;
+  TResamplerFunction = function(img: TImage32; x, y: double): TColor32;
 
   TImage32 = class(TObject)
   private

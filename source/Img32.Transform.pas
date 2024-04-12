@@ -425,15 +425,17 @@ begin
   pc := @tmp[0];
 
   for i := dstRec.Top to + dstRec.Bottom -1 do
+  begin
     for j := dstRec.Left to dstRec.Right -1 do
     begin
       //convert dest X,Y to src X,Y ...
       x := j; y := i;
       MatrixApply(matrix, x, y);
       //get weighted pixel (slow)
-      pc^ := resampler(img, Round(x * 256), Round(y * 256));
+      pc^ := resampler(img, x, y);
       inc(pc);
     end;
+  end;
   img.BeginUpdate;
   try
     img.SetSize(newWidth, newHeight);
@@ -505,6 +507,36 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure GetSrcCoords(const matrix: TMatrixD; var x, y: double);
+{$IFDEF INLINE} inline; {$ENDIF}
+var
+  zz: double;
+const
+  Q: integer = MaxInt div 256;
+begin
+  //returns coords multiplied by 256 in anticipation of the following
+  //GetWeightedPixel function call which in turn expects the lower 8bits
+  //of the integer coord value to represent a fraction.
+  zz := 1;
+  MatrixMulCoord(matrix, x, y, zz);
+
+  if zz = 0 then
+  begin
+    if x >= 0 then x := Q else x := -MaxDouble;
+    if y >= 0 then y := Q else y := -MaxDouble;
+  end else
+  begin
+    x := x/zz;
+    if x > Q then x := MaxDouble
+    else if x < -Q then x := -MaxDouble;
+
+    y := y/zz;
+    if y > Q then y := MaxDouble
+    else if y < -Q then y := -MaxDouble
+  end;
+end;
+//------------------------------------------------------------------------------
+
 function GetProjectionMatrix(const srcPts, dstPts: TPathD): TMatrixD;
 var
   srcMat, dstMat: TMatrixD;
@@ -526,7 +558,7 @@ function ProjectiveTransform(img: TImage32;
   const srcPts, dstPts: TPathD; const margins: TRect): Boolean;
 var
   w,h,i,j: integer;
-  x,y: integer;
+  x,y: double;
   rec: TRect;
   dstPts2: TPathD;
   mat: TMatrixD;
@@ -559,7 +591,7 @@ begin
     for j := 0 to w -1 do
     begin
       x := j; y := i;
-      GetSrcCoords256(mat, x, y);
+      GetSrcCoords(mat, x, y);
       pc^ := resampler(img, x, y);
       inc(pc);
     end;
@@ -735,10 +767,10 @@ begin
       if (j > y-1.0) and (j < y + img.Height) then
         if backColoring then
           pc^ := BlendToAlpha(pc^,
-            ReColor(resampler(img, Round(Distances[i]*q) ,Round((j - y)*256)), backColor))
+            ReColor(resampler(img, Distances[i]*q, j - y), backColor))
         else
           pc^ := BlendToAlpha(pc^,
-            resampler(img, Round(Distances[i]*q) ,Round((j - y)*256)));
+            resampler(img, Round(Distances[i]*q), j - y));
       inc(pc, w);
     end;
   end;
@@ -803,10 +835,9 @@ begin
       if (j > x-1.0) and (j < x + img.Width) then
         if backColoring then
           pc^ := BlendToAlpha(pc^,
-            ReColor(resampler(img, Round((j - x) *256), Round(Distances[i]*q)), backColor))
+            ReColor(resampler(img, (j - x), Distances[i]*q), backColor))
         else
-          pc^ := BlendToAlpha(pc^,
-            resampler(img, Round((j - x) *256), Round(Distances[i]*q)));
+          pc^ := BlendToAlpha(pc^, resampler(img, (j - x), Distances[i]*q));
       inc(pc);
     end;
   end;
