@@ -252,7 +252,7 @@ end;
 
 function BicubicResample(img: TImage32; x, y: double): TColor32;
 var
-  i, dx, dy, pi, iw, ih, last: Integer;
+  i, pi, iw, ih, last: Integer;
   xFrac,yFrac: Byte;
   c: array[0..3] of TColor32;
   bceX, bceY: TBiCubicEdgeAdjust;

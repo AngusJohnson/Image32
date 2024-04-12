@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  11 March 2024                                                   *
+* Date      :  13 March 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -345,7 +345,7 @@ begin
   if str[len-2] = '=' then extra := 2
   else if str[len-1] = '=' then extra := 1
   else extra := 0;
-  memStream.SetSize((len div 4 * 3) - extra);
+  memStream.SetSize(LongInt((len div 4 * 3) - extra));
   dst := memStream.Memory;
   Chars4 := @str[0];
   i := 0;
