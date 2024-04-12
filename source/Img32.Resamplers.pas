@@ -308,9 +308,9 @@ begin
   begin
     for i := 0 to 3 do
     begin
-      if bceX = eaSingle then
-        c[i] := img.Pixels[pi] else
-        c[i] := CubicHermite(@img.Pixels[pi], xFrac, bceX);
+      if pi > last then break
+      else if bceX = eaSingle then c[i] := img.Pixels[pi]
+      else c[i] := CubicHermite(@img.Pixels[pi], xFrac, bceX);
       inc(pi, iw);
     end;
     Result := CubicHermite(@c[0], yFrac, bceY);
