@@ -142,7 +142,7 @@ end;
 //------------------------------------------------------------------------------
 
 type
-  TBiCubicEdgeAdjust = (eaNormal, eaOneOnly,
+  TBiCubicEdgeAdjust = (eaNormal, eaOnePixel,
     eaPreStart, eaStart, eaEnd, eaPostEnd);
 
 var
@@ -275,17 +275,17 @@ begin
     yFrac := Round(frac(y) *255);
 
   if x < 0 then bceX := eaPreStart
-  else if (x < 1) and (iw > 1) then bceX := eaStart
   else if x > iw then bceX := eaPostEnd
-  else if iw = 1 then bceX := eaOneOnly
-  else if x > iw -1 then bceX := eaEnd
+  else if iw = 1 then bceX := eaOnePixel
+  else if x < 1 then bceX := eaStart
+  else if x >= iw -1 then bceX := eaEnd
   else bceX := eaNormal;
 
   if y < 0 then bceY := eaPreStart
-  else if (y < 1) and (ih > 1) then bceY := eaStart
   else if y > ih then bceY := eaPostEnd
-  else if ih = 1 then bceY := eaOneOnly
-  else if y > ih -1 then bceY := eaEnd
+  else if ih = 1 then bceY := eaOnePixel
+  else if y < 1 then bceY := eaStart
+  else if y >= ih -1 then bceY := eaEnd
   else bceY := eaNormal;
 
   if (x < 0) then x := 0
@@ -296,9 +296,9 @@ begin
 
   pi := Floor(y) * iw + Floor(x);
 
-  if bceY = eaOneOnly then
+  if bceY = eaOnePixel then
   begin
-    if bceX = eaOneOnly then
+    if bceX = eaOnePixel then
       Result := img.Pixels[0] else
       Result := CubicHermite(@img.Pixels[pi], xFrac, bceX);
   end else
@@ -306,7 +306,7 @@ begin
     for i := 0 to 3 do
     begin
       if pi > last then break
-      else if bceX = eaOneOnly then c[i] := img.Pixels[pi]
+      else if bceX = eaOnePixel then c[i] := img.Pixels[pi]
       else c[i] := CubicHermite(@img.Pixels[pi], xFrac, bceX);
       inc(pi, iw);
     end;
