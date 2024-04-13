@@ -142,7 +142,8 @@ end;
 //------------------------------------------------------------------------------
 
 type
-  TBiCubicEdgeAdjust = (eaNone, eaSingle, eaOne, eaTwo, eaThree, eaFour);
+  TBiCubicEdgeAdjust = (eaNormal, eaOneOnly,
+    eaPreStart, eaStart, eaEnd, eaPostEnd);
 
 var
   byteFrac: array [0..255] of double;
@@ -163,7 +164,7 @@ const
   clDebug: TColor32 = clBlack32;
 begin
   case bce of
-    eaOne:
+    eaPreStart:
       begin
         a := @clTrans;
         b := @clTrans;
@@ -171,7 +172,7 @@ begin
         c := PARGB(aclr);
         d := c;
       end;
-    eaTwo:
+    eaStart:
       begin
         a := PARGB(aclr);
         b := a;
@@ -179,7 +180,7 @@ begin
         c := PARGB(aclr);
         d := c;
       end;
-    eaThree:
+    eaEnd:
       begin
         a := PARGB(aclr);
         b := a;
@@ -187,7 +188,7 @@ begin
         c := PARGB(aclr);
         d := c;
       end;
-    eaFour:
+    eaPostEnd:
       begin
         a := PARGB(aclr);
         b := a;
@@ -260,7 +261,7 @@ begin
 
   iw := img.Width;
   ih := img.Height;
-  last := iw * ih;
+  last := iw * ih -1;
 
   Result := clNone32;
   if (x <= -1) or (x >= iw +1) or
@@ -273,43 +274,39 @@ begin
     yFrac := Round(frac(1+y) *255) else
     yFrac := Round(frac(y) *255);
 
-  if x < 0 then bceX := eaOne
-  else if (x < 1) and (iw > 1) then bceX := eaTwo
-  else if x > iw then bceX := eaFour
-  else if iw = 1 then bceX := eaSingle
-  else if x > iw -1 then bceX := eaThree
-  else bceX := eaNone;
+  if x < 0 then bceX := eaPreStart
+  else if (x < 1) and (iw > 1) then bceX := eaStart
+  else if x > iw then bceX := eaPostEnd
+  else if iw = 1 then bceX := eaOneOnly
+  else if x > iw -1 then bceX := eaEnd
+  else bceX := eaNormal;
 
-  if y < 0 then bceY := eaOne
-  else if (y < 1) and (ih > 1) then bceY := eaTwo
-  else if y > ih then bceY := eaFour
-  else if ih = 1 then bceY := eaSingle
-  else if y > ih -1 then bceY := eaThree
-  else bceY := eaNone;
+  if y < 0 then bceY := eaPreStart
+  else if (y < 1) and (ih > 1) then bceY := eaStart
+  else if y > ih then bceY := eaPostEnd
+  else if ih = 1 then bceY := eaOneOnly
+  else if y > ih -1 then bceY := eaEnd
+  else bceY := eaNormal;
 
-  if (x < 0) then
-    x := 0
-  else if (iw > 1) and (x >= 1) then
-    x := x - 1;
+  if (x < 0) then x := 0
+  else if (iw > 1) and (x >= 1) then x := x - 1;
 
-  if (y < 0) then
-    y := 0
-  else if (ih > 1) and (y >= 1) then
-    y := y - 1;
+  if (y < 0) then y := 0
+  else if (ih > 1) and (y >= 1) then y := y - 1;
 
   pi := Floor(y) * iw + Floor(x);
 
-  if bceY = eaSingle then
+  if bceY = eaOneOnly then
   begin
-    if bceX = eaSingle then
-      Result := img.Pixels[pi] else
+    if bceX = eaOneOnly then
+      Result := img.Pixels[0] else
       Result := CubicHermite(@img.Pixels[pi], xFrac, bceX);
   end else
   begin
     for i := 0 to 3 do
     begin
       if pi > last then break
-      else if bceX = eaSingle then c[i] := img.Pixels[pi]
+      else if bceX = eaOneOnly then c[i] := img.Pixels[pi]
       else c[i] := CubicHermite(@img.Pixels[pi], xFrac, bceX);
       inc(pi, iw);
     end;
