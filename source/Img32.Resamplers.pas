@@ -262,7 +262,7 @@ end;
 
 function BicubicResample(img: TImage32; x, y: double): TColor32;
 var
-  i, pi, iw, ih, dy: Integer;
+  i, pxIdx, iw, ih, dy, last: integer;
   xFrac,yFrac: Byte;
   c: array[0..3] of TColor32;
   bceX, bceY: TBiCubicEdgeAdjust;
@@ -270,6 +270,7 @@ begin
 
   iw := img.Width;
   ih := img.Height;
+  last := iw * ih -1;
 
   Result := clNone32;
   if (x <= -1) or (x >= iw +1) or
@@ -308,28 +309,29 @@ begin
   else if bceY = eaNormal then dy := 4
   else dy := 2;
 
-  pi := Floor(y) * iw + Floor(x);
+  pxIdx := Floor(y) * iw + Floor(x);
 
   if bceY = eaOnePixel then
   begin
     if bceX = eaOnePixel then
       Result := img.Pixels[0] else
-      Result := CubicHermite(@img.Pixels[pi], xFrac, bceX);
+      Result := CubicHermite(@img.Pixels[pxIdx], xFrac, bceX);
   end
   else if bceX = eaOnePixel then
   begin
     for i := 0 to dy-1 do
     begin
-      c[i] := img.Pixels[pi];
-      inc(pi, iw);
+      c[i] := img.Pixels[pxIdx];
+      inc(pxIdx, iw);
     end;
     Result := CubicHermite(@c[0], yFrac, bceY);
   end else
   begin
     for i := 0 to dy-1 do
     begin
-      c[i] := CubicHermite(@img.Pixels[pi], xFrac, bceX);
-      inc(pi, iw);
+      c[i] := CubicHermite(@img.Pixels[pxIdx], xFrac, bceX);
+      inc(pxIdx, iw);
+      if pxIdx >= last then break;
     end;
     Result := CubicHermite(@c[0], yFrac, bceY);
   end;
