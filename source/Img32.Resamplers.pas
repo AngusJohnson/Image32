@@ -276,6 +276,8 @@ begin
   if (x <= -1) or (x >= iw +1) or
     (y <= -1) or (y >= ih +1) then Exit;
 
+  // scale the image fractionally so as to avoid the pixels along the
+  // right and bottom edges effectively duplicating their adjacent pixels
   if (x > 0) and (x <= iw) then x := x - x/(iw+1);
   if (y > 0) and (y <= ih) then y := y - y/(ih+1);
 

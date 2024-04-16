@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  10 April 2024                                                   *
+* Date      :  16 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -3163,7 +3163,6 @@ end;
 
 procedure TImage32.Rotate(angleRads: double);
 var
-  rec: TRectD;
   mat: TMatrixD;
 begin
   if not ClockwiseRotationIsAnglePositive then
@@ -3189,11 +3188,10 @@ begin
   end else
   begin
     mat := IdentityMatrix;
-    MatrixTranslate(mat, Width/2, Height/2);
-    rec := RectD(Bounds);
-    rec := GetRotatedRectBounds(rec, angleRads);
+    // the rotation point isn't important
+    // because AffineTransformImage() will
+    // will resize and recenter the image
     MatrixRotate(mat, NullPointD, angleRads);
-    MatrixTranslate(mat, rec.Width/2, rec.Height/2);
     AffineTransformImage(self, mat);
   end;
 end;

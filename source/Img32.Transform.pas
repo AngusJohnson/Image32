@@ -3,15 +3,11 @@ unit Img32.Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  17 December 2023                                                *
+* Date      :  16 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2021                                         *
-*                                                                              *
+* Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
-*                                                                              *
-* License   :  Use, modification & distribution is subject to                  *
-*              Boost Software License Ver 1                                    *
-*              http://www.boost.org/LICENSE_1_0.txt                            *
+* License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
 interface
@@ -19,8 +15,7 @@ interface
 {$I Img32.inc}
 
 uses
-  SysUtils, Classes, Math, Types,
-  Img32, Img32.Vector;
+  SysUtils, Classes, Math, Types, Img32, Img32.Vector;
 
 type
   TMatrixD = array [0..2, 0..2] of double;
@@ -204,15 +199,11 @@ end;
 
 procedure MatrixApply(const matrix: TMatrixD; var rec: TRect);
 var
-  l,t,b,r,tmpX: double;
+  path: TPathD;
 begin
-  tmpX := rec.Left;
-  l := tmpX * matrix[0, 0] + rec.Top * matrix[1, 0] + matrix[2, 0];
-  t := tmpX * matrix[0, 1] + rec.Top * matrix[1, 1] + matrix[2, 1];
-  tmpX := rec.Right;
-  r := tmpX * matrix[0, 0] + rec.Bottom * matrix[1, 0] + matrix[2, 0];
-  b := tmpX * matrix[0, 1] + rec.Bottom * matrix[1, 1] + matrix[2, 1];
-  rec := Rect(RectD(l,t,r,b));
+  path := Rectangle(rec);
+  MatrixApply(matrix, path);
+  rec := GetBounds(path);
 end;
 //------------------------------------------------------------------------------
 
@@ -402,18 +393,19 @@ var
   resampler: TResamplerFunction;
 begin
   Result := NullPoint;
+  if IsIdentityMatrix(matrix) or
+    img.IsEmpty or (img.Resampler = 0) then Exit;
 
-  if img.Resampler = 0 then
-    resampler := nil else
-    resampler := GetResampler(img.Resampler);
-
-  if not Assigned(resampler) or img.IsEmpty or
-    IsIdentityMatrix(matrix) then
-      Exit;
+  resampler := GetResampler(img.Resampler);
+  if not Assigned(resampler) then Exit;
 
   //auto-resize the image so it'll fit transformed image
-  dstRec := GetTransformBounds(img, matrix);
+
+  dstRec := img.Bounds;
+  MatrixApply(matrix, dstRec);
+
   RectWidthHeight(dstRec, newWidth, newHeight);
+
   //auto-translate the image too
   Result := dstRec.TopLeft;
 
@@ -428,14 +420,13 @@ begin
   begin
     for j := dstRec.Left to dstRec.Right -1 do
     begin
-      //convert dest X,Y to src X,Y ...
       x := j; y := i;
       MatrixApply(matrix, x, y);
-      //get weighted pixel (slow)
       pc^ := resampler(img, x, y);
       inc(pc);
     end;
   end;
+
   img.BeginUpdate;
   try
     img.SetSize(newWidth, newHeight);

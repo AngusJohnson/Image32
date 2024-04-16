@@ -2,16 +2,12 @@ unit Img32.Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.3                                                             *
-* Date      :  3 September 2023                                                *
+* Version   :  4.4                                                             *
+* Date      :  16 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2023                                         *
-*                                                                              *
+* Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Layered images support                                          *
-*                                                                              *
-* License   :  Use, modification & distribution is subject to                  *
-*              Boost Software License Ver 1                                    *
-*              http://www.boost.org/LICENSE_1_0.txt                            *
+* License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
 interface
@@ -254,26 +250,23 @@ type
     property  OnDraw: TNotifyEvent read fOnDraw write fOnDraw;
   end;
 
-  TRasterLayer32 = class(TRotLayer32) //display laer for raster images
+  TRasterLayer32 = class(TRotLayer32) //display layer for raster images
   private
     fMasterImg    : TImage32;
     //fMatrix: allows combining any number of scaling & rotating ops.
     fMatrix       : TMatrixD;
     fRotating     : Boolean;
-    fSavedMidPt   : TPointD;
+    //fSavedMidPt   : TPointD;
     fPreScaleSize : TSize;
     fAutoHitTest  : Boolean;
     procedure DoAutoHitTest;
-    function  GetMatrix: TMatrixD;
   protected
     procedure ImageChanged(Sender: TImage32); override;
-    procedure SetPivotPt(const pivot: TPointD); override;
     procedure UpdateHitTestMaskTranspar(compareFunc: TCompareFunction;
       referenceColor: TColor32; tolerance: integer);
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor  Destroy; override;
-    procedure Offset(dx,dy: double); override;
     procedure UpdateHitTestMaskOpaque; virtual;
     procedure UpdateHitTestMaskTransparent(alphaValue: Byte = 127); overload; virtual;
     procedure SetInnerBounds(const newBounds: TRectD); override;
@@ -281,7 +274,7 @@ type
 
     property  AutoSetHitTestMask: Boolean read fAutoHitTest write fAutoHitTest;
     property  MasterImage: TImage32 read fMasterImg;
-    property  Matrix: TMatrixD read GetMatrix;
+    //property  Matrix: TMatrixD read fMatrix;
   end;
 
   TButtonDesignerLayer32 = class;
@@ -724,17 +717,10 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TLayer32.ImageChanged(Sender: TImage32);
-var
-  w,h: integer;
 begin
   if (StorageState = ssLoading) then Exit;
-  w := Ceil(fLeft + fWidth + fOuterMargin *2);
-  h := Ceil(fTop + fHeight + fOuterMargin *2);
-  if (Image.Width <> w) or (Image.Height <> h) then
-  begin
-    fWidth := Image.Width -fOuterMargin *2;
-    fHeight := Image.Height -fOuterMargin *2;
-  end;
+  fWidth := Image.Width -fOuterMargin *2;
+  fHeight := Image.Height -fOuterMargin *2;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -745,8 +731,8 @@ var
 begin
   if StorageState = ssDestroying then Exit;
   fWidth := width; fHeight := height;
-  w := Ceil(fLeft + fWidth + fOuterMargin *2);
-  h := Ceil(fTop + fHeight + fOuterMargin *2);
+  w := Ceil(fWidth + fOuterMargin *2);
+  h := Ceil(fHeight + fOuterMargin *2);
   Image.SetSize(w, h);
 end;
 //------------------------------------------------------------------------------
@@ -819,8 +805,7 @@ end;
 
 procedure TLayer32.Offset(dx, dy: double);
 begin
-  if (dx <> 0) or (dy <> 0) then
-    PositionAt(fLeft + dx, fTop + dy);
+  PositionAt(fLeft + dx, fTop + dy);
 end;
 //------------------------------------------------------------------------------
 
@@ -1802,20 +1787,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TRasterLayer32.Offset(dx,dy: double);
-begin
-  inherited;
-  fSavedMidPt := TranslatePoint(fSavedMidPt, dx,dy);
-end;
-//------------------------------------------------------------------------------
-
-procedure TRasterLayer32.SetPivotPt(const pivot: TPointD);
-begin
-  inherited;
-  fSavedMidPt := MidPoint;
-end;
-//------------------------------------------------------------------------------
-
 procedure TRasterLayer32.SetInnerBounds(const newBounds: TRectD);
 var
   newWidth, newHeight: double;
@@ -1824,22 +1795,23 @@ begin
 
   if fRotating and Assigned(Image) then
   begin
+    //rotation has just ended
     fRotating := false;
-    //rotation has just ended so add the rotation angle to fMatrix
+    //update fMatrix with the new rotation angle
     if (fAngle <> 0) then
       MatrixRotate(fMatrix, Image.MidPoint, fAngle);
-    fAngle := 0;
+
     //and since we're about to start scaling, we need
     //to store the starting size, and reset the angle
     fPreScaleSize := Size(Image.Width, Image.Height);
+    fAngle := 0;
   end;
 
   newWidth := newBounds.Width;
   newHeight := newBounds.Height;
 
   //make sure the image is large enough to scale safely
-  if (MasterImage.Width > 1) and (MasterImage.Height > 1) and
-    (newWidth > 1) and (newHeight > 1) then
+  if not MasterImage.IsEmpty and (newWidth > 1) and (newHeight > 1) then
   begin
     Image.BeginUpdate;
     try
@@ -1861,31 +1833,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TRasterLayer32.GetMatrix: TMatrixD;
-begin
-  Result := fMatrix;
-  //update for transformations not yet unapplied to fMatrix
-  if fRotating then
-  begin
-    if fAngle <> 0 then
-      MatrixRotate(Result, MidPoint, fAngle);
-  end else
-  begin
-    MatrixScale(Result, Image.Width/fPreScaleSize.cx,
-      Image.Height/fPreScaleSize.cy);
-  end;
-end;
-//------------------------------------------------------------------------------
-
 function TRasterLayer32.Rotate(angleDelta: double): Boolean;
 var
   mat: TMatrixD;
+  pt, mp: TPointD;
 begin
-  Result := not MasterImage.IsEmpty and
+  Result := (angleDelta <> 0) and
+    not MasterImage.IsEmpty and
     inherited Rotate(angleDelta);
+
   if not Result then Exit;
 
-  //if not already rotating, then update scaling in fMatrix
+  mp := MidPoint;
+
+  //if not already rotating, then update fMatrix with prior scaling
   if not fRotating then
   begin
     Assert((fPreScaleSize.cx > 0) and (fPreScaleSize.cy > 0), 'oops!');
@@ -1894,25 +1855,25 @@ begin
       Image.Height/fPreScaleSize.cy);
 
     fRotating := true;
-    fSavedMidPt := MidPoint;
-    if fAutoPivot then fPivotPt := fSavedMidPt;
+    if fAutoPivot then fPivotPt := mp;
   end;
 
-  if not fAutoPivot then
-    RotatePoint(fSavedMidPt, PivotPt, angleDelta);
+  RotatePoint(mp, PivotPt, angleDelta);
 
-  Image.BeginUpdate;
+  Image.BlockNotify;
   try
     Image.Assign(MasterImage);
     mat := fMatrix;
-    MatrixRotate(mat, NullPointD, Angle);
+    pt := PointD(PivotPt.X - fLeft, PivotPt.Y - fTop);
+    MatrixRotate(mat, pt, Angle);
     AffineTransformImage(Image, mat);
-    SymmetricCropTransparent(Image);
   finally
-    Image.EndUpdate;
+    Image.UnblockNotify;
   end;
-    PositionCenteredAt(fSavedMidPt);
 
+  fWidth := Image.Width;
+  fHeight := Image.Height;
+  PositionCenteredAt(mp);
   DoAutoHitTest;
 end;
 
