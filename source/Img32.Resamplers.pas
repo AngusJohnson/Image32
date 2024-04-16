@@ -3,7 +3,7 @@ unit Img32.Resamplers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.3                                                             *
-* Date      :  14 April 2024                                                   *
+* Date      :  17 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  For image transformations (scaling, rotating etc.)              *
@@ -42,16 +42,24 @@ uses
 
 function NearestResampler(img: TImage32; x, y: double): TColor32;
 var
-  xx, yy: integer;
+  iw, ih, xx, yy: integer;
 begin
-  if (x < -0.5) or (x -0.5 >= img.Width) or
-     (y < -0.5) or (y -0.5 >= img.Height) then
+  iw := img.Width;
+  ih := img.Height;
+  if (x < -0.5) or (x -0.5 >= iw) or
+     (y < -0.5) or (y -0.5 >= ih) then
   begin
     Result := clNone32;
     Exit;
   end;
-  xx := Min(Max(0, Round(x)), img.Width -1);
-  yy := Min(Max(0, Round(y)), img.Height -1);
+
+  // scale the image fractionally so as to avoid the pixels along the
+  // right and bottom edges effectively duplicating their adjacent pixels
+  if (x > 0) and (x < iw) then x := x - x/(iw+0.25);
+  if (y > 0) and (y < ih) then y := y - y/(ih+0.25);
+
+  xx := Min(Max(0, Round(x)), iw -1);
+  yy := Min(Max(0, Round(y)), ih -1);
   Result := img.Pixels[xx + yy * img.Width];
 end;
 
@@ -79,8 +87,10 @@ begin
     Exit;
   end;
 
-  if (x > 0) and (x < iw) then x := x - x/(iw+1);
-  if (y > 0) and (y < ih) then y := y - y/(ih+1);
+  // scale the image fractionally so as to avoid the pixels along the
+  // right and bottom edges effectively duplicating their adjacent pixels
+  if (x > 0) and (x < iw) then x := x - x/(iw+0.25);
+  if (y > 0) and (y < ih) then y := y - y/(ih+0.25);
 
   if x < 0 then
     xf := frac(1+x) else
@@ -278,8 +288,8 @@ begin
 
   // scale the image fractionally so as to avoid the pixels along the
   // right and bottom edges effectively duplicating their adjacent pixels
-  if (x > 0) and (x <= iw) then x := x - x/(iw+1);
-  if (y > 0) and (y <= ih) then y := y - y/(ih+1);
+  if (x > 0) and (x <= iw) then x := x - x/(iw+0.25);
+  if (y > 0) and (y <= ih) then y := y - y/(ih+0.25);
 
   if x < 0 then bceX := eaPreStart
   else if x > iw then bceX := eaPostEnd
