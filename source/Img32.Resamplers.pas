@@ -2,8 +2,8 @@ unit Img32.Resamplers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.3                                                             *
-* Date      :  17 April 2024                                                   *
+* Version   :  4.4                                                             *
+* Date      :  20 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  For image transformations (scaling, rotating etc.)              *
@@ -17,19 +17,21 @@ interface
 uses
   SysUtils, Classes, Math, Img32;
 
-//BoxDownSampling: As the name implies, this routine is only intended for
-//image down-sampling (ie when shrinking images) where it generally performs
-//better than other resamplers which tend to lose too much detail. However,
-//because this routine is inferior to other resamplers when performing other
-//transformations (ie when enlarging, rotating, and skewing images), it's not
-//intended as a general purpose resampler.
-procedure BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer);
+// BoxDownSampling: As the name implies, is only intended for image
+// down-sampling (ie shrinking images) where it performs a little better
+// than other resamplers which tend toward pixelation. Nevertheless, this
+// routine is inferior to other resamplers when performing other
+// types of transformations (ie when enlarging, rotating, and skewing images),
+// so BoxDownSampling should not be used as a general purpose resampler.
+procedure BoxDownSampling(Image: TImage32; scale: double); overload;
+procedure BoxDownSampling(Image: TImage32; scaleX, scaleY: double); overload;
+procedure BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer); overload;
 
-(* The following functions are registered in the initialization section below
-function NearestResampler(img: TImage32; x, y: double): TColor32;
-function BilinearResample(img: TImage32; x, y: double): TColor32;
-function BicubicResample (img: TImage32; x, y: double): TColor32;
-*)
+// The following general purpose resamplers are registered below:
+// function NearestResampler(img: TImage32; x, y: double): TColor32;
+// function BilinearResample(img: TImage32; x, y: double): TColor32;
+// function BicubicResample (img: TImage32; x, y: double): TColor32;
+// function WeightedBilinear(img: TImage32; x, y: double): TColor32;
 
 implementation
 
@@ -53,10 +55,9 @@ begin
     Exit;
   end;
 
-  // scale the image fractionally so as to avoid the pixels along the
-  // right and bottom edges effectively duplicating their adjacent pixels
-  if (x > 0) and (x < iw) then x := x - x/(iw+0.25);
-  if (y > 0) and (y < ih) then y := y - y/(ih+0.25);
+  // scale the image fractionally so it's properly centered
+  if (x > 0) and (x < iw) then x := x - x/(iw+0.2);
+  if (y > 0) and (y < ih) then y := y - y/(ih+0.2);
 
   xx := Min(Max(0, Round(x)), iw -1);
   yy := Min(Max(0, Round(y)), ih -1);
@@ -87,10 +88,9 @@ begin
     Exit;
   end;
 
-  // scale the image fractionally so as to avoid the pixels along the
-  // right and bottom edges effectively duplicating their adjacent pixels
-  if (x > 0) and (x < iw) then x := x - x/(iw+0.25);
-  if (y > 0) and (y < ih) then y := y - y/(ih+0.25);
+  // scale the image fractionally so it's properly centered
+  if (x > 0) and (x < iw) then x := x - x/(iw+0.2);
+  if (y > 0) and (y < ih) then y := y - y/(ih+0.2);
 
   if x < 0 then
     xf := frac(1+x) else
@@ -117,7 +117,7 @@ begin
 
   weightedColor.Reset;
 
-  weight := Round((1-xf) * (1-yf) * 256);      //top-left
+  weight := Round((1-xf) * (1-yf) * 255);      //top-left
   if weight > 0 then
   begin
     if (x < 0) or (y < 0) then
@@ -125,7 +125,7 @@ begin
       weightedColor.Add(pixels[xx + yy * iw], weight);
   end;
 
-  weight := Round(xf * (1-yf) * 256);         //top-right
+  weight := Round(xf * (1-yf) * 255);         //top-right
   if weight > 0 then
   begin
     if (x > iw) or (y < 0) then
@@ -133,7 +133,7 @@ begin
       weightedColor.Add(pixels[xR + yy * iw], weight);
   end;
 
-  weight := Round((1-xf) * yf * 256);          //bottom-left
+  weight := Round((1-xf) * yf * 255);          //bottom-left
   if weight > 0 then
   begin
     if (x < 0) or (y > ih) then
@@ -141,7 +141,96 @@ begin
       weightedColor.Add(pixels[xx + yB * iw], weight);
   end;
 
-  weight := Round(xf * yf * 256);              //bottom-right
+  weight := Round(xf * yf * 255);              //bottom-right
+  if weight > 0 then
+  begin
+    if (x > iw) or (y > ih) then
+      weightedColor.AddWeight(weight) else
+      weightedColor.Add(pixels[xR + yB * iw], weight);
+  end;
+  Result := weightedColor.Color;
+end;
+//------------------------------------------------------------------------------
+
+var
+  weightedCurve: array [0..255] of Cardinal;
+
+// WeightedBilinearResample: A modified bilinear resampler that's
+// less blurry but also a little more pixelated.
+function WeightedBilinearResample(img: TImage32; x, y: double): TColor32;
+var
+  iw, ih: integer;
+  xx, yy, xR, yB: integer;
+  weight: Cardinal;
+  pixels: TArrayOfColor32;
+  weightedColor: TWeightedColor;
+  xf, yf: double;
+begin
+  iw := img.Width;
+  ih := img.Height;
+  pixels := img.Pixels;
+
+  if (x < -1) or (x >= iw + 1) or
+     (y < -1) or (y >= ih + 1) then
+  begin
+    result := clNone32;
+    Exit;
+  end;
+
+  // scale the image fractionally so it's properly centered
+  if (x > 0) and (x < iw) then x := x - x/(iw+0.2);
+  if (y > 0) and (y < ih) then y := y - y/(ih+0.2);
+
+  if x < 0 then
+    xf := frac(1+x) else
+    xf := frac(x);
+  if y < 0 then
+    yf := frac(1+y) else
+    yf := frac(y);
+
+  xx := Floor(x);
+  yy := Floor(y);
+  xR := xx +1;
+  yB := yy +1;
+
+  if xx >= iw -1 then
+  begin
+    xx := iw -1;
+    xR := xx;
+  end;
+  if yy >= ih -1 then
+  begin
+    yy := ih -1;
+    yB := yy;
+  end;
+
+  weightedColor.Reset;
+
+  weight := weightedCurve[Round((1-xf) * (1-yf) * 255)];      //top-left
+  if weight > 0 then
+  begin
+    if (x < 0) or (y < 0) then
+      weightedColor.AddWeight(weight) else
+      weightedColor.Add(pixels[xx + yy * iw], weight);
+  end;
+
+  weight := weightedCurve[Round(xf * (1-yf) * 255)];        //top-right
+  if weight > 0 then
+  begin
+    if (x > iw) or (y < 0) then
+      weightedColor.AddWeight(weight) else
+      weightedColor.Add(pixels[xR + yy * iw], weight);
+  end;
+
+  weight := weightedCurve[Round((1-xf) * yf * 255)];          //bottom-left
+  if weight > 0 then
+  begin
+    if (x < 0) or (y > ih) then
+      weightedColor.AddWeight(weight) else
+      weightedColor.Add(pixels[xx + yB * iw], weight);
+  end;
+
+  weight := weightedCurve[Round(xf * yf * 255)];              //bottom-right
   if weight > 0 then
   begin
     if (x > iw) or (y > ih) then
@@ -286,8 +375,7 @@ begin
   if (x <= -1) or (x >= iw +1) or
     (y <= -1) or (y >= ih +1) then Exit;
 
-  // scale the image fractionally so as to avoid the pixels along the
-  // right and bottom edges effectively duplicating their adjacent pixels
+  // scale the image fractionally so it's properly centered
   if (x > 0) and (x <= iw) then x := x - x/(iw+0.25);
   if (y > 0) and (y <= ih) then y := y - y/(ih+0.25);
 
@@ -417,6 +505,22 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure BoxDownSampling(Image: TImage32; scaleX, scaleY: double);
+begin
+  BoxDownSampling(Image,
+    Max(1, Integer(Round(Image.Width * scaleX))),
+    Max(1, Integer(Round(Image.Height * scaleY))));
+end;
+//------------------------------------------------------------------------------
+
+procedure BoxDownSampling(Image: TImage32; scale: double);
+begin
+  BoxDownSampling(Image,
+    Max(1, Integer(Round(Image.Width * scale))),
+    Max(1, Integer(Round(Image.Height * scale))));
+end;
+//------------------------------------------------------------------------------
+
 procedure BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer);
 var
   x,y, x256,y256,xx256,yy256: Integer;
@@ -465,12 +569,15 @@ const
   inv255     : double = 1/255;
   inv255sqrd : double = 1/(255*255);
   inv255cubed: double = 1/(255*255*255);
+  piDiv256   : double = Pi / 256;
 begin
   for i := 0 to 255 do
   begin
     byteFrac[i]  := i     *inv255;
     byteFracSq[i]  := i*i   *inv255sqrd;
     byteFracCubed[i] := i*i*i *inv255cubed;
+
+    weightedCurve[i] := Round((Cos(Pi+ i * piDiv256) +1) /2 * 255);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -481,6 +588,7 @@ initialization
   rNearestResampler  := RegisterResampler(NearestResampler, 'NearestNeighbor');
   rBilinearResampler := RegisterResampler(BilinearResample, 'Bilinear');
   rBicubicResampler  := RegisterResampler(BicubicResample, 'HermiteBicubic');
+  rWeightedBilinear  := RegisterResampler(WeightedBilinearResample, 'WeightedBilinear');
   DefaultResampler   := rBilinearResampler;
 
 end.

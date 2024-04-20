@@ -9,11 +9,13 @@
 </head>
 
 <body bgcolor="#FFFFFF">
-  <div class="menu" id="menu"><a class="ancestor" href="../../_Body.htm">Index</a><span class="active">Img32.Vector</span>
+  <div class="menu" id="menu"><a class="ancestor" href="../../_Body.htm">Index</a><span class="submenu_owner" onmouseover="onSubmenuPopup(this)"><span class="submenu_heading">Units</span>
+      <div class="submenu_background"><a href="../../Units/Img32/_Body.htm">Img32</a><a href="../../Units/Img32.Clipper2/_Body.htm">Img32.Clipper2</a><a href="../../Units/Img32.CQ/_Body.htm">Img32.CQ</a><a href="../../Units/Img32.Draw/_Body.htm">Img32.Draw</a><a href="../../Units/Img32.Extra/_Body.htm">Img32.Extra</a><a href="../../Units/Img32.Fmt.BMP/_Body.htm">Img32.Fmt.BMP</a><a href="../../Units/Img32.Fmt.GIF/_Body.htm">Img32.Fmt.GIF</a><a href="../../Units/Img32.Fmt.JPG/_Body.htm">Img32.Fmt.JPG</a><a href="../../Units/Img32.Fmt.PNG/_Body.htm">Img32.Fmt.PNG</a><a href="../../Units/Img32.Fmt.QOI/_Body.htm">Img32.Fmt.QOI</a><a href="../../Units/Img32.Fmt.SVG/_Body.htm">Img32.Fmt.SVG</a><a href="../../Units/Img32.FMX/_Body.htm">Img32.FMX</a><a href="../../Units/Img32.Layers/_Body.htm">Img32.Layers</a><a href="../../Units/Img32.Resamplers/_Body.htm">Img32.Resamplers</a><a href="../../Units/Img32.Storage/_Body.htm">Img32.Storage</a><a href="../../Units/Img32.SVG.Reader/_Body.htm">Img32.SVG.Reader</a><a href="../../Units/Img32.Text/_Body.htm">Img32.Text</a><a href="../../Units/Img32.Transform/_Body.htm">Img32.Transform</a><a href="../../Units/Img32.Vector/_Body.htm">Img32.Vector</a>
+      </div></span><span class="active">Img32.Vector</span><a class="icon_container" id="icon_container" href="javascript:void(0)" onclick="hamburger()"><img id="menu_icon" src="../Menu/hamburger.svg"></a>
   </div><br><br>
 
   <h1>Img32.Vector</h1>
-  <p>This unit is almost always needed when performing line and polygon drawing, as both lines and polygons depend on vector definitions (<a href="../Img32/Types/TPathD.htm"><b>TPathD</b></a> and <a href="../Img32/Types/TPathsD.htm"><b>TPathsD</b></a>).<br><br> This unit provides a whole host of functions to facilitate vector drawing, including: <a href="./Routines/MakePath.htm"><b>MakePath</b></a>; <a href="./Routines/OffsetPath.htm"><b>OffsetPath</b></a>; <a href="./Routines/Ellipse.htm"><b>Ellipse</b></a> &amp; <a href="./Routines/Arc.htm"><b>Arc</b></a>; <b>Bezier</b> &amp; <b>Spline</b> functions; and <a href="./Routines/Rectangle.htm"><b>Rectangle</b></a> &amp; <a href="./Routines/RoundRect.htm"><b>RoundRect</b></a>. </p>
+  <p>This unit is almost always needed when performing line and polygon drawing, as both lines and polygons depend on vector definitions (<a href="../Img32/Types/TPathD.htm"><b>TPathD</b></a> and <a href="../Img32/Types/TPathsD.htm"><b>TPathsD</b></a>).<br><br> This unit provides a whole host of functions to facilitate vector drawing, including: <a href="./Routines/MakePath.htm"><b>MakePath</b></a>; <a href="./Routines/Ellipse.htm"><b>Ellipse</b></a> &amp; <a href="./Routines/Arc.htm"><b>Arc</b></a>; <b>Bezier</b> &amp; <b>Spline</b> functions; and <a href="./Routines/Rectangle.htm"><b>Rectangle</b></a> &amp; <a href="./Routines/RoundRect.htm"><b>RoundRect</b></a>. </p>
   <h2 id="Auto-Contents">Contents</h2>
   <div class="autoTblContainer">
     <div class="autoTbl">
@@ -70,17 +72,12 @@
 <span><a href="Routines/GetUnitNormal.htm">GetUnitNormal</a></span>
 <span><a href="Routines/GetUnitVector.htm">GetUnitVector</a></span>
 <span><a href="Routines/GetVectors.htm">GetVectors</a></span>
-<span><a href="Routines/Grow.htm">Grow</a></span>
 <span><a href="Routines/InflateRect.htm">InflateRect</a></span>
 <span><a href="Routines/IntersectPoint.htm">IntersectPoint</a></span>
 <span><a href="Routines/IntersectRect.htm">IntersectRect</a></span>
 <span><a href="Routines/IsPointInEllipse.htm">IsPointInEllipse</a></span>
 <span><a href="Routines/MakePath.htm">MakePath</a></span>
-<span><a href="Routines/OffsetPath.htm">OffsetPath</a></span>
-<span><a href="Routines/OffsetPoint.htm">OffsetPoint</a></span>
-<span><a href="Routines/OffsetRect.htm">OffsetRect</a></span>
 <span><a href="Routines/OpenPathToFlatPolygon.htm">OpenPathToFlatPolygon</a></span>
-<span><a href="Routines/Outline.htm">Outline</a></span>
 <span><a href="Routines/Paths.htm">Paths</a></span>
 <span><a href="Routines/Pie.htm">Pie</a></span>
 <span><a href="Routines/PointInPolygon.htm">PointInPolygon</a></span>
@@ -93,12 +90,16 @@
 <span><a href="Routines/RotatedEllipse.htm">RotatedEllipse</a></span>
 <span><a href="Routines/RotatePath.htm">RotatePath</a></span>
 <span><a href="Routines/RotatePoint.htm">RotatePoint</a></span>
+<span><a href="Routines/RoughOutline.htm">RoughOutline</a></span>
 <span><a href="Routines/RoundRect.htm">RoundRect</a></span>
 <span><a href="Routines/ScalePath.htm">ScalePath</a></span>
 <span><a href="Routines/ScaleRect.htm">ScaleRect</a></span>
 <span><a href="Routines/ShortenPath.htm">ShortenPath</a></span>
 <span><a href="Routines/Star.htm">Star</a></span>
 <span><a href="Routines/StripNearDuplicates.htm">StripNearDuplicates</a></span>
+<span><a href="Routines/TranslatePath.htm">TranslatePath</a></span>
+<span><a href="Routines/TranslatePoint.htm">TranslatePoint</a></span>
+<span><a href="Routines/TranslateRect.htm">TranslateRect</a></span>
 <span><a href="Routines/UnionRect.htm">UnionRect</a></span>
 <span><a href="Routines/ValueAlmostOne.htm">ValueAlmostOne</a></span>
 <span><a href="Routines/ValueAlmostZero.htm">ValueAlmostZero</a></span>
@@ -125,8 +126,8 @@
     </div>
   </div>
   <h2 id="Auto-SeeAlso">See Also</h2>
-  <p class="Body"><a href="Routines/Arc.htm">Arc</a>, <a href="Routines/Ellipse.htm">Ellipse</a>, <a href="Routines/MakePath.htm">MakePath</a>, <a href="Routines/OffsetPath.htm">OffsetPath</a>, <a href="Routines/Rectangle.htm">Rectangle</a>, <a href="Routines/RoundRect.htm">RoundRect</a>, <a href="../Img32/Types/TPathD.htm">TPathD</a>, <a href="../Img32/Types/TPathsD.htm">TPathsD</a></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+  <p class="Body"><a href="Routines/Arc.htm">Arc</a>, <a href="Routines/Ellipse.htm">Ellipse</a>, <a href="Routines/MakePath.htm">MakePath</a>, <a href="Routines/Rectangle.htm">Rectangle</a>, <a href="Routines/RoundRect.htm">RoundRect</a>, <a href="../Img32/Types/TPathD.htm">TPathD</a>, <a href="../Img32/Types/TPathsD.htm">TPathsD</a></p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
 
 </body>
 

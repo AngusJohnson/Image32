@@ -2,18 +2,20 @@
 
 <head>
 
-  <title>OffsetRect</title>
+  <title>TranslateRect</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
 <script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Vector</a><span class="active">OffsetRect</span>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Vector</a><span class="active">TranslateRect</span>
   </div><br><br>
 
-  <h1>OffsetRect</h1>
-  <p class="Decl"><b>procedure</b> OffsetRect(<b>var</b> rec: TRectD; dx, dy: double); <b>overload</b>;</p>
+  <h1>TranslateRect</h1>
+  <p class="Decl"><b>procedure</b> TranslateRect(<b>var</b> rec: TRect; dx, dy: integer); <b>overload</b>;</p>
+
+  <p class="Decl"><b>procedure</b> TranslateRect(<b>var</b> rec: TRectD; dx, dy: double); <b>overload</b>;</p>
 <br class="half">
   <div class="code">
     <pre class="brush: delphi;">
@@ -31,7 +33,7 @@ begin
   DrawPoint(img, PointD(pt), 20, clNavy32);
   img.GaussianBlur(rec, 48);
 
-  Windows.OffsetRect(rec, -120, 0);
+  TranslateRect(rec, -120, 0);
   pt := MidPoint(rec);
   DrawPoint(img, PointD(pt), 20, clNavy32);
   img.GaussianBlur(rec, 24);
@@ -42,7 +44,7 @@ begin
   DrawPoint(img, PointD(pt), 20, clNavy32);
   img.BoxBlur(rec, 12, 3);
 
-  Windows.OffsetRect(rec, -120, 0);
+  TranslateRect(rec, -120, 0);
   pt := MidPoint(rec);
   DrawPoint(img, PointD(pt), 20, clNavy32);
   img.BoxBlur(rec, 6, 3);
@@ -53,7 +55,7 @@ begin
   <div><img src="../../../../Images/boxblur.png">
 
   </div>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
 
 </body>
 

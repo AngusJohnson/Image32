@@ -14,66 +14,46 @@
 
   <h1>BoxDownSampling</h1>
   <p class="Decl"><b>procedure</b> BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer);</p>
-  <p>As the name implies, <span class="monobold">BoxDownSampling</span> is only intended for down-sampling images, and it's consistently better at this than general purpose resamplers. The general purpose resamplers - eg bilinear and bicubic resamplers - are prone to 'pixelation' when shrinking images.<br><br> However <span class="monobold">BoxDownSampling</span> is very inferior to general purpose resamplers when up-sampling and when performing other kinds of transformations (eg rotating, and skewing images), so it should not be used for these purposes.<br> </p>
-  <div><img src="../../../../Images/boxDS_or.png" style="width:256px; height:256px; float:left;"><span style="float:left; max-width:450px;"><b>Original image</b><br> Original size - 512 x 512px.<br><br><br>Zoom in to better see the differences.</span>
+  <p>As the name implies, <span class="monobold">BoxDownSampling</span> is only intended for down-sampling images, and it's consistently better at this than general purpose resamplers. General purpose resamplers - eg bilinear and bicubic kernel resamplers - are prone to 'pixelation' when shrinking images.<br><br> On the other hand, <span class="monobold">BoxDownSampling</span> is very inferior to general purpose resamplers when up-sampling and when performing other kinds of transformations (eg rotating, and skewing images), so it should not be used for these purposes.<br> </p>
+  <div><img src="../../../../Images/boxDS_or.png" style="width:600px; height:600px; float:none;"><br><b>Original image</b><br> Original size - 1200 x 1200px.<br>
 
   </div>
-  <div><img src="../../../../Images/boxDS_bc.png" style="width:256px; height:256px; float:left;"><span style="float:left; max-width:450px;"><b>Bicubic downsampling</b><br>Note pixelation.<br><br><br>So the results of downsampling can be more easily seen, the original image was shrunk to 1/4 its original size then returned to its original size using bicubic resampling for both transformations.</span>
+  <div><img src="../../../../Images/boxDS_bc.png" style="width:102px; height:102px; float:none;"><br><b>Bicubic kernel resampling</b><br>Image scaled to 1/10 original size. Note pixelation.<br>
 
   </div>
-  <div><img src="../../../../Images/boxDS_ds.png" style="width:256px; height:256px; float:left;"><span style="float:left; max-width:450px;"><b>BoxDownSampling</b><br>Note mild blurring.<br><br><br>Again the original image was shrunk to 1/4 its original size, though this time using the BoxDownSampling function. However it was returned to its original size using bicubic resampling.</span>
+  <div><img src="../../../../Images/boxDS_ds.png" style="width:102px; height:102px; float:none;"><br><b>BoxDownSampling</b><br>Image scaled to 1/10 original size. Note mild blurring.<br>
 
   </div><br>
   <div class="code">
     <pre class="brush: delphi;">
-  uses Img32, Img32.Fmt.PNG, 
-  Img32.Extra, Img32.Resamplers;	
-	...
+uses Img32, Img32.Fmt.PNG, Img32.Resamplers;	
+...
 var
-  img, img2, img3: TImage32;
-  rec, rec2, rec3: TRect;
+  img: TImage32;
 const
-  scale = 0.25;
-  invScale = 1/scale;
+  scale = 0.1;
 begin
   img := TImage32.Create;
-  img2 := TImage32.Create;
-  img3 := TImage32.Create;
   try
 
-    //Bicubic downsampling
-    img.LoadFromFile('fruit.png');
+    //Bicubic kernel resampling
+    img.LoadFromFile('TextOnPath.png');
     img.Resampler := rBicubicResampler;
     img.Scale(scale);
+    img.SaveToFile('TextOnPath_bc.png')
 
     //BoxDownSampling
-    img2.LoadFromFile('fruit.png');
-    BoxDownSampling(img2, 
-      Round(img2.Width * scale), 
-      Round(img2.Height * scale));
+    img.LoadFromFile('TextOnPath.png');
+    BoxDownSampling(img, scale, scale), 
+    img.SaveToFile('TextOnPath_ds.png')
 
-    //Merge (average) the two images above
-    img3.Assign(img);
-    img3.CopyBlend(img2, 
-      img2.Bounds, img3.Bounds, BlendAverage);
-
-    //make them all bigger again 
-    //so we can see the results
-    img.Scale(invScale);
-    img.SaveToFile('bicubic.png');
-    img2.Scale(invScale);
-    img2.SaveToFile('box.png');
-    img3.Scale(invScale);
-    img3.SaveToFile('merged.png');
   finally
     img.free;
-    img2.free;
-    img3.free;
   end;
 end;
     </pre>
   </div>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
 
 </body>
 

@@ -9,11 +9,13 @@
 </head>
 
 <body bgcolor="#FFFFFF">
-  <div class="menu" id="menu"><a class="ancestor" href="../../_Body.htm">Index</a><span class="active">Img32.Resamplers</span>
+  <div class="menu" id="menu"><a class="ancestor" href="../../_Body.htm">Index</a><span class="submenu_owner" onmouseover="onSubmenuPopup(this)"><span class="submenu_heading">Units</span>
+      <div class="submenu_background"><a href="../../Units/Img32/_Body.htm">Img32</a><a href="../../Units/Img32.Clipper2/_Body.htm">Img32.Clipper2</a><a href="../../Units/Img32.CQ/_Body.htm">Img32.CQ</a><a href="../../Units/Img32.Draw/_Body.htm">Img32.Draw</a><a href="../../Units/Img32.Extra/_Body.htm">Img32.Extra</a><a href="../../Units/Img32.Fmt.BMP/_Body.htm">Img32.Fmt.BMP</a><a href="../../Units/Img32.Fmt.GIF/_Body.htm">Img32.Fmt.GIF</a><a href="../../Units/Img32.Fmt.JPG/_Body.htm">Img32.Fmt.JPG</a><a href="../../Units/Img32.Fmt.PNG/_Body.htm">Img32.Fmt.PNG</a><a href="../../Units/Img32.Fmt.QOI/_Body.htm">Img32.Fmt.QOI</a><a href="../../Units/Img32.Fmt.SVG/_Body.htm">Img32.Fmt.SVG</a><a href="../../Units/Img32.FMX/_Body.htm">Img32.FMX</a><a href="../../Units/Img32.Layers/_Body.htm">Img32.Layers</a><a href="../../Units/Img32.Resamplers/_Body.htm">Img32.Resamplers</a><a href="../../Units/Img32.Storage/_Body.htm">Img32.Storage</a><a href="../../Units/Img32.SVG.Reader/_Body.htm">Img32.SVG.Reader</a><a href="../../Units/Img32.Text/_Body.htm">Img32.Text</a><a href="../../Units/Img32.Transform/_Body.htm">Img32.Transform</a><a href="../../Units/Img32.Vector/_Body.htm">Img32.Vector</a>
+      </div></span><span class="active">Img32.Resamplers</span><a class="icon_container" id="icon_container" href="javascript:void(0)" onclick="hamburger()"><img id="menu_icon" src="../Menu/hamburger.svg"></a>
   </div><br><br>
 
   <h1>Img32.Resamplers</h1>
-  <p>Resampling is used whenever an image's geometry (size or shape) is changed, whether by scaling, rotating, skewing or any other transformation. There are multiple resampling functions because each has its strengths and weaknesses.<br><br> The library supplies three resampling functions which can be selected using a unique numeric identifier: 
+  <p>Resampling is used whenever an image's geometry (size or shape) is changed, whether by scaling, rotating, skewing or any other transformation. There are multiple resampling functions because each has its strengths and weaknesses.<br><br> The library supplies four resampling functions which can be selected using a unique numeric identifier: 
     <ul>
 
       <li><span class="monobold">rNearestResampler</span>: "nearest neighbour" is very fast but sacrifices quality.</li>
@@ -22,9 +24,11 @@
 
       <li><span class="monobold">rBicubicResampler</span>: "bicubic" is relatively slow but produces excellent quality images.</li>
 
+      <li><span class="monobold">rWeightedBilinear</span>: "weighted bilinear" is just as fast as bilinear while a little less blurry, but also with slightly more pixelation.</li>
+
     </ul></p>
   <p> Additional resamplers can be added using the <a href="../Img32/Routines/RegisterResampler.htm"><b>RegisterResampler</b></a> function. (The resampling function's unique identifier will be assigned when it's registered.)<br><br> When a <a href="../Img32/Classes/TImage32/_Body.htm"><b>TImage32</b></a> object is created, it's assigned the <span class="monobold">DefaultResampler</span> (<span class="monobold">rBilinearResampler</span>), which will be used if or when the image's geometry is changed. The <span class="monobold">TImage32</span>'s resampling function can easily be changed through its <a href="../Img32/Classes/TImage32/Properties/Resampler.htm"><b>Resampler</b></a> property.<br> </p>
-  <div><span style="float:left;"> <b>rNearestResampler</b>:<br> Fast, pixelated<br> <img src="../../../Images/resampler2.png"></span><span style="float:left;"> <b>rBilinearResampler</b>:<br> Avg. speed, high quality<br> <img src="../../../Images/resampler3.png"> </span><span style="float:left;"> <b>rBicubicResampler</b>:<br> Slow, best quality<br> <img src="../../../Images/resampler4.png"></span><span style="float:left;"> <b>Original image</b>:<br> <img src="../../../Images/resampler1.png"></span>
+  <div><span>From Examples/Resampling ... <img src="../../../Images/Resampling1.png" style="float:none;"></span><br><img src="../../../Images/Resampling.png">
 
   </div>
   <h2 id="Auto-Contents">Contents</h2>
@@ -39,7 +43,7 @@
   </div>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="../Img32/Classes/TImage32/_Body.htm">TImage32</a>, <a href="../Img32/Classes/TImage32/Properties/Resampler.htm">TImage32.Resampler</a>, <a href="../Img32/Routines/RegisterResampler.htm">RegisterResampler</a></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
 
 </body>
 

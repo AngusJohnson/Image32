@@ -547,7 +547,7 @@ var
   rNearestResampler : integer;
   rBilinearResampler: integer;
   rBicubicResampler : integer;
-
+  rWeightedBilinear : integer;
   DefaultResampler: Integer = 0;
 
   //Both MulTable and DivTable are used in blend functions

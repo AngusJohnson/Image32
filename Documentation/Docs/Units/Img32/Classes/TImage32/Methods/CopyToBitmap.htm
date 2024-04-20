@@ -1,0 +1,53 @@
+<html>
+
+<head>
+
+  <title>CopyToBitmap</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../../../../../../Styles/Default.css" type="text/css">
+<script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/bootstrap.js"></script>
+</head>
+
+<body bgcolor="#FFFFFF">
+  <div class="menu" id="menu"><a class="ancestor" href="../../../../../_Body.htm">Index</a><a class="ancestor" href="../../../_Body.htm">Img32</a><a class="ancestor" href="../_Body.htm">TImage32</a><span class="active">CopyToBitmap</span>
+  </div><br><br>
+
+  <h1>TImage32.CopyToBitmap</h1>
+  <p class="Decl"><b>procedure</b> CopyToBitmap(bmp: TBitmap; dstLeft: integer = <span class="Number">0</span>; dstTop: integer = <span class="Number">0</span>);</p><br class="half">
+
+  <p>Blend copies the image onto the specified bitmap at the specified position.<br></p>
+  <p class="maroon">Note 1: Generally it's much more efficient to draw directly onto a TCanvas (rather than drawing to a TBitmap and then drawing that bitmap onto a Canvas). Therefore this method should only be used in applications that must use TBitmap objects.</p>
+  <p class="maroon">Note 2: This method will only be accessible when compiling Windows VCL applications.</p>
+  <p> 
+    <h3>Example</h3> 
+    <div class="code">
+      <pre class="brush: delphi;">
+  uses Img32, Img32.Fmt.PNG;
+  ...
+var
+  img: TImage32;
+  bmp: TBitmap;
+begin
+  img := TImage32.Create;
+  bmp := TBitmap.Create;
+  try
+    img.LoadFromResource('Beetle', 'PNG');
+    with bmp do
+    begin
+      SetSize(img.Width, img.Height);
+      Canvas.Brush.Color := clBtnFace;
+      Canvas.FillRect(Rect(0,0,Width,Height));
+    end;
+    img.CopyToBitmap(bmp);
+    // and now do something with 'bmp' ...
+  finally
+    img.Free;
+    bmp.Free;
+  end;
+      </pre>
+    </div> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
+
+</body>
+
+</html>

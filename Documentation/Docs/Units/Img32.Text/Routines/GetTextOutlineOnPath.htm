@@ -2,18 +2,18 @@
 
 <head>
 
-  <title>GetTextGlyphsOnPath</title>
+  <title>GetTextOutlineOnPath</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
 <script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Text</a><span class="active">GetTextGlyphsOnPath</span>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Text</a><span class="active">GetTextOutlineOnPath</span>
   </div><br><br>
 
-  <h1>GetTextGlyphsOnPath</h1>
-  <p class="Decl"><b>function</b> GetTextGlyphsOnPath(<b>const</b> text: UnicodeString; <b>const</b> path: TPathD; TFontCache: <a href="../Classes/TFontCache/_Body.htm"><b>TFontCache</b></a>; textAlign: <a href="../Types/TTextAlign.htm"><b>TTextAlign</b></a>; perpendicOffset: integer = 0; charSpacing: double = 0): <a href="../../Img32/Types/TPathsD.htm"><b>TPathsD</b></a>;<br></p>
+  <h1>GetTextOutlineOnPath</h1>
+  <p class="Decl"><b>function</b> GetTextOutlineOnPath(<b>const</b> text: UnicodeString; <b>const</b> path: TPathD; TFontCache: <a href="../Classes/TFontCache/_Body.htm"><b>TFontCache</b></a>; textAlign: <a href="../Types/TTextAlign.htm"><b>TTextAlign</b></a>; perpendicOffset: integer = 0; charSpacing: double = 0): <a href="../../Img32/Types/TPathsD.htm"><b>TPathsD</b></a>;<br></p>
   <p> <img id="img" src="../../../../Images/GetTextGlyphsOnPath.png"><br><br> 
     <div class="code">
       <pre class="brush: delphi;">
@@ -30,7 +30,7 @@ begin
   try
     p := MakePathD([50,400, 50,50, 450,400, 450,50]);
     p := FlattenCBezier(p);
-    pp := GetTextGlyphsOnPath(
+    pp := GetTextOutlineOnPath(
       'The quick brown fox jumps over the lazy dog', p, gc, taCenter, 5, 3);
     img2.Clear(clWhite32);
     DrawLine(img2, p, 1, clRed32, esButt, jsAuto);
@@ -45,7 +45,7 @@ begin
     </div> </p>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="../Classes/TFontCache/_Body.htm">TFontCache</a>, <a href="../Types/TTextAlign.htm">TTextAlign</a>, <a href="../../Img32/Types/TPathsD.htm">TPathsD</a></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.2&nbsp; - &nbsp;Help file built on 26 Mar 2023 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
 
 </body>
 

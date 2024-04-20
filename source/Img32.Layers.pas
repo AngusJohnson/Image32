@@ -256,7 +256,6 @@ type
     //fMatrix: allows combining any number of scaling & rotating ops.
     fMatrix       : TMatrixD;
     fRotating     : Boolean;
-    //fSavedMidPt   : TPointD;
     fPreScaleSize : TSize;
     fAutoHitTest  : Boolean;
     procedure DoAutoHitTest;
@@ -274,7 +273,6 @@ type
 
     property  AutoSetHitTestMask: Boolean read fAutoHitTest write fAutoHitTest;
     property  MasterImage: TImage32 read fMasterImg;
-    //property  Matrix: TMatrixD read fMatrix;
   end;
 
   TButtonDesignerLayer32 = class;
