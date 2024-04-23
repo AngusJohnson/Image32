@@ -2,12 +2,12 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'Resampling'
-  ClientHeight = 1094
+  ClientHeight = 1161
   ClientWidth = 1524
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -27
+  Font.Height = -28
   Font.Name = 'Tahoma'
   Font.Style = []
   KeyPreview = True
@@ -15,12 +15,12 @@ object MainForm: TMainForm
   OnDestroy = FormDestroy
   OnKeyPress = FormKeyPress
   PixelsPerInch = 192
-  TextHeight = 33
+  TextHeight = 34
   object TabControl1: TTabControl
     Left = 0
     Top = 0
     Width = 1524
-    Height = 1056
+    Height = 1123
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
@@ -34,10 +34,12 @@ object MainForm: TMainForm
     TabIndex = 0
     TabStop = False
     OnChange = TabControl1Change
+    ExplicitWidth = 1510
+    ExplicitHeight = 1055
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 1056
+    Top = 1123
     Width = 1524
     Height = 38
     Margins.Left = 6
@@ -46,9 +48,6 @@ object MainForm: TMainForm
     Margins.Bottom = 6
     Panels = <>
     SimplePanel = True
-    SimpleText = '  Ctrl + MouseWheell --> to zoom in or out'
-    ExplicitLeft = 8
-    ExplicitTop = 997
-    ExplicitWidth = 1508
+    SimpleText = '  Ctrl + MouseWheel --> to zoom in or out'
   end
 end

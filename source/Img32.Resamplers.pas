@@ -38,30 +38,21 @@ implementation
 uses
   Img32.Transform;
 
+var
+  sinWeighted: array [0..255] of Cardinal;
+
 //------------------------------------------------------------------------------
 // NearestNeighbor resampler
 //------------------------------------------------------------------------------
 
 function NearestResampler(img: TImage32; x, y: double): TColor32;
 var
-  iw, ih, xx, yy: integer;
+  xi, yi: integer;
 begin
-  iw := img.Width;
-  ih := img.Height;
-  if (x < -0.5) or (x -0.5 >= iw) or
-     (y < -0.5) or (y -0.5 >= ih) then
-  begin
-    Result := clNone32;
-    Exit;
-  end;
-
-  // scale the image fractionally so it's properly centered
-  if (x > 0) and (x < iw) then x := x - x/(iw+0.2);
-  if (y > 0) and (y < ih) then y := y - y/(ih+0.2);
-
-  xx := Min(Max(0, Round(x)), iw -1);
-  yy := Min(Max(0, Round(y)), ih -1);
-  Result := img.Pixels[xx + yy * img.Width];
+  xi := Round(x); yi := Round(y);
+  if (xi < 0) or (yi < 0) or (xi >= img.Width) or (yi >= img.Height) then
+    Result := clNone32 else
+    Result := img.Pixels[xi + yi * img.Width];
 end;
 
 //------------------------------------------------------------------------------
@@ -81,16 +72,9 @@ begin
   ih := img.Height;
   pixels := img.Pixels;
 
-  if (x < -1) or (x >= iw + 1) or
-     (y < -1) or (y >= ih + 1) then
-  begin
-    result := clNone32;
-    Exit;
-  end;
-
-  // scale the image fractionally so it's properly centered
-  if (x > 0) and (x < iw) then x := x - x/(iw+0.2);
-  if (y > 0) and (y < ih) then y := y - y/(ih+0.2);
+  // avoid antialiasing when x or y is very close to zero
+  if (x < 0) and (x >= -0.5) then x := 0;
+  if (y < 0) and (y >= -0.5) then y := 0;
 
   if x < 0 then
     xf := frac(1+x) else
@@ -128,7 +112,7 @@ begin
   weight := Round(xf * (1-yf) * 255);         //top-right
   if weight > 0 then
   begin
-    if (x > iw) or (y < 0) then
+    if (x > iw - 0.5) or (y < 0) then
       weightedColor.AddWeight(weight) else
       weightedColor.Add(pixels[xR + yy * iw], weight);
   end;
@@ -136,7 +120,7 @@ begin
   weight := Round((1-xf) * yf * 255);          //bottom-left
   if weight > 0 then
   begin
-    if (x < 0) or (y > ih) then
+    if (x < 0) or (y > ih - 0.5) then
       weightedColor.AddWeight(weight) else
       weightedColor.Add(pixels[xx + yB * iw], weight);
   end;
@@ -144,16 +128,13 @@ begin
   weight := Round(xf * yf * 255);              //bottom-right
   if weight > 0 then
   begin
-    if (x > iw) or (y > ih) then
+    if (x > iw - 0.5) or (y > ih - 0.5) then
       weightedColor.AddWeight(weight) else
       weightedColor.Add(pixels[xR + yB * iw], weight);
   end;
   Result := weightedColor.Color;
 end;
 //------------------------------------------------------------------------------
-
-var
-  weightedCurve: array [0..255] of Cardinal;
 
 // WeightedBilinearResample: A modified bilinear resampler that's
 // less blurry but also a little more pixelated.
@@ -170,20 +151,13 @@ begin
   ih := img.Height;
   pixels := img.Pixels;
 
-  if (x < -1) or (x >= iw + 1) or
-     (y < -1) or (y >= ih + 1) then
-  begin
-    result := clNone32;
-    Exit;
-  end;
-
-  // scale the image fractionally so it's properly centered
-  if (x > 0) and (x < iw) then x := x - x/(iw+0.2);
-  if (y > 0) and (y < ih) then y := y - y/(ih+0.2);
+  if (x < 0) and (x >= -0.5) then x := 0;
+  if (y < 0) and (y >= -0.5) then y := 0;
 
   if x < 0 then
     xf := frac(1+x) else
     xf := frac(x);
+
   if y < 0 then
     yf := frac(1+y) else
     yf := frac(y);
@@ -206,7 +180,7 @@ begin
 
   weightedColor.Reset;
 
-  weight := weightedCurve[Round((1-xf) * (1-yf) * 255)];      //top-left
+  weight := sinWeighted[Round((1-xf) * (1-yf) * 255)];      //top-left
   if weight > 0 then
   begin
     if (x < 0) or (y < 0) then
@@ -214,26 +188,26 @@ begin
       weightedColor.Add(pixels[xx + yy * iw], weight);
   end;
 
-  weight := weightedCurve[Round(xf * (1-yf) * 255)];        //top-right
+  weight := sinWeighted[Round(xf * (1-yf) * 255)];        //top-right
   if weight > 0 then
   begin
-    if (x > iw) or (y < 0) then
+    if (x > iw - 0.5) or (y < 0) then
       weightedColor.AddWeight(weight) else
       weightedColor.Add(pixels[xR + yy * iw], weight);
   end;
 
-  weight := weightedCurve[Round((1-xf) * yf * 255)];          //bottom-left
+  weight := sinWeighted[Round((1-xf) * yf * 255)];          //bottom-left
   if weight > 0 then
   begin
-    if (x < 0) or (y > ih) then
+    if (x < 0) or (y > ih - 0.5) then
       weightedColor.AddWeight(weight) else
       weightedColor.Add(pixels[xx + yB * iw], weight);
   end;
 
-  weight := weightedCurve[Round(xf * yf * 255)];              //bottom-right
+  weight := sinWeighted[Round(xf * yf * 255)];              //bottom-right
   if weight > 0 then
   begin
-    if (x > iw) or (y > ih) then
+    if (x > iw - 0.5) or (y > ih - 0.5) then
       weightedColor.AddWeight(weight) else
       weightedColor.Add(pixels[xR + yB * iw], weight);
   end;
@@ -269,7 +243,6 @@ begin
   case bce of
     eaPreStart:
       begin
-        Inc(aclr);
         a := @clTrans;
         b := @clTrans;
         c := PARGB(aclr);
@@ -277,14 +250,12 @@ begin
       end;
     eaStart:
       begin
-        a := PARGB(aclr);
-        b := a;
-        Inc(aclr);
-        c := PARGB(aclr);
-        d := c;
+        result := aclr^;
+        Exit;
       end;
     eaEnd:
       begin
+        Dec(aclr);
         a := PARGB(aclr);
         Inc(aclr);
         b := PARGB(aclr);
@@ -300,6 +271,7 @@ begin
       end;
     else
       begin
+        Dec(aclr);
         a := PARGB(aclr);
         Inc(aclr);
         b := PARGB(aclr);
@@ -375,21 +347,17 @@ begin
   if (x <= -1) or (x >= iw +1) or
     (y <= -1) or (y >= ih +1) then Exit;
 
-  // scale the image fractionally so it's properly centered
-  if (x > 0) and (x <= iw) then x := x - x/(iw+0.25);
-  if (y > 0) and (y <= ih) then y := y - y/(ih+0.25);
-
-  if x < 0 then bceX := eaPreStart
-  else if x > iw then bceX := eaPostEnd
+  if x < -0.5 then bceX := eaPreStart
+  else if x > iw - 0.5 then bceX := eaPostEnd
   else if iw = 1 then bceX := eaOnePixel
-  else if x < 1 then bceX := eaStart
+  else if x < 0 then bceX := eaStart
   else if x >= iw -1 then bceX := eaEnd
   else bceX := eaNormal;
 
-  if y < 0 then bceY := eaPreStart
-  else if y > ih then bceY := eaPostEnd
+  if y < -0.5 then bceY := eaPreStart
+  else if y > ih -0.5 then bceY := eaPostEnd
   else if ih = 1 then bceY := eaOnePixel
-  else if y < 1 then bceY := eaStart
+  else if y < 0 then bceY := eaStart
   else if y >= ih -1 then bceY := eaEnd
   else bceY := eaNormal;
 
@@ -400,15 +368,12 @@ begin
     yFrac := Round(frac(1+y) *255) else
     yFrac := Round(frac(y) *255);
 
-  if (x < 0) then x := 0
-  else if (x >= 1) then x := x - 1;
-  if (y < 0) then y := 0
-  else if (y >= 1) then y := y - 1;
-
   if bceY = eaPostEnd then dy := 1
   else if bceY = eaNormal then dy := 4
   else dy := 2;
 
+  x := Max(0, Min(iw-1, x));
+  y := Max(0, Min(ih-1, y));
   pxIdx := Floor(y) * iw + Floor(x);
 
   if bceY = eaOnePixel then
@@ -577,7 +542,7 @@ begin
     byteFracSq[i]  := i*i   *inv255sqrd;
     byteFracCubed[i] := i*i*i *inv255cubed;
 
-    weightedCurve[i] := Round((Cos(Pi+ i * piDiv256) +1) /2 * 255);
+    sinWeighted[i] := Round((Sin(i * piDiv256 - Pi/2) +1) /2 * 255);
   end;
 end;
 //------------------------------------------------------------------------------

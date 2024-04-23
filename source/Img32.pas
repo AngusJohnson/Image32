@@ -1980,7 +1980,7 @@ begin
 
   BlockNotify;
   try
-    if fResampler = 0 then
+    if fResampler <= rNearestResampler then
       NearestNeighborResize(newWidth, newHeight)
     else
       ResamplerResize(newWidth, newHeight);
@@ -2007,16 +2007,15 @@ begin
   //get scaled X & Y values once only (storing them in lookup arrays) ...
   SetLength(scaledXi, newWidth);
   for x := 0 to newWidth -1 do
-    scaledXi[x] := Floor(x * fWidth / newWidth);
+    scaledXi[x] := Trunc(x * fWidth / newWidth);
   SetLength(scaledYi, newHeight);
   for y := 0 to newHeight -1 do
-    scaledYi[y] := Floor(y * fHeight / newHeight);
+    scaledYi[y] := Trunc(y * fHeight / newHeight);
 
   pc := @tmp[0];
   for y := 0 to newHeight - 1 do
   begin
     srcY := scaledYi[y];
-    if (srcY < 0) or (srcY >= fHeight) then Continue;
     for x := 0 to newWidth - 1 do
     begin
       pc^ := fPixels[scaledXi[x] + srcY * fWidth];

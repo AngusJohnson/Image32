@@ -38,10 +38,10 @@ type
   procedure MatrixApply(const matrix: TMatrixD; var paths: TPathsD); overload;
   function  MatrixInvert(var matrix: TMatrixD): Boolean;
 
-  //MatrixSkew: dx represents the delta offset of an X coordinate as a
-  //fraction of its Y coordinate, and likewise for dy. For example, if dx = 0.1
-  //and dy = 0, and the matrix is applied to the coordinate [20,15], then the
-  //transformed coordinate will become [20 + (15 * 0.1),10], ie [21.5,10].
+  // MatrixSkew: dx represents the delta offset of an X coordinate as a
+  // fraction of its Y coordinate, and likewise for dy. Example: if dx = 0.1
+  // and dy = 0, and the matrix is applied to the coordinate [20,15], then the
+  // transformed coordinate will become [20 + (15 * 0.1),10], ie [21.5,10].
   procedure MatrixSkew(var matrix: TMatrixD; angleX, angleY: double);
   procedure MatrixScale(var matrix: TMatrixD; scale: double); overload;
   procedure MatrixScale(var matrix: TMatrixD; scaleX, scaleY: double); overload;
@@ -49,8 +49,14 @@ type
     const center: TPointD; angRad: double);
   procedure MatrixTranslate(var matrix: TMatrixD; dx, dy: double);
 
-  //AffineTransformImage: automagically resizes and translates the image
-  function AffineTransformImage(img: TImage32; matrix: TMatrixD): TPoint;
+  // The following MatrixExtract routines assume here is no skew
+  procedure MatrixExtractScale(const mat: TMatrixD; out sx, sy: double);
+  procedure MatrixExtractTranslation(const mat: TMatrixD; out dx, dy: double);
+  procedure MatrixExtractRotation(const mat: TMatrixD; out angle: double);
+
+  //AffineTransformImage: will automagically translate the image
+  function AffineTransformImage(img: TImage32; matrix: TMatrixD;
+    scaleAdjust: Boolean = false): TPoint;
 
   //ProjectiveTransform:
   //  srcPts, dstPts => each path must contain 4 points
@@ -367,6 +373,36 @@ begin
   m[0, 1] := tan(angleY);
   matrix := MatrixMultiply(m, matrix);
 end;
+//------------------------------------------------------------------------------
+
+procedure MatrixExtractScale(const mat: TMatrixD; out sx, sy: double);
+begin
+  sx := Sqrt(Sqr(mat[0,0]) + Sqr(mat[0,1]));
+  sy := Sqrt(Sqr(mat[1,0]) + Sqr(mat[1,1]));
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixExtractTranslation(const mat: TMatrixD; out dx, dy: double);
+begin
+  dx := mat[2,0];
+  dy := mat[2,1];
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixExtractRotation(const mat: TMatrixD; out angle: double);
+var
+  sx, sy: double;
+  mat2: TMatrixD;
+begin
+  MatrixExtractScale(mat, sx, sy);
+  mat2 := mat;
+  mat2[0,0] := mat2[0,0] / sx;
+  mat2[0,1] := mat2[0,1] / sx;
+  mat2[1,0] := mat2[1,0] / sy;
+  mat2[1,1] := mat2[1,1] / sy;
+
+  angle := ArcCos(mat2[0,0]);
+end;
 
 //------------------------------------------------------------------------------
 // Affine Transformation
@@ -382,11 +418,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function AffineTransformImage(img: TImage32; matrix: TMatrixD): TPoint;
+function AffineTransformImage(img: TImage32; matrix: TMatrixD;
+  scaleAdjust: Boolean): TPoint;
 var
   i, j: integer;
   newWidth, newHeight: integer;
-  x,y: double;
+  sx, sy, x,y: double;
+  xLimLo, yLimLo, xLimHi, yLimHi: double;
   pc: PColor32;
   tmp: TArrayOfColor32;
   dstRec: TRect;
@@ -406,6 +444,14 @@ begin
 
   RectWidthHeight(dstRec, newWidth, newHeight);
 
+  sx := 1; sy := 1;
+  if scaleAdjust then
+  begin
+    MatrixExtractScale(matrix, sx, sy);
+    sx := Max(1, sx/4);
+    sy := Max(1, sy/4);
+  end;
+
   //auto-translate the image too
   Result := dstRec.TopLeft;
 
@@ -415,14 +461,22 @@ begin
 
   SetLength(tmp, newWidth * newHeight);
   pc := @tmp[0];
+  xLimLo := -0.5/sx;
+  xLimHi := img.Width + 0.5/sx;
+  yLimLo := -0.5/sy;
+  yLimHi := img.Height + 0.5/sy;
 
-  for i := dstRec.Top to + dstRec.Bottom -1 do
+  for i := dstRec.Top to dstRec.Bottom -1 do
   begin
     for j := dstRec.Left to dstRec.Right -1 do
     begin
       x := j; y := i;
       MatrixApply(matrix, x, y);
-      pc^ := resampler(img, x, y);
+      if (x <= xLimLo) or (x >= xLimHi) or (y <= yLimLo) or (y >= yLimHi) then
+        pc^ := clNone32 else
+        // nb: -0.5 below is needed to properly center the transformed image
+        // (and this is most obviously needed when there is large scaling)
+        pc^ := resampler(img, x - 0.5, y - 0.5);
       inc(pc);
     end;
   end;

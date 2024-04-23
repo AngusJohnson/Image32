@@ -3,9 +3,9 @@ unit Main;
 interface
 
 uses
-  Windows, Types, SysUtils, Classes, Controls, Forms,
+  Windows, Types, SysUtils, Classes, Controls, Forms, Math, ComCtrls,
   Img32, Img32.Panels, Img32.Resamplers, Img32.Vector, Img32.Extra,
-  Img32.Fmt.BMP, Img32.Fmt.PNG, Img32.Draw, Img32.Text, Vcl.ComCtrls;
+  Img32.Fmt.BMP, Img32.Fmt.PNG, Img32.Draw, Img32.Text, Img32.Transform;
 
 type
   TMainForm = class(TForm)
@@ -101,8 +101,10 @@ var
   img: TImage32;
   rec, dstRect: TRect;
   tr: TTimeRec;
+  mat: TMatrixD;
 const
   len = 220;
+  useMatix = false;//true;//
 begin
   ImagePanel.Image.Clear;
   img := TImage32.Create;
@@ -119,7 +121,7 @@ begin
     img.SetSize(3,3);
     img.Clear(clBlue32);
     img.FillRect(Types.Rect(1,1,2,2), clRed32);
-    img.Resampler := rWeightedBilinear;
+    img.Resampler := rBilinearResampler;
     img.Resize(len,len);
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
     TranslateRect(dstRect, 0, len + 10);
@@ -127,7 +129,7 @@ begin
     img.SetSize(3,3);
     img.Clear(clBlue32);
     img.FillRect(Types.Rect(1,1,2,2), clRed32);
-    img.Resampler := rBilinearResampler;
+    img.Resampler := rWeightedBilinear;
     img.Resize(len,len);
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
     TranslateRect(dstRect, 0, len + 10);
@@ -144,81 +146,100 @@ begin
     rec := Types.Rect(10, 10, len, len);
     rec := GetRotatedRectBounds(rec, angle15);
     d := Round(len * len/rec.Width);
+    mat := IdentityMatrix;
+    MatrixScale(mat, d);
+    MatrixRotate(mat, NullPointD, DegToRad(15));
 
     img.SetSize(3,3);
     img.Clear(clBlue32);
     img.FillRect(Types.Rect(1,1,2,2), clRed32);
-    img.Resampler := rNearestResampler;
-    StartTimer(tr);
-    img.Resize(d, d);
-    img.Rotate(angle15);
-    times[0] := EndTimer(tr);
+    img.Resampler := rNearestResampler; /////
+    if useMatix then
+      AffineTransformImage(img, mat, true)
+    else
+    begin
+      img.Resize(d, d);
+      img.Rotate(angle15);
+    end;
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
     TranslateRect(dstRect, 0, len + 10);
 
     img.SetSize(3,3);
     img.Clear(clBlue32);
     img.FillRect(Types.Rect(1,1,2,2), clRed32);
-    img.Resampler := rWeightedBilinear;
-    StartTimer(tr);
-    img.Resize(d, d);
-    img.Rotate(angle15);
-    times[1] := EndTimer(tr);
+    img.Resampler := rBilinearResampler; /////
+    if useMatix then
+      AffineTransformImage(img, mat, true)
+    else
+    begin
+      img.Resize(d, d);
+      img.Rotate(angle15);
+    end;
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
     TranslateRect(dstRect, 0, len + 10);
 
     img.SetSize(3,3);
     img.Clear(clBlue32);
     img.FillRect(Types.Rect(1,1,2,2), clRed32);
-    img.Resampler := rBilinearResampler;
-    StartTimer(tr);
-    img.Resize(d, d);
-    img.Rotate(angle15);
-    times[2] := EndTimer(tr);
+    img.Resampler := rWeightedBilinear; /////
+    if useMatix then
+      AffineTransformImage(img, mat, true)
+    else
+    begin
+      img.Resize(d, d);
+      img.Rotate(angle15);
+    end;
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
     TranslateRect(dstRect, 0, len + 10);
 
     img.SetSize(3,3);
     img.Clear(clBlue32);
     img.FillRect(Types.Rect(1,1,2,2), clRed32);
-    img.Resampler := rBicubicResampler;
-    StartTimer(tr);
-    img.Resize(d, d);
-    img.Rotate(angle15);
-    times[3] := EndTimer(tr);
+    img.Resampler := rBicubicResampler; /////
+    if useMatix then
+      AffineTransformImage(img, mat, true)
+    else
+    begin
+      img.Resize(d, d);
+      img.Rotate(angle15);
+    end;
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
     TranslateRect(dstRect, len + 10, -dstRect.Top + 10);
     //-----------------
 
     img.LoadFromFile('beetle.png');
     img.Resampler := rNearestResampler;
+    StartTimer(tr);
     img.Rotate(angle60);
+    times[0] := EndTimer(tr);
     img.CropTransparentPixels;
-    img.ScaleToFit(len, len);
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
     TranslateRect(dstRect, 0, len + 10);
 
     img.LoadFromFile('beetle.png');
-    img.Resampler := rWeightedBilinear;
+    img.Resampler := rBilinearResampler;
+    StartTimer(tr);
     img.Rotate(angle60);
+    times[1] := EndTimer(tr);
     img.CropTransparentPixels;
-    img.ScaleToFit(len, len);
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
     TranslateRect(dstRect, 0, len +10);
 
     img.LoadFromFile('beetle.png');
-    img.Resampler := rBilinearResampler;
+    img.Resampler := rWeightedBilinear;
+    StartTimer(tr);
     img.Rotate(angle60);
+    times[2] := EndTimer(tr);
     img.CropTransparentPixels;
-    img.ScaleToFit(len, len);
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
     TranslateRect(dstRect, 0, len +10);
 
     img.LoadFromFile('beetle.png');
     img.Resampler := rBicubicResampler;
+    StartTimer(tr);
     img.Rotate(angle60);
+    times[3] := EndTimer(tr);
     img.CropTransparentPixels;
-    img.ScaleToFit(len, len);
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
     TranslateRect(dstRect, len + 10, -dstRect.Top + 10);
 
@@ -229,22 +250,33 @@ begin
   DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 -10,
     'Resampler: rNearestResampler', fontCacheSmall);
   DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 +20,
-    format('Resampling time = %1.4n', [times[0]]), fontCacheSmall);
+    format('Resampling time = %1.2n msecs', [times[0]*1e3]), fontCacheSmall);
+  DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 +50,
+    'Note pixelation', fontCacheSmall);
   TranslateRect(dstRect, 0, len +10);
-  DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 -10,
-    'Resampler: rWeightedBilinear', fontCacheSmall);
-  DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 +20,
-    format('Resampling time = %1.4n', [times[1]]), fontCacheSmall);
-  TranslateRect(dstRect, 0, len +10);
+
   DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 -10,
     'Resampler: rBilinearResampler', fontCacheSmall);
   DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 +20,
-    format('Resampling time = %1.4n', [times[2]]), fontCacheSmall);
+    format('Resampling time = %1.2n msecs', [times[1]*1e3]), fontCacheSmall);
+  DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 +50,
+    'Note mild blurring', fontCacheSmall);
   TranslateRect(dstRect, 0, len +10);
+
+  DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 -10,
+    'Resampler: rWeightedBilinear', fontCacheSmall);
+  DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 +20,
+    format('Resampling time = %1.2n msecs', [times[2]*1e3]), fontCacheSmall);
+  DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 +50,
+    'Very little blurring but slight pixelation', fontCacheSmall);
+  TranslateRect(dstRect, 0, len +10);
+
   DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 -10,
     'Resampler: rBiCubicResampler', fontCacheSmall);
   DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 +20,
-    format('Resampling time = %1.4n', [times[3]]), fontCacheSmall);
+    format('Resampling time = %1.2n msecs', [times[3]*1e3]), fontCacheSmall);
+  DrawText(ImagePanel.Image, dstRect.Left, dstRect.Top + len div 2 +50,
+    'No blurring or pixelation but slower', fontCacheSmall);
 end;
 //------------------------------------------------------------------------------
 

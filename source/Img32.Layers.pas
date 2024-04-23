@@ -1815,7 +1815,8 @@ begin
     try
       Image.Assign(MasterImage);
       //apply any prior transformations
-      AffineTransformImage(Image, fMatrix);
+      Image.Resampler := rWeightedBilinear;
+      AffineTransformImage(Image, fMatrix, true); // assumes no skew
       //cropping is very important with rotation
       SymmetricCropTransparent(Image);
       w := Ceil(newBounds.Right) - Floor(newBounds.Left);
@@ -1864,7 +1865,8 @@ begin
     mat := fMatrix;
     pt := PointD(PivotPt.X - fLeft, PivotPt.Y - fTop);
     MatrixRotate(mat, pt, Angle);
-    AffineTransformImage(Image, mat);
+    Image.Resampler := rWeightedBilinear;
+    AffineTransformImage(Image, mat, true); // assumes no skew
   finally
     Image.UnblockNotify;
   end;
