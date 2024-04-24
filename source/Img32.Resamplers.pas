@@ -219,7 +219,8 @@ end;
 //------------------------------------------------------------------------------
 
 type
-  TBiCubicEdgeAdjust = (eaNone, eaPreStart, eaStart, eaStartPlus, eaEnd, eaPostEnd);
+  TBiCubicEdgeAdjust = (eaCenterFill,
+    eaPreStart, eaStart, eaPostStart, eaEnd, eaPostEnd);
 
 var
   byteFrac: array [0..255] of double;
@@ -251,7 +252,7 @@ begin
         Result := aclr^;
         Exit;
       end;
-    eaStartPlus:
+    eaPostStart:
       begin
         a := PARGB(aclr);
         b := a;
@@ -353,24 +354,18 @@ begin
     yFrac := Round(frac(y) *255);
 
   if x < -0.5 then bceX := eaPreStart
-  else if (x < 1) then
-  begin
-    if (x < 0.5) and ((iw >= 6) or (x < 0)) then bceX := eaStart
-    else bceX := eaStartPlus;
-  end
+  else if (x < 0) then bceX := eaStart
+  else if (x < 1) then bceX := eaPostStart
   else if x > iw - 0.5 then bceX := eaPostEnd
   else if x > iw - 1 then bceX := eaEnd
-  else bceX := eaNone;
+  else bceX := eaCenterFill;
 
   if y < -0.5 then bceY := eaPreStart
-  else if (y < 1) then
-  begin
-    if (y < 0.5) and ((ih >= 6) or (y < 0)) then bceY := eaStart
-    else bceY := eaStartPlus;
-  end
+  else if (y < 0) then bceY := eaStart
+  else if (y < 1) then bceY := eaPostStart
   else if y > ih - 0.5 then bceY := eaPostEnd
   else if y > ih - 1 then bceY := eaEnd
-  else bceY := eaNone;
+  else bceY := eaCenterFill;
 
   x := Max(0, Min(iw -1, x -1));
   y := Max(0, Min(ih -1, y -1));
