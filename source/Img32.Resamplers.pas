@@ -3,7 +3,7 @@ unit Img32.Resamplers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  20 April 2024                                                   *
+* Date      :  24 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  For image transformations (scaling, rotating etc.)              *
@@ -77,11 +77,11 @@ begin
   if (y < 0) and (y >= -0.5) then y := 0;
 
   if x < 0 then
-    xf := frac(1+x) else
-    xf := frac(x);
+    xf := -frac(x) else
+    xf := 1-frac(x);
   if y < 0 then
-    yf := frac(1+y) else
-    yf := frac(y);
+    yf := -frac(y) else
+    yf := 1-frac(y);
 
   xx := Floor(x);
   yy := Floor(y);
@@ -101,7 +101,7 @@ begin
 
   weightedColor.Reset;
 
-  weight := Round((1-xf) * (1-yf) * 255);      //top-left
+  weight := Round(xf * yf * 255);      //top-left
   if weight > 0 then
   begin
     if (x < 0) or (y < 0) then
@@ -109,7 +109,7 @@ begin
       weightedColor.Add(pixels[xx + yy * iw], weight);
   end;
 
-  weight := Round(xf * (1-yf) * 255);         //top-right
+  weight := Round((1-xf) * yf * 255);         //top-right
   if weight > 0 then
   begin
     if (x > iw - 0.5) or (y < 0) then
@@ -117,7 +117,7 @@ begin
       weightedColor.Add(pixels[xR + yy * iw], weight);
   end;
 
-  weight := Round((1-xf) * yf * 255);          //bottom-left
+  weight := Round(xf * (1-yf) * 255);          //bottom-left
   if weight > 0 then
   begin
     if (x < 0) or (y > ih - 0.5) then
@@ -125,7 +125,7 @@ begin
       weightedColor.Add(pixels[xx + yB * iw], weight);
   end;
 
-  weight := Round(xf * yf * 255);              //bottom-right
+  weight := Round((1-xf) * (1-yf) * 255);              //bottom-right
   if weight > 0 then
   begin
     if (x > iw - 0.5) or (y > ih - 0.5) then
@@ -151,16 +151,16 @@ begin
   ih := img.Height;
   pixels := img.Pixels;
 
+  // avoid antialiasing when x or y is very close to zero
   if (x < 0) and (x >= -0.5) then x := 0;
   if (y < 0) and (y >= -0.5) then y := 0;
 
   if x < 0 then
-    xf := frac(1+x) else
-    xf := frac(x);
-
+    xf := -frac(x) else
+    xf := 1-frac(x);
   if y < 0 then
-    yf := frac(1+y) else
-    yf := frac(y);
+    yf := -frac(y) else
+    yf := 1-frac(y);
 
   xx := Floor(x);
   yy := Floor(y);
@@ -180,7 +180,7 @@ begin
 
   weightedColor.Reset;
 
-  weight := sinWeighted[Round((1-xf) * (1-yf) * 255)];      //top-left
+  weight := sinWeighted[Round(xf * yf * 255)];      //top-left
   if weight > 0 then
   begin
     if (x < 0) or (y < 0) then
@@ -188,7 +188,7 @@ begin
       weightedColor.Add(pixels[xx + yy * iw], weight);
   end;
 
-  weight := sinWeighted[Round(xf * (1-yf) * 255)];        //top-right
+  weight := sinWeighted[Round((1-xf) * yf * 255)];        //top-right
   if weight > 0 then
   begin
     if (x > iw - 0.5) or (y < 0) then
@@ -196,7 +196,7 @@ begin
       weightedColor.Add(pixels[xR + yy * iw], weight);
   end;
 
-  weight := sinWeighted[Round((1-xf) * yf * 255)];          //bottom-left
+  weight := sinWeighted[Round(xf * (1-yf) * 255)];          //bottom-left
   if weight > 0 then
   begin
     if (x < 0) or (y > ih - 0.5) then
@@ -204,7 +204,7 @@ begin
       weightedColor.Add(pixels[xx + yB * iw], weight);
   end;
 
-  weight := sinWeighted[Round(xf * yf * 255)];              //bottom-right
+  weight := sinWeighted[Round((1-xf) * (1-yf) * 255)];              //bottom-right
   if weight > 0 then
   begin
     if (x > iw - 0.5) or (y > ih - 0.5) then
@@ -219,8 +219,7 @@ end;
 //------------------------------------------------------------------------------
 
 type
-  TBiCubicEdgeAdjust = (eaNormal, eaOnePixel,
-    eaPreStart, eaStart, eaEnd, eaPostEnd);
+  TBiCubicEdgeAdjust = (eaNone, eaPreStart, eaStart, eaStartPlus, eaEnd, eaPostEnd);
 
 var
   byteFrac: array [0..255] of double;
@@ -238,7 +237,6 @@ var
   res: TARGB absolute Result;
 const
   clTrans: TColor32 = clNone32;
-  clDebug: TColor32 = clBlack32;
 begin
   case bce of
     eaPreStart:
@@ -250,20 +248,26 @@ begin
       end;
     eaStart:
       begin
-        result := aclr^;
+        Result := aclr^;
         Exit;
+      end;
+    eaStartPlus:
+      begin
+        a := PARGB(aclr);
+        b := a;
+        Inc(aclr);
+        c := PARGB(aclr);
+        d := c;
       end;
     eaEnd:
       begin
-        Dec(aclr);
-        a := PARGB(aclr);
         Inc(aclr);
-        b := PARGB(aclr);
-        c := b;
-        d := b;
+        Result := aclr^;
+        Exit;
       end;
     eaPostEnd:
       begin
+        Inc(aclr);
         a := PARGB(aclr);
         b := a;
         c := @clTrans;
@@ -271,7 +275,6 @@ begin
       end;
     else
       begin
-        Dec(aclr);
         a := PARGB(aclr);
         Inc(aclr);
         b := PARGB(aclr);
@@ -287,7 +290,7 @@ begin
     result := clNone32;
     Exit;
   end
-  else if (b.Color = c.Color) then
+  else if (b = c) then
   begin
     result := b.Color;
     Exit;
@@ -333,33 +336,14 @@ end;
 
 function BicubicResample(img: TImage32; x, y: double): TColor32;
 var
-  i, pxIdx, iw, ih, dy, last: integer;
-  xFrac,yFrac: Byte;
+  i, pi, iw, ih, last: Integer;
   c: array[0..3] of TColor32;
+  xFrac, yFrac: byte;
   bceX, bceY: TBiCubicEdgeAdjust;
 begin
-
   iw := img.Width;
   ih := img.Height;
   last := iw * ih -1;
-
-  Result := clNone32;
-  if (x <= -1) or (x >= iw +1) or
-    (y <= -1) or (y >= ih +1) then Exit;
-
-  if x < -0.5 then bceX := eaPreStart
-  else if x > iw - 0.5 then bceX := eaPostEnd
-  else if iw = 1 then bceX := eaOnePixel
-  else if x < 0 then bceX := eaStart
-  else if x >= iw -1 then bceX := eaEnd
-  else bceX := eaNormal;
-
-  if y < -0.5 then bceY := eaPreStart
-  else if y > ih -0.5 then bceY := eaPostEnd
-  else if ih = 1 then bceY := eaOnePixel
-  else if y < 0 then bceY := eaStart
-  else if y >= ih -1 then bceY := eaEnd
-  else bceY := eaNormal;
 
   if x < 0 then
     xFrac := Round(frac(1+x) *255) else
@@ -368,38 +352,37 @@ begin
     yFrac := Round(frac(1+y) *255) else
     yFrac := Round(frac(y) *255);
 
-  if bceY = eaPostEnd then dy := 1
-  else if bceY = eaNormal then dy := 4
-  else dy := 2;
-
-  x := Max(0, Min(iw-1, x));
-  y := Max(0, Min(ih-1, y));
-  pxIdx := Floor(y) * iw + Floor(x);
-
-  if bceY = eaOnePixel then
+  if x < -0.5 then bceX := eaPreStart
+  else if (x < 1) then
   begin
-    if bceX = eaOnePixel then
-      Result := img.Pixels[0] else
-      Result := CubicHermite(@img.Pixels[pxIdx], xFrac, bceX);
+    if (x < 0.5) and ((iw >= 6) or (x < 0)) then bceX := eaStart
+    else bceX := eaStartPlus;
   end
-  else if bceX = eaOnePixel then
+  else if x > iw - 0.5 then bceX := eaPostEnd
+  else if x > iw - 1 then bceX := eaEnd
+  else bceX := eaNone;
+
+  if y < -0.5 then bceY := eaPreStart
+  else if (y < 1) then
   begin
-    for i := 0 to dy-1 do
-    begin
-      c[i] := img.Pixels[pxIdx];
-      inc(pxIdx, iw);
-    end;
-    Result := CubicHermite(@c[0], yFrac, bceY);
-  end else
+    if (y < 0.5) and ((ih >= 6) or (y < 0)) then bceY := eaStart
+    else bceY := eaStartPlus;
+  end
+  else if y > ih - 0.5 then bceY := eaPostEnd
+  else if y > ih - 1 then bceY := eaEnd
+  else bceY := eaNone;
+
+  x := Max(0, Min(iw -1, x -1));
+  y := Max(0, Min(ih -1, y -1));
+  pi := Trunc(y) * iw + Trunc(x);
+
+  for i := 0 to 3 do
   begin
-    for i := 0 to dy-1 do
-    begin
-      c[i] := CubicHermite(@img.Pixels[pxIdx], xFrac, bceX);
-      inc(pxIdx, iw);
-      if pxIdx >= last then break;
-    end;
-    Result := CubicHermite(@c[0], yFrac, bceY);
+    c[i] := CubicHermite(@img.Pixels[pi], xFrac, bceX);
+    inc(pi, iw);
+    if pi > last then break;
   end;
+  Result := CubicHermite(@c[0], yFrac, bceY);
 end;
 
 //------------------------------------------------------------------------------
