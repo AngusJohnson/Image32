@@ -37,6 +37,7 @@ var
 implementation
 
 {$R *.dfm}
+{$R images.res}
 
 //------------------------------------------------------------------------------
 // Timer/StopWatch
@@ -44,23 +45,53 @@ implementation
 
 type
   TTimeRec = record
-    freq      : TLargeInteger;
-    startTime : TLargeInteger;
-    endTime   : TLargeInteger;
+    started         : Boolean;
+    freq            : TLargeInteger;
+    startTime       : TLargeInteger;
+    cumulativeTime  : double;
+    endTime         : TLargeInteger;
   end;
 
-procedure StartTimer(out timeRec: TTimeRec);
+procedure ResetTimer(out timeRec: TTimeRec;
+  startNow: Boolean = true);
 begin
   QueryPerformanceFrequency(timeRec.freq);
   QueryPerformanceCounter(timeRec.startTime);
-  timeRec.endTime := timeRec.startTime;
+  timeRec.started := startNow;
+  timeRec.cumulativeTime := 0;
+  if timeRec.started then
+    QueryPerformanceCounter(timeRec.startTime);
 end;
 
-function EndTimer(timeRec: TTimeRec): double;
+procedure PauseTimer(out timeRec: TTimeRec);
 begin
-  QueryPerformanceCounter(timeRec.endTime);
   with timeRec do
-    Result := (endTime - startTime)/freq;
+  begin
+    if not started then Exit;
+    QueryPerformanceCounter(endTime);
+    cumulativeTime := cumulativeTime + (endTime - startTime)/freq;
+    started := false;
+  end;
+end;
+
+procedure ResumeTimer(out timeRec: TTimeRec);
+begin
+  with timeRec do
+  begin
+    if started then Exit;
+    started := true;
+    QueryPerformanceCounter(startTime);
+  end;
+end;
+
+function StopTimer(timeRec: TTimeRec): double;
+begin
+  PauseTimer(timeRec);
+  with timeRec do
+  begin
+    QueryPerformanceCounter(endTime);
+    Result := cumulativeTime;
+  end;
 end;
 
 //------------------------------------------------------------------------------
@@ -267,7 +298,7 @@ var
   displaySize       : integer;
   dpi5, dpi8, dpi18 : integer;
   scale             : double;
-  margin            : integer;
+  i, margin         : integer;
   topOffset         : integer;
   angle             : double;
   img               : TImage32;
@@ -276,7 +307,7 @@ var
   mat               : TMatrixD;
   times             : array[0..3] of double;
 const
-  useMatix    = false;//true;//
+  loopCnt     = 20;
 begin
   dpi5 := DPIAware(5);
   dpi8 := DPIAware(8);
@@ -293,59 +324,80 @@ begin
   DrawText(ImagePanel.Image, margin, margin + DpiAware(13),
     'Scale and rotate a small bitmap image', fontCache16);
 
+  Screen.Cursor := crHourGlass;
   img := TImage32.Create;
   try
-    img.LoadFromFile('beetle.png');
-
+    img.LoadFromResource('BEETLE', 'PNG');
     rec := GetRotatedRectBounds(img.Bounds, angle);
     scale := (displaySize/rec.Width);
     mat := IdentityMatrix;
     MatrixScale(mat, scale);
     MatrixRotate(mat, NullPointD, angle);
 
-    //mg.LoadFromFile('beetle.png');
     img.Resampler := rNearestResampler;
-    StartTimer(tr);
-    img.Scale(scale);
-    img.Rotate(angle);
-    times[0] := EndTimer(tr);
+    ResetTimer(tr, false);
+    for i := 1 to loopCnt do
+    begin
+      img.LoadFromResource('BEETLE', 'PNG');
+      ResumeTimer(tr);
+      img.Scale(scale);
+      img.Rotate(angle);
+      PauseTimer(tr);
+    end;
+    times[0] := StopTimer(tr) / loopCnt;
 
     displayRect.Right := displayRect.Left + img.Width;
     displayRect.Bottom := displayRect.Top + img.Height;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize*2 + margin*3, 0);
 
-    img.LoadFromFile('beetle.png');
     img.Resampler := rBilinearResampler;
-    StartTimer(tr);
-    img.Scale(scale);
-    img.Rotate(angle);
-    times[1] := EndTimer(tr);
+    ResetTimer(tr, false);
+    for i := 1 to loopCnt do
+    begin
+      img.LoadFromResource('BEETLE', 'PNG');
+      ResumeTimer(tr);
+      img.Scale(scale);
+      img.Rotate(angle);
+      PauseTimer(tr);
+    end;
+    times[1] := StopTimer(tr) / loopCnt;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect,
       -displayRect.Left + margin, displaySize + margin*4);
 
-    img.LoadFromFile('beetle.png');
     img.Resampler := rWeightedBilinear;
-    StartTimer(tr);
-    img.Scale(scale);
-    img.Rotate(angle);
-    times[2] := EndTimer(tr);
+    ResetTimer(tr, false);
+    for i := 1 to loopCnt do
+    begin
+      img.LoadFromResource('BEETLE', 'PNG');
+      ResumeTimer(tr);
+      img.Scale(scale);
+      img.Rotate(angle);
+      PauseTimer(tr);
+    end;
+    times[2] := StopTimer(tr) / loopCnt;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize*2 + margin*3, 0);
 
-    img.LoadFromFile('beetle.png');
     img.Resampler := rBicubicResampler;
-    StartTimer(tr);
-    img.Scale(scale);
-    img.Rotate(angle);
-    times[3] := EndTimer(tr);
+    ResetTimer(tr, false);
+    for i := 1 to loopCnt do
+    begin
+      img.LoadFromResource('BEETLE', 'PNG');
+      ResumeTimer(tr);
+      img.Scale(scale);
+      img.Rotate(angle);
+      PauseTimer(tr);
+    end;
+    times[3] := StopTimer(tr) / loopCnt;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin*3, 0);
     //img.SaveToFile('c:\temp\resampling_bc.png');
 
   finally
     img.Free;
+    Screen.Cursor := crDefault;
   end;
 
   DrawText(ImagePanel.Image, margin,
@@ -399,10 +451,10 @@ begin
 
   margin := DPIAware(15);
   lineHt := DPIAware(16);
+  scale  := DPIAware(0.22);
   img := TImage32.Create;
   try
-    img.LoadFromFile('TextOnPath.png');
-    scale := ImagePanel.InnerClientRect.Width/(img.Width *2);
+    img.LoadFromResource('TEXTONPATH', 'PNG');
     img.Scale(scale);
     dstRect := img.Bounds;
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
@@ -410,7 +462,7 @@ begin
     pt.X := dstRect.Right;
     pt.Y := dstRect.Bottom div 2;
 
-    img.LoadFromFile('TextOnPath.png');
+    img.LoadFromResource('TEXTONPATH', 'PNG');
     img.Resampler := rBicubicResampler;
     img.Scale(0.1);
     ImagePanel.Image.Copy(img, img.Bounds,
@@ -419,7 +471,7 @@ begin
     pt2.X := pt.X;
     pt2.Y := pt.Y + Round(img.Height * DPIAware(0.5)) + margin*3;
 
-    img.LoadFromFile('TextOnPath.png');
+    img.LoadFromResource('TEXTONPATH', 'PNG');
     BoxDownSampling(img, 0.1, 0.1);
     ImagePanel.Image.Copy(img, img.Bounds,
       Types.Rect(pt2.X, pt2.Y, pt2.X + img.Width, pt2.Y + img.Height));
