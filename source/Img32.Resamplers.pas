@@ -3,7 +3,7 @@ unit Img32.Resamplers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  24 April 2024                                                   *
+* Date      :  25 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  For image transformations (scaling, rotating etc.)              *
@@ -72,31 +72,48 @@ begin
   ih := img.Height;
   pixels := img.Pixels;
 
-  // avoid antialiasing when x or y is very close to zero
-  if (x < 0) and (x >= -0.5) then x := 0;
-  if (y < 0) and (y >= -0.5) then y := 0;
-
-  if x < 0 then
-    xf := -frac(x) else
+  if (x < 0) then
+  begin
+    // avoid antialiasing when x is very close to zero
+    if (x >= -0.5) then x := 0
+    else x := x + 0.5;
+    xf := -x;
+    xx := 0;
+    xR := 0;
+  end else
+  begin
     xf := 1-frac(x);
-  if y < 0 then
-    yf := -frac(y) else
-    yf := 1-frac(y);
-
-  xx := Floor(x);
-  yy := Floor(y);
-  xR := xx +1;
-  yB := yy +1;
-
-  if xx >= iw -1 then
-  begin
-    xx := iw -1;
-    xR := xx;
+    if x >= iw -1 then
+    begin
+      xx := iw -1;
+      xR := xx;
+    end else
+    begin
+      xx := Trunc(x);
+      xR := xx +1;
+    end;
   end;
-  if yy >= ih -1 then
+
+  if (y < 0) then
   begin
-    yy := ih -1;
-    yB := yy;
+    // avoid antialiasing when y is very close to zero
+    if (y >= -0.5) then y := 0
+    else y := y + 0.5;
+    yf := -y;
+    yy := 0;
+    yB := 0;
+  end else
+  begin
+    yf := 1-frac(y);
+    if y >= ih -1 then
+    begin
+      yy := ih -1;
+      yB := yy;
+    end else
+    begin
+      yy := Trunc(y);
+      yB := yy +1;
+    end;
   end;
 
   weightedColor.Reset;
@@ -151,31 +168,48 @@ begin
   ih := img.Height;
   pixels := img.Pixels;
 
-  // avoid antialiasing when x or y is very close to zero
-  if (x < 0) and (x >= -0.5) then x := 0;
-  if (y < 0) and (y >= -0.5) then y := 0;
-
-  if x < 0 then
-    xf := -frac(x) else
+  if (x < 0) then
+  begin
+    // avoid antialiasing when x is very close to zero
+    if (x >= -0.5) then x := 0
+    else x := x + 0.5;
+    xf := -x;
+    xx := 0;
+    xR := 0;
+  end else
+  begin
     xf := 1-frac(x);
-  if y < 0 then
-    yf := -frac(y) else
-    yf := 1-frac(y);
-
-  xx := Floor(x);
-  yy := Floor(y);
-  xR := xx +1;
-  yB := yy +1;
-
-  if xx >= iw -1 then
-  begin
-    xx := iw -1;
-    xR := xx;
+    if x >= iw -1 then
+    begin
+      xx := iw -1;
+      xR := xx;
+    end else
+    begin
+      xx := Trunc(x);
+      xR := xx +1;
+    end;
   end;
-  if yy >= ih -1 then
+
+  if (y < 0) then
   begin
-    yy := ih -1;
-    yB := yy;
+    // avoid antialiasing when y is very close to zero
+    if (y >= -0.5) then y := 0
+    else y := y + 0.5;
+    yf := -y;
+    yy := 0;
+    yB := 0;
+  end else
+  begin
+    yf := 1-frac(y);
+    if y >= ih -1 then
+    begin
+      yy := ih -1;
+      yB := yy;
+    end else
+    begin
+      yy := Trunc(y);
+      yB := yy +1;
+    end;
   end;
 
   weightedColor.Reset;
@@ -233,7 +267,8 @@ function CubicHermite(aclr: PColor32; t: Byte; bce: TBiCubicEdgeAdjust): TColor3
 var
   a,b,c,d: PARGB;
   q: TARGB;
-	aa, bb, cc: integer;
+	//aa, bb, cc: integer;
+	aa, bb, cc: double;
   t1, t2, t3: double;
   res: TARGB absolute Result;
 const
@@ -313,24 +348,24 @@ begin
   t2 := byteFracSq[t];
   t3 := byteFracCubed[t];
 
-	aa := Integer(-a.A + 3*b.A - 3*c.A + d.A) div 2;
-	bb := Integer(2*a.A - 5*b.A + 4*c.A - d.A) div 2;
-	cc := Integer(-a.A + c.A) div 2;
+	aa := Integer(-a.A + 3*b.A - 3*c.A + d.A) / 2;
+	bb := Integer(2*a.A - 5*b.A + 4*c.A - d.A) / 2;
+	cc := Integer(-a.A + c.A) / 2;
   Res.A := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.A);
 
-	aa := Integer(-a.R + 3*b.R - 3*c.R + d.R) div 2;
-	bb := Integer(2*a.R - 5*b.R + 4*c.R - d.R) div 2;
-	cc := Integer(-a.R + c.R) div 2;
+	aa := Integer(-a.R + 3*b.R - 3*c.R + d.R) / 2;
+	bb := Integer(2*a.R - 5*b.R + 4*c.R - d.R) / 2;
+	cc := Integer(-a.R + c.R) / 2;
   Res.R := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.R);
 
-	aa := Integer(-a.G + 3*b.G - 3*c.G + d.G) div 2;
-	bb := Integer(2*a.G - 5*b.G + 4*c.G - d.G) div 2;
-	cc := Integer(-a.G + c.G) div 2;
+	aa := Integer(-a.G + 3*b.G - 3*c.G + d.G) / 2;
+	bb := Integer(2*a.G - 5*b.G + 4*c.G - d.G) / 2;
+	cc := Integer(-a.G + c.G) / 2;
   Res.G := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.G);
 
-	aa := Integer(-a.B + 3*b.B - 3*c.B + d.B) div 2;
-	bb := Integer(2*a.B - 5*b.B + 4*c.B - d.B) div 2;
-	cc := Integer(-a.B + c.B) div 2;
+	aa := Integer(-a.B + 3*b.B - 3*c.B + d.B) / 2;
+	bb := Integer(2*a.B - 5*b.B + 4*c.B - d.B) / 2;
+	cc := Integer(-a.B + c.B) / 2;
   Res.B := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.B);
 end;
 //------------------------------------------------------------------------------
@@ -346,22 +381,27 @@ begin
   ih := img.Height;
   last := iw * ih -1;
 
+  if (x < 0) then
+    x := Min(0, x + 0.5);
+  if (y < 0) then
+    y := Min(0, y + 0.5);
+
   if x < 0 then
-    xFrac := Round(frac(1+x) *255) else
+    xFrac := Round((1+x) *255) else
     xFrac := Round(frac(x) *255);
   if y < 0 then
-    yFrac := Round(frac(1+y) *255) else
+    yFrac := Round((1+y) *255) else
     yFrac := Round(frac(y) *255);
 
-  if x < -0.5 then bceX := eaPreStart
-  else if (x < 0) then bceX := eaStart
+  if x < 0 then bceX := eaPreStart
+  else if (x = 0) then bceX := eaStart
   else if (x < 1) then bceX := eaPostStart
   else if x > iw - 0.5 then bceX := eaPostEnd
   else if x > iw - 1 then bceX := eaEnd
   else bceX := eaCenterFill;
 
-  if y < -0.5 then bceY := eaPreStart
-  else if (y < 0) then bceY := eaStart
+  if y < 0 then bceY := eaPreStart
+  else if (y = 0) then bceY := eaStart
   else if (y < 1) then bceY := eaPostStart
   else if y > ih - 0.5 then bceY := eaPostEnd
   else if y > ih - 1 then bceY := eaEnd

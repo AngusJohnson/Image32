@@ -3,7 +3,7 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  16 March 2024                                                   *
+* Date      :  25 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -716,44 +716,27 @@ end;
 
 function GetRotatedRectBounds(const rec: TRect; angle: double): TRect;
 var
-  sinA, cosA: double;
-  w,h, recW, recH: integer;
-  mp: TPoint;
+  p: TPathD;
+  mp: TPointD;
 begin
-  NormalizeAngle(angle);
+  p := Rectangle(rec);
+  mp := PointD((rec.Left + rec.Right)/2, (rec.Top + rec.Bottom)/2);
   if angle <> 0 then
-  begin
-    GetSinCos(angle, sinA, cosA); //the sign of the angle isn't important
-    sinA := Abs(sinA); cosA := Abs(cosA);
-    RectWidthHeight(rec, recW, recH);
-    w := Ceil((recW *cosA + recH *sinA) /2);
-    h := Ceil((recW *sinA + recH *cosA) /2);
-    mp := MidPoint(rec);
-    Result := Rect(mp.X - w, mp.Y - h, mp.X + w, mp.Y +h);
-  end
-  else
-    Result := rec;
+    p := RotatePath(p, mp, angle);
+  Result := GetBounds(p);
 end;
 //------------------------------------------------------------------------------
 
 function GetRotatedRectBounds(const rec: TRectD; angle: double): TRectD;
 var
-  sinA, cosA: double;
-  w,h: double;
+  p: TPathD;
   mp: TPointD;
 begin
-  NormalizeAngle(angle);
+  p := Rectangle(rec);
+  mp := PointD((rec.Left + rec.Right)/2, (rec.Top + rec.Bottom)/2);
   if angle <> 0 then
-  begin
-    GetSinCos(angle, sinA, cosA); //the sign of the angle isn't important
-    sinA := Abs(sinA); cosA := Abs(cosA);
-    w := (rec.Width *cosA + rec.Height *sinA) /2;
-    h := (rec.Width *sinA + rec.Height *cosA) /2;
-    mp := rec.MidPoint;
-    Result := RectD(mp.X - w, mp.Y - h, mp.X + w, mp.Y +h);
-  end
-  else
-    Result := rec;
+    p := RotatePath(p, mp, angle);
+  Result := GetBoundsD(p);
 end;
 //------------------------------------------------------------------------------
 

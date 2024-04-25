@@ -3,7 +3,7 @@ unit Img32.Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  16 April 2024                                                   *
+* Date      :  25 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -54,11 +54,13 @@ type
   procedure MatrixExtractTranslation(const mat: TMatrixD; out dx, dy: double);
   procedure MatrixExtractRotation(const mat: TMatrixD; out angle: double);
 
-  //AffineTransformImage: will automagically translate the image
+  // AffineTransformImage: will automagically translate the image
+  // Note: "scaleAdjust" prevents antialiasing extending way outside of images
+  // when they are being enlarged significantly and rotated concurrently
   function AffineTransformImage(img: TImage32; matrix: TMatrixD;
     scaleAdjust: Boolean = false): TPoint;
 
-  //ProjectiveTransform:
+  // ProjectiveTransform:
   //  srcPts, dstPts => each path must contain 4 points
   //  margins => the margins around dstPts (in the dest. projective).
   //  Margins are only meaningful when srcPts are inside the image.
@@ -429,6 +431,7 @@ var
   tmp: TArrayOfColor32;
   dstRec: TRect;
   resampler: TResamplerFunction;
+
 begin
   Result := NullPoint;
   if IsIdentityMatrix(matrix) or
@@ -441,15 +444,14 @@ begin
 
   dstRec := img.Bounds;
   MatrixApply(matrix, dstRec);
-
   RectWidthHeight(dstRec, newWidth, newHeight);
 
   sx := 1; sy := 1;
   if scaleAdjust then
   begin
     MatrixExtractScale(matrix, sx, sy);
-    sx := Max(1, sx/4);
-    sy := Max(1, sy/4);
+    sx := Max(1, sx * 0.25);
+    sy := Max(1, sy * 0.25);
   end;
 
   //auto-translate the image too
@@ -461,9 +463,9 @@ begin
 
   SetLength(tmp, newWidth * newHeight);
   pc := @tmp[0];
-  xLimLo := -0.5/sx;
+  xLimLo := -1/sx;
   xLimHi := img.Width + 0.5/sx;
-  yLimLo := -0.5/sy;
+  yLimLo := -1/sy;
   yLimHi := img.Height + 0.5/sy;
 
   for i := dstRec.Top to dstRec.Bottom -1 do

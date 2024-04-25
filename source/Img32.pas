@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  16 April 2024                                                   *
+* Date      :  25 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -479,7 +479,9 @@ type
   function ClampByte(val: Integer): byte; overload; {$IFDEF INLINE} inline; {$ENDIF}
   function ClampByte(val: double): byte; overload; {$IFDEF INLINE} inline; {$ENDIF}
   function ClampRange(val, min, max: Integer): Integer; overload;
+    {$IFDEF INLINE} inline; {$ENDIF}
   function ClampRange(val, min, max: double): double; overload;
+    {$IFDEF INLINE} inline; {$ENDIF}
   function IncPColor32(pc: Pointer; cnt: Integer): PColor32;
 
   procedure NormalizeAngle(var angle: double; tolerance: double = Pi/360);
