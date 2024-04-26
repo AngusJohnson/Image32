@@ -3,7 +3,7 @@ unit Img32.Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  25 April 2024                                                   *
+* Date      :  27 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -450,8 +450,8 @@ begin
   if scaleAdjust then
   begin
     MatrixExtractScale(matrix, sx, sy);
-    sx := Max(1, sx * 0.25);
-    sy := Max(1, sy * 0.25);
+    sx := Max(1, sx * 0.5);
+    sy := Max(1, sy * 0.5);
   end;
 
   //auto-translate the image too
@@ -463,9 +463,9 @@ begin
 
   SetLength(tmp, newWidth * newHeight);
   pc := @tmp[0];
-  xLimLo := -1/sx;
+  xLimLo := -0.5/sx;
   xLimHi := img.Width + 0.5/sx;
-  yLimLo := -1/sy;
+  yLimLo := -0.5/sy;
   yLimHi := img.Height + 0.5/sy;
 
   for i := dstRec.Top to dstRec.Bottom -1 do
@@ -474,11 +474,14 @@ begin
     begin
       x := j; y := i;
       MatrixApply(matrix, x, y);
+
       if (x <= xLimLo) or (x >= xLimHi) or (y <= yLimLo) or (y >= yLimHi) then
-        pc^ := clNone32 else
+        pc^ := clNone32
+      else
         // nb: -0.5 below is needed to properly center the transformed image
         // (and this is most obviously needed when there is large scaling)
         pc^ := resampler(img, x - 0.5, y - 0.5);
+
       inc(pc);
     end;
   end;

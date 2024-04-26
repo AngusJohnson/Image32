@@ -11,8 +11,10 @@ object MainForm: TMainForm
   Font.Name = 'Tahoma'
   Font.Style = []
   KeyPreview = True
+  Position = poDesktopCenter
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnKeyDown = FormKeyDown
   OnKeyPress = FormKeyPress
   PixelsPerInch = 192
   TextHeight = 34
@@ -29,14 +31,14 @@ object MainForm: TMainForm
     RaggedRight = True
     TabOrder = 0
     Tabs.Strings = (
-      'Kernel Resamplers 1'
-      'Kernel Resamplers 2'
-      'Down Sampling')
+      '&1 Resamplers1'
+      '&2 Resamplers2'
+      '&3 Resamplers3'
+      '&4 Resamplers4'
+      '&5 Down Sampling')
     TabIndex = 0
     TabStop = False
     OnChange = TabControl1Change
-    ExplicitWidth = 1127
-    ExplicitHeight = 850
   end
   object StatusBar1: TStatusBar
     Left = 0

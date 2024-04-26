@@ -3,7 +3,7 @@ unit Img32.Resamplers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  25 April 2024                                                   *
+* Date      :  27 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  For image transformations (scaling, rotating etc.)              *
@@ -74,10 +74,14 @@ begin
 
   if (x < 0) then
   begin
-    // avoid antialiasing when x is very close to zero
-    if (x >= -0.5) then x := 0
-    else x := x + 0.5;
-    xf := -x;
+    if (x < -0.5) then
+    begin
+      xf := -x;
+    end else
+    begin
+      x := 0;
+      xf := 0;
+    end;
     xx := 0;
     xR := 0;
   end else
@@ -96,10 +100,14 @@ begin
 
   if (y < 0) then
   begin
-    // avoid antialiasing when y is very close to zero
-    if (y >= -0.5) then y := 0
-    else y := y + 0.5;
-    yf := -y;
+    if (y < -0.5) then
+    begin
+      yf := -y;
+    end else
+    begin
+      y := 0;
+      yf := 0;
+    end;
     yy := 0;
     yB := 0;
   end else
@@ -170,10 +178,14 @@ begin
 
   if (x < 0) then
   begin
-    // avoid antialiasing when x is very close to zero
-    if (x >= -0.5) then x := 0
-    else x := x + 0.5;
-    xf := -x;
+    if (x < -0.5) then
+    begin
+      xf := -x;
+    end else
+    begin
+      x := 0;
+      xf := 0;
+    end;
     xx := 0;
     xR := 0;
   end else
@@ -192,10 +204,14 @@ begin
 
   if (y < 0) then
   begin
-    // avoid antialiasing when y is very close to zero
-    if (y >= -0.5) then y := 0
-    else y := y + 0.5;
-    yf := -y;
+    if (y < -0.5) then
+    begin
+      yf := -y;
+    end else
+    begin
+      y := 0;
+      yf := 0;
+    end;
     yy := 0;
     yB := 0;
   end else
@@ -267,7 +283,6 @@ function CubicHermite(aclr: PColor32; t: Byte; bce: TBiCubicEdgeAdjust): TColor3
 var
   a,b,c,d: PARGB;
   q: TARGB;
-	//aa, bb, cc: integer;
 	aa, bb, cc: double;
   t1, t2, t3: double;
   res: TARGB absolute Result;
@@ -381,31 +396,77 @@ begin
   ih := img.Height;
   last := iw * ih -1;
 
-  if (x < 0) then
-    x := Min(0, x + 0.5);
-  if (y < 0) then
-    y := Min(0, y + 0.5);
-
-  if x < 0 then
-    xFrac := Round((1+x) *255) else
+  if x < 1 then
+  begin
+    if x < -0.5 then
+    begin
+      xFrac := Round((1+x) *255);
+      bceX := eaPreStart;
+    end
+    else if (x < 0) or
+      ((iw = 1) and (x < 0.5)) then
+    begin
+      x := 0;
+      xFrac := 0;
+      bceX := eaStart;
+    end
+    else if (iw = 1) and (x > 0.5) then
+    begin
+      // the following is a workaround to avoid the increment in eaPostEnd
+      bceX := eaPreStart;         // ie anti-aliase but without increment
+      xFrac := Round((1-x) *127); // reversed because 'end' not 'start'
+    end else
+    begin
+      xFrac := Round(frac(x) *255);
+      bceX := eaPostStart;
+    end;
+  end else
+  begin
     xFrac := Round(frac(x) *255);
-  if y < 0 then
-    yFrac := Round((1+y) *255) else
+    if x > iw - 1 then
+    begin
+      if x > iw - 0.5 then bceX := eaPostEnd
+      else bceX := eaEnd
+    end
+    else
+      bceX := eaCenterFill;
+  end;
+
+  if y < 1 then
+  begin
+    if y < -0.5 then
+    begin
+      yFrac := Round((1+y) *255);
+      bceY := eaPreStart;
+    end
+    else if (y < 0) or
+      ((ih = 1) and (y < 0.5)) then
+    begin
+      y := 0;
+      yFrac := 0;
+      bceY := eaStart;
+    end
+    else if (ih = 1) and (y > 0.5) then
+    begin
+      // the following is a workaround to avoid the increment in eaPostEnd
+      bceY := eaPreStart;         // ie anti-aliase but without increment
+      yFrac := Round((1-y) *127); // reversed because 'end' not 'start'
+    end else
+    begin
+      yFrac := Round(frac(y) *255);
+      bceY := eaPostStart;
+    end;
+  end else
+  begin
     yFrac := Round(frac(y) *255);
-
-  if x < 0 then bceX := eaPreStart
-  else if (x = 0) then bceX := eaStart
-  else if (x < 1) then bceX := eaPostStart
-  else if x > iw - 0.5 then bceX := eaPostEnd
-  else if x > iw - 1 then bceX := eaEnd
-  else bceX := eaCenterFill;
-
-  if y < 0 then bceY := eaPreStart
-  else if (y = 0) then bceY := eaStart
-  else if (y < 1) then bceY := eaPostStart
-  else if y > ih - 0.5 then bceY := eaPostEnd
-  else if y > ih - 1 then bceY := eaEnd
-  else bceY := eaCenterFill;
+    if y > ih - 1 then
+    begin
+      if y > ih - 0.5 then bceY := eaPostEnd
+      else bceY := eaEnd
+    end
+    else
+      bceY := eaCenterFill;
+  end;
 
   x := Max(0, Min(iw -1, x -1));
   y := Max(0, Min(ih -1, y -1));
