@@ -39,6 +39,8 @@ object MainForm: TMainForm
     TabIndex = 0
     TabStop = False
     OnChange = TabControl1Change
+    ExplicitWidth = 1127
+    ExplicitHeight = 850
   end
   object StatusBar1: TStatusBar
     Left = 0

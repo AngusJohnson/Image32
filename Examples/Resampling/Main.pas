@@ -303,7 +303,7 @@ const
   loopCnt     = 20;
   // when performing multiple transformations then using a matrix
   // that combines these into a single transformation will be faster
-  useMatix    = true;//false;//
+  useMatix    = false;//true;//
 begin
   dpi5 := DPIAware(5);
   dpi8 := DPIAware(8);
@@ -461,7 +461,7 @@ var
   rec, displayRect: TRect;
   mat             : TMatrixD;
 const
-  useMatix    = true;//false;//
+  useMatix    = false;//true;//
 begin
   dpi8 := DPIAware(8);
 
@@ -576,7 +576,6 @@ begin
       img.Pixels[i] := RainbowColor(i/100);
     img.Resampler := rBicubicResampler;
     img.Resize(displaySize,displaySize);
-    img.SaveToFile('c:\temp\test.png');
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 
