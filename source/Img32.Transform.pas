@@ -3,7 +3,7 @@ unit Img32.Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  27 April 2024                                                   *
+* Date      :  30 April 2024                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -841,7 +841,7 @@ begin
       x := Distances[i]*q;
       y := j - yy;
       if (y < yLimLo) or (y > yLimHi) then
-        pc^ := clNone32
+        // do nothing !
       else if backColoring then
         pc^ := BlendToAlpha(pc^, ReColor(resampler(img, x -0.5, y -0.5), backColor))
       else
@@ -915,7 +915,7 @@ begin
       x := j - xx;
 
       if (x < xLimLo) or (x > xLimHi) then
-        pc^ := clNone32
+        // do nothing !
       else if backColoring then
         pc^ := BlendToAlpha(pc^, ReColor(resampler(img, x -0.5, y -0.5), backColor))
       else
