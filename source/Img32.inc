@@ -3,6 +3,13 @@
 //Must be disabled to compile the experimental 'CtrlDemo' in Examples
 {$DEFINE NO_STORAGE}   
 
+// Image downsampling occurs when images are reduced in size, and the default downsampling  
+// function is 'BoxDownSampling'. When downsampling, this function generally produces much
+// clearer images than general purpose resamplers (which are much better at upsampling,
+// and doing other affine transformations). However, if for some reason you do wish to use 
+// a general purpose resampler while downsampling, then disable this define.
+{$DEFINE USE_DOWNSAMPLER_AUTOMATICALLY}
+
 //USING_VCL_LCL - using either Delphi Visual Component Library or Lazarus Component Library
 //is required if using the TImage32Panel component
 //and adds a few extra library features (eg copying to and from TBitmap objects)

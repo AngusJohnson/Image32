@@ -112,6 +112,8 @@ const
 
 implementation
 
+uses Img32.Resamplers;
+
 resourcestring
   rsInvalidScale   = 'Invalid matrix scaling factor (0)';
 
@@ -441,6 +443,10 @@ var
   tmp: TArrayOfColor32;
   dstRec: TRect;
   resampler: TResamplerFunction;
+{$IFDEF USE_DOWNSAMPLER_AUTOMATICALLY}
+  rx: double;
+  useBoxDownsampler: Boolean;
+{$ENDIF}
 begin
   Result := NullPoint;
   if IsIdentityMatrix(matrix) or
@@ -455,10 +461,25 @@ begin
   MatrixApply(matrix, dstRec);
   RectWidthHeight(dstRec, newWidth, newHeight);
 
-  sx := 1; sy := 1;
+  MatrixExtractScale(matrix, sx, sy);
+{$IFDEF USE_DOWNSAMPLER_AUTOMATICALLY}
+  if (sx < 1.0) and (sy < 1.0) then
+  begin
+    //only use box downsampling when downsizing
+    MatrixExtractRotation(matrix, rx);
+    useBoxDownsampler := (rx = 0);
+  end else
+    useBoxDownsampler := false;
+
+  if useBoxDownsampler then
+  begin
+    BoxDownSampling(img, sx, sy);
+    Exit;
+  end;
+{$ENDIF}
+
   if scaleAdjust then
   begin
-    MatrixExtractScale(matrix, sx, sy);
     sx := Max(1, sx * 0.5);
     sy := Max(1, sy * 0.5);
   end;

@@ -731,56 +731,44 @@ var
   lineHt    : integer;
   img       : TImage32;
   dstRect   : TRect;
-  pt, pt2   : TPoint;
-  scale     : double;
+  pt        : TPoint;
 begin
   ImagePanel.Image.Clear;
 
   margin := DPIAware(15);
   lineHt := DPIAware(16);
-  scale  := DPIAware(0.22);
   img := TImage32.Create;
   try
     img.LoadFromResource('TEXTONPATH', 'PNG');
-    img.Scale(scale);
+    img.CropTransparentPixels;
+    with ImagePanel.InnerClientRect do
+      img.ScaleToFit(Width, Height - margin *2);
     dstRect := img.Bounds;
+    TranslateRect(dstRect, margin, margin);
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
 
-    pt.X := dstRect.Right;
-    pt.Y := dstRect.Bottom div 2;
-
     img.LoadFromResource('TEXTONPATH', 'PNG');
+    // the specified resampler is usually ignored when downsampling
+    // UNLESS the compiler conditional USE_DEFAULT_DOWNSAMPLER has
+    // been disabled. (See BoxDownsampling for more info.)
     img.Resampler := rBicubicResampler;
-    img.Scale(0.1);
-    ImagePanel.Image.Copy(img, img.Bounds,
-      Types.Rect(pt.X, pt.Y, pt.X + img.Width, pt.Y + img.Height));
+    img.Scale(0.2);
+    dstRect.Top := dstRect.Bottom - img.Height;
+    dstRect.Left := img.Width + margin;
+    dstRect.Right := dstRect.Left + img.Width;
+    ImagePanel.Image.Copy(img, img.Bounds, dstRect);
 
-    pt2.X := pt.X;
-    pt2.Y := pt.Y + Round(img.Height * DPIAware(0.5)) + margin*3;
 
-    img.LoadFromResource('TEXTONPATH', 'PNG');
-    BoxDownSampling(img, 0.1, 0.1);
-    ImagePanel.Image.Copy(img, img.Bounds,
-      Types.Rect(pt2.X, pt2.Y, pt2.X + img.Width, pt2.Y + img.Height));
+    pt.X := dstRect.Right + margin;
+    pt.Y := dstRect.Bottom - lineHt *2;
 
-    DrawText(ImagePanel.Image,
-      pt.X + img.Width, pt.Y + lineHt * 3, 'rBicubicResampler', fontCache12);
-    DrawText(ImagePanel.Image,
-      pt.X + img.Width, pt.Y + lineHt * 4, 'Note pixelation', fontCache12);
-
-    DrawText(ImagePanel.Image,
-      pt2.X + img.Width, pt2.Y + lineHt * 3, 'BoxDownSampling', fontCache12);
-    DrawText(ImagePanel.Image,
-      pt2.X + img.Width, pt2.Y + lineHt * 4, 'Note mild blurring', fontCache12);
-    DrawText(ImagePanel.Image,
-      pt2.X + img.Width, pt2.Y + lineHt * 5,
-      boxDownSamplingText, fontCache12, clBlue32);
-
-    boxDownsamplingLinkRect.Left := pt2.X + img.Width;
-    boxDownsamplingLinkRect.Bottom := pt2.Y + lineHt * 5;
-    boxDownsamplingLinkRect.Top := pt2.Y + lineHt * 4;
+    boxDownsamplingLinkRect.Left := pt.X;
+    boxDownsamplingLinkRect.Bottom := pt.Y;
+    boxDownsamplingLinkRect.Top := pt.Y - lineHt;
     boxDownsamplingLinkRect.Right := boxDownsamplingLinkRect.Left +
       Ceil(fontCache12.GetTextWidth(boxDownSamplingText));
+    DrawText(ImagePanel.Image,
+      pt.X, pt.Y, boxDownSamplingText, fontCache12, clBlue32);
   finally
     img.Free;
   end;
