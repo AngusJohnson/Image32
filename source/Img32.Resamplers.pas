@@ -283,7 +283,7 @@ function CubicHermite(aclr: PColor32; t: Byte; bce: TBiCubicEdgeAdjust): TColor3
 var
   a,b,c,d: PARGB;
   q: TARGB;
-	aa, bb, cc: double;
+	aa, bb, m0, m1: double;
   t1, t2, t3: double;
   res: TARGB absolute Result;
 const
@@ -348,12 +348,14 @@ begin
   end
   else if b.A = 0 then
   begin
+    // ignore differences between b & c's color channels
     q := c^;
     q.A := 0;
     b := @q;
   end;
   if c.A = 0 then
   begin
+    // ignore differences between b & c's color channels
     q := b^;
     q.A := 0;
     c := @q;
@@ -363,25 +365,50 @@ begin
   t2 := byteFracSq[t];
   t3 := byteFracCubed[t];
 
-	aa := Integer(-a.A + 3*b.A - 3*c.A + d.A) / 2;
-	bb := Integer(2*a.A - 5*b.A + 4*c.A - d.A) / 2;
-	cc := Integer(-a.A + c.A) / 2;
-  Res.A := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.A);
+  // find piecewise bicubic interpolation between pixel_b and pixel_c
+  // at point 't' (as byte div 255) ...
+  // given parametric equation aa(t^3) + bb(t^2) + cc(t)+ dd = 0
+  // where t(0) = pixel_b and t(1) = pixel_c
+  // let m1 = slope at pixel_b (using slope of pixel_c - pixel_a)
+  // let m2 = slope at pixel_c (using slope of pixel_d - pixel_b)
+  // then t(0) = aa(0^3) + bb(0^2) + cc(0) + dd = dd
+  // then t(1) = aa(1^3) + bb(1^2) + cc(1) + dd = aa + bb + cc + dd
+  // differentiating parametic equation at t'(0) and t'(1) ...
+  // t'(0) = m0 = 3*aa(0^2) + 2*bb(0) + cc = cc
+  // t'(1) = m1 = 3*aa(1^2) + 2*bb(1) + cc = 3*aa + 2*bb + cc
+  // t(0)  = dd                 ::EQ1
+  // t(1)  = aa+bb+cc+dd        ::EQ2
+  // t'(0) = cc                 ::EQ3
+  // t'(1) = 3*aa + 2*bb + cc   ::EQ4
+  // solving simultaneous equations
+  // aa = 2*t(0) -2*t(1) +t'(0)   +t'(1)
+  // bb = 3*t(1) -3*t(0) -2*t'(0) -t'(1)
+  // cc = m0
+  // dd = t(0)
 
-	aa := Integer(-a.R + 3*b.R - 3*c.R + d.R) / 2;
-	bb := Integer(2*a.R - 5*b.R + 4*c.R - d.R) / 2;
-	cc := Integer(-a.R + c.R) / 2;
-  Res.R := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.R);
+  m0 {aka t'(0)} := (c.A - a.A) /2;
+  m1 {aka t'(1)} := (d.A - b.A) /2;
+  aa := 2*b.A - 2*c.A + m0 + m1;
+  bb := 3*c.A -3*b.A -2*m0 - m1;
+  Res.A := ClampByte(aa*t3 + bb*t2 + m0*t1 + b.A);
 
-	aa := Integer(-a.G + 3*b.G - 3*c.G + d.G) / 2;
-	bb := Integer(2*a.G - 5*b.G + 4*c.G - d.G) / 2;
-	cc := Integer(-a.G + c.G) / 2;
-  Res.G := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.G);
+  m0 := (c.R - a.R) /2;
+  m1 := (d.R - b.R) /2;
+  aa := 2*b.R - 2*c.R + m0 + m1;
+  bb := 3*c.R -3*b.R -2*m0 - m1;
+  Res.R := ClampByte(aa*t3 + bb*t2 + m0*t1 + b.R);
 
-	aa := Integer(-a.B + 3*b.B - 3*c.B + d.B) / 2;
-	bb := Integer(2*a.B - 5*b.B + 4*c.B - d.B) / 2;
-	cc := Integer(-a.B + c.B) / 2;
-  Res.B := ClampByte(aa*t3 + bb*t2 + cc*t1 + b.B);
+  m0 := (c.G - a.G) /2;
+  m1 := (d.G - b.G) /2;
+  aa := 2*b.G - 2*c.G + m0 + m1;
+  bb := 3*c.G -3*b.G -2*m0 - m1;
+  Res.G := ClampByte(aa*t3 + bb*t2 + m0*t1 + b.G);
+
+  m0 := (c.B - a.B) /2;
+  m1 := (d.B - b.B) /2;
+  aa := 2*b.B - 2*c.B + m0 + m1;
+  bb := 3*c.B -3*b.B -2*m0 - m1;
+  Res.B := ClampByte(aa*t3 + bb*t2 + m0*t1 + b.B);
 end;
 //------------------------------------------------------------------------------
 
