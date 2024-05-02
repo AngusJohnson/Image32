@@ -155,7 +155,7 @@ end;
 
 procedure TForm1.DisplayImage;
 var
-  i,j, len: integer;
+  i,j: integer;
   scale, simplifyTol: double;
   vectorBounds: TRect;
   //tmpColors: TArrayOfColor32;
@@ -212,22 +212,10 @@ begin
   end else
   begin
 
-    // 2. SmoothToCubicBezier and flatten result
-    // returns a bezier path, NOT a flattened path
-    if TrackBar1.Position > 0 then
-    begin
-      len := Length(rawPaths);
-      setLength(bezierPaths, len);
-      for i := 0 to len -1 do
-        bezierPaths[i] := SmoothToCubicBezier(rawPaths[i],
-          true, TrackBar1.Position);
-      // flatten beziers
-      SetLength(flattenedPaths, Length(bezierPaths));
-      for i := 0 to High(bezierPaths) do
-        flattenedPaths[i] := FlattenCBezier(bezierPaths[i]);
-    end
-    else
-      flattenedPaths := CopyPaths(rawPaths);
+    for i := 0 to High(rawPaths) do
+      rawPaths[i] := InterpolatePoints(rawPaths[i],
+        1, true, (50-TrackBar1.Position)/50);
+    flattenedPaths := SimplifyPaths(rawPaths, 0.25);
 
     lblSmooth.Caption :=
       Format('Smooth'#10'Amount'#10'(%d)',[TrackBar1.Position]);

@@ -288,7 +288,7 @@ end;
 
 procedure TMainForm.ShowGeneralResamplers2;
 var
-  displaySize       : integer;
+  imgDisplaySize    : integer;
   dpi5, dpi8, dpi18 : integer;
   scale             : double;
   i, margin         : integer;
@@ -309,10 +309,10 @@ begin
   dpi8 := DPIAware(8);
   dpi18 := DPIAware(18);
   margin := DPIAware(10);
-  displaySize := DPIAware(125);
+  imgDisplaySize := DPIAware(180);
   topOffset := DPIAware(60);
-  displayRect := Types.Rect(margin, margin + topOffset,
-    margin + displaySize, margin + displaySize + topOffset);
+  displayRect := Types.Rect(margin, topOffset -margin,
+    margin + imgDisplaySize, topOffset -margin + imgDisplaySize);
   angle := DegToRad(60);
 
   ImagePanel.Image.Clear;
@@ -325,7 +325,7 @@ begin
   try
     img.LoadFromResource('BEETLE', 'PNG');
     rec := GetRotatedRectBounds(img.Bounds, angle);
-    scale := (displaySize/rec.Width);
+    scale := (imgDisplaySize/rec.Width);
     mat := IdentityMatrix;
     MatrixScale(mat, scale);
     MatrixRotate(mat, NullPointD, angle);
@@ -349,7 +349,7 @@ begin
     displayRect.Right := displayRect.Left + img.Width;
     displayRect.Bottom := displayRect.Top + img.Height;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
-    TranslateRect(displayRect, displaySize*2 + margin*3, 0);
+    TranslateRect(displayRect, imgDisplaySize + margin*3, 0);
 
     img.Resampler := rBilinearResampler;
     ResetTimer(tr, false);
@@ -368,7 +368,7 @@ begin
     times[1] := StopTimer(tr) / loopCnt;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect,
-      -displayRect.Left + margin, displaySize + margin*4);
+      -displayRect.Left + margin, imgDisplaySize);
 
     img.Resampler := rWeightedBilinear;
     ResetTimer(tr, false);
@@ -386,7 +386,7 @@ begin
     end;
     times[2] := StopTimer(tr) / loopCnt;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
-    TranslateRect(displayRect, displaySize*2 + margin*3, 0);
+    TranslateRect(displayRect, imgDisplaySize + margin*5, 0);
 
     img.Resampler := rBicubicResampler;
     ResetTimer(tr, false);
@@ -404,7 +404,7 @@ begin
     end;
     times[3] := StopTimer(tr) / loopCnt;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
-    TranslateRect(displayRect, displaySize + margin*3, 0);
+    TranslateRect(displayRect, imgDisplaySize + margin*5, 0);
     //img.SaveToFile('c:\temp\resampling_bc.png');
 
   finally
@@ -420,32 +420,32 @@ begin
     topOffset + dpi18,
     Format('%1.2n msec',[times[0]*1e3]), fontCache12);
 
-  DrawText(ImagePanel.Image, margin*5 + displaySize*2,
+  DrawText(ImagePanel.Image, margin*5 + imgDisplaySize,
     topOffset - dpi8, 'rBilinearResampler', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + displaySize*2,
+  DrawText(ImagePanel.Image, margin*5 + imgDisplaySize,
     topOffset + dpi5, 'Note blurring', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + displaySize*2,
+  DrawText(ImagePanel.Image, margin*5 + imgDisplaySize,
     topOffset + dpi18,
     Format('%1.2n msec',[times[1]*1e3]), fontCache12);
 
   DrawText(ImagePanel.Image, margin,
-    topOffset - dpi8 + displaySize + margin*4,
+    topOffset - dpi8 + imgDisplaySize,
     'rWeightedBilinear', fontCache12);
   DrawText(ImagePanel.Image, margin,
-    topOffset + dpi5 + displaySize + margin*4,
+    topOffset + dpi5 + imgDisplaySize,
     'Very mildly pixelated and blurred', fontCache12);
   DrawText(ImagePanel.Image, margin,
-    topOffset + dpi18 + displaySize + margin*4,
+    topOffset + dpi18 + imgDisplaySize,
     Format('%1.2n msec',[times[2]*1e3]), fontCache12);
 
-  DrawText(ImagePanel.Image, margin*5 + displaySize*2,
-    topOffset - dpi8 + displaySize + margin*4,
+  DrawText(ImagePanel.Image, margin*5 + imgDisplaySize,
+    topOffset - dpi8 + imgDisplaySize,
     'rBicubicResampler', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + displaySize*2,
-    topOffset + dpi5 + displaySize + margin*4,
+  DrawText(ImagePanel.Image, margin*5 + imgDisplaySize,
+    topOffset + dpi5 + imgDisplaySize,
     'Slow, but no pixelation or blurring', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + displaySize*2,
-    topOffset + dpi18 + displaySize + margin*4,
+  DrawText(ImagePanel.Image, margin*5 + imgDisplaySize,
+    topOffset + dpi18 + imgDisplaySize,
     Format('%1.2n msec',[times[3]*1e3]), fontCache12);
 end;
 //------------------------------------------------------------------------------
@@ -482,7 +482,7 @@ begin
   ImagePanel.Image.Clear;
 
   DrawText(ImagePanel.Image, margin, margin + DpiAware(13),
-    'Scale 100 x 1 image, then scale and rotate the same image',
+    'Scale 100x1 image, then scale and rotate the same image',
     fontCache16);
 
   DrawText(ImagePanel.Image, margin,
@@ -748,8 +748,8 @@ begin
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
 
     img.LoadFromResource('TEXTONPATH', 'PNG');
-    // the specified resampler is usually ignored when downsampling
-    // UNLESS the compiler conditional USE_DEFAULT_DOWNSAMPLER has
+    // the image's specified resampler is usually ignored when downsampling
+    // UNLESS the compiler conditional USE_DOWNSAMPLER_AUTOMATICALLY has
     // been disabled. (See BoxDownsampling for more info.)
     img.Resampler := rBicubicResampler;
     img.Scale(0.2);

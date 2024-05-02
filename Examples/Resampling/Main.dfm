@@ -2,7 +2,7 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'Resampling'
-  ClientHeight = 889
+  ClientHeight = 930
   ClientWidth = 1141
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -22,7 +22,7 @@ object MainForm: TMainForm
     Left = 0
     Top = 0
     Width = 1141
-    Height = 851
+    Height = 892
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
@@ -44,7 +44,7 @@ object MainForm: TMainForm
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 851
+    Top = 892
     Width = 1141
     Height = 38
     Margins.Left = 6

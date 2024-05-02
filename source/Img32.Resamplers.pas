@@ -3,7 +3,7 @@ unit Img32.Resamplers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  27 April 2024                                                   *
+* Date      :  2 May 2024                                                      *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  For image transformations (scaling, rotating etc.)              *
@@ -279,7 +279,8 @@ var
 
 //------------------------------------------------------------------------------
 
-function CubicHermite(aclr: PColor32; t: Byte; bce: TBiCubicEdgeAdjust): TColor32;
+function CubicInterpolate(aclr: PColor32;
+  t: Byte; bce: TBiCubicEdgeAdjust): TColor32;
 var
   a,b,c,d: PARGB;
   q: TARGB;
@@ -501,11 +502,11 @@ begin
 
   for i := 0 to 3 do
   begin
-    c[i] := CubicHermite(@img.Pixels[pi], xFrac, bceX);
+    c[i] := CubicInterpolate(@img.Pixels[pi], xFrac, bceX);
     inc(pi, iw);
     if pi > last then break;
   end;
-  Result := CubicHermite(@c[0], yFrac, bceY);
+  Result := CubicInterpolate(@c[0], yFrac, bceY);
 end;
 
 //------------------------------------------------------------------------------

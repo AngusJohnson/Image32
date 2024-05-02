@@ -27,7 +27,18 @@ package Img32_Library;
 {$DEFINE DEBUG}
 
 requires
-  rtl;
+  rtl
+  {$ifndef FPC}
+    {$ifndef LINUX}
+      {$ifndef MACOS}
+        {$ifndef ANDROID}
+          {$ifndef IOS}
+            , vcl
+          {$endif}
+        {$endif}
+      {$endif}
+    {$endif}
+  {$endif};
 
 contains
   Img32 in '..\Img32.pas',
@@ -41,11 +52,11 @@ contains
   Img32.Transform in '..\Img32.Transform.pas',
   Img32.Vector in '..\Img32.Vector.pas',
   Img32.Clipper2 in '..\Img32.Clipper2.pas',
-  Clipper in '..\Clipper\Clipper.pas',
-  Clipper.Core in '..\Clipper\Clipper.Core.pas',
-  Clipper.Engine in '..\Clipper\Clipper.Engine.pas',
-  Clipper.Offset in '..\Clipper\Clipper.Offset.pas',
-  Clipper.Minkowski in '..\Clipper\Clipper.Minkowski.pas',
-  Clipper.RectClip in '..\Clipper\Clipper.RectClip.pas';
+  Clipper in '..\Clipper2\Clipper.pas',
+  Clipper.Core in '..\Clipper2\Clipper.Core.pas',
+  Clipper.Engine in '..\Clipper2\Clipper.Engine.pas',
+  Clipper.Offset in '..\Clipper2\Clipper.Offset.pas',
+  Clipper.Minkowski in '..\Clipper2\Clipper.Minkowski.pas',
+  Clipper.RectClip in '..\Clipper2\Clipper.RectClip.pas';
 
 end.
