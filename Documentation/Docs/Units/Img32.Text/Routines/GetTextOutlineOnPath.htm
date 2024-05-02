@@ -21,31 +21,33 @@ var
   img2: TImage32;
   p: TPathD;
   pp: TPathsD;
-  fr: TFontReader;
-  gc: TFontCache;
+  arialFont: TFontReader;
+  arial20: TFontCache;
 begin
-  fr := TFontReader.Create('Arial');
-  gc := TFontCache.Create(fr, 20);
+  FontManager.Load('Arial', 600);
+  arialFont := FontManager.GetFont('Arial');
+  arial20 := TFontCache.Create(arialFont, 20);
   img2 := TImage32.Create(500,460);
   try
     p := MakePathD([50,400, 50,50, 450,400, 450,50]);
     p := FlattenCBezier(p);
     pp := GetTextOutlineOnPath(
-      'The quick brown fox jumps over the lazy dog', p, gc, taCenter, 5, 3);
+      'The quick brown fox jumps over the lazy dog', 
+      p, arial20, taCenter, 5, 3);
     img2.Clear(clWhite32);
     DrawLine(img2, p, 1, clRed32, esButt, jsAuto);
     DrawPolygon(img2, pp, frNonZero, clBlack32);
     img2.SaveToFile('c:\temp\tmp.png');
   finally
     img2.free;
-    gc.Free;
-    fr.Free;
+    arial20.Free;
+    //arialFont.Free; //freed by FontManager
   end;
       </pre>
     </div> </p>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="../Classes/TFontCache/_Body.htm">TFontCache</a>, <a href="../Types/TTextAlign.htm">TTextAlign</a>, <a href="../../Img32/Types/TPathsD.htm">TPathsD</a></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 2 May 2024 <br><br> </p>
 
 </body>
 

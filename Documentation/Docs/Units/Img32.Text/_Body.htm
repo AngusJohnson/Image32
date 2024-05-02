@@ -20,7 +20,7 @@
 
     <pre class="brush: delphi;">
   var
-    font            : TFontReader;
+    notoSansFont    : TFontReader;
     notoSans14      : TFontCache;
     glyphPaths      : TPathsD;
     rec             : TRect;
@@ -30,18 +30,16 @@
     essay = 'Img32 Rocks!'#10'Write lots of '+
       'interesting things about Img32.';
   begin    
-    //get a font which will be destroyed by
-    //FontManager when the application terminates
-    font := FontManager.LoadFromResource(
-        'NOTOSANSFONT', RT_RCDATA);
-    if not font.IsValidFontFormat then Exit;        
+    notoSansFont := FontManager.
+      LoadFromResource(
+      'NOTOSANSFONT', RT_RCDATA);
+    if not notoSansFont.IsValidFontFormat then 
+      Exit;        
         
-    //create a 'fontCache' using the 
-    //specified font with size = 14
-    notoSans14 := 
-      TFontCache.Create(font, DpiAware(14));
+    notoSans14 := TFontCache.Create(notoSansFont, 
+      DpiAware(14));
     try    
-      rec := Rect(20, 20,
+      rec := Rect(20, 20, 
         ClientWidth-20, ClientHeight-20);   
 
       // get the text outlines (glyphs) ...  
@@ -54,7 +52,8 @@
         glyphPaths, frNonZero, clBlack32);
         
     finally
-      notoSans14.Free;
+      notoSans14.Free;     
+      //notoSansFont.Free; //managed by FontManager 
     end;
     </pre>
   </div>
@@ -129,7 +128,7 @@
   </div>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="Classes/TFontCache/_Body.htm">TFontCache</a>, <a href="Classes/TFontManager/_Body.htm">TFontManager</a>, <a href="Classes/TFontReader/_Body.htm">TFontReader</a>, <a href="Classes/TFontReader/Methods/GetGlyphInfo.htm">TFontReader.GetGlyphInfo</a>, <a href="Classes/TFontReader/Properties/FontInfo.htm">TFontReader.FontInfo</a>, <a href="Routines/FontManager.htm">FontManager</a></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 2 May 2024 <br><br> </p>
 
 </body>
 

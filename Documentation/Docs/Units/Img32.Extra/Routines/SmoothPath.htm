@@ -1,0 +1,99 @@
+<html>
+
+<head>
+
+  <title>SmoothPath</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
+<script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
+</head>
+
+<body bgcolor="#FFFFFF">
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Extra</a><span class="active">SmoothPath</span>
+  </div><br><br>
+
+  <h1>SmoothPath</h1>
+  <p class="Decl"><b>procedure</b> SmoothPath(<b>const</b> points: TPathD; isClosedPath: Boolean; tension: double = <span class="Number">0</span>; shapeTolerance: double = <span class="Number">0.1</span>): TPathD;</p><br class="half">
+
+  <p> This function performs bicubic interpolation to convert discrete points in a path into an approximation of a smooth curve. Paths may be open or closed.<br><br> <span class="monobold">tension</span>: the relative weighting toward linear interpolation with -1 indicating least tension (maximum curve smoothing) and +1 indicating most tension (no curve smoothing).<br><br> <span class="monobold">shapeTolerance</span>: the minimum distance a vertex can be from an imaginary line drawn between its two adjacent vertices (see <a href="SimplifyPaths.htm">SimplifyPaths</a>).<br> </p>
+  <div class="code">
+    <pre class="brush: delphi;">
+uses Img32, Img32.Fmt.PNG, Img32.Draw, Img32.Extra;
+...
+var
+  i: integer;
+  img: TImage32;
+  path, smoothedPath: TPathD;
+  rec: TRect;
+begin
+  path :=  MakePath([190,120, 240,160, 560,120, 190,490]);
+  // smooth closed path with normal smoothing 
+  smoothedPath := SmoothPath(path, true, 0);
+  // smooth closed path with maximum smoothing 
+  //smoothedPath := SmoothPath(path, true, -1);
+  rec := GetBounds(smoothedPath);
+  Types.InflateRect(rec, margin, margin);
+  path := TranslatePath(path, -rec.Left, -rec.Top);
+  smoothedPath := 
+    TranslatePath(smoothedPath, -rec.Left, -rec.Top);
+  
+  img := TImage32.Create(rec.Width, rec.Height);
+  DrawLine(img, path, 1, clRed32, esClosed);
+  DrawLine(img, smoothedPath, 3, clBlue32, esClosed);
+  for i := 0 to High(path) do
+    DrawPoint(img, path[i], 3, clRed32);
+  img.SaveToFile('interpolation.png');
+  img.Free;
+    </pre>
+  </div>
+  <table style="background-color:white; font-size: 0.9rem">
+    <tr>
+      <td><img src="../../../../Images/interpolation0.png">
+      </td>
+      <td><img src="../../../../Images/interpolationM1.png">
+      </td>
+    </tr>
+    <tr>
+      <td>with normal smoothing (0)
+      </td>
+      <td>with maximum smoothing (-1)
+      </td>
+    </tr>
+
+  </table>
+  <div class="code">
+    <pre class="brush: delphi;">
+uses Img32, Img32.Fmt.PNG, Img32.Draw, Img32.Extra;
+...
+var
+  i: integer;
+  img: TImage32;
+  path, smoothedPath: TPathD;
+  rec: TRect;
+begin
+  path := MakePath([10,100, 60,50, 110,50, 160,10, 210,100]);
+  // smooth open path with normal smoothing 
+  smoothedPath := SmoothPath(path, false, 0);
+  rec := GetBounds(smoothedPath);
+  Types.InflateRect(rec, margin, margin);
+  path := TranslatePath(path, -rec.Left, -rec.Top);
+  smoothedPath := TranslatePath(smoothedPath, -rec.Left, -rec.Top);
+
+  img := TImage32.Create(rec.Width, rec.Height);
+  DrawLine( img, smoothedPath, 3, clBlue32, esRound, jsRound);
+  for i := 0 to High(path) do
+    DrawPoint(img, path[i], 3, clRed32);
+  img.SaveToFile('interpolation2.png');
+  img.Free;
+    </pre>
+  </div>
+  <div><img src="../../../../Images/interpolation2.png">
+
+  </div>
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="SimplifyPaths.htm">SimplifyPaths</a></p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 2 May 2024 <br><br> </p>
+
+</body>
+
+</html>

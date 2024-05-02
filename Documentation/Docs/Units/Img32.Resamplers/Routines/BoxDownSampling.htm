@@ -14,46 +14,40 @@
 
   <h1>BoxDownSampling</h1>
   <p class="Decl"><b>procedure</b> BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer);</p>
-  <p>As the name implies, <span class="monobold">BoxDownSampling</span> is only intended for down-sampling images, and it's consistently better at this than general purpose resamplers. General purpose resamplers - eg bilinear and bicubic kernel resamplers - are prone to 'pixelation' when shrinking images.<br><br> On the other hand, <span class="monobold">BoxDownSampling</span> is very inferior to general purpose resamplers when up-sampling and when performing other kinds of transformations (eg rotating, and skewing images), so it should not be used for these purposes.<br> </p>
+  <p>Image downsampling occurs when images are reduced in size. When downsampling, this function generally produces much clearer images than general purpose resamplers (which are much better at upsampling, and doing other affine transformations). Because of that, this function will be used automatically whenever downsampling <i>unless</i> the <span class="monobold2">USE_DOWNSAMPLER_AUTOMATICALLY</span> compiler directive has been disabled (see img32.inc).</p>
   <div><img src="../../../../Images/boxDS_or.png" style="width:600px; height:600px; float:none;"><br><b>Original image</b><br> Original size - 1200 x 1200px.<br>
 
   </div>
-  <div><img src="../../../../Images/boxDS_bc.png" style="width:102px; height:102px; float:none;"><br><b>Bicubic kernel resampling</b><br>Image scaled to 1/10 original size. Note pixelation.<br>
-
-  </div>
-  <div><img src="../../../../Images/boxDS_ds.png" style="width:102px; height:102px; float:none;"><br><b>BoxDownSampling</b><br>Image scaled to 1/10 original size. Note mild blurring.<br>
+  <!--<div>
+  <img src="../../../../Images/boxDS_bc.png" style="width:102px; height:102px; float:none;"><br>
+  <b>Bicubic kernel resampling</b><br>Image scaled to 1/10 original size. Note pixelation.<br>
+</div>-->
+  <div><img src="../../../../Images/boxDS_ds.png" style="width:102px; height:102px; float:none;"><br><b>BoxDownSampling</b><br>Image scaled to 1/10 original size. Note very mild blurring.<br>
 
   </div><br>
   <div class="code">
     <pre class="brush: delphi;">
-uses Img32, Img32.Fmt.PNG, Img32.Resamplers;	
+uses Img32, Img32.Fmt.PNG;	
 ...
 var
   img: TImage32;
-const
-  scale = 0.1;
 begin
   img := TImage32.Create;
   try
-
-    //Bicubic kernel resampling
     img.LoadFromFile('TextOnPath.png');
-    img.Resampler := rBicubicResampler;
-    img.Scale(scale);
-    img.SaveToFile('TextOnPath_bc.png')
-
-    //BoxDownSampling
-    img.LoadFromFile('TextOnPath.png');
-    BoxDownSampling(img, scale, scale), 
-    img.SaveToFile('TextOnPath_ds.png')
-
+    // the specified resampler will be 
+    // ignored when downsampling unless 
+    // directed otherwise in img32.inc.
+    //img.Resampler := rBicubicResampler;
+    img.Scale(0.1);
+    img.SaveToFile('TextOnPath_small.png')
   finally
     img.free;
   end;
 end;
     </pre>
   </div>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 2 May 2024 <br><br> </p>
 
 </body>
 

@@ -89,10 +89,8 @@ object Form1: TForm1
       Margins.Top = 6
       Margins.Right = 6
       Margins.Bottom = 6
-      Max = 50
       Orientation = trVertical
       PageSize = 0
-      Position = 17
       TabOrder = 1
       ThumbLength = 40
       TickStyle = tsNone

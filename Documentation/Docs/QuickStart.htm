@@ -44,19 +44,13 @@ var
   img: TImage32;
 begin
   img := TImage32.Create;
-  img.LoadFromFile('clipart.png');
-  //optionally select a resampler
-  //other than the default Bilinear one
-  img.Resampler := rBicubicResampler;
-  //angle parameters are always expressed
-  //in radians not degrees. Nevertheless
-  //many angles have predefined constants ...
-  img.Rotate(angle15);
-  img.SaveToFile('c:\temp\clipart_rot15.png');
+  img.LoadFromFile('fruit.png');
+  img.Rotate(-angle45);
+  img.SaveToFile('fruit45.png');
   img.Free;
     </pre>
   </div>
-  <div><span class="floatLeft"> <img style="vertical-align: -128px;" src="../Images/resampler1.png"> <span class="plusImg"><img src="../Images/right_arrow.png"></span> <img style="vertical-align: -128px;" src="../Images/resampler4.png"> </span>
+  <div><span class="floatLeft"> <img style="vertical-align: -128px;" src="../Images/fruit_rot45.png"> </span>
   </div>
   <div class="code">
     <pre class="brush: delphi;">
@@ -144,14 +138,15 @@ begin
 	  impactFont: TFontReader;
 	  impact48: TFontCache;
   begin
-	img := TImage32.Create(400,150);
-	//Load Windows' Impact TTF font
-    impactFont := TFontReader.Create('Impact'); 
-	impact48 := TFontCache.Create(impactFont, DpiAware(48));
+	  img := TImage32.Create(400,150);
+	  //Load Windows' Impact TTF font
+    FontManager.Load('Impact', 800);
+    impactFont := FontManager.GetFont('Impact'); 
+	  impact48 := TFontCache.Create(impactFont, DpiAware(48));
     try
-	  textOutline := impact48.GetTextGlyphs(
-        20, 130, 'Image32');
-	  //draw textOutline using shadow &amp; 3D effects
+      textOutline := 
+        impact48.GetTextGlyphs(20, 130, 'Image32');
+      //draw textOutline using shadow &amp; 3D effects
       DrawShadow(img, textOutline, frNonZero, 3);
       DrawPolygon(img, textOutline, frNonZero, $FF00DD00);
       Draw3D(img, textOutline, frNonZero, 3,4);
@@ -160,7 +155,7 @@ begin
     finally
       img.Free;
       impact48.Free;
-      impactFont.Free;
+      //impactFont.Free; //managed by FontManager
     end;
   end;
     </pre>
@@ -190,7 +185,7 @@ begin
   <p> Otherwise use the accompanying <a href="Img32.Panels/_Body.htm"><b>Img32.Panels</b></a> unit which contains the TImage32Panel component. </p>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="_Body.htm"><b>Index</b></a>, <a href="Img32.Panels/_Body.htm">Img32.Panels</a>, <a href="Units/Img32.Draw/_Body.htm">Img32.Draw</a>, <a href="Units/Img32.Draw/Routines/DrawDashedLine.htm">DrawDashedLine</a>, <a href="Units/Img32.Draw/Routines/DrawLine.htm">DrawLine</a>, <a href="Units/Img32.Draw/Routines/DrawPolygon.htm">DrawPolygon</a>, <a href="Units/Img32.Vector/_Body.htm">Img32.Vector</a>, <a href="Units/Img32/Classes/TImage32/_Body.htm">TImage32</a></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 2 May 2024 <br><br> </p>
 
 </body>
 </html>

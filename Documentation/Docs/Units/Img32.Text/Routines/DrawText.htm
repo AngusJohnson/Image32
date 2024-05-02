@@ -21,30 +21,32 @@
   <p> 
     <div class="code">
       <pre class="brush: delphi;">
-  uses Img32, Img32.Text;
+  uses Img32, Img32.Text, Img32.Fmt.PNG;
   ...
   var
     img: TImage32;
-    arialFontReader: TFontReader;
-    arialCache: TFontCache;
-    nextX: double;
+    arialFont: TFontReader;
+    arial12: TFontCache;
   begin
+    FontManager.Load('Arial', 800);
+    arialFont := FontManager.GetFont('Arial');
+
+    arial12 := TFontCache.Create(arialFont, 12);
     img := TImage32.create(200, 50);
-    arialFontReader := TFontReader.Create;
-    arialFontReader.LoadFromFile('c:\windows\fonts\arial.ttf');
-    arialCache := TFontCache.Create(arialFontReader, 12);
-    
-    nextX := DrawText(img, 10,10, 'Img32!', arialCache);
-    
-    arialCache.Free;
-    arialFontReader.Free;
-    img.Free;
+    try
+      DrawText(img, 10,10, 'Img32!', arial12);
+      img.SaveToFile('img32.png');
+    finally
+      img.Free;
+      arial12.Free;
+      //arialFont.Free; //managed by FontManager
+    end;
   end;
       </pre>
     </div> </p>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="../../Img32.Draw/Classes/TCustomRenderer/_Body.htm">TCustomRenderer</a>, <a href="../Classes/TFontCache/_Body.htm">TFontCache</a>, <a href="../Types/TTextAlign.htm">TTextAlign</a>, <a href="../Types/TTextVAlign.htm">TTextVAlign</a></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 2 May 2024 <br><br> </p>
 
 </body>
 

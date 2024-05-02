@@ -28,7 +28,25 @@
 
     </ul></p>
   <p> Additional resamplers can be added using the <a href="../Img32/Routines/RegisterResampler.htm"><b>RegisterResampler</b></a> function. (The resampling function's unique identifier will be assigned when it's registered.)<br><br> When a <a href="../Img32/Classes/TImage32/_Body.htm"><b>TImage32</b></a> object is created, it's assigned the <span class="monobold">DefaultResampler</span> (<span class="monobold">rBilinearResampler</span>), which will be used if or when the image's geometry is changed. The <span class="monobold">TImage32</span>'s resampling function can easily be changed through its <a href="../Img32/Classes/TImage32/Properties/Resampler.htm"><b>Resampler</b></a> property.<br> </p>
-  <div><span>From Examples/Resampling ... <img src="../../../Images/Resampling1.png" style="float:none;"></span><br><img src="../../../Images/Resampling.png">
+  <div>
+  From resampling example ...<br><br>
+  starting with this image<br><img src="../../../Images/resampling_orig.png" style="float:none"><br><br>
+
+  scaling and rotating produces<br><br>
+    <table style="margin:0; background-color:white; font-size:small; width:67%">
+      <tr style="background-color:white">
+        <td>rNearestResampler<br>Fast but also pixelated<br>0.98 msec<br><img src="../../../Images/resampling_n.png" style="float:none">
+        </td>
+        <td>rBilinearResampler<br>Moderately blurred<br>5.01 msec<br><img src="../../../Images/resampling_bl.png" style="float:none">
+        </td>
+      </tr>
+      <tr style="background-color:white">
+        <td>rWeightedBilinear<br>Mildly pixelated and mildly blurred<br>5.38 msec<br><img src="../../../Images/resampling_wb.png" style="float:none">
+        </td>
+        <td>rBicubicResampler<br>Clearest image but slowest<br>15.5 msec<br><img src="../../../Images/resampling_bc.png" style="float:none">
+        </td>
+      </tr>
+    </table>
 
   </div>
   <h2 id="Auto-Contents">Contents</h2>
@@ -43,7 +61,7 @@
   </div>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="../Img32/Classes/TImage32/_Body.htm">TImage32</a>, <a href="../Img32/Classes/TImage32/Properties/Resampler.htm">TImage32.Resampler</a>, <a href="../Img32/Routines/RegisterResampler.htm">RegisterResampler</a></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 2 May 2024 <br><br> </p>
 
 </body>
 

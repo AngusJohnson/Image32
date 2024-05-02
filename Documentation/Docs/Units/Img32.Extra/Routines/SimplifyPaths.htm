@@ -13,14 +13,17 @@
   </div><br><br>
 
   <h1>SimplifyPaths</h1>
-  <p class="Decl"><b>function</b> SimplifyPaths(<b>const</b> path: TPathD; epsilon: double; isOpenPath: Boolean = false): TPathD; <b>overload;</b><br><br></p>
+  <p class="Decl"><b>function</b> SimplifyPaths(<b>const</b> path: TPathD; shapeTolerance: double = <span class="Number">0.1</span>; isClosedPath: Boolean = true): TPathD; <b>overload;</b><br><br></p>
 
-  <p class="Decl"><b>function</b> SimplifyPaths(<b>const</b> path: TPathsD; epsilon: double; isOpenPath: Boolean = false): TPathD; <b>overload;</b></p><br class="half">
+  <p class="Decl"><b>function</b> SimplifyPaths(<b>const</b> path: TPathsD; shapeTolerance: double = <span class="Number">0.1</span>; isClosedPath: Boolean = true): TPathD; <b>overload;</b></p><br class="half">
 
-  <p>This function removes vertices that contribute very little to a path's shape. The <span class="monobold2">epsilon</span> parameter specifies the minimum distance a vertex can be from an imaginary line drawn between its two adjacent vertices.<br><br> This function is especially useful following <a href="./Vectorize.htm"><b>vectorize</b></a>, that converts monochrome raster images into vector images. This is demonstrated in the <b>VectorizeImage</b> example. It's also very useful following <a href="../../Img32.Clipper2/Routines/InflatePath.htm"><b>InflatePaths</b></a>. </p>
+  <p>This function removes vertices that contribute very little to a path's shape. It's especially useful following <a href="./Vectorize.htm"><b>Vectorize</b></a> and <a href="../../Img32.Clipper2/Routines/InflatePath.htm"><b>InflatePaths</b></a>. <br><br> <span class="monobold2">shapeTolerance</span>: specifies the minimum distance a vertex can be from an imaginary line drawn between its two adjacent vertices (default = 0.1). (This value affects how aggressive simplifying will be, with larger tolerances being more aggressive and returning simpler paths.) </p>
+  <div><img src="../../../../Images/SimplifyPaths.png">
+  </div>
+  <p style="background-color:yellow; color: maroon"> CAUTION: The last parameter has recently changed from <span class="monobold">IsOpenPath</span> to <span class="monobold">IsClosedPath</span>. (This change was made to remove an inconsistency with other functions that contain an IsClosedPath parameter.) If this is likely to cause you major inconvenience, then enable the <span class="monobold">USE_OLD_SIMPLIFYPATHS</span> compilier directive in img32.inc. </p>
   <h2 id="Auto-SeeAlso">See Also</h2>
-  <p class="Body"><a href="../../Img32.Clipper2/Routines/InflatePath.htm">InflatePath</a>, <a href="SmoothToCubicBezier.htm">SmoothToCubicBezier</a>, <a href="Vectorize.htm">Vectorize</a></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
+  <p class="Body"><a href="../../Img32.Clipper2/Routines/InflatePath.htm">InflatePath</a>, <a href="Vectorize.htm">Vectorize</a></p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 2 May 2024 <br><br> </p>
 
 </body>
 

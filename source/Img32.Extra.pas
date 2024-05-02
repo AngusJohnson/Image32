@@ -169,6 +169,8 @@ function SmoothToCubicBezier2(const paths: TPathsD;
 //   tension (range -1 to 1): from least to most curve constraint
 function SmoothPath(const path: TPathD; isClosedPath: Boolean;
   tension: double = 0; shapeTolerance: double = 0.1): TPathD;
+function SmoothPaths(const paths: TPathsD; isClosedPath: Boolean;
+  tension: double = 0; shapeTolerance: double = 0.1): TPathsD;
 
 function GetFloodFillMask(imgIn, imgMaskOut: TImage32; x, y: Integer;
   tolerance: Byte; compareFunc: TCompareFunctionEx): Boolean;
@@ -2108,7 +2110,7 @@ begin
 
   if tension > 1 then tension := 1
   else if tension < -1 then tension := -1;
-  if tension = 1 then
+  if tension > 0.9 then
   begin
     Result := path;
     Exit;
@@ -2158,6 +2160,18 @@ begin
     Append(Result, path[highi]);
   end;
   Result := SimplifyPath(Result, shapeTolerance, false);
+end;
+//------------------------------------------------------------------------------
+
+function SmoothPaths(const paths: TPathsD; isClosedPath: Boolean;
+  tension: double = 0; shapeTolerance: double = 0.1): TPathsD;
+var
+  i, len: integer;
+begin
+  len := Length(paths);
+  SetLength(Result, len);
+  for i := 0 to len -1 do
+    Result[i] := SmoothPath(paths[i], isClosedPath, tension, shapeTolerance);
 end;
 
 //------------------------------------------------------------------------------

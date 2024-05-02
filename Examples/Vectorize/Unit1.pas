@@ -44,7 +44,7 @@ type
   private
     masterImg, workImg: TImage32;
     hasTransparency: Boolean; // must be checked before resizing
-    rawPaths, bezierPaths, flattenedPaths: TPathsD;
+    rawPaths, bezierPaths, smoothedPaths: TPathsD;
     function GetDisplaySize: TSize;
     procedure DisplayImage;
   public
@@ -162,7 +162,7 @@ var
 begin
   rawPaths := nil;
   bezierPaths := nil;
-  flattenedPaths := nil;
+  smoothedPaths := nil;
 
   Invalidate;
   if masterImg.IsEmpty then Exit;
@@ -206,37 +206,34 @@ begin
 
   if mnuShowRawPoly.Checked then
   begin
-    flattenedPaths := rawPaths;
+    smoothedPaths := rawPaths;
     StatusBar1.Panels[0].Text := Format(' Vertices: %d', [Count(rawPaths)]);
     StatusBar1.Panels[1].Text := ' Raw Vectors (no smoothing or simplification)';
   end else
   begin
 
-    for i := 0 to High(rawPaths) do
-      rawPaths[i] := InterpolatePoints(rawPaths[i],
-        1, true, (50-TrackBar1.Position)/50);
-    flattenedPaths := SimplifyPaths(rawPaths, 0.25);
+    smoothedPaths := SmoothPaths(rawPaths, true, (10-TrackBar1.Position)/10, 0.25);
 
     lblSmooth.Caption :=
       Format('Smooth'#10'Amount'#10'(%d)',[TrackBar1.Position]);
     lblSimplify.Caption :=
       Format('Simplify'#10'Amount'#10'(%d)',[TrackBar2.Position]);
 
-    StatusBar1.Panels[0].Text := Format(' Vertices: %d', [Count(flattenedPaths)]);
+    StatusBar1.Panels[0].Text := Format(' Vertices: %d', [Count(smoothedPaths)]);
     StatusBar1.Panels[1].Text := ' Simplified & smoothed';
   end;
 
   if mnuHighlightVertices.Checked then
   begin
-    DrawPolygon(workImg, flattenedPaths, frEvenOdd, $20660000);
-    DrawLine(workImg, flattenedPaths, DPIAware(2), clMaroon32, esPolygon);
+    DrawPolygon(workImg, smoothedPaths, frEvenOdd, $20660000);
+    DrawLine(workImg, smoothedPaths, DPIAware(2), clMaroon32, esPolygon);
 
-    for i := 0 to High(flattenedPaths) do
-      for j := 0 to High(flattenedPaths[i]) do
-          DrawPoint(workImg, flattenedPaths[i][j], DPIAware(2.5), clNavy32);
+    for i := 0 to High(smoothedPaths) do
+      for j := 0 to High(smoothedPaths[i]) do
+          DrawPoint(workImg, smoothedPaths[i][j], DPIAware(2.5), clNavy32);
   end else
   begin
-    DrawPolygon(workImg, flattenedPaths, frEvenOdd, $FF660033);
+    DrawPolygon(workImg, smoothedPaths, frEvenOdd, $FF660033);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -293,7 +290,7 @@ begin
 
   with TSimpleSvgWriter.Create(frEvenOdd) do
   try
-    AddPaths(flattenedPaths, false, $40000033, $FF000033, 1.2);
+    AddPaths(smoothedPaths, false, $40000033, $FF000033, 1.2);
     SaveToFile(SaveDialog1.FileName, 800,600);
   finally
     free;

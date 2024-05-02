@@ -25,23 +25,24 @@ const
 var
   image       : TImage32;
   rec         : TRect;
-  arialReader  : TFontReader;
-  arial14Cache: TFontCache;
+  arialFont   : TFontReader;
+  arial14     : TFontCache;
 begin
   ... 
   //The following line of code assumes compiling to the Windows platform.
   //For cross-platform applications, consider storing the font in the
   //application's resource section, and loading it from there.
-  arialReader := TFontReader.Create('Arial'); 
-  //create a font cache for arialReader (with font height 14)
-  arial14Cache := TFontCache.Create(arialReader, DpiAware(14));
+  FontManager.Load('Arial', 800);
+  arialFont := FontManager.GetFont('Arial');
+  //create a font cache for arialFont (with font height 14)
+  arial14 := TFontCache.Create(arialFont, DpiAware(14));
   try
     //now do something with arial14Cache
-    DrawText(image, rec, text, taCenter, tvaMiddle, arial14Cache);
+    DrawText(image, rec, text, taCenter, tvaMiddle, arial14);
   finally
     //clean up
-    arialReader.Free;
-    arial14Cache.Free;
+    //arialFont.Free; //handled by FontManager
+    arial14.Free;
   end;
       </pre>
     </div> </p>
@@ -119,7 +120,7 @@ begin
         </td>
       </tr>
     </table></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 20 Apr 2024 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 2 May 2024 <br><br> </p>
 
 </body>
 
