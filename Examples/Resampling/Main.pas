@@ -41,9 +41,6 @@ var
 
 implementation
 
-{$R *.dfm}
-{$R images.res}
-
 //------------------------------------------------------------------------------
 // Timer/StopWatch
 //------------------------------------------------------------------------------
@@ -104,6 +101,9 @@ end;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
+
+{$R *.dfm}
+{$R images.res}
 
 const
   boxDownSamplingUrl = 'https://angusj.com/image32/Docs/Units/'+
@@ -742,9 +742,12 @@ begin
     img.LoadFromResource('TEXTONPATH', 'PNG');
     img.CropTransparentPixels;
     with ImagePanel.InnerClientRect do
-      img.ScaleToFit(Width, Height - margin *2);
-    dstRect := img.Bounds;
-    TranslateRect(dstRect, margin, margin);
+      ImagePanel.Image.SetSize(Width, Height);
+    dstRect := ImagePanel.Image.Bounds;
+    Types.InflateRect(dstRect, -margin, -margin);
+    img.ScaleToFit(dstRect.Width * 3 div 4, dstRect.Height * 3 div 4);
+    dstRect.Right := dstRect.Left + img.Width;
+    dstRect.Bottom := dstRect.Top + img.Height;
     ImagePanel.Image.Copy(img, img.Bounds, dstRect);
 
     img.LoadFromResource('TEXTONPATH', 'PNG');
