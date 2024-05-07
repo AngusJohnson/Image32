@@ -1075,7 +1075,7 @@ begin
   Result.biHeight := height;
   Result.biPlanes := 1;
   Result.biBitCount := 32;
-  Result.biSizeImage := width * height * SizeOf(TColor32);
+  Result.biSizeImage := width * Abs(height) * SizeOf(TColor32);
   Result.biCompression := BI_RGB;
 end;
 //------------------------------------------------------------------------------
@@ -2539,7 +2539,7 @@ begin
   try
     RectWidthHeight(srcRect, w,h);
     SetSize(w, h);
-    bi := Get32bitBitmapInfoHeader(w, h);
+    bi := Get32bitBitmapInfoHeader(w, -h); // -h => avoids need to flip image
     dc := GetDC(0);
     memDc := CreateCompatibleDC(dc);
     try
@@ -2559,7 +2559,7 @@ begin
       ReleaseDc(0, dc);
     end;
     if IsBlank then SetAlpha(255);
-    FlipVertical;
+    //FlipVertical;
   finally
     EndUpdate;
   end;
