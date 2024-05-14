@@ -1,0 +1,26 @@
+object Form1: TForm1
+  Left = 514
+  Top = 310
+  BorderIcons = []
+  BorderStyle = bsNone
+  Caption = 'Animation2'
+  ClientHeight = 574
+  ClientWidth = 465
+  Color = clBtnFace
+  TransparentColorValue = clBtnFace
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -24
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  FormStyle = fsStayOnTop
+  KeyPreview = True
+  Position = poScreenCenter
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  OnKeyPress = FormKeyPress
+  OnMouseDown = FormMouseDown
+  OnPaint = FormPaint
+  PixelsPerInch = 192
+  TextHeight = 29
+end

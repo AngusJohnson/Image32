@@ -2,8 +2,8 @@ object MainForm: TMainForm
   Left = 0
   Top = 0
   Caption = 'Bicubic Interpolation'
-  ClientHeight = 660
-  ClientWidth = 1488
+  ClientHeight = 773
+  ClientWidth = 1159
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -15,12 +15,13 @@ object MainForm: TMainForm
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnKeyPress = FormKeyPress
+  OnResize = FormResize
   PixelsPerInch = 192
   TextHeight = 34
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 622
-    Width = 1488
+    Top = 735
+    Width = 1159
     Height = 38
     Margins.Left = 6
     Margins.Top = 6
@@ -29,14 +30,14 @@ object MainForm: TMainForm
     Panels = <>
     SimplePanel = True
     SimpleText = '  Ctrl + MouseWheel --> to zoom in or out'
-    ExplicitTop = 597
-    ExplicitWidth = 1474
+    ExplicitTop = 734
+    ExplicitWidth = 1145
   end
   object TabControl1: TTabControl
     Left = 0
     Top = 0
-    Width = 1488
-    Height = 622
+    Width = 1159
+    Height = 735
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
@@ -49,6 +50,7 @@ object MainForm: TMainForm
       '&3. Open Paths')
     TabIndex = 0
     OnChange = TabControl1Change
-    ExplicitHeight = 598
+    ExplicitWidth = 1145
+    ExplicitHeight = 734
   end
 end

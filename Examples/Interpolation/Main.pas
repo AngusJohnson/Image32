@@ -16,13 +16,15 @@ type
     procedure FormKeyPress(Sender: TObject; var Key: Char);
     procedure FormDestroy(Sender: TObject);
     procedure TabControl1Change(Sender: TObject);
+    procedure FormResize(Sender: TObject);
   private
     arial12: TFontCache;
     arial16: TFontCache;
     ImagePanel: TImage32Panel;
-    procedure DoClosed1;
-    procedure DoClosed2;
-    procedure DoOpen;
+    procedure ImagePanelClick(Sender: TObject);
+    procedure DoClosedPaths1;
+    procedure DoClosedPaths2;
+    procedure DoOpenPaths;
   public
   end;
 
@@ -32,8 +34,6 @@ var
 implementation
 
 {$R *.dfm}
-
-//------------------------------------------------------------------------------
 
 procedure TMainForm.FormCreate(Sender: TObject);
 var
@@ -47,6 +47,7 @@ begin
   ImagePanel := TImage32Panel.Create(self);
   ImagePanel.Parent := TabControl1;
   ImagePanel.Align := alClient;
+  ImagePanel.OnClick := ImagePanelClick;
   ActiveControl := ImagePanel;
   with ImagePanel.InnerClientRect do
     ImagePanel.Image.SetSize(Width, Height);
@@ -67,101 +68,130 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TMainForm.ImagePanelClick(Sender: TObject);
+begin
+  if TabControl1.TabIndex <> 0 then
+    TabControl1Change(nil);
+end;
+//------------------------------------------------------------------------------
+
 procedure TMainForm.TabControl1Change(Sender: TObject);
 begin
+  ImagePanel.Scale := 1.0;
   ImagePanel.Image.Clear;
   case TabControl1.TabIndex of
-    0: DoClosed1;
-    1: DoClosed2;
-    else DoOpen;
+    0: DoClosedPaths1;
+    1: DoClosedPaths2;
+    else DoOpenPaths;
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.DoClosed1;
-var
-  adjustXY: integer;
-  path, path2, smoothedPath: TPathD;
-  rec: TRect;
-const
-  margin = 80;
+procedure TMainForm.FormResize(Sender: TObject);
 begin
-  path :=  MakePath([190,120, 240,160, 560,120, 190,490]);
-  rec := ImagePanel.InnerClientRect;
-  Types.InflateRect(rec, -margin, -margin);
-  rec.Right := rec.Left + (rec.Right - rec.Left) div 3;
-  adjustXY := rec.Left div 3;
+  with ImagePanel.InnerClientRect do
+    ImagePanel.Image.SetSize(Width, Height);
+  TabControl1Change(nil);
+end;
+//------------------------------------------------------------------------------
 
-  path := ScalePathToFit(path, rec);
-  smoothedPath := SmoothPath(path, true, 0);
+procedure TMainForm.DoClosedPaths1;
+var
+  margin, adjustX: integer;
+  path, smoothedPath: TPathD;
+  srcRec, spRec, dstRec: TRect;
+  scale, dx, dy: double;
+begin
+  margin := dpiAware(20);
+  path := MakePath([190,120, 240,160, 560,120, 190,490]);
 
-  DrawLine(ImagePanel.Image, path, 1, clRed32, esClosed);
-  DrawLine(ImagePanel.Image, smoothedPath, 5, clBlue32, esClosed);
-  DrawText(ImagePanel.Image, margin +adjustXY,
-    rec.Top + adjustXY*4, 'Tension = 0', arial16);
+  // get the bounds of the smoothpath with the largest bounds
   smoothedPath := SmoothPath(path, true, -1);
-  path2 := TranslatePath(path, rec.Right - margin, 0);
-  smoothedPath := TranslatePath(smoothedPath, rec.Right - margin, 0);
+  spRec := GetBounds(smoothedPath);
 
-  DrawLine(ImagePanel.Image, path2, 1, clRed32, esClosed);
-  DrawLine(ImagePanel.Image, smoothedPath, 5, clBlue32, esClosed);
-  DrawText(ImagePanel.Image, rec.Right +adjustXY,
-    rec.Top + adjustXY*4, 'Tension = -1', arial16);
+  // get dstRec
+  dstRec := ImagePanel.InnerClientRect;
+  Types.InflateRect(dstRec, -margin, -margin);
+  dstRec.Width := dstRec.Width div 3 - margin;
+  inc(dstRec.Top, DPIAware(20));    //making sure there's room for text
+  dec(dstRec.Bottom, DPIAware(20)); //making sure there's room for text
+  adjustX := dstRec.Width + margin;
+
+  DrawText(ImagePanel.Image, dstRec.Left, dstRec.Top - DpiAware(20),
+    'SmoothPath function - using different tensions', arial16);
+
+  scale := Min(dstRec.Width/spRec.Width, dstRec.Height/spRec.Height);
+  path := ScalePath(path, scale);
+
+  dx := dstRec.Left - spRec.Left * scale;
+  dy := dstRec.Top - spRec.Top * scale;
+
+  path := TranslatePath(path, dx, dy);
+  srcRec := GetBounds(path);
+
+  smoothedPath := SmoothPath(path, true, 0);
+  DrawLine(ImagePanel.Image, path, DpiAware(1), clRed32, esClosed);
+  DrawLine(ImagePanel.Image, smoothedPath, DpiAware(2), clBlue32, esClosed);
+  DrawText(ImagePanel.Image, srcRec.Left, srcRec.Bottom + dpiAware(20), '0', arial16);
+
+  path := TranslatePath(path, adjustX, 0);
+  TranslateRect(srcRec, adjustX, 0);
+
+  smoothedPath := SmoothPath(path, true, -1);
+  DrawLine(ImagePanel.Image, path, DpiAware(1), clRed32, esClosed);
+  DrawLine(ImagePanel.Image, smoothedPath, DpiAware(2), clBlue32, esClosed);
+  DrawText(ImagePanel.Image, srcRec.Left, srcRec.Bottom + dpiAware(20), '-1', arial16);
+
+  path := TranslatePath(path, adjustX, 0);
+  TranslateRect(srcRec, adjustX, 0);
 
   smoothedPath := SmoothPath(path, true, 0.5);
-  path2 := TranslatePath(path, rec.Right *2 - margin*2, 0);
-  smoothedPath := TranslatePath(smoothedPath, rec.Right *2 - margin*2, 0);
-
-  DrawLine(ImagePanel.Image, path2, 1, clRed32, esClosed);
-  DrawLine(ImagePanel.Image, smoothedPath, 5, clBlue32, esClosed);
-  DrawText(ImagePanel.Image, rec.Right*2 +adjustXY - margin,
-    rec.Top + adjustXY*4, 'Tension = 0.5', arial16);
-
+  DrawLine(ImagePanel.Image, path, DpiAware(1), clRed32, esClosed);
+  DrawLine(ImagePanel.Image, smoothedPath, DpiAware(2), clBlue32, esClosed);
+  DrawText(ImagePanel.Image, srcRec.Left, srcRec.Bottom + dpiAware(20), '0.5', arial16);
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.DoClosed2;
+procedure TMainForm.DoClosedPaths2;
 var
-  i,j, dx, dy: integer;
-  paths, smoothedPaths: TPathsD;
-  rec: TRect;
-  mp: TPoint;
+  i,j, maxX,maxY: integer;
+  path, smoothedPath: TPathD;
+  dstRec, srcRec: TRect;
+  scaleX, scaleY: double;
 const
   margin = 50;
-  ptCount = 4;
-  pathCount = 1;
+  ptCount = 3;
 begin
-  rec := ImagePanel.InnerClientRect;
-  Types.InflateRect(rec, -margin*3, -margin);
-  dx := rec.Width div 2;
-  dy := rec.Height div 2;
-  mp := MidPoint(rec);
+  SetLength(path, ptCount);
 
-  SetLength(paths, pathCount);
-  SetLength(smoothedPaths, pathCount);
+  dstRec := ImagePanel.InnerClientRect;
+  Types.InflateRect(dstRec, -margin, -margin);
+  maxX := dstRec.Width;
+  maxY := dstRec.Height;
 
-  for i := 0 to High(paths) do
-  begin
-    SetLength(paths[i], ptCount);
-    paths[i][0] := PointD(mp.X - Random(dx), mp.Y - Random(dy));
-    paths[i][1] := PointD(mp.X + Random(dx), mp.Y - Random(dy));
-    paths[i][2] := PointD(mp.X + Random(dx), mp.Y + Random(dy));
-    paths[i][3] := PointD(mp.X - Random(dx), mp.Y + Random(dy));
-  end;
-  for i := 0 to High(smoothedPaths) do
-    smoothedPaths[i] := SmoothPath(paths[i], true, 0);
+  for i := 0 to ptCount -1 do
+    path[i] := PointD(Random(maxX), Random(maxY));
+  smoothedPath := SmoothPath(path, true, -0.5);
+  srcRec := GetBounds(smoothedPath);
+  scaleX := maxX /srcRec.Width;
+  scaleY := maxY /srcRec.Height;
+  path := ScalePath(path, scaleX, scaleY);
 
-  for i := 0 to High(smoothedPaths) do
-  begin
-    DrawLine(ImagePanel.Image, smoothedPaths[i], 5, clGreen32, esPolygon);
-    for j := 0 to High(paths[i]) do
-       DrawPoint(ImagePanel.Image, paths[i][j], 7, clRed32);
-  end;
+  // repeat smoothing now that the path has been properly scaled
+  smoothedPath := SmoothPath(path, true, -0.5);
+  // re-centre paths
+  srcRec := GetBounds(smoothedPath);
+  path := TranslatePath(path, margin - srcRec.Left, margin -srcRec.Top);
+  smoothedPath := TranslatePath(smoothedPath, margin -srcRec.Left, margin -srcRec.Top);
+
+  DrawLine(ImagePanel.Image, smoothedPath, DpiAware(2.5), clGreen32, esPolygon);
+  for j := 0 to High(path) do
+    DrawPoint(ImagePanel.Image, path[j], DpiAware(3.5), clRed32);
 
 end;
 //------------------------------------------------------------------------------
 
-procedure TMainForm.DoOpen;
+procedure TMainForm.DoOpenPaths;
 var
   i,j, dx: integer;
   paths, smoothedPaths: TPathsD;
@@ -189,12 +219,11 @@ begin
 
   for i := 0 to High(smoothedPaths) do
   begin
-    DrawLine(ImagePanel.Image, smoothedPaths[i], 5,
+    DrawLine(ImagePanel.Image, smoothedPaths[i], DpiAware(3),
       RainbowColor(i/pathCount), esSquare);
     for j := 0 to High(paths[i]) do
-       DrawPoint(ImagePanel.Image, paths[i][j], 5, clRed32);
+       DrawPoint(ImagePanel.Image, paths[i][j], DpiAware(2.5), clRed32);
   end;
-
 end;
 //------------------------------------------------------------------------------
 
