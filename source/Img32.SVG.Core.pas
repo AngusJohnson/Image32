@@ -229,6 +229,7 @@ type
   function Match(c: PUTF8Char; const compare: UTF8String): Boolean; overload;
   function Match(const compare1, compare2: UTF8String): Boolean; overload;
   function ToUTF8String(var c: PUTF8Char; endC: PUTF8Char): UTF8String;
+  function ToTrimmedUTF8String(var c: PUTF8Char; endC: PUTF8Char): UTF8String;
 
   //special parsing functions //////////////////////////////////////////
   procedure ParseStyleElementContent(const value: UTF8String; stylesList: TClassStylesList);
@@ -846,21 +847,25 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function AllTrim(var name: UTF8String): Boolean;
+function ToTrimmedUTF8String(var c: PUTF8Char; endC: PUTF8Char): UTF8String;
 var
-  i, len: integer;
+  len: integer;
+  start: PUTF8Char;
 begin
-  len := Length(name);
-  i := 0;
-  while (len > 0) and (name[1] <= space) do
+  start := c;
+  c := endC;
+  if endC > start then
   begin
-    inc(i); dec(len);
+    // trim left
+    while (start < endC) and (start^ <= #32) do Inc(start);
+    // trim right
+    while (endC > start) and (endC[-1] <= #32) do Dec(endC);
   end;
-  if i > 0 then Delete(name, 1, i);
-  Result := len > 0;
-  if not Result then Exit;
-  while name[len] <= space do dec(len);
-  SetLength(name, len);
+
+  len := endC - start;
+  SetLength(Result, len);
+  if len = 0 then Exit;
+  Move(start^, Result[1], len * SizeOf(UTF8Char));
 end;
 //------------------------------------------------------------------------------
 
@@ -1389,11 +1394,13 @@ begin
     c2 := c;
     while (c < endC) and (c^ <> '}') do inc(c);
     if (c = endC) then break;
-    aStyle := ToUTF8String(c2, c);
-
-    //finally, for each class name add (or append) this style
-    for i := 0 to High(names) do
-      stylesList.AddAppendStyle(names[i], aStyle);
+    aStyle := ToTrimmedUTF8String(c2, c);
+    if aStyle <> '' then
+    begin
+      //finally, for each class name add (or append) this style
+      for i := 0 to High(names) do
+        stylesList.AddAppendStyle(names[i], aStyle);
+    end;
     names := nil;
     len := 0; cap := 0;
     inc(c);
@@ -1608,8 +1615,7 @@ begin
     c2 := c;
     inc(c);
     while (c < endC) and (c^ <> ';') do inc(c);
-    styleVal := ToUTF8String(c2, c);
-    AllTrim(styleVal);
+    styleVal := ToTrimmedUTF8String(c2, c);
     inc(c);
 
     new(attrib);
