@@ -3022,9 +3022,7 @@ begin
   pc := PARGB(PixelBase);
   for i := 0 to Width * Height -1 do
   begin
-    pc.R := 255 - pc.R;
-    pc.G := 255 - pc.G;
-    pc.B := 255 - pc.B;
+    pc.Color := pc.Color xor $00FFFFFF; // keep the alpha channel untouched
     inc(pc);
   end;
   Changed;
@@ -3049,7 +3047,7 @@ end;
 procedure TImage32.AdjustHue(percent: Integer);
 var
   i: Integer;
-  tmpImage: TArrayofHSL;
+  hsl: THsl;
   lut: array [byte] of byte;
 begin
   percent := percent mod 100;
@@ -3057,10 +3055,14 @@ begin
   percent := Round(percent * 255 / 100);
   if (percent = 0) or IsEmpty then Exit;
   for i := 0 to 255 do lut[i] := (i + percent) mod 255;
-  tmpImage := ArrayOfColor32ToArrayHSL(fPixels);
-  for i := 0 to high(tmpImage) do
-    tmpImage[i].hue := lut[ tmpImage[i].hue ];
-  fPixels := ArrayOfHSLToArrayColor32(tmpImage);
+
+  for i := 0 to high(fPixels) do
+  begin
+    hsl := RgbToHsl(fPixels[i]);
+    hsl.hue := lut[ hsl.hue ];
+    fPixels[i] := HslToRgb(hsl);
+  end;
+
   Changed;
 end;
 //------------------------------------------------------------------------------
@@ -3068,7 +3070,7 @@ end;
 procedure TImage32.AdjustLuminance(percent: Integer);
 var
   i: Integer;
-  tmpImage: TArrayofHSL;
+  hsl: THsl;
   pc: double;
   lut: array [byte] of byte;
 begin
@@ -3080,10 +3082,13 @@ begin
   else
     for i := 0 to 255 do lut[i] := Round(i + (i * pc));
 
-  tmpImage := ArrayOfColor32ToArrayHSL(fPixels);
-  for i := 0 to high(tmpImage) do
-    tmpImage[i].lum := lut[ tmpImage[i].lum ];
-  fPixels := ArrayOfHSLToArrayColor32(tmpImage);
+  for i := 0 to high(fPixels) do
+  begin
+    hsl := RgbToHsl(fPixels[i]);
+    hsl.lum := lut[ hsl.lum ];
+    fPixels[i] := HslToRgb(hsl);
+  end;
+
   Changed;
 end;
 //------------------------------------------------------------------------------
@@ -3091,7 +3096,7 @@ end;
 procedure TImage32.AdjustSaturation(percent: Integer);
 var
   i: Integer;
-  tmpImage: TArrayofHSL;
+  hsl: THsl;
   lut: array [byte] of byte;
   pc: double;
 begin
@@ -3103,10 +3108,14 @@ begin
   else
     for i := 0 to 255 do lut[i] := Round(i + (i * pc));
 
-  tmpImage := ArrayOfColor32ToArrayHSL(fPixels);
-  for i := 0 to high(tmpImage) do
-    tmpImage[i].sat := lut[ tmpImage[i].sat ];
-  fPixels := ArrayOfHSLToArrayColor32(tmpImage);
+  // Do the conversion inline without creating new pixel/hsl arrays
+  for i := 0 to high(fPixels) do
+  begin
+    hsl := RgbToHsl(fPixels[i]);
+    hsl.sat := lut[ hsl.sat ];
+    fPixels[i] := HslToRgb(hsl);
+  end;
+
   Changed;
 end;
 //------------------------------------------------------------------------------
