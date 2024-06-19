@@ -372,6 +372,14 @@ end;
 // Miscellaneous functions ...
 //------------------------------------------------------------------------------
 
+function NewSvgAttrib(): PSvgAttrib; {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  // New(Result) uses RTTI to initialize the UTF8String fields to nil.
+  // By allocating zero'ed memory we can achieve that much faster.
+  Result := AllocMem(SizeOf(TSvgAttrib));
+end;
+//------------------------------------------------------------------------------
+
 function GetScale(src, dst: double): double;
 begin
   Result := dst / src;
@@ -1536,7 +1544,7 @@ begin
       inc(c, 4); //ignore xml: prefixes
     end;
 
-    New(attrib);
+    attrib := NewSvgAttrib();
     if not ParseAttribName(c, endC, attrib) or
       not ParseAttribValue(c, endC, attrib) then
     begin
@@ -1611,7 +1619,7 @@ begin
     styleVal := ToTrimmedUTF8String(c2, c);
     inc(c);
 
-    new(attrib);
+    attrib := NewSvgAttrib();
     attrib.name := styleName;
     attrib.value := styleVal;
     attrib.hash := GetHash(attrib.name);
@@ -1764,7 +1772,7 @@ begin
       Continue;
     end;
     inc(c, 8);
-    new(attrib);
+    attrib := NewSvgAttrib();
     if not ParseAttribName(c, endC, attrib) then break;
     SkipBlanks(c, endC);
     if not (c^ in [quote, dquote]) then break;
