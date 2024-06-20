@@ -1444,16 +1444,15 @@ begin
     //get one or more class names for each pending style
     c2 := c;
     ParseNameLength(c, endC);
-    ToUTF8String(c2, c, aclassName);
+    ToAsciiLowerUTF8String(c2, c, aclassName);
 
-    AddName(Lowercase(String(aclassName)));
+    AddName(String(aclassName));
     if PeekNextChar(c, endC) = ',' then
     begin
       inc(c);
       Continue;
     end;
     if len = 0 then break;
-    SetLength(names, len); //ie no more comma separated names
 
     //now get the style
     if PeekNextChar(c, endC) <> '{' then Break;
@@ -1465,11 +1464,11 @@ begin
     if aStyle <> '' then
     begin
       //finally, for each class name add (or append) this style
-      for i := 0 to High(names) do
+      for i := 0 to len - 1 do
         stylesList.AddAppendStyle(names[i], aStyle);
     end;
-    names := nil;
-    len := 0; cap := 0;
+    // Reset the used names array length, so we can reuse it to reduce the amount of SetLength calls
+    len := 0;
     inc(c);
   end;
 end;
@@ -2311,10 +2310,11 @@ function TClassStylesList.GetStyle(const classname: UTF8String): UTF8String;
 var
   i: integer;
 begin
-  SetLength(Result, 0);
   i := fList.IndexOf(string(className));
   if i >= 0 then
-    Result := PAnsStringiRec(fList.objects[i]).ansi;
+    Result := PAnsStringiRec(fList.objects[i]).ansi
+  else
+    Result := '';
 end;
 //------------------------------------------------------------------------------
 
