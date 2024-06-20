@@ -3791,7 +3791,7 @@ begin
     dec(endC); //removes trailing ')'
   end;
   if c^ = '#' then inc(c);
-  ref := ToUTF8String(c, endC);
+  ToUTF8String(c, endC, ref);
   i := fReader.fIdList.IndexOf(string(ref));
   if i >= 0 then
     Result := TBaseElement(fReader.fIdList.Objects[i]) else

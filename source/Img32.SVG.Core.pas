@@ -228,8 +228,9 @@ type
   function ScaleDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfDouble;
   function Match(c: PUTF8Char; const compare: UTF8String): Boolean; overload;
   function Match(const compare1, compare2: UTF8String): Boolean; overload;
-  function ToUTF8String(var c: PUTF8Char; endC: PUTF8Char): UTF8String;
-  function ToTrimmedUTF8String(var c: PUTF8Char; endC: PUTF8Char): UTF8String;
+  procedure ToUTF8String(c, endC: PUTF8Char; var S: UTF8String);
+  procedure ToAsciiLowerUTF8String(c, endC: PUTF8Char; var S: UTF8String);
+  procedure ToTrimmedUTF8String(c, endC: PUTF8Char; var S: UTF8String);
 
   //special parsing functions //////////////////////////////////////////
   procedure ParseStyleElementContent(const value: UTF8String; stylesList: TClassStylesList);
@@ -595,7 +596,7 @@ begin
       else break;
     end;
   end;
-  word := ToUTF8String(c2, c);
+  ToUTF8String(c2, c, word);
 end;
 //------------------------------------------------------------------------------
 
@@ -613,7 +614,7 @@ begin
     inc(c);
     c2 := c;
     while (c < endC) and (c^ <> quote) do inc(c);
-    word := ToUTF8String(c2, c);
+    ToUTF8String(c2, c, word);
     inc(c);
   end else
   begin
@@ -629,7 +630,7 @@ begin
         else break;
       end;
     end;
-    word := ToUTF8String(c2, c);
+    ToUTF8String(c2, c, word);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -702,7 +703,7 @@ var
 begin
   c2 := c;
   ParseNameLength(c, endC);
-  name := ToUTF8String(c2, c);
+  ToUTF8String(c2, c, name);
   if name = '' then Result := 0
   else Result := GetHash(name);
 end;
@@ -866,7 +867,7 @@ begin
   if c^ = '#' then inc(c);
   c2 := c;
   while (c < endC) and (c^ <> ')') do inc(c);
-  Result := ToUTF8String(c2, c);
+  ToUTF8String(c2, c, Result);
 end;
 //------------------------------------------------------------------------------
 
@@ -894,37 +895,57 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ToTrimmedUTF8String(var c: PUTF8Char; endC: PUTF8Char): UTF8String;
+procedure ToTrimmedUTF8String(c, endC: PUTF8Char; var S: UTF8String);
 var
   len: integer;
-  start: PUTF8Char;
 begin
-  start := c;
-  c := endC;
-  if endC > start then
-  begin
-    // trim left
-    while (start < endC) and (start^ <= #32) do Inc(start);
-    // trim right
-    while (endC > start) and (endC[-1] <= #32) do Dec(endC);
-  end;
+  // trim left
+  while (c < endC) and (c^ <= #32) do Inc(c);
+  // trim right
+  while (endC > c) and (endC[-1] <= #32) do Dec(endC);
 
-  len := endC - start;
-  SetLength(Result, len);
+  len := endC - c;
+  SetLength(S, len);
   if len = 0 then Exit;
-  Move(start^, Result[1], len * SizeOf(UTF8Char));
+  Move(c^, PUTF8Char(S)^, len * SizeOf(UTF8Char));
 end;
 //------------------------------------------------------------------------------
 
-function ToUTF8String(var c: PUTF8Char; endC: PUTF8Char): UTF8String;
+procedure ToUTF8String(c, endC: PUTF8Char; var S: UTF8String);
 var
   len: integer;
 begin
   len := endC - c;
-  SetLength(Result, len);
+  SetLength(S, len);
   if len = 0 then Exit;
-  Move(c^, Result[1], len * SizeOf(UTF8Char));
-  c := endC;
+  Move(c^, PUTF8Char(S)^, len * SizeOf(UTF8Char));
+end;
+//------------------------------------------------------------------------------
+
+procedure ToAsciiLowerUTF8String(c, endC: PUTF8Char; var S: UTF8String);
+// Reads a UTF8String and converts all upper case 'A'..'Z' to lower case 'a'..'z'
+var
+  len: integer;
+  p: PUTF8Char;
+  ch: UTF8Char;
+begin
+  len := endC - c;
+  SetLength(S, len);
+  if len = 0 then Exit;
+
+  // Use a pointer arithmetic trick to run forward by using a negative index
+  p := PUTF8Char(S) + len;
+  len := -len;
+  while len < 0 do
+  begin
+    ch := endC[len];
+    case ch of
+      'A'..'Z':
+        ch := UTF8Char(Byte(ch) or $20);
+    end;
+    p[len] := ch;
+    inc(len);
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -937,7 +958,7 @@ begin
   inc(c); //skip ampersand.
   c2 := c; c3 := c;
   ParseNameLength(c3, endC);
-  entityName := ToUTF8String(c2, c3);
+  ToUTF8String(c2, c3, entityName);
   entity := owner.FindEntity(GetHash(entityName));
   Result := (c3^ = ';') and Assigned(entity);
   //nb: increments 'c' only if the entity is found.
@@ -957,7 +978,7 @@ begin
   while (c < endC) and (c^ <> quote) do inc(c);
   Result := (c < endC);
   if not Result then Exit;
-  quotStr := ToUTF8String(c2, c);
+  ToUTF8String(c2, c, quotStr);
   inc(c);
 end;
 //------------------------------------------------------------------------------
@@ -1423,7 +1444,7 @@ begin
     //get one or more class names for each pending style
     c2 := c;
     ParseNameLength(c, endC);
-    aclassName := ToUTF8String(c2, c);
+    ToUTF8String(c2, c, aclassName);
 
     AddName(Lowercase(String(aclassName)));
     if PeekNextChar(c, endC) = ',' then
@@ -1440,7 +1461,7 @@ begin
     c2 := c;
     while (c < endC) and (c^ <> '}') do inc(c);
     if (c = endC) then break;
-    aStyle := ToTrimmedUTF8String(c2, c);
+    ToTrimmedUTF8String(c2, c, aStyle);
     if aStyle <> '' then
     begin
       //finally, for each class name add (or append) this style
@@ -1494,17 +1515,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TagNameToLower(const tagName: UTF8String): UTF8String;
-var
-  i: integer;
-begin
-  Result := tagName;
-  for i := 1 to Length(Result) do
-    if (Result[i] >= 'A') and (Result[i] <= 'Z') then
-      Result[i] := AnsiChar(Ord(Result[i]) + 32);
-end;
-//------------------------------------------------------------------------------
-
 function TXmlEl.ParseHeader(var c: PUTF8Char; endC: PUTF8Char): Boolean;
 var
   style: UTF8String;
@@ -1513,7 +1523,7 @@ begin
   SkipBlanks(c, endC);
   c2 := c;;
   ParseNameLength(c, endC);
-  name := TagNameToLower(ToUTF8String(c2, c));
+  ToAsciiLowerUTF8String(c2, c, name);
 
   //load the class's style (ie undotted style) if found.
   style := owner.classStyles.GetStyle(name);
@@ -1533,7 +1543,7 @@ begin
   if not Result then Exit;
   c2 := c;
   ParseNameLength(c, endC);
-  attrib.Name := ToUTF8String(c2, c);
+  ToUTF8String(c2, c, attrib.Name);
   attrib.hash := GetHash(attrib.Name);
 end;
 //------------------------------------------------------------------------------
@@ -1555,7 +1565,7 @@ begin
   c3 := c;
   while (c3 > c2) and ((c3 -1)^ <= space) do 
     dec(c3);
-  attrib.value := ToUTF8String(c2, c3);
+  ToUTF8String(c2, c3, attrib.value);
   inc(c); //skip end quote
 end;
 //------------------------------------------------------------------------------
@@ -1658,7 +1668,7 @@ begin
   begin
     c2 := c;
     ParseStyleNameLen(c, endC);
-    styleName := ToUTF8String(c2, c);
+    ToUTF8String(c2, c, styleName);
     if styleName = '' then Break;
 
     if (ParseNextChar(c, endC) <> ':') or  //syntax check
@@ -1667,7 +1677,7 @@ begin
     c2 := c;
     inc(c);
     while (c < endC) and (c^ <> ';') do inc(c);
-    styleVal := ToTrimmedUTF8String(c2, c);
+    ToTrimmedUTF8String(c2, c, styleVal);
     inc(c);
 
     attrib := NewSvgAttrib();
@@ -1720,14 +1730,14 @@ begin
               begin
                 while (c < endC) and ((c^ <> ']') or not Match(c, ']]>')) do
                   inc(c);
-                text := ToUTF8String(c2, c);
+                ToUTF8String(c2, c, text);
                 inc(c, 3);
                 if (hash = hStyle) then
                   ParseStyleElementContent(text, owner.classStyles);
               end else
               begin
                 while (c < endC) and (c^ <> '<') do inc(c);
-                text := ToUTF8String(c2, c);
+                ToUTF8String(c2, c, text);
               end;
             end;
           end;
@@ -1777,18 +1787,18 @@ begin
       while (c < endC) and (c^ <> '<') do inc(c);
       if (hash = hTextPath) then
       begin
-        text := ToUTF8String(tmpC, c);
+        ToUTF8String(tmpC, c, text);
       end else
       begin
         child := TSvgTreeEl.Create(owner);
         childs.Add(child);
-        child.text := ToUTF8String(tmpC, c);
+        ToUTF8String(tmpC, c, child.text);
       end;
     end else
     begin
       tmpC := c;
       while (c < endC) and (c^ <> '<') do inc(c);
-      text := ToUTF8String(tmpC, c);
+      ToUTF8String(tmpC, c, text);
 
       //if <style> element then load styles into owner.classStyles
       if (hash = hStyle) then
