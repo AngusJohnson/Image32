@@ -346,28 +346,49 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+const
+  SegTypeMap: array['A'..'Z'] of TSvgPathSegType = (
+    stArc,       // A
+      stUnknown, // B
+    stCBezier,   // C
+      stUnknown, // D
+      stUnknown, // E
+      stUnknown, // F
+      stUnknown, // G
+    stHorz,      // H
+      stUnknown, // I
+      stUnknown, // J
+      stUnknown, // K
+    stLine,      // L
+    stMove,      // M
+      stUnknown, // N
+      stUnknown, // O
+      stUnknown, // P
+    stQBezier,   // Q
+      stUnknown, // R
+    stCSpline,   // S
+    stQSpline,   // T
+      stUnknown, // U
+    stVert,      // V
+      stUnknown, // W
+      stUnknown, // X
+      stUnknown, // Y
+    stClose      // Z
+  );
+
 function GetSegType(var c, endC: PUTF8Char; out isRelative: Boolean): TSvgPathSegType;
 var
   ch: UTF8Char;
 begin
   Result := stUnknown;
   if not SkipBlanks(c, endC) then Exit;
-  ch := upcase(c^);
-  if not CharInSet(ch,
-    ['A','C','H','M','L','Q','S','T','V','Z']) then Exit;
+  ch := c^;
   case ch of
-    'M': Result := stMove;
-    'L': Result := stLine;
-    'H': Result := stHorz;
-    'V': Result := stVert;
-    'A': Result := stArc;
-    'Q': Result := stQBezier;
-    'C': Result := stCBezier;
-    'T': Result := stQSpline;
-    'S': Result := stCSpline;
-    'Z': Result := stClose;
+    'a'..'z': Result := SegTypeMap[UTF8Char(Byte(ch) and not $20)];
+    'A'..'Z': Result := SegTypeMap[ch];
   end;
-  isRelative := c^ >= 'a';
+  if Result = stUnknown then Exit;
+  isRelative := ch >= 'a';
   inc(c);
 end;
 //------------------------------------------------------------------------------
@@ -531,18 +552,27 @@ end;
 //------------------------------------------------------------------------------
 
 function TSvgCurvedSeg.GetPreviousCtrlPt: TPointD;
+var
+  UseParentLastCtrlPt: Boolean;
 begin
-  if (fIdx > 0) and (fSegType in [stQSpline, stCSpline]) then
+  UseParentLastCtrlPt := False;
+  if fIdx > 0 then
   begin
-    if (fSegType = stQSpline) and
-      (fParent[fIdx -1].fSegType in [stQBezier, stQSpline]) then
-        Result := TSvgCurvedSeg(fParent[fIdx -1]).GetLastCtrlPt
-    else if (fSegType = stCSpline) and
-      (fParent[fIdx -1].fSegType in [stCBezier, stCSpline]) then
-        Result := TSvgCurvedSeg(fParent[fIdx -1]).GetLastCtrlPt
-    else
-      Result := fFirstPt;
-  end else
+    case fSegType of
+      stQSpline:
+        case fParent[fIdx -1].fSegType of
+          stQBezier, stQSpline: UseParentLastCtrlPt := True;
+        end;
+      stCSpline:
+        case fParent[fIdx -1].fSegType of
+          stCBezier, stCSpline: UseParentLastCtrlPt := True;
+        end;
+    end;
+  end;
+
+  if UseParentLastCtrlPt then
+    Result := TSvgCurvedSeg(fParent[fIdx -1]).GetLastCtrlPt
+  else
     Result := fFirstPt;
 end;
 

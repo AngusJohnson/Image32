@@ -255,7 +255,7 @@ type
   TSetOfUTF8Char = set of UTF8Char;
   UTF8Strings = array of UTF8String;
 
-function CharInSet(chr: UTF8Char; chrs: TSetOfUTF8Char): Boolean;
+function CharInSet(chr: UTF8Char; const chrs: TSetOfUTF8Char): Boolean;
 
 const
   clInvalid   = $00010001;
@@ -269,7 +269,7 @@ const
   {$I Img32.SVG.HashConsts.inc}
 
 var
-  LowerCaseTable : array[#0..#255] of UTF8Char;
+  LowerCaseTable : array[#0..#$FF] of UTF8Char;
   ColorConstList : TStringList;
 
 implementation
@@ -408,7 +408,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function CharInSet(chr: UTF8Char; chrs: TSetOfUTF8Char): Boolean;
+function CharInSet(chr: UTF8Char; const chrs: TSetOfUTF8Char): Boolean;
 begin
   Result := chr in chrs;
 end;
@@ -534,28 +534,49 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function IsDigit(c: UTF8Char): Boolean; {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  case c of
+    '0'..'9': Result := True;
+    else Result := False;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function IsQuoteChar(c: UTF8Char): Boolean; {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result := (c = quote) or (c = dquote);
+end;
+//------------------------------------------------------------------------------
+
 function IsAlpha(c: UTF8Char): Boolean; {$IFDEF INLINE} inline; {$ENDIF}
 begin
-  Result := CharInSet(c, ['A'..'Z','a'..'z']);
+  case c of
+    'A'..'Z', 'a'..'z': Result := True;
+    else Result := False;
+  end;
 end;
 //------------------------------------------------------------------------------
 
 function ParseStyleNameLen(var c: PUTF8Char; endC: PUTF8Char): integer;
 var
   c2: PUTF8Char;
-const
-  validNonFirstChars =  ['0'..'9','A'..'Z','a'..'z','-'];
 begin
   Result := 0;
   //nb: style names may start with a hyphen
-  if (c^ = '-') then
-  begin
-    if not IsAlpha((c+1)^) then Exit;
-  end
-  else if not IsAlpha(c^) then Exit;
+  c2 := c;
+  if (c2^ = '-') then inc(c2);
+  if not IsAlpha(c2^) then Exit;
 
+  c := c2;
   c2 := c; inc(c);
-  while (c < endC) and CharInSet(c^, validNonFirstChars) do inc(c);
+  while c < endC do
+  begin
+    case c^ of
+      '0'..'9', 'A'..'Z', 'a'..'z', '-': inc(c);
+      else break;
+    end;
+  end;
   Result := c - c2;
 end;
 //------------------------------------------------------------------------------
@@ -567,9 +588,13 @@ begin
   Result := SkipBlanksAndComma(c, endC);
   if not Result then Exit;
   c2 := c;
-  while (c < endC) and
-    (LowerCaseTable[c^] >= 'a') and (LowerCaseTable[c^] <= 'z') do
-      inc(c);
+  while c < endC do
+  begin
+    case c^ of
+      'A'..'Z', 'a'..'z': inc(c);
+      else break;
+    end;
+  end;
   word := ToUTF8String(c2, c);
 end;
 //------------------------------------------------------------------------------
@@ -592,12 +617,18 @@ begin
     inc(c);
   end else
   begin
-    Result := CharInSet(LowerCaseTable[c^], ['A'..'Z', 'a'..'z']);
+    //Result := IsLowerAlpha(LowerCaseTable[c^]);
+    Result := IsAlpha(c^);
     if not Result then Exit;
     c2 := c;
     inc(c);
-    while (c < endC) and
-      CharInSet(LowerCaseTable[c^], ['A'..'Z', 'a'..'z', '-', '_']) do inc(c);
+    while c < endC do
+    begin
+      case c^ of
+        'A'..'Z', 'a'..'z', '-', '_': inc(c);
+        else break;
+      end;
+    end;
     word := ToUTF8String(c2, c);
   end;
 end;
@@ -606,12 +637,16 @@ end;
 function ParseNameLength(var c: PUTF8Char; endC: PUTF8Char): integer; overload;
 var
   c2: PUTF8Char;
-const
-  validNonFirstChars =  ['0'..'9','A'..'Z','a'..'z','_',':','-'];
 begin
   c2 := c;
   inc(c);
-  while (c < endC) and CharInSet(c^, validNonFirstChars) do inc(c);
+  while c < endC do
+  begin
+    case c^ of
+      '0'..'9', 'A'..'Z', 'a'..'z', '_', ':', '-': inc(c);
+      else break;
+    end;
+  end;
   Result := c - c2;
 end;
 //------------------------------------------------------------------------------
@@ -846,12 +881,16 @@ end;
 
 function ParseQuoteChar(var c: PUTF8Char; endC: PUTF8Char): UTF8Char;
 begin
-  if SkipBlanks(c, endC) and (c^ in [quote, dquote]) then
+  if SkipBlanks(c, endC) then
   begin
     Result := c^;
-    inc(c);
-  end else
-    Result := #0;
+    if IsQuoteChar(Result) then
+    begin
+      inc(c);
+      Exit;
+    end;
+  end;
+  Result := #0;
 end;
 //------------------------------------------------------------------------------
 
@@ -942,7 +981,7 @@ begin
   c2 := c;
   if (c2^ = '-') then inc(c2);
   if (c2^ = SvgDecimalSeparator) then inc(c2);
-  Result := (c2 < endC) and (c2^ >= '0') and (c2^ <= '9');
+  Result := (c2 < endC) and IsDigit(c2^);
 end;
 //------------------------------------------------------------------------------
 
@@ -1064,6 +1103,7 @@ function HtmlDecode(const html: UTF8String): UTF8String;
 var
   val, len: integer;
   c,ce,endC: PUTF8Char;
+  ch: UTF8Char;
 begin
   len := Length(html);
   SetLength(Result, len*3);
@@ -1095,14 +1135,15 @@ begin
         inc(c, 3);
         while c < ce do
         begin
-          if (c^ >= 'a') and (c^ <= 'f') then
-            val := val * 16 + Ord(c^) - 87
-          else if (c^ >= 'A') and (c^ <= 'F') then
-            val := val * 16 + Ord(c^) - 55
-          else if (c^ >= '0') and (c^ <= '9') then
-            val := val * 16 + Ord(c^) - 48
+          ch := c^;
+          case ch of
+            'a'..'f':
+              val := val * 16 + Ord(ch) - 87;
+            'A'..'F':
+              val := val * 16 + Ord(ch) - 55;
+            '0'..'9':
+              val := val * 16 + Ord(ch) - 48;
           else
-          begin
             val := -1;
             break;
           end;
@@ -1371,10 +1412,14 @@ begin
   SkipBlanks(c, endC);
   if Match(c, '<![cdata[') then inc(c, 9);
 
-  while SkipStyleBlanks(c, endC) and
-    CharInSet(LowerCaseTable[PeekNextChar(c, endC)],
-      [SvgDecimalSeparator, '#', 'a'..'z']) do
+  while SkipStyleBlanks(c, endC) do
   begin
+    //case LowerCaseTable[PeekNextChar(c, endC)] of
+    case PeekNextChar(c, endC) of
+      SvgDecimalSeparator, '#', 'A'..'Z', 'a'..'z': ;
+      else break;
+    end;
+
     //get one or more class names for each pending style
     c2 := c;
     ParseNameLength(c, endC);
@@ -1527,21 +1572,27 @@ begin
 
   while SkipBlanks(c, endC) do
   begin
-    if CharInSet(c^, ['/', '?', '>']) then
-    begin
-      if (c^ <> '>') then
-      begin
-        inc(c);
-        if (c^ <> '>') then Exit; //error
-        selfClosed := true;
-      end;
-      inc(c);
-      Result := true;
-      break;
-    end
-    else if (c^ = 'x') and Match(c, 'xml:') then
-    begin
-      inc(c, 4); //ignore xml: prefixes
+    case c^ of
+      '/', '?':
+        begin
+          inc(c);
+          if (c^ <> '>') then Exit; //error
+          selfClosed := true;
+          inc(c);
+          Result := true;
+          break;
+        end;
+      '>':
+        begin
+          inc(c);
+          Result := true;
+          break;
+        end;
+      'x':
+        if Match(c, 'xml:') then
+        begin
+          inc(c, 4); //ignore xml: prefixes
+        end;
     end;
 
     attrib := NewSvgAttrib();
@@ -1775,7 +1826,7 @@ begin
     attrib := NewSvgAttrib();
     if not ParseAttribName(c, endC, attrib) then break;
     SkipBlanks(c, endC);
-    if not (c^ in [quote, dquote]) then break;
+    if not IsQuoteChar(c^) then break;
     if not ParseQuotedString(c, endC, attrib.value) then break;
     attribs.Add(attrib);
     attrib := nil;
@@ -1909,7 +1960,10 @@ var
 begin
   memStream.Position := 0;
   encoding := GetXmlEncoding(memStream.Memory, memStream.Size);
-  if not (encoding in [eUnicodeLE, eUnicodeBE]) then Exit;
+  case encoding of
+    eUnicodeLE, eUnicodeBE: ;
+    else Exit;
+  end;
   SetLength(s, memStream.Size div 2);
   Move(memStream.Memory^, s[1], memStream.Size);
   if encoding = eUnicodeBE then
