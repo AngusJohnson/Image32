@@ -2,8 +2,8 @@ unit Img32.SVG.Reader;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.4                                                             *
-* Date      :  23 March 2024                                                   *
+* Version   :  4.5                                                             *
+* Date      :  21 June 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -105,6 +105,8 @@ type
     procedure Draw(image: TImage32; drawDat: TDrawData); override;
   public
     function  GetViewbox: TRectWH;
+    function  Width     : TValue;
+    function  Height    : TValue;
   end;
 
   TSvgReader = class
@@ -208,11 +210,11 @@ type
   //-------------------------------------
 
   TShapeElement = class(TBaseElement)
-  private
-    procedure SimpleDrawFill(const paths: TPathsD;
-      fillRule: TFillRule; color: TColor32);
-    procedure SimpleDrawStroke(const paths: TPathsD; width: double;
-      joinStyle: TJoinStyle; endStyle: TEndStyle; color: TColor32);
+//  private
+//    procedure SimpleDrawFill(const paths: TPathsD;
+//      fillRule: TFillRule; color: TColor32);
+//    procedure SimpleDrawStroke(const paths: TPathsD; width: double;
+//      joinStyle: TJoinStyle; endStyle: TEndStyle; color: TColor32);
   protected
     hasPaths    : Boolean;
     drawPathsO  : TPathsD; //open only
@@ -2454,16 +2456,16 @@ begin
   end
   else if drawDat.fillColor = clInvalid then
   begin
-    if fReader.RecordSimpleDraw then
-      SimpleDrawFill(fillPaths, drawDat.fillRule, clBlack32);
+//    if fReader.RecordSimpleDraw then
+//      SimpleDrawFill(fillPaths, drawDat.fillRule, clBlack32);
     DrawPolygon(img, fillPaths, drawDat.fillRule, clBlack32);
   end
   else
     with drawDat do
     begin
-      if fReader.RecordSimpleDraw then
-        SimpleDrawFill(fillPaths, fillRule,
-          MergeColorAndOpacity(fillColor, fillOpacity));
+//      if fReader.RecordSimpleDraw then
+//        SimpleDrawFill(fillPaths, fillRule,
+//          MergeColorAndOpacity(fillColor, fillOpacity));
       DrawPolygon(img, fillPaths, fillRule,
         MergeColorAndOpacity(fillColor, fillOpacity));
     end;
@@ -2473,60 +2475,87 @@ end;
 procedure TShapeElement.DrawStroke(img: TImage32;
   drawDat: TDrawData; isClosed: Boolean);
 var
-  dashOffset, scaledStrokeWidth, roundingScale: double;
-  dashArray: TArrayOfInteger;
-  scale: Double;
+  i: integer;
+  dashOffset, sw: double;
+  dashArray: TArrayOfDouble;
+  lim, scale: Double;
   strokeClr: TColor32;
   strokePaths: TPathsD;
   refEl: TBaseElement;
   endStyle: TEndStyle;
   joinStyle: TJoinStyle;
   bounds: TRectD;
+  paths: TPathsD;
 begin
-  if isClosed then
-  begin
-    strokePaths := MatrixApply(drawPathsC, drawDat.matrix);
-    endStyle := esPolygon;
-  end else
-  begin
-    strokePaths := MatrixApply(drawPathsO, drawDat.matrix);
-    if fDrawData.strokeCap = esPolygon then
-      endStyle := esButt else
-      endStyle := fDrawData.strokeCap;
-  end;
-  if not Assigned(strokePaths) then Exit;
-  joinStyle := fDrawData.strokeJoin;
-  if drawDat.strokeColor = clCurrent then
-    drawDat.strokeColor := fReader.currentColor;
 
   scale := ExtractAvgScaleFromMatrix(drawDat.matrix);
+  joinStyle := fDrawData.strokeJoin;
+
   bounds := fReader.userSpaceBounds;
   with drawDat.strokeWidth do
   begin
     if not IsValid then
-      scaledStrokeWidth := scale
+      sw := 1
     else if HasFontUnits then
-      scaledStrokeWidth :=
-        GetValue(drawDat.fontInfo.size, GetRelFracLimit) * scale
+      sw := GetValue(drawDat.fontInfo.size, GetRelFracLimit)
     else
-      scaledStrokeWidth := GetValueXY(bounds, 0) * scale;
+      sw := GetValueXY(bounds, 0);
   end;
-  roundingScale := scale;
+
+  if joinStyle = jsMiter then
+    lim := drawDat.strokeMitLim else
+    lim := scale;
+
+  if drawDat.strokeColor = clCurrent then
+    drawDat.strokeColor := fReader.currentColor;
 
   if Length(drawDat.dashArray) > 0 then
-    dashArray := MakeDashArray(drawDat.dashArray, scale) else
+    dashArray := ScaleDashArray(drawDat.dashArray, scale) else
     dashArray := nil;
+  dashOffset := drawDat.dashOffset;
 
   with drawDat do
     strokeClr := MergeColorAndOpacity(strokeColor, strokeOpacity);
 
-  if Assigned(dashArray) then
+  if isClosed then
   begin
-    dashOffset := drawDat.dashOffset * scale;
-    DrawDashedLine(img, strokePaths, dashArray,
-      @dashOffset, scaledStrokeWidth, strokeClr, endStyle);
-  end
-  else if (drawDat.strokeEl <> '') then
+    if not Assigned(drawPathsC) then Exit;
+    if Assigned(dashArray) then
+    begin
+      if joinStyle = jsRound then
+        endStyle := esRound else
+        endStyle := esButt;
+      dashArray := ScaleDashArray(drawDat.dashArray, 1);  // ie. don't scale yet!
+      strokePaths := nil;
+      for i := 0 to High(drawPathsC) do
+      begin
+        paths := GetDashedPath(drawPathsC[i], true, dashArray, @dashOffset);
+        AppendPath(strokePaths, paths);
+      end;
+      strokePaths := RoughOutline(strokePaths, sw, joinStyle, endStyle, lim);
+    end else
+    begin
+      endStyle := esPolygon;
+      strokePaths := RoughOutline(drawPathsC, sw, joinStyle, endStyle, lim);
+    end;
+  end else
+  begin
+    if not Assigned(drawPathsO) then Exit;
+    if fDrawData.strokeCap = esPolygon then
+      endStyle := esButt else
+      endStyle := fDrawData.strokeCap;
+    if Assigned(dashArray) then
+    begin
+      strokePaths := MatrixApply(drawPathsO, drawDat.matrix);
+      DrawDashedLine(img, strokePaths, dashArray,
+        @dashOffset, sw * scale, strokeClr, endStyle);
+      Exit;
+    end;
+    strokePaths := RoughOutline(drawPathsO, sw, joinStyle, endStyle, lim);
+  end;
+  strokePaths := MatrixApply(strokePaths, drawDat.matrix);
+
+  if (drawDat.strokeEl <> '') then
   begin
     refEl := FindRefElement(drawDat.strokeEl);
     if not Assigned(refEl) then Exit;
@@ -2535,42 +2564,31 @@ begin
     begin
       with TRadGradElement(refEl) do
         PrepareRenderer(fReader.RadGradRenderer, drawDat);
-      DrawLine(img, strokePaths, scaledStrokeWidth,
-        fReader.RadGradRenderer, endStyle, joinStyle, roundingScale);
+      DrawPolygon(img, strokePaths, frNonZero, fReader.RadGradRenderer);
     end
     else if refEl is TLinGradElement then
     begin
       with TLinGradElement(refEl) do
         PrepareRenderer(fReader.LinGradRenderer, drawDat);
-      DrawLine(img, strokePaths, scaledStrokeWidth,
-        fReader.LinGradRenderer, endStyle, joinStyle, roundingScale);
+      DrawPolygon(img, strokePaths, frNonZero, fReader.LinGradRenderer);
     end
     else if refEl is TPatternElement then
       with TPatternElement(refEl) do
       begin
         PrepareRenderer(imgRenderer, drawDat);
-        DrawLine(img, strokePaths,  scaledStrokeWidth,
-          imgRenderer, endStyle, joinStyle, roundingScale);
+        DrawLine(img, strokePaths,  1, imgRenderer, esPolygon, joinStyle, scale);
+        DrawPolygon(img, strokePaths, frNonZero, imgRenderer);
       end;
-  end
-  else if (joinStyle = jsMiter) then
-  begin
-    if fReader.RecordSimpleDraw then
-      SimpleDrawStroke(strokePaths, scaledStrokeWidth,
-        joinStyle, endStyle, strokeClr);
-    DrawLine(img, strokePaths, scaledStrokeWidth,
-      strokeClr, endStyle, joinStyle, drawDat.strokeMitLim);
   end else
   begin
-    if fReader.RecordSimpleDraw then
-      SimpleDrawStroke(strokePaths, scaledStrokeWidth,
-        joinStyle, endStyle, strokeClr);
-    DrawLine(img, strokePaths, scaledStrokeWidth,
-      strokeClr, endStyle, joinStyle, roundingScale);
+//    if fReader.RecordSimpleDraw then
+//      SimpleDrawFill(strokePaths2, frNonZero, strokeClr);
+    DrawPolygon(img, strokePaths, frNonZero, strokeClr);
   end;
 end;
 //------------------------------------------------------------------------------
 
+(*
 procedure TShapeElement.SimpleDrawFill(const paths: TPathsD;
   fillRule: TFillRule; color: TColor32);
 var
@@ -2597,6 +2615,7 @@ begin
   sdd.color := color or $FF000000;
   fReader.SimpleDrawList.Add(sdd);
 end;
+*)
 
 //------------------------------------------------------------------------------
 // TPathElement
@@ -3602,6 +3621,18 @@ begin
     viewboxWH.height := elRectWH.height.GetValue(defaultSvgHeight, 0);
   end;
   Result := viewboxWH;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgElement.Width: TValue;
+begin
+  Result := elRectWH.Width;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgElement.Height: TValue;
+begin
+  Result := elRectWH.Height;
 end;
 
 //------------------------------------------------------------------------------

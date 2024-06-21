@@ -2,8 +2,8 @@ unit Img32.SVG.Core;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.4                                                             *
-* Date      :  13 March 2024                                                   *
+* Version   :  4.5                                                             *
+* Date      :  21 June 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -225,7 +225,7 @@ type
   function IsNumPending(var c: PUTF8Char;
     endC: PUTF8Char; ignoreComma: Boolean): Boolean;
   function UTF8StringToColor32(const value: UTF8String; var color: TColor32): Boolean;
-  function MakeDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfInteger;
+  function ScaleDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfDouble;
   function Match(c: PUTF8Char; const compare: UTF8String): Boolean; overload;
   function Match(const compare1, compare2: UTF8String): Boolean; overload;
   function ToUTF8String(var c: PUTF8Char; endC: PUTF8Char): UTF8String;
@@ -1301,28 +1301,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function MakeDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfInteger;
+function ScaleDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfDouble;
 var
   i, len: integer;
-  dist: double;
 begin
-  dist := 0;
   len := Length(dblArray);
   SetLength(Result, len);
-  for i := 0 to len -1 do
-  begin
-    Result[i] := Ceil(dblArray[i] * scale);
-    dist := Result[i] + dist;
-  end;
+  if len = 0 then Exit;
 
-  if dist = 0 then
-  begin
-    Result := nil;
-  end
-  else if Odd(len) then
+  for i := 0 to len -1 do
+    Result[i] := dblArray[i] * scale;
+
+  if Odd(len) then
   begin
     SetLength(Result, len *2);
-    Move(Result[0], Result[len], len * SizeOf(integer));
+    Move(Result[0], Result[len], len * SizeOf(double));
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2043,8 +2036,8 @@ end;
 
 procedure TValue.Init;
 begin
-  rawVal      := InvalidD;
-  unitType          := utNumber;
+  rawVal   := InvalidD;
+  unitType := utNumber;
 end;
 //------------------------------------------------------------------------------
 

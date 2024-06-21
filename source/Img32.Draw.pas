@@ -2,8 +2,8 @@ unit Img32.Draw;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.4                                                             *
-* Date      :  23 March 2024                                                   *
+* Version   :  4.5                                                             *
+* Date      :  21 June 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -17,14 +17,6 @@ unit Img32.Draw;
 interface
 
 {$I Img32.inc}
-
-// MemCheck may be useful for debugging (adds a minimal cost to performance)
-{.$DEFINE MemCheck}
-
-// UseTrunc makes rendering thread safe,
-// so it's generally preferred over Round and SetRoundMode().
-// See https://github.com/AngusJohnson/Image32/issues/45
-{$DEFINE UseTrunc}
 
 uses
   SysUtils, Classes, Types, Math, Img32, Img32.Vector;
@@ -245,28 +237,28 @@ type
      endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
 
   procedure DrawDashedLine(img: TImage32; const line: TPathD;
-    dashPattern: TArrayOfInteger; patternOffset: PDouble;
+    dashPattern: TArrayOfDouble; patternOffset: PDouble;
     lineWidth: double; color: TColor32;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
   procedure DrawDashedLine(img: TImage32; const lines: TPathsD;
-    dashPattern: TArrayOfInteger; patternOffset: PDouble;
+    dashPattern: TArrayOfDouble; patternOffset: PDouble;
     lineWidth: double; color: TColor32; endStyle: TEndStyle;
     joinStyle: TJoinStyle = jsAuto); overload;
   procedure DrawDashedLine(img: TImage32; const line: TPathD;
-    dashPattern: TArrayOfInteger; patternOffset: PDouble;
+    dashPattern: TArrayOfDouble; patternOffset: PDouble;
     lineWidth: double; renderer: TCustomRenderer; endStyle: TEndStyle;
     joinStyle: TJoinStyle = jsAuto); overload;
   procedure DrawDashedLine(img: TImage32; const lines: TPathsD;
-    dashPattern: TArrayOfInteger; patternOffset: PDouble;
+    dashPattern: TArrayOfDouble; patternOffset: PDouble;
     lineWidth: double; renderer: TCustomRenderer;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
 
   procedure DrawInvertedDashedLine(img: TImage32;
-    const line: TPathD; dashPattern: TArrayOfInteger;
+    const line: TPathD; dashPattern: TArrayOfDouble;
     patternOffset: PDouble; lineWidth: double; endStyle: TEndStyle;
     joinStyle: TJoinStyle = jsAuto); overload;
   procedure DrawInvertedDashedLine(img: TImage32;
-    const lines: TPathsD; dashPattern: TArrayOfInteger;
+    const lines: TPathsD; dashPattern: TArrayOfDouble;
     patternOffset: PDouble; lineWidth: double;
     endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto); overload;
 
@@ -314,11 +306,6 @@ type
 
 implementation
 
-{$IFDEF MemCheck}
-resourcestring
-  sMemCheckError = 'Img32.Draw: Memory allocation error';
-{$ENDIF}
-
 type
 
   // A horizontal scanline contains any number of line fragments. A fragment
@@ -331,7 +318,6 @@ type
     Y: integer;
     minX, maxX: integer;
     fragCnt: integer;
-    {$IFDEF MemCheck} total: integer; {$ENDIF}
     fragOffset: integer;
   end;
   PScanline = ^TScanline;
@@ -519,15 +505,9 @@ end;
 function MirrorD(d: double; colorCnt: integer): integer;
 begin
   dec(colorCnt);
-{$IFDEF UseTrunc} // used in TSvgRadialGradientRenderer.RenderProc
   if Odd(Trunc(d)) then
     result := Trunc((1 - frac(d)) * colorCnt) else
     result := Trunc(frac(d)  * colorCnt);
-{$ELSE}
-  if Odd(Round(d)) then
-    result := Round((1 - frac(d)) * colorCnt) else
-    result := Round(frac(d)  * colorCnt);
-{$ENDIF}
 end;
 // ------------------------------------------------------------------------------
 
@@ -555,15 +535,9 @@ end;
 function RepeatD(d: double; colorCnt: integer): integer;
 begin
   dec(colorCnt);
-{$IFDEF UseTrunc} // used in TSvgRadialGradientRenderer.RenderProc
   if (d < 0) then
     result := Trunc((1 + frac(d)) * colorCnt) else
     result := Trunc(frac(d)  * colorCnt);
-{$ELSE}
-  if (d < 0) then
-    result := Round((1 + frac(d)) * colorCnt) else
-    result := Round(frac(d)  * colorCnt);
-{$ENDIF}
 end;
 // ------------------------------------------------------------------------------
 
@@ -656,18 +630,10 @@ begin
   begin
     highJ := high(polygons[i]);
     if highJ < 2 then continue;
-{$IFDEF UseTrunc}
     y1 := Trunc(polygons[i][highJ].Y);
-{$ELSE}
-    y1 := Round(polygons[i][highJ].Y);
-{$ENDIF}
     for j := 0 to highJ do
     begin
-{$IFDEF UseTrunc}
       y2 := Trunc(polygons[i][j].Y);
-{$ELSE}
-      y2 := Round(polygons[i][j].Y);
-{$ENDIF}
       if y1 < y2 then
       begin
         // descending (but ignore edges outside the clipping range)
@@ -712,7 +678,6 @@ begin
       inc(fragOff, j * 4); // 4 doubles are needed for each fragment
     end else
       psl.fragOffset := -1;
-    {$IFDEF MemCheck} psl.total := j; {$ENDIF}
     psl.fragCnt := 0; // reset for later
     psl.minX := clipRight;
     psl.maxX := 0;
@@ -763,13 +728,8 @@ begin
     // but still update maxX for each scanline the edge passes
     if bot.X > maxX then
     begin
-{$IFDEF UseTrunc}
       for i := Min(maxY, Trunc(bot.Y)) downto Max(0, Trunc(top.Y)) do
         scanlines[i].maxX := maxX;
-{$ELSE}
-      for i := Min(maxY, Round(bot.Y)) downto Max(0, Round(top.Y)) do
-        scanlines[i].maxX := maxX;
-{$ENDIF}
       Exit;
     end;
 
@@ -786,24 +746,14 @@ begin
   begin
     if top.X >= maxX then
     begin
-{$IFDEF UseTrunc}
       for i := Min(maxY, Trunc(bot.Y)) downto Max(0, Trunc(top.Y)) do
         scanlines[i].maxX := maxX;
-{$ELSE}
-      for i := Min(maxY, Round(bot.Y)) downto Max(0, Round(top.Y)) do
-        scanlines[i].maxX := maxX;
-{$ENDIF}
       Exit;
     end;
     // here the edge must be oriented bottom-right to top-left
     y := bot.Y - (bot.X - maxX) * Abs(dydx);
-{$IFDEF UseTrunc}
     for i := Min(maxY, Trunc(bot.Y)) downto Max(0, Trunc(y)) do
       scanlines[i].maxX := maxX;
-{$ELSE}
-    for i := Min(maxY, Round(bot.Y)) downto Max(0, Round(y)) do
-      scanlines[i].maxX := maxX;
-{$ENDIF}
     bot.Y := y;
     if bot.Y <= 0 then Exit;
     bot.X := maxX;
@@ -812,13 +762,8 @@ begin
   begin
     // here the edge must be oriented bottom-left to top-right
     y := top.Y + (top.X - maxX) * Abs(dydx);
-{$IFDEF UseTrunc}
     for i := Min(maxY, Trunc(y)) downto Max(0, Trunc(top.Y)) do
       scanlines[i].maxX := maxX;
-{$ELSE}
-    for i := Min(maxY, Round(y)) downto Max(0, Round(top.Y)) do
-      scanlines[i].maxX := maxX;
-{$ENDIF}
     top.Y := y;
     if top.Y >= maxY then Exit;
     top.X := maxX;
@@ -837,11 +782,7 @@ begin
   end;
 
   // SPLIT THE EDGE INTO MULTIPLE SCANLINE FRAGMENTS
-{$IFDEF UseTrunc}
   scanlineY := Trunc(bot.Y);
-{$ELSE}
-  scanlineY := Round(bot.Y);
-{$ENDIF}
   if bot.Y = scanlineY then dec(scanlineY);
 
   // at the lower-most extent of the edge 'split' the first fragment
@@ -849,9 +790,6 @@ begin
 
   psl := @scanlines[scanlineY];
   if psl.fragOffset < 0 then Exit; //a very rare event
-  {$IFDEF MemCheck}
-  if psl.fragCnt = psl.total then raise Exception.Create(sMemCheckError);
-  {$ENDIF}
 
   pFrag := fragments;
   inc(pFrag, psl.fragOffset + psl.fragCnt * 4);
@@ -875,9 +813,6 @@ begin
   dec(psl);
   while psl.Y > top.Y do
   begin
-    {$IFDEF MemCheck}
-    if psl.fragCnt = psl.total then raise Exception.Create(sMemCheckError);
-    {$ENDIF}
     pFrag := fragments;
     inc(pFrag, psl.fragOffset + psl.fragCnt * 4);
     inc(psl.fragCnt);
@@ -889,9 +824,6 @@ begin
     dec(psl);
   end;
   // and finally the top fragment
-  {$IFDEF MemCheck}
-  if psl.fragCnt = psl.total then raise Exception.Create(sMemCheckError);
-  {$ENDIF}
   pFrag := fragments;
   inc(pFrag, psl.fragOffset + psl.fragCnt * 4);
   inc(psl.fragCnt);
@@ -949,18 +881,12 @@ begin
       right := q;
     end;
 
-{$IFDEF UseTrunc}
     leftXi := Max(0, Trunc(left));
     rightXi := Max(0, Trunc(right));
-{$ELSE}
-    leftXi := Max(0, Round(left));
-    rightXi := Max(0, Round(right));
-{$ENDIF}
-
     if (leftXi = rightXi) then
     begin
-      if dydx < 0 then windDir := -1.0 else windDir := 1.0;
       // the fragment is only one pixel wide
+      if dydx < 0 then windDir := -1.0 else windDir := 1.0;
       if leftXi < scanline.minX then
         scanline.minX := leftXi;
       if rightXi > scanline.maxX then
@@ -1026,9 +952,6 @@ var
   scanlines: TArrayOfScanline;
   fragments: PDouble;
   scanline: PScanline;
-{$IFnDEF UseTrunc}
-  savedRoundMode: TRoundingMode;
-{$ENDIF}
 begin
   // See also https://nothings.org/gamedev/rasterize/
   if not assigned(renderer) then Exit;
@@ -1041,9 +964,6 @@ begin
   // and even a little faster than Trunc() above (except
   // when the FastMM4 memory manager is enabled.)
   fragments := nil;
-{$IFnDEF UseTrunc}
-  savedRoundMode := SetRoundMode(rmDown);
-{$ENDIF}
   try
     RectWidthHeight(clipRec2, maxW, maxH);
     SetLength(scanlines, maxH +1);
@@ -1079,22 +999,14 @@ begin
         case fillRule of
           frEvenOdd:
             begin
-{$IFDEF UseTrunc}
-              aa := Trunc(Abs(accum) * 1275) mod 2550;            // *5
-{$ELSE}
-              aa := Round(Abs(accum) * 1275) mod 2550;              // *5
-{$ENDIF}
+              aa := Trunc(Abs(accum) * 1275) mod 2550;            // mul 5
               if aa > 1275 then
-                byteBuffer[j] := Min(255, (2550 - aa) shr 2) else   // /4
-                byteBuffer[j] := Min(255, aa shr 2);                // /4
+                byteBuffer[j] := Min(255, (2550 - aa) shr 2) else   // div 4
+                byteBuffer[j] := Min(255, aa shr 2);                // div 4
             end;
           frNonZero:
             begin
-{$IFDEF UseTrunc}
               byteBuffer[j] := Min(255, Trunc(Abs(accum) * 318));
-{$ELSE}
-              byteBuffer[j] := Min(255, Round(Abs(accum) * 318));
-{$ENDIF}
             end;
   {$IFDEF REVERSE_ORIENTATION}
           frPositive:
@@ -1102,13 +1014,8 @@ begin
           frNegative:
   {$ENDIF}
             begin
-{$IFDEF UseTrunc}
               if accum > 0.002 then
                 byteBuffer[j] := Min(255, Trunc(accum * 318));
-{$ELSE}
-              if accum > 0.002 then
-                byteBuffer[j] := Min(255, Round(accum * 318));
-{$ENDIF}
             end;
   {$IFDEF REVERSE_ORIENTATION}
           frNegative:
@@ -1116,13 +1023,8 @@ begin
           frPositive:
   {$ENDIF}
             begin
-{$IFDEF UseTrunc}
               if accum < -0.002 then
                 byteBuffer[j] := Min(255, Trunc(-accum * 318));
-{$ELSE}
-              if accum < -0.002 then
-                byteBuffer[j] := Min(255, Round(-accum * 318));
-{$ENDIF}
             end;
         end;
       end;
@@ -1135,9 +1037,6 @@ begin
     end;
   finally
     FreeMem(fragments);
-{$IFnDEF UseTrunc}
-    SetRoundMode(savedRoundMode);
-{$ENDIF}
   end;
 end;
 
@@ -1558,11 +1457,7 @@ begin
   for i := x1 to x2 do
   begin
     dist := Hypot((y - fCenterPt.Y) *fScaleY, (i - fCenterPt.X) *fScaleX);
-{$IFDEF UseTrunc}
     color.Color := fColors[fBoundsProc(Trunc(dist), fColorsCnt)];
-{$ELSE}
-    color.Color := fColors[fBoundsProc(Round(dist), fColorsCnt)];
-{$ENDIF}
     pDst^ := BlendToAlpha(pDst^,
       MulBytes(color.A, Ord(alpha^)) shl 24 or (color.Color and $FFFFFF));
     inc(pDst); inc(alpha);
@@ -1958,7 +1853,7 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure DrawDashedLine(img: TImage32; const line: TPathD;
-  dashPattern: TArrayOfInteger; patternOffset: PDouble; lineWidth: double;
+  dashPattern: TArrayOfDouble; patternOffset: PDouble; lineWidth: double;
   color: TColor32; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
   lines: TPathsD;
@@ -2001,7 +1896,7 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure DrawDashedLine(img: TImage32; const lines: TPathsD;
-  dashPattern: TArrayOfInteger; patternOffset: PDouble; lineWidth: double;
+  dashPattern: TArrayOfDouble; patternOffset: PDouble; lineWidth: double;
   color: TColor32; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
   i: integer;
@@ -2014,7 +1909,7 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure DrawDashedLine(img: TImage32; const line: TPathD;
-  dashPattern: TArrayOfInteger; patternOffset: PDouble; lineWidth: double;
+  dashPattern: TArrayOfDouble; patternOffset: PDouble; lineWidth: double;
   renderer: TCustomRenderer; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
   i: integer;
@@ -2038,7 +1933,7 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure DrawDashedLine(img: TImage32; const lines: TPathsD;
-  dashPattern: TArrayOfInteger; patternOffset: PDouble; lineWidth: double;
+  dashPattern: TArrayOfDouble; patternOffset: PDouble; lineWidth: double;
   renderer: TCustomRenderer; endStyle: TEndStyle; joinStyle: TJoinStyle);
 var
   i: integer;
@@ -2051,7 +1946,7 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure DrawInvertedDashedLine(img: TImage32;
-  const line: TPathD; dashPattern: TArrayOfInteger;
+  const line: TPathD; dashPattern: TArrayOfDouble;
   patternOffset: PDouble; lineWidth: double; endStyle: TEndStyle;
   joinStyle: TJoinStyle = jsAuto);
 var
@@ -2082,7 +1977,7 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure DrawInvertedDashedLine(img: TImage32;
-  const lines: TPathsD; dashPattern: TArrayOfInteger;
+  const lines: TPathsD; dashPattern: TArrayOfDouble;
   patternOffset: PDouble; lineWidth: double;
   endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto);
 var

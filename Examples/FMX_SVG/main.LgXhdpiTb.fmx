@@ -1,0 +1,9 @@
+inherited MainForm_LgXhdpiTb: TMainForm_LgXhdpiTb
+  ClientHeight = 829
+  ClientWidth = 480
+  DesignerMasterStyle = 0
+  inherited Layout1: TLayout
+    Size.Width = 480.000000000000000000
+    Size.Height = 829.000000000000000000
+  end
+end

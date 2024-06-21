@@ -2,8 +2,8 @@ unit Img32;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.4                                                             *
-* Date      :  7 May 2024                                                      *
+* Version   :  4.5                                                             *
+* Date      :  21 June 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -1007,14 +1007,8 @@ end;
 //------------------------------------------------------------------------------
 
 function InvertColor(color: TColor32): TColor32;
-var
-  c: TARGB absolute color;
-  r: TARGB absolute Result;
 begin
-  r.A := c.A;
-  r.R := 255 - c.R;
-  r.G := 255 - c.G;
-  r.B := 255 - c.B;
+  Result := color xor $00FFFFFF;
 end;
 //------------------------------------------------------------------------------
 

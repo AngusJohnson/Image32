@@ -2,8 +2,8 @@ unit Img32.Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.4                                                             *
-* Date      :  16 April 2024                                                   *
+* Version   :  4.5                                                             *
+* Date      :  21 June 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Layered images support                                          *
@@ -443,7 +443,7 @@ function UpdateRotatingButtonGroup(rotateButton: TLayer32): double;
 
 var
   DefaultButtonSize: integer;
-  dashes: TArrayOfInteger;
+  dashes: TArrayOfDouble;
 
 const
   crDefault   =   0;
