@@ -27,6 +27,10 @@ uses
   {$ZEROBASEDSTRINGS OFF}
 {$ENDIF}
 
+{$IFOPT R+}
+  {$DEFINE OVERFLOWCHECKS_ENABLED}
+{$ENDIF}
+
 type
   TSvgEncoding = (eUnknown, eUtf8, eUnicodeLE, eUnicodeBE);
 
@@ -673,7 +677,10 @@ begin
   Result := Result xor (Result shr 11);
   Result := Result + (Result shl 15);
 end;
-{$OVERFLOWCHECKS ON}
+{$IFDEF OVERFLOWCHECKS_ENABLED}
+  {$OVERFLOWCHECKS ON}
+{$ENDIF}
+
 //------------------------------------------------------------------------------
 
 {$OVERFLOWCHECKS OFF}
@@ -693,7 +700,9 @@ begin
   Result := Result xor (Result shr 11);
   Result := Result + (Result shl 15);
 end;
-{$OVERFLOWCHECKS ON}
+{$IFDEF OVERFLOWCHECKS_ENABLED}
+  {$OVERFLOWCHECKS ON}
+{$ENDIF}
 //------------------------------------------------------------------------------
 
 function ParseNextWordHashed(var c: PUTF8Char; endC: PUTF8Char): cardinal;
@@ -709,136 +718,264 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function ParseExpDigits(c, endC: PUTF8Char; out val: Integer): PUTF8Char; {$IFDEF INLINE} inline; {$ENDIF}
+var
+  v32: Cardinal;
+  Digit: Integer;
+begin
+  Result := c;
+  v32 := 0;
+  while Result < endC do
+  begin
+    Digit := Integer(Ord(Result^)) - Ord('0');
+    if Cardinal(Digit) >= 10 then break;
+    {$IFDEF FPC} // Something Delphi can optimize but FPC can't (yet?)
+    v32 := (v32 shl 3) + (v32 shl 1) + Cardinal(Digit); // Delphi's code is even better than this
+    {$ELSE}
+    v32 := v32 * 10 + Cardinal(Digit);
+    {$ENDIF FPC}
+    inc(Result);
+  end;
+  val := v32;
+end;
+//------------------------------------------------------------------------------
+
+function ParseDigitsToDouble(c, endC: PUTF8Char; out val: double): PUTF8Char;
+var
+  v32: Cardinal;
+  v64: Int64;
+  Digit: Integer;
+  blockEndC: PUTF8Char;
+begin
+  // skip leading zeros
+  while (c < endC) and (c^ = '0') do inc(c);
+
+  // Use Int32 first as it is fast for 64bit and 32bit CPUs
+  Result := c;
+  v32 := 0;
+
+  blockEndC := c + 9; // log10(2^31) = 9.33
+  if blockEndC > endC then
+    blockEndC := endC;
+  while Result < blockEndC do
+  begin
+    Digit := Integer(Ord(Result^)) - Ord('0');
+    if Cardinal(Digit) >= 10 then break;
+    {$IFDEF FPC} // Something Delphi can optimize but FPC can't (yet?)
+    v32 := (v32 shl 3) + (v32 shl 1) + Cardinal(Digit);
+    {$ELSE}
+    v32 := v32 * 10 + Cardinal(Digit);
+    {$ENDIF FPC}
+    inc(Result);
+  end;
+
+  if (Result < endC) and (Result >= blockEndC) then
+  begin
+    v64 := v32;
+
+    blockEndC := c + 18; // log10(2^63) = 18.96
+    if blockEndC > endC then
+      blockEndC := endC;
+    while Result < blockEndC do
+    begin
+      Digit := Integer(Ord(Result^)) - Ord('0');
+      if Cardinal(Digit) >= 10 then break;
+      {$IF (SizeOf(Pointer) = 4) or defined(FPC)} // neither Delphi 32bit nor FPC can optimize this
+      v64 := (v64 shl 3) + (v64 shl 1) + Cardinal(Digit);
+      {$ELSE}
+      v64 := v64 * 10 + Cardinal(Digit);
+      {$IFEND}
+      inc(Result);
+    end;
+
+    val := v64;
+    // Use Double for the remaining digits and loose precision (we are beyong 16 digits anyway)
+    if (Result < endC) and (Result >= blockEndC) then
+    begin
+      while Result < endC do
+      begin
+        Digit := Integer(Ord(Result^)) - Ord('0');
+        if Cardinal(Digit) >= 10 then break;
+        val := val * 10 + Digit;
+        inc(Result);
+      end;
+    end;
+  end
+  else
+    val := v32;
+end;
+
+//------------------------------------------------------------------------------
+
 function ParseNextNumEx(var c: PUTF8Char; endC: PUTF8Char; skipComma: Boolean;
   out val: double; out unitType: TUnitType): Boolean;
+const
+  Power10: array[0..18] of Double = (
+    1E0, 1E1, 1E2, 1E3, 1E4, 1E5, 1E6, 1E7, 1E8, 1E9,
+    1E10, 1E11, 1E12, 1E13, 1E14, 1E15, 1E16, 1E17, 1E18
+  );
+  Power10Reciprocal: array[0..18] of Double = (
+    1/1E0, 1/1E1, 1/1E2, 1/1E3, 1/1E4, 1/1E5, 1/1E6, 1/1E7, 1/1E8, 1/1E9,
+    1/1E10, 1/1E11, 1/1E12, 1/1E13, 1/1E14, 1/1E15, 1/1E16, 1/1E17, 1/1E18
+  );
 var
-  decPos,exp: integer;
+  exp: integer;
   isNeg, expIsNeg: Boolean;
-  start: PUTF8Char;
+  start, decStart, cc: PUTF8Char;
+  decimals: Double;
 begin
   Result := false;
   unitType := utNumber;
 
+  cc := c;
+
   //skip white space +/- single comma
   if skipComma then
   begin
-    while (c < endC) and (c^ <= space) do inc(c);
-    if (c^ = ',') then inc(c);
+    while (cc < endC) and (cc^ <= space) do inc(cc);
+    if (cc^ = ',') then inc(cc);
   end;
-  while (c < endC) and (c^ <= space) do inc(c);
-  if (c = endC) then Exit;
-
-  decPos := -1; exp := Invalid; expIsNeg := false;
-  isNeg := c^ = '-';
-  if isNeg then inc(c);
-
-  val := 0;
-  start := c;
-  while c < endC do
+  while (cc < endC) and (cc^ <= space) do inc(cc);
+  if (cc = endC) then
   begin
-    if Ord(c^) = Ord(SvgDecimalSeparator) then
-    begin
-      if decPos >= 0 then break;
-      decPos := 0;
-    end
-    else if (LowerCaseTable[c^] = 'e') and
-      (CharInSet((c+1)^, ['-','0'..'9'])) then
-    begin
-      if (c +1)^ = '-' then expIsNeg := true;
-      inc(c);
-      exp := 0;
-    end
-    else if (c^ < '0') or (c^ > '9') then
-      break
-    else if IsValid(exp) then
-    begin
-      exp := exp * 10 + (Ord(c^) - Ord('0'))
-    end else
-    begin
-      val := val *10 + Ord(c^) - Ord('0');
-      if decPos >= 0 then inc(decPos);
-    end;
-    inc(c);
+    c := cc;
+    Exit;
   end;
-  Result := c > start;
-  if not Result then Exit;
 
-  if decPos > 0 then val := val * Power(10, -decPos);
+  exp := Invalid; expIsNeg := false;
+  isNeg := cc^ = '-';
+  if isNeg then inc(cc);
+
+  start := cc;
+
+  // Use fast parsing
+  cc := ParseDigitsToDouble(cc, endC, val);
+  if cc < endC then
+  begin
+    // Decimals
+    if Ord(cc^) = Ord(SvgDecimalSeparator) then
+    begin
+      inc(cc);
+      decStart := cc;
+      cc := ParseDigitsToDouble(cc, endC, decimals);
+      if cc > decStart then
+      begin
+        if cc - decStart <= 18 then
+          val := val + (decimals * Power10Reciprocal[(cc - decStart)])
+        else
+          val := val + (decimals * Power(10, -(cc - decStart)))
+      end;
+    end;
+
+    // Exponent
+    if (cc < endC) and ((cc^ = 'e') or (cc^ = 'E')) then
+    begin
+      case (cc+1)^ of
+        '-', '0'..'9':
+          begin
+            inc(cc);
+            if cc^ = '-' then
+            begin
+              expIsNeg := true;
+              inc(cc);
+            end;
+            cc := ParseExpDigits(cc, endC, exp);
+          end;
+      end;
+    end;
+  end;
+  Result := cc > start;
+  if not Result then
+  begin
+    c := cc;
+    Exit;
+  end;
+
   if isNeg then val := -val;
   if IsValid(exp) then
   begin
-    if expIsNeg then
-      val := val * Power(10, -exp) else
-      val := val * Power(10, exp);
+    if exp <= 18 then
+    begin
+      if expIsNeg then
+        val := val * Power10Reciprocal[exp] else
+        val := val * Power10[exp];
+    end
+    else
+    begin
+      if expIsNeg then
+        val := val * Power(10, -exp) else
+        val := val * Power(10, exp);
+    end;
   end;
 
   //https://oreillymedia.github.io/Using_SVG/guide/units.html
-  case c^ of
+  case cc^ of
     '%':
       begin
-        inc(c);
+        inc(cc);
         unitType := utPercent;
       end;
     'c': //convert cm to pixels
-      if ((c+1)^ = 'm') then
+      if ((cc+1)^ = 'm') then
       begin
-        inc(c, 2);
+        inc(cc, 2);
         unitType := utCm;
       end;
     'd': //ignore deg
-      if ((c+1)^ = 'e') and ((c+2)^ = 'g') then
+      if ((cc+1)^ = 'e') and ((cc+2)^ = 'g') then
       begin
-        inc(c, 3);
+        inc(cc, 3);
         unitType := utDegree;
       end;
     'e': //convert cm to pixels
-      if ((c+1)^ = 'm') then
+      if ((cc+1)^ = 'm') then
       begin
-        inc(c, 2);
+        inc(cc, 2);
         unitType := utEm;
       end
-      else if ((c+1)^ = 'x') then
+      else if ((cc+1)^ = 'x') then
       begin
-        inc(c, 2);
+        inc(cc, 2);
         unitType := utEx;
       end;
     'i': //convert inchs to pixels
-      if ((c+1)^ = 'n') then
+      if ((cc+1)^ = 'n') then
       begin
-        inc(c, 2);
+        inc(cc, 2);
         unitType := utInch;
       end;
     'm': //convert mm to pixels
-      if ((c+1)^ = 'm') then
+      if ((cc+1)^ = 'm') then
       begin
-        inc(c, 2);
+        inc(cc, 2);
         unitType := utMm;
       end;
     'p':
-      case (c+1)^ of
+      case (cc+1)^ of
         'c':
           begin
-            inc(c, 2);
+            inc(cc, 2);
             unitType := utPica;
           end;
         't':
           begin
-            inc(c, 2);
+            inc(cc, 2);
             unitType := utPt;
           end;
         'x':
           begin
-            inc(c, 2);
+            inc(cc, 2);
             unitType := utPixel;
           end;
       end;
     'r': //convert radian angles to degrees
-      if Match(c, 'rad') then
+      if Match(cc, 'rad') then
       begin
-        inc(c, 3);
+        inc(cc, 3);
         unitType := utRadian;
       end;
   end;
+  c := cc;
 end;
 //------------------------------------------------------------------------------
 
@@ -1285,7 +1422,7 @@ begin
       if mus[i] = utPercent then
         vals[i] := vals[i] * 255 / 100;
 
-    if ParseNextNumEx(c, endC, true, vals[3], mus[3]) then
+    if (c < endC) and (c^ <> ')') and ParseNextNumEx(c, endC, true, vals[3], mus[3]) then
       alpha := 255 else //stops further alpha adjustment
       vals[3] := 255;
     if ParseNextChar(c, endC) <> ')' then Exit;
@@ -2071,9 +2208,9 @@ begin
   //https://oreillymedia.github.io/Using_SVG/guide/units.html
   //todo: still lots of units to support (eg times for animation)
   with value do
-    if not IsValid or (rawVal = 0) then
+    {if not IsValid or (rawVal = 0) then  // already checked by TValue.GetValue, the only function calling this code
       Result := 0
-    else
+    else}
       case value.unitType of
         utNumber:
           Result := rawVal;
