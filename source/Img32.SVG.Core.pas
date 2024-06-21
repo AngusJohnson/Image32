@@ -275,20 +275,44 @@ const
 
 var
   LowerCaseTable : array[#0..#$FF] of UTF8Char;
-  ColorConstList : TStringList;
 
 implementation
 
+//------------------------------------------------------------------------------
+// Color Constant HashMap
+//------------------------------------------------------------------------------
 
 type
+  PColorConst = ^TColorConst;
   TColorConst = record
-    ColorName : string;
-    ColorValue: Cardinal;
+    ColorName : UTF8String;
+    ColorValue: TColor32;
   end;
 
-  TColorObj = class
-    cc: TColorConst;
+  PPColorConstMapItem = ^PColorConstMapItem;
+  PColorConstMapItem = ^TColorConstMapItem;
+  TColorConstMapItem = record
+    Hash: Cardinal;
+    Next: PColorConstMapItem;
+    Data: PColorConst;
   end;
+
+  PColorConstMapItemArray = ^TColorConstMapItemArray;
+  TColorConstMapItemArray = array[0..MaxInt div SizeOf(TColorConstMapItem) - 1] of TColorConstMapItem;
+
+  TColorConstList = class(TObject)
+  private
+    FItems: array of TColorConstMapItem;
+    FBuckets: array of PColorConstMapItem;
+    FCount: Integer;
+    FMod: Cardinal;
+  public
+    constructor Create(Colors: PColorConst; Count: Integer);
+    function GetColorValue(const ColorName: UTF8String; var Color: TColor32): Boolean;
+  end;
+
+var
+  ColorConstList : TColorConstList;
 
 const
   buffSize    = 8;
@@ -426,8 +450,7 @@ begin
   Result := false;
   for i := 1 to Length(compare) do
   begin
-    if LowerCaseTable[c^] <> compare[i] then Exit;
-    inc(c);
+    if LowerCaseTable[c[i - 1]] <> compare[i] then Exit;
   end;
   Result := true;
 end;
@@ -444,8 +467,7 @@ begin
   c1 := @compare1[1]; c2 := @compare2[1];
   for i := 1 to len do
   begin
-    if LowerCaseTable[c1^] <> LowerCaseTable[c2^] then Exit;
-    inc(c1); inc(c2);
+    if LowerCaseTable[c1[i - 1]] <> LowerCaseTable[c2[i - 1]] then Exit;
   end;
   Result := true;
 end;
@@ -663,7 +685,7 @@ var
   c: PUTF8Char;
 begin
   //https://en.wikipedia.org/wiki/Jenkins_hash_function
-  c := PUTF8Char(name);
+  c := PUTF8Char(Pointer(name)); // skip function call by directly casting it to Pointer
   Result := 0;
   if c = nil then Exit;
   for i := 1 to Length(name) do
@@ -1493,9 +1515,8 @@ begin
     color :=  clr;
   end else                          //color name lookup
   begin
-    i := ColorConstList.IndexOf(string(value));
-    if i < 0 then Exit;
-    color := TColorObj(ColorConstList.Objects[i]).cc.ColorValue;
+    if not ColorConstList.GetColorValue(value, color) then
+      Exit;
   end;
 
   //and in case the opacity has been set before the color
@@ -2463,6 +2484,95 @@ begin
     Dispose(PAnsStringiRec(fList.Objects[i]));
   fList.Clear;
 end;
+//------------------------------------------------------------------------------
+
+function IsSameAsciiUTF8String(const S1, S2: UTF8String): Boolean;
+var
+  Len: Integer;
+  I: Integer;
+  Ch1, Ch2: UTF8Char;
+begin
+  Len := Length(S1);
+  Result := Len = Length(S2);
+  if Result then
+  begin
+    Result := False;
+    I := 0;
+    while True do
+    begin
+      if I = Len then
+        Break;
+
+      Ch1 := S1[I];
+      Ch2 := S2[I];
+      if Ch1 = Ch2 then
+      begin
+        Inc(I);
+        Continue;
+      end;
+
+      case Ch1 of
+        'A'..'Z': ch1 := UTF8Char(Ord(ch1) xor $20); // toggle upper/lower
+      end;
+
+      if Ch1 <> Ch2 then
+        Exit;
+      Inc(I);
+    end;
+    Result := True;
+  end;
+end;
+
+//------------------------------------------------------------------------------
+// TColorConstList
+//------------------------------------------------------------------------------
+
+constructor TColorConstList.Create(Colors: PColorConst; Count: Integer);
+var
+  I: Integer;
+  Bucket: PPColorConstMapItem;
+  Item: PColorConstMapItem;
+begin
+  inherited Create;
+  FCount := Count;
+  SetLength(FItems, FCount);
+
+  FMod := FCount * 2; // gives us 3 color constants as max. bucket depth
+  if not Odd(FMod) then
+    Inc(FMod);
+  SetLength(FBuckets, FMod);
+
+  // Initialize FItems[] and fill the buckets
+  for I := 0 to Count - 1 do
+  begin
+    Item := @FItems[I];
+    Item.Data := Colors; // link the constant to the ColorConstMapItem
+    Inc(Colors);
+    Item.Hash := GetHash(Item.Data.ColorName); // case-insensitive
+    Bucket := @FBuckets[(Cardinal(Item.Hash) and $7FFFFFFF) mod FMod];
+    Item.Next := Bucket^;
+    Bucket^ := Item;
+  end;
+end;
+
+function TColorConstList.GetColorValue(const ColorName: UTF8String; var Color: TColor32): Boolean;
+var
+  Hash: Integer;
+  Item: PColorConstMapItem;
+begin
+  Hash := GetHash(ColorName);
+  Item := FBuckets[(Cardinal(Hash) and $7FFFFFFF) mod FMod];
+  while (Item <> nil) and not IsSameAsciiUTF8String(Item.Data.ColorName, ColorName) do
+    Item := Item.Next;
+  if Item <> nil then
+  begin
+    Color := Item.Data.ColorValue;
+    Result := True;
+  end
+  else
+    Result := False;
+end;
+
 
 //------------------------------------------------------------------------------
 // initialization procedures
@@ -2479,31 +2589,14 @@ end;
 //------------------------------------------------------------------------------
 
 procedure MakeColorConstList;
-var
-  i   : integer;
-  co  : TColorObj;
   {$I Img32.SVG.HtmlColorConsts.inc}
 begin
-  ColorConstList := TStringList.Create;
-  ColorConstList.CaseSensitive := false;
-  //ColorConstList.OwnsObjects := true; //not all versions of Delphi
-  ColorConstList.Capacity := Length(ColorConsts);
-  for i := 0 to High(ColorConsts) do
-  begin
-    co := TColorObj.Create;
-    co.cc := ColorConsts[i];
-    ColorConstList.AddObject(co.cc.ColorName, co);
-  end;
-  ColorConstList.Sorted := true;
+  ColorConstList := TColorConstList.Create(@ColorConsts, Length(ColorConsts));
 end;
 //------------------------------------------------------------------------------
 
 procedure CleanupColorConstList;
-var
-  i   : integer;
 begin
-  for i := 0 to ColorConstList.Count -1 do
-    TColorObj(ColorConstList.Objects[i]).Free;
   ColorConstList.Free;
 end;
 
