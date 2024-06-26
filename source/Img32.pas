@@ -583,6 +583,8 @@ var
 
   function MulBytes(b1, b2: Byte) : Byte;
 
+  function __Trunc(Value: Double): Integer; {$IFNDEF CPU_X86} {$IFDEF INLINE} inline; {$ENDIF} {$ENDIF}
+
 implementation
 
 uses
@@ -592,6 +594,12 @@ resourcestring
   rsImageTooLarge = 'Image32 error: the image is too large.';
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
+
+{$IFDEF CPUX86}
+const
+  // Use faster Trunc for x86 code in this unit.
+  Trunc: function(Value: Double): Integer = __Trunc;
+{$ENDIF CPUX86}
 
 const
   div255 : Double = 1 / 255;
@@ -658,6 +666,46 @@ begin
   else angle := angle90;
 end;
 //------------------------------------------------------------------------------
+
+{$IFDEF CPUX86}
+{ Trunc with FPU code is very slow because the x87 ControlWord has to be changed
+  and then there is Delphi's Default8087CW variable that is not thread-safe. }
+
+//__Trunc: An efficient Trunc() algorithm (ie rounds toward zero)
+function __Trunc(Value: Double): Integer;
+type
+  TDoubleDataRec = packed record // x86 -> Little Endian
+    Mantisse: Integer;
+    Exp: Integer;
+  end;
+var
+  exp: integer;
+  i64: UInt64 absolute Value;
+  dbl: TDoubleDataRec absolute Value;
+begin
+  //https://en.wikipedia.org/wiki/Double-precision_floating-point_format
+  Result := 0;
+  if i64 = 0 then Exit;
+  exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;
+  //nb: when exp == 1024 then Value == INF or NAN.
+  if exp < 0 then
+    Exit
+  else if exp > 52 then
+    Result := ((i64 and $1FFFFFFFFFFFFF) shl (exp - 52)) or (UInt64(1) shl exp)
+  else
+    Result := ((i64 and $1FFFFFFFFFFFFF) shr (52 - exp)) or (UInt64(1) shl exp);
+  if dbl.exp and $80000000 <> 0 then Result := -Result;
+end;
+//------------------------------------------------------------------------------
+
+{$ELSE}
+function __Trunc(Value: Double): Integer;
+begin
+  // Uses fast SSE2 instruction
+  Result := System.Trunc(Value);
+end;
+//------------------------------------------------------------------------------
+{$ENDIF CPUX86}
 
 function SwapRedBlue(color: TColor32): TColor32;
 var
