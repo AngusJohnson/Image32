@@ -477,7 +477,7 @@ type
   function RectD(const rec: TRect): TRectD; overload;
 
   function ClampByte(val: Integer): byte; overload; {$IFDEF INLINE} inline; {$ENDIF}
-  function ClampByte(val: double): byte; overload; {$IFDEF INLINE} inline; {$ENDIF}
+  function ClampByte(val: double): byte; overload; {$IFNDEF ASM_X86} {$IFDEF INLINE} inline; {$ENDIF} {$ENDIF} // Delphi isn't able to inline this function anyway
   function ClampRange(val, min, max: Integer): Integer; overload;
     {$IFDEF INLINE} inline; {$ENDIF}
   function ClampRange(val, min, max: double): double; overload;
@@ -490,7 +490,7 @@ type
   //DPIAware: Useful for DPIAware sizing of images and their container controls.
   //It scales values relative to the display's resolution (PixelsPerInch).
   //See https://docs.microsoft.com/en-us/windows/desktop/hidpi/high-DPIAware-desktop-application-development-on-windows
-  function DPIAware(val: Integer): Integer; overload; {$IFDEF INLINE} inline; {$ENDIF}
+  function DPIAware(val: Integer): Integer; overload; {$IFNDEF ASM_X86} {$IFDEF INLINE} inline; {$ENDIF} {$ENDIF}
   function DPIAware(val: double): double; overload; {$IFDEF INLINE} inline; {$ENDIF}
   function DPIAware(const pt: TPoint): TPoint; overload;
   function DPIAware(const pt: TPointD): TPointD; overload;
@@ -583,6 +583,9 @@ var
 
   function MulBytes(b1, b2: Byte) : Byte;
 
+function __Round(Value: Double): Integer; {$IFNDEF ASM_X86} {$IFDEF INLINE} inline; {$ENDIF} {$ENDIF}
+function __Trunc(Value: Double): Integer; {$IFNDEF CPU_X86} {$IFDEF INLINE} inline; {$ENDIF} {$ENDIF}
+
 implementation
 
 uses
@@ -592,6 +595,15 @@ resourcestring
   rsImageTooLarge = 'Image32 error: the image is too large.';
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
+
+{$IFDEF CPUX86}
+const
+  // Use faster Trunc/Round for x86 code in this unit.
+  Trunc: function(Value: Double): Integer = __Trunc;
+  {$IFDEF ASM_X86}
+  Round: function(Value: Double): Integer = __Round;
+  {$ENDIF ASM_X86}
+{$ENDIF CPUX86}
 
 const
   div255 : Double = 1 / 255;
@@ -658,6 +670,88 @@ begin
   else angle := angle90;
 end;
 //------------------------------------------------------------------------------
+
+{$IFDEF CPUX86}
+{ Round and Trunc with FPU code is very slow because the x87 ControlWord has
+  to be changed and then there is Delphi's Default8087CW variable that is not
+  thread-safe. }
+
+//__Trunc: An efficient Trunc() algorithm (ie rounds toward zero)
+function __Trunc(Value: Double): Integer;
+type
+  TDoubleDataRec = packed record // x86 -> Little Endian
+    Mantisse: Integer;
+    Exp: Integer;
+  end;
+var
+  exp: integer;
+  i64: UInt64 absolute Value;
+  dbl: TDoubleDataRec absolute Value;
+begin
+  //https://en.wikipedia.org/wiki/Double-precision_floating-point_format
+  Result := 0;
+  if i64 = 0 then Exit;
+  exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;
+  //nb: when exp == 1024 then Value == INF or NAN.
+  if exp < 0 then
+    Exit
+  else if exp > 52 then
+    Result := ((i64 and $1FFFFFFFFFFFFF) shl (exp - 52)) or (UInt64(1) shl exp)
+  else
+    Result := ((i64 and $1FFFFFFFFFFFFF) shr (52 - exp)) or (UInt64(1) shl exp);
+  //if Value < 0 then Result := -Result;
+  if dbl.exp and $80000000 <> 0 then Result := -Result;
+end;
+//------------------------------------------------------------------------------
+
+{$IFDEF ASM_X86} // Delphi only
+function RoundSSE2({$IFDEF CONSTREF}const [ref]{$ELSE}var{$ENDIF} Value: Double): Integer;
+asm
+  MOVQ       XMM0, QWORD PTR [Value]
+  CVTSD2SI   EAX, XMM0
+end;
+//------------------------------------------------------------------------------
+
+function RoundFPU({$IFDEF CONSTREF}const [ref]{$ELSE}var{$ENDIF} Value: Double): Integer;
+begin
+  Result := System.Round(Value);
+end;
+//------------------------------------------------------------------------------
+
+var
+  __RoundImpl: function({$IFDEF CONSTREF}const [ref]{$ELSE}var{$ENDIF} Value: Double): Integer = RoundFPU;
+
+function __Round(Value: Double): Integer;
+begin
+  Result := __RoundImpl(Value);
+end;
+//------------------------------------------------------------------------------
+
+{$ELSE}
+function __Round(Value: Double): Integer;
+begin
+  // Uses slow FPU Round
+  Result := System.Round(Value);
+end;
+//------------------------------------------------------------------------------
+
+{$ENDIF ASM_X86}
+
+{$ELSE}
+function __Trunc(Value: Double): Integer;
+begin
+  // Uses fast x86_64 SSE2 instruction
+  Result := System.Trunc(Value);
+end;
+//------------------------------------------------------------------------------
+
+function __Round(Value: Double): Integer;
+begin
+  // Uses fast x86_64 SSE2 instruction
+  Result := System.Round(Value);
+end;
+//------------------------------------------------------------------------------
+{$ENDIF CPUX86}
 
 function SwapRedBlue(color: TColor32): TColor32;
 var
@@ -3581,7 +3675,66 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+{$IFDEF ASM_X86} // Delphi only
+type
+  TCPURegisters = record
+    EAX, EBX, ECX, EDX: Cardinal;
+  end;
+
+procedure GetCPUID(Param: Cardinal; var Registers: TCPURegisters);
+asm
+  PUSH    EBX
+  PUSH    EDI
+  MOV     EDI, DWORD PTR Registers
+  XOR     EBX, EBX
+  XOR     ECX, ECX
+  XOR     EDX, EDX
+  DB      $0F, $A2  // CPUID
+  MOV     TCPURegisters(EDI).&EAX, EAX
+  MOV     TCPURegisters(EDI).&EBX, EBX
+  MOV     TCPURegisters(EDI).&ECX, ECX
+  MOV     TCPURegisters(EDI).&EDX, EDX
+  POP     EDI
+  POP     EBX
+end;
+//------------------------------------------------------------------------------
+
+procedure InitSSE;
+const
+  // EDX:
+  FEATURE_EDX_CMOV   = 1 shl 15;
+  FEATURE_EDX_SSE    = 1 shl 25;
+  FEATURE_EDX_SSE2   = 1 shl 26;
+
+  // EAX:
+  FEATURE_ECX_SSE3   = 1 shl 0;
+  FEATURE_ECX_SSSE3  = 1 shl 9;
+  FEATURE_ECX_SSE41  = 1 shl 19;
+  FEATURE_ECX_SSE42  = 1 shl 20;
+  FEATURE_ECX_POPCNT = 1 shl 23;
+  FEATURE_ECX_AVX256 = 1 shl 28;
+var
+  Registers: TCPURegisters;
+begin
+  try
+    GetCPUID($00000001, Registers);
+    if Registers.EDX and FEATURE_EDX_SSE2 <> 0 then
+    begin
+      __RoundImpl := RoundSSE2;
+    end;
+  except
+    // No CPUID (must be a very old CPU)
+  end;
+end;
+//------------------------------------------------------------------------------
+
+{$ENDIF ASM_X86}
+
 initialization
+  {$IFDEF ASM_X86} // Delphi only
+  InitSSE;
+  {$ENDIF ASM_X86}
+
   CreateImageFormatList;
   MakeBlendTables;
 
