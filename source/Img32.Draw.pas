@@ -306,6 +306,12 @@ type
 
 implementation
 
+{$IFDEF CPUX86}
+const
+  // Use faster Trunc for x86 code in this unit.
+  Trunc: function(Value: Double): Integer = __Trunc;
+{$ENDIF CPUX86}
+
 type
 
   // A horizontal scanline contains any number of line fragments. A fragment

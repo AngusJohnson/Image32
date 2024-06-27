@@ -478,6 +478,12 @@ resourcestring
 const
   BuffSize = 64;
 
+{$IFDEF CPUX86}
+const
+  // Use faster Trunc for x86 code in this unit.
+  Trunc: function(Value: Double): Integer = __Trunc;
+{$ENDIF CPUX86}
+
 //------------------------------------------------------------------------------
 // TSizeD
 //------------------------------------------------------------------------------

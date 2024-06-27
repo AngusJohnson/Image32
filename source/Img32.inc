@@ -50,10 +50,13 @@
 {$ELSE}
   {$IF COMPILERVERSION < 15}
     Your version of Delphi is not supported (Image32 requires Delphi version 7 or above)
-  {$IFEND}  
+  {$IFEND}
+  {$IFDEF CPU386}
+    {$DEFINE CPUX86}                            // CPUX86 was added in Delphi XE2
+  {$ENDIF}
   {$IFDEF CPUX86}
       {$DEFINE ASM_X86}                         //caution: do not define in FPC
-  {$ENDIF}  
+  {$ENDIF}
   {$IF COMPILERVERSION >= 17}                   //Delphi 2005
     {$IFNDEF DEBUG}
       {$DEFINE INLINE}                            //added inlining
