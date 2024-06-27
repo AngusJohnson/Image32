@@ -125,6 +125,10 @@ const
   Trunc: function(Value: Double): Integer = __Trunc;
 {$ENDIF CPUX86}
 
+var
+  // DivOneByXTable[x] = 1/x
+  DivOneByXTable: array[Word] of Double;
+
 //------------------------------------------------------------------------------
 // Matrix functions
 //------------------------------------------------------------------------------
@@ -1234,5 +1238,17 @@ begin
   Result := Average(Abs(scale.cx), Abs(scale.cy));
 end;
 //------------------------------------------------------------------------------
+
+procedure MakeDivOneByXTable;
+var
+  i: Integer;
+begin
+  DivOneByXTable[0] := 0; // NaN
+  for i := 1 to High(DivOneByXTable) do
+    DivOneByXTable[i] := 1/i;
+end;
+
+initialization
+  MakeDivOneByXTable;
 
 end.
