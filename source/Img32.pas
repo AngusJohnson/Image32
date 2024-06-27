@@ -557,6 +557,8 @@ var
   MulTable: array [Byte,Byte] of Byte;
   //DivTable[a,b] = a * 255/b (for a &lt;= b)
   DivTable: array [Byte,Byte] of Byte;
+  // DivOneByX[x] = 1/x
+  DivOneByXTable: array[Word] of Double;
 
   //Sigmoid: weight byte values towards each end
   Sigmoid: array[Byte] of Byte;
@@ -583,7 +585,7 @@ var
 
   function MulBytes(b1, b2: Byte) : Byte;
 
-  function __Trunc(Value: Double): Integer; {$IFNDEF CPU_X86} {$IFDEF INLINE} inline; {$ENDIF} {$ENDIF}
+  function __Trunc(Value: Double): Integer; {$IFNDEF CPUX86} {$IFDEF INLINE} inline; {$ENDIF} {$ENDIF}
 
 implementation
 
@@ -3523,6 +3525,10 @@ begin
         DivTable[i, j] := Round(i * $FF / j);
     end;
   end;
+
+  DivOneByXTable[0] := 0; // NaN
+  for i := 1 to High(DivOneByXTable) do
+    DivOneByXTable[i] := 1/i;
 
   Sigmoid[128] := 128;
   for i := 1 to 127 do

@@ -51,9 +51,9 @@
   {$IF COMPILERVERSION < 15}
     Your version of Delphi is not supported (Image32 requires Delphi version 7 or above)
   {$IFEND}
-  {$IFDEF CPU386}
-    {$DEFINE CPUX86}                            // CPUX86 was added in Delphi XE2
-  {$ENDIF}
+  {$IF COMPILERVERSION < 23}
+    {$DEFINE CPUX86}                            // CPUX86 was added in Delphi XE2 (added Win64 compiler)
+  {$IFEND}
   {$IFDEF CPUX86}
       {$DEFINE ASM_X86}                         //caution: do not define in FPC
   {$ENDIF}
