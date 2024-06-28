@@ -583,7 +583,7 @@ var
 
   function MulBytes(b1, b2: Byte) : Byte;
 
-  function __Trunc(Value: Double): Integer; {$IFNDEF CPU_X86} {$IFDEF INLINE} inline; {$ENDIF} {$ENDIF}
+  function __Trunc(Value: Double): Integer; {$IFNDEF CPUX86} {$IFDEF INLINE} inline; {$ENDIF} {$ENDIF}
 
 implementation
 

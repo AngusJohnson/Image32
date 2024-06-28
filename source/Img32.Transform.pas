@@ -94,10 +94,12 @@ type
   public
     procedure Reset; overload; {$IFDEF INLINE} inline; {$ENDIF}
     procedure Reset(c: TColor32; w: Integer = 1); overload; {$IFDEF INLINE} inline; {$ENDIF}
-    procedure Add(c: TColor32; w: Integer = 1); overload;
+    procedure Add(c: TColor32; w: Integer); overload;
+    procedure Add(c: TColor32); overload; {$IFDEF INLINE} inline; {$ENDIF}
     procedure Add(const other: TWeightedColor); overload;
       {$IFDEF INLINE} inline; {$ENDIF}
-    procedure Subtract(c: TColor32; w: Integer =1); overload;
+    procedure Subtract(c: TColor32; w: Integer); overload;
+    procedure Subtract(c: TColor32); overload; {$IFDEF INLINE} inline; {$ENDIF}
     procedure Subtract(const other: TWeightedColor); overload;
       {$IFDEF INLINE} inline; {$ENDIF}
     procedure AddWeight(w: Integer); {$IFDEF INLINE} inline; {$ENDIF}
@@ -122,6 +124,10 @@ const
   // Use faster Trunc for x86 code in this unit.
   Trunc: function(Value: Double): Integer = __Trunc;
 {$ENDIF CPUX86}
+
+var
+  // DivOneByXTable[x] = 1/x
+  DivOneByXTable: array[Word] of Double;
 
 //------------------------------------------------------------------------------
 // Matrix functions
@@ -957,6 +963,14 @@ begin
   Move(tmp[0], img.Pixels[0], img.Width * img.Height * SizeOf(TColor32));
   img.EndUpdate;
 end;
+//------------------------------------------------------------------------------
+
+function LimitByte(val: Cardinal): byte; {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  if val > 255 then result := 255
+  else result := val;
+end;
+//------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
 // TWeightedColor
@@ -974,7 +988,7 @@ end;
 
 procedure TWeightedColor.Reset(c: TColor32; w: Integer);
 var
-  a: Integer;
+  a: Cardinal;
   argb: TARGB absolute c;
 begin
   fAddCount := w;
@@ -1016,6 +1030,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TWeightedColor.Add(c: TColor32);
+// Optimized for w=1
+var
+  a: Cardinal;
+begin
+  inc(fAddCount);
+  a := Byte(c shr 24);
+  if a = 0 then Exit;
+  inc(fAlphaTot, a);
+  inc(fColorTotB, (a * Byte(c)));
+  inc(fColorTotG, (a * Byte(c shr 8)));
+  inc(fColorTotR, (a * Byte(c shr 16)));
+end;
+//------------------------------------------------------------------------------
+
 procedure TWeightedColor.Add(const other: TWeightedColor);
 begin
   inc(fAddCount, other.fAddCount);
@@ -1041,6 +1070,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TWeightedColor.Subtract(c: TColor32);
+// Optimized for w=1
+var
+  a: Cardinal;
+begin
+  dec(fAddCount);
+  a := Byte(c shr 24);
+  if a = 0 then Exit;
+  dec(fAlphaTot, a);
+  dec(fColorTotB, (a * Byte(c)));
+  dec(fColorTotG, (a * Byte(c shr 8)));
+  dec(fColorTotR, (a * Byte(c shr 16)));
+end;
+//------------------------------------------------------------------------------
+
 procedure TWeightedColor.Subtract(const other: TWeightedColor);
 begin
   dec(fAddCount, other.fAddCount);
@@ -1054,20 +1098,38 @@ end;
 function TWeightedColor.GetColor: TColor32;
 var
   invAlpha: double;
-  res: TARGB absolute Result;
+  B: Integer;
 begin
+  result := clNone32;
   if (fAlphaTot <= 0) or (fAddCount <= 0) then
-  begin
-    result := clNone32;
     Exit;
-  end;
-  res.A := Min(255, (fAlphaTot  + (fAddCount shr 1)) div fAddCount);
+  {$IFDEF CPUX86}
+  if fAlphaTot and $FFFFFFFF80000000 = 0 then // prevent _lldiv calls if possible
+    B := (Cardinal(fAlphaTot) + (Cardinal(fAddCount) shr 1)) div Cardinal(fAddCount)
+  else
+  {$ENDIF CPUX86}
+    B := (fAlphaTot + (Cardinal(fAddCount) shr 1)) div Cardinal(fAddCount);
+
+  result := Min(255, B) shl 24;
   //nb: alpha weighting is applied to colors when added,
   //so we now need to div by fAlphaTot here ...
-  invAlpha := 1/fAlphaTot;
-  res.R := ClampByte(fColorTotR * invAlpha);
-  res.G := ClampByte(fColorTotG * invAlpha);
-  res.B := ClampByte(fColorTotB * invAlpha);
+  if fAlphaTot <= High(DivOneByXTable) then // use precalculated values for 1 to 65535
+    invAlpha := DivOneByXTable[fAlphaTot]
+  else
+    invAlpha := 1/fAlphaTot;
+
+  // 1. Skip zero calculations.
+  // 2. LimitByte(Integer): The value can't be less than 0, so ClampByte does too much.
+  // 3. x86: Round expects the value in the st(0)/xmm1 FPU register. Thus we need to
+  //         do the calculation and Round call in one expression. Otherwise the
+  //         compiler will use a temporary double variable on the stack causing
+  //         unnecessary store and load operations.
+  if fColorTotB <> 0 then
+    result := result or LimitByte(System.Round(fColorTotB * invAlpha));
+  if fColorTotG <> 0 then
+    result := result or LimitByte(System.Round(fColorTotG * invAlpha)) shl 8;
+  if fColorTotR <> 0 then
+    result := result or LimitByte(System.Round(fColorTotR * invAlpha)) shl 16;
 end;
 
 //------------------------------------------------------------------------------
@@ -1176,5 +1238,17 @@ begin
   Result := Average(Abs(scale.cx), Abs(scale.cy));
 end;
 //------------------------------------------------------------------------------
+
+procedure MakeDivOneByXTable;
+var
+  i: Integer;
+begin
+  DivOneByXTable[0] := 0; // NaN
+  for i := 1 to High(DivOneByXTable) do
+    DivOneByXTable[i] := 1/i;
+end;
+
+initialization
+  MakeDivOneByXTable;
 
 end.
