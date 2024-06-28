@@ -965,6 +965,9 @@ begin
   Move(tmp[0], img.Pixels[0], img.Width * img.Height * SizeOf(TColor32));
   img.EndUpdate;
 end;
+
+//------------------------------------------------------------------------------
+// Miscellaneous WeightedColor function
 //------------------------------------------------------------------------------
 
 function LimitByte(val: Cardinal): byte; {$IFDEF INLINE} inline; {$ENDIF}
@@ -972,7 +975,6 @@ begin
   if val > 255 then result := 255
   else result := val;
 end;
-//------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
 // TWeightedColor
@@ -1099,7 +1101,7 @@ end;
 
 function TWeightedColor.GetColor: TColor32;
 var
-  invAlpha: double;
+  oneDivAlphaTot: double;
   alpha: Integer;
 begin
   result := clNone32;
@@ -1114,27 +1116,28 @@ begin
     alpha := (fAlphaTot + (Cardinal(fAddCount) shr 1)) div Cardinal(fAddCount);
 
   result := Min(255, alpha) shl 24;
-  // nb: alpha weighting is applied to colors when added, so div by fAlphaTot
-  if fAlphaTot < DivOneByXTableSize then // use precalculated values
-    invAlpha := DivOneByXTable[fAlphaTot]
+  // alpha weighting has been applied to color channels, so div by fAlphaTot
+  if fAlphaTot < DivOneByXTableSize then // use precalculated 1/X values
+    oneDivAlphaTot := DivOneByXTable[fAlphaTot]
   else
-    invAlpha := 1/fAlphaTot;
+    oneDivAlphaTot := 1/fAlphaTot;
 
   // 1. Skip zero calculations.
-  // 2. LimitByte(Integer): The value can't be less than 0, so ClampByte does too much.
-  // 3. x86: Round expects the value in the st(0)/xmm1 FPU register. Thus we need to
-  //         do the calculation and Round call in one expression. Otherwise the
-  //         compiler will use a temporary double variable on the stack causing
-  //         unnecessary store and load operations.
+  // 2. LimitByte(Integer): Values can't be less than 0, so don't use ClampByte.
+  // 3. x86: Round expects the value in the st(0)/xmm1 FPU register.
+  //         Thus we need to do the calculation and Round call in one expression.
+  //         Otherwise the compiler will use a temporary double variable on
+  //         the stack that will cause unnecessary store and load operations.
   if fColorTotB <> 0 then
-    result := result or LimitByte(System.Round(fColorTotB * invAlpha));
+    result := result or LimitByte(System.Round(fColorTotB * oneDivAlphaTot));
   if fColorTotG <> 0 then
-    result := result or LimitByte(System.Round(fColorTotG * invAlpha)) shl 8;
+    result := result or LimitByte(System.Round(fColorTotG * oneDivAlphaTot)) shl 8;
   if fColorTotR <> 0 then
-    result := result or LimitByte(System.Round(fColorTotR * invAlpha)) shl 16;
+    result := result or LimitByte(System.Round(fColorTotR * oneDivAlphaTot)) shl 16;
 end;
 
 //------------------------------------------------------------------------------
+// Miscellaneous Matrix functions
 //------------------------------------------------------------------------------
 
 procedure ExtractAllFromMatrix(const mat: TMatrixD; out angle: double;
@@ -1239,6 +1242,9 @@ begin
   scale := ExtractScaleFromMatrix(mat);
   Result := Average(Abs(scale.cx), Abs(scale.cy));
 end;
+
+//------------------------------------------------------------------------------
+// Initialization
 //------------------------------------------------------------------------------
 
 procedure MakeDivOneByXTable;
