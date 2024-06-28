@@ -119,15 +119,17 @@ uses Img32.Resamplers;
 resourcestring
   rsInvalidScale   = 'Invalid matrix scaling factor (0)';
 
-{$IFDEF CPUX86}
 const
+  DivOneByXTableSize = SizeOf(Word);
+
+{$IFDEF CPUX86}
   // Use faster Trunc for x86 code in this unit.
   Trunc: function(Value: Double): Integer = __Trunc;
 {$ENDIF CPUX86}
 
 var
   // DivOneByXTable[x] = 1/x
-  DivOneByXTable: array[Word] of Double;
+  DivOneByXTable: array[0 .. DivOneByXTableSize -1] of Double;
 
 //------------------------------------------------------------------------------
 // Matrix functions
@@ -1098,22 +1100,22 @@ end;
 function TWeightedColor.GetColor: TColor32;
 var
   invAlpha: double;
-  B: Integer;
+  alpha: Integer;
 begin
   result := clNone32;
   if (fAlphaTot <= 0) or (fAddCount <= 0) then
     Exit;
   {$IFDEF CPUX86}
-  if fAlphaTot and $FFFFFFFF80000000 = 0 then // prevent _lldiv calls if possible
-    B := (Cardinal(fAlphaTot) + (Cardinal(fAddCount) shr 1)) div Cardinal(fAddCount)
+  if fAlphaTot and $FFFFFFFF80000000 = 0 then // small, so can avoid _lldiv call
+    alpha := (Cardinal(fAlphaTot) + (Cardinal(fAddCount) shr 1)) div
+      Cardinal(fAddCount)
   else
   {$ENDIF CPUX86}
-    B := (fAlphaTot + (Cardinal(fAddCount) shr 1)) div Cardinal(fAddCount);
+    alpha := (fAlphaTot + (Cardinal(fAddCount) shr 1)) div Cardinal(fAddCount);
 
-  result := Min(255, B) shl 24;
-  //nb: alpha weighting is applied to colors when added,
-  //so we now need to div by fAlphaTot here ...
-  if fAlphaTot <= High(DivOneByXTable) then // use precalculated values for 1 to 65535
+  result := Min(255, alpha) shl 24;
+  // nb: alpha weighting is applied to colors when added, so div by fAlphaTot
+  if fAlphaTot < DivOneByXTableSize then // use precalculated values
     invAlpha := DivOneByXTable[fAlphaTot]
   else
     invAlpha := 1/fAlphaTot;

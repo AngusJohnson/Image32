@@ -54,9 +54,6 @@
   {$IF COMPILERVERSION < 23}
     {$DEFINE CPUX86}                            // CPUX86 was added in Delphi XE2 (added Win64 compiler)
   {$IFEND}
-  {$IFDEF CPUX86}
-      {$DEFINE ASM_X86}                         //caution: do not define in FPC
-  {$ENDIF}
   {$IF COMPILERVERSION >= 17}                   //Delphi 2005
     {$IFNDEF DEBUG}
       {$DEFINE INLINE}                            //added inlining

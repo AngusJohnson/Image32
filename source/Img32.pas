@@ -673,15 +673,9 @@ end;
 
 //__Trunc: An efficient Trunc() algorithm (ie rounds toward zero)
 function __Trunc(Value: Double): Integer;
-type
-  TDoubleDataRec = packed record // x86 -> Little Endian
-    Mantisse: Integer;
-    Exp: Integer;
-  end;
 var
   exp: integer;
   i64: UInt64 absolute Value;
-  dbl: TDoubleDataRec absolute Value;
 begin
   //https://en.wikipedia.org/wiki/Double-precision_floating-point_format
   Result := 0;
@@ -694,7 +688,7 @@ begin
     Result := ((i64 and $1FFFFFFFFFFFFF) shl (exp - 52)) or (UInt64(1) shl exp)
   else
     Result := ((i64 and $1FFFFFFFFFFFFF) shr (52 - exp)) or (UInt64(1) shl exp);
-  if dbl.exp and $80000000 <> 0 then Result := -Result;
+  if Value < 0 then Result := -Result;
 end;
 //------------------------------------------------------------------------------
 
