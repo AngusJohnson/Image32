@@ -120,7 +120,7 @@ resourcestring
   rsInvalidScale   = 'Invalid matrix scaling factor (0)';
 
 const
-  DivOneByXTableSize = SizeOf(Word);
+  DivOneByXTableSize = 65536;
 
 {$IFDEF CPUX86}
   // Use faster Trunc for x86 code in this unit.

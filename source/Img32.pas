@@ -676,6 +676,7 @@ function __Trunc(Value: Double): Integer;
 var
   exp: integer;
   i64: UInt64 absolute Value;
+  valueBytes: array[0..7] of Byte absolute Value;
 begin
   //https://en.wikipedia.org/wiki/Double-precision_floating-point_format
   Result := 0;
@@ -688,7 +689,9 @@ begin
     Result := ((i64 and $1FFFFFFFFFFFFF) shl (exp - 52)) or (UInt64(1) shl exp)
   else
     Result := ((i64 and $1FFFFFFFFFFFFF) shr (52 - exp)) or (UInt64(1) shl exp);
-  if Value < 0 then Result := -Result;
+  // Check for the sign bit without loading Value into the FPU.
+  // The simple bit-test is faster.
+  if valueBytes[7] and $80 <> 0 then Result := -Result; // replaces FPU code: if Value < 0 then Result := -Result;
 end;
 //------------------------------------------------------------------------------
 
