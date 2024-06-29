@@ -1120,15 +1120,19 @@ procedure TColorRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
 var
   i: integer;
   dst: PColor32;
+  color: TColor32;
+  tab: PByteArray;
 begin
   dst := GetDstPixel(x1,y);
+  tab := PByteArray(@MulTable[fAlpha]);
+  color := fColor; // optimize access to Self.fColor
   for i := x1 to x2 do
   begin
     // BlendToAlpha is marginally slower than BlendToOpaque but it's used
     // here because it's universally applicable.
     // Ord() is used here because very old compilers define PByte as a PChar
     if Ord(alpha^) > 1 then
-      dst^ := BlendToAlpha(dst^, ((Ord(alpha^) * fAlpha) shr 8) shl 24 or fColor);
+      dst^ := BlendToAlpha(dst^, (tab[Ord(alpha^)] shl 24) or color);
     inc(dst); inc(alpha);
   end;
 end;
