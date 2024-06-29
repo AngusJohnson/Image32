@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.5                                                             *
-* Date      :  21 June 2024                                                    *
+* Date      :  30 June 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -592,6 +592,7 @@ uses
 
 resourcestring
   rsImageTooLarge = 'Image32 error: the image is too large.';
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
@@ -678,20 +679,22 @@ var
   i64: UInt64 absolute Value;
   valueBytes: array[0..7] of Byte absolute Value;
 begin
-  //https://en.wikipedia.org/wiki/Double-precision_floating-point_format
+  // https://en.wikipedia.org/wiki/Double-precision_floating-point_format
+  // 52 bit fractional value, 11bit ($7FF) exponent, and 1bit sign
   Result := 0;
   if i64 = 0 then Exit;
-  exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;
-  //nb: when exp == 1024 then Value == INF or NAN.
+  exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;  
+  // nb: when exp == 1024 then Value == INF or NAN.
   if exp < 0 then
     Exit
-  else if exp > 52 then
-    Result := ((i64 and $1FFFFFFFFFFFFF) shl (exp - 52)) or (UInt64(1) shl exp)
+  //else if exp > 52 then   // ie only for 64bit int results
+  //  Result := ((i64 and $1FFFFFFFFFFFFF) shl (exp - 52)) or (1 shl exp)
+  //else if exp > 31 then   // alternatively, range check for 32bit ints ????
+  //  raise Exception.Create(rsIntegerOverflow)
   else
-    Result := ((i64 and $1FFFFFFFFFFFFF) shr (52 - exp)) or (UInt64(1) shl exp);
+    Result := Integer((i64 and $1FFFFFFFFFFFFF) shr (52 - exp)) or (1 shl exp);
   // Check for the sign bit without loading Value into the FPU.
-  // The simple bit-test is faster.
-  if valueBytes[7] and $80 <> 0 then Result := -Result; // replaces FPU code: if Value < 0 then Result := -Result;
+  if valueBytes[7] and $80 <> 0 then Result := -Result;
 end;
 //------------------------------------------------------------------------------
 
