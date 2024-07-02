@@ -203,8 +203,11 @@ type
   TImageElement = class(TBaseElement)
   private
     refEl: UTF8String;
+    fImage: TImage32;
   protected
     procedure Draw(image: TImage32; drawDat: TDrawData); override;
+  public
+    destructor Destroy; override;
   end;
 
   //-------------------------------------
@@ -500,8 +503,11 @@ type
   TFeImageElement  = class(TFeBaseElement)
   private
     refEl: UTF8String;
+    fImage: TImage32;
   protected
     procedure Apply; override;
+  public
+    destructor Destroy; override;
   end;
 
   TCompositeOp = (coOver, coIn, coOut, coAtop, coXOR, coArithmetic);
@@ -869,56 +875,72 @@ end;
 function TrimSpaces(const s: UTF8String): UTF8String;
 var
   i, j, len: integer;
+  dst: PUTF8Char;
 begin
   len := Length(s);
   SetLength(Result, len);
+  dst := PUTF8Char(Pointer(Result));
   j := 0;
   for i := 1 to len do
     if s[i] > #32 then
     begin
+      dst[j] := s[i];
       inc(j);
-      Result[j] := s[i];
     end;
-  SetLength(Result, j);
+  if j <> len then
+    SetLength(Result, j);
 end;
 //------------------------------------------------------------------------------
 
-function DrawRefElImage(const refEl: UTF8String;
-  image: TImage32; dstRec: TRect): Boolean;
+procedure ReadRefElImage(var refEl: UTF8String; var img: TImage32);
 var
   len, offset: integer;
   s: UTF8String;
   ms: TMemoryStream;
-  img: TImage32;
+  c: PUTF8Char;
 begin
-  Result := false;
+  FreeAndNil(img); // release the previous image
+
   // unfortunately white spaces are sometimes found inside encoded base64
   s := TrimSpaces(refEl);
 
   len := Length(s);
   // currently only accepts **embedded** images
   if (len = 0) then Exit;
-  if Match(@s[1], 'data:image/jpg;base64,') then offset := 22
-  else if Match(@s[1], 'data:image/jpeg;base64,') then offset := 23
-  else if Match(@s[1], 'data:image/png;base64,') then offset := 22
-  else if Match(@s[1], 'data:img/jpg;base64,') then offset := 20
-  else if Match(@s[1], 'data:img/jpeg;base64,') then offset := 21
-  else if Match(@s[1], 'data:img/png;base64,') then offset := 20
+
+  c := PUTF8Char(s);
+  if not Match(c, 'data:image/') then Exit;
+
+  if Match(@c[11], 'jpg;base64,') then offset := 22
+  else if Match(@c[11], 'jpeg;base64,') then offset := 23
+  else if Match(@c[11], 'png;base64,') then offset := 22
+  else if Match(@c[11], 'jpg;base64,') then offset := 20
+  else if Match(@c[11], 'jpeg;base64,') then offset := 21
+  else if Match(@c[11], 'png;base64,') then offset := 20
   else Exit;
 
   ms := TMemoryStream.Create;
-  img := TImage32.Create;
   try
-    if not Base64Decode(@s[offset +1], len -offset, ms) or
-      not img.LoadFromStream(ms) then Exit;
-    image.Copy(img, img.Bounds, dstRec);
+    if not Base64Decode(@c[offset], len -offset, ms) then Exit;
+    refEl := ''; // release memory
+
+    img := TImage32.Create;
+    if not img.LoadFromStream(ms) then
+    begin
+      FreeAndNil(img);
+      Exit;
+    end;
   finally
     ms.Free;
-    img.Free;
   end;
-  Result := true;
 end;
 //------------------------------------------------------------------------------
+
+destructor TImageElement.Destroy;
+begin
+  fImage.Free;
+  inherited Destroy;
+end;
 
 procedure TImageElement.Draw(image: TImage32; drawDat: TDrawData);
 var
@@ -928,7 +950,12 @@ begin
   drawDat.matrix := MatrixMultiply(drawDat.matrix, fDrawData.matrix);
 
   MatrixApply(drawDat.matrix, dstRecD);
-  DrawRefElImage(refEl, image, Rect(dstRecD));
+
+  if refEl <> '' then
+    ReadRefElImage(refEl, fImage); // also clears refEl
+
+  if fImage <> nil then
+    image.Copy(fImage, fImage.Bounds, Rect(dstRecD));
 end;
 
 //------------------------------------------------------------------------------
@@ -1776,10 +1803,23 @@ end;
 // TFeImageElement
 //------------------------------------------------------------------------------
 
+destructor TFeImageElement.Destroy;
+begin
+  fImage.Free;
+  inherited Destroy;
+end;
+//------------------------------------------------------------------------------
+
 procedure TFeImageElement.Apply;
 begin
   if GetSrcAndDst then
-    DrawRefElImage(refEl, dstImg, dstRec);
+  begin
+    if refEl <> '' then
+      ReadRefElImage(refEl, fImage); // also clears refEl
+
+    if fImage <> nil then
+      dstImg.Copy(fImage, fImage.Bounds, dstRec);
+  end;
 end;
 
 //------------------------------------------------------------------------------
