@@ -3,7 +3,7 @@ unit Img32.Resamplers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  2 May 2024                                                      *
+* Date      :  3 July 2024                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  For image transformations (scaling, rotating etc.)              *
@@ -26,6 +26,9 @@ uses
 procedure BoxDownSampling(Image: TImage32; scale: double); overload;
 procedure BoxDownSampling(Image: TImage32; scaleX, scaleY: double); overload;
 procedure BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer); overload;
+procedure BoxDownSampling(Image, TargetImage: TImage32; scale: double); overload;
+procedure BoxDownSampling(Image, TargetImage: TImage32; scaleX, scaleY: double); overload;
+procedure BoxDownSampling(Image, TargetImage: TImage32; newWidth, newHeight: Integer); overload;
 
 // The following general purpose resamplers are registered below:
 // function NearestResampler(img: TImage32; x, y: double): TColor32;
@@ -579,21 +582,39 @@ end;
 
 procedure BoxDownSampling(Image: TImage32; scaleX, scaleY: double);
 begin
-  BoxDownSampling(Image,
-    Max(1, Integer(Round(Image.Width * scaleX))),
-    Max(1, Integer(Round(Image.Height * scaleY))));
+  BoxDownSampling(Image, Image, scaleX, scaleY);
 end;
 //------------------------------------------------------------------------------
 
 procedure BoxDownSampling(Image: TImage32; scale: double);
 begin
-  BoxDownSampling(Image,
+  BoxDownSampling(Image, Image, scale);
+end;
+//------------------------------------------------------------------------------
+
+procedure BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer);
+begin
+  BoxDownSampling(Image, Image, newWidth, newHeight);
+end;
+//------------------------------------------------------------------------------
+
+procedure BoxDownSampling(Image, TargetImage: TImage32; scaleX, scaleY: double);
+begin
+  BoxDownSampling(Image, TargetImage,
+    Max(1, Integer(Round(Image.Width * scaleX))),
+    Max(1, Integer(Round(Image.Height * scaleY))));
+end;
+//------------------------------------------------------------------------------
+
+procedure BoxDownSampling(Image, TargetImage: TImage32; scale: double);
+begin
+  BoxDownSampling(Image, TargetImage,
     Max(1, Integer(Round(Image.Width * scale))),
     Max(1, Integer(Round(Image.Height * scale))));
 end;
 //------------------------------------------------------------------------------
 
-procedure BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer);
+procedure BoxDownSampling(Image, TargetImage: TImage32; newWidth, newHeight: Integer);
 var
   x,y, x256,y256,xx256,yy256: Integer;
   sx,sy: double;
@@ -626,10 +647,7 @@ begin
     y256 := yy256;
   end;
 
-  Image.BeginUpdate;
-  Image.SetSize(newWidth, newHeight);
-  Move(tmp[0], Image.Pixels[0], newWidth * newHeight * SizeOf(TColor32));
-  Image.EndUpdate;
+  TargetImage.AssignPixelArray(tmp, newWidth, newHeight);
 end;
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------

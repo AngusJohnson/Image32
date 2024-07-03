@@ -3,7 +3,7 @@ unit Img32.Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  30 April 2024                                                   *
+* Date      :  3 July 2024                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -37,7 +37,9 @@ type
   procedure MatrixApply(const matrix: TMatrixD; var path: TPathD); overload;
   procedure MatrixApply(const matrix: TMatrixD; var paths: TPathsD); overload;
   procedure MatrixApply(const matrix: TMatrixD;
-    img: TImage32; scaleAdjust: Boolean = false); overload;
+    img: TImage32; scaleAdjust: Boolean = false); overload; {$IFDEF INLINE} inline; {$ENDIF}
+  procedure MatrixApply(const matrix: TMatrixD;
+    img, targetImg: TImage32; scaleAdjust: Boolean = false); overload; {$IFDEF INLINE} inline; {$ENDIF}
 
   function  MatrixInvert(var matrix: TMatrixD): Boolean;
 
@@ -61,19 +63,27 @@ type
   // Note: "scaleAdjust" prevents antialiasing extending way outside of images
   // when they are being enlarged significantly and rotated concurrently
   function AffineTransformImage(img: TImage32; matrix: TMatrixD;
-    scaleAdjust: Boolean = false): TPoint;
+    scaleAdjust: Boolean = false): TPoint; overload; {$IFDEF INLINE} inline; {$ENDIF}
+  function AffineTransformImage(img, targetImg: TImage32; matrix: TMatrixD;
+    scaleAdjust: Boolean = false): TPoint; overload;
 
   // ProjectiveTransform:
   //  srcPts, dstPts => each path must contain 4 points
   //  margins => the margins around dstPts (in the dest. projective).
   //  Margins are only meaningful when srcPts are inside the image.
   function ProjectiveTransform(img: TImage32;
-    const srcPts, dstPts: TPathD; const margins: TRect): Boolean;
+    const srcPts, dstPts: TPathD; const margins: TRect): Boolean; overload; {$IFDEF INLINE} inline; {$ENDIF}
+  function ProjectiveTransform(img, targetImg: TImage32;
+    const srcPts, dstPts: TPathD; const margins: TRect): Boolean; overload;
 
   function SplineVertTransform(img: TImage32; const topSpline: TPathD;
-    splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean;
+    splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean; overload; {$IFDEF INLINE} inline; {$ENDIF}
+  function SplineVertTransform(img, targetImg: TImage32; const topSpline: TPathD;
+    splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean; overload;
   function SplineHorzTransform(img: TImage32; const leftSpline: TPathD;
-    splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean;
+    splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean; overload; {$IFDEF INLINE} inline; {$ENDIF}
+  function SplineHorzTransform(img, targetImg: TImage32; const leftSpline: TPathD;
+    splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean; overload;
 
   function ExtractAngleFromMatrix(const mat: TMatrixD): double;
   function ExtractScaleFromMatrix(const mat: TMatrixD): TSizeD;
@@ -295,6 +305,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure MatrixApply(const matrix: TMatrixD;
+  img, targetImg: TImage32; scaleAdjust: Boolean);
+begin
+  AffineTransformImage(img, targetImg, matrix, scaleAdjust);
+end;
+//------------------------------------------------------------------------------
+
 function MatrixMultiply(const modifier, matrix: TMatrixD): TMatrixD;
 var
   i, j: Integer;
@@ -431,6 +448,23 @@ begin
 
   angle := ArcCos(mat2[0,0]);
 end;
+//------------------------------------------------------------------------------
+
+{$IFDEF USE_DOWNSAMPLER_AUTOMATICALLY}
+function CanUseBoxDownsampler(const mat: TMatrixD; sx, sy: double): Boolean;
+begin
+  // If the matrix looks like this after removing the scale,
+  // the box downsampler can be used.
+  //  cos(0)  -sin(0)  tx          1   0   tx
+  //  sin(0)   cos(0)  ty    =>    0   1   ty
+  //  0        0       1           0   0   1
+
+  Result := (mat[0,0]/sx = 1) and (mat[0,1]/sx = 0) and
+            (mat[1,0]/sy = 0) and (mat[1,1]/sy = 1) and
+            (mat[2,0]    = 0) and (mat[2,1]    = 0) and
+            (mat[2,2]    = 1);
+end;
+{$ENDIF USE_DOWNSAMPLER_AUTOMATICALLY}
 
 //------------------------------------------------------------------------------
 // Affine Transformation
@@ -448,6 +482,13 @@ end;
 
 function AffineTransformImage(img: TImage32; matrix: TMatrixD;
   scaleAdjust: Boolean): TPoint;
+begin
+  Result := AffineTransformImage(img, img, matrix, scaleAdjust);
+end;
+//------------------------------------------------------------------------------
+
+function AffineTransformImage(img, targetImg: TImage32; matrix: TMatrixD;
+  scaleAdjust: Boolean): TPoint;
 var
   i, j: integer;
   newWidth, newHeight: integer;
@@ -458,16 +499,23 @@ var
   dstRec: TRect;
   resampler: TResamplerFunction;
 {$IFDEF USE_DOWNSAMPLER_AUTOMATICALLY}
-  rx: double;
   useBoxDownsampler: Boolean;
 {$ENDIF}
 begin
   Result := NullPoint;
   if IsIdentityMatrix(matrix) or
-    img.IsEmpty or (img.Resampler = 0) then Exit;
+    img.IsEmpty or (targetImg.Resampler = 0) then
+  begin
+    if targetImg <> img then targetImg.Assign(img);
+    Exit;
+  end;
 
-  resampler := GetResampler(img.Resampler);
-  if not Assigned(resampler) then Exit;
+  resampler := GetResampler(targetImg.Resampler);
+  if not Assigned(resampler) then
+  begin
+    if targetImg <> img then targetImg.Assign(img);
+    Exit;
+  end;
 
   //auto-resize the image so it'll fit transformed image
 
@@ -480,14 +528,13 @@ begin
   if (sx < 1.0) and (sy < 1.0) then
   begin
     //only use box downsampling when downsizing
-    MatrixExtractRotation(matrix, rx);
-    useBoxDownsampler := (rx = 0);
+    useBoxDownsampler := CanUseBoxDownsampler(matrix, sx, sy);
   end else
     useBoxDownsampler := false;
 
   if useBoxDownsampler then
   begin
-    BoxDownSampling(img, sx, sy);
+    BoxDownSampling(img, targetImg, sx, sy);
     Exit;
   end;
 {$ENDIF}
@@ -503,7 +550,11 @@ begin
 
   //starting with the result pixel coords, reverse lookup
   //the fractional coordinates in the untransformed image
-  if not MatrixInvert(matrix) then Exit;
+  if not MatrixInvert(matrix) then
+  begin
+    if targetImg <> img then targetImg.Assign(img);
+    Exit;
+  end;
 
   SetLength(tmp, newWidth * newHeight);
   pc := @tmp[0];
@@ -530,13 +581,7 @@ begin
     end;
   end;
 
-  img.BeginUpdate;
-  try
-    img.SetSize(newWidth, newHeight);
-    Move(tmp[0], img.Pixels[0], newWidth * newHeight * sizeOf(TColor32));
-  finally
-    img.EndUpdate;
-  end;
+  targetImg.AssignPixelArray(tmp, newWidth, newHeight);
 end;
 
 //------------------------------------------------------------------------------
@@ -650,6 +695,13 @@ end;
 
 function ProjectiveTransform(img: TImage32;
   const srcPts, dstPts: TPathD; const margins: TRect): Boolean;
+begin
+  Result := ProjectiveTransform(img, img, srcPts, dstPts, margins);
+end;
+//------------------------------------------------------------------------------
+
+function ProjectiveTransform(img, targetImg: TImage32;
+  const srcPts, dstPts: TPathD; const margins: TRect): Boolean;
 var
   w,h,i,j: integer;
   x,y: double;
@@ -663,13 +715,17 @@ var
 begin
   //https://math.stackexchange.com/a/339033/384709
 
-  if img.Resampler = 0 then
+  if targetImg.Resampler = 0 then
     resampler := nil else
-    resampler := GetResampler(img.Resampler);
+    resampler := GetResampler(targetImg.Resampler);
 
   Result := Assigned(resampler) and not img.IsEmpty and
     (Length(dstPts) = 4) and IsPathConvex(dstPts);
-  if not Result then Exit;
+  if not Result then
+  begin
+    if targetImg <> img then targetImg.Assign(img);
+    Exit;
+  end;
 
   rec := GetBounds(dstPts);
   dec(rec.Left, margins.Left);
@@ -699,8 +755,10 @@ begin
         pc^ := resampler(img, x -0.5, y -0.5);
       inc(pc);
     end;
-  img.SetSize(w, h);
-  Move(tmp[0], img.PixelBase^, w * h * sizeOf(TColor32));
+
+  targetImg.BlockNotify;
+  targetImg.AssignPixelArray(tmp, w, h);
+  targetImg.UnblockNotify;
 end;
 
 //------------------------------------------------------------------------------
@@ -820,6 +878,13 @@ end;
 
 function SplineVertTransform(img: TImage32; const topSpline: TPathD;
   splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean;
+begin
+  Result := SplineVertTransform(img, img, topSpline, splineType, backColor, offset);
+end;
+//------------------------------------------------------------------------------
+
+function SplineVertTransform(img, targetImg: TImage32; const topSpline: TPathD;
+  splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean;
 var
   i,j, w,h, len: integer;
   x,y, yy, q: double;
@@ -834,9 +899,9 @@ var
   backColoring, allowBackColoring: Boolean;
 begin
   offset := NullPoint;
-  if img.Resampler = 0 then
+  if targetImg.Resampler = 0 then
     resampler := nil else
-    resampler := GetResampler(img.Resampler);
+    resampler := GetResampler(targetImg.Resampler);
 
   //convert the top spline control points into a flattened path
   if splineType = stQuadratic then
@@ -846,7 +911,11 @@ begin
   rec := GetBounds(topPath);
   //return false if the spline is invalid or there's no vertical transformation
   Result := Assigned(resampler) and not IsEmptyRect(rec);
-  if not Result then Exit;
+  if not Result then
+  begin
+    if targetImg <> img then targetImg.Assign(img);
+    Exit;
+  end;
 
   offset := rec.TopLeft;
   topPath := InterpolatePathForX(topPath);
@@ -885,14 +954,21 @@ begin
     end;
   end;
 
-  img.BeginUpdate;
-  img.SetSize(w,h);
-  Move(tmp[0], img.Pixels[0], w*h * SizeOf(TColor32));
-  img.EndUpdate;
+  // tmp was creates with "(w+1)*h". We take advantage of the
+  // memory manager's inplace shrink.
+  SetLength(tmp, w * h);
+  targetImg.AssignPixelArray(tmp, w, h);
 end;
 //------------------------------------------------------------------------------
 
 function SplineHorzTransform(img: TImage32; const leftSpline: TPathD;
+  splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean;
+begin
+  Result := SplineHorzTransform(img, img, leftSpline, splineType, backColor, offset);
+end;
+//------------------------------------------------------------------------------
+
+function SplineHorzTransform(img, targetImg: TImage32; const leftSpline: TPathD;
   splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean;
 var
   i,j, len, w,h: integer;
@@ -908,9 +984,9 @@ var
 begin
   offset := NullPoint;
 
-  if img.Resampler = 0 then
+  if targetImg.Resampler = 0 then
     resampler := nil else
-    resampler := GetResampler(img.Resampler);
+    resampler := GetResampler(targetImg.Resampler);
 
   //convert the left spline control points into a flattened path
   if splineType = stQuadratic then
@@ -920,7 +996,11 @@ begin
 
   //return false if the spline is invalid or there's no horizontal transformation
   Result := Assigned(resampler) and not IsEmptyRect(rec);
-  if not Result then Exit;
+  if not Result then
+  begin
+    if targetImg <> img then targetImg.Assign(img);
+    Exit;
+  end;
 
   offset := rec.TopLeft;
   leftPath := InterpolatePathForY(leftPath);
@@ -960,10 +1040,10 @@ begin
     end;
   end;
 
-  img.BeginUpdate;
-  img.SetSize(w,h);
-  Move(tmp[0], img.Pixels[0], img.Width * img.Height * SizeOf(TColor32));
-  img.EndUpdate;
+  // tmp was creates with "w*(h+1)". We take advantage of the
+  // memory manager's inplace shrink.
+  SetLength(tmp, w * h);
+  targetImg.AssignPixelArray(tmp, w, h);
 end;
 
 //------------------------------------------------------------------------------

@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.5                                                             *
-* Date      :  30 June 2024                                                    *
+* Date      :  3 July 2024                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -185,8 +185,8 @@ type
     function GetIsEmpty: Boolean;
     function GetPixelBase: PColor32;
     function GetPixelRow(row: Integer): PColor32;
-    procedure NearestNeighborResize(newWidth, newHeight: Integer);
-    procedure ResamplerResize(newWidth, newHeight: Integer);
+    procedure NearestNeighborResize(targetImg: TImage32; newWidth, newHeight: Integer);
+    procedure ResamplerResize(targetImg: TImage32; newWidth, newHeight: Integer);
     procedure RotateLeft90;
     procedure RotateRight90;
     procedure Rotate180;
@@ -207,6 +207,9 @@ type
     property   UpdateCount: integer read fUpdateCnt;
   public
     constructor Create(width: Integer = 0; height: Integer = 0); overload;
+    //Create(src:array, width, height): Uses the specified array for the pixels.
+    //  Uses src for the pixels without copying it.
+    constructor Create(const src: TArrayOfColor32; width: Integer; height: Integer); overload;
     constructor Create(src: TImage32); overload;
     constructor Create(src: TImage32; const srcRec: TRect); overload;
     destructor Destroy; override;
@@ -219,11 +222,16 @@ type
 
     procedure Assign(src: TImage32);
     procedure AssignTo(dst: TImage32);
+    procedure AssignSettings(src: TImage32);
+    //AssignPixelArray: Replaces the content and takes ownership of src.
+    //  Uses src for the pixels without copying it.
+    procedure AssignPixelArray(const src: TArrayOfColor32; width: Integer; height: Integer);
 
     //SetSize: Erases any current image, and fills with the specified color.
     procedure SetSize(newWidth, newHeight: Integer; color: TColor32 = 0);
     //Resize: is very similar to Scale()
     procedure Resize(newWidth, newHeight: Integer);
+    procedure ResizeTo(targetImg: TImage32; newWidth, newHeight: Integer);
     //ScaleToFit: The image will be scaled proportionally
     procedure ScaleToFit(width, height: integer);
     //ScaleToFitCentered: The new image will be scaled and also centred
@@ -231,6 +239,8 @@ type
     procedure ScaleToFitCentered(const rect: TRect); overload;
     procedure Scale(s: double); overload;
     procedure Scale(sx, sy: double); overload;
+    procedure ScaleTo(targetImg: TImage32; s: double); overload;
+    procedure ScaleTo(targetImg: TImage32; sx, sy: double); overload;
 
     function Copy(src: TImage32; srcRec, dstRec: TRect): Boolean;
     //CopyBlend: Copies part or all of another image (src) on top of the
@@ -592,6 +602,7 @@ uses
 
 resourcestring
   rsImageTooLarge = 'Image32 error: the image is too large.';
+  rsInvalidImageArrayData = 'Image32 error: the specified pixels array and the size does not match.';
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -1572,6 +1583,22 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+constructor TImage32.Create(const src: TArrayOfColor32; width: Integer; height: Integer);
+begin
+  fAntiAliased := true;
+  fResampler := DefaultResampler;
+
+  width := Max(0, width);
+  height := Max(0, height);
+  if Length(src) <> width * height then
+    raise Exception.Create(rsInvalidImageArrayData);
+
+  fWidth := width;
+  fHeight := height;
+  fPixels := src;
+end;
+//------------------------------------------------------------------------------
+
 constructor TImage32.Create(src: TImage32);
 begin
   Assign(src);
@@ -1709,10 +1736,7 @@ begin
   if dst = self then Exit;
   dst.BeginUpdate;
   try
-    dst.fResampler := fResampler;
-    dst.fIsPremultiplied := fIsPremultiplied;
-    dst.fAntiAliased := fAntiAliased;
-    dst.ResetColorCount;
+    dst.AssignSettings(Self);
     try
       dst.SetSize(Width, Height);
       if (Width > 0) and (Height > 0) then
@@ -1723,6 +1747,48 @@ begin
   finally
     dst.EndUpdate;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.AssignSettings(src: TImage32);
+begin
+  if assigned(src) and (src <> Self) then
+  begin
+    BeginUpdate;
+    try
+      fResampler := src.fResampler;
+      fIsPremultiplied := src.fIsPremultiplied;
+      fAntiAliased := src.fAntiAliased;
+      ResetColorCount;
+    finally
+      EndUpdate;
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.AssignPixelArray(const src: TArrayOfColor32; width: Integer; height: Integer);
+var
+  wasResized: Boolean;
+begin
+  width := Max(0, width);
+  height := Max(0, height);
+  if Length(src) <> width * height then
+    raise Exception.Create(rsInvalidImageArrayData);
+
+  wasResized := (fWidth <> width) or (fHeight <> height);
+
+  BeginUpdate;
+  try
+    fWidth := width;
+    fHeight := height;
+    fPixels := src;
+  finally
+    EndUpdate;
+  end;
+
+  if wasResized then
+    Resized;
 end;
 //------------------------------------------------------------------------------
 
@@ -2006,36 +2072,42 @@ end;
 
 procedure TImage32.Resize(newWidth, newHeight: Integer);
 begin
+  ResizeTo(Self, newWidth, newHeight);
+end;
+//------------------------------------------------------------------------------
 
+procedure TImage32.ResizeTo(targetImg: TImage32; newWidth, newHeight: Integer);
+begin
   if (newWidth <= 0) or (newHeight <= 0) then
   begin
-    SetSize(0, 0);
+    targetImg.SetSize(0, 0);
     Exit;
   end
   else if (newWidth = fwidth) and (newHeight = fheight) then
   begin
+    if targetImg <> Self then targetImg.Assign(Self);
     Exit
   end
   else if IsEmpty then
   begin
-    SetSize(newWidth, newHeight);
+    targetImg.SetSize(newWidth, newHeight);
     Exit;
   end;
 
-  BlockNotify;
+  targetImg.BlockNotify;
   try
-    if fResampler <= rNearestResampler then
-      NearestNeighborResize(newWidth, newHeight)
+    if targetImg.fResampler <= rNearestResampler then
+      NearestNeighborResize(targetImg, newWidth, newHeight)
     else
-      ResamplerResize(newWidth, newHeight);
+      ResamplerResize(targetImg, newWidth, newHeight);
   finally
-    UnblockNotify;
+    targetImg.UnblockNotify;
   end;
-  Resized;
+  targetImg.Resized;
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.NearestNeighborResize(newWidth, newHeight: Integer);
+procedure TImage32.NearestNeighborResize(targetImg: TImage32; newWidth, newHeight: Integer);
 var
   x, y, srcY: Integer;
   scaledXi, scaledYi: TArrayOfInteger;
@@ -2045,8 +2117,12 @@ begin
   //this NearestNeighbor code is slightly more efficient than
   //the more general purpose one in Img32.Resamplers
 
-  if (newWidth = fWidth) and (newHeight = fHeight) then Exit;
-  SetLength(tmp, newWidth * newHeight * SizeOf(TColor32));
+  if (newWidth = fWidth) and (newHeight = fHeight) then
+  begin
+    if targetImg <> Self then targetImg.Assign(Self);
+    Exit;
+  end;
+  SetLength(tmp, newWidth * newHeight);
 
   //get scaled X & Y values once only (storing them in lookup arrays) ...
   SetLength(scaledXi, newWidth);
@@ -2067,19 +2143,17 @@ begin
     end;
   end;
 
-  fPixels := tmp;
-  fwidth := newWidth;
-  fheight := newHeight;
+  targetImg.AssignPixelArray(tmp, newWidth, newHeight);
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.ResamplerResize(newWidth, newHeight: Integer);
+procedure TImage32.ResamplerResize(targetImg: TImage32; newWidth, newHeight: Integer);
 var
   mat: TMatrixD;
 begin
   mat := IdentityMatrix;
   MatrixScale(mat, newWidth/fWidth, newHeight/fHeight);
-  AffineTransformImage(self, mat);
+  AffineTransformImage(self, targetImg, mat);
 end;
 //------------------------------------------------------------------------------
 
@@ -2089,10 +2163,23 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TImage32.ScaleTo(targetImg: TImage32; s: double);
+begin
+  ScaleTo(targetImg, s, s);
+end;
+//------------------------------------------------------------------------------
+
 procedure TImage32.Scale(sx, sy: double);
 begin
   if (sx > 0) and (sy > 0) then
-    ReSize(Round(width * sx), Round(height * sy));
+    Resize(Round(width * sx), Round(height * sy));
+end;
+//------------------------------------------------------------------------------
+
+procedure TImage32.ScaleTo(targetImg: TImage32; sx, sy: double);
+begin
+  if (sx > 0) and (sy > 0) then
+    ResizeTo(targetImg, Round(width * sx), Round(height * sy));
 end;
 //------------------------------------------------------------------------------
 
@@ -2507,11 +2594,13 @@ begin
 
   if (scaleX <> 1.0) or (scaleY <> 1.0) then
   begin
-    //scale source (tmp) to the destination then call CopyBlend() again ...
-    tmp := TImage32.Create(src, srcRecClipped);
+    //scale source (tmp) to the destination then call CopyBlend() again ...^
+    tmp := TImage32.Create;
     try
-      tmp.Scale(scaleX, scaleY);
-      result := CopyBlend(tmp, tmp.Bounds, dstRec, blendFunc);
+      tmp.AssignSettings(src);
+      src.ScaleTo(tmp, scaleX, scaleY);
+      ScaleRect(srcRecClipped, scaleX, scaleY);
+      result := CopyBlend(tmp, srcRecClipped, dstRec, blendFunc);
     finally
       tmp.Free;
     end;
