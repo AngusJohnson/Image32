@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.5                                                             *
-* Date      :  24 June 2024                                                    *
+* Date      :  4 July 2024                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -202,7 +202,7 @@ type
 
   TImageElement = class(TBaseElement)
   private
-    refEl: UTF8String;
+    fRefEl: UTF8String;
     fImage: TImage32;
   protected
     procedure Draw(image: TImage32; drawDat: TDrawData); override;
@@ -251,7 +251,7 @@ type
     callerUse: TBaseElement;
     function ValidateNonRecursion(el: TBaseElement): Boolean;
   protected
-    refEl: UTF8String;
+    fRefEl: UTF8String;
     procedure GetPaths(const drawDat: TDrawData); override;
     procedure Draw(img: TImage32; drawDat: TDrawData); override;
   end;
@@ -892,19 +892,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure ReadRefElImage(var refEl: UTF8String; var img: TImage32);
+procedure ReadRefElImage(const refEl: UTF8String; out img: TImage32);
 var
   len, offset: integer;
   s: UTF8String;
   ms: TMemoryStream;
   c: PUTF8Char;
 begin
-  FreeAndNil(img); // release the previous image
+  img := nil;
 
   // unfortunately white spaces are sometimes found inside encoded base64
   s := TrimSpaces(refEl);
-
   len := Length(s);
+
   // currently only accepts **embedded** images
   if (len = 0) then Exit;
 
@@ -922,8 +922,6 @@ begin
   ms := TMemoryStream.Create;
   try
     if not Base64Decode(@c[offset], len -offset, ms) then Exit;
-    refEl := ''; // release memory
-
     img := TImage32.Create;
     if not img.LoadFromStream(ms) then
     begin
@@ -934,13 +932,17 @@ begin
     ms.Free;
   end;
 end;
+
+//------------------------------------------------------------------------------
+// TImageElement
 //------------------------------------------------------------------------------
 
 destructor TImageElement.Destroy;
 begin
-  fImage.Free;
+  if Assigned(fImage) then fImage.Free;
   inherited Destroy;
 end;
+//------------------------------------------------------------------------------
 
 procedure TImageElement.Draw(image: TImage32; drawDat: TDrawData);
 var
@@ -951,8 +953,11 @@ begin
 
   MatrixApply(drawDat.matrix, dstRecD);
 
-  if refEl <> '' then
-    ReadRefElImage(refEl, fImage); // also clears refEl
+  if (fRefEl <> '') and not Assigned(fImage) then
+  begin
+    ReadRefElImage(fRefEl, fImage);
+    fRefEl := ''; // ie avoid reloading fImage
+  end;
 
   if fImage <> nil then
     image.Copy(fImage, fImage.Bounds, Rect(dstRecD));
@@ -1054,9 +1059,9 @@ var
   el: TBaseElement;
   dx, dy: double;
 begin
-  if Assigned(drawPathsF) or (refEl = '') then Exit;
+  if Assigned(drawPathsF) or (fRefEl = '') then Exit;
 
-  el := FindRefElement(refEl);
+  el := FindRefElement(fRefEl);
   if not Assigned(el) or not (el is TShapeElement) then Exit;
   with TShapeElement(el) do
   begin
@@ -1110,7 +1115,7 @@ begin
   callerUse := drawDat.useEl;
   drawDat.useEl := self;
 
-  el := FindRefElement(refEl);
+  el := FindRefElement(fRefEl);
   if not Assigned(el) then Exit;
 
   UpdateDrawInfo(drawDat, self); //nb: <use> attribs override el's.
@@ -2495,16 +2500,11 @@ begin
   end
   else if drawDat.fillColor = clInvalid then
   begin
-//    if fReader.RecordSimpleDraw then
-//      SimpleDrawFill(fillPaths, drawDat.fillRule, clBlack32);
     DrawPolygon(img, fillPaths, drawDat.fillRule, clBlack32);
   end
   else
     with drawDat do
     begin
-//      if fReader.RecordSimpleDraw then
-//        SimpleDrawFill(fillPaths, fillRule,
-//          MergeColorAndOpacity(fillColor, fillOpacity));
       DrawPolygon(img, fillPaths, fillRule,
         MergeColorAndOpacity(fillColor, fillOpacity));
     end;
@@ -2620,41 +2620,9 @@ begin
       end;
   end else
   begin
-//    if fReader.RecordSimpleDraw then
-//      SimpleDrawFill(strokePaths2, frNonZero, strokeClr);
     DrawPolygon(img, strokePaths, frNonZero, strokeClr);
   end;
 end;
-//------------------------------------------------------------------------------
-
-(*
-procedure TShapeElement.SimpleDrawFill(const paths: TPathsD;
-  fillRule: TFillRule; color: TColor32);
-var
-  sdd: PSimpleDrawData;
-begin
-  if TARGB(color).A < 128 then Exit;
-  new(sdd);
-  sdd.paths := CopyPaths(paths);
-  sdd.fillRule := fillRule;
-  sdd.color := color or $FF000000;
-  fReader.SimpleDrawList.Add(sdd);
-end;
-//------------------------------------------------------------------------------
-
-procedure TShapeElement.SimpleDrawStroke(const paths: TPathsD;
-  width: double; joinStyle: TJoinStyle; endStyle: TEndStyle; color: TColor32);
-var
-  sdd: PSimpleDrawData;
-begin
-  if TARGB(color).A < 128 then Exit;
-  new(sdd);
-  sdd.paths := InflatePaths(paths, width, joinStyle, ClipperEndType(endStyle));
-  sdd.fillRule := frNonZero;
-  sdd.color := color or $FF000000;
-  fReader.SimpleDrawList.Add(sdd);
-end;
-*)
 
 //------------------------------------------------------------------------------
 // TPathElement
@@ -3829,9 +3797,9 @@ begin
     hFeImage:
       TFeImageElement(el).refEl := ExtractRef(value);
     hImage:
-      TImageElement(el).refEl := ExtractRef(value);
+      TImageElement(el).fRefEl := ExtractRef(value);
     hUse:
-      TUseElement(el).refEl := ExtractRef(value);
+      TUseElement(el).fRefEl := ExtractRef(value);
     hTextPath:
       TTextPathElement(el).pathEl := ExtractRef(value);
     else if el is TFillElement then
