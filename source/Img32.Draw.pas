@@ -438,16 +438,32 @@ begin
 end;
 // ------------------------------------------------------------------------------
 
-function ReverseColors(const colors: TArrayOfGradientColor): TArrayOfGradientColor;
+procedure ReverseColors(var colors: TArrayOfGradientColor);
 var
-  i, highI: integer;
+  highI: integer;
+  dst, src: ^TGradientColor;
+  // Allow the 64bit compiler to use XMM registers instead of the stack
+  // by not using a TGradientColor record for the temporary value.
+  tmpOffset: double;
+  tmpColor: TColor32;
 begin
   highI := High(colors);
-  SetLength(result, highI +1);
-  for i := 0 to highI do
+
+  dst := @colors[0];
+  src := @colors[highI];
+  while PByte(dst) < PByte(src) do
   begin
-    result[i].color := colors[highI -i].color;
-    result[i].offset := 1 - colors[highI -i].offset;
+    tmpColor := dst.color;
+    tmpOffset := dst.offset;
+
+    dst.color := src.color;
+    dst.offset := 1 - src.offset;
+
+    src.color := tmpColor;
+    src.offset := 1 - tmpOffset;
+
+    inc(dst);
+    dec(src);
   end;
 end;
 // ------------------------------------------------------------------------------
@@ -557,12 +573,12 @@ begin
   if fg.A = 0 then
   begin
     Result := bgColor;
-    res.A := MulBytes(res.A, not mask);
+    res.A := MulTable[res.A, not mask];
   end
   else if bg.A = 0 then
   begin
     Result := fgColor;
-    res.A := MulBytes(res.A, mask);
+    res.A := MulTable[res.A, mask];
   end
   else if (mask = 0) then
     Result := bgColor
@@ -582,21 +598,23 @@ end;
 
 // MakeColorGradient: using the supplied array of TGradientColor,
 // create an array of TColor32 of the specified length
-function MakeColorGradient(const gradColors: TArrayOfGradientColor;
-  len: integer): TArrayOfColor32;
+procedure MakeColorGradient(const gradColors: TArrayOfGradientColor;
+  len: integer; var result: TArrayOfColor32);
 var
   i,j, lenC: integer;
-  dist, offset1, offset2, step, pos: double;
+  dist, offset1, offset2, step, pos, reciprocalDistTimes255: double;
   color1, color2: TColor32;
 begin
   lenC := length(gradColors);
   if (len = 0) or (lenC < 2) then Exit;
-  SetLength(result, len);
+  if Length(result) <> len then // we can reuse the array
+    SetLength(result, len);
 
   color2 := gradColors[0].color;
   result[0] := color2;
   if len = 1 then Exit;
 
+  reciprocalDistTimes255 := 0;
   step := 1/(len-1);
   pos := step;
   offset2 := 0;
@@ -607,9 +625,11 @@ begin
     dist := offset2 - offset1;
     color1 := color2;
     color2 := gradColors[i].color;
+    if dist > 0 then
+      reciprocalDistTimes255 := 255/dist; // 1/dist*255
     while (pos <= dist) and (j < len) do
     begin
-      result[j] := BlendColorUsingMask(color1, color2, Round(pos/dist * 255));
+      result[j] := BlendColorUsingMask(color1, color2, Round(pos * reciprocalDistTimes255));
       inc(j);
       pos := pos + step;
     end;
@@ -1222,7 +1242,7 @@ begin
   for i := x1 to x2 do
   begin
     pDst^ := BlendToAlpha(pDst^,
-      MulBytes(pBrush.A, Ord(alpha^)) shl 24 or (pBrush.Color and $FFFFFF));
+      MulTable[pBrush.A, Ord(alpha^)] shl 24 or (pBrush.Color and $FFFFFF));
     inc(pDst); inc(alpha);
     pBrush := GetPixel(fBrushPixel, fBoundsProc(i, fImage.Width));
   end;
@@ -1343,7 +1363,7 @@ begin
     // gradient > 45 degrees
     if (fEndPt.Y < fStartPt.Y) then
     begin
-      fGradientColors := ReverseColors(fGradientColors);
+      ReverseColors(fGradientColors);
       SwapPoints(fStartPt, fEndPt);
     end;
     fIsVert := true;
@@ -1352,7 +1372,7 @@ begin
     dxdy := dx/dy;
 
     fColorsCnt := Ceil(dy + dxdy * (fEndPt.X - fStartPt.X));
-    fColors := MakeColorGradient(fGradientColors, fColorsCnt);
+    MakeColorGradient(fGradientColors, fColorsCnt, fColors);
     // get a list of perpendicular offsets for each
     SetLength(fPerpendicOffsets, ImgWidth);
     // from an imaginary line that's through fStartPt and perpendicular to
@@ -1369,7 +1389,7 @@ begin
     end;
     if (fEndPt.X < fStartPt.X) then
     begin
-      fGradientColors := ReverseColors(fGradientColors);
+      ReverseColors(fGradientColors);
       SwapPoints(fStartPt, fEndPt);
     end;
     fIsVert := false;
@@ -1378,7 +1398,7 @@ begin
     dydx := dy/dx; //perpendicular slope
 
     fColorsCnt := Ceil(dx + dydx * (fEndPt.Y - fStartPt.Y));
-    fColors := MakeColorGradient(fGradientColors, fColorsCnt);
+    MakeColorGradient(fGradientColors, fColorsCnt, fColors);
     SetLength(fPerpendicOffsets, ImgHeight);
     // from an imaginary line that's through fStartPt and perpendicular to
     // the gradient line, get a list of X offsets for each Y in image height
@@ -1389,28 +1409,48 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure TLinearGradientRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
+type
+  PArrayOfColor32 = ^TArrayOfColor32;
+  TArrayOfColor32 = array[0..MaxInt div SizeOf(TColor32) - 1] of TColor32;
+  PStaticIntegerArray = ^TStaticIntegerArray;
+  TStaticIntegerArray = array[0..MaxInt div SizeOf(Integer) - 1] of Integer;
 var
-  i, off: integer;
+  i, colorsCnt: integer;
   pDst: PColor32;
-  color: TARGB;
+  color: TColor32;
+  colors: PArrayOfColor32;
+  boundsProc: TBoundsProc;
+  offset: Integer;
+  perpendicOffsets: PStaticIntegerArray;
 begin
   pDst := GetDstPixel(x1,y);
-  for i := x1 to x2 do
+  // optimize self fields access
+  colorsCnt := fColorsCnt;
+  colors := @fColors[0];
+  boundsProc := fBoundsProc;
+  if fIsVert then
   begin
-    if fIsVert then
+    perpendicOffsets := @fPerpendicOffsets[0]; // optimize self field access
+    for i := x1 to x2 do
     begin
       // when fIsVert = true, fPerpendicOffsets is an array of Y for each X
-      off := fPerpendicOffsets[i];
-      color.Color := fColors[fBoundsProc(y - off, fColorsCnt)];
-    end else
-    begin
-      // when fIsVert = false, fPerpendicOffsets is an array of X for each Y
-      off := fPerpendicOffsets[y];
-      color.Color := fColors[fBoundsProc(i - off, fColorsCnt)];
+      color := colors[boundsProc(y - perpendicOffsets[i], colorsCnt)];
+      pDst^ := BlendToAlpha(pDst^,
+        MulTable[color shr 24, Ord(alpha^)] shl 24 or (color and $00FFFFFF));
+      inc(pDst); inc(alpha);
     end;
-    pDst^ := BlendToAlpha(pDst^,
-      MulBytes(color.A, Ord(alpha^)) shl 24 or (color.Color and $FFFFFF));
-    inc(pDst); inc(alpha);
+  end
+  else
+  begin
+    // when fIsVert = false, fPerpendicOffsets is an array of X for each Y
+    offset := fPerpendicOffsets[y];
+    for i := x1 to x2 do
+    begin
+      color := colors[boundsProc(i - offset, colorsCnt)];
+      pDst^ := BlendToAlpha(pDst^,
+        MulTable[color shr 24, Ord(alpha^)] shl 24 or (color and $00FFFFFF));
+      inc(pDst); inc(alpha);
+    end;
   end;
 end;
 
@@ -1422,7 +1462,7 @@ function TRadialGradientRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
   result := inherited Initialize(targetImage) and (fColorsCnt > 1);
   if result then
-    fColors := MakeColorGradient(fGradientColors, fColorsCnt);
+    MakeColorGradient(fGradientColors, fColorsCnt, fColors);
 end;
 // ------------------------------------------------------------------------------
 
@@ -1469,7 +1509,7 @@ begin
     dist := Hypot((y - fCenterPt.Y) *fScaleY, (i - fCenterPt.X) *fScaleX);
     color.Color := fColors[fBoundsProc(Trunc(dist), fColorsCnt)];
     pDst^ := BlendToAlpha(pDst^,
-      MulBytes(color.A, Ord(alpha^)) shl 24 or (color.Color and $FFFFFF));
+      MulTable[color.A, Ord(alpha^)] shl 24 or (color.Color and $FFFFFF));
     inc(pDst); inc(alpha);
   end;
 end;
@@ -1482,7 +1522,7 @@ function TSvgRadialGradientRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
   result := inherited Initialize(targetImage) and (fColorsCnt > 1);
   if result then
-    fColors := MakeColorGradient(fGradientColors, fColorsCnt);
+    MakeColorGradient(fGradientColors, fColorsCnt, fColors);
 end;
 // ------------------------------------------------------------------------------
 
@@ -1580,7 +1620,7 @@ begin
     end;
     color.Color := fColors[fBoundsProcD(Abs(q), fColorsCnt)];
     pDst^ := BlendToAlpha(pDst^,
-      MulBytes(color.A, Ord(alpha^)) shl 24 or (color.Color and $FFFFFF));
+      MulTable[color.A, Ord(alpha^)] shl 24 or (color.Color and $FFFFFF));
     inc(pDst); pt.X := pt.X + 1; inc(alpha);
   end;
 end;
@@ -1598,9 +1638,9 @@ begin
   for i := x1 to x2 do
   begin
     {$IFDEF PBYTE}
-    dst.A := MulBytes(dst.A, not alpha^);
+    dst.A := MulTable[dst.A, not alpha^];
     {$ELSE}
-    dst.A := MulBytes(dst.A, not Ord(alpha^));
+    dst.A := MulTable[dst.A, not Ord(alpha^)];
     {$ENDIF}
     inc(dst); inc(alpha);
   end;
@@ -1620,7 +1660,7 @@ begin
   for i := x1 to x2 do
   begin
     c.Color := not dst.Color;
-    c.A := MulBytes(dst.A, Ord(alpha^));
+    c.A := MulTable[dst.A, Ord(alpha^)];
     dst.Color := BlendToAlpha(dst.Color, c.Color);
     inc(dst); inc(alpha);
   end;
@@ -1682,7 +1722,7 @@ begin
   for x := x1 to x2 do
   begin
     c.Color := GetColor(PointD(x, y));
-    c.A := c.A * Ord(alpha^) shr 8;
+    c.A := MulTable[c.A, Ord(alpha^)];
     p.Color := BlendToAlpha(p.Color, c.Color);
     inc(p); inc(alpha);
   end;
