@@ -324,9 +324,10 @@ type
 
   // A horizontal scanline contains any number of line fragments. A fragment
   // can be a number of pixels wide but it can't be more than one pixel high.
-  //  TFragment = record
-  //    botX, topX, dy, dydx: double; // ie x at bottom and top of scanline
-  //  end;
+  PFragment = ^TFragment;
+  TFragment = record
+    botX, topX, dy, dydx: double; // ie x at bottom and top of scanline
+  end;
 
   TScanLine = record
     Y: integer;
@@ -652,7 +653,7 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure AllocateScanlines(const polygons: TPathsD;
-  var scanlines: TArrayOfScanline; out fragments: PDouble; clipBottom, clipRight: integer);
+  var scanlines: TArrayOfScanline; out fragments: PFragment; clipBottom, clipRight: integer);
 var
   i,j, highI, highJ: integer;
   y1, y2: integer;
@@ -709,7 +710,7 @@ begin
     if j > 0 then
     begin
       psl.fragOffset := fragOff;
-      inc(fragOff, j * 4); // 4 doubles are needed for each fragment
+      inc(fragOff, j);
     end else
       psl.fragOffset := -1;
     psl.fragCnt := 0; // reset for later
@@ -719,17 +720,17 @@ begin
     dec(psl);
   end;
   // allocate fragments as a single block of memory
-  GetMem(fragments, fragOff * sizeOf(Double));
+  GetMem(fragments, fragOff * sizeOf(TFragment));
 end;
 // ------------------------------------------------------------------------------
 
 procedure SplitEdgeIntoFragments(const pt1, pt2: TPointD;
-  const scanlines: TArrayOfScanline; fragments: PDouble; const clipRec: TRect);
+  const scanlines: TArrayOfScanline; fragments: PFragment; const clipRec: TRect);
 var
   x,y, dx,dy, absDx, dydx, dxdy: double;
   i, scanlineY, maxY, maxX: integer;
   psl: PScanLine;
-  pFrag: PDouble;
+  pFrag: PFragment;
   bot, top: TPointD;
 begin
   dy := pt1.Y - pt2.Y;
@@ -742,16 +743,14 @@ begin
     // ASCENDING EDGE (+VE WINDING DIR)
     if dy < 0.0001 then Exit;            //ignore near horizontals
     bot := pt1; top := pt2;
-    // exclude edges that are completely outside the top or bottom clip region
-    if (top.Y >= maxY) or (bot.Y <= 0) then Exit;
   end else
   begin
     // DESCENDING EDGE (-VE WINDING DIR)
     if dy > -0.0001 then Exit;           //ignore near horizontals
     bot := pt2; top := pt1;
-    // exclude edges that are completely outside the top or bottom clip region
-    if (top.Y >= maxY) or (bot.Y <= 0) then Exit;
   end;
+  // exclude edges that are completely outside the top or bottom clip region
+  if (top.Y >= maxY) or (bot.Y <= 0) then Exit;
 
   if absDx < 0.000001 then
   begin
@@ -826,50 +825,50 @@ begin
   if psl.fragOffset < 0 then Exit; //a very rare event
 
   pFrag := fragments;
-  inc(pFrag, psl.fragOffset + psl.fragCnt * 4);
+  inc(pFrag, psl.fragOffset + psl.fragCnt);
   inc(psl.fragCnt);
 
-  pFrag^ := bot.X; inc(pFrag);
+  pFrag.botX := bot.X;
   if scanlineY <= top.Y then
   begin
     // the whole edge is within 1 scanline
-    pFrag^ := top.X;  inc(pFrag);
-    pFrag^ := bot.Y - top.Y; inc(pFrag);
-    pFrag^ := dydx;
+    pFrag.topX := top.X;
+    pFrag.dy := bot.Y - top.Y;
+    pFrag.dydx := dydx;
     Exit;
   end;
 
   x := bot.X + (bot.Y - scanlineY) * dxdy;
-  pFrag^ := x; inc(pFrag);
-  pFrag^ := bot.Y - scanlineY; inc(pFrag);
-  pFrag^ := dydx;
+  pFrag.topX := x;
+  pFrag.dy := bot.Y - scanlineY;
+  pFrag.dydx := dydx;
   // 'split' subsequent fragments until the top fragment
   dec(psl);
   while psl.Y > top.Y do
   begin
     pFrag := fragments;
-    inc(pFrag, psl.fragOffset + psl.fragCnt * 4);
+    inc(pFrag, psl.fragOffset + psl.fragCnt);
     inc(psl.fragCnt);
-    pFrag^ := x; inc(pFrag);
+    pFrag.botX := x;
     x := x + dxdy;
-    pFrag^ := x; inc(pFrag);
-    pFrag^ := 1; inc(pFrag);
-    pFrag^ := dydx;
+    pFrag.topX := x;
+    pFrag.dy := 1;
+    pFrag.dydx := dydx;
     dec(psl);
   end;
   // and finally the top fragment
   pFrag := fragments;
-  inc(pFrag, psl.fragOffset + psl.fragCnt * 4);
+  inc(pFrag, psl.fragOffset + psl.fragCnt);
   inc(psl.fragCnt);
-  pFrag^ := x; inc(pFrag);
-  pFrag^ := top.X; inc(pFrag);
-  pFrag^ := psl.Y + 1 - top.Y; inc(pFrag);
-  pFrag^ := dydx;
+  pFrag.botX := x;
+  pFrag.topX := top.X;
+  pFrag.dy := psl.Y + 1 - top.Y;
+  pFrag.dydx := dydx;
 end;
 // ------------------------------------------------------------------------------
 
 procedure InitializeScanlines(var polygons: TPathsD;
-  const scanlines: TArrayOfScanline; fragments: PDouble; const clipRec: TRect);
+  const scanlines: TArrayOfScanline; fragments: PFragment; const clipRec: TRect);
 var
   i,j, highJ: integer;
   pt1, pt2: PPointD;
@@ -891,21 +890,23 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure ProcessScanlineFragments(var scanline: TScanLine;
-  fragments: PDouble; var buffer: TArrayOfDouble);
+  fragments: PFragment; var buffer: TArrayOfDouble);
 var
   i,j, leftXi,rightXi: integer;
   fracX, yy, q{, windDir}: double;
   left, right, dy, dydx: double;
-  pd, frag: PDouble;
+  frag: PFragment;
+  pd: PDouble;
 begin
   frag := fragments;
   inc(frag, scanline.fragOffset);
   for i := 1 to scanline.fragCnt do
   begin
-    left := frag^; inc(frag);   //botX
-    right := frag^; inc(frag);  //topX
-    dy := frag^; inc(frag);
-    dydx := frag^; inc(frag);
+    left := frag.botX;
+    right := frag.topX;
+    dy := frag.dy;
+    dydx := frag.dydx;
+    inc(frag);
 
     // converting botX & topX to left & right simplifies code
     if {botX > topX} left > right then
@@ -1176,7 +1177,7 @@ var
   windingAccum: TArrayOfDouble;
   byteBuffer: TArrayOfByte;
   scanlines: TArrayOfScanline;
-  fragments: PDouble;
+  fragments: PFragment;
   scanline: PScanline;
 
   // FPC generates wrong code if "count" isn't NativeInt
