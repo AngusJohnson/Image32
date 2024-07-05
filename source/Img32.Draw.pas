@@ -3,7 +3,7 @@ unit Img32.Draw;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.5                                                             *
-* Date      :  21 June 2024                                                    *
+* Date      :  5 July 2024                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -313,6 +313,14 @@ const
 {$ENDIF CPUX86}
 
 type
+  {$IF not declared(NativeInt)}
+  NativeInt = Integer;
+  {$IFEND}
+
+  PStaticDoubleArray = ^TStaticDoubleArray;
+  TStaticDoubleArray = array[0..MaxInt div SizeOf(double) - 1] of double;
+  PStaticInt64Array = ^TStaticInt64Array;
+  TStaticInt64Array = array[0..MaxInt div SizeOf(int64) - 1] of int64;
 
   // A horizontal scanline contains any number of line fragments. A fragment
   // can be a number of pixels wide but it can't be more than one pixel high.
@@ -886,7 +894,7 @@ procedure ProcessScanlineFragments(var scanline: TScanLine;
   fragments: PDouble; var buffer: TArrayOfDouble);
 var
   i,j, leftXi,rightXi: integer;
-  fracX, yy, q, windDir: double;
+  fracX, yy, q{, windDir}: double;
   left, right, dy, dydx: double;
   pd, frag: PDouble;
 begin
@@ -912,7 +920,9 @@ begin
     if (leftXi = rightXi) then
     begin
       // the fragment is only one pixel wide
-      if dydx < 0 then windDir := -1.0 else windDir := 1.0;
+      //if dydx < 0 then windDir := -1.0 else windDir := 1.0;
+      if dydx < 0 then dy := -dy;
+
       if leftXi < scanline.minX then
         scanline.minX := leftXi;
       if rightXi > scanline.maxX then
@@ -920,13 +930,13 @@ begin
       pd := @buffer[leftXi];
       if (left <= 0) then
       begin
-        pd^ := pd^ + dy * windDir;
+        pd^ := pd^ + dy {* windDir};
       end else
       begin
         q := (left + right) * 0.5 - leftXi;
-        pd^ := pd^ + (1-q) * dy * windDir;
+        pd^ := pd^ + (1-q) * dy {* windDir};
         inc(pd);
-        pd^ := pd^ + q * dy * windDir;
+        pd^ := pd^ + q * dy {* windDir};
       end;
     end else
     begin
@@ -961,23 +971,216 @@ begin
 end;
 // ------------------------------------------------------------------------------
 
-{$IFNDEF TROUNDINGMODE}
-type
-  TRoundingMode = {$IFNDEF FPC}Math.{$ENDIF}TFPURoundingMode;
+{$RANGECHECKS OFF} // negative array index is used
+{ CPU register optimized implementations. Every data type must be exactly the one used. }
+procedure FillByteBufferEvenOdd(byteBuffer: PByteArray;
+  windingAccum: PDouble; count: nativeint);
+var
+  accum: double;
+  lastValue: integer;
+  start: nativeint;
+  buf: PByteArray;
+begin
+  accum := 0; //winding count accumulator
+  lastValue := 0;
+  // Copy byteBuffer to a local variable, so Delphi's 32bit compiler
+  // can put buf into a CPU register.
+  buf := PByteArray(byteBuffer);
+
+  // Use the negative offset trick to only increment "count"
+  // until it reaches zero. And by offsetting the arrays, "count"
+  // also becomes the index for those.
+  inc(PByte(buf), count);
+  inc(windingAccum, count);
+  count := -count;
+  while count < 0 do
+  begin
+    // lastValue can be used if accum doesn't change
+    if PStaticInt64Array(windingAccum)[count] = 0 then
+    begin
+      start := count;
+      repeat
+        inc(count);
+      until (count = 0) or (PStaticInt64Array(windingAccum)[count] <> 0);
+      FillChar(buf[start], count - start, Byte(lastValue));
+      if count = 0 then break;
+    end;
+
+    accum := accum + PStaticDoubleArray(windingAccum)[count];
+
+    // EvenOdd
+    lastValue := Trunc(Abs(accum) * 1275) mod 2550; // mul 5
+    if lastValue > 1275 then
+      lastValue := (2550 - lastValue) shr 2 else    // div 4
+      lastValue := lastValue shr 2;                 // div 4
+    if lastValue > 255 then lastValue := 255;
+
+    buf[count] := Byte(lastValue);
+    PStaticDoubleArray(windingAccum)[count] := 0;
+    inc(count); // walk towards zero
+  end;
+end;
+
+procedure FillByteBufferNonZero(byteBuffer: PByteArray;
+  windingAccum: PDouble; count: nativeint);
+var
+  accum: double;
+  lastValue: integer;
+  start: nativeint;
+  buf: PByteArray;
+begin
+  accum := 0; //winding count accumulator
+  lastValue := 0;
+  // Copy byteBuffer to a local variable, so Delphi's 32bit compiler
+  // can put buf into a CPU register.
+  buf := PByteArray(byteBuffer);
+
+  // Use the negative offset trick to only increment "count"
+  // until it reaches zero. And by offsetting the arrays, "count"
+  // also becomes the index for those.
+  inc(PByte(buf), count);
+  inc(windingAccum, count);
+  count := -count;
+  while count < 0 do
+  begin
+    // lastValue can be used if accum doesn't change
+    if PStaticInt64Array(windingAccum)[count] = 0 then
+    begin
+      start := count;
+      repeat
+        inc(count);
+      until (count = 0) or (PStaticInt64Array(windingAccum)[count] <> 0);
+      FillChar(buf[start], count - start, Byte(lastValue));
+      if count = 0 then break;
+    end;
+
+    accum := accum + PStaticDoubleArray(windingAccum)[count];
+
+    // NonZero
+    lastValue := Trunc(Abs(accum) * 318);
+    if lastValue > 255 then lastValue := 255;
+
+    buf[count] := Byte(lastValue);
+    PStaticDoubleArray(windingAccum)[count] := 0;
+    inc(count); // walk towards zero
+  end;
+end;
+
+procedure FillByteBufferPositive(byteBuffer: PByteArray;
+  windingAccum: PDouble; count: nativeint);
+var
+  accum: double;
+  lastValue: integer;
+  start: nativeint;
+  buf: PByteArray;
+begin
+  accum := 0; //winding count accumulator
+  lastValue := 0;
+  // Copy byteBuffer to a local variable, so Delphi's 32bit compiler
+  // can put buf into a CPU register.
+  buf := PByteArray(byteBuffer);
+
+  // Use the negative offset trick to only increment "count"
+  // until it reaches zero. And by offsetting the arrays, "count"
+  // also becomes the index for those.
+  inc(PByte(buf), count);
+  inc(windingAccum, count);
+  count := -count;
+  while count < 0 do
+  begin
+    // lastValue can be used if accum doesn't change
+    if PStaticInt64Array(windingAccum)[count] = 0 then
+    begin
+      start := count;
+      repeat
+        inc(count);
+      until (count = 0) or (PStaticInt64Array(windingAccum)[count] <> 0);
+      FillChar(buf[start], count - start, Byte(lastValue));
+      if count = 0 then break;
+    end;
+
+    accum := accum + PStaticDoubleArray(windingAccum)[count];
+
+    // Positive
+    lastValue := 0;
+    if accum > 0.002 then
+    begin
+      lastValue := Trunc(accum * 318);
+      if lastValue > 255 then lastValue := 255;
+    end;
+
+    buf[count] := Byte(lastValue);
+    PStaticDoubleArray(windingAccum)[count] := 0;
+    inc(count); // walk towards zero
+  end;
+end;
+
+procedure FillByteBufferNegative(byteBuffer: PByteArray;
+  windingAccum: PDouble; count: nativeint);
+var
+  accum: double;
+  lastValue: integer;
+  start: nativeint;
+  buf: PByteArray;
+begin
+  accum := 0; //winding count accumulator
+  lastValue := 0;
+  // Copy byteBuffer to a local variable, so Delphi's 32bit compiler
+  // can put buf into a CPU register.
+  buf := PByteArray(byteBuffer);
+
+  // Use the negative offset trick to only increment "count"
+  // until it reaches zero. And by offsetting the arrays, "count"
+  // also becomes the index for those.
+  inc(PByte(buf), count);
+  inc(windingAccum, count);
+  count := -count;
+  while count < 0 do
+  begin
+    // lastValue can be used if accum doesn't change
+    if PStaticInt64Array(windingAccum)[count] = 0 then
+    begin
+      start := count;
+      repeat
+        inc(count);
+      until (count = 0) or (PStaticInt64Array(windingAccum)[count] <> 0);
+      FillChar(buf[start], count - start, Byte(lastValue));
+      if count = 0 then break;
+    end;
+
+    accum := accum + PStaticDoubleArray(windingAccum)[count];
+
+    // Negative
+    lastValue := 0;
+    if accum < -0.002 then
+    begin
+      lastValue := Trunc(accum * -318);
+      if lastValue > 255 then lastValue := 255;
+    end;
+
+    buf[count] := Byte(lastValue);
+    PStaticDoubleArray(windingAccum)[count] := 0;
+    inc(count); // walk towards zero
+  end;
+end;
+{$IFDEF RANGECHECKS_ENABLED}
+  {$RANGECHECKS ON}
 {$ENDIF}
 
 procedure Rasterize(const paths: TPathsD; const clipRec: TRect;
   fillRule: TFillRule; renderer: TCustomRenderer);
 var
-  i,j, xli,xri, maxW, maxH, aa: integer;
+  i, xli,xri, maxW, maxH: integer;
   clipRec2: TRect;
   paths2: TPathsD;
-  accum: double;
   windingAccum: TArrayOfDouble;
   byteBuffer: TArrayOfByte;
   scanlines: TArrayOfScanline;
   fragments: PDouble;
   scanline: PScanline;
+
+  // FPC generates wrong code if "count" isn't NativeInt
+  FillByteBuffer: procedure(byteBuffer: PByteArray; windingAccum: PDouble; count: nativeint);
 begin
   // See also https://nothings.org/gamedev/rasterize/
   if not assigned(renderer) then Exit;
@@ -992,12 +1195,33 @@ begin
   fragments := nil;
   try
     RectWidthHeight(clipRec2, maxW, maxH);
+    SetLength(byteBuffer, maxW);
+    if byteBuffer = nil then Exit;
     SetLength(scanlines, maxH +1);
     SetLength(windingAccum, maxW +2);
     AllocateScanlines(paths2, scanlines, fragments, maxH, maxW-1);
     InitializeScanlines(paths2, scanlines, fragments, clipRec2);
-    SetLength(byteBuffer, maxW);
-    if byteBuffer = nil then Exit;
+
+    case fillRule of
+      frEvenOdd:
+        FillByteBuffer := FillByteBufferEvenOdd;
+      frNonZero:
+        FillByteBuffer := FillByteBufferNonZero;
+{$IFDEF REVERSE_ORIENTATION}
+      frPositive:
+{$ELSE}
+      frNegative:
+{$ENDIF}
+        FillByteBuffer := FillByteBufferPositive;
+{$IFDEF REVERSE_ORIENTATION}
+      frNegative:
+{$ELSE}
+      frPositive:
+{$ENDIF}
+        FillByteBuffer := FillByteBufferNegative;
+      else
+        Exit;
+    end;
 
     scanline := @scanlines[0];
     for i := 0 to high(scanlines) do
@@ -1013,55 +1237,21 @@ begin
       // it's faster to process only the modified sub-array of windingAccum
       xli := scanline.minX;
       xri := Min(maxW -1, scanline.maxX +1);
-      FillChar(byteBuffer[xli], xri - xli +1, 0);
 
       // a 25% weighting has been added to the alpha channel to minimize any
       // background bleed-through where polygons join with a common edge.
 
-      accum := 0; //winding count accumulator
-      for j := xli to xri do
-      begin
-        accum := accum + windingAccum[j];
-        case fillRule of
-          frEvenOdd:
-            begin
-              aa := Trunc(Abs(accum) * 1275) mod 2550;            // mul 5
-              if aa > 1275 then
-                byteBuffer[j] := Min(255, (2550 - aa) shr 2) else   // div 4
-                byteBuffer[j] := Min(255, aa shr 2);                // div 4
-            end;
-          frNonZero:
-            begin
-              byteBuffer[j] := Min(255, Trunc(Abs(accum) * 318));
-            end;
-  {$IFDEF REVERSE_ORIENTATION}
-          frPositive:
-  {$ELSE}
-          frNegative:
-  {$ENDIF}
-            begin
-              if accum > 0.002 then
-                byteBuffer[j] := Min(255, Trunc(accum * 318));
-            end;
-  {$IFDEF REVERSE_ORIENTATION}
-          frNegative:
-  {$ELSE}
-          frPositive:
-  {$ENDIF}
-            begin
-              if accum < -0.002 then
-                byteBuffer[j] := Min(255, Trunc(-accum * 318));
-            end;
-        end;
-      end;
+      // FillByteBuffer overwrites every byte in byteBuffer[xli..xri] and also resets
+      // windingAccum[xli..xri] to 0.
+      FillByteBuffer(@byteBuffer[xli], @windingAccum[xli], xri - xli +1);
+
       renderer.RenderProc(clipRec2.Left + xli, clipRec2.Left + xri,
         clipRec2.Top + i, @byteBuffer[xli]);
 
-      // cleanup and deallocate memory
-      FillChar(windingAccum[xli], (xri - xli +1) * sizeOf(Double), 0);
       inc(scanline);
     end;
   finally
+    // cleanup and deallocate memory
     FreeMem(fragments);
   end;
 end;
