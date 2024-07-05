@@ -447,7 +447,7 @@ begin
 end;
 // ------------------------------------------------------------------------------
 
-procedure ReverseColors(var colors: TArrayOfGradientColor);
+procedure ReverseColors(const colors: TArrayOfGradientColor);
 var
   highI: integer;
   dst, src: ^TGradientColor;
@@ -653,7 +653,7 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure AllocateScanlines(const polygons: TPathsD;
-  var scanlines: TArrayOfScanline; out fragments: PFragment; clipBottom, clipRight: integer);
+  const scanlines: TArrayOfScanline; var fragments: PFragment; clipBottom, clipRight: integer);
 var
   i,j, highI, highJ: integer;
   y1, y2: integer;
@@ -734,9 +734,6 @@ var
   bot, top: TPointD;
 begin
   dy := pt1.Y - pt2.Y;
-  dx := pt2.X - pt1.X;
-  RectWidthHeight(clipRec, maxX, maxY);
-  absDx := abs(dx);
 
   if dy > 0 then
   begin
@@ -750,7 +747,11 @@ begin
     bot := pt2; top := pt1;
   end;
   // exclude edges that are completely outside the top or bottom clip region
+  RectWidthHeight(clipRec, maxX, maxY);
   if (top.Y >= maxY) or (bot.Y <= 0) then Exit;
+
+  dx := pt2.X - pt1.X;
+  absDx := abs(dx);
 
   if absDx < 0.000001 then
   begin
@@ -867,7 +868,7 @@ begin
 end;
 // ------------------------------------------------------------------------------
 
-procedure InitializeScanlines(var polygons: TPathsD;
+procedure InitializeScanlines(const polygons: TPathsD;
   const scanlines: TArrayOfScanline; fragments: PFragment; const clipRec: TRect);
 var
   i,j, highJ: integer;
@@ -890,7 +891,7 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure ProcessScanlineFragments(var scanline: TScanLine;
-  fragments: PFragment; var buffer: TArrayOfDouble);
+  fragments: PFragment; const buffer: TArrayOfDouble);
 var
   i,j, leftXi,rightXi: integer;
   fracX, yy, q{, windDir}: double;
@@ -1175,7 +1176,7 @@ var
   clipRec2: TRect;
   paths2: TPathsD;
   windingAccum: TArrayOfDouble;
-  byteBuffer: TArrayOfByte;
+  byteBuffer: PByteArray;
   scanlines: TArrayOfScanline;
   fragments: PFragment;
   scanline: PScanline;
@@ -1194,10 +1195,11 @@ begin
   // and even a little faster than Trunc() above (except
   // when the FastMM4 memory manager is enabled.)
   fragments := nil;
+  byteBuffer := nil;
   try
     RectWidthHeight(clipRec2, maxW, maxH);
-    SetLength(byteBuffer, maxW);
-    if byteBuffer = nil then Exit;
+    if maxW <= 0 then Exit;
+    GetMem(byteBuffer, maxW); // no need for dyn. array zero initialize
     SetLength(scanlines, maxH +1);
     SetLength(windingAccum, maxW +2);
     AllocateScanlines(paths2, scanlines, fragments, maxH, maxW-1);
@@ -1254,6 +1256,7 @@ begin
   finally
     // cleanup and deallocate memory
     FreeMem(fragments);
+    FreeMem(byteBuffer);
   end;
 end;
 
