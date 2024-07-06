@@ -185,8 +185,6 @@ type
     function GetIsEmpty: Boolean;
     function GetPixelBase: PColor32;
     function GetPixelRow(row: Integer): PColor32;
-    procedure NearestNeighborResize(targetImg: TImage32; newWidth, newHeight: Integer);
-    procedure ResamplerResize(targetImg: TImage32; newWidth, newHeight: Integer);
     procedure RotateLeft90;
     procedure RotateRight90;
     procedure Rotate180;
@@ -197,7 +195,7 @@ type
   protected
     procedure ResetColorCount;
     function  RectHasTransparency(rec: TRect): Boolean;
-    function  CopyPixels(rec: TRect): TArrayOfColor32;
+    function  CopyPixels(const rec: TRect): TArrayOfColor32;
     //CopyInternal: Internal routine (has no scaling or bounds checking)
     procedure CopyInternal(src: TImage32;
       const srcRec, dstRec: TRect; blendFunc: TBlendFunction);
@@ -1949,7 +1947,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImage32.CopyPixels(rec: TRect): TArrayOfColor32;
+function TImage32.CopyPixels(const rec: TRect): TArrayOfColor32;
 var
   i, clipW, w,h: Integer;
   pSrc, pDst, pDst2: PColor32;
@@ -2097,63 +2095,13 @@ begin
   targetImg.BlockNotify;
   try
     if targetImg.fResampler <= rNearestResampler then
-      NearestNeighborResize(targetImg, newWidth, newHeight)
+      NearestNeighborResize(Self, targetImg, newWidth, newHeight)
     else
-      ResamplerResize(targetImg, newWidth, newHeight);
+      ResamplerResize(Self, targetImg, newWidth, newHeight);
   finally
     targetImg.UnblockNotify;
   end;
   targetImg.Resized;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImage32.NearestNeighborResize(targetImg: TImage32; newWidth, newHeight: Integer);
-var
-  x, y, srcY: Integer;
-  scaledXi, scaledYi: TArrayOfInteger;
-  tmp: TArrayOfColor32;
-  pc: PColor32;
-begin
-  //this NearestNeighbor code is slightly more efficient than
-  //the more general purpose one in Img32.Resamplers
-
-  if (newWidth = fWidth) and (newHeight = fHeight) then
-  begin
-    if targetImg <> Self then targetImg.Assign(Self);
-    Exit;
-  end;
-  SetLength(tmp, newWidth * newHeight);
-
-  //get scaled X & Y values once only (storing them in lookup arrays) ...
-  SetLength(scaledXi, newWidth);
-  for x := 0 to newWidth -1 do
-    scaledXi[x] := Trunc(x * fWidth / newWidth);
-  SetLength(scaledYi, newHeight);
-  for y := 0 to newHeight -1 do
-    scaledYi[y] := Trunc(y * fHeight / newHeight);
-
-  pc := @tmp[0];
-  for y := 0 to newHeight - 1 do
-  begin
-    srcY := scaledYi[y];
-    for x := 0 to newWidth - 1 do
-    begin
-      pc^ := fPixels[scaledXi[x] + srcY * fWidth];
-      inc(pc);
-    end;
-  end;
-
-  targetImg.AssignPixelArray(tmp, newWidth, newHeight);
-end;
-//------------------------------------------------------------------------------
-
-procedure TImage32.ResamplerResize(targetImg: TImage32; newWidth, newHeight: Integer);
-var
-  mat: TMatrixD;
-begin
-  mat := IdentityMatrix;
-  MatrixScale(mat, newWidth/fWidth, newHeight/fHeight);
-  AffineTransformImage(self, targetImg, mat);
 end;
 //------------------------------------------------------------------------------
 

@@ -30,6 +30,11 @@ procedure BoxDownSampling(Image, TargetImage: TImage32; scale: double); overload
 procedure BoxDownSampling(Image, TargetImage: TImage32; scaleX, scaleY: double); overload;
 procedure BoxDownSampling(Image, TargetImage: TImage32; newWidth, newHeight: Integer); overload;
 
+procedure NearestNeighborResize(Image: TImage32; newWidth, newHeight: Integer); overload;
+procedure NearestNeighborResize(Image, TargetImage: TImage32; newWidth, newHeight: Integer); overload;
+procedure ResamplerResize(Image: TImage32; newWidth, newHeight: Integer); overload;
+procedure ResamplerResize(Image, TargetImage: TImage32; newWidth, newHeight: Integer); overload;
+
 // The following general purpose resamplers are registered below:
 // function NearestResampler(img: TImage32; x, y: double): TColor32;
 // function BilinearResample(img: TImage32; x, y: double): TColor32;
@@ -649,6 +654,71 @@ begin
 
   TargetImage.AssignPixelArray(tmp, newWidth, newHeight);
 end;
+//------------------------------------------------------------------------------
+
+procedure NearestNeighborResize(Image: TImage32; newWidth, newHeight: Integer);
+begin
+  NearestNeighborResize(Image, Image, newWidth, newHeight);
+end;
+//------------------------------------------------------------------------------
+
+procedure NearestNeighborResize(Image, TargetImage: TImage32; newWidth, newHeight: Integer);
+var
+  x, y, offset: Integer;
+  scaledXi, scaledYi: TArrayOfInteger;
+  tmp: TArrayOfColor32;
+  pc: PColor32;
+  pixels: TArrayOfColor32;
+begin
+  //this NearestNeighbor code is slightly more efficient than
+  //the more general purpose one in Img32.Resamplers
+
+  if (newWidth = Image.Width) and (newHeight = Image.Height) then
+  begin
+    if TargetImage <> Image then TargetImage.Assign(Image);
+    Exit;
+  end;
+  SetLength(tmp, newWidth * newHeight);
+
+  //get scaled X & Y values once only (storing them in lookup arrays) ...
+  SetLength(scaledXi, newWidth);
+  for x := 0 to newWidth -1 do
+    scaledXi[x] := Trunc(x * Image.Width / newWidth);
+  SetLength(scaledYi, newHeight);
+  for y := 0 to newHeight -1 do
+    scaledYi[y] := Trunc(y * Image.Height / newHeight);
+
+  pc := @tmp[0];
+  pixels := Image.Pixels;
+  for y := 0 to newHeight - 1 do
+  begin
+    offset := scaledYi[y] * Image.Width;
+    for x := 0 to newWidth - 1 do
+    begin
+      pc^ := pixels[scaledXi[x] + offset];
+      inc(pc);
+    end;
+  end;
+
+  TargetImage.AssignPixelArray(tmp, newWidth, newHeight);
+end;
+//------------------------------------------------------------------------------
+
+procedure ResamplerResize(Image: TImage32; newWidth, newHeight: Integer);
+begin
+  ResamplerResize(Image, Image, newWidth, newHeight);
+end;
+//------------------------------------------------------------------------------
+
+procedure ResamplerResize(Image, TargetImage: TImage32; newWidth, newHeight: Integer);
+var
+  mat: TMatrixD;
+begin
+  mat := IdentityMatrix;
+  MatrixScale(mat, newWidth/Image.Width, newHeight/Image.Height);
+  AffineTransformImage(Image, TargetImage, mat);
+end;
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
