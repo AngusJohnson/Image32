@@ -321,6 +321,8 @@ type
   TStaticDoubleArray = array[0..MaxInt div SizeOf(double) - 1] of double;
   PStaticInt64Array = ^TStaticInt64Array;
   TStaticInt64Array = array[0..MaxInt div SizeOf(int64) - 1] of int64;
+  PStaticColor32Array = ^TStaticColor32Array;
+  TStaticColor32Array = array[0..MaxInt div SizeOf(TColor32) - 1] of TColor32;
 
   // A horizontal scanline contains any number of line fragments. A fragment
   // can be a number of pixels wide but it can't be more than one pixel high.
@@ -1330,6 +1332,7 @@ begin
 end;
 // ------------------------------------------------------------------------------
 
+{
 procedure TColorRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
 var
   i: integer;
@@ -1349,6 +1352,103 @@ begin
       dst^ := BlendToAlpha(dst^, (tab[Ord(alpha^)] shl 24) or color);
     inc(dst); inc(alpha);
   end;
+end;
+}
+// ------------------------------------------------------------------------------
+
+{$RANGECHECKS OFF} // negative array index usage
+type
+  // Used to reduce the number of parameters to help the compiler's
+  // optimizer.
+  TRenderProcData = record
+    dst: PStaticColor32Array;
+    alpha: PByteArray;
+  end;
+
+function RenderProcBlendToAlpha255(count: nativeint; dstColor: TColor32;
+  var data: TRenderProcData): nativeint;
+// CPU register optimized
+var
+  a: byte;
+  dst: PStaticColor32Array;
+  alpha: PByteArray;
+begin
+  Result := count;
+  dst := data.dst;
+  alpha := data.alpha;
+
+  a := alpha[Result];
+  dst[Result] := dstColor;
+  inc(Result);
+
+  while (Result < 0) and (alpha[Result] = a) do
+  begin
+    dst[Result] := dstColor;
+    inc(Result);
+  end;
+end;
+
+procedure RenderProcBlendToAlpha(dst: PStaticColor32Array; alpha: PByteArray;
+  count: nativeint; color: TColor32; tab: PByteArray);
+var
+  a: byte;
+  lastDst, dstColor: TColor32;
+  data: TRenderProcData;
+begin
+  // Use negative offset trick.
+  alpha := @alpha[count];
+  dst := @dst[count];
+  count := -count;
+
+  // store pointers for RenderProcBlendToAlpha255
+  data.dst := dst;
+  data.alpha := alpha;
+
+  while count < 0 do
+  begin
+    a := alpha[count];
+    if a > 1 then
+    begin
+      a := tab[a];
+      dstColor := (a shl 24) or color;
+
+      // Special handling for alpha channel 255 (copy dstColor into dst)
+      if a = 255 then
+        count := RenderProcBlendToAlpha255(count, dstColor, data)
+      else
+      begin
+        lastDst := dst[count];
+        dstColor := BlendToAlpha(lastDst, dstColor);
+
+        a := alpha[count];
+        dst[count] := dstColor;
+        inc(count);
+
+        // if we have the same dst-pixel and the same alpha channel, we can
+        // just copy the already calculated BlendToAlpha color.
+        while (count < 0) and (a = alpha[count]) and (dst[count] = lastDst) do
+        begin
+          dst[count] := dstColor;
+          inc(count);
+        end;
+      end;
+    end
+    else
+      inc(count);
+  end;
+end;
+{$IFDEF RANGECHECKS_ENABLED}
+  {$RANGECHECKS ON}
+{$ENDIF}
+
+procedure TColorRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
+begin
+  // Help the compiler to get better CPU register allocation.
+  // Without the hidden Self parameter the compiler optimizes
+  // better.
+  RenderProcBlendToAlpha(PStaticColor32Array(GetDstPixel(x1, y)),
+                         PByteArray(alpha), x2 - x1 + 1, fColor,
+                         PByteArray(@MulTable[fAlpha]));
 end;
 
 // ------------------------------------------------------------------------------
