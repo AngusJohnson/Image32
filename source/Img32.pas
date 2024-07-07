@@ -1855,6 +1855,7 @@ end;
 function TImage32.RectHasTransparency(rec: TRect): Boolean;
 var
   i,j, rw: Integer;
+  lineByteOffset: nativeint;
   c: PARGB;
 begin
   Result := True;
@@ -1862,6 +1863,7 @@ begin
   if IsEmptyRect(rec) then Exit;
   rw := RectWidth(rec);
   c := @Pixels[rec.Top * Width + rec.Left];
+  lineByteOffset := (Width - rw) * SizeOf(TColor32);
   for i := rec.Top to rec.Bottom -1 do
   begin
     for j := 1 to rw do
@@ -1869,7 +1871,7 @@ begin
       if c.A < 254 then Exit;
       inc(c);
     end;
-    inc(c, Width - rw);
+    inc(PByte(c), lineByteOffset);
   end;
   Result := False;
 end;
@@ -2637,6 +2639,7 @@ var
   memDc: HDC;
   isTransparent: Boolean;
   bf: BLENDFUNCTION;
+  oldStretchBltMode: integer;
 begin
   Types.IntersectRect(rec, srcRect, Bounds);
   if IsEmpty or IsEmptyRect(rec) or IsEmptyRect(dstRect) then Exit;
@@ -2650,7 +2653,7 @@ begin
   bi := Get32bitBitmapInfoHeader(wSrc, hSrc);
 
   isTransparent := transparent and RectHasTransparency(srcRect);
-  memDc := CreateCompatibleDC(0);
+  memDc := CreateCompatibleDC(dstDc);
   try
     bm := CreateDIBSection(memDc, PBITMAPINFO(@bi)^,
       DIB_RGB_COLORS, dibBits, 0, 0);
@@ -2662,31 +2665,30 @@ begin
       pDst := dibBits;
       pSrc := PARGB(PixelRow[rec.Bottom -1]);
       inc(pSrc, rec.Left);
-      for i := rec.Bottom -1 downto rec.Top do
+      if isTransparent and not IsPremultiplied then
       begin
-        Move(pSrc^, pDst^, wBytes);
-        dec(pSrc, Width);
-        inc(pDst, wSrc);
+        //premultiplied alphas are required when alpha blending
+        for i := rec.Bottom -1 downto rec.Top do
+        begin
+          PremultiplyAlpha(pSrc, pDst, wSrc);
+          dec(pSrc, Width);
+          inc(pDst, wSrc);
+        end;
+      end
+      else
+      begin
+        for i := rec.Bottom -1 downto rec.Top do
+        begin
+          Move(pSrc^, pDst^, wBytes);
+          dec(pSrc, Width);
+          inc(pDst, wSrc);
+        end;
       end;
 
       oldBm := SelectObject(memDC, bm);
       if isTransparent then
       begin
-
         //premultiplied alphas are required when alpha blending
-        pDst := dibBits;
-        for i := 0 to wSrc * hSrc -1 do
-        begin
-          if pDst.A > 0 then
-          begin
-            pDst.R  := MulTable[pDst.R, pDst.A];
-            pDst.G  := MulTable[pDst.G, pDst.A];
-            pDst.B  := MulTable[pDst.B, pDst.A];
-          end else
-            pDst.Color := 0;
-          inc(pDst);
-        end;
-
         bf.BlendOp := AC_SRC_OVER;
         bf.BlendFlags := 0;
         bf.SourceConstantAlpha := 255;
@@ -2698,8 +2700,10 @@ begin
         BitBlt(dstDc, x,y, wSrc, hSrc, memDc, 0,0, SRCCOPY)
       end else
       begin
-        SetStretchBltMode(dstDc, COLORONCOLOR);
+        oldStretchBltMode := SetStretchBltMode(dstDc, COLORONCOLOR);
         StretchBlt(dstDc, x,y, wDest, hDest, memDc, 0,0, wSrc,hSrc, SRCCOPY);
+        if oldStretchBltMode <> COLORONCOLOR then // restore mode
+          SetStretchBltMode(dstDc, oldStretchBltMode);
       end;
       SelectObject(memDC, oldBm);
     finally
@@ -2918,24 +2922,10 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.PreMultiply;
-var
-  i: Integer;
-  c: PARGB;
 begin
   if IsEmpty or fIsPremultiplied then Exit;
   fIsPremultiplied := true;
-  c := PARGB(PixelBase);
-  for i := 0 to Width * Height -1 do
-  begin
-    if (c.A = 0) then c.Color := 0
-    else if (c.A < 255) then
-    begin
-      c.R  := MulTable[c.R, c.A];
-      c.G  := MulTable[c.G, c.A];
-      c.B  := MulTable[c.B, c.A];
-    end;
-    inc(c);
-  end;
+  PremultiplyAlpha(PARGB(PixelBase), PARGB(PixelBase), Width * Height);
   //nb: no OnChange notify event here
 end;
 //------------------------------------------------------------------------------
