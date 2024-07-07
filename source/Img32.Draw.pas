@@ -449,12 +449,15 @@ begin
 end;
 // ------------------------------------------------------------------------------
 
+// Here "const" is used for opimization reasons, to skip the
+// dyn-array reference counting. "const" for dyn-arrays doesn't
+// prevent one from changing the array's content.
 procedure ReverseColors(const colors: TArrayOfGradientColor);
 var
   highI: integer;
   dst, src: ^TGradientColor;
-  // Allow the 64bit compiler to use XMM registers instead of the stack
-  // by not using a TGradientColor record for the temporary value.
+  // Not using a TGradientColor record for the temporary value
+  // allows the 64-bit compiler to use an XMM register for it.
   tmpOffset: double;
   tmpColor: TColor32;
 begin
