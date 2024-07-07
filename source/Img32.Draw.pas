@@ -3,7 +3,7 @@ unit Img32.Draw;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.5                                                             *
-* Date      :  21 June 2024                                                    *
+* Date      :  5 July 2024                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -313,12 +313,23 @@ const
 {$ENDIF CPUX86}
 
 type
+  {$IF not declared(NativeInt)}
+  NativeInt = Integer;
+  {$IFEND}
+
+  PStaticDoubleArray = ^TStaticDoubleArray;
+  TStaticDoubleArray = array[0..MaxInt div SizeOf(double) - 1] of double;
+  PStaticInt64Array = ^TStaticInt64Array;
+  TStaticInt64Array = array[0..MaxInt div SizeOf(int64) - 1] of int64;
+  PStaticColor32Array = ^TStaticColor32Array;
+  TStaticColor32Array = array[0..MaxInt div SizeOf(TColor32) - 1] of TColor32;
 
   // A horizontal scanline contains any number of line fragments. A fragment
   // can be a number of pixels wide but it can't be more than one pixel high.
-  //  TFragment = record
-  //    botX, topX, dy, dydx: double; // ie x at bottom and top of scanline
-  //  end;
+  PFragment = ^TFragment;
+  TFragment = record
+    botX, topX, dy, dydx: double; // ie x at bottom and top of scanline
+  end;
 
   TScanLine = record
     Y: integer;
@@ -438,16 +449,32 @@ begin
 end;
 // ------------------------------------------------------------------------------
 
-function ReverseColors(const colors: TArrayOfGradientColor): TArrayOfGradientColor;
+procedure ReverseColors(const colors: TArrayOfGradientColor);
 var
-  i, highI: integer;
+  highI: integer;
+  dst, src: ^TGradientColor;
+  // Allow the 64bit compiler to use XMM registers instead of the stack
+  // by not using a TGradientColor record for the temporary value.
+  tmpOffset: double;
+  tmpColor: TColor32;
 begin
   highI := High(colors);
-  SetLength(result, highI +1);
-  for i := 0 to highI do
+
+  dst := @colors[0];
+  src := @colors[highI];
+  while PByte(dst) < PByte(src) do
   begin
-    result[i].color := colors[highI -i].color;
-    result[i].offset := 1 - colors[highI -i].offset;
+    tmpColor := dst.color;
+    tmpOffset := dst.offset;
+
+    dst.color := src.color;
+    dst.offset := 1 - src.offset;
+
+    src.color := tmpColor;
+    src.offset := 1 - tmpOffset;
+
+    inc(dst);
+    dec(src);
   end;
 end;
 // ------------------------------------------------------------------------------
@@ -557,12 +584,12 @@ begin
   if fg.A = 0 then
   begin
     Result := bgColor;
-    res.A := MulBytes(res.A, not mask);
+    res.A := MulTable[res.A, not mask];
   end
   else if bg.A = 0 then
   begin
     Result := fgColor;
-    res.A := MulBytes(res.A, mask);
+    res.A := MulTable[res.A, mask];
   end
   else if (mask = 0) then
     Result := bgColor
@@ -582,21 +609,23 @@ end;
 
 // MakeColorGradient: using the supplied array of TGradientColor,
 // create an array of TColor32 of the specified length
-function MakeColorGradient(const gradColors: TArrayOfGradientColor;
-  len: integer): TArrayOfColor32;
+procedure MakeColorGradient(const gradColors: TArrayOfGradientColor;
+  len: integer; var result: TArrayOfColor32);
 var
   i,j, lenC: integer;
-  dist, offset1, offset2, step, pos: double;
+  dist, offset1, offset2, step, pos, reciprocalDistTimes255: double;
   color1, color2: TColor32;
 begin
   lenC := length(gradColors);
   if (len = 0) or (lenC < 2) then Exit;
-  SetLength(result, len);
+  if Length(result) <> len then // we can reuse the array
+    SetLength(result, len);
 
   color2 := gradColors[0].color;
   result[0] := color2;
   if len = 1 then Exit;
 
+  reciprocalDistTimes255 := 0;
   step := 1/(len-1);
   pos := step;
   offset2 := 0;
@@ -607,9 +636,11 @@ begin
     dist := offset2 - offset1;
     color1 := color2;
     color2 := gradColors[i].color;
+    if dist > 0 then
+      reciprocalDistTimes255 := 255/dist; // 1/dist*255
     while (pos <= dist) and (j < len) do
     begin
-      result[j] := BlendColorUsingMask(color1, color2, Round(pos/dist * 255));
+      result[j] := BlendColorUsingMask(color1, color2, Round(pos * reciprocalDistTimes255));
       inc(j);
       pos := pos + step;
     end;
@@ -624,7 +655,7 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure AllocateScanlines(const polygons: TPathsD;
-  var scanlines: TArrayOfScanline; out fragments: PDouble; clipBottom, clipRight: integer);
+  const scanlines: TArrayOfScanline; var fragments: PFragment; clipBottom, clipRight: integer);
 var
   i,j, highI, highJ: integer;
   y1, y2: integer;
@@ -681,7 +712,7 @@ begin
     if j > 0 then
     begin
       psl.fragOffset := fragOff;
-      inc(fragOff, j * 4); // 4 doubles are needed for each fragment
+      inc(fragOff, j);
     end else
       psl.fragOffset := -1;
     psl.fragCnt := 0; // reset for later
@@ -691,39 +722,38 @@ begin
     dec(psl);
   end;
   // allocate fragments as a single block of memory
-  GetMem(fragments, fragOff * sizeOf(Double));
+  GetMem(fragments, fragOff * sizeOf(TFragment));
 end;
 // ------------------------------------------------------------------------------
 
 procedure SplitEdgeIntoFragments(const pt1, pt2: TPointD;
-  const scanlines: TArrayOfScanline; fragments: PDouble; const clipRec: TRect);
+  const scanlines: TArrayOfScanline; fragments: PFragment; const clipRec: TRect);
 var
   x,y, dx,dy, absDx, dydx, dxdy: double;
   i, scanlineY, maxY, maxX: integer;
   psl: PScanLine;
-  pFrag: PDouble;
+  pFrag: PFragment;
   bot, top: TPointD;
 begin
   dy := pt1.Y - pt2.Y;
-  dx := pt2.X - pt1.X;
-  RectWidthHeight(clipRec, maxX, maxY);
-  absDx := abs(dx);
 
   if dy > 0 then
   begin
     // ASCENDING EDGE (+VE WINDING DIR)
     if dy < 0.0001 then Exit;            //ignore near horizontals
     bot := pt1; top := pt2;
-    // exclude edges that are completely outside the top or bottom clip region
-    if (top.Y >= maxY) or (bot.Y <= 0) then Exit;
   end else
   begin
     // DESCENDING EDGE (-VE WINDING DIR)
     if dy > -0.0001 then Exit;           //ignore near horizontals
     bot := pt2; top := pt1;
-    // exclude edges that are completely outside the top or bottom clip region
-    if (top.Y >= maxY) or (bot.Y <= 0) then Exit;
   end;
+  // exclude edges that are completely outside the top or bottom clip region
+  RectWidthHeight(clipRec, maxX, maxY);
+  if (top.Y >= maxY) or (bot.Y <= 0) then Exit;
+
+  dx := pt2.X - pt1.X;
+  absDx := abs(dx);
 
   if absDx < 0.000001 then
   begin
@@ -798,50 +828,50 @@ begin
   if psl.fragOffset < 0 then Exit; //a very rare event
 
   pFrag := fragments;
-  inc(pFrag, psl.fragOffset + psl.fragCnt * 4);
+  inc(pFrag, psl.fragOffset + psl.fragCnt);
   inc(psl.fragCnt);
 
-  pFrag^ := bot.X; inc(pFrag);
+  pFrag.botX := bot.X;
   if scanlineY <= top.Y then
   begin
     // the whole edge is within 1 scanline
-    pFrag^ := top.X;  inc(pFrag);
-    pFrag^ := bot.Y - top.Y; inc(pFrag);
-    pFrag^ := dydx;
+    pFrag.topX := top.X;
+    pFrag.dy := bot.Y - top.Y;
+    pFrag.dydx := dydx;
     Exit;
   end;
 
   x := bot.X + (bot.Y - scanlineY) * dxdy;
-  pFrag^ := x; inc(pFrag);
-  pFrag^ := bot.Y - scanlineY; inc(pFrag);
-  pFrag^ := dydx;
+  pFrag.topX := x;
+  pFrag.dy := bot.Y - scanlineY;
+  pFrag.dydx := dydx;
   // 'split' subsequent fragments until the top fragment
   dec(psl);
   while psl.Y > top.Y do
   begin
     pFrag := fragments;
-    inc(pFrag, psl.fragOffset + psl.fragCnt * 4);
+    inc(pFrag, psl.fragOffset + psl.fragCnt);
     inc(psl.fragCnt);
-    pFrag^ := x; inc(pFrag);
+    pFrag.botX := x;
     x := x + dxdy;
-    pFrag^ := x; inc(pFrag);
-    pFrag^ := 1; inc(pFrag);
-    pFrag^ := dydx;
+    pFrag.topX := x;
+    pFrag.dy := 1;
+    pFrag.dydx := dydx;
     dec(psl);
   end;
   // and finally the top fragment
   pFrag := fragments;
-  inc(pFrag, psl.fragOffset + psl.fragCnt * 4);
+  inc(pFrag, psl.fragOffset + psl.fragCnt);
   inc(psl.fragCnt);
-  pFrag^ := x; inc(pFrag);
-  pFrag^ := top.X; inc(pFrag);
-  pFrag^ := psl.Y + 1 - top.Y; inc(pFrag);
-  pFrag^ := dydx;
+  pFrag.botX := x;
+  pFrag.topX := top.X;
+  pFrag.dy := psl.Y + 1 - top.Y;
+  pFrag.dydx := dydx;
 end;
 // ------------------------------------------------------------------------------
 
-procedure InitializeScanlines(var polygons: TPathsD;
-  const scanlines: TArrayOfScanline; fragments: PDouble; const clipRec: TRect);
+procedure InitializeScanlines(const polygons: TPathsD;
+  const scanlines: TArrayOfScanline; fragments: PFragment; const clipRec: TRect);
 var
   i,j, highJ: integer;
   pt1, pt2: PPointD;
@@ -863,21 +893,23 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure ProcessScanlineFragments(var scanline: TScanLine;
-  fragments: PDouble; var buffer: TArrayOfDouble);
+  fragments: PFragment; const buffer: TArrayOfDouble);
 var
   i,j, leftXi,rightXi: integer;
-  fracX, yy, q, windDir: double;
+  fracX, yy, q{, windDir}: double;
   left, right, dy, dydx: double;
-  pd, frag: PDouble;
+  frag: PFragment;
+  pd: PDouble;
 begin
   frag := fragments;
   inc(frag, scanline.fragOffset);
   for i := 1 to scanline.fragCnt do
   begin
-    left := frag^; inc(frag);   //botX
-    right := frag^; inc(frag);  //topX
-    dy := frag^; inc(frag);
-    dydx := frag^; inc(frag);
+    left := frag.botX;
+    right := frag.topX;
+    dy := frag.dy;
+    dydx := frag.dydx;
+    inc(frag);
 
     // converting botX & topX to left & right simplifies code
     if {botX > topX} left > right then
@@ -892,7 +924,9 @@ begin
     if (leftXi = rightXi) then
     begin
       // the fragment is only one pixel wide
-      if dydx < 0 then windDir := -1.0 else windDir := 1.0;
+      //if dydx < 0 then windDir := -1.0 else windDir := 1.0;
+      if dydx < 0 then dy := -dy;
+
       if leftXi < scanline.minX then
         scanline.minX := leftXi;
       if rightXi > scanline.maxX then
@@ -900,13 +934,13 @@ begin
       pd := @buffer[leftXi];
       if (left <= 0) then
       begin
-        pd^ := pd^ + dy * windDir;
+        pd^ := pd^ + dy {* windDir};
       end else
       begin
         q := (left + right) * 0.5 - leftXi;
-        pd^ := pd^ + (1-q) * dy * windDir;
+        pd^ := pd^ + (1-q) * dy {* windDir};
         inc(pd);
-        pd^ := pd^ + q * dy * windDir;
+        pd^ := pd^ + q * dy {* windDir};
       end;
     end else
     begin
@@ -941,23 +975,216 @@ begin
 end;
 // ------------------------------------------------------------------------------
 
-{$IFNDEF TROUNDINGMODE}
-type
-  TRoundingMode = {$IFNDEF FPC}Math.{$ENDIF}TFPURoundingMode;
+{$RANGECHECKS OFF} // negative array index is used
+{ CPU register optimized implementations. Every data type must be exactly the one used. }
+procedure FillByteBufferEvenOdd(byteBuffer: PByteArray;
+  windingAccum: PDouble; count: nativeint);
+var
+  accum: double;
+  lastValue: integer;
+  start: nativeint;
+  buf: PByteArray;
+begin
+  accum := 0; //winding count accumulator
+  lastValue := 0;
+  // Copy byteBuffer to a local variable, so Delphi's 32bit compiler
+  // can put buf into a CPU register.
+  buf := PByteArray(byteBuffer);
+
+  // Use the negative offset trick to only increment "count"
+  // until it reaches zero. And by offsetting the arrays, "count"
+  // also becomes the index for those.
+  inc(PByte(buf), count);
+  inc(windingAccum, count);
+  count := -count;
+  while count < 0 do
+  begin
+    // lastValue can be used if accum doesn't change
+    if PStaticInt64Array(windingAccum)[count] = 0 then
+    begin
+      start := count;
+      repeat
+        inc(count);
+      until (count = 0) or (PStaticInt64Array(windingAccum)[count] <> 0);
+      FillChar(buf[start], count - start, Byte(lastValue));
+      if count = 0 then break;
+    end;
+
+    accum := accum + PStaticDoubleArray(windingAccum)[count];
+
+    // EvenOdd
+    lastValue := Trunc(Abs(accum) * 1275) mod 2550; // mul 5
+    if lastValue > 1275 then
+      lastValue := (2550 - lastValue) shr 2 else    // div 4
+      lastValue := lastValue shr 2;                 // div 4
+    if lastValue > 255 then lastValue := 255;
+
+    buf[count] := Byte(lastValue);
+    PStaticDoubleArray(windingAccum)[count] := 0;
+    inc(count); // walk towards zero
+  end;
+end;
+
+procedure FillByteBufferNonZero(byteBuffer: PByteArray;
+  windingAccum: PDouble; count: nativeint);
+var
+  accum: double;
+  lastValue: integer;
+  start: nativeint;
+  buf: PByteArray;
+begin
+  accum := 0; //winding count accumulator
+  lastValue := 0;
+  // Copy byteBuffer to a local variable, so Delphi's 32bit compiler
+  // can put buf into a CPU register.
+  buf := PByteArray(byteBuffer);
+
+  // Use the negative offset trick to only increment "count"
+  // until it reaches zero. And by offsetting the arrays, "count"
+  // also becomes the index for those.
+  inc(PByte(buf), count);
+  inc(windingAccum, count);
+  count := -count;
+  while count < 0 do
+  begin
+    // lastValue can be used if accum doesn't change
+    if PStaticInt64Array(windingAccum)[count] = 0 then
+    begin
+      start := count;
+      repeat
+        inc(count);
+      until (count = 0) or (PStaticInt64Array(windingAccum)[count] <> 0);
+      FillChar(buf[start], count - start, Byte(lastValue));
+      if count = 0 then break;
+    end;
+
+    accum := accum + PStaticDoubleArray(windingAccum)[count];
+
+    // NonZero
+    lastValue := Trunc(Abs(accum) * 318);
+    if lastValue > 255 then lastValue := 255;
+
+    buf[count] := Byte(lastValue);
+    PStaticDoubleArray(windingAccum)[count] := 0;
+    inc(count); // walk towards zero
+  end;
+end;
+
+procedure FillByteBufferPositive(byteBuffer: PByteArray;
+  windingAccum: PDouble; count: nativeint);
+var
+  accum: double;
+  lastValue: integer;
+  start: nativeint;
+  buf: PByteArray;
+begin
+  accum := 0; //winding count accumulator
+  lastValue := 0;
+  // Copy byteBuffer to a local variable, so Delphi's 32bit compiler
+  // can put buf into a CPU register.
+  buf := PByteArray(byteBuffer);
+
+  // Use the negative offset trick to only increment "count"
+  // until it reaches zero. And by offsetting the arrays, "count"
+  // also becomes the index for those.
+  inc(PByte(buf), count);
+  inc(windingAccum, count);
+  count := -count;
+  while count < 0 do
+  begin
+    // lastValue can be used if accum doesn't change
+    if PStaticInt64Array(windingAccum)[count] = 0 then
+    begin
+      start := count;
+      repeat
+        inc(count);
+      until (count = 0) or (PStaticInt64Array(windingAccum)[count] <> 0);
+      FillChar(buf[start], count - start, Byte(lastValue));
+      if count = 0 then break;
+    end;
+
+    accum := accum + PStaticDoubleArray(windingAccum)[count];
+
+    // Positive
+    lastValue := 0;
+    if accum > 0.002 then
+    begin
+      lastValue := Trunc(accum * 318);
+      if lastValue > 255 then lastValue := 255;
+    end;
+
+    buf[count] := Byte(lastValue);
+    PStaticDoubleArray(windingAccum)[count] := 0;
+    inc(count); // walk towards zero
+  end;
+end;
+
+procedure FillByteBufferNegative(byteBuffer: PByteArray;
+  windingAccum: PDouble; count: nativeint);
+var
+  accum: double;
+  lastValue: integer;
+  start: nativeint;
+  buf: PByteArray;
+begin
+  accum := 0; //winding count accumulator
+  lastValue := 0;
+  // Copy byteBuffer to a local variable, so Delphi's 32bit compiler
+  // can put buf into a CPU register.
+  buf := PByteArray(byteBuffer);
+
+  // Use the negative offset trick to only increment "count"
+  // until it reaches zero. And by offsetting the arrays, "count"
+  // also becomes the index for those.
+  inc(PByte(buf), count);
+  inc(windingAccum, count);
+  count := -count;
+  while count < 0 do
+  begin
+    // lastValue can be used if accum doesn't change
+    if PStaticInt64Array(windingAccum)[count] = 0 then
+    begin
+      start := count;
+      repeat
+        inc(count);
+      until (count = 0) or (PStaticInt64Array(windingAccum)[count] <> 0);
+      FillChar(buf[start], count - start, Byte(lastValue));
+      if count = 0 then break;
+    end;
+
+    accum := accum + PStaticDoubleArray(windingAccum)[count];
+
+    // Negative
+    lastValue := 0;
+    if accum < -0.002 then
+    begin
+      lastValue := Trunc(accum * -318);
+      if lastValue > 255 then lastValue := 255;
+    end;
+
+    buf[count] := Byte(lastValue);
+    PStaticDoubleArray(windingAccum)[count] := 0;
+    inc(count); // walk towards zero
+  end;
+end;
+{$IFDEF RANGECHECKS_ENABLED}
+  {$RANGECHECKS ON}
 {$ENDIF}
 
 procedure Rasterize(const paths: TPathsD; const clipRec: TRect;
   fillRule: TFillRule; renderer: TCustomRenderer);
 var
-  i,j, xli,xri, maxW, maxH, aa: integer;
+  i, xli,xri, maxW, maxH: integer;
   clipRec2: TRect;
   paths2: TPathsD;
-  accum: double;
   windingAccum: TArrayOfDouble;
-  byteBuffer: TArrayOfByte;
+  byteBuffer: PByteArray;
   scanlines: TArrayOfScanline;
-  fragments: PDouble;
+  fragments: PFragment;
   scanline: PScanline;
+
+  // FPC generates wrong code if "count" isn't NativeInt
+  FillByteBuffer: procedure(byteBuffer: PByteArray; windingAccum: PDouble; count: nativeint);
 begin
   // See also https://nothings.org/gamedev/rasterize/
   if not assigned(renderer) then Exit;
@@ -970,14 +1197,36 @@ begin
   // and even a little faster than Trunc() above (except
   // when the FastMM4 memory manager is enabled.)
   fragments := nil;
+  byteBuffer := nil;
   try
     RectWidthHeight(clipRec2, maxW, maxH);
+    if maxW <= 0 then Exit;
+    GetMem(byteBuffer, maxW); // no need for dyn. array zero initialize
     SetLength(scanlines, maxH +1);
     SetLength(windingAccum, maxW +2);
     AllocateScanlines(paths2, scanlines, fragments, maxH, maxW-1);
     InitializeScanlines(paths2, scanlines, fragments, clipRec2);
-    SetLength(byteBuffer, maxW);
-    if byteBuffer = nil then Exit;
+
+    case fillRule of
+      frEvenOdd:
+        FillByteBuffer := FillByteBufferEvenOdd;
+      frNonZero:
+        FillByteBuffer := FillByteBufferNonZero;
+{$IFDEF REVERSE_ORIENTATION}
+      frPositive:
+{$ELSE}
+      frNegative:
+{$ENDIF}
+        FillByteBuffer := FillByteBufferPositive;
+{$IFDEF REVERSE_ORIENTATION}
+      frNegative:
+{$ELSE}
+      frPositive:
+{$ENDIF}
+        FillByteBuffer := FillByteBufferNegative;
+      else
+        Exit;
+    end;
 
     scanline := @scanlines[0];
     for i := 0 to high(scanlines) do
@@ -993,56 +1242,23 @@ begin
       // it's faster to process only the modified sub-array of windingAccum
       xli := scanline.minX;
       xri := Min(maxW -1, scanline.maxX +1);
-      FillChar(byteBuffer[xli], xri - xli +1, 0);
 
       // a 25% weighting has been added to the alpha channel to minimize any
       // background bleed-through where polygons join with a common edge.
 
-      accum := 0; //winding count accumulator
-      for j := xli to xri do
-      begin
-        accum := accum + windingAccum[j];
-        case fillRule of
-          frEvenOdd:
-            begin
-              aa := Trunc(Abs(accum) * 1275) mod 2550;            // mul 5
-              if aa > 1275 then
-                byteBuffer[j] := Min(255, (2550 - aa) shr 2) else   // div 4
-                byteBuffer[j] := Min(255, aa shr 2);                // div 4
-            end;
-          frNonZero:
-            begin
-              byteBuffer[j] := Min(255, Trunc(Abs(accum) * 318));
-            end;
-  {$IFDEF REVERSE_ORIENTATION}
-          frPositive:
-  {$ELSE}
-          frNegative:
-  {$ENDIF}
-            begin
-              if accum > 0.002 then
-                byteBuffer[j] := Min(255, Trunc(accum * 318));
-            end;
-  {$IFDEF REVERSE_ORIENTATION}
-          frNegative:
-  {$ELSE}
-          frPositive:
-  {$ENDIF}
-            begin
-              if accum < -0.002 then
-                byteBuffer[j] := Min(255, Trunc(-accum * 318));
-            end;
-        end;
-      end;
+      // FillByteBuffer overwrites every byte in byteBuffer[xli..xri] and also resets
+      // windingAccum[xli..xri] to 0.
+      FillByteBuffer(@byteBuffer[xli], @windingAccum[xli], xri - xli +1);
+
       renderer.RenderProc(clipRec2.Left + xli, clipRec2.Left + xri,
         clipRec2.Top + i, @byteBuffer[xli]);
 
-      // cleanup and deallocate memory
-      FillChar(windingAccum[xli], (xri - xli +1) * sizeOf(Double), 0);
       inc(scanline);
     end;
   finally
+    // cleanup and deallocate memory
     FreeMem(fragments);
+    FreeMem(byteBuffer);
   end;
 end;
 
@@ -1116,6 +1332,7 @@ begin
 end;
 // ------------------------------------------------------------------------------
 
+{
 procedure TColorRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
 var
   i: integer;
@@ -1135,6 +1352,103 @@ begin
       dst^ := BlendToAlpha(dst^, (tab[Ord(alpha^)] shl 24) or color);
     inc(dst); inc(alpha);
   end;
+end;
+}
+// ------------------------------------------------------------------------------
+
+{$RANGECHECKS OFF} // negative array index usage
+type
+  // Used to reduce the number of parameters to help the compiler's
+  // optimizer.
+  TRenderProcData = record
+    dst: PStaticColor32Array;
+    alpha: PByteArray;
+  end;
+
+function RenderProcBlendToAlpha255(count: nativeint; dstColor: TColor32;
+  var data: TRenderProcData): nativeint;
+// CPU register optimized
+var
+  a: byte;
+  dst: PStaticColor32Array;
+  alpha: PByteArray;
+begin
+  Result := count;
+  dst := data.dst;
+  alpha := data.alpha;
+
+  a := alpha[Result];
+  dst[Result] := dstColor;
+  inc(Result);
+
+  while (Result < 0) and (alpha[Result] = a) do
+  begin
+    dst[Result] := dstColor;
+    inc(Result);
+  end;
+end;
+
+procedure RenderProcBlendToAlpha(dst: PStaticColor32Array; alpha: PByteArray;
+  count: nativeint; color: TColor32; tab: PByteArray);
+var
+  a: byte;
+  lastDst, dstColor: TColor32;
+  data: TRenderProcData;
+begin
+  // Use negative offset trick.
+  alpha := @alpha[count];
+  dst := @dst[count];
+  count := -count;
+
+  // store pointers for RenderProcBlendToAlpha255
+  data.dst := dst;
+  data.alpha := alpha;
+
+  while count < 0 do
+  begin
+    a := alpha[count];
+    if a > 1 then
+    begin
+      a := tab[a];
+      dstColor := (a shl 24) or color;
+
+      // Special handling for alpha channel 255 (copy dstColor into dst)
+      if a = 255 then
+        count := RenderProcBlendToAlpha255(count, dstColor, data)
+      else
+      begin
+        lastDst := dst[count];
+        dstColor := BlendToAlpha(lastDst, dstColor);
+
+        a := alpha[count];
+        dst[count] := dstColor;
+        inc(count);
+
+        // if we have the same dst-pixel and the same alpha channel, we can
+        // just copy the already calculated BlendToAlpha color.
+        while (count < 0) and (a = alpha[count]) and (dst[count] = lastDst) do
+        begin
+          dst[count] := dstColor;
+          inc(count);
+        end;
+      end;
+    end
+    else
+      inc(count);
+  end;
+end;
+{$IFDEF RANGECHECKS_ENABLED}
+  {$RANGECHECKS ON}
+{$ENDIF}
+
+procedure TColorRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
+begin
+  // Help the compiler to get better CPU register allocation.
+  // Without the hidden Self parameter the compiler optimizes
+  // better.
+  RenderProcBlendToAlpha(PStaticColor32Array(GetDstPixel(x1, y)),
+                         PByteArray(alpha), x2 - x1 + 1, fColor,
+                         PByteArray(@MulTable[fAlpha]));
 end;
 
 // ------------------------------------------------------------------------------
@@ -1222,7 +1536,7 @@ begin
   for i := x1 to x2 do
   begin
     pDst^ := BlendToAlpha(pDst^,
-      MulBytes(pBrush.A, Ord(alpha^)) shl 24 or (pBrush.Color and $FFFFFF));
+      MulTable[pBrush.A, Ord(alpha^)] shl 24 or (pBrush.Color and $FFFFFF));
     inc(pDst); inc(alpha);
     pBrush := GetPixel(fBrushPixel, fBoundsProc(i, fImage.Width));
   end;
@@ -1343,7 +1657,7 @@ begin
     // gradient > 45 degrees
     if (fEndPt.Y < fStartPt.Y) then
     begin
-      fGradientColors := ReverseColors(fGradientColors);
+      ReverseColors(fGradientColors);
       SwapPoints(fStartPt, fEndPt);
     end;
     fIsVert := true;
@@ -1352,7 +1666,7 @@ begin
     dxdy := dx/dy;
 
     fColorsCnt := Ceil(dy + dxdy * (fEndPt.X - fStartPt.X));
-    fColors := MakeColorGradient(fGradientColors, fColorsCnt);
+    MakeColorGradient(fGradientColors, fColorsCnt, fColors);
     // get a list of perpendicular offsets for each
     SetLength(fPerpendicOffsets, ImgWidth);
     // from an imaginary line that's through fStartPt and perpendicular to
@@ -1369,7 +1683,7 @@ begin
     end;
     if (fEndPt.X < fStartPt.X) then
     begin
-      fGradientColors := ReverseColors(fGradientColors);
+      ReverseColors(fGradientColors);
       SwapPoints(fStartPt, fEndPt);
     end;
     fIsVert := false;
@@ -1378,7 +1692,7 @@ begin
     dydx := dy/dx; //perpendicular slope
 
     fColorsCnt := Ceil(dx + dydx * (fEndPt.Y - fStartPt.Y));
-    fColors := MakeColorGradient(fGradientColors, fColorsCnt);
+    MakeColorGradient(fGradientColors, fColorsCnt, fColors);
     SetLength(fPerpendicOffsets, ImgHeight);
     // from an imaginary line that's through fStartPt and perpendicular to
     // the gradient line, get a list of X offsets for each Y in image height
@@ -1389,28 +1703,48 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure TLinearGradientRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
+type
+  PArrayOfColor32 = ^TArrayOfColor32;
+  TArrayOfColor32 = array[0..MaxInt div SizeOf(TColor32) - 1] of TColor32;
+  PStaticIntegerArray = ^TStaticIntegerArray;
+  TStaticIntegerArray = array[0..MaxInt div SizeOf(Integer) - 1] of Integer;
 var
-  i, off: integer;
+  i, colorsCnt: integer;
   pDst: PColor32;
-  color: TARGB;
+  color: TColor32;
+  colors: PArrayOfColor32;
+  boundsProc: TBoundsProc;
+  offset: Integer;
+  perpendicOffsets: PStaticIntegerArray;
 begin
   pDst := GetDstPixel(x1,y);
-  for i := x1 to x2 do
+  // optimize self fields access
+  colorsCnt := fColorsCnt;
+  colors := @fColors[0];
+  boundsProc := fBoundsProc;
+  if fIsVert then
   begin
-    if fIsVert then
+    perpendicOffsets := @fPerpendicOffsets[0]; // optimize self field access
+    for i := x1 to x2 do
     begin
       // when fIsVert = true, fPerpendicOffsets is an array of Y for each X
-      off := fPerpendicOffsets[i];
-      color.Color := fColors[fBoundsProc(y - off, fColorsCnt)];
-    end else
-    begin
-      // when fIsVert = false, fPerpendicOffsets is an array of X for each Y
-      off := fPerpendicOffsets[y];
-      color.Color := fColors[fBoundsProc(i - off, fColorsCnt)];
+      color := colors[boundsProc(y - perpendicOffsets[i], colorsCnt)];
+      pDst^ := BlendToAlpha(pDst^,
+        MulTable[color shr 24, Ord(alpha^)] shl 24 or (color and $00FFFFFF));
+      inc(pDst); inc(alpha);
     end;
-    pDst^ := BlendToAlpha(pDst^,
-      MulBytes(color.A, Ord(alpha^)) shl 24 or (color.Color and $FFFFFF));
-    inc(pDst); inc(alpha);
+  end
+  else
+  begin
+    // when fIsVert = false, fPerpendicOffsets is an array of X for each Y
+    offset := fPerpendicOffsets[y];
+    for i := x1 to x2 do
+    begin
+      color := colors[boundsProc(i - offset, colorsCnt)];
+      pDst^ := BlendToAlpha(pDst^,
+        MulTable[color shr 24, Ord(alpha^)] shl 24 or (color and $00FFFFFF));
+      inc(pDst); inc(alpha);
+    end;
   end;
 end;
 
@@ -1422,7 +1756,7 @@ function TRadialGradientRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
   result := inherited Initialize(targetImage) and (fColorsCnt > 1);
   if result then
-    fColors := MakeColorGradient(fGradientColors, fColorsCnt);
+    MakeColorGradient(fGradientColors, fColorsCnt, fColors);
 end;
 // ------------------------------------------------------------------------------
 
@@ -1469,7 +1803,7 @@ begin
     dist := Hypot((y - fCenterPt.Y) *fScaleY, (i - fCenterPt.X) *fScaleX);
     color.Color := fColors[fBoundsProc(Trunc(dist), fColorsCnt)];
     pDst^ := BlendToAlpha(pDst^,
-      MulBytes(color.A, Ord(alpha^)) shl 24 or (color.Color and $FFFFFF));
+      MulTable[color.A, Ord(alpha^)] shl 24 or (color.Color and $FFFFFF));
     inc(pDst); inc(alpha);
   end;
 end;
@@ -1482,7 +1816,7 @@ function TSvgRadialGradientRenderer.Initialize(targetImage: TImage32): Boolean;
 begin
   result := inherited Initialize(targetImage) and (fColorsCnt > 1);
   if result then
-    fColors := MakeColorGradient(fGradientColors, fColorsCnt);
+    MakeColorGradient(fGradientColors, fColorsCnt, fColors);
 end;
 // ------------------------------------------------------------------------------
 
@@ -1580,7 +1914,7 @@ begin
     end;
     color.Color := fColors[fBoundsProcD(Abs(q), fColorsCnt)];
     pDst^ := BlendToAlpha(pDst^,
-      MulBytes(color.A, Ord(alpha^)) shl 24 or (color.Color and $FFFFFF));
+      MulTable[color.A, Ord(alpha^)] shl 24 or (color.Color and $FFFFFF));
     inc(pDst); pt.X := pt.X + 1; inc(alpha);
   end;
 end;
@@ -1598,9 +1932,9 @@ begin
   for i := x1 to x2 do
   begin
     {$IFDEF PBYTE}
-    dst.A := MulBytes(dst.A, not alpha^);
+    dst.A := MulTable[dst.A, not alpha^];
     {$ELSE}
-    dst.A := MulBytes(dst.A, not Ord(alpha^));
+    dst.A := MulTable[dst.A, not Ord(alpha^)];
     {$ENDIF}
     inc(dst); inc(alpha);
   end;
@@ -1620,7 +1954,7 @@ begin
   for i := x1 to x2 do
   begin
     c.Color := not dst.Color;
-    c.A := MulBytes(dst.A, Ord(alpha^));
+    c.A := MulTable[dst.A, Ord(alpha^)];
     dst.Color := BlendToAlpha(dst.Color, c.Color);
     inc(dst); inc(alpha);
   end;
@@ -1682,7 +2016,7 @@ begin
   for x := x1 to x2 do
   begin
     c.Color := GetColor(PointD(x, y));
-    c.A := c.A * Ord(alpha^) shr 8;
+    c.A := MulTable[c.A, Ord(alpha^)];
     p.Color := BlendToAlpha(p.Color, c.Color);
     inc(p); inc(alpha);
   end;
