@@ -38,6 +38,7 @@
   {$DEFINE RECORD_METHODS}
   {$DEFINE PBYTE}
   {$DEFINE NEWPOSFUNC}
+  {$DEFINE SUPPORTS_POINTERMATH}
   {.$DEFINE UITYPES}
   {$DEFINE NESTED_TYPES}
   {$IFNDEF DEBUG}
@@ -74,6 +75,7 @@
           {$DEFINE CHARINSET}                     //added CharInSet function
           {$DEFINE EXIT_PARAM}                    //added Exit(value)
           {$DEFINE ALPHAFORMAT}                   //added TBitmap.AlphaFormat property
+          {$DEFINE SUPPORTS_POINTERMATH}          //added {$POINTERMATH ON/OFF}
           {$IF COMPILERVERSION >= 21}           //Delphi 2010
             {$DEFINE GESTURES}                    //added screen gesture support
             {$IF COMPILERVERSION >= 23}         //DelphiXE2
