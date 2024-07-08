@@ -2047,7 +2047,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Clamp(val, endVal: integer): integer; inline;
+function Clamp(val, endVal: integer): integer;
+  {$IFDEF INLINE} inline; {$ENDIF}
 begin
   if val < 0 then Result := 0
   else if val >= endVal then Result := endVal -1
@@ -2055,7 +2056,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ModEx(val, endVal: integer): integer; inline;
+function ModEx(val, endVal: integer): integer;
+  {$IFDEF INLINE} inline; {$ENDIF}
 begin
   Result := val mod endVal;
   if Result < 0 then Result := endVal + Result;
@@ -2079,7 +2081,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Append(var path: TPathD; const pt: TPointD); inline;
+procedure Append(var path: TPathD; const pt: TPointD);
+  {$IFDEF INLINE} inline; {$ENDIF}
 var
   len: integer;
 begin

@@ -317,12 +317,31 @@ type
   NativeInt = Integer;
   {$IFEND}
 
+  {$IFDEF SUPPORTS_POINTERMATH}
+  // Works for Delphi 2009 and newer. For FPC it is a requirement,
+  // otherwise 32bit and 64bit code behave differently for negative
+  // indices, because FPC does not sign-extend the index variable
+  // of type Integer, if it is used for an array-index into an array
+  // with an unsigned index range.
+  //   i32:=-1; i64:=-1 => i32=i64 but @arr[i32] <> @arr[i64]
+
+  PStaticByteArray = PByte; // PByte already has PointerMath
+  {$POINTERMATH ON}
+  PStaticDoubleArray = ^Double;
+  PStaticInt64Array = ^Int64;
+  PStaticColor32Array = ^TColor32;
+  {$POINTERMATH OFF}
+
+  {$ELSE} // Delphi 7-2007
+  PStaticByteArray = ^TStaticByteArray;
+  TStaticByteArray = array[0..MaxInt div SizeOf(byte) - 1] of byte;
   PStaticDoubleArray = ^TStaticDoubleArray;
   TStaticDoubleArray = array[0..MaxInt div SizeOf(double) - 1] of double;
   PStaticInt64Array = ^TStaticInt64Array;
   TStaticInt64Array = array[0..MaxInt div SizeOf(int64) - 1] of int64;
   PStaticColor32Array = ^TStaticColor32Array;
   TStaticColor32Array = array[0..MaxInt div SizeOf(TColor32) - 1] of TColor32;
+  {$ENDIF}
 
   // A horizontal scanline contains any number of line fragments. A fragment
   // can be a number of pixels wide but it can't be more than one pixel high.
@@ -977,19 +996,19 @@ end;
 
 {$RANGECHECKS OFF} // negative array index is used
 { CPU register optimized implementations. Every data type must be exactly the one used. }
-procedure FillByteBufferEvenOdd(byteBuffer: PByteArray;
+procedure FillByteBufferEvenOdd(byteBuffer: PByte;
   windingAccum: PDouble; count: nativeint);
 var
   accum: double;
   lastValue: integer;
   start: nativeint;
-  buf: PByteArray;
+  buf: PStaticByteArray;
 begin
   accum := 0; //winding count accumulator
   lastValue := 0;
   // Copy byteBuffer to a local variable, so Delphi's 32bit compiler
   // can put buf into a CPU register.
-  buf := PByteArray(byteBuffer);
+  buf := PStaticByteArray(byteBuffer);
 
   // Use the negative offset trick to only increment "count"
   // until it reaches zero. And by offsetting the arrays, "count"
@@ -1025,19 +1044,19 @@ begin
   end;
 end;
 
-procedure FillByteBufferNonZero(byteBuffer: PByteArray;
+procedure FillByteBufferNonZero(byteBuffer: PByte;
   windingAccum: PDouble; count: nativeint);
 var
   accum: double;
   lastValue: integer;
   start: nativeint;
-  buf: PByteArray;
+  buf: PStaticByteArray;
 begin
   accum := 0; //winding count accumulator
   lastValue := 0;
   // Copy byteBuffer to a local variable, so Delphi's 32bit compiler
   // can put buf into a CPU register.
-  buf := PByteArray(byteBuffer);
+  buf := PStaticByteArray(byteBuffer);
 
   // Use the negative offset trick to only increment "count"
   // until it reaches zero. And by offsetting the arrays, "count"
@@ -1070,19 +1089,19 @@ begin
   end;
 end;
 
-procedure FillByteBufferPositive(byteBuffer: PByteArray;
+procedure FillByteBufferPositive(byteBuffer: PByte;
   windingAccum: PDouble; count: nativeint);
 var
   accum: double;
   lastValue: integer;
   start: nativeint;
-  buf: PByteArray;
+  buf: PStaticByteArray;
 begin
   accum := 0; //winding count accumulator
   lastValue := 0;
   // Copy byteBuffer to a local variable, so Delphi's 32bit compiler
   // can put buf into a CPU register.
-  buf := PByteArray(byteBuffer);
+  buf := PStaticByteArray(byteBuffer);
 
   // Use the negative offset trick to only increment "count"
   // until it reaches zero. And by offsetting the arrays, "count"
@@ -1119,19 +1138,19 @@ begin
   end;
 end;
 
-procedure FillByteBufferNegative(byteBuffer: PByteArray;
+procedure FillByteBufferNegative(byteBuffer: PByte;
   windingAccum: PDouble; count: nativeint);
 var
   accum: double;
   lastValue: integer;
   start: nativeint;
-  buf: PByteArray;
+  buf: PStaticByteArray;
 begin
   accum := 0; //winding count accumulator
   lastValue := 0;
   // Copy byteBuffer to a local variable, so Delphi's 32bit compiler
   // can put buf into a CPU register.
-  buf := PByteArray(byteBuffer);
+  buf := PStaticByteArray(byteBuffer);
 
   // Use the negative offset trick to only increment "count"
   // until it reaches zero. And by offsetting the arrays, "count"
@@ -1178,13 +1197,13 @@ var
   clipRec2: TRect;
   paths2: TPathsD;
   windingAccum: TArrayOfDouble;
-  byteBuffer: PByteArray;
+  byteBuffer: PStaticByteArray;
   scanlines: TArrayOfScanline;
   fragments: PFragment;
   scanline: PScanline;
 
   // FPC generates wrong code if "count" isn't NativeInt
-  FillByteBuffer: procedure(byteBuffer: PByteArray; windingAccum: PDouble; count: nativeint);
+  FillByteBuffer: procedure(byteBuffer: PByte; windingAccum: PDouble; count: nativeint);
 begin
   // See also https://nothings.org/gamedev/rasterize/
   if not assigned(renderer) then Exit;
@@ -1356,13 +1375,13 @@ end;
 }
 // ------------------------------------------------------------------------------
 
-{$RANGECHECKS OFF} // negative array index usage
+{$RANGECHECKS OFF} // negative array index usage (Delphi 7-2007 have no pointer math)
 type
   // Used to reduce the number of parameters to help the compiler's
   // optimizer.
   TRenderProcData = record
     dst: PStaticColor32Array;
-    alpha: PByteArray;
+    alpha: PStaticByteArray;
   end;
 
 function RenderProcBlendToAlpha255(count: nativeint; dstColor: TColor32;
@@ -1371,7 +1390,7 @@ function RenderProcBlendToAlpha255(count: nativeint; dstColor: TColor32;
 var
   a: byte;
   dst: PStaticColor32Array;
-  alpha: PByteArray;
+  alpha: PStaticByteArray;
 begin
   Result := count;
   dst := data.dst;
@@ -1388,8 +1407,8 @@ begin
   end;
 end;
 
-procedure RenderProcBlendToAlpha(dst: PStaticColor32Array; alpha: PByteArray;
-  count: nativeint; color: TColor32; tab: PByteArray);
+procedure RenderProcBlendToAlpha(dst: PStaticColor32Array; alpha: PStaticByteArray;
+  count: nativeint; color: TColor32; tab: PStaticByteArray);
 var
   a: byte;
   lastDst, dstColor: TColor32;
@@ -1447,8 +1466,8 @@ begin
   // Without the hidden Self parameter the compiler optimizes
   // better.
   RenderProcBlendToAlpha(PStaticColor32Array(GetDstPixel(x1, y)),
-                         PByteArray(alpha), x2 - x1 + 1, fColor,
-                         PByteArray(@MulTable[fAlpha]));
+                         PStaticByteArray(alpha), x2 - x1 + 1, fColor,
+                         PStaticByteArray(@MulTable[fAlpha]));
 end;
 
 // ------------------------------------------------------------------------------
