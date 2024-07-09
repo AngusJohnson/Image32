@@ -948,6 +948,7 @@ end;
 procedure TImageElement.Draw(image: TImage32; drawDat: TDrawData);
 var
   dstRecD: TRectD;
+  tmp: TImage32;
 begin
   dstRecD := Self.elRectWH.GetRectD(0,0);
   drawDat.matrix := MatrixMultiply(drawDat.matrix, fDrawData.matrix);
@@ -961,7 +962,16 @@ begin
   end;
 
   if fImage <> nil then
-    image.Copy(fImage, fImage.Bounds, Rect(dstRecD));
+  begin
+    tmp := TImage32.Create();
+    try
+      tmp.AssignSettings(fImage);
+      MatrixApply(drawDat.matrix, fImage, tmp);
+      image.Copy(tmp, tmp.Bounds, Rect(dstRecD));
+    finally
+      tmp.Free;
+    end;
+  end;
 end;
 
 //------------------------------------------------------------------------------

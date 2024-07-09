@@ -3,7 +3,7 @@ unit Img32.Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  11 May 2024                                                     *
+* Date      :  3 July 2024                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Miscellaneous routines that don't belong in other modules.      *
@@ -1221,7 +1221,11 @@ begin
       inc(s, w); inc(s2, w); inc(d, w);
     end;
   end;
-  Move(tmp2[0], img.PixelBase^, w * h * sizeOf(TColor32));
+
+  img.BlockNotify;
+  img.AssignPixelArray(tmp2, w, h);
+  img.UnblockNotify;
+
   if intensity < 1 then Exit;
   if intensity > 10 then
     intensity := 10; // range = 1-10

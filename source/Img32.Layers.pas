@@ -3,7 +3,7 @@ unit Img32.Layers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.5                                                             *
-* Date      :  21 June 2024                                                    *
+* Date      :  3 July 2024                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Layered images support                                          *
@@ -1813,10 +1813,10 @@ begin
   begin
     Image.BeginUpdate;
     try
-      Image.Assign(MasterImage);
+      Image.AssignSettings(MasterImage);
       //apply any prior transformations
       Image.Resampler := rWeightedBilinear;
-      AffineTransformImage(Image, fMatrix, true); // assumes no skew
+      AffineTransformImage(MasterImage, Image, fMatrix, true); // assumes no skew
       //cropping is very important with rotation
       SymmetricCropTransparent(Image);
       w := Ceil(newBounds.Right) - Floor(newBounds.Left);
@@ -1861,12 +1861,12 @@ begin
 
   Image.BlockNotify;
   try
-    Image.Assign(MasterImage);
+    Image.AssignSettings(MasterImage);
     mat := fMatrix;
     pt := PointD(PivotPt.X - fLeft, PivotPt.Y - fTop);
     MatrixRotate(mat, pt, Angle);
     Image.Resampler := rWeightedBilinear;
-    AffineTransformImage(Image, mat, true); // assumes no skew
+    AffineTransformImage(MasterImage, Image, mat, true); // assumes no skew
   finally
     Image.UnblockNotify;
   end;

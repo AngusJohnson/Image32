@@ -3,7 +3,7 @@ unit Img32.Resamplers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  2 May 2024                                                      *
+* Date      :  3 July 2024                                                     *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  For image transformations (scaling, rotating etc.)              *
@@ -30,6 +30,14 @@ procedure PremultiplyAlpha(pSrc, pDst: PARGB; count: nativeint); overload;
 procedure BoxDownSampling(Image: TImage32; scale: double); overload;
 procedure BoxDownSampling(Image: TImage32; scaleX, scaleY: double); overload;
 procedure BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer); overload;
+procedure BoxDownSampling(Image, TargetImage: TImage32; scale: double); overload;
+procedure BoxDownSampling(Image, TargetImage: TImage32; scaleX, scaleY: double); overload;
+procedure BoxDownSampling(Image, TargetImage: TImage32; newWidth, newHeight: Integer); overload;
+
+procedure NearestNeighborResize(Image: TImage32; newWidth, newHeight: Integer); overload;
+procedure NearestNeighborResize(Image, TargetImage: TImage32; newWidth, newHeight: Integer); overload;
+procedure ResamplerResize(Image: TImage32; newWidth, newHeight: Integer); overload;
+procedure ResamplerResize(Image, TargetImage: TImage32; newWidth, newHeight: Integer); overload;
 
 // The following general purpose resamplers are registered below:
 // function NearestResampler(img: TImage32; x, y: double): TColor32;
@@ -695,21 +703,39 @@ end;
 
 procedure BoxDownSampling(Image: TImage32; scaleX, scaleY: double);
 begin
-  BoxDownSampling(Image,
-    Max(1, Integer(Round(Image.Width * scaleX))),
-    Max(1, Integer(Round(Image.Height * scaleY))));
+  BoxDownSampling(Image, Image, scaleX, scaleY);
 end;
 //------------------------------------------------------------------------------
 
 procedure BoxDownSampling(Image: TImage32; scale: double);
 begin
-  BoxDownSampling(Image,
+  BoxDownSampling(Image, Image, scale);
+end;
+//------------------------------------------------------------------------------
+
+procedure BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer);
+begin
+  BoxDownSampling(Image, Image, newWidth, newHeight);
+end;
+//------------------------------------------------------------------------------
+
+procedure BoxDownSampling(Image, TargetImage: TImage32; scaleX, scaleY: double);
+begin
+  BoxDownSampling(Image, TargetImage,
+    Max(1, Integer(Round(Image.Width * scaleX))),
+    Max(1, Integer(Round(Image.Height * scaleY))));
+end;
+//------------------------------------------------------------------------------
+
+procedure BoxDownSampling(Image, TargetImage: TImage32; scale: double);
+begin
+  BoxDownSampling(Image, TargetImage,
     Max(1, Integer(Round(Image.Width * scale))),
     Max(1, Integer(Round(Image.Height * scale))));
 end;
 //------------------------------------------------------------------------------
 
-procedure BoxDownSampling(Image: TImage32; newWidth, newHeight: Integer);
+procedure BoxDownSampling(Image, TargetImage: TImage32; newWidth, newHeight: Integer);
 var
   x,y, x256,y256,xx256,yy256: Integer;
   sx,sy: double;
@@ -742,11 +768,73 @@ begin
     y256 := yy256;
   end;
 
-  Image.BeginUpdate;
-  Image.SetSize(newWidth, newHeight);
-  Move(tmp[0], Image.Pixels[0], newWidth * newHeight * SizeOf(TColor32));
-  Image.EndUpdate;
+  TargetImage.AssignPixelArray(tmp, newWidth, newHeight);
 end;
+//------------------------------------------------------------------------------
+
+procedure NearestNeighborResize(Image: TImage32; newWidth, newHeight: Integer);
+begin
+  NearestNeighborResize(Image, Image, newWidth, newHeight);
+end;
+//------------------------------------------------------------------------------
+
+procedure NearestNeighborResize(Image, TargetImage: TImage32; newWidth, newHeight: Integer);
+var
+  x, y, offset: Integer;
+  scaledXi, scaledYi: TArrayOfInteger;
+  tmp: TArrayOfColor32;
+  pc: PColor32;
+  pixels: TArrayOfColor32;
+begin
+  //this NearestNeighbor code is slightly more efficient than
+  //the more general purpose one in Img32.Resamplers
+
+  if (newWidth = Image.Width) and (newHeight = Image.Height) then
+  begin
+    if TargetImage <> Image then TargetImage.Assign(Image);
+    Exit;
+  end;
+  SetLength(tmp, newWidth * newHeight);
+
+  //get scaled X & Y values once only (storing them in lookup arrays) ...
+  SetLength(scaledXi, newWidth);
+  for x := 0 to newWidth -1 do
+    scaledXi[x] := Trunc(x * Image.Width / newWidth);
+  SetLength(scaledYi, newHeight);
+  for y := 0 to newHeight -1 do
+    scaledYi[y] := Trunc(y * Image.Height / newHeight);
+
+  pc := @tmp[0];
+  pixels := Image.Pixels;
+  for y := 0 to newHeight - 1 do
+  begin
+    offset := scaledYi[y] * Image.Width;
+    for x := 0 to newWidth - 1 do
+    begin
+      pc^ := pixels[scaledXi[x] + offset];
+      inc(pc);
+    end;
+  end;
+
+  TargetImage.AssignPixelArray(tmp, newWidth, newHeight);
+end;
+//------------------------------------------------------------------------------
+
+procedure ResamplerResize(Image: TImage32; newWidth, newHeight: Integer);
+begin
+  ResamplerResize(Image, Image, newWidth, newHeight);
+end;
+//------------------------------------------------------------------------------
+
+procedure ResamplerResize(Image, TargetImage: TImage32; newWidth, newHeight: Integer);
+var
+  mat: TMatrixD;
+begin
+  mat := IdentityMatrix;
+  MatrixScale(mat, newWidth/Image.Width, newHeight/Image.Height);
+  AffineTransformImage(Image, TargetImage, mat);
+end;
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
