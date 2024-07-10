@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.5                                                             *
-* Date      :  4 July 2024                                                     *
+* Date      :  10 July 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -1116,7 +1116,7 @@ procedure TUseElement.Draw(img: TImage32; drawDat: TDrawData);
 var
   el: TBaseElement;
   s, dx, dy: double;
-  scale, scale2: TSizeD;
+  scale, scale2: TPointD;
   mat: TMatrixD;
 begin
 
@@ -1130,7 +1130,7 @@ begin
   if not Assigned(el) then Exit;
 
   UpdateDrawInfo(drawDat, self); //nb: <use> attribs override el's.
-  scale := ExtractScaleFromMatrix(drawDat.matrix);
+  MatrixExtractScale(drawDat.matrix, scale.X, scale.Y);
 
   if elRectWH.left.IsValid then dx := elRectWH.left.rawVal else dx := 0;
   if elRectWH.top.IsValid  then dy := elRectWH.top.rawVal  else dy := 0;
@@ -1151,9 +1151,9 @@ begin
         //scale the symbol according to its width and height attributes
         if elRectWH.width.IsValid and elRectWH.height.IsValid then
         begin
-          scale2.cx := elRectWH.width.rawVal / viewboxWH.Width;
-          scale2.cy := elRectWH.height.rawVal / viewboxWH.Height;
-          if scale2.cy < scale2.cx then s := scale2.cy else s := scale2.cx;
+          scale2.X := elRectWH.width.rawVal / viewboxWH.Width;
+          scale2.Y := elRectWH.height.rawVal / viewboxWH.Height;
+          if scale2.Y < scale2.X then s := scale2.Y else s := scale2.X;
           //the following 3 lines will scale without translating
           mat := IdentityMatrix;
           MatrixScale(mat, s, s);
@@ -1170,9 +1170,9 @@ begin
             dy := -Top/Height * self.elRectWH.height.rawVal;
 
             //scale <symbol> proportionally to fill the <use> element
-            scale2.cx := self.elRectWH.width.rawVal / Width;
-            scale2.cy := self.elRectWH.height.rawVal / Height;
-            if scale2.cy < scale2.cx then s := scale2.cy else s := scale2.cx;
+            scale2.X := self.elRectWH.width.rawVal / Width;
+            scale2.Y := self.elRectWH.height.rawVal / Height;
+            if scale2.Y < scale2.X then s := scale2.Y else s := scale2.X;
           end;
 
           mat := IdentityMatrix;
@@ -1181,17 +1181,17 @@ begin
           drawDat.matrix := MatrixMultiply(drawDat.matrix, mat);
 
           //now center after scaling
-          if scale2.cx > scale2.cy then
+          if scale2.X > scale2.Y then
           begin
-            if scale2.cx > 1 then
+            if scale2.X > 1 then
             begin
               s := (self.elRectWH.width.rawVal - viewboxWH.Width) * 0.5;
-              MatrixTranslate(drawDat.matrix, s * scale.cx, 0);
+              MatrixTranslate(drawDat.matrix, s * scale.X, 0);
             end;
-          end else if scale2.cy > 1 then
+          end else if scale2.Y > 1 then
           begin
             s := (self.elRectWH.height.rawVal - viewboxWH.Height) * 0.5;
-            MatrixTranslate(drawDat.matrix, 0, s * scale.cy);
+            MatrixTranslate(drawDat.matrix, 0, s * scale.Y);
           end;
 
         end;
@@ -1380,7 +1380,7 @@ function TRadGradElement.PrepareRenderer(renderer: TCustomGradientRenderer;
 var
   hiStops: integer;
   cp, fp, r: TPointD;
-  scale, scale2: TSizeD;
+  scale, scale2: TPointD;
   rec2, rec3: TRectD;
 begin
   inherited PrepareRenderer(renderer, drawDat);
@@ -1402,9 +1402,9 @@ begin
     r.X := rec2.Width * 0.5;
     r.Y := rec2.Height * 0.5;
   end;
-  scale := ExtractScaleFromMatrix(drawDat.matrix);
-  scale2 := ExtractScaleFromMatrix(fDrawData.matrix);
-  r := ScalePoint(r, scale.cx * scale2.cx, scale.cy * scale2.cy);
+  MatrixExtractScale(drawDat.matrix, scale.X, scale.Y);
+  MatrixExtractScale(fDrawData.matrix, scale2.X, scale2.Y);
+  r := ScalePoint(r, scale.X * scale2.X, scale.Y * scale2.Y);
 
   if C.IsValid then
   begin
@@ -1732,7 +1732,7 @@ procedure TFilterElement.Apply(img: TImage32;
 var
   i: integer;
 begin
-  fScale := ExtractAvgScaleFromMatrix(matrix);
+  MatrixExtractScale(matrix, fScale);
   fFilterBounds := filterBounds;
   Types.IntersectRect(fObjectBounds, fObjectBounds, img.Bounds);
   fSrcImg := img;
@@ -2351,7 +2351,7 @@ begin
         drawDat.filterElRef := '';
         with TFilterElement(filterEl) do
         begin
-          fScale := ExtractAvgScaleFromMatrix(DrawData.matrix);
+          MatrixExtractScale(DrawData.matrix, fScale);
           clipRec := GetAdjustedBounds(clipRec);
         end;
       end;
@@ -2406,7 +2406,7 @@ end;
 procedure TShapeElement.DrawMarkers(img: TImage32; drawDat: TDrawData);
 var
   i,j: integer;
-  sw: double;
+  scale, sw: double;
   markerEl: TBaseElement;
   markerPaths: TPathsD;
   pt1, pt2: TPointD;
@@ -2427,8 +2427,8 @@ begin
       sw := GetValue(drawDat.fontInfo.size, GetRelFracLimit)
     else sw := GetValueXY(drawDat.bounds, GetRelFracLimit);
 
-  MatrixScale(di.matrix, sw * ExtractAvgScaleFromMatrix(drawDat.matrix));
-
+  MatrixExtractScale(drawDat.matrix, scale);
+  MatrixScale(di.matrix, sw * scale);
   if (fDrawData.markerStart <> '') then
   begin
     markerEl := FindRefElement(fDrawData.markerStart);
@@ -2561,7 +2561,7 @@ var
   paths: TPathsD;
 begin
 
-  scale := ExtractAvgScaleFromMatrix(drawDat.matrix);
+  MatrixExtractScale(drawDat.matrix, scale);
   joinStyle := fDrawData.strokeJoin;
 
   bounds := fReader.userSpaceBounds;
@@ -2708,7 +2708,7 @@ var
   path: TPathD;
 begin
   if Assigned(drawPathsC) or Assigned(drawPathsO) then inherited;
-  scalePending := ExtractAvgScaleFromMatrix(drawDat.matrix);
+  MatrixExtractScale(drawDat.matrix, scalePending);
   for i := 0 to fSvgPaths.Count -1 do
   begin
     Flatten(i, scalePending, path, isClosed);
@@ -2866,7 +2866,7 @@ begin
   if not radius.IsValid then Exit;
   r := radius.GetValueXY(drawDat.bounds, GetRelFracLimit);
   pt := centerPt.GetPoint(drawDat.bounds, GetRelFracLimit);
-  scalePending := ExtractAvgScaleFromMatrix(drawDat.matrix);
+  MatrixExtractScale(drawDat.matrix, scalePending);
   rec := RectD(pt.X -r, pt.Y -r, pt.X +r, pt.Y +r);
   path := Ellipse(rec, scalePending);
   AppendPath(drawPathsC, path);
@@ -2911,7 +2911,7 @@ begin
   centPt := centerPt.GetPoint(drawDat.bounds, GetRelFracLimit);
   with centPt do
     rec := RectD(X -rad.X, Y -rad.Y, X +rad.X, Y +rad.Y);
-  scalePending := ExtractAvgScaleFromMatrix(drawDat.matrix);
+  MatrixExtractScale(drawDat.matrix, scalePending);
   path := Ellipse(rec, scalePending);
   AppendPath(drawPathsC, path);
   drawPathsF := drawPathsC;
@@ -3471,7 +3471,7 @@ begin
   begin
     l := refPt.X.rawVal;
     t := refPt.Y.rawVal;
-    scale := ExtractAvgScaleFromMatrix(mat);
+    MatrixExtractScale(mat, scale);
     MatrixTranslate(mat, -l * scale, -t * scale);
   end;
 
@@ -3563,11 +3563,11 @@ var
   rec   : TRectD;
   mat   : TMatrixD;
   sx,sy : double;
-  scale: TSizeD;
+  scale : TPointD;
 begin
   Result := false;
 
-  scale := ExtractScaleFromMatrix(drawDat.matrix);
+  MatrixExtractScale(drawDat.matrix, scale.X, scale.Y);
 
   if units = hUserSpaceOnUse then
     rec := fReader.userSpaceBounds else
@@ -3596,13 +3596,13 @@ begin
     Exit;
 
   renderer.Image.SetSize(
-    Round(recWH.Width * scale.cx),
-    Round(recWH.Height * scale.cy));
+    Round(recWH.Width * scale.X),
+    Round(recWH.Height * scale.Y));
 
   Result := true;
 
   mat := IdentityMatrix;
-  MatrixScale(mat, scale.cx * sx, scale.cy * sy);
+  MatrixScale(mat, scale.X * sx, scale.Y * sy);
 
   if (refEl <> '') then
   begin

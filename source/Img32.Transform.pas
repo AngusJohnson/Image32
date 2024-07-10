@@ -27,6 +27,7 @@ type
   function MatrixDeterminant(const matrix: TMatrixD): double;
   function MatrixAdjugate(const matrix: TMatrixD): TMatrixD;
   function MatrixMultiply(const modifier, matrix: TMatrixD): TMatrixD;
+  function  MatrixInvert(var matrix: TMatrixD): Boolean;
 
   procedure MatrixApply(const matrix: TMatrixD;
     var x, y: double); overload; {$IFDEF INLINE} inline; {$ENDIF}
@@ -41,27 +42,29 @@ type
   procedure MatrixApply(const matrix: TMatrixD;
     img, targetImg: TImage32; scaleAdjust: Boolean = false); overload; {$IFDEF INLINE} inline; {$ENDIF}
 
-  function  MatrixInvert(var matrix: TMatrixD): Boolean;
-
-  // MatrixSkew: dx represents the delta offset of an X coordinate as a
-  // fraction of its Y coordinate, and likewise for dy. Example: if dx = 0.1
-  // and dy = 0, and the matrix is applied to the coordinate [20,15], then the
-  // transformed coordinate will become [20 + (15 * 0.1),10], ie [21.5,10].
   procedure MatrixSkew(var matrix: TMatrixD; angleX, angleY: double);
+
   procedure MatrixScale(var matrix: TMatrixD; scale: double); overload;
   procedure MatrixScale(var matrix: TMatrixD; scaleX, scaleY: double); overload;
-  procedure MatrixRotate(var matrix: TMatrixD;
-    const center: TPointD; angRad: double);
+
+  procedure MatrixRotate(var matrix: TMatrixD; angRad: double); overload;
+  procedure MatrixRotate(var matrix: TMatrixD; const center: TPointD; angRad: double); overload;
+
   procedure MatrixTranslate(var matrix: TMatrixD; dx, dy: double);
 
   // The following MatrixExtract routines assume here is no skew
-  procedure MatrixExtractScale(const mat: TMatrixD; out sx, sy: double);
+  procedure MatrixExtractScale(const mat: TMatrixD; out scale: double); overload;
+  procedure MatrixExtractScale(const mat: TMatrixD; out X, Y: double); overload;
   procedure MatrixExtractTranslation(const mat: TMatrixD; out dx, dy: double);
   procedure MatrixExtractRotation(const mat: TMatrixD; out angle: double);
+  // MatrixExtractAll - except skew :)
+  function MatrixExtractAll(const mat: TMatrixD; out angle: double;
+    out scale, trans: TPointD): Boolean;
 
   // AffineTransformImage: will automagically translate the image
-  // Note: "scaleAdjust" prevents antialiasing extending way outside of images
-  // when they are being enlarged significantly and rotated concurrently
+  // Note: when the "scaleAdjust" parameter is enabled, it prevents antialiasing
+  // from extending way outside of images when they are being enlarged
+  // significantly (> 2 times) and rotated concurrently
   function AffineTransformImage(img: TImage32; matrix: TMatrixD;
     scaleAdjust: Boolean = false): TPoint; overload; {$IFDEF INLINE} inline; {$ENDIF}
   function AffineTransformImage(img, targetImg: TImage32; matrix: TMatrixD;
@@ -84,12 +87,6 @@ type
     splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean; overload; {$IFDEF INLINE} inline; {$ENDIF}
   function SplineHorzTransform(img, targetImg: TImage32; const leftSpline: TPathD;
     splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean; overload;
-
-  function ExtractAngleFromMatrix(const mat: TMatrixD): double;
-  function ExtractScaleFromMatrix(const mat: TMatrixD): TSizeD;
-  function ExtractAvgScaleFromMatrix(const mat: TMatrixD): double;
-  procedure ExtractAllFromMatrix(const mat: TMatrixD;
-    out angle: double; out scale, skew, trans: TPointD);
 
 type
   PWeightedColor = ^TWeightedColor;
@@ -347,28 +344,49 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure MatrixRotate(var matrix: TMatrixD;
-  const center: TPointD; angRad: double);
+procedure MatrixRotate(var matrix: TMatrixD; const center: TPointD; angRad: double);
 var
   m: TMatrixD;
   sinA, cosA: double;
-  origOffset: Boolean;
+begin
+  if (center.X <> 0) or (center.Y <> 0) then
+  begin
+    NormalizeAngle(angRad);
+    if angRad = 0 then Exit;
+    if ClockwiseRotationIsAnglePositive then
+      angRad := -angRad; //negated angle because of inverted Y-axis.
+    m := IdentityMatrix;
+    MatrixTranslate(matrix, -center.X, -center.Y);
+    GetSinCos(angRad, sinA, cosA);
+    m := IdentityMatrix;
+    m[0, 0] := cosA;   m[1, 0] := sinA;
+    m[0, 1] := -sinA;  m[1, 1] := cosA;
+    matrix := MatrixMultiply(m, matrix);
+    MatrixTranslate(matrix, center.X, center.Y);
+  end else
+    MatrixRotate(matrix, angRad);
+
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixRotate(var matrix: TMatrixD; angRad: double);
+var
+  m: TMatrixD;
+  sinA, cosA: double;
 begin
   NormalizeAngle(angRad);
   if angRad = 0 then Exit;
   if ClockwiseRotationIsAnglePositive then
     angRad := -angRad; //negated angle because of inverted Y-axis.
   m := IdentityMatrix;
-  origOffset := (center.X <> 0) or (center.Y <> 0);
-  if origOffset then MatrixTranslate(matrix, -center.X, -center.Y);
   GetSinCos(angRad, sinA, cosA);
   m := IdentityMatrix;
   m[0, 0] := cosA;   m[1, 0] := sinA;
   m[0, 1] := -sinA;  m[1, 1] := cosA;
   matrix := MatrixMultiply(m, matrix);
-  if origOffset then MatrixTranslate(matrix, center.X, center.Y);
 end;
 //------------------------------------------------------------------------------
+
 
 procedure MatrixTranslate(var matrix: TMatrixD; dx, dy: double);
 var
@@ -420,12 +438,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure MatrixExtractScale(const mat: TMatrixD; out sx, sy: double);
+procedure MatrixExtractScale(const mat: TMatrixD; out X, Y: double);
 begin
   // https://stackoverflow.com/a/32125700/359538
-  sx := Sqrt(Sqr(mat[0,0]) + Sqr(mat[0,1]));
-  //sy := Sqrt(Sqr(mat[1,0]) + Sqr(mat[1,1]));
-  sy := (mat[0,0] * mat[1,1] - mat[1,0] * mat[0,1]) / sx;
+  X := Sqrt(Sqr(mat[0,0]) + Sqr(mat[0,1]));
+  //Y := Sqrt(Sqr(mat[1,0]) + Sqr(mat[1,1]));
+  Y := (mat[0,0] * mat[1,1] - mat[1,0] * mat[0,1]) / X;
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixExtractScale(const mat: TMatrixD; out scale: double);
+var
+  x,y: double;
+begin
+  MatrixExtractScale(mat, x, y);
+  scale := Average(x,y);
 end;
 //------------------------------------------------------------------------------
 
@@ -439,6 +466,29 @@ end;
 procedure MatrixExtractRotation(const mat: TMatrixD; out angle: double);
 begin
   angle := ArcTan2(mat[0,1], mat[0,0]);
+end;
+//------------------------------------------------------------------------------
+
+function MatrixExtractAll(const mat: TMatrixD;
+  out angle: double; out scale, trans: TPointD): Boolean;
+var
+  m00, m01, m10, m11: double;
+begin
+  m00 := mat[0][0]; m10 := mat[1][0];
+  m01 := mat[0][1]; m11 := mat[1][1];
+  trans.X := mat[2][0];
+  trans.Y := mat[2][1];
+
+  angle := 0;
+  scale := PointD(1,1);
+
+  Result := (m00 <> 0) or (m01 <> 0);
+  if not Result then Exit;
+
+  angle := ArcTan2(m01, m00);
+  // https://stackoverflow.com/a/32125700/359538
+  scale.X := Sqrt(Sqr(mat[0,0]) + Sqr(mat[0,1]));
+  scale.Y := (m00 * m11 - m10 * m01) / scale.X;
 end;
 //------------------------------------------------------------------------------
 
@@ -1206,113 +1256,6 @@ begin
     result := result or LimitByte(System.Round(fColorTotG * oneDivAlphaTot)) shl 8;
   if fColorTotR <> 0 then
     result := result or LimitByte(System.Round(fColorTotR * oneDivAlphaTot)) shl 16;
-end;
-
-//------------------------------------------------------------------------------
-// Miscellaneous Matrix functions
-//------------------------------------------------------------------------------
-
-procedure ExtractAllFromMatrix(const mat: TMatrixD; out angle: double;
-  out scale, skew, trans: TPointD);
-var
-  a,b,c,d,e,f: double;
-  delta, r,s: double;
-begin
-  a := mat[0][0]; b := mat[1][0];
-  c := mat[0][1]; d := mat[1][1];
-  e := mat[2][0]; f := mat[2][1];
-
-  delta := a * d - b * c;
-  trans := PointD(e,f);
-  angle := 0;
-  scale := PointD(1,1);
-  skew := NullPointD;
-
-  if (a <> 0) or (b <> 0) then
-  begin
-    r := Sqrt(a * a + b * b);
-	  angle :=  ArcCos(a / r);
-	  if b < 0 then angle := -angle;
-    scale.X	:= r;
-	  scale.Y	:= delta / r;
-    skew.X	:= ArcTan((a * c + b * d) / (r * r));
-  end
-  else if (c <> 0) or (d <> 0) then
-  begin
-    s := Sqrt(c * c + d * d);
-    if d > 0 then
-      angle := Angle90 - ArcCos(-c / s) else
-	  angle := Angle90 + ArcCos(c / s);
-    scale.X := delta / s;
-    scale.Y := s;
-    skew.Y  := ArcTan((a * c + b * d) / (s * s));
-  end;
-  angle := -angle;
-  NormalizeAngle(angle);
-end;
-//------------------------------------------------------------------------------
-
-function ExtractAngleFromMatrix(const mat: TMatrixD): double;
-var
-  a,b,c,d: double;
-  r,s: double;
-begin
-  a := mat[0][0]; b := mat[1][0];
-  c := mat[0][1]; d := mat[1][1];
-
-  if (a <> 0) or (b <> 0) then
-  begin
-    r := Sqrt(a * a + b * b);
-	  Result :=  ArcCos(a / r);
-	  if b < 0 then Result := -Result;
-  end
-  else if (c <> 0) or (d <> 0) then
-  begin
-    s := Sqrt(c * c + d * d);
-    if d > 0 then
-      Result := Angle90 - ArcCos(-c / s) else
-	  Result := Angle90 + ArcCos(c / s);
-  end else
-  begin
-    Result := InvalidD; //error
-    Exit;
-  end;
-  Result := -Result;
-  NormalizeAngle(Result);
-end;
-//------------------------------------------------------------------------------
-
-function ExtractScaleFromMatrix(const mat: TMatrixD): TSizeD;
-var
-  a,b,c,d: double;
-  delta, q: double;
-begin
-  a := mat[0][0]; b := mat[1][0];
-  c := mat[0][1]; d := mat[1][1];
-
-  delta := a * d - b * c;
-  if (a <> 0) or (b <> 0) then
-  begin
-    q := Sqrt(a * a + b * b);
-    Result.cx	:= q;
-	  Result.cy	:= delta / q;
-  end
-  else if (c <> 0) or (d <> 0) then
-  begin
-    q := Sqrt(c * c + d * d);
-    Result.cx := delta / q;
-    Result.cy := q;
-  end else
-    Result := SizeD(0.0, 0.0);
-end;
-//------------------------------------------------------------------------------
-
-function ExtractAvgScaleFromMatrix(const mat: TMatrixD): double;
-var
-  scale: TSizeD;
-begin
-  scale := ExtractScaleFromMatrix(mat);
-  Result := Average(Abs(scale.cx), Abs(scale.cy));
 end;
 
 //------------------------------------------------------------------------------
