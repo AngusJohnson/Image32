@@ -3,7 +3,7 @@ unit Img32.Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  3 July 2024                                                     *
+* Date      :  10 July 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -422,8 +422,10 @@ end;
 
 procedure MatrixExtractScale(const mat: TMatrixD; out sx, sy: double);
 begin
+  // https://stackoverflow.com/a/32125700/359538
   sx := Sqrt(Sqr(mat[0,0]) + Sqr(mat[0,1]));
-  sy := Sqrt(Sqr(mat[1,0]) + Sqr(mat[1,1]));
+  //sy := Sqrt(Sqr(mat[1,0]) + Sqr(mat[1,1]));
+  sy := (mat[0,0] * mat[1,1] - mat[1,0] * mat[0,1]) / sx;
 end;
 //------------------------------------------------------------------------------
 
@@ -435,18 +437,8 @@ end;
 //------------------------------------------------------------------------------
 
 procedure MatrixExtractRotation(const mat: TMatrixD; out angle: double);
-var
-  sx, sy: double;
-  mat2: TMatrixD;
 begin
-  MatrixExtractScale(mat, sx, sy);
-  mat2 := mat;
-  mat2[0,0] := mat2[0,0] / sx;
-  mat2[0,1] := mat2[0,1] / sx;
-  mat2[1,0] := mat2[1,0] / sy;
-  mat2[1,1] := mat2[1,1] / sy;
-
-  angle := ArcCos(mat2[0,0]);
+  angle := ArcTan2(mat[0,1], mat[0,0]);
 end;
 //------------------------------------------------------------------------------
 
@@ -1195,7 +1187,7 @@ begin
   {$ENDIF CPUX86}
     alpha := (fAlphaTot + (Cardinal(fAddCount) shr 1)) div Cardinal(fAddCount);
 
-  result := Min(255, alpha) shl 24;
+  result := TColor32(Min(255, alpha)) shl 24;
   // alpha weighting has been applied to color channels, so div by fAlphaTot
   if fAlphaTot < DivOneByXTableSize then // use precalculated 1/X values
     oneDivAlphaTot := DivOneByXTable[fAlphaTot]
