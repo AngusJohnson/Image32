@@ -759,7 +759,6 @@ var
   UsesAlpha: Boolean;
   pals: TArrayOfColor32;
   tmp: TImage32;
-  writeValue: TTriColor32;
 begin
   //write everything except a BMP file header because some streams
   //(eg resource streams) don't need a file header
