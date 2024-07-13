@@ -236,9 +236,7 @@ end;
 constructor TGroup.Create(const pathsIn: TPaths64; jt: TJoinType; et: TEndType);
 var
   i, len: integer;
-  a: double;
   isJoined: boolean;
-  pb: PBoolean;
 begin
   Self.joinType := jt;
   Self.endType := et;
@@ -345,7 +343,6 @@ var
   i,j, len, steps: Integer;
   r, stepsPer360, arcTol: Double;
   absDelta: double;
-  isShrinking: Boolean;
   rec: TRect64;
   pt0: TPoint64;
 begin

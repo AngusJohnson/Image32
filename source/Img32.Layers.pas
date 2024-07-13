@@ -1189,6 +1189,11 @@ begin
     img := fMergeImage;
   end;
 
+  {$IF not defined(FPC) and (CompilerVersion <= 26.0)}
+  // Delphi 7-XE5 have a problem with "continue" and the
+  // code analysis, marking "childImg" as "not initialized"
+  childImg := nil;
+  {$IFEND}
   //merge redraw all children
   for i := 0 to ChildCount -1 do
   begin
