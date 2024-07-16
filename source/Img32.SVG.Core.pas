@@ -1009,7 +1009,7 @@ begin
             MatrixSkew(mat, 0, DegToRad(values[0]));
          end;
     end;
-    MatrixMultiply(Result, mat);
+    MatrixMultiply2(mat, Result);
   end;
 end;
 //------------------------------------------------------------------------------
