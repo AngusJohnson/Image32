@@ -3,7 +3,7 @@ unit Img32.Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  10 July 2024                                                    *
+* Date      :  17 July 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -22,12 +22,17 @@ type
 
   //Matrix functions
   function IsIdentityMatrix(const matrix: TMatrixD): Boolean;
+  {$IFDEF INLINE} inline; {$ENDIF}
   function IsValidMatrix(const matrix: TMatrixD): Boolean;
+  {$IFDEF INLINE} inline; {$ENDIF}
   function Matrix(const m00, m01, m02, m10, m11, m12, m20, m21, m22: double): TMatrixD;
   function MatrixDeterminant(const matrix: TMatrixD): double;
   function MatrixAdjugate(const matrix: TMatrixD): TMatrixD;
-  function MatrixMultiply(const modifier, matrix: TMatrixD): TMatrixD;
   function  MatrixInvert(var matrix: TMatrixD): Boolean;
+
+  // Note: Matrix multiplication IS NOT commutative hence ...
+  procedure MatrixMultiply(var matrix1: TMatrixD; const matrix2: TMatrixD);
+  procedure MatrixMultiply2(const matrix1: TMatrixD; var matrix2: TMatrixD);
 
   procedure MatrixApply(const matrix: TMatrixD;
     var x, y: double); overload; {$IFDEF INLINE} inline; {$ENDIF}
@@ -235,6 +240,7 @@ procedure MatrixApply(const matrix: TMatrixD; var rec: TRect);
 var
   path: TPathD;
 begin
+  if not IsValidMatrix(matrix) then Exit;
   path := Rectangle(rec);
   MatrixApply(matrix, path);
   rec := GetBounds(path);
@@ -245,6 +251,7 @@ procedure MatrixApply(const matrix: TMatrixD; var rec: TRectD);
 var
   path: TPathD;
 begin
+  if not IsValidMatrix(matrix) then Exit;
   path := Rectangle(rec);
   MatrixApply(matrix, path);
   rec := GetBoundsD(path);
@@ -258,7 +265,8 @@ var
   pp: PPointD;
 begin
   len := Length(path);
-  if (len = 0) or IsIdentityMatrix(matrix) then Exit;
+  if (len = 0) or IsIdentityMatrix(matrix) or
+    not IsValidMatrix(matrix) then Exit;
   pp := @path[0];
   for i := 0 to len -1 do
   begin
@@ -276,8 +284,8 @@ var
   tmpX: double;
   pp: PPointD;
 begin
-  if not Assigned(paths) or IsIdentityMatrix(matrix) then
-    Exit;
+  if not Assigned(paths) or IsIdentityMatrix(matrix) or
+    not IsValidMatrix(matrix) then Exit;
 
   for i := 0 to High(paths) do
   begin
@@ -309,16 +317,33 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function MatrixMultiply(const modifier, matrix: TMatrixD): TMatrixD;
+procedure MatrixMultiply(var matrix1: TMatrixD; const matrix2: TMatrixD);
 var
   i, j: Integer;
+  m: TMatrixD;
 begin
   for i := 0 to 2 do
     for j := 0 to 2 do
-      Result[i, j] :=
-        (modifier[0, j] * matrix[i, 0]) +
-        (modifier[1, j] * matrix[i, 1]) +
-        (modifier[2, j] * matrix[i, 2]);
+      m[i, j] :=
+        (matrix1[i, 0] * matrix2[0, j]) +
+        (matrix1[i, 1] * matrix2[1, j]) +
+        (matrix1[i, 2] * matrix2[2, j]);
+  matrix1 := m;
+end;
+//------------------------------------------------------------------------------
+
+procedure MatrixMultiply2(const matrix1: TMatrixD; var matrix2: TMatrixD);
+var
+  i, j: Integer;
+  m: TMatrixD;
+begin
+  for i := 0 to 2 do
+    for j := 0 to 2 do
+      m[i, j] :=
+        (matrix1[i, 0] * matrix2[0, j]) +
+        (matrix1[i, 1] * matrix2[1, j]) +
+        (matrix1[i, 2] * matrix2[2, j]);
+  matrix2 := m;
 end;
 //------------------------------------------------------------------------------
 
@@ -333,7 +358,7 @@ begin
   if ValueAlmostOne(scaleX) and ValueAlmostOne(scaleY) then Exit;
   m[0, 0] := scaleX;
   m[1, 1] := scaleY;
-  matrix := MatrixMultiply(m, matrix);
+  MatrixMultiply(matrix, m);
 end;
 //------------------------------------------------------------------------------
 
@@ -361,7 +386,7 @@ begin
     m := IdentityMatrix;
     m[0, 0] := cosA;   m[1, 0] := sinA;
     m[0, 1] := -sinA;  m[1, 1] := cosA;
-    matrix := MatrixMultiply(m, matrix);
+    MatrixMultiply(matrix, m);
     MatrixTranslate(matrix, center.X, center.Y);
   end else
     MatrixRotate(matrix, angRad);
@@ -383,7 +408,7 @@ begin
   m := IdentityMatrix;
   m[0, 0] := cosA;   m[1, 0] := sinA;
   m[0, 1] := -sinA;  m[1, 1] := cosA;
-  matrix := MatrixMultiply(m, matrix);
+  MatrixMultiply(matrix, m);
 end;
 //------------------------------------------------------------------------------
 
@@ -396,7 +421,7 @@ begin
   m := IdentityMatrix;
   m[2, 0] := dx;
   m[2, 1] := dy;
-  matrix := MatrixMultiply(m, matrix);
+  MatrixMultiply(matrix, m);
 end;
 //------------------------------------------------------------------------------
 
@@ -434,7 +459,7 @@ begin
   m := IdentityMatrix;
   m[1, 0] := tan(angleX);
   m[0, 1] := tan(angleY);
-  matrix := MatrixMultiply(m, matrix);
+  MatrixMultiply(matrix, m);
 end;
 //------------------------------------------------------------------------------
 
@@ -644,15 +669,15 @@ end;
 
 function BasisToPoints(x1, y1, x2, y2, x3, y3, x4, y4: double): TMatrixD;
 var
-  m, m2: TMatrixD;
+  m2: TMatrixD;
   z4: double;
 begin
-  m := Matrix(x1, x2, x3, y1, y2, y3, 1,  1,  1);
-  m2 := MatrixAdjugate(m);
+  Result := Matrix(x1, x2, x3, y1, y2, y3, 1,  1,  1);
+  m2 := MatrixAdjugate(Result);
   z4 := 1;
   MatrixMulCoord(m2, x4, y4, z4);
   m2 := Matrix(x4, 0, 0, 0, y4, 0, 0, 0, z4);
-  Result := MatrixMultiply(m2, m);
+  MatrixMultiply(Result, m2);
 end;
 //------------------------------------------------------------------------------
 
@@ -720,18 +745,18 @@ end;
 
 function GetProjectionMatrix(const srcPts, dstPts: TPathD): TMatrixD;
 var
-  srcMat, dstMat: TMatrixD;
+  dstMat: TMatrixD;
 begin
   if (length(srcPts) <> 4) or (length(dstPts) <> 4) then
   begin
     Result := IdentityMatrix;
     Exit;
   end;
-  srcMat := BasisToPoints(srcPts[0].X, srcPts[0].Y,
+  Result := BasisToPoints(srcPts[0].X, srcPts[0].Y,
     srcPts[1].X, srcPts[1].Y, srcPts[2].X, srcPts[2].Y, srcPts[3].X, srcPts[3].Y);
   dstMat := BasisToPoints(dstPts[0].X, dstPts[0].Y,
     dstPts[1].X, dstPts[1].Y, dstPts[2].X, dstPts[2].Y, dstPts[3].X, dstPts[3].Y);
-  Result := MatrixMultiply(MatrixAdjugate(dstMat), srcMat);
+  MatrixMultiply(Result, MatrixAdjugate(dstMat));
 end;
 //------------------------------------------------------------------------------
 

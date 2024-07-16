@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.5                                                             *
-* Date      :  21 June 2024                                                    *
+* Date      :  17 July 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -1009,7 +1009,7 @@ begin
             MatrixSkew(mat, 0, DegToRad(values[0]));
          end;
     end;
-    Result := MatrixMultiply(Result, mat);
+    MatrixMultiply(Result, mat);
   end;
 end;
 //------------------------------------------------------------------------------

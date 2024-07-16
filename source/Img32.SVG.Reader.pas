@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.5                                                             *
-* Date      :  10 July 2024                                                    *
+* Date      :  17 July 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -751,7 +751,7 @@ begin
       drawDat.fontInfo.baseShift := fontInfo.baseShift;
 
     if not IsIdentityMatrix(matrix) then
-      drawDat.matrix := MatrixMultiply(drawDat.matrix, matrix);
+      MatrixMultiply2(matrix, drawDat.matrix);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -951,7 +951,7 @@ var
   tmp: TImage32;
 begin
   dstRecD := Self.elRectWH.GetRectD(0,0);
-  drawDat.matrix := MatrixMultiply(drawDat.matrix, fDrawData.matrix);
+  MatrixMultiply2(fDrawData.matrix, drawDat.matrix);
 
   MatrixApply(drawDat.matrix, dstRecD);
 
@@ -1139,7 +1139,7 @@ begin
   begin
     mat := IdentityMatrix;
     MatrixTranslate(mat, dx, dy);
-    drawDat.matrix := MatrixMultiply(drawDat.matrix, mat);
+    MatrixMultiply2(mat, drawDat.matrix);
   end;
 
   if el is TSymbolElement then
@@ -1157,7 +1157,7 @@ begin
           //the following 3 lines will scale without translating
           mat := IdentityMatrix;
           MatrixScale(mat, s, s);
-          drawDat.matrix := MatrixMultiply(drawDat.matrix, mat);
+          MatrixMultiply2(mat, drawDat.matrix);
           drawDat.bounds := RectD(0,0,viewboxWH.Width, viewboxWH.Height);
         end;
 
@@ -1178,7 +1178,7 @@ begin
           mat := IdentityMatrix;
           MatrixScale(mat, s, s);
           MatrixTranslate(mat, dx, dy);
-          drawDat.matrix := MatrixMultiply(drawDat.matrix, mat);
+          MatrixMultiply2(mat, drawDat.matrix);
 
           //now center after scaling
           if scale2.X > scale2.Y then
@@ -4302,7 +4302,7 @@ end;
 procedure Transform_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
 begin
   with aOwnerEl.fDrawData do
-    matrix := MatrixMultiply(matrix, ParseTransform(value));
+    MatrixMultiply2(ParseTransform(value), matrix);
 end;
 //------------------------------------------------------------------------------
 
@@ -4332,7 +4332,7 @@ begin
   if not (aOwnerEl is TGradientElement) then Exit;
   mat := ParseTransform(value);
   with aOwnerEl.fDrawData do
-    matrix := MatrixMultiply(matrix, mat);
+    MatrixMultiply2(mat, matrix);
 end;
 //------------------------------------------------------------------------------
 
