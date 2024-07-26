@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.5                                                             *
-* Date      :  3 July 2024                                                     *
+* Date      :  26 July 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -551,8 +551,6 @@ const
   angle360 = TwoPi;
 
 var
-  ClockwiseRotationIsAnglePositive: Boolean = true;
-
   //Resampling function identifiers (initialized in Img32.Resamplers)
   rNearestResampler : integer;
   rBilinearResampler: integer;
@@ -692,7 +690,7 @@ begin
   // 52 bit fractional value, 11bit ($7FF) exponent, and 1bit sign
   Result := 0;
   if i64 = 0 then Exit;
-  exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;  
+  exp := Integer(Cardinal(i64 shr 52) and $7FF) - 1023;
   // nb: when exp == 1024 then Value == INF or NAN.
   if exp < 0 then
     Exit
@@ -3251,8 +3249,10 @@ procedure TImage32.Rotate(angleRads: double);
 var
   mat: TMatrixD;
 begin
-  if not ClockwiseRotationIsAnglePositive then
-    angleRads := -angleRads;
+
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  angleRads := -angleRads;
+{$ENDIF}
 
   //nb: There's no point rotating about a specific point
   //since the rotated image will be recentered.

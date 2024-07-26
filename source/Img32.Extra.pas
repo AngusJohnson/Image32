@@ -3,7 +3,7 @@ unit Img32.Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  3 July 2024                                                     *
+* Date      :  26 July 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Miscellaneous routines that don't belong in other modules.      *
@@ -538,7 +538,9 @@ var
 begin
   rec := GetBounds(polygons);
   if IsEmptyRect(rec) or (depth < 1) then Exit;
-  if not ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  angleRads := -angleRads;
+{$ENDIF}
   NormalizeAngle(angleRads);
   GetSinCos(angleRads, y, x);
   depth := depth * 0.5;
@@ -986,7 +988,9 @@ var
 begin
   rec := GetBounds(polygons);
   if IsEmptyRect(rec) then Exit;
-  if not ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  angleRads := -angleRads;
+{$ENDIF}
   GetSinCos(angleRads, y, x);
   paths := TranslatePath(polygons, -rec.Left, -rec.Top);
   RectWidthHeight(rec, w, h);

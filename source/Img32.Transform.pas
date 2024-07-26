@@ -3,7 +3,7 @@ unit Img32.Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  17 July 2024                                                    *
+* Date      :  26 July 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -148,16 +148,10 @@ var
 //------------------------------------------------------------------------------
 
 function IsIdentityMatrix(const matrix: TMatrixD): Boolean;
-var
-  i,j: integer;
-const
-  matVal: array [boolean] of double = (0.0, 1.0);
 begin
-  result := false;
-  for i := 0 to 2 do
-    for j := 0 to 2 do
-      if matrix[i][j] <> matVal[j=i] then Exit;
-  Result := true;
+  result := (matrix[0,0] = 1) and (matrix[0,1] = 0) and (matrix[0,2] = 0) and
+    (matrix[1,0] = 0) and (matrix[1,1] = 1) and (matrix[1,2] = 0) and
+    (matrix[2,0] = 0) and (matrix[2,1] = 0) and (matrix[2,2] = 1);
 end;
 //------------------------------------------------------------------------------
 
@@ -369,17 +363,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure MatrixRotate(var matrix: TMatrixD; const center: TPointD; angRad: double);
+procedure MatrixRotate(var matrix: TMatrixD;
+  const center: TPointD; angRad: double);
 var
   m: TMatrixD;
   sinA, cosA: double;
 begin
-  if (center.X <> 0) or (center.Y <> 0) then
+  if not PointsEqual(center, NullPointD) then
   begin
     NormalizeAngle(angRad);
     if angRad = 0 then Exit;
-    if ClockwiseRotationIsAnglePositive then
-      angRad := -angRad; //negated angle because of inverted Y-axis.
+{$IFNDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+    angRad := -angRad; //negated angle because of inverted Y-axis.
+{$ENDIF}
     m := IdentityMatrix;
     MatrixTranslate(matrix, -center.X, -center.Y);
     GetSinCos(angRad, sinA, cosA);
@@ -388,9 +384,9 @@ begin
     m[0, 1] := -sinA;  m[1, 1] := cosA;
     MatrixMultiply(matrix, m);
     MatrixTranslate(matrix, center.X, center.Y);
-  end else
-    MatrixRotate(matrix, angRad);
-
+  end
+  else
+    MatrixRotate(matrix, angRad)
 end;
 //------------------------------------------------------------------------------
 
@@ -401,8 +397,9 @@ var
 begin
   NormalizeAngle(angRad);
   if angRad = 0 then Exit;
-  if ClockwiseRotationIsAnglePositive then
+{$IFNDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
     angRad := -angRad; //negated angle because of inverted Y-axis.
+{$ENDIF}
   m := IdentityMatrix;
   GetSinCos(angRad, sinA, cosA);
   m := IdentityMatrix;
@@ -1264,10 +1261,10 @@ begin
 
   result := TColor32(Min(255, alpha)) shl 24;
   // alpha weighting has been applied to color channels, so div by fAlphaTot
+
   if fAlphaTot < DivOneByXTableSize then // use precalculated 1/X values
-    oneDivAlphaTot := DivOneByXTable[fAlphaTot]
-  else
-    oneDivAlphaTot := 1/fAlphaTot;
+    oneDivAlphaTot := DivOneByXTable[fAlphaTot] else
+    oneDivAlphaTot := 1/(fAlphaTot);
 
   // 1. Skip zero calculations.
   // 2. LimitByte(Integer): Values can't be less than 0, so don't use ClampByte.
@@ -1275,11 +1272,11 @@ begin
   //         Thus we need to do the calculation and Round call in one expression.
   //         Otherwise the compiler will use a temporary double variable on
   //         the stack that will cause unnecessary store and load operations.
-  if fColorTotB <> 0 then
+  if fColorTotB > 0 then
     result := result or LimitByte(System.Round(fColorTotB * oneDivAlphaTot));
-  if fColorTotG <> 0 then
+  if fColorTotG > 0 then
     result := result or LimitByte(System.Round(fColorTotG * oneDivAlphaTot)) shl 8;
-  if fColorTotR <> 0 then
+  if fColorTotR > 0 then
     result := result or LimitByte(System.Round(fColorTotR * oneDivAlphaTot)) shl 16;
 end;
 

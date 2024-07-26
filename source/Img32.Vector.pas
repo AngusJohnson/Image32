@@ -3,7 +3,7 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.5                                                             *
-* Date      :  21 June 2024                                                    *
+* Date      :  26 July 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -479,7 +479,6 @@ const
   BuffSize = 64;
 
 {$IFDEF CPUX86}
-const
   // Use faster Trunc for x86 code in this unit.
   Trunc: function(Value: Double): Integer = __Trunc;
 {$ENDIF CPUX86}
@@ -1927,7 +1926,9 @@ var
   sinA, cosA: double;
 begin
   if angleRad = 0 then Exit;
-  if not ClockwiseRotationIsAnglePositive then angleRad := -angleRad;
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  angleRad := -angleRad;
+{$ENDIF}
   GetSinCos(angleRad, sinA, cosA);
   RotatePoint(pt, focalPoint, sinA, cosA);
 end;
@@ -1960,7 +1961,9 @@ begin
     Result := path;
     Exit;
   end;
-  if not ClockwiseRotationIsAnglePositive then angleRads := -angleRads;
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  angleRads := -angleRads;
+{$ENDIF}
   GetSinCos(angleRads, sinA, cosA);
   Result := RotatePathInternal(path, focalPoint, sinA, cosA);
 end;
@@ -1977,8 +1980,9 @@ begin
   if not IsValid(angleRads) then Exit;
   NormalizeAngle(angleRads);
   if angleRads = 0 then Exit;
-  if not ClockwiseRotationIsAnglePositive then
-    angleRads := -angleRads;
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  angleRads := -angleRads;
+{$ENDIF}
   GetSinCos(angleRads, sinA, cosA);
   SetLength(Result, length(paths));
   if IsValid(focalPoint) then
@@ -2006,7 +2010,9 @@ begin
     else result := angle180;
   end else
     result := arctan2(y, x); //range between -Pi and Pi
-  if not ClockwiseRotationIsAnglePositive then Result := -Result;
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  Result := -Result;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -2027,7 +2033,9 @@ begin
     else result := angle180;
   end else
     result := arctan2(y, x); //range between -Pi and Pi
-  if not ClockwiseRotationIsAnglePositive then Result := -Result;
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  Result := -Result;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -2042,7 +2050,9 @@ begin
   dp := (ab.x * bc.x + ab.y * bc.y);
   cp := (ab.x * bc.y - ab.y * bc.x);
   Result := arctan2(cp, dp); //range between -Pi and Pi
-  if not ClockwiseRotationIsAnglePositive then Result := -Result;
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  Result := -Result;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -2057,7 +2067,9 @@ begin
   dp := (ab.x * bc.x + ab.y * bc.y);
   cp := (ab.x * bc.y - ab.y * bc.x);
   Result := arctan2(cp, dp); //range between -Pi and Pi
-  if not ClockwiseRotationIsAnglePositive then Result := -Result;
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  Result := -Result;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -3130,11 +3142,12 @@ begin
   Result := nil;
   if (endAngle = startAngle) or IsEmptyRect(rec) then Exit;
   if scale <= 0 then scale := 4.0;
-  if not ClockwiseRotationIsAnglePositive then
-  begin
-    startAngle := -startAngle;
-    endAngle := -endAngle;
-  end;
+
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  startAngle := -startAngle;
+  endAngle := -endAngle;
+{$ENDIF}
+
   NormalizeAngle(startAngle, qtrDeg);
   NormalizeAngle(endAngle, qtrDeg);
   with rec do

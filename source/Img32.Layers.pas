@@ -3,7 +3,7 @@ unit Img32.Layers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.5                                                             *
-* Date      :  3 July 2024                                                     *
+* Date      :  26 July 2024                                                    *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Layered images support                                          *
@@ -1905,8 +1905,9 @@ var
   rec2: TRectD;
 begin
   //startingZeroOffset: default = 0 (ie 3 o'clock)
-  if not ClockwiseRotationIsAnglePositive then
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
     startingZeroOffset := -startingZeroOffset;
+{$ENDIF}
   fZeroOffset := startingZeroOffset;
 
   if buttonSize <= 0 then buttonSize := DefaultButtonSize;
