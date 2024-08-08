@@ -114,8 +114,8 @@ type
     procedure Subtract(c: TColor32); overload; {$IFDEF INLINE} inline; {$ENDIF}
     procedure Subtract(const other: TWeightedColor); overload;
       {$IFDEF INLINE} inline; {$ENDIF}
-    procedure AddSubtract(addC, subC: TColor32);
-    procedure AddNoneSubtract(c: TColor32); {$IFDEF INLINE} inline; {$ENDIF}
+    function AddSubtract(addC, subC: TColor32): Boolean; {$IFDEF INLINE} inline; {$ENDIF}
+    function AddNoneSubtract(c: TColor32): Boolean; {$IFDEF INLINE} inline; {$ENDIF}
     procedure AddWeight(w: Integer); {$IFDEF INLINE} inline; {$ENDIF}
     property AddCount: Integer read fAddCount;
     property Color: TColor32 read GetColor;
@@ -1244,13 +1244,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TWeightedColor.AddSubtract(addC, subC: TColor32);
+function TWeightedColor.AddSubtract(addC, subC: TColor32): Boolean;
 var
   a: Cardinal;
 begin
   // add+subtract => fAddCount stays the same
 
   // skip identical colors
+  Result := False;
   if addC = subC then Exit;
 
   a := Byte(addC shr 24);
@@ -1260,6 +1261,7 @@ begin
     inc(fColorTotB, (a * Byte(addC)));
     inc(fColorTotG, (a * Byte(addC shr 8)));
     inc(fColorTotR, (a * Byte(addC shr 16)));
+    Result := True;
   end;
 
   a := Byte(subC shr 24);
@@ -1269,21 +1271,28 @@ begin
     dec(fColorTotB, (a * Byte(subC)));
     dec(fColorTotG, (a * Byte(subC shr 8)));
     dec(fColorTotR, (a * Byte(subC shr 16)));
+    Result := True;
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TWeightedColor.AddNoneSubtract(c: TColor32);
+function TWeightedColor.AddNoneSubtract(c: TColor32): Boolean;
 var
   a: Cardinal;
 begin
   // add+subtract => fAddCount stays the same
+
   a := Byte(c shr 24);
-  if a = 0 then Exit;
-  dec(fAlphaTot, a);
-  dec(fColorTotB, (a * Byte(c)));
-  dec(fColorTotG, (a * Byte(c shr 8)));
-  dec(fColorTotR, (a * Byte(c shr 16)));
+  if a > 0 then
+  begin
+    dec(fAlphaTot, a);
+    dec(fColorTotB, (a * Byte(c)));
+    dec(fColorTotG, (a * Byte(c shr 8)));
+    dec(fColorTotR, (a * Byte(c shr 16)));
+    Result := True;
+  end
+  else
+    Result := False;
 end;
 //------------------------------------------------------------------------------
 
