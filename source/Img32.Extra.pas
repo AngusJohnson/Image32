@@ -2299,16 +2299,17 @@ begin
     begin
       if ri <= re then
       begin
-        val.Add(src[ri]); inc(ri);
-        val.Subtract(src[li]); inc(li);
+        val.AddSubtract(src[ri], src[li]);
+        inc(ri);
+        inc(li);
       end;
       dst[ti] := val.Color; inc(ti);
     end;
     while ti <= re do
     begin
       if ti > re then Break;
-      val.Add(clNone32);
-      val.Subtract(src[li]); inc(li);
+      val.AddNoneSubtract(src[li]);
+      inc(li);
       dst[ti] := val.Color;
       inc(ti);
     end;
@@ -2350,15 +2351,16 @@ begin
     begin
       if ri <= re then
       begin
-        val.Add(src[ri]); inc(ri, w);
-        val.Subtract(src[li]); inc(li, w);
+        val.AddSubtract(src[ri], src[li]);
+        inc(ri, w);
+        inc(li, w);
       end;
       dst[ti] := val.Color; inc(ti, w);
     end;
     while ti <= re do
     begin
-      val.Add(clNone32);
-      val.Subtract(src[li]); inc(li, w);
+      val.AddNoneSubtract(src[li]);
+      inc(li, w);
       dst[ti] := val.Color;
       inc(ti, w);
     end;
