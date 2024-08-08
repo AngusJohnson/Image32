@@ -774,169 +774,162 @@ end;
 
 function BlendToOpaque(bgColor, fgColor: TColor32): TColor32;
 var
-  res: TARGB absolute Result;
-  bg: TARGB absolute bgColor;
-  fg: TARGB absolute fgColor;
+  fgA: byte;
   fw,bw: PByteArray;
 begin
-  if fg.A = 0 then Result := bgColor
-  else if fg.A = 255 then Result := fgColor
+  fgA := fgColor shr 24;
+  if fgA = 0 then Result := bgColor
+  else if fgA = 255 then Result := fgColor
   else
   begin
     //assuming bg.A = 255, use just fg.A for color weighting
-    res.A := 255;
-    fw := PByteArray(@MulTable[fg.A]);     //ie weight of foreground
-    bw := PByteArray(@MulTable[not fg.A]); //ie weight of foreground
-    res.R := fw[fg.R] + bw[bg.R];
-    res.G := fw[fg.G] + bw[bg.G];
-    res.B := fw[fg.B] + bw[bg.B];
+    fw := PByteArray(@MulTable[fgA]);     //ie weight of foreground
+    bw := PByteArray(@MulTable[not fgA]); //ie weight of background
+
+    Result := $FF000000
+              or (TColor32(Byte(fw[Byte(fgColor shr 16)] + bw[Byte(bgColor shr 16)])) shl 16)
+              or (TColor32(Byte(fw[Byte(fgColor shr 8 )] + bw[Byte(bgColor shr  8)])) shl  8)
+              or (TColor32(Byte(fw[Byte(fgColor       )] + bw[Byte(bgColor       )]))       );
   end;
 end;
 //------------------------------------------------------------------------------
 
 function BlendToAlpha(bgColor, fgColor: TColor32): TColor32;
 var
-  res: TARGB absolute Result;
-  bg: TARGB absolute bgColor;
-  fg: TARGB absolute fgColor;
   fgWeight: byte;
   R, InvR: PByteArray;
+  bgA, fgA: byte;
 begin
   //(see https://en.wikipedia.org/wiki/Alpha_compositing)
-  if (bg.A = 0) or (fg.A = 255) then Result := fgColor
-  else if fg.A = 0 then Result := bgColor
+  fgA := fgColor shr 24;
+  bgA := bgColor shr 24;
+  if (bgA = 0) or (fgA = 255) then Result := fgColor
+  else if fgA = 0 then Result := bgColor
   else
   begin
     //combine alphas ...
-    res.A := not MulTable[not fg.A, not bg.A];
-    fgWeight := DivTable[fg.A, res.A]; //fgWeight = amount foreground color
+    Result := not MulTable[not fgA, not bgA];
+    fgWeight := DivTable[fgA, Result]; //fgWeight = amount foreground color
                                        //contibutes to total (result) color
 
     R     := PByteArray(@MulTable[fgWeight]);      //ie weight of foreground
-    InvR  := PByteArray(@MulTable[not fgWeight]);  //ie weight of foreground
-    res.R := R[fg.R] + InvR[bg.R];
-    res.G := R[fg.G] + InvR[bg.G];
-    res.B := R[fg.B] + InvR[bg.B];
+    InvR  := PByteArray(@MulTable[not fgWeight]);  //ie weight of background
+
+    Result := Result shl 24
+              or (TColor32(R[Byte(fgColor shr 16)] + InvR[Byte(bgColor shr 16)]) shl 16)
+              or (TColor32(R[Byte(fgColor shr 8 )] + InvR[Byte(bgColor shr  8)]) shl  8)
+              or (TColor32(R[Byte(fgColor)       ] + InvR[Byte(bgColor)       ])       );
   end;
 end;
+
 //------------------------------------------------------------------------------
 
 function BlendMask(bgColor, alphaMask: TColor32): TColor32;
 var
-  res: TARGB absolute Result;
-  bg: TARGB absolute bgColor;
-  fg: TARGB absolute alphaMask;
+  a: byte;
 begin
-  Result := bgColor;
-  res.A := MulTable[bg.A, fg.A];
-  if res.A = 0 then Result := 0;
+  a := MulTable[bgColor shr 24, alphaMask shr 24];
+  if a <> 0 then Result := (TColor32(a) shl 24) or (bgColor and $00FFFFFF)
+  else Result := 0;
 end;
 //------------------------------------------------------------------------------
 
 function BlendAltMask(bgColor, alphaMask: TColor32): TColor32;
 var
-  res: TARGB absolute Result;
-  bg: TARGB absolute bgColor;
-  fg: TARGB absolute alphaMask;
+  a: byte;
 begin
-  Result := bgColor;
-  res.A := MulTable[bg.A, 255-fg.A];
-  if res.A = 0 then Result := 0;
+  a := MulTable[bgColor shr 24, (alphaMask shr 24) xor 255];
+  if a <> 0 then Result := (TColor32(a) shl 24) or (bgColor and $00FFFFFF)
+  else Result := 0;
 end;
 //------------------------------------------------------------------------------
 
 function BlendDifference(color1, color2: TColor32): TColor32;
 var
-  res: TARGB absolute Result;
-  bg: TARGB absolute color1;
-  fg: TARGB absolute color2;
+  fgA, bgA: byte;
 begin
-  if fg.A = 0 then Result := color1
-  else if bg.A = 0 then Result := color2
+  fgA := color2 shr 24;
+  bgA := color1 shr 24;
+  if fgA = 0 then Result := color1
+  else if bgA = 0 then Result := color2
   else
   begin
-    res.A := (((fg.A xor 255) * (bg.A xor 255)) shr 8) xor 255;
-    res.R := Abs(fg.R - bg.R);
-    res.G := Abs(fg.G - bg.G);
-    res.B := Abs(fg.B - bg.B);
+    Result := TColor32(MulTable[(fgA xor 255), (bgA xor 255)] xor 255) shl 24
+              or (TColor32(Abs(Byte(color2 shr 16) - Byte(color1 shr 16))) shl 16)
+              or (TColor32(Abs(Byte(color2 shr  8) - Byte(color1 shr  8))) shl  8)
+              or (TColor32(Abs(Byte(color2       ) - Byte(color1       )))       );
   end;
 end;
 //------------------------------------------------------------------------------
 
 function BlendSubtract(bgColor, fgColor: TColor32): TColor32;
 var
-  res: TARGB absolute Result;
-  bg: TARGB absolute bgColor;
-  fg: TARGB absolute fgColor;
+  fgA, bgA: byte;
 begin
-  if fg.A = 0 then Result := bgColor
-  else if bg.A = 0 then Result := fgColor
+  fgA := fgColor shr 24;
+  bgA := bgColor shr 24;
+  if fgA = 0 then Result := bgColor
+  else if bgA = 0 then Result := fgColor
   else
   begin
-    res.A := (((fg.A xor 255) * (bg.A xor 255)) shr 8) xor 255;
-    res.R := ClampByte(fg.R - bg.R);
-    res.G := ClampByte(fg.G - bg.G);
-    res.B := ClampByte(fg.B - bg.B);
+    Result := TColor32(MulTable[(fgA xor 255), (bgA xor 255)] xor 255) shl 24
+              or (TColor32(ClampByte(Byte(fgColor shr 16) - Byte(bgColor shr 16))) shl 16)
+              or (TColor32(ClampByte(Byte(fgColor shr 8 ) - Byte(bgColor shr  8))) shl  8)
+              or (TColor32(ClampByte(Byte(fgColor       ) - Byte(bgColor       )))       );
   end;
 end;
 //------------------------------------------------------------------------------
 
 function BlendLighten(bgColor, fgColor: TColor32): TColor32;
 var
-  res: TARGB absolute Result;
-  bg: TARGB absolute bgColor;
-  fg: TARGB absolute fgColor;
+  fgA, bgA: byte;
 begin
-  if fg.A = 0 then Result := bgColor
-  else if bg.A = 0 then Result := fgColor
+  fgA := fgColor shr 24;
+  bgA := bgColor shr 24;
+  if fgA = 0 then Result := bgColor
+  else if bgA = 0 then Result := fgColor
   else
   begin
-    res.A := (((fg.A xor 255) * (bg.A xor 255)) shr 8) xor 255;
-    res.R := Max(fg.R, bg.R);
-    res.G := Max(fg.G, bg.G);
-    res.B := Max(fg.B, bg.B);
+    Result := TColor32(MulTable[(fgA xor 255), (bgA xor 255)] xor 255) shl 24
+              or (TColor32(Max(Byte(fgColor shr 16), Byte(bgColor shr 16))) shl 16)
+              or (TColor32(Max(Byte(fgColor shr 8 ), Byte(bgColor shr  8))) shl  8)
+              or (TColor32(Max(Byte(fgColor       ), Byte(bgColor       )))       );
   end;
 end;
 //------------------------------------------------------------------------------
 
 function BlendDarken(bgColor, fgColor: TColor32): TColor32;
 var
-  res: TARGB absolute Result;
-  bg: TARGB absolute bgColor;
-  fg: TARGB absolute fgColor;
+  fgA, bgA: byte;
 begin
-  if fg.A = 0 then Result := bgColor
-  else if bg.A = 0 then Result := fgColor
+  fgA := fgColor shr 24;
+  bgA := bgColor shr 24;
+  if fgA = 0 then Result := bgColor
+  else if bgA = 0 then Result := fgColor
   else
   begin
-    res.A := (((fg.A xor 255) * (bg.A xor 255)) shr 8) xor 255;
-    res.R := Min(fg.R, bg.R);
-    res.G := Min(fg.G, bg.G);
-    res.B := Min(fg.B, bg.B);
+    Result := TColor32(MulTable[(fgA xor 255), (bgA xor 255)] xor 255) shl 24
+              or (TColor32(Min(Byte(fgColor shr 16), Byte(bgColor shr 16))) shl 16)
+              or (TColor32(Min(Byte(fgColor shr 8 ), Byte(bgColor shr  8))) shl  8)
+              or (TColor32(Min(Byte(fgColor       ), Byte(bgColor       )))       );
   end;
 end;
 //------------------------------------------------------------------------------
 
 function BlendBlueChannel(bgColor, blueMask: TColor32): TColor32;
-var
-  res: TARGB absolute Result;
-  bg: TARGB absolute bgColor;
-  fg: TARGB absolute blueMask;
 begin
-  Result := bgColor;
-  res.A := MulTable[bg.A, fg.B];
+  Result := (bgColor and $00FFFFFF) or
+            (TColor32(MulTable[bgColor shr 24, blueMask shr 24]) shl 24);
 end;
 //------------------------------------------------------------------------------
 
 function BlendInvertedMask(bgColor, alphaMask: TColor32): TColor32;
 var
-  res: TARGB absolute Result;
-  bg: TARGB absolute bgColor;
-  fg: TARGB absolute alphaMask;
+  a: byte;
 begin
-  Result := bgColor;
-  res.A := MulTable[bg.A, 255 - fg.A];
-  if res.A < 2 then Result := 0;
+  a := MulTable[bgColor shr 24, (alphaMask shr 24) xor 255];
+  if a < 2 then Result := 0
+  else Result := (bgColor and $00FFFFFF) or (TColor32(a) shl 24);
 end;
 
 //------------------------------------------------------------------------------
