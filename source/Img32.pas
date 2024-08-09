@@ -2857,9 +2857,10 @@ end;
 procedure TImage32.CopyInternal(src: TImage32;
   const srcRec, dstRec: TRect; blendFunc: TBlendFunction);
 var
-  i, j, srcRecWidth, srcRecHeight: Integer;
+  i, j: integer;
+  srcRecWidth, srcRecHeight: nativeint;
+  srcWidth, dstWidth: nativeint;
   s, d: PColor32;
-  srcDiff, dstDiff: Integer;
 begin
   // occasionally, due to rounding, srcRec and dstRec
   // don't have exactly the same widths and heights, so ...
@@ -2868,13 +2869,16 @@ begin
   srcRecHeight :=
     Min(srcRec.Bottom - srcRec.Top, dstRec.Bottom - dstRec.Top);
 
-  s := @src.Pixels[srcRec.Top * src.Width + srcRec.Left];
-  d := @Pixels[dstRec.top * Width + dstRec.Left];
+  srcWidth := src.Width;
+  dstWidth := Width;
+
+  s := @src.Pixels[srcRec.Top * srcWidth + srcRec.Left];
+  d := @Pixels[dstRec.top * dstWidth + dstRec.Left];
 
   if assigned(blendFunc) then
   begin
-    srcDiff := (src.Width - srcRecWidth) * SizeOf(TColor32);
-    dstDiff := (Width - srcRecWidth) * SizeOf(TColor32);
+    srcWidth := (srcWidth - srcRecWidth) * SizeOf(TColor32);
+    dstWidth := (dstWidth - srcRecWidth) * SizeOf(TColor32);
     for i := 1 to srcRecHeight do
     begin
       for j := 1 to srcRecWidth do
@@ -2882,28 +2886,41 @@ begin
         d^ := blendFunc(d^, s^);
         inc(s); inc(d);
       end;
-      inc(PByte(s), srcDiff);
-      inc(PByte(d), dstDiff);
+      inc(PByte(s), srcWidth); // byte offset to the next s line
+      inc(PByte(d), dstWidth); // byte offset to the next d line
     end;
   end
+  //simply overwrite src with dst (ie without blending)
+  else if (srcRecWidth = dstWidth) and (srcWidth = dstWidth) then
+    move(s^, d^, srcRecWidth * srcRecHeight * SizeOf(TColor32))
   else
-    //simply overwrite src with dst (ie without blending)
-    for i := srcRec.Top to srcRec.Top + srcRecHeight -1 do
+  begin
+    srcWidth := srcWidth * SizeOf(TColor32);
+    dstWidth := dstWidth * SizeOf(TColor32);
+    srcRecWidth := srcRecWidth * SizeOf(TColor32);
+    for i := 1 to srcRecHeight do
     begin
-      move(s^, d^, srcRecWidth * SizeOf(TColor32));
-      inc(s, src.Width);
-      inc(d, Width);
+      move(s^, d^, srcRecWidth);
+      inc(PByte(s), srcWidth); // srcWidth is in bytes 
+      inc(PByte(d), dstWidth); // dstWidth is in bytes
     end;
+  end;
 end;
-
 //------------------------------------------------------------------------------
 procedure TImage32.CopyInternalLine(src: TImage32;
   const srcRec, dstRec: TRect; blendLineFunc: TBlendLineFunction);
 var
   i: integer;
   srcRecWidth, srcRecHeight: nativeint;
+  srcWidth, dstWidth: nativeint;
   s, d: PColor32;
 begin
+  if not Assigned(blendLineFunc) then
+  begin
+    CopyInternal(src, srcRec, dstRec, nil);
+    Exit;
+  end;
+
   // occasionally, due to rounding, srcRec and dstRec
   // don't have exactly the same widths and heights, so ...
   srcRecWidth :=
@@ -2911,24 +2928,25 @@ begin
   srcRecHeight :=
     Min(srcRec.Bottom - srcRec.Top, dstRec.Bottom - dstRec.Top);
 
-  s := @src.Pixels[srcRec.Top * src.Width + srcRec.Left];
-  d := @Pixels[dstRec.top * Width + dstRec.Left];
+  srcWidth := src.Width;
+  dstWidth := Width;
 
-  if assigned(blendLineFunc) then
+  s := @src.Pixels[srcRec.Top * srcWidth + srcRec.Left];
+  d := @Pixels[dstRec.top * dstWidth + dstRec.Left];
+
+  if (srcRecWidth = dstWidth) and (srcWidth = dstWidth) then
+    blendLineFunc(d, s, srcRecWidth * srcRecHeight)
+  else
+  begin
+    srcWidth := srcWidth * SizeOf(TColor32);
+    dstWidth := dstWidth * SizeOf(TColor32);
     for i := 1 to srcRecHeight do
     begin
       blendLineFunc(d, s, srcRecWidth);
-      inc(s, src.Width);
-      inc(d, Width);
-    end
-  else
-    //simply overwrite src with dst (ie without blending)
-    for i := 1 to srcRecHeight -1 do
-    begin
-      move(s^, d^, srcRecWidth * SizeOf(TColor32));
-      inc(s, src.Width);
-      inc(d, Width);
+      inc(PByte(s), srcWidth); // srcWidth is in bytes
+      inc(PByte(d), dstWidth); // dstWidth is in bytes
     end;
+  end;
 end;
 //------------------------------------------------------------------------------
 
