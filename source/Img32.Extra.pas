@@ -556,7 +556,7 @@ begin
     DrawPolygon(shadowImg, shadowPolys, fillRule, color);
     FastGaussianBlur(shadowImg, shadowImg.Bounds, blurSize, 1);
     if cutoutInsideShadow then EraseInsidePaths(shadowImg, polys, fillRule);
-    img.CopyBlend(shadowImg, shadowImg.Bounds, rec, BlendToAlpha);
+    img.CopyBlend(shadowImg, shadowImg.Bounds, rec, BlendToAlphaLine);
   finally
     shadowImg.Free;
   end;
@@ -592,7 +592,7 @@ begin
     DrawPolygon(glowImg, glowPolys, fillRule, color);
     FastGaussianBlur(glowImg, glowImg.Bounds, blurRadius, 2);
     glowImg.ScaleAlpha(4);
-    img.CopyBlend(glowImg, glowImg.Bounds, rec, BlendToAlpha);
+    img.CopyBlend(glowImg, glowImg.Bounds, rec, BlendToAlphaLine);
   finally
     glowImg.Free;
   end;
@@ -897,7 +897,7 @@ begin
     path := Ellipse(cutoutRec);
     radGrad.SetParameters(rect3, clBlack32, clNone32);
     DrawPolygon(mask, path, frNonZero, radGrad);
-    cutout.CopyBlend(mask, mask.Bounds, cutout.Bounds, BlendMask);
+    cutout.CopyBlend(mask, mask.Bounds, cutout.Bounds, BlendMaskLine);
     // now remove red from the cutout
     RemoveColor(cutout, clRed32);
     // finally replace the cutout ...
@@ -937,7 +937,7 @@ begin
   try
     p := TranslatePath(path, -outsideBounds.Left, -outsideBounds.top);
     DrawPolygon(mask, p, fillRule, clBlack32);
-    img.CopyBlend(mask, mask.Bounds, outsideBounds, BlendMask);
+    img.CopyBlend(mask, mask.Bounds, outsideBounds, BlendMaskLine);
   finally
     mask.Free;
   end;
@@ -957,7 +957,7 @@ begin
   try
     pp := TranslatePath(paths, -outsideBounds.Left, -outsideBounds.top);
     DrawPolygon(mask, pp, fillRule, clBlack32);
-    img.CopyBlend(mask, mask.Bounds, outsideBounds, BlendMask);
+    img.CopyBlend(mask, mask.Bounds, outsideBounds, BlendMaskLine);
   finally
     mask.Free;
   end;
@@ -1003,7 +1003,7 @@ begin
       EraseInsidePaths(tmp, paths2, fillRule);
       FastGaussianBlur(tmp, tmp.Bounds, Round(blurRadius), 0);
       EraseOutsidePaths(tmp, paths, fillRule, tmp.Bounds);
-      img.CopyBlend(tmp, tmp.Bounds, rec, BlendToAlpha);
+      img.CopyBlend(tmp, tmp.Bounds, rec, BlendToAlphaLine);
     end;
     if GetAlpha(colorDk) > 0 then
     begin
@@ -1012,7 +1012,7 @@ begin
       EraseInsidePaths(tmp, paths2, fillRule);
       FastGaussianBlur(tmp, tmp.Bounds, Round(blurRadius), 0);
       EraseOutsidePaths(tmp, paths, fillRule, tmp.Bounds);
-      img.CopyBlend(tmp, tmp.Bounds, rec, BlendToAlpha);
+      img.CopyBlend(tmp, tmp.Bounds, rec, BlendToAlphaLine);
     end;
   finally
     tmp.Free;

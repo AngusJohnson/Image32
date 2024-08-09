@@ -2473,7 +2473,7 @@ begin
       cr.Free;
     end;
     ApplyClearType(tmpImg, color, backColor);
-    img.CopyBlend(tmpImg, tmpImg.Bounds, rec, BlendToAlpha);
+    img.CopyBlend(tmpImg, tmpImg.Bounds, rec, BlendToAlphaLine);
   finally
     tmpImg.Free;
   end;
