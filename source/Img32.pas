@@ -158,6 +158,7 @@ type
   end;
 
   TBlendFunction = function(bgColor, fgColor: TColor32): TColor32;
+  TBlendLineFunction = procedure(bgColor, fgColor: PColor32; w: integer);
 
   TCompareFunction = function(master, current: TColor32; data: integer): Boolean;
   TCompareFunctionEx = function(master, current: TColor32): Byte;
@@ -199,6 +200,10 @@ type
     //CopyInternal: Internal routine (has no scaling or bounds checking)
     procedure CopyInternal(src: TImage32;
       const srcRec, dstRec: TRect; blendFunc: TBlendFunction);
+    procedure CopyInternalLine(src: TImage32;
+      const srcRec, dstRec: TRect; blendLineFunc: TBlendLineFunction);
+    function CopyBlendInternal(src: TImage32; srcRec, dstRec: TRect;
+      blendFunc: TBlendFunction = nil; blendLineFunc: TBlendLineFunction = nil): Boolean; overload;
     procedure  Changed; virtual;
     procedure  Resized; virtual;
     function   SetPixels(const newPixels: TArrayOfColor32): Boolean;
@@ -247,8 +252,10 @@ type
     //function is specified, that function will determine how the images will
     //be blended. If srcRec and dstRec have different widths or heights,
     //then the image in srcRec will also be stretched to fit dstRec.
-    function CopyBlend(src: TImage32; srcRec, dstRec: TRect;
-      blendFunc: TBlendFunction = nil): Boolean;
+    function CopyBlend(src: TImage32; const srcRec, dstRec: TRect;
+      blendFunc: TBlendFunction = nil): Boolean; overload; {$IFDEF INLINE} inline; {$ENDIF}
+    function CopyBlend(src: TImage32; const srcRec, dstRec: TRect;
+      blendLineFunc: TBlendLineFunction): Boolean; overload; {$IFDEF INLINE} inline; {$ENDIF}
 
 {$IFDEF MSWINDOWS}
     //CopyFromDC: Copies an image from a Windows device context, erasing
@@ -424,16 +431,20 @@ type
   function BlendToOpaque(bgColor, fgColor: TColor32): TColor32;
   //BlendToAlpha: Blends two semi-transparent images (slower than BlendToOpaque)
   function BlendToAlpha(bgColor, fgColor: TColor32): TColor32;
+  procedure BlendToAlphaLine(bgColor, fgColor: PColor32; w: Integer);
   //BlendMask: Whereever the mask is, preserves the background
   function BlendMask(bgColor, alphaMask: TColor32): TColor32;
+  procedure BlendMaskLine(bgColor, alphaMask: PColor32; w: Integer);
   function BlendAltMask(bgColor, alphaMask: TColor32): TColor32;
   function BlendDifference(color1, color2: TColor32): TColor32;
   function BlendSubtract(bgColor, fgColor: TColor32): TColor32;
   function BlendLighten(bgColor, fgColor: TColor32): TColor32;
   function BlendDarken(bgColor, fgColor: TColor32): TColor32;
   function BlendInvertedMask(bgColor, alphaMask: TColor32): TColor32;
+  procedure BlendInvertedMaskLine(bgColor, alphaMask: PColor32; w: integer);
   //BlendBlueChannel: typically useful for white color masks
   function BlendBlueChannel(bgColor, blueMask: TColor32): TColor32;
+  procedure BlendBlueChannelLine(bgColor, blueMask: PColor32; w: integer);
 
   //COMPARE COLOR FUNCTIONS (ConvertToBoolMask, FloodFill, Vectorize etc.)
 
@@ -614,6 +625,15 @@ const
 type
   TByteArray = array[0..MaxInt -1] of Byte;
   PByteArray = ^TByteArray;
+
+  {$IFDEF SUPPORTS_POINTERMATH}
+    {$POINTERMATH ON}
+  PStaticColor32Array = ^TColor32;
+    {$POINTERMATH OFF}
+  {$ELSE} // Delphi 7-2007
+  PStaticColor32Array = ^TStaticColor32Array;
+  TStaticColor32Array = array[0..MaxInt div SizeOf(TColor32) - 1] of TColor32;
+  {$ENDIF}
 
   TImgFmtRec = record
     Fmt: string;
@@ -821,7 +841,208 @@ begin
               or (TColor32(R[Byte(fgColor)       ] + InvR[Byte(bgColor)       ])       );
   end;
 end;
+//------------------------------------------------------------------------------
 
+{$RANGECHECKS OFF} // negative array index is used
+
+{$IFNDEF CPUX64}
+function BlendToAlphaLineWeight(bgColorArr, fgColorArr: PStaticColor32Array; w: integer): integer;
+// Helper function for x86 code, reduces the CPU register pressure in
+// BlendToAlphaLine().
+var
+  fgWeight: byte;
+  R, InvR: PByteArray;
+  fgA, bgA, newBgA: byte;
+  fgCol, bgCol: TColor32;
+begin
+  Result := w;
+  fgCol := fgColorArr[Result];
+  bgCol := bgColorArr[Result];
+
+  while True do
+  begin
+    fgA := fgCol shr 24;
+    bgA := bgCol shr 24;
+
+    //combine alphas ...
+    newBgA := not MulTable[not fgA, not bgA];
+    fgWeight := DivTable[fgA, newBgA]; //fgWeight = amount foreground color
+                                       //contibutes to total (result) color
+
+    R     := PByteArray(@MulTable[fgWeight]);      //ie weight of foreground
+    InvR  := PByteArray(@MulTable[not fgWeight]);  //ie weight of foreground
+
+    while True do
+    begin
+      bgColorArr[Result] := TColor32(newBgA) shl 24
+            or (TColor32(R[Byte(fgCol shr 16)] + InvR[Byte(bgCol shr 16)]) shl 16)
+            or (TColor32(R[Byte(fgCol shr 8 )] + InvR[Byte(bgCol shr  8)]) shl  8)
+            or (TColor32(R[Byte(fgCol)       ] + InvR[Byte(bgCol)       ])       );
+      inc(Result);
+      if Result = 0 then exit;
+
+      fgCol := fgColorArr[Result];
+      bgCol := bgColorArr[Result];
+
+      // if both alpha channels are the same in the new pixels, we
+      // can use the already calculated R/InvR tables.
+      if (fgCol shr 24 <> fgA) or (bgCol shr 24 <> bgA) then break;
+    end;
+    // return if we have alpha channel values for which we have special code
+    if (fgCol and $FF000000 = 0) or (fgCol and $FF000000 = $FF000000) or (bgCol and $FF000000 = 0) then exit;
+  end;
+end;
+//------------------------------------------------------------------------------
+{$ENDIF ~CPUX64}
+
+procedure BlendToAlphaLine(bgColor, fgColor: PColor32; w: Integer);
+label
+  LabelBgAlphaIsZero;
+var
+  bgColorArr, fgColorArr: PStaticColor32Array;
+  bgCol, fgCol: TColor32;
+  {$IFDEF CPUX64}
+  fgWeight, fgA, bgA: byte;
+  R, InvR: PByteArray;
+  {$ENDIF CPUX64}
+begin
+  //(see https://en.wikipedia.org/wiki/Alpha_compositing)
+
+  // Use the negative offset trick to only increment "w"
+  // until it reaches zero. And by offsetting the arrays, "w"
+  // also becomes the index for those.
+  inc(bgColor, w);
+  inc(fgColor, w);
+  w := -w;
+
+  bgColorArr := PStaticColor32Array(bgColor);
+  fgColorArr := PStaticColor32Array(fgColor);
+
+  while w < 0 do
+  begin
+    bgCol := bgColorArr[w];
+    fgCol := fgColorArr[w];
+
+    // bgColor.A is zero => change bgColor to fgColor
+    while bgCol shr 24 = 0 do
+    begin
+LabelBgAlphaIsZero:
+      bgColorArr[w] := fgCol;
+      inc(w);
+      if w = 0 then exit;
+      fgCol := fgColorArr[w];
+      bgCol := bgColorArr[w];
+    end;
+
+    // fgColor.A is zero => don't change bgColor
+    while fgCol shr 24 = 0 do
+    begin
+      // bgColorArr[w] := bgColorArr[w];
+      inc(w);
+      if w = 0 then exit;
+      fgCol := fgColorArr[w];
+      bgCol := bgColorArr[w];
+      if bgCol shr 24 = 0 then goto LabelBgAlphaIsZero;
+    end;
+
+    // fgColor.A is 255 => change bgColor to fgColor
+    while fgCol shr 24 = 255 do
+    begin
+      bgColorArr[w] := fgCol;
+      inc(w);
+      if w = 0 then exit;
+      fgCol := fgColorArr[w];
+      bgCol := bgColorArr[w];
+      if bgCol shr 24 = 0 then goto LabelBgAlphaIsZero;
+    end;
+
+    {$IFDEF CPUX64}
+    // x64 has more CPU registers than x86 and calling BlendToAlphaLineWeight
+    // is slower, so we inline it.
+
+    //combine alphas ...
+    fgA := fgCol shr 24;
+    bgA := bgCol shr 24;
+    bgA := not MulTable[not fgA, not bgA];
+    fgWeight := DivTable[fgA, bgA]; //fgWeight = amount foreground color
+                                    //contibutes to total (result) color
+
+    R     := PByteArray(@MulTable[fgWeight]);      //ie weight of foreground
+    InvR  := PByteArray(@MulTable[not fgWeight]);  //ie weight of foreground
+
+    bgColorArr[w] := TColor32(bgA) shl 24
+          or (TColor32(R[Byte(fgCol shr 16)] + InvR[Byte(bgCol shr 16)]) shl 16)
+          or (TColor32(R[Byte(fgCol shr 8 )] + InvR[Byte(bgCol shr  8)]) shl  8)
+          or (TColor32(R[Byte(fgCol)       ] + InvR[Byte(bgCol)       ])       );
+    inc(w);
+    {$ELSE}
+    // x86 has not enough CPU registers and the loops above will suffer if we
+    // inline the code. So we let the compiler use a "new set" of CPU registers
+    // by calling a function.
+    w := BlendToAlphaLineWeight(bgColorArr, fgColorArr, w);
+    {$ENDIF CPUX64}
+  end;
+end;
+//------------------------------------------------------------------------------
+
+{
+// reference implementation
+procedure BlendToAlphaLine(bgColor, fgColor: PColor32; w: Integer);
+var
+  fgWeight: byte;
+  R, InvR: PByteArray;
+  bgA, fgA: Byte;
+  bgColorArr, fgColorArr: PStaticColor32Array;
+  bgCol, fgCol: TColor32;
+begin
+  //(see https://en.wikipedia.org/wiki/Alpha_compositing)
+
+  // Use the negative offset trick to only increment "w"
+  // until it reaches zero. And by offsetting the arrays, "w"
+  // also becomes the index for those.
+  inc(bgColor, w);
+  inc(fgColor, w);
+  w := -w;
+
+  bgColorArr := PStaticColor32Array(bgColor);
+  fgColorArr := PStaticColor32Array(fgColor);
+
+  while w < 0 do
+  begin
+    bgCol := bgColorArr[w];
+    fgCol := fgColorArr[w];
+    bgA := bgCol shr 24;
+    if bgA = 0 then bgColorArr[w] := fgCol
+    else
+    begin
+      fgA := fgCol shr 24;
+      if fgA > 0 then
+      begin
+        if fgA = 255 then bgColorArr[w] := fgCol
+        else if fgA > 0 then
+        begin
+          //combine alphas ...
+          bgA := not MulTable[not fgA, not bgA];
+          fgWeight := DivTable[fgA, bgA]; //fgWeight = amount foreground color
+                                          //contibutes to total (result) color
+
+          R     := PByteArray(@MulTable[fgWeight]);      //ie weight of foreground
+          InvR  := PByteArray(@MulTable[not fgWeight]);  //ie weight of foreground
+
+          bgColorArr[w] := TColor32(bgA) shl 24
+                or (TColor32(R[Byte(fgCol shr 16)] + InvR[Byte(bgCol shr 16)]) shl 16)
+                or (TColor32(R[Byte(fgCol shr 8 )] + InvR[Byte(bgCol shr  8)]) shl  8)
+                or (TColor32(R[Byte(fgCol)       ] + InvR[Byte(bgCol)       ])       );
+        end;
+      end;
+    end;
+
+    inc(w);
+  end;
+end;}
+{$IFDEF RANGECHECKS_ENABLED}
+  {$RANGECHECKS ON}
+{$ENDIF}
 //------------------------------------------------------------------------------
 
 function BlendMask(bgColor, alphaMask: TColor32): TColor32;
@@ -832,6 +1053,95 @@ begin
   if a <> 0 then Result := (TColor32(a) shl 24) or (bgColor and $00FFFFFF)
   else Result := 0;
 end;
+//------------------------------------------------------------------------------
+
+{$RANGECHECKS OFF} // negative array index is used
+
+procedure BlendMaskLine(bgColor, alphaMask: PColor32; w: Integer);
+var
+  a: byte;
+begin
+  // Use the negative offset trick to only increment "w"
+  // until it reaches zero. And by offsetting the arrays, "w"
+  // also becomes the index for those.
+  inc(bgColor, w);
+  inc(alphaMask, w);
+  w := -w;
+
+  // Handle special cases Alpha=0 or 255 as those are the most
+  // common values.
+  while w < 0 do
+  begin
+    a := PARGB(@PStaticColor32Array(bgColor)[w]).A;
+    // MulTable[0, fgA] -> 0 => replace color with 0
+    while a = 0 do
+    begin
+      PStaticColor32Array(bgColor)[w] := 0;
+      inc(w);
+      if w = 0 then exit;
+      a := PARGB(@PStaticColor32Array(bgColor)[w]).A;
+    end;
+    // MulTable[255, fgA] -> fgA => replace alpha with fgA
+    while a = 255 do
+    begin
+      PARGB(@PStaticColor32Array(bgColor)[w]).A := PARGB(@PStaticColor32Array(alphaMask)[w]).A;
+      inc(w);
+      if w = 0 then exit;
+      a := PARGB(@PStaticColor32Array(bgColor)[w]).A;
+    end;
+
+    a := PARGB(@PStaticColor32Array(alphaMask)[w]).A;
+    // MulTable[bgA, 0] -> 0 => replace color with 0
+    while a = 0 do
+    begin
+      PStaticColor32Array(bgColor)[w] := 0;
+      inc(w);
+      if w = 0 then exit;
+      a := PARGB(@PStaticColor32Array(alphaMask)[w]).A;
+    end;
+    // MulTable[bgA, 255] -> bgA => nothing to do
+    while a = 255 do
+    begin
+      inc(w);
+      if w = 0 then exit;
+      a := PARGB(@PStaticColor32Array(alphaMask)[w]).A;
+    end;
+
+    a := MulTable[PARGB(@PStaticColor32Array(bgColor)[w]).A, a];
+    if a <> 0 then PARGB(@PStaticColor32Array(bgColor)[w]).A := a
+    else PStaticColor32Array(bgColor)[w] := 0;
+
+    inc(w);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+{
+// reference implementation
+procedure BlendMaskLine(bgColor, alphaMask: PColor32; w: Integer);
+var
+  a: byte;
+begin
+  // Use the negative offset trick to only increment "w"
+  // until it reaches zero. And by offsetting the arrays, "w"
+  // also becomes the index for those.
+  inc(bgColor, w);
+  inc(alphaMask, w);
+  w := -w;
+
+  while w < 0 do
+  begin
+    a := MulTable[PARGB(@PStaticColor32Array(bgColor)[w]).A,
+                  PARGB(@PStaticColor32Array(alphaMask)[w]).A];
+    if a = 0 then PStaticColor32Array(bgColor)[w] := 0
+    else PARGB(@PStaticColor32Array(bgColor)[w]).A := a;
+
+    inc(w);
+  end;
+end;}
+{$IFDEF RANGECHECKS_ENABLED}
+  {$RANGECHECKS ON}
+{$ENDIF}
 //------------------------------------------------------------------------------
 
 function BlendAltMask(bgColor, alphaMask: TColor32): TColor32;
@@ -923,6 +1233,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure BlendBlueChannelLine(bgColor, blueMask: PColor32; w: integer);
+begin
+  while w > 0 do
+  begin
+    PARGB(bgColor).A := MulTable[PARGB(bgColor).A, PARGB(blueMask).A];
+    inc(bgColor);
+    dec(w);
+  end;
+end;
+//------------------------------------------------------------------------------
+
 function BlendInvertedMask(bgColor, alphaMask: TColor32): TColor32;
 var
   a: byte;
@@ -931,6 +1252,34 @@ begin
   if a < 2 then Result := 0
   else Result := (bgColor and $00FFFFFF) or (TColor32(a) shl 24);
 end;
+//------------------------------------------------------------------------------
+
+{$RANGECHECKS OFF} // negative array index is used
+
+procedure BlendInvertedMaskLine(bgColor, alphaMask: PColor32; w: integer);
+var
+  a: byte;
+begin
+  // Use the negative offset trick to only increment "w"
+  // until it reaches zero. And by offsetting the arrays, "w"
+  // also becomes the index for those.
+  inc(bgColor, w);
+  inc(alphaMask, w);
+  w := -w;
+
+  while w < 0 do
+  begin
+    a := MulTable[PARGB(@PStaticColor32Array(bgColor)[w]).A,
+                  PARGB(@PStaticColor32Array(alphaMask)[w]).A xor 255];
+    if a < 2 then PStaticColor32Array(bgColor)[w] := 0
+    else PARGB(@PStaticColor32Array(bgColor)[w]).A := a;
+
+    inc(w);
+  end;
+end;
+{$IFDEF RANGECHECKS_ENABLED}
+  {$RANGECHECKS ON}
+{$ENDIF}
 
 //------------------------------------------------------------------------------
 // Compare functions (see ConvertToBoolMask, FloodFill & Vectorize)
@@ -2456,6 +2805,7 @@ procedure TImage32.CopyInternal(src: TImage32;
 var
   i, j, srcRecWidth, srcRecHeight: Integer;
   s, d: PColor32;
+  srcDiff, dstDiff: Integer;
 begin
   // occasionally, due to rounding, srcRec and dstRec
   // don't have exactly the same widths and heights, so ...
@@ -2468,6 +2818,9 @@ begin
   d := @Pixels[dstRec.top * Width + dstRec.Left];
 
   if assigned(blendFunc) then
+  begin
+    srcDiff := (src.Width - srcRecWidth) * SizeOf(TColor32);
+    dstDiff := (Width - srcRecWidth) * SizeOf(TColor32);
     for i := srcRec.Top to srcRec.Top + srcRecHeight -1 do
     begin
       for j := 1 to srcRecWidth do
@@ -2475,8 +2828,43 @@ begin
         d^ := blendFunc(d^, s^);
         inc(s); inc(d);
       end;
-      inc(s, src.Width - srcRecWidth);
-      inc(d, Width - srcRecWidth);
+      inc(PByte(s), srcDiff);
+      inc(PByte(d), dstDiff);
+    end;
+  end
+  else
+    //simply overwrite src with dst (ie without blending)
+    for i := srcRec.Top to srcRec.Top + srcRecHeight -1 do
+    begin
+      move(s^, d^, srcRecWidth * SizeOf(TColor32));
+      inc(s, src.Width);
+      inc(d, Width);
+    end;
+end;
+
+//------------------------------------------------------------------------------
+procedure TImage32.CopyInternalLine(src: TImage32;
+  const srcRec, dstRec: TRect; blendLineFunc: TBlendLineFunction);
+var
+  i, srcRecWidth, srcRecHeight: Integer;
+  s, d: PColor32;
+begin
+  // occasionally, due to rounding, srcRec and dstRec
+  // don't have exactly the same widths and heights, so ...
+  srcRecWidth :=
+    Min(srcRec.Right - srcRec.Left, dstRec.Right - dstRec.Left);
+  srcRecHeight :=
+    Min(srcRec.Bottom - srcRec.Top, dstRec.Bottom - dstRec.Top);
+
+  s := @src.Pixels[srcRec.Top * src.Width + srcRec.Left];
+  d := @Pixels[dstRec.top * Width + dstRec.Left];
+
+  if assigned(blendLineFunc) then
+    for i := srcRec.Top to srcRec.Top + srcRecHeight -1 do
+    begin
+      blendLineFunc(d, s, srcRecWidth);
+      inc(s, src.Width);
+      inc(d, Width);
     end
   else
     //simply overwrite src with dst (ie without blending)
@@ -2491,12 +2879,26 @@ end;
 
 function TImage32.Copy(src: TImage32; srcRec, dstRec: TRect): Boolean;
 begin
-  Result := CopyBlend(src, srcRec, dstRec, nil);
+  Result := CopyBlendInternal(src, srcRec, dstRec, nil, nil);
 end;
 //------------------------------------------------------------------------------
 
-function TImage32.CopyBlend(src: TImage32; srcRec, dstRec: TRect;
+function TImage32.CopyBlend(src: TImage32; const srcRec, dstRec: TRect;
   blendFunc: TBlendFunction): Boolean;
+begin
+  Result := CopyBlendInternal(src, srcRec, dstRec, blendFunc, nil);
+end;
+//------------------------------------------------------------------------------
+
+function TImage32.CopyBlend(src: TImage32; const srcRec, dstRec: TRect;
+  blendLineFunc: TBlendLineFunction): Boolean;
+begin
+  Result := CopyBlendInternal(src, srcRec, dstRec, nil, blendLineFunc);
+end;
+//------------------------------------------------------------------------------
+
+function TImage32.CopyBlendInternal(src: TImage32; srcRec, dstRec: TRect;
+  blendFunc: TBlendFunction; blendLineFunc: TBlendLineFunction): Boolean;
 var
   tmp: TImage32;
   srcRecClipped, dstRecClipped, r: TRect;
@@ -2541,7 +2943,7 @@ begin
       tmp.AssignSettings(src);
       src.ScaleTo(tmp, scaleX, scaleY);
       ScaleRect(srcRecClipped, scaleX, scaleY);
-      result := CopyBlend(tmp, srcRecClipped, dstRec, blendFunc);
+      result := CopyBlendInternal(tmp, srcRecClipped, dstRec, blendFunc, blendLineFunc);
     finally
       tmp.Free;
     end;
@@ -2571,14 +2973,17 @@ begin
   begin
     tmp := TImage32.Create(self, srcRecClipped);
     try
-      result := src.CopyBlend(tmp, tmp.Bounds, dstRecClipped, blendFunc);
+      result := src.CopyBlendInternal(tmp, tmp.Bounds, dstRecClipped, blendFunc, blendLineFunc);
     finally
       tmp.Free;
     end;
     Exit;
   end;
 
-  CopyInternal(src, srcRecClipped, dstRecClipped, blendFunc);
+  if Assigned(blendLineFunc) then
+    CopyInternalLine(src, srcRecClipped, dstRecClipped, blendLineFunc)
+  else
+    CopyInternal(src, srcRecClipped, dstRecClipped, blendFunc);
   result := true;
   Changed;
 end;

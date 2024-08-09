@@ -1259,7 +1259,7 @@ begin
           TranslateRect(rec2,
             Floor(childLayer.fOuterMargin -childLayer.Left -fOuterMargin),
             Floor(childLayer.fOuterMargin -childLayer.Top -fOuterMargin));
-          childImg2.CopyBlend(fClipImage, rec, rec2, BlendMask);
+          childImg2.CopyBlend(fClipImage, rec, rec2, BlendMaskLine);
         end;
       end else
         childImg2 := childImg;
