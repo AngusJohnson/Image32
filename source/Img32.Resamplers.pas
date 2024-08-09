@@ -745,7 +745,7 @@ var
 begin
   sx := Image.Width/newWidth * 256;
   sy := Image.Height/newHeight * 256;
-  SetLength(tmp, newWidth * newHeight);
+  NewColor32Array(tmp, newWidth * newHeight, True);
 
   SetLength(scaledX, newWidth +1); //+1 for fractional overrun
   for x := 0 to newWidth -1 do
@@ -794,7 +794,7 @@ begin
     if TargetImage <> Image then TargetImage.Assign(Image);
     Exit;
   end;
-  SetLength(tmp, newWidth * newHeight);
+  NewColor32Array(tmp, newWidth * newHeight, True);
 
   //get scaled X & Y values once only (storing them in lookup arrays) ...
   SetLength(scaledXi, newWidth);

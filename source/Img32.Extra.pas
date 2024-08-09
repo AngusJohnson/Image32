@@ -1202,8 +1202,8 @@ var
 begin
   w := img.Width; h := img.Height;
   if w * h = 0 then Exit;
-  SetLength(tmp, w * h);
-  SetLength(tmp2, w * h);
+  NewColor32Array(tmp, w * h);
+  NewColor32Array(tmp2, w * h);
   s := img.PixelRow[0]; d := @tmp[0];
   for j := 0 to h-1 do
   begin
@@ -2401,8 +2401,8 @@ begin
   RectWidthHeight(rec2, w, h);
   if (Min(w, h) < 2) or ((stdDevX < 1) and (stdDevY < 1)) then Exit;
   len := w * h;
-  SetLength(src, len);
-  SetLength(dst, len);
+  NewColor32Array(src, len, True); // content is overwritten in BoxBlurH
+  NewColor32Array(dst, len, True);
   if blurFullImage then
   begin
     // copy the entire image into 'dst'

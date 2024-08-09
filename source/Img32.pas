@@ -606,6 +606,12 @@ var
 
   function __Trunc(Value: Double): Integer; {$IFNDEF CPUX86} {$IFDEF INLINE} inline; {$ENDIF} {$ENDIF}
 
+  // NewColor32Array creates a new "array of TColor32". "a" is nil'ed
+  // before allocating the array. If "count" is zero or negative "a" will
+  // be nil. If "uninitialized" is True, the memory will not be zero'ed.
+  procedure NewColor32Array(var a: TArrayOfColor32; count: integer;
+    uninitialized: boolean = False);
+
 implementation
 
 uses
@@ -665,6 +671,55 @@ var
 {$ENDIF}
 
 //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+function NewSimpleDynArray(count: NativeInt; elemSize: integer; uninitialized: boolean = False): Pointer;
+type
+  PDynArrayRec = ^TDynArrayRec;
+  {$IFDEF FPC}
+  tdynarrayindex = sizeint;
+  TDynArrayRec = packed record
+    refcount: ptrint;
+    high: tdynarrayindex;
+    Data: record end;
+  end;
+  {$ELSE}
+  TDynArrayRec = packed record
+    {$IFDEF CPU64BITS}
+    _Padding: Integer;
+    {$ENDIF}
+    RefCnt: Integer;
+    Length: NativeInt;
+    Data: record end;
+  end;
+  {$ENDIF}
+var
+  p: PDynArrayRec;
+begin
+  Result := nil;
+  if count > 0 then
+  begin
+    if uninitialized then
+      GetMem(Pointer(p), SizeOf(TDynArrayRec) + count * elemSize)
+    else
+      p := AllocMem(SizeOf(TDynArrayRec) + count * elemSize);
+    {$IFDEF FPC}
+    p.refcount := 1;
+    p.high := count -1;
+    {$ELSE}
+    p.RefCnt := 1;
+    p.Length := count;
+    {$ENDIF}
+    Result := @p.Data;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure NewColor32Array(var a: TArrayOfColor32; count: integer; uninitialized: boolean);
+begin
+  a := nil;
+  Pointer(a) := NewSimpleDynArray(count, SizeOf(TColor32), uninitialized);
+end;
 //------------------------------------------------------------------------------
 
 procedure CreateImageFormatList;
@@ -1619,7 +1674,7 @@ begin
   result := nil;
   if not assigned(img) or img.IsEmpty then Exit;
   if not Assigned(compareFunc) then compareFunc := CompareRGB;
-  SetLength(Result, img.Width * img.Height);
+  NewColor32Array(Result, img.Width * img.Height, True);
   pDstPxl := @Result[0];
   pSrcPxl := img.PixelBase;
   for i := 0 to img.Width * img.Height -1 do
@@ -1773,7 +1828,7 @@ var
   i, len: Integer;
 begin
   len := length(hslArr);
-  setLength(result, len);
+  NewColor32Array(result, len, True);
   for i := 0 to len -1 do
     result[i] := HslToRgb(hslArr[i]);
 end;
@@ -1926,7 +1981,7 @@ begin
   fResampler := DefaultResampler;
   fwidth := Max(0, width);
   fheight := Max(0, height);
-  SetLength(fPixels, fwidth * fheight);
+  NewColor32Array(fPixels, fwidth * fheight);
 end;
 //------------------------------------------------------------------------------
 
@@ -1960,9 +2015,8 @@ begin
   fResampler := src.fResampler;
   types.IntersectRect(rec, src.Bounds, srcRec);
   RectWidthHeight(rec, fWidth, fHeight);
-  SetLength(fPixels, fWidth * fHeight);
   if (fWidth = 0) or (fheight = 0) then Exit;
-  fPixels := src.CopyPixels(srcRec);
+  fPixels := src.CopyPixels(rec);
 end;
 //------------------------------------------------------------------------------
 
@@ -2350,7 +2404,7 @@ var
   recClipped: TRect;
 begin
   RectWidthHeight(rec, w,h);
-  setLength(result, w * h);
+  NewColor32Array(result, w * h, True);
 
   if w * h = 0 then Exit;
   Types.IntersectRect(recClipped, rec, Bounds);
@@ -2455,7 +2509,7 @@ begin
   fwidth := Max(0, newWidth);
   fheight := Max(0, newHeight);
   fPixels := nil; //forces a blank image
-  SetLength(fPixels, fwidth * fheight);
+  NewColor32Array(fPixels, fwidth * fheight, True);
   fIsPremultiplied := false;
   BlockNotify;
   Clear(color);
@@ -3390,7 +3444,7 @@ var
   src, dst: PColor32;
 begin
   if IsEmpty then Exit;
-  SetLength(a, fWidth * fHeight);
+  NewColor32Array(a, fWidth * fHeight, True);
   src := @fPixels[(height-1) * width];
   dst := @a[0];
   for i := 0 to fHeight -1 do
@@ -3410,7 +3464,7 @@ var
   row: PColor32;
 begin
   if IsEmpty then Exit;
-  SetLength(a, fWidth);
+  NewColor32Array(a, fWidth, True);
   widthLess1 := fWidth -1;
   row := @fPixels[(height-1) * width]; //top row
   for i := 0 to fHeight -1 do

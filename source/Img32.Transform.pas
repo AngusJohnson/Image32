@@ -631,7 +631,7 @@ begin
     Exit;
   end;
 
-  SetLength(tmp, newWidth * newHeight);
+  NewColor32Array(tmp, newWidth * newHeight, True);
   pc := @tmp[0];
   xLimLo := -0.5/sx;
   xLimHi := img.Width + 0.5/sx;
@@ -816,7 +816,7 @@ begin
 
   mat := GetProjectionMatrix(srcPts, dstPts2);
   RectWidthHeight(rec, w, h);
-  SetLength(tmp, w * h);
+  NewColor32Array(tmp, w * h, True);
   pc := @tmp[0];
   for i :=  0 to h -1 do
     for j := 0 to w -1 do
@@ -997,7 +997,7 @@ begin
   len := Length(topPath);
   inc(rec.Bottom, img.Height);
   RectWidthHeight(rec, w, h);
-  SetLength(tmp, (w+1) * h);
+  NewColor32Array(tmp, (w+1) * h, True);
 
   prevX := topPath[0].X;
   allowBackColoring := GetAlpha(backColor) > 2;
@@ -1082,7 +1082,7 @@ begin
   len := Length(leftPath);
   inc(rec.Right, img.Width);
   RectWidthHeight(rec, w, h);
-  SetLength(tmp, w * (h+1));
+  NewColor32Array(tmp, w * (h+1), True);
 
   prevY := leftPath[0].Y;
   allowBackColoring := GetAlpha(backColor) > 2;
