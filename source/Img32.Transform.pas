@@ -520,15 +520,24 @@ end;
 function CanUseBoxDownsampler(const mat: TMatrixD; sx, sy: double): Boolean;
 begin
   // If the matrix looks like this after removing the scale,
-  // the box downsampler can be used.
+  // the box downsampler can be used. (only translation and scaling)
   //  cos(0)  -sin(0)  tx          1   0   tx
   //  sin(0)   cos(0)  ty    =>    0   1   ty
   //  0        0       1           0   0   1
 
+{
   Result := (mat[0,0]/sx = 1) and (mat[0,1]/sx = 0) and
             (mat[1,0]/sy = 0) and (mat[1,1]/sy = 1) and
             (mat[2,0]    = 0) and (mat[2,1]    = 0) and
             (mat[2,2]    = 1);
+}
+
+  // We can skip the divisions, because m/s is only zero if m is zero
+  // and m/s=1 is the same as m=s
+  Result := (SameValue(mat[0,0], sx)) and (mat[0,1] = 0) and
+            (mat[1,0] = 0)            and (SameValue(mat[1,1], sy)) and
+            (mat[2,0] = 0)            and (mat[2,1] = 0) and
+            (mat[2,2] = 1);
 end;
 {$ENDIF USE_DOWNSAMPLER_AUTOMATICALLY}
 
