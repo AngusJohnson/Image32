@@ -158,7 +158,7 @@ type
   end;
 
   TBlendFunction = function(bgColor, fgColor: TColor32): TColor32;
-  TBlendLineFunction = procedure(bgColor, fgColor: PColor32; w: integer);
+  TBlendLineFunction = procedure(bgColor, fgColor: PColor32; width: integer);
 
   TCompareFunction = function(master, current: TColor32; data: integer): Boolean;
   TCompareFunctionEx = function(master, current: TColor32): Byte;
@@ -971,11 +971,11 @@ LabelBgAlphaIsZero:
     R     := PByteArray(@MulTable[fgWeight]);      //ie weight of foreground
     InvR  := PByteArray(@MulTable[not fgWeight]);  //ie weight of foreground
 
-    bgColorArr[w] := TColor32(bgA) shl 24
+    bgColorArr[width] := TColor32(bgA) shl 24
           or (TColor32(R[Byte(fgCol shr 16)] + InvR[Byte(bgCol shr 16)]) shl 16)
           or (TColor32(R[Byte(fgCol shr 8 )] + InvR[Byte(bgCol shr  8)]) shl  8)
           or (TColor32(R[Byte(fgCol)       ] + InvR[Byte(bgCol)       ])       );
-    inc(w);
+    inc(width);
     {$ELSE}
     // x86 has not enough CPU registers and the loops above will suffer if we
     // inline the code. So we let the compiler use a "new set" of CPU registers
@@ -988,7 +988,7 @@ end;
 
 {
 // reference implementation
-procedure BlendToAlphaLine(bgColor, fgColor: PColor32; w: Integer);
+procedure BlendToAlphaLine(bgColor, fgColor: PColor32; width: Integer);
 var
   fgWeight: byte;
   R, InvR: PByteArray;
@@ -1001,25 +1001,25 @@ begin
   // Use the negative offset trick to only increment "w"
   // until it reaches zero. And by offsetting the arrays, "w"
   // also becomes the index for those.
-  inc(bgColor, w);
-  inc(fgColor, w);
-  w := -w;
+  inc(bgColor, width);
+  inc(fgColor, width);
+  width := -width;
 
   bgColorArr := PStaticColor32Array(bgColor);
   fgColorArr := PStaticColor32Array(fgColor);
 
-  while w < 0 do
+  while width < 0 do
   begin
-    bgCol := bgColorArr[w];
-    fgCol := fgColorArr[w];
+    bgCol := bgColorArr[width];
+    fgCol := fgColorArr[width];
     bgA := bgCol shr 24;
-    if bgA = 0 then bgColorArr[w] := fgCol
+    if bgA = 0 then bgColorArr[width] := fgCol
     else
     begin
       fgA := fgCol shr 24;
       if fgA > 0 then
       begin
-        if fgA = 255 then bgColorArr[w] := fgCol
+        if fgA = 255 then bgColorArr[width] := fgCol
         else if fgA > 0 then
         begin
           //combine alphas ...
@@ -1030,7 +1030,7 @@ begin
           R     := PByteArray(@MulTable[fgWeight]);      //ie weight of foreground
           InvR  := PByteArray(@MulTable[not fgWeight]);  //ie weight of foreground
 
-          bgColorArr[w] := TColor32(bgA) shl 24
+          bgColorArr[width] := TColor32(bgA) shl 24
                 or (TColor32(R[Byte(fgCol shr 16)] + InvR[Byte(bgCol shr 16)]) shl 16)
                 or (TColor32(R[Byte(fgCol shr 8 )] + InvR[Byte(bgCol shr  8)]) shl  8)
                 or (TColor32(R[Byte(fgCol)       ] + InvR[Byte(bgCol)       ])       );
@@ -1038,7 +1038,7 @@ begin
       end;
     end;
 
-    inc(w);
+    inc(width);
   end;
 end;}
 {$IFDEF RANGECHECKS_ENABLED}
@@ -1119,25 +1119,25 @@ end;
 
 {
 // reference implementation
-procedure BlendMaskLine(bgColor, alphaMask: PColor32; w: Integer);
+procedure BlendMaskLine(bgColor, alphaMask: PColor32; width: Integer);
 var
   a: byte;
 begin
   // Use the negative offset trick to only increment "w"
   // until it reaches zero. And by offsetting the arrays, "w"
   // also becomes the index for those.
-  inc(bgColor, w);
-  inc(alphaMask, w);
-  w := -w;
+  inc(bgColor, width);
+  inc(alphaMask, width);
+  width := -width;
 
-  while w < 0 do
+  while width < 0 do
   begin
-    a := MulTable[PARGB(@PStaticColor32Array(bgColor)[w]).A,
-                  PARGB(@PStaticColor32Array(alphaMask)[w]).A];
-    if a = 0 then PStaticColor32Array(bgColor)[w] := 0
-    else PARGB(@PStaticColor32Array(bgColor)[w]).A := a;
+    a := MulTable[PARGB(@PStaticColor32Array(bgColor)[width]).A,
+                  PARGB(@PStaticColor32Array(alphaMask)[width]).A];
+    if a = 0 then PStaticColor32Array(bgColor)[width] := 0
+    else PARGB(@PStaticColor32Array(bgColor)[width]).A := a;
 
-    inc(w);
+    inc(width);
   end;
 end;}
 {$IFDEF RANGECHECKS_ENABLED}
