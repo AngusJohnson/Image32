@@ -114,6 +114,8 @@ type
     procedure Subtract(c: TColor32); overload; {$IFDEF INLINE} inline; {$ENDIF}
     procedure Subtract(const other: TWeightedColor); overload;
       {$IFDEF INLINE} inline; {$ENDIF}
+    function AddSubtract(addC, subC: TColor32): Boolean; {$IFDEF INLINE} inline; {$ENDIF}
+    function AddNoneSubtract(c: TColor32): Boolean; {$IFDEF INLINE} inline; {$ENDIF}
     procedure AddWeight(w: Integer); {$IFDEF INLINE} inline; {$ENDIF}
     property AddCount: Integer read fAddCount;
     property Color: TColor32 read GetColor;
@@ -132,7 +134,7 @@ resourcestring
   rsInvalidScale   = 'Invalid matrix scaling factor (0)';
 
 const
-  DivOneByXTableSize = 65536;
+  DivOneByXTableSize = 1024;
 
 {$IFDEF CPUX86}
   // Use faster Trunc for x86 code in this unit.
@@ -1137,10 +1139,9 @@ end;
 procedure TWeightedColor.Reset(c: TColor32; w: Integer);
 var
   a: Cardinal;
-  argb: TARGB absolute c;
 begin
   fAddCount := w;
-  a := w * argb.A;
+  a := w * Byte(c shr 24);
   if a = 0 then
   begin
     fAlphaTot := 0;
@@ -1150,9 +1151,9 @@ begin
   end else
   begin
     fAlphaTot := a;
-    fColorTotB := (a * argb.B);
-    fColorTotG := (a * argb.G);
-    fColorTotR := (a * argb.R);
+    fColorTotB := (a * Byte(c));
+    fColorTotG := (a * Byte(c shr 8));
+    fColorTotR := (a * Byte(c shr 16));
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1240,6 +1241,58 @@ begin
   dec(fColorTotR, other.fColorTotR);
   dec(fColorTotG, other.fColorTotG);
   dec(fColorTotB, other.fColorTotB);
+end;
+//------------------------------------------------------------------------------
+
+function TWeightedColor.AddSubtract(addC, subC: TColor32): Boolean;
+var
+  a: Cardinal;
+begin
+  // add+subtract => fAddCount stays the same
+
+  // skip identical colors
+  Result := False;
+  if addC = subC then Exit;
+
+  a := Byte(addC shr 24);
+  if a > 0 then
+  begin
+    inc(fAlphaTot, a);
+    inc(fColorTotB, (a * Byte(addC)));
+    inc(fColorTotG, (a * Byte(addC shr 8)));
+    inc(fColorTotR, (a * Byte(addC shr 16)));
+    Result := True;
+  end;
+
+  a := Byte(subC shr 24);
+  if a > 0 then
+  begin
+    dec(fAlphaTot, a);
+    dec(fColorTotB, (a * Byte(subC)));
+    dec(fColorTotG, (a * Byte(subC shr 8)));
+    dec(fColorTotR, (a * Byte(subC shr 16)));
+    Result := True;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TWeightedColor.AddNoneSubtract(c: TColor32): Boolean;
+var
+  a: Cardinal;
+begin
+  // add+subtract => fAddCount stays the same
+
+  a := Byte(c shr 24);
+  if a > 0 then
+  begin
+    dec(fAlphaTot, a);
+    dec(fColorTotB, (a * Byte(c)));
+    dec(fColorTotG, (a * Byte(c shr 8)));
+    dec(fColorTotR, (a * Byte(c shr 16)));
+    Result := True;
+  end
+  else
+    Result := False;
 end;
 //------------------------------------------------------------------------------
 
