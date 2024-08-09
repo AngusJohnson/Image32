@@ -281,7 +281,7 @@ type
     procedure SetBackgroundColor(bgColor: TColor32);
     procedure Clear(color: TColor32 = 0); overload;
     procedure Clear(const rec: TRect; color: TColor32 = 0); overload;
-    procedure FillRect(rec: TRect; color: TColor32);
+    procedure FillRect(const rec: TRect; color: TColor32);
 
     procedure ConvertToBoolMask(reference: TColor32;
       tolerance: integer; colorFunc: TCompareFunction;
@@ -2230,23 +2230,47 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.FillRect(rec: TRect; color: TColor32);
+procedure TImage32.FillRect(const rec: TRect; color: TColor32);
 var
-  i,j, rw: Integer;
+  i,j, rw, w: Integer;
   c: PColor32;
+  r: TRect;
 begin
-  Types.IntersectRect(rec, rec, bounds);
-  if IsEmptyRect(rec) then Exit;
-  rw := RectWidth(rec);
-  c := @Pixels[rec.Top * Width + rec.Left];
-  for i := rec.Top to rec.Bottom -1 do
+  Types.IntersectRect(r, rec, bounds);
+  if IsEmptyRect(r) then Exit;
+  rw := RectWidth(r);
+  w := Width;
+  c := @Pixels[r.Top * w + r.Left];
+
+  if (color = 0) and (w = rw) then
+    FillChar(c^, (r.Bottom - r.Top) * rw * SizeOf(TColor32), 0)
+  else if rw = 1 then
   begin
-    for j := 1 to rw do
+    for i := r.Top to r.Bottom -1 do
     begin
       c^ := color;
-      inc(c);
+      inc(c, w);
     end;
-    inc(c, Width - rw);
+  end
+  else if (color = 0) and (rw > 15) then
+  begin
+    for i := r.Top to r.Bottom -1 do
+    begin
+      FillChar(c^, rw * SizeOf(TColor32), 0);
+      inc(c, w);
+    end;
+  end
+  else
+  begin
+    for i := r.Top to r.Bottom -1 do
+    begin
+      for j := 1 to rw do
+      begin
+        c^ := color;
+        inc(c);
+      end;
+      inc(c, w - rw);
+    end;
   end;
   Changed;
 end;
