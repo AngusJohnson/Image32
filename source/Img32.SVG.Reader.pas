@@ -89,7 +89,7 @@ type
     //GetRelFracLimit: ie when to assume untyped vals are relative vals
     function  GetRelFracLimit: double; virtual;
     procedure Draw(image: TImage32; drawDat: TDrawData); virtual;
-    procedure DrawChildren(image: TImage32; drawDat: TDrawData); virtual;
+    procedure DrawChildren(image: TImage32; const drawDat: TDrawData);
   public
     constructor Create(parent: TBaseElement; svgEl: TSvgTreeEl); virtual;
     destructor  Destroy; override;
@@ -3723,7 +3723,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TBaseElement.DrawChildren(image: TImage32; drawDat: TDrawData);
+procedure TBaseElement.DrawChildren(image: TImage32; const drawDat: TDrawData);
 var
   i: integer;
 begin
