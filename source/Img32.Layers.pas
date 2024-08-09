@@ -2377,7 +2377,7 @@ var
   mp: TPointD;
 begin
   mp := MidPoint(rec);
-  SetLength(Result, 4);
+  NewPointDArray(Result, 4, True);
   Result[0] := PointD(mp.X, rec.Top);
   Result[1] := PointD(rec.Right, mp.Y);
   Result[2] := PointD(mp.X, rec.Bottom);
@@ -2462,7 +2462,7 @@ begin
   group := TSizingGroupLayer32(movedButton.Parent);
   with group do
   begin
-    SetLength(path, ChildCount);
+    NewPointDArray(path, ChildCount, True);
     for i := 0 to ChildCount -1 do
       path[i] := Child[i].MidPoint;
   end;

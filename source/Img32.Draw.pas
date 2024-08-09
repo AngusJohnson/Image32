@@ -1686,7 +1686,7 @@ begin
     fColorsCnt := Ceil(dy + dxdy * (fEndPt.X - fStartPt.X));
     MakeColorGradient(fGradientColors, fColorsCnt, fColors);
     // get a list of perpendicular offsets for each
-    SetLength(fPerpendicOffsets, ImgWidth);
+    NewIntegerArray(fPerpendicOffsets, ImgWidth, True);
     // from an imaginary line that's through fStartPt and perpendicular to
     // the gradient line, get a list of Y offsets for each X in image width
     for i := 0 to ImgWidth -1 do
@@ -1711,7 +1711,7 @@ begin
 
     fColorsCnt := Ceil(dx + dydx * (fEndPt.Y - fStartPt.Y));
     MakeColorGradient(fGradientColors, fColorsCnt, fColors);
-    SetLength(fPerpendicOffsets, ImgHeight);
+    NewIntegerArray(fPerpendicOffsets, ImgHeight, True);
     // from an imaginary line that's through fStartPt and perpendicular to
     // the gradient line, get a list of X offsets for each Y in image height
     for i := 0 to ImgHeight -1 do
@@ -2107,7 +2107,7 @@ var
   lines: TPathsD;
 begin
   setLength(lines, 1);
-  setLength(lines[0], 2);
+  NewPointDArray(lines[0], 2, True);
   lines[0][0] := pt1;
   lines[0][1] := pt2;
   DrawLine(img, lines, lineWidth, color, esRound);

@@ -626,7 +626,7 @@ end;
 
 procedure TSvgASegment.SetCtrlPtsFromArcInfo;
 begin
-  SetLength(fCtrlPts, 5);
+  NewPointDArray(fCtrlPts, 5, True);
   with fArcInfo do
   begin
     fCtrlPts[0] := startPos;
@@ -771,7 +771,7 @@ var
   i, len: integer;
 begin
   len := Length(fCtrlPts) div 3;
-  SetLength(Result, len);
+  NewPointDArray(Result, len, True);
   for i := 0 to High(Result) do
     Result[i] := fCtrlPts[i*3 +2];
 end;
@@ -890,7 +890,7 @@ var
   i, len: integer;
 begin
   len := Length(fCtrlPts) div 2;
-  SetLength(Result, len);
+  NewPointDArray(Result, len, True);
   for i := 0 to High(Result) do
     Result[i] := fCtrlPts[i*2+1];
 end;
@@ -955,7 +955,7 @@ var
   i, len: integer;
 begin
   len := Length(fCtrlPts) div 2;
-  SetLength(Result, len);
+  NewPointDArray(Result, len, True);
   for i := 0 to High(Result) do
     Result[i] := fCtrlPts[i*2+1];
 end;
@@ -1202,7 +1202,7 @@ begin
   SetLength(fSegs, i+1);
   Result := TSvgZSegment.Create(self, i, endPt);
   fSegs[i] := Result;
-  SetLength(Result.fCtrlPts, 1);
+  NewPointDArray(Result.fCtrlPts, 1, True);
   Result.fCtrlPts[0] := firstPt;
   isClosed := true;
 end;

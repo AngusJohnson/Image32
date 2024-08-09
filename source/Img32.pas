@@ -609,7 +609,13 @@ var
   // NewColor32Array creates a new "array of TColor32". "a" is nil'ed
   // before allocating the array. If "count" is zero or negative "a" will
   // be nil. If "uninitialized" is True, the memory will not be zero'ed.
-  procedure NewColor32Array(var a: TArrayOfColor32; count: integer;
+  procedure NewColor32Array(var a: TArrayOfColor32; count: nativeint;
+    uninitialized: boolean = False);
+  procedure NewIntegerArray(var a: TArrayOfInteger; count: nativeint;
+    uninitialized: boolean = False);
+  procedure NewByteArray(var a: TArrayOfByte; count: nativeint;
+    uninitialized: boolean = False);
+  procedure NewPointDArray(var a: TPathD; count: nativeint;
     uninitialized: boolean = False);
 
 implementation
@@ -661,20 +667,6 @@ type
     func: TResamplerFunction;
   end;
 
-var
-{$IFDEF XPLAT_GENERICS}
-  ImageFormatClassList: TList<PImgFmtRec>; //list of supported file extensions
-  ResamplerList: TList<TResamplerObj>;     //list of resampler functions
-{$ELSE}
-  ImageFormatClassList: TList;
-  ResamplerList: TList;
-{$ENDIF}
-
-//------------------------------------------------------------------------------
-//------------------------------------------------------------------------------
-
-function NewSimpleDynArray(count: NativeInt; elemSize: integer; uninitialized: boolean = False): Pointer;
-type
   PDynArrayRec = ^TDynArrayRec;
   {$IFDEF FPC}
   tdynarrayindex = sizeint;
@@ -693,6 +685,20 @@ type
     Data: record end;
   end;
   {$ENDIF}
+
+var
+{$IFDEF XPLAT_GENERICS}
+  ImageFormatClassList: TList<PImgFmtRec>; //list of supported file extensions
+  ResamplerList: TList<TResamplerObj>;     //list of resampler functions
+{$ELSE}
+  ImageFormatClassList: TList;
+  ResamplerList: TList;
+{$ENDIF}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+function NewSimpleDynArray(count: nativeint; elemSize: integer; uninitialized: boolean = False): Pointer;
 var
   p: PDynArrayRec;
 begin
@@ -715,10 +721,67 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure NewColor32Array(var a: TArrayOfColor32; count: integer; uninitialized: boolean);
+function CanReuseDynArray(a: Pointer; count: nativeint): Boolean;
+// returns True if RefCnt=1 and Length=count
 begin
-  a := nil;
+  //Assert(a <> nil);
+  a := PByte(a) - SizeOf(TDynArrayRec);
+  Result :=
+    {$IFDEF FPC}
+    (PDynArrayRec(a).refcount = 1) and
+    (PDynArrayRec(a).high = count - 1);
+    {$ELSE}
+    (PDynArrayRec(a).RefCnt = 1) and
+    (PDynArrayRec(a).Length = count);
+    {$ENDIF}
+end;
+//------------------------------------------------------------------------------
+
+procedure NewColor32Array(var a: TArrayOfColor32; count: nativeint; uninitialized: boolean);
+begin
+  if a <> nil then
+  begin
+    if uninitialized and CanReuseDynArray(a, count) then
+      Exit;
+    a := nil;
+  end;
   Pointer(a) := NewSimpleDynArray(count, SizeOf(TColor32), uninitialized);
+end;
+//------------------------------------------------------------------------------
+
+procedure NewIntegerArray(var a: TArrayOfInteger; count: nativeint; uninitialized: boolean);
+begin
+  if a <> nil then
+  begin
+    if uninitialized and CanReuseDynArray(a, count) then
+      Exit;
+    a := nil;
+  end;
+  Pointer(a) := NewSimpleDynArray(count, SizeOf(Integer), uninitialized);
+end;
+//------------------------------------------------------------------------------
+
+procedure NewByteArray(var a: TArrayOfByte; count: nativeint; uninitialized: boolean);
+begin
+  if a <> nil then
+  begin
+    if uninitialized and CanReuseDynArray(a, count) then
+      Exit;
+    a := nil;
+  end;
+  Pointer(a) := NewSimpleDynArray(count, SizeOf(Byte), uninitialized);
+end;
+//------------------------------------------------------------------------------
+
+procedure NewPointDArray(var a: TPathD; count: nativeint; uninitialized: boolean);
+begin
+  if a <> nil then
+  begin
+    if uninitialized and CanReuseDynArray(a, count) then
+      Exit;
+    a := nil;
+  end;
+  Pointer(a) := NewSimpleDynArray(count, SizeOf(TPointD), uninitialized);
 end;
 //------------------------------------------------------------------------------
 
@@ -1646,7 +1709,7 @@ begin
   result := nil;
   if not assigned(img) or img.IsEmpty then Exit;
   if not Assigned(compareFunc) then compareFunc := CompareRGB;
-  SetLength(Result, img.Width * img.Height);
+  NewByteArray(Result, img.Width * img.Height, True);
   pa := @Result[0];
   pc := img.PixelBase;
   for i := 0 to img.Width * img.Height -1 do
@@ -1706,7 +1769,7 @@ begin
   result := nil;
   if not assigned(img) or img.IsEmpty then Exit;
   if not Assigned(compareFunc) then compareFunc := GetAlphaEx;
-  SetLength(Result, img.Width * img.Height);
+  NewByteArray(Result, img.Width * img.Height, True);
   pa := @Result[0];
   pc := img.PixelBase;
   for i := 0 to img.Width * img.Height -1 do
