@@ -195,7 +195,7 @@ type
     function GetMidPoint: TPointD;
   protected
     procedure ResetColorCount;
-    function  RectHasTransparency(rec: TRect): Boolean;
+    function  RectHasTransparency(const rec: TRect): Boolean;
     function  CopyPixels(const rec: TRect): TArrayOfColor32;
     //CopyInternal: Internal routine (has no scaling or bounds checking)
     procedure CopyInternal(src: TImage32;
@@ -629,10 +629,13 @@ type
   {$IFDEF SUPPORTS_POINTERMATH}
     {$POINTERMATH ON}
   PStaticColor32Array = ^TColor32;
+  PStaticARGBArray = ^TARGB;
     {$POINTERMATH OFF}
   {$ELSE} // Delphi 7-2007
   PStaticColor32Array = ^TStaticColor32Array;
   TStaticColor32Array = array[0..MaxInt div SizeOf(TColor32) - 1] of TColor32;
+  PStaticARGBArray = ^TStaticARGBArray;
+  TStaticARGBArray = array[0..MaxInt div SizeOf(TARGB) - 1] of TARGB;
   {$ENDIF}
 
   TImgFmtRec = record
@@ -2282,29 +2285,50 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImage32.RectHasTransparency(rec: TRect): Boolean;
+{$RANGECHECKS OFF} // negative array index is used
+
+function TImage32.RectHasTransparency(const rec: TRect): Boolean;
 var
-  i,j, rw: Integer;
+  i, j, rw: Integer;
   lineByteOffset: nativeint;
   c: PARGB;
+  r: TRect;
 begin
   Result := True;
-  Types.IntersectRect(rec, rec, bounds);
-  if IsEmptyRect(rec) then Exit;
-  rw := RectWidth(rec);
-  c := @Pixels[rec.Top * Width + rec.Left];
-  lineByteOffset := (Width - rw) * SizeOf(TColor32);
-  for i := rec.Top to rec.Bottom -1 do
+  Types.IntersectRect(r, rec, bounds);
+  if IsEmptyRect(r) then Exit;
+  rw := RectWidth(r);
+  c := @Pixels[r.Top * Width + r.Left];
+
+  if rw = Width then // we can use one loop
   begin
-    for j := 1 to rw do
+    i := (r.Bottom - r.Top) * rw;
+    inc(c, i);
+    i := -i;
+    while i < 0 do
     begin
-      if c.A < 254 then Exit;
-      inc(c);
+      if PStaticARGBArray(c)[i].A < 254 then Exit;
+      inc(i);
     end;
-    inc(PByte(c), lineByteOffset);
+  end
+  else
+  begin
+    lineByteOffset := (Width - rw) * SizeOf(TColor32);
+    for i := r.Top to r.Bottom -1 do
+    begin
+      for j := 1 to rw do
+      begin
+        if c.A < 254 then Exit;
+        inc(c);
+      end;
+      inc(PByte(c), lineByteOffset);
+    end;
   end;
   Result := False;
 end;
+{$IFDEF RANGECHECKS_ENABLED}
+  {$RANGECHECKS ON}
+{$ENDIF}
 //------------------------------------------------------------------------------
 
 procedure CheckBlendFill(pc: PColor32; color: TColor32);
