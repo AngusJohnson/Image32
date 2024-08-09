@@ -1076,43 +1076,43 @@ begin
   // common values.
   while width < 0 do
   begin
-    a := PARGB(@PStaticColor32Array(bgColor)[width]).A;
+    a := PStaticARGBArray(bgColor)[width].A;
     // MulTable[0, fgA] -> 0 => replace color with 0
     while a = 0 do
     begin
       PStaticColor32Array(bgColor)[width] := 0;
       inc(width);
       if width = 0 then exit;
-      a := PARGB(@PStaticColor32Array(bgColor)[width]).A;
+      a := PStaticARGBArray(bgColor)[width].A;
     end;
     // MulTable[255, fgA] -> fgA => replace alpha with fgA
     while a = 255 do
     begin
-      PARGB(@PStaticColor32Array(bgColor)[width]).A := PARGB(@PStaticColor32Array(alphaMask)[width]).A;
+      PStaticARGBArray(bgColor)[width].A := PStaticARGBArray(alphaMask)[width].A;
       inc(width);
       if width = 0 then exit;
-      a := PARGB(@PStaticColor32Array(bgColor)[width]).A;
+      a := PStaticARGBArray(bgColor)[width].A;
     end;
 
-    a := PARGB(@PStaticColor32Array(alphaMask)[width]).A;
+    a := PStaticARGBArray(alphaMask)[width].A;
     // MulTable[bgA, 0] -> 0 => replace color with 0
     while a = 0 do
     begin
       PStaticColor32Array(bgColor)[width] := 0;
       inc(width);
       if width = 0 then exit;
-      a := PARGB(@PStaticColor32Array(alphaMask)[width]).A;
+      a := PStaticARGBArray(alphaMask)[width].A;
     end;
     // MulTable[bgA, 255] -> bgA => nothing to do
     while a = 255 do
     begin
       inc(width);
       if width = 0 then exit;
-      a := PARGB(@PStaticColor32Array(alphaMask)[width]).A;
+      a := PStaticARGBArray(alphaMask)[width].A;
     end;
 
-    a := MulTable[PARGB(@PStaticColor32Array(bgColor)[width]).A, a];
-    if a <> 0 then PARGB(@PStaticColor32Array(bgColor)[width]).A := a
+    a := MulTable[PStaticARGBArray(bgColor)[width].A, a];
+    if a <> 0 then PStaticARGBArray(bgColor)[width].A := a
     else PStaticColor32Array(bgColor)[width] := 0;
 
     inc(width);
@@ -1135,10 +1135,10 @@ begin
 
   while w < 0 do
   begin
-    a := MulTable[PARGB(@PStaticColor32Array(bgColor)[w]).A,
-                  PARGB(@PStaticColor32Array(alphaMask)[w]).A];
+    a := MulTable[PStaticARGBArray(bgColor)[w].A,
+                  PStaticARGBArray(alphaMask)[w].A];
     if a = 0 then PStaticColor32Array(bgColor)[w] := 0
-    else PARGB(@PStaticColor32Array(bgColor)[w]).A := a;
+    else PStaticARGBArray(bgColor)[w].A := a;
 
     inc(w);
   end;
@@ -1274,10 +1274,10 @@ begin
 
   while width < 0 do
   begin
-    a := MulTable[PARGB(@PStaticColor32Array(bgColor)[width]).A,
-                  PARGB(@PStaticColor32Array(alphaMask)[width]).A xor 255];
+    a := MulTable[PStaticARGBArray(bgColor)[width].A,
+                  PStaticARGBArray(alphaMask)[width].A xor 255];
     if a < 2 then PStaticColor32Array(bgColor)[width] := 0
-    else PARGB(@PStaticColor32Array(bgColor)[width]).A := a;
+    else PStaticARGBArray(bgColor)[width].A := a;
 
     inc(width);
   end;
