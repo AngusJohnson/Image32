@@ -846,8 +846,8 @@ end;
 {$RANGECHECKS OFF} // negative array index is used
 
 {$IFNDEF CPUX64}
-function BlendToAlphaLineWeight(bgColorArr, fgColorArr: PStaticColor32Array;
-  width: integer): integer;
+function BlendToAlphaLineX86(bgColorArr, fgColorArr: PStaticColor32Array;
+  idx: integer): integer;
 // Helper function for x86 code, reduces the CPU register pressure in
 // BlendToAlphaLine().
 var
@@ -856,9 +856,9 @@ var
   fgA, bgA, newBgA: byte;
   fgCol, bgCol: TColor32;
 begin
-  Result := width;
-  fgCol := fgColorArr[Result];
-  bgCol := bgColorArr[Result];
+  fgCol := fgColorArr[idx];
+  bgCol := bgColorArr[idx];
+  Result := idx;              // idx - negative offset into color arrays
 
   while True do
   begin
@@ -909,9 +909,9 @@ var
 begin
   //(see https://en.wikipedia.org/wiki/Alpha_compositing)
 
-  // Use the negative offset trick to only increment "w"
-  // until it reaches zero. And by offsetting the arrays, "w"
-  // also becomes the index for those.
+  // Use the negative offset trick to only increment the array "width"
+  // until it reaches zero. And by offsetting the arrays by "width",
+  // the negative "width" values also becomes the index into these arrays.
   inc(bgColor, width);
   inc(fgColor, width);
   width := -width;
@@ -958,7 +958,7 @@ LabelBgAlphaIsZero:
     end;
 
     {$IFDEF CPUX64}
-    // x64 has more CPU registers than x86 and calling BlendToAlphaLineWeight
+    // x64 has more CPU registers than x86 and calling BlendToAlphaLineX86
     // is slower, so we inline it.
 
     //combine alphas ...
@@ -971,16 +971,16 @@ LabelBgAlphaIsZero:
     R     := PByteArray(@MulTable[fgWeight]);      //ie weight of foreground
     InvR  := PByteArray(@MulTable[not fgWeight]);  //ie weight of foreground
 
-    bgColorArr[w] := TColor32(bgA) shl 24
+    bgColorArr[width] := TColor32(bgA) shl 24
           or (TColor32(R[Byte(fgCol shr 16)] + InvR[Byte(bgCol shr 16)]) shl 16)
           or (TColor32(R[Byte(fgCol shr 8 )] + InvR[Byte(bgCol shr  8)]) shl  8)
           or (TColor32(R[Byte(fgCol)       ] + InvR[Byte(bgCol)       ])       );
-    inc(w);
+    inc(width);
     {$ELSE}
     // x86 has not enough CPU registers and the loops above will suffer if we
     // inline the code. So we let the compiler use a "new set" of CPU registers
     // by calling a function.
-    width := BlendToAlphaLineWeight(bgColorArr, fgColorArr, width);
+    width := BlendToAlphaLineX86(bgColorArr, fgColorArr, width);
     {$ENDIF CPUX64}
   end;
 end;
@@ -998,9 +998,9 @@ var
 begin
   //(see https://en.wikipedia.org/wiki/Alpha_compositing)
 
-  // Use the negative offset trick to only increment "w"
-  // until it reaches zero. And by offsetting the arrays, "w"
-  // also becomes the index for those.
+  // Use the negative offset trick to only increment the array "w"
+  // until it reaches zero. And by offsetting the arrays by "w",
+  // the negative "w" values also becomes the index into these arrays.
   inc(bgColor, w);
   inc(fgColor, w);
   w := -w;
@@ -1062,9 +1062,9 @@ procedure BlendMaskLine(bgColor, alphaMask: PColor32; width: Integer);
 var
   a: byte;
 begin
-  // Use the negative offset trick to only increment "w"
-  // until it reaches zero. And by offsetting the arrays, "w"
-  // also becomes the index for those.
+  // Use the negative offset trick to only increment the array "width"
+  // until it reaches zero. And by offsetting the arrays by "width",
+  // the negative "width" values also becomes the index into these arrays.
   inc(bgColor, width);
   inc(alphaMask, width);
   width := -width;
@@ -1123,9 +1123,9 @@ procedure BlendMaskLine(bgColor, alphaMask: PColor32; w: Integer);
 var
   a: byte;
 begin
-  // Use the negative offset trick to only increment "w"
-  // until it reaches zero. And by offsetting the arrays, "w"
-  // also becomes the index for those.
+  // Use the negative offset trick to only increment the array "w"
+  // until it reaches zero. And by offsetting the arrays by "w",
+  // the negative "w" values also becomes the index into these arrays.
   inc(bgColor, w);
   inc(alphaMask, w);
   w := -w;
@@ -1262,9 +1262,9 @@ procedure BlendInvertedMaskLine(bgColor, alphaMask: PColor32; width: integer);
 var
   a: byte;
 begin
-  // Use the negative offset trick to only increment "w"
-  // until it reaches zero. And by offsetting the arrays, "w"
-  // also becomes the index for those.
+  // Use the negative offset trick to only increment the array "width"
+  // until it reaches zero. And by offsetting the arrays by "width",
+  // the negative "width" values also becomes the index into these arrays.
   inc(bgColor, width);
   inc(alphaMask, width);
   width := -width;
