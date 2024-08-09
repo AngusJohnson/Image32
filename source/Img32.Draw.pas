@@ -313,10 +313,6 @@ const
 {$ENDIF CPUX86}
 
 type
-  {$IF not declared(NativeInt)}
-  NativeInt = Integer;
-  {$IFEND}
-
   {$IFDEF SUPPORTS_POINTERMATH}
   // Works for Delphi 2009 and newer. For FPC it is a requirement,
   // otherwise 32bit and 64bit code behave differently for negative

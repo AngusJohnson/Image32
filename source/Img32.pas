@@ -28,6 +28,10 @@ uses
   {$IFDEF UITYPES} UITypes,{$ENDIF} Math;
 
 type
+  {$IF not declared(NativeInt)}
+  NativeInt = Integer;
+  {$IFEND}
+
   TRect = Types.TRect;
   TColor32 = type Cardinal;
 
@@ -158,7 +162,7 @@ type
   end;
 
   TBlendFunction = function(bgColor, fgColor: TColor32): TColor32;
-  TBlendLineFunction = procedure(bgColor, fgColor: PColor32; w: integer);
+  TBlendLineFunction = procedure(bgColor, fgColor: PColor32; width: nativeint);
 
   TCompareFunction = function(master, current: TColor32; data: integer): Boolean;
   TCompareFunctionEx = function(master, current: TColor32): Byte;
@@ -431,20 +435,20 @@ type
   function BlendToOpaque(bgColor, fgColor: TColor32): TColor32;
   //BlendToAlpha: Blends two semi-transparent images (slower than BlendToOpaque)
   function BlendToAlpha(bgColor, fgColor: TColor32): TColor32;
-  procedure BlendToAlphaLine(bgColor, fgColor: PColor32; width: Integer);
+  procedure BlendToAlphaLine(bgColor, fgColor: PColor32; width: nativeint);
   //BlendMask: Whereever the mask is, preserves the background
   function BlendMask(bgColor, alphaMask: TColor32): TColor32;
-  procedure BlendMaskLine(bgColor, alphaMask: PColor32; width: Integer);
+  procedure BlendMaskLine(bgColor, alphaMask: PColor32; width: nativeint);
   function BlendAltMask(bgColor, alphaMask: TColor32): TColor32;
   function BlendDifference(color1, color2: TColor32): TColor32;
   function BlendSubtract(bgColor, fgColor: TColor32): TColor32;
   function BlendLighten(bgColor, fgColor: TColor32): TColor32;
   function BlendDarken(bgColor, fgColor: TColor32): TColor32;
   function BlendInvertedMask(bgColor, alphaMask: TColor32): TColor32;
-  procedure BlendInvertedMaskLine(bgColor, alphaMask: PColor32; width: integer);
+  procedure BlendInvertedMaskLine(bgColor, alphaMask: PColor32; width: nativeint);
   //BlendBlueChannel: typically useful for white color masks
   function BlendBlueChannel(bgColor, blueMask: TColor32): TColor32;
-  procedure BlendBlueChannelLine(bgColor, blueMask: PColor32; width: integer);
+  procedure BlendBlueChannelLine(bgColor, blueMask: PColor32; width: nativeint);
 
   //COMPARE COLOR FUNCTIONS (ConvertToBoolMask, FloodFill, Vectorize etc.)
 
@@ -850,7 +854,7 @@ end;
 
 {$IFNDEF CPUX64}
 function BlendToAlphaLineX86(bgColorArr, fgColorArr: PStaticColor32Array;
-  idx: integer): integer;
+  idx: nativeint): nativeint;
 // Helper function for x86 code, reduces the CPU register pressure in
 // BlendToAlphaLine().
 var
@@ -899,7 +903,7 @@ end;
 //------------------------------------------------------------------------------
 {$ENDIF ~CPUX64}
 
-procedure BlendToAlphaLine(bgColor, fgColor: PColor32; width: Integer);
+procedure BlendToAlphaLine(bgColor, fgColor: PColor32; width: nativeint);
 label
   LabelBgAlphaIsZero;
 var
@@ -991,7 +995,7 @@ end;
 
 {
 // reference implementation
-procedure BlendToAlphaLine(bgColor, fgColor: PColor32; w: Integer);
+procedure BlendToAlphaLine(bgColor, fgColor: PColor32; width: nativeint);
 var
   fgWeight: byte;
   R, InvR: PByteArray;
@@ -1001,28 +1005,28 @@ var
 begin
   //(see https://en.wikipedia.org/wiki/Alpha_compositing)
 
-  // Use the negative offset trick to only increment the array "w"
-  // until it reaches zero. And by offsetting the arrays by "w",
-  // the negative "w" values also becomes the index into these arrays.
-  inc(bgColor, w);
-  inc(fgColor, w);
-  w := -w;
+  // Use the negative offset trick to only increment the array "width"
+  // until it reaches zero. And by offsetting the arrays by "width",
+  // the negative "width" values also becomes the index into these arrays.
+  inc(bgColor, width);
+  inc(fgColor, width);
+  width := -width;
 
   bgColorArr := PStaticColor32Array(bgColor);
   fgColorArr := PStaticColor32Array(fgColor);
 
-  while w < 0 do
+  while width < 0 do
   begin
-    bgCol := bgColorArr[w];
-    fgCol := fgColorArr[w];
+    bgCol := bgColorArr[width];
+    fgCol := fgColorArr[width];
     bgA := bgCol shr 24;
-    if bgA = 0 then bgColorArr[w] := fgCol
+    if bgA = 0 then bgColorArr[width] := fgCol
     else
     begin
       fgA := fgCol shr 24;
       if fgA > 0 then
       begin
-        if fgA = 255 then bgColorArr[w] := fgCol
+        if fgA = 255 then bgColorArr[width] := fgCol
         else if fgA > 0 then
         begin
           //combine alphas ...
@@ -1033,7 +1037,7 @@ begin
           R     := PByteArray(@MulTable[fgWeight]);      //ie weight of foreground
           InvR  := PByteArray(@MulTable[not fgWeight]);  //ie weight of foreground
 
-          bgColorArr[w] := TColor32(bgA) shl 24
+          bgColorArr[width] := TColor32(bgA) shl 24
                 or (TColor32(R[Byte(fgCol shr 16)] + InvR[Byte(bgCol shr 16)]) shl 16)
                 or (TColor32(R[Byte(fgCol shr 8 )] + InvR[Byte(bgCol shr  8)]) shl  8)
                 or (TColor32(R[Byte(fgCol)       ] + InvR[Byte(bgCol)       ])       );
@@ -1041,7 +1045,7 @@ begin
       end;
     end;
 
-    inc(w);
+    inc(width);
   end;
 end;}
 {$IFDEF RANGECHECKS_ENABLED}
@@ -1061,7 +1065,7 @@ end;
 
 {$RANGECHECKS OFF} // negative array index is used
 
-procedure BlendMaskLine(bgColor, alphaMask: PColor32; width: Integer);
+procedure BlendMaskLine(bgColor, alphaMask: PColor32; width: nativeint);
 var
   a: byte;
 begin
@@ -1122,25 +1126,25 @@ end;
 
 {
 // reference implementation
-procedure BlendMaskLine(bgColor, alphaMask: PColor32; w: Integer);
+procedure BlendMaskLine(bgColor, alphaMask: PColor32; width: nativeint);
 var
   a: byte;
 begin
-  // Use the negative offset trick to only increment the array "w"
-  // until it reaches zero. And by offsetting the arrays by "w",
-  // the negative "w" values also becomes the index into these arrays.
-  inc(bgColor, w);
-  inc(alphaMask, w);
-  w := -w;
+  // Use the negative offset trick to only increment the array "width"
+  // until it reaches zero. And by offsetting the arrays by "width",
+  // the negative "width" values also becomes the index into these arrays.
+  inc(bgColor, width);
+  inc(alphaMask, width);
+  width := -width;
 
-  while w < 0 do
+  while width < 0 do
   begin
-    a := MulTable[PStaticARGBArray(bgColor)[w].A,
-                  PStaticARGBArray(alphaMask)[w].A];
-    if a = 0 then PStaticColor32Array(bgColor)[w] := 0
-    else PStaticARGBArray(bgColor)[w].A := a;
+    a := MulTable[PStaticARGBArray(bgColor)[width].A,
+                  PStaticARGBArray(alphaMask)[width].A];
+    if a = 0 then PStaticColor32Array(bgColor)[width] := 0
+    else PStaticARGBArray(bgColor)[width].A := a;
 
-    inc(w);
+    inc(width);
   end;
 end;}
 {$IFDEF RANGECHECKS_ENABLED}
@@ -1237,7 +1241,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure BlendBlueChannelLine(bgColor, blueMask: PColor32; width: integer);
+procedure BlendBlueChannelLine(bgColor, blueMask: PColor32; width: nativeint);
 begin
   while width > 0 do
   begin
@@ -1261,7 +1265,7 @@ end;
 
 {$RANGECHECKS OFF} // negative array index is used
 
-procedure BlendInvertedMaskLine(bgColor, alphaMask: PColor32; width: integer);
+procedure BlendInvertedMaskLine(bgColor, alphaMask: PColor32; width: nativeint);
 var
   a: byte;
 begin
@@ -2896,7 +2900,8 @@ end;
 procedure TImage32.CopyInternalLine(src: TImage32;
   const srcRec, dstRec: TRect; blendLineFunc: TBlendLineFunction);
 var
-  i, srcRecWidth, srcRecHeight: Integer;
+  i: integer;
+  srcRecWidth, srcRecHeight: nativeint;
   s, d: PColor32;
 begin
   // occasionally, due to rounding, srcRec and dstRec
