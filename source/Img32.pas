@@ -2272,7 +2272,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
 procedure TImage32.Assign(src: TImage32);
 begin
   if assigned(src) then
@@ -2287,15 +2286,17 @@ begin
   try
     dst.AssignSettings(Self);
     try
-      dst.SetSize(Width, Height);
-      if (Width > 0) and (Height > 0) then
-        move(fPixels[0], dst.fPixels[0], Width * Height * SizeOf(TColor32));
+      dst.fPixels := System.Copy(fPixels, 0, Length(fPixels));
+      dst.fWidth := fWidth;
+      dst.fHeight := fHeight;
+      dst.Resized;
     except
       dst.SetSize(0,0);
     end;
   finally
     dst.EndUpdate;
   end;
+  dst.fColorCount := fColorCount; // dst.EndUpdate called ResetColorCount
 end;
 //------------------------------------------------------------------------------
 
