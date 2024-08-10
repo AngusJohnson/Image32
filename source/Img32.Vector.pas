@@ -220,6 +220,10 @@ type
   procedure AppendPath(var paths: TPathsD; const extra: TPathsD); overload;
   procedure AppendPath(var ppp: TArrayOfPathsD; const extra: TPathsD); overload;
 
+  // ConcatPaths concats multiple paths. It skips the start-point
+  // of a path, if it matches the previous path's end-point.
+  procedure ConcatPaths(var dstPath: TPathD; const paths: TPathsD);
+
   function GetAngle(const origin, pt: TPoint): double; overload;
   function GetAngle(const origin, pt: TPointD): double; overload;
   function GetAngle(const a, b, c: TPoint): double; overload;
@@ -1905,6 +1909,46 @@ begin
   if Assigned(extra) then
     AppendPath(ppp[len], extra) else
     ppp[len] := nil;
+end;
+//------------------------------------------------------------------------------
+
+procedure ConcatPaths(var dstPath: TPathD; const paths: TPathsD);
+var
+  i, len, pathLen, offset: integer;
+begin
+  // calculate the length of the final array
+  len := 0;
+  for i := 0 to high(paths) do
+  begin
+    pathLen := Length(paths[i]);
+    if pathLen > 0 then
+    begin
+      // Skip the start-point if is matches the previous path's end-point
+      if (i > 0) and PointsEqual(paths[i][0], paths[i -1][high(paths[i -1])]) then
+        dec(pathLen);
+      inc(len, pathLen);
+    end;
+  end;
+  SetLength(dstPath, len);
+
+  // fill the array
+  len := 0;
+  for i := 0 to high(paths) do
+  begin
+    pathLen := Length(paths[i]);
+    if pathLen > 0 then
+    begin
+      offset := 0;
+      // Skip the start-point if is matches the previous path's end-point
+      if (i > 0) and PointsEqual(paths[i][0], paths[i -1][high(paths[i -1])]) then
+      begin
+        dec(pathLen);
+        offset := 1;
+      end;
+      Move(paths[i][offset], dstPath[len], pathLen * SizeOf(TPointD));
+      inc(len, pathLen);
+    end;
+  end;
 end;
 //------------------------------------------------------------------------------
 

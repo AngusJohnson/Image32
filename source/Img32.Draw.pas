@@ -313,10 +313,6 @@ const
 {$ENDIF CPUX86}
 
 type
-  {$IF not declared(NativeInt)}
-  NativeInt = Integer;
-  {$IFEND}
-
   {$IFDEF SUPPORTS_POINTERMATH}
   // Works for Delphi 2009 and newer. For FPC it is a requirement,
   // otherwise 32bit and 64bit code behave differently for negative
@@ -1926,11 +1922,13 @@ begin
           ellipsePt.X := (-qb -qs)/(2 * qa) else
           ellipsePt.X := (-qb +qs)/(2 * qa);
         ellipsePt.Y := m * ellipsePt.X + c;
-        dist := Hypot(pt.X - fFocusPt.X, pt.Y - fFocusPt.Y);
-        dist2 := Hypot(ellipsePt.X - fFocusPt.X, ellipsePt.Y - fFocusPt.Y);
+
+        // Use sqr'ed distances (Sqrt(a^2+b^2)/Sqrt(x^2+y^2) => Sqrt((a^2+b^2)/(x^2+y^2))
+        dist := Sqr(pt.X - fFocusPt.X) + Sqr(pt.Y - fFocusPt.Y);
+        dist2 := Sqr(ellipsePt.X - fFocusPt.X) + Sqr(ellipsePt.Y - fFocusPt.Y);
         if dist2 = 0 then
           q := 1 else
-          q := dist/ dist2;
+          q := Sqrt(dist/dist2);
       end else
         q := 1; //shouldn't happen :)
     end;
