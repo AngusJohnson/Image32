@@ -1236,7 +1236,7 @@ function TSvgSubPath.GetSimplePath: TPathD;
 var
   i: integer;
 begin
-  Result := Img32.Vector.MakePath([GetFirstPt.X, GetFirstPt.Y]);
+  Result := Img32.Vector.MakePath(GetFirstPt);
   for i := 0 to High(fSegs) do
     AppendPath(Result, fSegs[i].GetOnPathCtrlPts);
 end;
@@ -1413,7 +1413,7 @@ var
     if ptCnt = ptCap then
     begin
       inc(ptCap, 8);
-      setLength(pts, ptCap);
+      SetLengthUninit(pts, ptCap);
     end;
     pts[ptCnt] := pt;
     inc(ptCnt);

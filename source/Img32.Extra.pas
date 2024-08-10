@@ -2095,7 +2095,7 @@ var
   len: integer;
 begin
   len := Length(path);
-  SetLength(path, len +1);
+  SetLengthUninit(path, len +1);
   path[len] := pt;
 end;
 //------------------------------------------------------------------------------

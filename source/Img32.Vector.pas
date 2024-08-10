@@ -253,6 +253,7 @@ type
 
   //function MakePath(const pts: array of integer): TPathD; overload;
   function MakePath(const pts: array of double): TPathD; overload;
+  function MakePath(const pt: TPointD): TPathD; overload;
 
   function GetBounds(const path: TPathD): TRect; overload;
   function GetBounds(const paths: TPathsD): TRect; overload;
@@ -1845,7 +1846,7 @@ var
 begin
   len := length(path);
   if (len > 0) and PointsEqual(pt, path[len -1]) then Exit;
-  setLength(path, len + 1);
+  SetLengthUninit(path, len + 1);
   path[len] := pt;
 end;
 //------------------------------------------------------------------------------
@@ -1858,7 +1859,7 @@ begin
   len2 := length(path2);
   if len2 = 0 then Exit;
   if (len1 > 0) and PointsEqual(path2[0], path1[len1 -1]) then dec(len1);
-  setLength(path1, len1 + len2);
+  SetLengthUninit(path1, len1 + len2);
   Move(path2[0], path1[len1], len2 * SizeOf(TPointD));
 end;
 //------------------------------------------------------------------------------
@@ -1868,7 +1869,7 @@ var
   len: integer;
 begin
   len := length(path);
-  SetLength(path, len +1);
+  SetLengthUninit(path, len +1);
   path[len] := extra;
 end;
 //------------------------------------------------------------------------------
@@ -1929,7 +1930,7 @@ begin
       inc(len, pathLen);
     end;
   end;
-  SetLength(dstPath, len);
+  SetLengthUninit(dstPath, len);
 
   // fill the array
   len := 0;
@@ -2221,7 +2222,7 @@ var
     if resCnt >= resCap then
     begin
       inc(resCap, 64);
-      setLength(result, resCap);
+      SetLengthUninit(result, resCap);
     end;
     result[resCnt] := pt;
     inc(resCnt);
@@ -2483,7 +2484,7 @@ var
     if resCnt >= resCap then
     begin
       inc(resCap, 64);
-      setLength(result, resCap);
+      SetLengthUninit(result, resCap);
     end;
     result[resCnt] := pt;
     inc(resCnt);
@@ -3231,7 +3232,7 @@ var
 begin
   result := Arc(rec, StartAngle, EndAngle, scale);
   len := length(result);
-  setLength(result, len +1);
+  SetLengthUninit(result, len +1);
   result[len] := PointD((rec.Left + rec.Right)/2, (rec.Top + rec.Bottom)/2);
 end;
 //------------------------------------------------------------------------------
@@ -3664,7 +3665,7 @@ var
     if resultCnt = resultLen then
     begin
       inc(resultLen, BuffSize);
-      setLength(result, resultLen);
+      SetLengthUninit(result, resultLen);
     end;
     result[resultCnt] := pt;
     inc(resultCnt);
@@ -3775,7 +3776,7 @@ var
     if resultCnt = resultLen then
     begin
       inc(resultLen, BuffSize);
-      setLength(result, resultLen);
+      SetLengthUninit(result, resultLen);
     end;
     result[resultCnt] := pt;
     inc(resultCnt);
@@ -3857,7 +3858,7 @@ var
     if resultCnt = resultLen then
     begin
       inc(resultLen, BuffSize);
-      setLength(result, resultLen);
+      SetLengthUninit(result, resultLen);
     end;
     result[resultCnt] := pt;
     inc(resultCnt);
@@ -3870,10 +3871,7 @@ var
     if (abs(p1.x + p3.x - 2*p2.x) + abs(p2.x + p4.x - 2*p3.x) +
       abs(p1.y + p3.y - 2*p2.y) + abs(p2.y + p4.y - 2*p3.y)) < tolerance then
     begin
-      if resultCnt = length(result) then
-        setLength(result, length(result) +BuffSize);
-      result[resultCnt] := p4;
-      inc(resultCnt);
+      AddPoint(p4);
     end else
     begin
       p12.X := (p1.X + p2.X) / 2;
@@ -3945,7 +3943,7 @@ var
     if resultCnt = resultLen then
     begin
       inc(resultLen, BuffSize);
-      setLength(result, resultLen);
+      SetLengthUninit(result, resultLen);
     end;
     result[resultCnt] := pt;
     inc(resultCnt);
@@ -4000,7 +3998,7 @@ end;
 
 function MakePath(const pts: array of double): TPathD;
 var
-  i, j, len: Integer;
+  i, len: Integer;
   x,y: double;
 begin
   Result := nil;
@@ -4009,16 +4007,20 @@ begin
   NewPointDArray(Result, len, True);
   Result[0].X := pts[0];
   Result[0].Y := pts[1];
-  j := 0;
   for i := 1 to len -1 do
   begin
     x := pts[i*2];
     y := pts[i*2 +1];
-    inc(j);
-    Result[j].X := x;
-    Result[j].Y := y;
+    Result[i].X := x;
+    Result[i].Y := y;
   end;
-  setlength(Result, j+1);
+end;
+//------------------------------------------------------------------------------
+
+function MakePath(const pt: TPointD): TPathD;
+begin
+  SetLengthUninit(Result, 1);
+  Result[0] := pt;
 end;
 //------------------------------------------------------------------------------
 

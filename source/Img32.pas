@@ -618,6 +618,14 @@ var
   procedure NewPointDArray(var a: TPathD; count: nativeint;
     uninitialized: boolean = False);
 
+  // SetLengthUninit changes the dyn. array's length but does not initialize
+  // the new elements with zeros. It can be used as a replacement for
+  // SetLength where the zero-initialitation is not required.
+  procedure SetLengthUninit(var a: TArrayOfColor32; count: nativeint); overload;
+  procedure SetLengthUninit(var a: TArrayOfInteger; count: nativeint); overload;
+  procedure SetLengthUninit(var a: TArrayOfByte; count: nativeint); overload;
+  procedure SetLengthUninit(var a: TPathD; count: nativeint); overload;
+
 implementation
 
 uses
@@ -703,7 +711,7 @@ var
   p: PDynArrayRec;
 begin
   Result := nil;
-  if count > 0 then
+  if (count > 0) and (elemSize > 0) then
   begin
     if uninitialized then
       GetMem(Pointer(p), SizeOf(TDynArrayRec) + count * elemSize)
@@ -717,6 +725,59 @@ begin
     p.Length := count;
     {$ENDIF}
     Result := @p.Data;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function InternSetSimpleDynArrayLengthUninit(a: Pointer; count: nativeint; elemSize: integer): Pointer;
+var
+  p: PDynArrayRec;
+  oldCount: integer;
+begin
+  if a = nil then
+    Result := NewSimpleDynArray(count, elemSize)
+  else if (count > 0) and (elemSize > 0) then
+  begin
+    p := PDynArrayRec(PByte(a) - SizeOf(TDynArrayRec));
+    {$IFDEF FPC}
+    oldCount := p.high + 1;
+    if p.refcount = 1 then
+    {$ELSE}
+    oldCount := p.Length;
+    if p.RefCnt = 1 then
+    {$ENDIF}
+    begin
+      // There is only one reference to this array and that is "a",
+      // so we can use ReallocMem to change the array's length.
+      if oldCount = count then
+      begin
+        Result := a;
+        Exit;
+      end;
+      ReallocMem(Pointer(p), SizeOf(TDynArrayRec) + count * elemSize);
+    end
+    else
+    begin
+      // SetLength makes a copy of the dyn array to get RefCnt=1
+      GetMem(Pointer(p), SizeOf(TDynArrayRec) + count * elemSize);
+      if oldCount < 0 then oldCount := 0; // data corruption detected
+      Move(a^, p.Data, Min(oldCount, count) * elemSize);
+      TArrayOfByte(a) := nil; // use a non-managed dyn.array type
+    end;
+
+    {$IFDEF FPC}
+    p.refcount := 1;
+    p.high := count -1;
+    {$ELSE}
+    p.RefCnt := 1;
+    p.Length := count;
+    {$ENDIF}
+    Result := @p.Data;
+  end
+  else
+  begin
+    TArrayOfByte(a) := nil; // use a non-managed dyn.array type
+    Result := nil;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -782,6 +843,30 @@ begin
     a := nil;
   end;
   Pointer(a) := NewSimpleDynArray(count, SizeOf(TPointD), uninitialized);
+end;
+//------------------------------------------------------------------------------
+
+procedure SetLengthUninit(var a: TArrayOfColor32; count: nativeint);
+begin
+  Pointer(a) := InternSetSimpleDynArrayLengthUninit(Pointer(a), count, SizeOf(TColor32));
+end;
+//------------------------------------------------------------------------------
+
+procedure SetLengthUninit(var a: TArrayOfInteger; count: nativeint);
+begin
+  Pointer(a) := InternSetSimpleDynArrayLengthUninit(Pointer(a), count, SizeOf(Integer));
+end;
+//------------------------------------------------------------------------------
+
+procedure SetLengthUninit(var a: TArrayOfByte; count: nativeint);
+begin
+  Pointer(a) := InternSetSimpleDynArrayLengthUninit(Pointer(a), count, SizeOf(Byte));
+end;
+//------------------------------------------------------------------------------
+
+procedure SetLengthUninit(var a: TPathD; count: nativeint);
+begin
+  Pointer(a) := InternSetSimpleDynArrayLengthUninit(Pointer(a), count, SizeOf(TPointD));
 end;
 //------------------------------------------------------------------------------
 
