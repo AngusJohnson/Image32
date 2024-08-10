@@ -75,7 +75,7 @@ function BilinearResample(img: TImage32; x, y: double): TColor32;
 var
   iw, ih: integer;
   xx, yy, xR, yB: integer;
-  weight: Cardinal;
+  weight: integer;
   pixels: TArrayOfColor32;
   weightedColor: TWeightedColor;
   xf, yf: double;
@@ -179,7 +179,7 @@ function WeightedBilinearResample(img: TImage32; x, y: double): TColor32;
 var
   iw, ih: integer;
   xx, yy, xR, yB: integer;
-  weight: Cardinal;
+  weight: integer;
   pixels: TArrayOfColor32;
   weightedColor: TWeightedColor;
   xf, yf: double;
