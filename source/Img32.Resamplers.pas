@@ -781,7 +781,7 @@ end;
 procedure NearestNeighborResize(Image, TargetImage: TImage32; newWidth, newHeight: Integer);
 var
   x, y, offset: Integer;
-  scaledXi, scaledYi: TArrayOfInteger;
+  scaledXi, scaledYiOffset: TArrayOfInteger;
   tmp: TArrayOfColor32;
   pc: PColor32;
   pixels: TArrayOfColor32;
@@ -799,16 +799,18 @@ begin
   //get scaled X & Y values once only (storing them in lookup arrays) ...
   NewIntegerArray(scaledXi, newWidth, True);
   for x := 0 to newWidth -1 do
-    scaledXi[x] := Trunc(x * Image.Width / newWidth);
-  NewIntegerArray(scaledYi, newHeight, True);
+    scaledXi[x] := (x * Image.Width) div newWidth;
+  NewIntegerArray(scaledYiOffset, newHeight, True);
+  SetLength(scaledYiOffset, newHeight);
   for y := 0 to newHeight -1 do
-    scaledYi[y] := Trunc(y * Image.Height / newHeight);
+    //scaledYiOffset[y] := Round(y * Image.Height / newHeight) * Image.Width;
+    scaledYiOffset[y] := ((y * Image.Height) div newHeight) * Image.Width;
 
   pc := @tmp[0];
   pixels := Image.Pixels;
   for y := 0 to newHeight - 1 do
   begin
-    offset := scaledYi[y] * Image.Width;
+    offset := scaledYiOffset[y];
     for x := 0 to newWidth - 1 do
     begin
       pc^ := pixels[scaledXi[x] + offset];
