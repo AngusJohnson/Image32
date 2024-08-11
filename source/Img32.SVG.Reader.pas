@@ -845,7 +845,7 @@ begin
     for i := 0 to len -1 do
     begin
       len2 := Length(paths[i]);
-      SetLength(Result[i], len2);
+      NewPointDArray(Result[i], len2, True);
       if len2 = 0 then Continue;
       pp := @paths[i][0];
       rr := @Result[i][0];
@@ -2804,7 +2804,7 @@ end;
 constructor TLineElement.Create(parent: TBaseElement; svgEl: TSvgTreeEl);
 begin
   inherited;
-  SetLength(path, 2);
+  NewPointDArray(path, 2, True);
   path[0] := NullPointD; path[1] := NullPointD;
 end;
 //------------------------------------------------------------------------------
@@ -3502,7 +3502,7 @@ end;
 
 procedure TMarkerElement.SetEndPoint(const pt: TPointD; angle: double);
 begin
-  SetLength(fPoints, 1);
+  NewPointDArray(fPoints, 1, True);
   fPoints[0] := pt;
   self.angle := angle;
 end;

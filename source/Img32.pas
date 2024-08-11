@@ -606,6 +606,26 @@ var
 
   function __Trunc(Value: Double): Integer; {$IFNDEF CPUX86} {$IFDEF INLINE} inline; {$ENDIF} {$ENDIF}
 
+  // NewColor32Array creates a new "array of TColor32". "a" is nil'ed
+  // before allocating the array. If "count" is zero or negative "a" will
+  // be nil. If "uninitialized" is True, the memory will not be zero'ed.
+  procedure NewColor32Array(var a: TArrayOfColor32; count: nativeint;
+    uninitialized: boolean = False);
+  procedure NewIntegerArray(var a: TArrayOfInteger; count: nativeint;
+    uninitialized: boolean = False);
+  procedure NewByteArray(var a: TArrayOfByte; count: nativeint;
+    uninitialized: boolean = False);
+  procedure NewPointDArray(var a: TPathD; count: nativeint;
+    uninitialized: boolean = False);
+
+  // SetLengthUninit changes the dyn. array's length but does not initialize
+  // the new elements with zeros. It can be used as a replacement for
+  // SetLength where the zero-initialitation is not required.
+  procedure SetLengthUninit(var a: TArrayOfColor32; count: nativeint); overload;
+  procedure SetLengthUninit(var a: TArrayOfInteger; count: nativeint); overload;
+  procedure SetLengthUninit(var a: TArrayOfByte; count: nativeint); overload;
+  procedure SetLengthUninit(var a: TPathD; count: nativeint); overload;
+
 implementation
 
 uses
@@ -655,6 +675,25 @@ type
     func: TResamplerFunction;
   end;
 
+  PDynArrayRec = ^TDynArrayRec;
+  {$IFDEF FPC}
+  tdynarrayindex = sizeint;
+  TDynArrayRec = packed record
+    refcount: ptrint;
+    high: tdynarrayindex;
+    Data: record end;
+  end;
+  {$ELSE}
+  TDynArrayRec = packed record
+    {$IFDEF CPU64BITS}
+    _Padding: Integer;
+    {$ENDIF}
+    RefCnt: Integer;
+    Length: NativeInt;
+    Data: record end;
+  end;
+  {$ENDIF}
+
 var
 {$IFDEF XPLAT_GENERICS}
   ImageFormatClassList: TList<PImgFmtRec>; //list of supported file extensions
@@ -665,6 +704,170 @@ var
 {$ENDIF}
 
 //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+function NewSimpleDynArray(count: nativeint; elemSize: integer; uninitialized: boolean = False): Pointer;
+var
+  p: PDynArrayRec;
+begin
+  Result := nil;
+  if (count > 0) and (elemSize > 0) then
+  begin
+    if uninitialized then
+      GetMem(Pointer(p), SizeOf(TDynArrayRec) + count * elemSize)
+    else
+      p := AllocMem(SizeOf(TDynArrayRec) + count * elemSize);
+    {$IFDEF FPC}
+    p.refcount := 1;
+    p.high := count -1;
+    {$ELSE}
+    p.RefCnt := 1;
+    p.Length := count;
+    {$ENDIF}
+    Result := @p.Data;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function InternSetSimpleDynArrayLengthUninit(a: Pointer; count: nativeint; elemSize: integer): Pointer;
+var
+  p: PDynArrayRec;
+  oldCount: integer;
+begin
+  if a = nil then
+    Result := NewSimpleDynArray(count, elemSize)
+  else if (count > 0) and (elemSize > 0) then
+  begin
+    p := PDynArrayRec(PByte(a) - SizeOf(TDynArrayRec));
+    {$IFDEF FPC}
+    oldCount := p.high + 1;
+    if p.refcount = 1 then
+    {$ELSE}
+    oldCount := p.Length;
+    if p.RefCnt = 1 then
+    {$ENDIF}
+    begin
+      // There is only one reference to this array and that is "a",
+      // so we can use ReallocMem to change the array's length.
+      if oldCount = count then
+      begin
+        Result := a;
+        Exit;
+      end;
+      ReallocMem(Pointer(p), SizeOf(TDynArrayRec) + count * elemSize);
+    end
+    else
+    begin
+      // SetLength makes a copy of the dyn array to get RefCnt=1
+      GetMem(Pointer(p), SizeOf(TDynArrayRec) + count * elemSize);
+      if oldCount < 0 then oldCount := 0; // data corruption detected
+      Move(a^, p.Data, Min(oldCount, count) * elemSize);
+      TArrayOfByte(a) := nil; // use a non-managed dyn.array type
+    end;
+
+    {$IFDEF FPC}
+    p.refcount := 1;
+    p.high := count -1;
+    {$ELSE}
+    p.RefCnt := 1;
+    p.Length := count;
+    {$ENDIF}
+    Result := @p.Data;
+  end
+  else
+  begin
+    TArrayOfByte(a) := nil; // use a non-managed dyn.array type
+    Result := nil;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function CanReuseDynArray(a: Pointer; count: nativeint): Boolean;
+// returns True if RefCnt=1 and Length=count
+begin
+  //Assert(a <> nil);
+  a := PByte(a) - SizeOf(TDynArrayRec);
+  Result :=
+    {$IFDEF FPC}
+    (PDynArrayRec(a).refcount = 1) and
+    (PDynArrayRec(a).high = count - 1);
+    {$ELSE}
+    (PDynArrayRec(a).RefCnt = 1) and
+    (PDynArrayRec(a).Length = count);
+    {$ENDIF}
+end;
+//------------------------------------------------------------------------------
+
+procedure NewColor32Array(var a: TArrayOfColor32; count: nativeint; uninitialized: boolean);
+begin
+  if a <> nil then
+  begin
+    if uninitialized and CanReuseDynArray(a, count) then
+      Exit;
+    a := nil;
+  end;
+  Pointer(a) := NewSimpleDynArray(count, SizeOf(TColor32), uninitialized);
+end;
+//------------------------------------------------------------------------------
+
+procedure NewIntegerArray(var a: TArrayOfInteger; count: nativeint; uninitialized: boolean);
+begin
+  if a <> nil then
+  begin
+    if uninitialized and CanReuseDynArray(a, count) then
+      Exit;
+    a := nil;
+  end;
+  Pointer(a) := NewSimpleDynArray(count, SizeOf(Integer), uninitialized);
+end;
+//------------------------------------------------------------------------------
+
+procedure NewByteArray(var a: TArrayOfByte; count: nativeint; uninitialized: boolean);
+begin
+  if a <> nil then
+  begin
+    if uninitialized and CanReuseDynArray(a, count) then
+      Exit;
+    a := nil;
+  end;
+  Pointer(a) := NewSimpleDynArray(count, SizeOf(Byte), uninitialized);
+end;
+//------------------------------------------------------------------------------
+
+procedure NewPointDArray(var a: TPathD; count: nativeint; uninitialized: boolean);
+begin
+  if a <> nil then
+  begin
+    if uninitialized and CanReuseDynArray(a, count) then
+      Exit;
+    a := nil;
+  end;
+  Pointer(a) := NewSimpleDynArray(count, SizeOf(TPointD), uninitialized);
+end;
+//------------------------------------------------------------------------------
+
+procedure SetLengthUninit(var a: TArrayOfColor32; count: nativeint);
+begin
+  Pointer(a) := InternSetSimpleDynArrayLengthUninit(Pointer(a), count, SizeOf(TColor32));
+end;
+//------------------------------------------------------------------------------
+
+procedure SetLengthUninit(var a: TArrayOfInteger; count: nativeint);
+begin
+  Pointer(a) := InternSetSimpleDynArrayLengthUninit(Pointer(a), count, SizeOf(Integer));
+end;
+//------------------------------------------------------------------------------
+
+procedure SetLengthUninit(var a: TArrayOfByte; count: nativeint);
+begin
+  Pointer(a) := InternSetSimpleDynArrayLengthUninit(Pointer(a), count, SizeOf(Byte));
+end;
+//------------------------------------------------------------------------------
+
+procedure SetLengthUninit(var a: TPathD; count: nativeint);
+begin
+  Pointer(a) := InternSetSimpleDynArrayLengthUninit(Pointer(a), count, SizeOf(TPointD));
+end;
 //------------------------------------------------------------------------------
 
 procedure CreateImageFormatList;
@@ -1591,7 +1794,7 @@ begin
   result := nil;
   if not assigned(img) or img.IsEmpty then Exit;
   if not Assigned(compareFunc) then compareFunc := CompareRGB;
-  SetLength(Result, img.Width * img.Height);
+  NewByteArray(Result, img.Width * img.Height, True);
   pa := @Result[0];
   pc := img.PixelBase;
   for i := 0 to img.Width * img.Height -1 do
@@ -1619,7 +1822,7 @@ begin
   result := nil;
   if not assigned(img) or img.IsEmpty then Exit;
   if not Assigned(compareFunc) then compareFunc := CompareRGB;
-  SetLength(Result, img.Width * img.Height);
+  NewColor32Array(Result, img.Width * img.Height, True);
   pDstPxl := @Result[0];
   pSrcPxl := img.PixelBase;
   for i := 0 to img.Width * img.Height -1 do
@@ -1651,7 +1854,7 @@ begin
   result := nil;
   if not assigned(img) or img.IsEmpty then Exit;
   if not Assigned(compareFunc) then compareFunc := GetAlphaEx;
-  SetLength(Result, img.Width * img.Height);
+  NewByteArray(Result, img.Width * img.Height, True);
   pa := @Result[0];
   pc := img.PixelBase;
   for i := 0 to img.Width * img.Height -1 do
@@ -1773,7 +1976,7 @@ var
   i, len: Integer;
 begin
   len := length(hslArr);
-  setLength(result, len);
+  NewColor32Array(result, len, True);
   for i := 0 to len -1 do
     result[i] := HslToRgb(hslArr[i]);
 end;
@@ -1926,7 +2129,7 @@ begin
   fResampler := DefaultResampler;
   fwidth := Max(0, width);
   fheight := Max(0, height);
-  SetLength(fPixels, fwidth * fheight);
+  NewColor32Array(fPixels, fwidth * fheight);
 end;
 //------------------------------------------------------------------------------
 
@@ -1960,9 +2163,8 @@ begin
   fResampler := src.fResampler;
   types.IntersectRect(rec, src.Bounds, srcRec);
   RectWidthHeight(rec, fWidth, fHeight);
-  SetLength(fPixels, fWidth * fHeight);
   if (fWidth = 0) or (fheight = 0) then Exit;
-  fPixels := src.CopyPixels(srcRec);
+  fPixels := src.CopyPixels(rec);
 end;
 //------------------------------------------------------------------------------
 
@@ -2350,7 +2552,7 @@ var
   recClipped: TRect;
 begin
   RectWidthHeight(rec, w,h);
-  setLength(result, w * h);
+  NewColor32Array(result, w * h, True);
 
   if w * h = 0 then Exit;
   Types.IntersectRect(recClipped, rec, Bounds);
@@ -2455,7 +2657,7 @@ begin
   fwidth := Max(0, newWidth);
   fheight := Max(0, newHeight);
   fPixels := nil; //forces a blank image
-  SetLength(fPixels, fwidth * fheight);
+  NewColor32Array(fPixels, fwidth * fheight, True);
   fIsPremultiplied := false;
   BlockNotify;
   Clear(color);
@@ -3390,7 +3592,7 @@ var
   src, dst: PColor32;
 begin
   if IsEmpty then Exit;
-  SetLength(a, fWidth * fHeight);
+  NewColor32Array(a, fWidth * fHeight, True);
   src := @fPixels[(height-1) * width];
   dst := @a[0];
   for i := 0 to fHeight -1 do
@@ -3410,7 +3612,7 @@ var
   row: PColor32;
 begin
   if IsEmpty then Exit;
-  SetLength(a, fWidth);
+  NewColor32Array(a, fWidth, True);
   widthLess1 := fWidth -1;
   row := @fPixels[(height-1) * width]; //top row
   for i := 0 to fHeight -1 do

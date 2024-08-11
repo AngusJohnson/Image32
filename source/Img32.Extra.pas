@@ -678,7 +678,7 @@ var
 begin
   img.Clear(fillColor);
   w := img.Width; h := img.Height;
-  SetLength(path, 2);
+  NewPointDArray(path, 2, True);
   if minorInterval > 0 then
   begin
     x := minorInterval;
@@ -1091,7 +1091,7 @@ begin
   case buttonShape of
     bsDiamond:
       begin
-        SetLength(Result, 4);
+        NewPointDArray(Result, 4, True);
         for i := 0 to 3 do Result[i] := pt;
         Result[0].X := Result[0].X -radius;
         Result[1].Y := Result[1].Y -radius;
@@ -1202,8 +1202,8 @@ var
 begin
   w := img.Width; h := img.Height;
   if w * h = 0 then Exit;
-  SetLength(tmp, w * h);
-  SetLength(tmp2, w * h);
+  NewColor32Array(tmp, w * h);
+  NewColor32Array(tmp2, w * h);
   s := img.PixelRow[0]; d := @tmp[0];
   for j := 0 to h-1 do
   begin
@@ -1754,7 +1754,7 @@ begin
   end;
   if highI +1 < minLen then Exit;
   if not isClosedPath then first := @srArray[0];
-  SetLength(Result, highI +1);
+  NewPointDArray(Result, highI +1, True);
   for i := 0 to HighI do
   begin
     Result[i] := first.pt;
@@ -1877,7 +1877,7 @@ begin
   end;
 
   if highI < 2 then Exit;
-  SetLength(Result, highI +1);
+  NewPointDArray(Result, highI +1, True);
   for i := 0 to HighI do
   begin
     Result[i] := current.pt;
@@ -1925,7 +1925,7 @@ begin
   len := Length(path);
   if len < 3 then Exit;
 
-  SetLength(Result, len *3 +1);
+  NewPointDArray(Result, len *3 +1, True);
   prev := len-1;
   SetLength(pl, len);
   SetLength(unitVecs, len);
@@ -1998,7 +1998,7 @@ begin
   len := Length(path);
   if len < 3 then Exit;
 
-  SetLength(Result, len *3 +1);
+  NewPointDArray(Result, len *3 +1);
   prev := len-1;
   SetLength(pl, len);
   SetLength(unitVecs, len);
@@ -2095,7 +2095,7 @@ var
   len: integer;
 begin
   len := Length(path);
-  SetLength(path, len +1);
+  SetLengthUninit(path, len +1);
   path[len] := pt;
 end;
 //------------------------------------------------------------------------------
@@ -2243,7 +2243,7 @@ var
   i, wl, wu, m: integer;
   wIdeal, mIdeal: double;
 begin
-  SetLength(Result, boxCnt);
+  NewIntegerArray(Result, boxCnt, True);
   wIdeal := Sqrt((12*stdDev*stdDev/boxCnt)+1); // Ideal averaging filter width
   wl := Floor(wIdeal); if not Odd(wl) then dec(wl);
   mIdeal :=
@@ -2401,8 +2401,8 @@ begin
   RectWidthHeight(rec2, w, h);
   if (Min(w, h) < 2) or ((stdDevX < 1) and (stdDevY < 1)) then Exit;
   len := w * h;
-  SetLength(src, len);
-  SetLength(dst, len);
+  NewColor32Array(src, len, True); // content is overwritten in BoxBlurH
+  NewColor32Array(dst, len, True);
   if blurFullImage then
   begin
     // copy the entire image into 'dst'

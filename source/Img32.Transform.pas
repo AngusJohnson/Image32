@@ -631,7 +631,7 @@ begin
     Exit;
   end;
 
-  SetLength(tmp, newWidth * newHeight);
+  NewColor32Array(tmp, newWidth * newHeight, True);
   pc := @tmp[0];
   xLimLo := -0.5/sx;
   xLimHi := img.Width + 0.5/sx;
@@ -816,7 +816,7 @@ begin
 
   mat := GetProjectionMatrix(srcPts, dstPts2);
   RectWidthHeight(rec, w, h);
-  SetLength(tmp, w * h);
+  NewColor32Array(tmp, w * h, True);
   pc := @tmp[0];
   for i :=  0 to h -1 do
     for j := 0 to w -1 do
@@ -860,7 +860,7 @@ begin
     if x1 = x2 then Exit;
     dydx := (pt2.Y - pt1.Y)/(pt2.X - pt1.X);
     xo := x1 -pt1.X;
-    SetLength(Result, x2-x1);
+    NewPointDArray(Result, x2-x1, True);
     for i:= 0 to x2 - x1 -1 do
     begin
       Result[i].X := x1 +i;
@@ -873,7 +873,7 @@ begin
     if x1 = x2 then Exit;
     dydx := (pt2.Y - pt1.Y)/(pt2.X - pt1.X);
     xo := x1 -pt1.X;
-    SetLength(Result, x1-x2);
+    NewPointDArray(Result, x1-x2, True);
     for i:= 0 to x1 - x2 -1 do
     begin
       Result[i].X := x1 -i;
@@ -896,7 +896,7 @@ begin
     if y1 = y2 then Exit;
     dxdy := (pt2.X - pt1.X)/(pt2.Y - pt1.Y);
     yo := y1 -pt1.Y;
-    SetLength(Result, y2-y1);
+    NewPointDArray(Result, y2-y1, True);
     for i:= 0 to y2 - y1 -1 do
     begin
       Result[i].Y := y1 +i;
@@ -909,7 +909,7 @@ begin
     if y1 = y2 then Exit;
     dxdy := (pt2.X - pt1.X)/(pt2.Y - pt1.Y);
     yo := y1 -pt1.Y;
-    SetLength(Result, y1-y2);
+    NewPointDArray(Result, y1-y2, True);
     for i:= 0 to y1 - y2 -1 do
     begin
       Result[i].Y := y1 -i;
@@ -997,7 +997,7 @@ begin
   len := Length(topPath);
   inc(rec.Bottom, img.Height);
   RectWidthHeight(rec, w, h);
-  SetLength(tmp, (w+1) * h);
+  NewColor32Array(tmp, (w+1) * h, True);
 
   prevX := topPath[0].X;
   allowBackColoring := GetAlpha(backColor) > 2;
@@ -1082,7 +1082,7 @@ begin
   len := Length(leftPath);
   inc(rec.Right, img.Width);
   RectWidthHeight(rec, w, h);
-  SetLength(tmp, w * (h+1));
+  NewColor32Array(tmp, w * (h+1), True);
 
   prevY := leftPath[0].Y;
   allowBackColoring := GetAlpha(backColor) > 2;
