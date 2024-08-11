@@ -3,7 +3,7 @@ unit Img32.Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  26 July 2024                                                    *
+* Date      :  11 August 2024                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -997,7 +997,7 @@ begin
   len := Length(topPath);
   inc(rec.Bottom, img.Height);
   RectWidthHeight(rec, w, h);
-  NewColor32Array(tmp, (w+1) * h, True);
+  NewColor32Array(tmp, (w+1) * h, False);
 
   prevX := topPath[0].X;
   allowBackColoring := GetAlpha(backColor) > 2;
@@ -1082,7 +1082,7 @@ begin
   len := Length(leftPath);
   inc(rec.Right, img.Width);
   RectWidthHeight(rec, w, h);
-  NewColor32Array(tmp, w * (h+1), True);
+  NewColor32Array(tmp, w * (h+1), False);
 
   prevY := leftPath[0].Y;
   allowBackColoring := GetAlpha(backColor) > 2;
