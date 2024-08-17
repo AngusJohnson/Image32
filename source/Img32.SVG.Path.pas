@@ -1097,11 +1097,20 @@ begin
   if (pendingScale > fPendingScale) then
     fPendingScale := pendingScale;
 
-  Result := nil;
-  SetLength(flattenedPaths, Length(fSegs));
-  for i := 0 to High(fSegs) do
-    flattenedPaths[i] := fSegs[i].GetFlattened;
-  ConcatPaths(Result, flattenedPaths);
+  if Length(fSegs) <= 1 then
+  begin
+    Result := Img32.Vector.MakePath(GetFirstPt);
+    if fSegs <> nil then
+      AppendPath(Result, fSegs[0].GetOnPathCtrlPts);
+  end
+  else
+  begin
+    Result := nil;
+    SetLength(flattenedPaths, Length(fSegs));
+    for i := 0 to High(fSegs) do
+      flattenedPaths[i] := fSegs[i].GetFlattened;
+    ConcatPaths(Result, flattenedPaths);
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1235,10 +1244,22 @@ end;
 function TSvgSubPath.GetSimplePath: TPathD;
 var
   i: integer;
+  paths: TPathsD;
 begin
-  Result := Img32.Vector.MakePath(GetFirstPt);
-  for i := 0 to High(fSegs) do
-    AppendPath(Result, fSegs[i].GetOnPathCtrlPts);
+  if Length(fSegs) <= 1 then
+  begin
+    Result := Img32.Vector.MakePath(GetFirstPt);
+    if fSegs <> nil then
+      AppendPath(Result, fSegs[0].GetOnPathCtrlPts);
+  end
+  else
+  begin
+    SetLength(paths, 1 + Length(fSegs));
+    paths[0] := Img32.Vector.MakePath(GetFirstPt);
+    for i := 0 to High(fSegs) do
+      paths[1 + i] := fSegs[i].GetOnPathCtrlPts;
+    ConcatPaths(Result, paths);
+  end;
 end;
 //------------------------------------------------------------------------------
 

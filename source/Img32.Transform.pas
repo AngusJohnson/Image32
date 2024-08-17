@@ -1175,16 +1175,15 @@ end;
 
 procedure TWeightedColor.Add(c: TColor32; w: Integer);
 var
-  a: Int64;
-  argb: TARGB absolute c;
+  a: Cardinal;
 begin
   inc(fAddCount, w);
-  a := w * argb.A;
+  a := w * Byte(c shr 24);
   if a = 0 then Exit;
   inc(fAlphaTot, a);
-  inc(fColorTotB, (a * argb.B));
-  inc(fColorTotG, (a * argb.G));
-  inc(fColorTotR, (a * argb.R));
+  inc(fColorTotB, (a * Byte(c)));
+  inc(fColorTotG, (a * Byte(c shr 8)));
+  inc(fColorTotR, (a * Byte(c shr 16)));
 end;
 //------------------------------------------------------------------------------
 
@@ -1215,16 +1214,15 @@ end;
 
 procedure TWeightedColor.Subtract(c: TColor32; w: Integer);
 var
-  a: Int64;
-  argb: TARGB absolute c;
+  a: Cardinal;
 begin
   dec(fAddCount, w);
-  a := w * argb.A;
+  a := w * Byte(c shr 24);
   if a = 0 then Exit;
   dec(fAlphaTot, a);
-  dec(fColorTotB, (a * argb.B));
-  dec(fColorTotG, (a * argb.G));
-  dec(fColorTotR, (a * argb.R));
+  dec(fColorTotB, (a * Byte(c)));
+  dec(fColorTotG, (a * Byte(c shr 8)));
+  dec(fColorTotR, (a * Byte(c shr 16)));
 end;
 //------------------------------------------------------------------------------
 

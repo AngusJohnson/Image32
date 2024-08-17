@@ -2871,9 +2871,10 @@ var
   glyphs: TPathsD;
   glyphInfo: PGlyphInfo;
   dx, dy, scale: double;
+  cr: TCustomRenderer;
 begin
   Result := y;
-  if not assigned(font) or not font.IsValidFont then Exit;
+  if not assigned(font) or not font.IsValidFont or (text = '') then Exit;
 
   xxMax := 0;
   for i := 1 to Length(text) do
@@ -2885,21 +2886,28 @@ begin
          xxMax := xMax;
   end;
 
-  scale := font.Scale;
-  for i := 1 to Length(text) do
-  begin
-    glyphInfo := font.GetCharInfo(ord(text[i]));
-    with glyphInfo.metrics.glyf do
+  if image.AntiAliased then
+    cr := TColorRenderer.Create(textColor) else
+    cr := TAliasedColorRenderer.Create(textColor);
+  try
+    scale := font.Scale;
+    for i := 1 to Length(text) do
     begin
-      dx :=  (xxMax - xMax) * 0.5 * scale;
-      y := y + yMax  * scale; //yMax = char ascent
-      dy := - yMin * scale;   //yMin = char descent
+      glyphInfo := font.GetCharInfo(ord(text[i]));
+      with glyphInfo.metrics.glyf do
+      begin
+        dx :=  (xxMax - xMax) * 0.5 * scale;
+        y := y + yMax  * scale; //yMax = char ascent
+        dy := - yMin * scale;   //yMin = char descent
+      end;
+      glyphs := TranslatePath( glyphInfo.contours, x + dx, y);
+      DrawPolygon(image, glyphs, frNonZero, cr);
+      if text[i] = #32 then
+        y := y + dy - interCharSpace else
+        y := y + dy + interCharSpace;
     end;
-    glyphs := TranslatePath( glyphInfo.contours, x + dx, y);
-    DrawPolygon(image, glyphs, frNonZero, textColor);
-    if text[i] = #32 then
-      y := y + dy - interCharSpace else
-      y := y + dy + interCharSpace;
+  finally
+    cr.Free;
   end;
   Result := y;
 end;
