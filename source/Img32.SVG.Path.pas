@@ -3,7 +3,7 @@ unit Img32.SVG.Path;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  16 March 2024                                                   *
+* Date      :  18 August 2024                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -451,7 +451,7 @@ var
 begin
   len := Length(pts);
   Result := (len <> 0) and (fExtend <> 0) and (len mod fExtend = 0);
-  if Result then Img32.Vector.AppendPath(fCtrlPts, pts);
+  if Result then ConcatPaths(fCtrlPts, pts);
 end;
 //------------------------------------------------------------------------------
 
@@ -655,7 +655,7 @@ begin
       p := Arc(rec, a1, a2, pendingScale);
     if rectAngle <> 0 then
       p := RotatePath(p, rec.MidPoint, rectAngle);
-    AppendPath(fFlatPath, p);
+    ConcatPaths(fFlatPath, p);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1097,20 +1097,11 @@ begin
   if (pendingScale > fPendingScale) then
     fPendingScale := pendingScale;
 
-  if Length(fSegs) <= 1 then
-  begin
-    Result := Img32.Vector.MakePath(GetFirstPt);
-    if fSegs <> nil then
-      AppendPath(Result, fSegs[0].GetOnPathCtrlPts);
-  end
-  else
-  begin
-    Result := nil;
-    SetLength(flattenedPaths, Length(fSegs));
-    for i := 0 to High(fSegs) do
-      flattenedPaths[i] := fSegs[i].GetFlattened;
-    ConcatPaths(Result, flattenedPaths);
-  end;
+  Result := nil;
+  SetLength(flattenedPaths, Length(fSegs));
+  for i := 0 to High(fSegs) do
+    flattenedPaths[i] := fSegs[i].GetFlattened;
+  ConcatPaths(Result, flattenedPaths);
 end;
 //------------------------------------------------------------------------------
 
@@ -1249,8 +1240,8 @@ begin
   if Length(fSegs) <= 1 then
   begin
     Result := Img32.Vector.MakePath(GetFirstPt);
-    if fSegs <> nil then
-      AppendPath(Result, fSegs[0].GetOnPathCtrlPts);
+    for i := 0 to High(fSegs) do
+      ConcatPaths(Result, fSegs[i].GetOnPathCtrlPts);
   end
   else
   begin
@@ -1365,7 +1356,7 @@ var
 begin
   p := nil;
   for i := 0 to Count -1 do
-    AppendPath(p, fSegs[i].fFlatPath);
+    ConcatPaths(p, fSegs[i].fFlatPath);
   Result := Img32.Vector.GetBoundsD(p);
 end;
 
@@ -1620,7 +1611,7 @@ var
 begin
   p := nil;
   for i := 0 to Count -1 do
-      AppendPath(p, fSubPaths[i].GetFlattenedPath);
+      ConcatPaths(p, fSubPaths[i].GetFlattenedPath);
   Result := Img32.Vector.GetBoundsD(p);
 end;
 //------------------------------------------------------------------------------
@@ -1634,9 +1625,9 @@ begin
   for i := 0 to Count -1 do
     with fSubPaths[i] do
     begin
-      AppendToPath(p, GetFirstPt);
+      AppendPoint(p, GetFirstPt);
       for j := 0 to High(fSegs) do
-        AppendPath(p, fSegs[j].fCtrlPts);
+        ConcatPaths(p, fSegs[j].fCtrlPts);
     end;
   Result := GetBoundsD(p);
 

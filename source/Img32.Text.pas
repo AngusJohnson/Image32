@@ -3,9 +3,9 @@ unit Img32.Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  19 May 2023                                                     *
+* Date      :  18 August 2024                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2023                                         *
+* Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
@@ -1925,7 +1925,7 @@ begin
           pt2 := pathsEx[i][0] else
           pt2 := pathsEx[i][j+1];
         bez := FlattenQBezier(pathsEx[i][j-1].pt, pathsEx[i][j].pt, pt2.pt);
-        AppendPath(Result[i], bez);
+        ConcatPaths(Result[i], bez);
       end;
     end;
   end;
