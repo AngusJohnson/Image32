@@ -3,7 +3,7 @@ unit Img32.Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.4                                                             *
-* Date      :  11 August 2024                                                  *
+* Date      :  18 August 2024                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -930,7 +930,7 @@ begin
   for i := 1 to len -1 do
   begin
     tmp := InterpolateSegX(path[i-1], path[i]);
-    AppendPath(Result, tmp);
+    ConcatPaths(Result, tmp);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -946,7 +946,7 @@ begin
   for i := 1 to len -1 do
   begin
     tmp := InterpolateSegY(path[i-1], path[i]);
-    AppendPath(Result, tmp);
+    ConcatPaths(Result, tmp);
   end;
 end;
 //------------------------------------------------------------------------------
