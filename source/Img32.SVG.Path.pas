@@ -1370,12 +1370,12 @@ begin
     SetLength(fSegs, fSegsCount);
 end;
 //------------------------------------------------------------------------------
+
 procedure TSvgSubPath.InitSegs(Capacity: Integer);
 begin
   if Capacity > fSegsCount then
     SetLength(fSegs, Capacity);
 end;
-
 //------------------------------------------------------------------------------
 
 function TSvgSubPath.GetCount: integer;

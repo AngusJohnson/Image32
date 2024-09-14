@@ -27,10 +27,6 @@ uses
   {$ZEROBASEDSTRINGS OFF}
 {$ENDIF}
 
-{$IFOPT R+}
-  {$DEFINE OVERFLOWCHECKS_ENABLED}
-{$ENDIF}
-
 type
   TSvgEncoding = (eUnknown, eUtf8, eUnicodeLE, eUnicodeBE);
 
@@ -826,7 +822,6 @@ begin
   else
     val := v32;
 end;
-
 //------------------------------------------------------------------------------
 
 function ParseNextNumEx(var c: PUTF8Char; endC: PUTF8Char; skipComma: Boolean;
@@ -2537,9 +2532,7 @@ begin
   FCount := Count;
   SetLength(FItems, FCount);
 
-  FMod := FCount * 2; // gives us 3 color constants as max. bucket depth
-  if not Odd(FMod) then
-    Inc(FMod);
+  FMod := FCount * 2 + 1; // gives us 3 color constants as max. bucket depth
   SetLength(FBuckets, FMod);
 
   // Initialize FItems[] and fill the buckets
@@ -2554,6 +2547,7 @@ begin
     Bucket^ := Item;
   end;
 end;
+//------------------------------------------------------------------------------
 
 function TColorConstList.GetColorValue(const ColorName: UTF8String; var Color: TColor32): Boolean;
 var
@@ -2572,7 +2566,6 @@ begin
   else
     Result := False;
 end;
-
 
 //------------------------------------------------------------------------------
 // initialization procedures
@@ -2597,7 +2590,7 @@ end;
 
 procedure CleanupColorConstList;
 begin
-  ColorConstList.Free;
+  FreeAndNil(ColorConstList);
 end;
 
 //------------------------------------------------------------------------------
