@@ -213,13 +213,16 @@ type
   //general parsing functions //////////////////////////////////////////
   function ParseNextWord(var c: PUTF8Char; endC: PUTF8Char;
     out word: UTF8String): Boolean;
-  function ParseNextWordEx(var c: PUTF8Char; endC: PUTF8Char;
-    out word: UTF8String): Boolean;
+  function ParseNextWordHash(var c: PUTF8Char; endC: PUTF8Char;
+    out hash: cardinal): Boolean;
+  function ParseNextWordExHash(var c: PUTF8Char; endC: PUTF8Char;
+    out hash: cardinal): Boolean;
   function ParseNextNum(var c: PUTF8Char; endC: PUTF8Char;
     skipComma: Boolean; out val: double): Boolean;
   function ParseNextNumEx(var c: PUTF8Char; endC: PUTF8Char; skipComma: Boolean;
     out val: double; out unitType: TUnitType): Boolean;
-  function GetHash(const name: UTF8String): cardinal;
+  function GetHash(c: PUTF8Char; len: integer): cardinal; overload;
+  function GetHash(const name: UTF8String): cardinal; overload;
   function GetHashCaseSensitive(name: PUTF8Char; nameLen: integer): cardinal;
   function ExtractRef(const href: UTF8String): UTF8String;
   function IsNumPending(var c: PUTF8Char;
@@ -641,13 +644,39 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ParseNextWordEx(var c: PUTF8Char; endC: PUTF8Char;
-  out word: UTF8String): Boolean;
+function ParseNextWordHash(var c: PUTF8Char; endC: PUTF8Char; out hash: cardinal): Boolean;
 var
   c2, cc: PUTF8Char;
 begin
   if not SkipBlanksAndComma(c, endC) then
   begin
+    hash := 0;
+    Result := False;
+    Exit;
+  end;
+  cc := c;
+  c2 := cc;
+  while cc < endC do
+  begin
+    case cc^ of
+      'A'..'Z', 'a'..'z': inc(cc);
+      else break;
+    end;
+  end;
+  c := cc;
+  hash := GetHash(c2, cc - c2);
+  Result := True;
+end;
+//------------------------------------------------------------------------------
+
+function ParseNextWordExHash(var c: PUTF8Char; endC: PUTF8Char;
+  out hash: cardinal): Boolean;
+var
+  c2, cc: PUTF8Char;
+begin
+  if not SkipBlanksAndComma(c, endC) then
+  begin
+    hash := 0;
     Result := False;
     Exit;
   end;
@@ -657,13 +686,14 @@ begin
     inc(c);
     c2 := cc;
     while (cc < endC) and (cc^ <> quote) do inc(cc);
-    ToUTF8String(c2, cc, word);
+    hash := GetHash(c2, cc - c2);
     inc(cc);
   end else
   begin
     //Result := IsLowerAlpha(LowerCaseTable[cc^]);
     if not IsAlpha(cc^) then
     begin
+      hash := 0;
       Result := False;
       Exit;
     end;
@@ -677,7 +707,7 @@ begin
       end;
       inc(cc);
     end;
-    ToUTF8String(c2, cc, word);
+    hash := GetHash(c2, cc - c2);
   end;
   c := cc;
   Result := True;
@@ -699,16 +729,14 @@ end;
 //------------------------------------------------------------------------------
 
 {$OVERFLOWCHECKS OFF}
-function GetHash(const name: UTF8String): cardinal;
+function GetHash(c: PUTF8Char; len: integer): cardinal;
 var
   i: integer;
-  c: PUTF8Char;
 begin
   //https://en.wikipedia.org/wiki/Jenkins_hash_function
-  c := PUTF8Char(Pointer(name)); // skip function call by directly casting it to Pointer
   Result := 0;
   if c = nil then Exit;
-  for i := 1 to Length(name) do
+  for i := 1 to len do
   begin
     Result := (Result + Ord(LowerCaseTable[c^]));
     Result := Result + (Result shl 10);
@@ -722,7 +750,13 @@ end;
 {$IFDEF OVERFLOWCHECKS_ENABLED}
   {$OVERFLOWCHECKS ON}
 {$ENDIF}
+//------------------------------------------------------------------------------
 
+function GetHash(const name: UTF8String): cardinal;
+begin
+  // skip function call by directly casting it to Pointer
+  Result := GetHash(PUTF8Char(Pointer(name)), Length(name));
+end;
 //------------------------------------------------------------------------------
 
 {$OVERFLOWCHECKS OFF}
@@ -750,13 +784,13 @@ end;
 function ParseNextWordHashed(var c: PUTF8Char; endC: PUTF8Char): cardinal;
 var
   c2: PUTF8Char;
-  name: UTF8String;
+  len: integer;
 begin
   c2 := c;
-  c := ParseNameLength(c, endC);
-  ToUTF8String(c2, c, name);
-  if name = '' then Result := 0
-  else Result := GetHash(name);
+  c := ParseNameLength(c2, endC);
+  len := c - c2;
+  if len <= 0 then Result := 0
+  else Result := GetHash(c2, len);
 end;
 //------------------------------------------------------------------------------
 
@@ -1131,13 +1165,11 @@ function IsKnownEntity(owner: TSvgParser;
   var c: PUTF8Char; endC: PUTF8Char; out entity: PSvgAttrib): boolean;
 var
   c2, c3: PUTF8Char;
-  entityName: UTF8String;
 begin
   inc(c); //skip ampersand.
   c2 := c; c3 := c;
   c3 := ParseNameLength(c3, endC);
-  ToUTF8String(c2, c3, entityName);
-  entity := owner.FindEntity(GetHash(entityName));
+  entity := owner.FindEntity(GetHash(c2, c3 - c2));
   Result := (c3^ = ';') and Assigned(entity);
   //nb: increments 'c' only if the entity is found.
   if Result then c := c3 +1 else dec(c);
