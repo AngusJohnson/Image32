@@ -3859,7 +3859,7 @@ var
 begin
   c := PUTF8Char(value);
   endC := c + Length(value);
-  ParseNextWordHash(c, endC, hash);
+  hash := ParseNextWordHash(c, endC);
   with aOwnerEl.fDrawData.FontInfo do
     case hash of
       hSuper: baseShift.SetValue(50, utPercent);
@@ -4246,7 +4246,7 @@ var
 begin
   c := PUTF8Char(value);
   endC := c + Length(value);
-  ParseNextWordHash(c, endC, hash);
+  hash := ParseNextWordHash(c, endC);
   with aOwnerEl.fDrawData do
     case hash of
       hButt   : strokeCap := esButt;
@@ -4263,7 +4263,7 @@ var
 begin
   c := PUTF8Char(value);
   endC := c + Length(value);
-  ParseNextWordHash(c, endC, hash);
+  hash := ParseNextWordHash(c, endC);
   with aOwnerEl.fDrawData do
     case hash of
       hMiter  : strokeJoin := jsMiter;
@@ -4562,7 +4562,7 @@ begin
   if not (aOwnerEl is TGradientElement) then Exit;
   c := PUTF8Char(value);
   endC := c + Length(value);
-  ParseNextWordHash(c, endC, hash);
+  hash := ParseNextWordHash(c, endC);
   with TGradientElement(aOwnerEl) do
     case hash of
       hPad      : spreadMethod := gfsClamp;

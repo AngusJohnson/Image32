@@ -108,22 +108,29 @@ type
   end;
 
   //////////////////////////////////////////////////////////////////////
-  // TClassStylesList: custom TStringList that stores ansistring objects
+  // TClassStylesList: Map that stores CSS selectors with their styles
   //////////////////////////////////////////////////////////////////////
 
-  PAnsStringiRec = ^TAnsiStringRec;   //used internally by TClassStylesList
-  TAnsiStringRec = record
-    ansi  : UTF8String;
+  PClassStyleListItem = ^TClassStyleListItem;
+  TClassStyleListItem = record //used internally by TClassStylesList
+    Hash: Cardinal;
+    Next: Integer;
+    Name: UTF8String;
+    Style: UTF8String;
   end;
 
   TClassStylesList = class
   private
-    fList : TStringList;
+    FItems: array of TClassStyleListItem;
+    FBuckets: TArrayOfInteger;
+    FCount: Integer;
+    FMod: Cardinal;
+    procedure Grow(NewCapacity: Integer = -1);
+    function FindItemIndex(Hash: Cardinal; const Name: UTF8String): Integer;
   public
-    constructor Create;
-    destructor Destroy; override;
-    function  AddAppendStyle(const classname: string; const ansi: UTF8String): integer;
-    function  GetStyle(const classname: UTF8String): UTF8String;
+    procedure Preallocate(AdditionalItemCount: Integer);
+    procedure AddAppendStyle(const Name, Style: UTF8String);
+    function GetStyle(const Name: UTF8String): UTF8String;
     procedure Clear;
   end;
 
@@ -194,7 +201,7 @@ type
     svgStream : TMemoryStream;
     procedure ParseUtf8Stream;
   public
-    classStyles :TClassStylesList;
+    classStyles : TClassStylesList;
     xmlHeader   : TXmlEl;
     docType     : TDocTypeEl;
     svgTree     : TSvgTreeEl;
@@ -215,14 +222,15 @@ type
   function ParseNextWord(var c: PUTF8Char; endC: PUTF8Char;
     out word: UTF8String): Boolean;
   function ParseNextWordHash(var c: PUTF8Char; endC: PUTF8Char;
-    out hash: cardinal): Boolean;
+    out hash: cardinal): Boolean; overload;
+  function ParseNextWordHash(c, endC: PUTF8Char): cardinal; overload;
   function ParseNextWordExHash(var c: PUTF8Char; endC: PUTF8Char;
     out hash: cardinal): Boolean;
   function ParseNextNum(var c: PUTF8Char; endC: PUTF8Char;
     skipComma: Boolean; out val: double): Boolean;
   function ParseNextNumEx(var c: PUTF8Char; endC: PUTF8Char; skipComma: Boolean;
     out val: double; out unitType: TUnitType): Boolean;
-  function GetHash(c: PUTF8Char; len: integer): cardinal; overload;
+  function GetHash(c: PUTF8Char; len: nativeint): cardinal; overload;
   function GetHash(const name: UTF8String): cardinal; overload; {$IFDEF INLINE} inline; {$ENDIF}
   function GetHashCaseSensitive(name: PUTF8Char; nameLen: integer): cardinal;
   function ExtractRef(const href: UTF8String): UTF8String;
@@ -410,6 +418,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure DisposeSvgAttrib(attrib: PSvgAttrib); {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  // Dispose(Result) uses RTTI to set the UTF8String fields to nil.
+  // By clearing them outself we can achieve that much faster.
+  attrib.name := '';
+  attrib.value := '';
+  FreeMem(attrib);
+end;
+//------------------------------------------------------------------------------
+
 function GetScale(src, dst: double): double;
 begin
   Result := dst / src;
@@ -435,6 +453,93 @@ begin
   if val <= min then Result := min
   else if val >= max then Result := max
   else Result := val;
+end;
+//------------------------------------------------------------------------------
+
+function IsSameAsciiUTF8String(const S1, S2: UTF8String): Boolean;
+var
+  Len: Integer;
+  I: Integer;
+  Ch1, Ch2: UTF8Char;
+begin
+  Len := Length(S1);
+  Result := Len = Length(S2);
+  if Result then
+  begin
+    Result := False;
+    I := 1;
+    while True do
+    begin
+      if I > Len then
+        Break;
+
+      Ch1 := S1[I];
+      Ch2 := S2[I];
+      if Ch1 = Ch2 then
+      begin
+        Inc(I);
+        Continue;
+      end;
+
+      case Ch1 of
+        'A'..'Z': ch1 := UTF8Char(Ord(ch1) xor $20); // toggle upper/lower
+      end;
+
+      if Ch1 <> Ch2 then
+        Exit;
+      Inc(I);
+    end;
+    Result := True;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function IsSameUTF8StringSlow(const S1, S2: UTF8String): Boolean;
+begin
+  Result := AnsiSameText(string(S1), string(S2));
+end;
+//------------------------------------------------------------------------------
+
+function IsSameUTF8String(const S1, S2: UTF8String): Boolean;
+var
+  Len: Integer;
+  I: Integer;
+  Ch1, Ch2: UTF8Char;
+begin
+  Len := Length(S1);
+  Result := Len = Length(S2);
+  if Result then
+  begin
+    Result := False;
+    I := 1;
+    Ch1 := #0;
+    Ch2 := #0;
+    while True do
+    begin
+      if I > Len then
+        Break;
+
+      Ch1 := S1[I];
+      Ch2 := S2[I];
+      if Ch1 = Ch2 then
+      begin
+        Inc(I);
+        Continue;
+      end;
+
+      case Ch1 of
+        'A'..'Z': ch1 := UTF8Char(Ord(ch1) xor $20); // toggle upper/lower
+      end;
+
+      if Ch1 <> Ch2 then
+        Break;
+      Inc(I);
+    end;
+    if Ch1 = Ch2 then
+      Result := True
+    else if (Ord(Ch1) or Ord(Ch2)) and $80 <> 0 then // we found non-matching, non-ASCII characters
+      Result := IsSameUTF8StringSlow(S1, S2);
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -549,35 +654,32 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SkipStyleBlanks(var c: PUTF8Char; endC: PUTF8Char): Boolean;
+function SkipStyleBlanks(c, endC: PUTF8Char): PUTF8Char;
 var
   inComment: Boolean;
-  cc: PUTF8Char;
   ch: UTF8Char;
 begin
   //style content may include multi-line comment blocks
   inComment := false;
-  cc := c;
-  while (cc < endC) do
+  while (c < endC) do
   begin
-    ch := cc^;
+    ch := c^;
     if inComment then
     begin
-      if (ch = '*') and ((cc +1)^ = '/')  then
+      if (ch = '*') and ((c +1)^ = '/')  then
       begin
         inComment := false;
-        inc(cc);
+        inc(c);
       end;
     end
     else if (ch > space) then
     begin
-      inComment := (ch = '/') and ((cc +1)^ = '*');
+      inComment := (ch = '/') and ((c +1)^ = '*');
       if not inComment then break;
     end;
-    inc(cc);
+    inc(c);
   end;
-  c := cc;
-  Result := (cc < endC);
+  Result := c;
 end;
 //------------------------------------------------------------------------------
 
@@ -605,26 +707,24 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ParseStyleNameLen(var c: PUTF8Char; endC: PUTF8Char): integer;
+function ParseStyleNameLen(c, endC: PUTF8Char): PUTF8Char;
 var
-  c2, cc: PUTF8Char;
+  c2: PUTF8Char;
 begin
-  Result := 0;
+  Result := c;
   //nb: style names may start with a hyphen
-  c2 := c;
+  c2 := Result;
   if (c2^ = '-') then inc(c2);
   if not IsAlpha(c2^) then Exit;
 
-  cc := c2 + 1;
-  while cc < endC do
+  Result := c2 + 1;
+  while Result < endC do
   begin
-    case cc^ of
-      '0'..'9', 'A'..'Z', 'a'..'z', '-': inc(cc);
+    case Result^ of
+      '0'..'9', 'A'..'Z', 'a'..'z', '-': inc(Result);
       else break;
     end;
   end;
-  c := cc;
-  Result := cc - c2;
 end;
 //------------------------------------------------------------------------------
 
@@ -678,6 +778,29 @@ begin
   c := cc;
   hash := GetHash(c2, cc - c2);
   Result := True;
+end;
+//------------------------------------------------------------------------------
+
+function ParseNextWordHash(c, endC: PUTF8Char): cardinal;
+var
+  c2: PUTF8Char;
+begin
+  c := SkipBlanksAndComma(c, endC);
+  if c >= endC then
+  begin
+    Result := 0;
+    Exit;
+  end;
+
+  c2 := c;
+  while c < endC do
+  begin
+    case c^ of
+      'A'..'Z', 'a'..'z': inc(c);
+      else break;
+    end;
+  end;
+  Result := GetHash(c2, c - c2);
 end;
 //------------------------------------------------------------------------------
 
@@ -742,7 +865,7 @@ end;
 //------------------------------------------------------------------------------
 
 {$OVERFLOWCHECKS OFF}
-function GetHash(c: PUTF8Char; len: integer): cardinal;
+function GetHash(c: PUTF8Char; len: nativeint): cardinal;
 var
   i: integer;
 begin
@@ -1615,9 +1738,9 @@ procedure ParseStyleElementContent(const value: UTF8String;
   stylesList: TClassStylesList);
 var
   len, cap: integer;
-  names: array of string;
+  names: array of UTF8String;
 
-  procedure AddName(const name: string);
+  procedure AddName(const name: UTF8String);
   begin
     if len = cap then
     begin
@@ -1643,13 +1766,17 @@ begin
   c := @value[1];
   endC := c + Length(value);
 
-  SkipBlanks(c, endC);
+  c := SkipBlanksEx(c, endC);
+  if c >= endC then Exit;
+  
   if Match(c, '<![cdata[') then inc(c, 9);
 
-  while SkipStyleBlanks(c, endC) do
+  while True do
   begin
-    //case LowerCaseTable[PeekNextChar(c, endC)] of
-    case PeekNextChar(c, endC) of
+    c := SkipStyleBlanks(c, endC);
+    if c >= endC then Break;
+
+    case c^ of
       SvgDecimalSeparator, '#', 'A'..'Z', 'a'..'z': ;
       else break;
     end;
@@ -1659,8 +1786,10 @@ begin
     c := ParseNameLength(c, endC);
     ToAsciiLowerUTF8String(c2, c, aclassName);
 
-    AddName(String(aclassName));
-    if PeekNextChar(c, endC) = ',' then
+    AddName(aclassName);
+
+    c := SkipStyleBlanks(c, endC);
+    if (c < endC) and (c^ = ',') then
     begin
       inc(c);
       Continue;
@@ -1668,7 +1797,7 @@ begin
     if len = 0 then break;
 
     //now get the style
-    if PeekNextChar(c, endC) <> '{' then Break;
+    if (c >= endC) or (c^ <> '{') then Break;
     inc(c);
     c2 := c;
     while (c < endC) and (c^ <> '}') do inc(c);
@@ -1676,6 +1805,7 @@ begin
     ToTrimmedUTF8String(c2, c, aStyle);
     if aStyle <> '' then
     begin
+      stylesList.Preallocate(len);
       //finally, for each class name add (or append) this style
       for i := 0 to len - 1 do
         stylesList.AddAppendStyle(names[i], aStyle);
@@ -1718,7 +1848,7 @@ var
   i: integer;
 begin
   for i := 0 to attribs.Count -1 do
-    Dispose(PSvgAttrib(attribs[i]));
+    DisposeSvgAttrib(PSvgAttrib(attribs[i]));
   attribs.Clear;
 
   for i := 0 to childs.Count -1 do
@@ -1732,9 +1862,8 @@ var
   style: UTF8String;
   c2: PUTF8Char;
 begin
-  SkipBlanks(c, endC);
-  c2 := c;
-  c := ParseNameLength(c, endC);
+  c2 := SkipBlanksEx(c, endC);
+  c := ParseNameLength(c2, endC);
   ToAsciiLowerUTF8String(c2, c, name);
 
   //load the class's style (ie undotted style) if found.
@@ -1838,7 +1967,7 @@ begin
     c := ParseAttribNameAndValue(c, endC, attrib);
     if c >= endC then
     begin
-      Dispose(attrib);
+      DisposeSvgAttrib(attrib);
       Exit;
     end;
 
@@ -1893,15 +2022,23 @@ begin
 
   c := PUTF8Char(style);
   endC := c + Length(style);
-  while SkipStyleBlanks(c, endC) do
+  while True do
   begin
+    c := SkipStyleBlanks(c, endC);
+    if c >= endC then Break;
+
     c2 := c;
-    ParseStyleNameLen(c, endC);
+    c := ParseStyleNameLen(c, endC);
     ToUTF8String(c2, c, styleName);
     if styleName = '' then Break;
 
-    if (ParseNextChar(c, endC) <> ':') or  //syntax check
-      not SkipBlanks(c,endC) then Break;
+    // ParseNextChar
+    c := SkipStyleBlanks(c, endC);
+    if (c >= endC) or (c^ <> ':') then Break;  //syntax check
+    inc(c);
+
+    c := SkipBlanksEx(c, endC);
+    if c >= endC then Break;
 
     c2 := c;
     inc(c);
@@ -2085,7 +2222,7 @@ begin
     if c^ <> '>' then break;
     inc(c); //skip entity's trailing '>'
   end;
-  if Assigned(attrib) then Dispose(attrib);
+  if Assigned(attrib) then DisposeSvgAttrib(attrib);
   Result := (c < endC) and (c^ = ']');
   inc(c);
 end;
@@ -2509,102 +2646,118 @@ end;
 // TClassStylesList
 //------------------------------------------------------------------------------
 
-constructor TClassStylesList.Create;
-begin
-  fList := TStringList.Create;
-  fList.Duplicates := dupIgnore;
-  fList.CaseSensitive := false;
-  fList.Sorted := True;
-end;
-//------------------------------------------------------------------------------
-
-destructor TClassStylesList.Destroy;
-begin
-  Clear;
-  fList.Free;
-  inherited Destroy;
-end;
-//------------------------------------------------------------------------------
-
-function TClassStylesList.AddAppendStyle(const classname: string; const ansi: UTF8String): integer;
+procedure TClassStylesList.Grow(NewCapacity: Integer);
 var
-  i: integer;
-  sr: PAnsStringiRec;
+  Len, I: Integer;
+  Index: Integer;
 begin
-  Result := fList.IndexOf(classname);
-  if (Result >= 0) then
+  Len := Length(FItems);
+  if NewCapacity < 0 then
   begin
-    sr := PAnsStringiRec(fList.Objects[Result]);
-    i := Length(sr.ansi);
-    if sr.ansi[i] <> ';' then
-      sr.ansi := sr.ansi + ';' + ansi else
-      sr.ansi := sr.ansi + ansi;
-  end else
+    if Len < 5 then
+      Len := 5
+    else
+      Len := Len * 2;
+  end
+  else if NewCapacity <= Len then
+    Exit
+  else
+    Len := NewCapacity;
+
+  SetLength(FItems, Len);
+  FMod := Cardinal(Len);
+  if not Odd(FMod) then
+    Inc(FMod);
+  SetLengthUninit(FBuckets, FMod);
+  FillChar(FBuckets[0], FMod * SizeOf(FBuckets[0]), $FF);
+
+  // Rehash
+  for I := 0 to FCount - 1 do
   begin
-    new(sr);
-    sr.ansi := ansi;
-    Result := fList.AddObject(classname, Pointer(sr));
+    Index := (FItems[I].Hash and $7FFFFFFF) mod FMod;
+    FItems[I].Next := FBuckets[Index];
+    FBuckets[Index] := I;
+  end;
+end;
+//------------------------------------------------------------------------------
+procedure TClassStylesList.Preallocate(AdditionalItemCount: Integer);
+begin
+  if AdditionalItemCount > 2 then
+    Grow(Length(FItems) + AdditionalItemCount);
+end;
+
+function TClassStylesList.FindItemIndex(Hash: Cardinal; const Name: UTF8String): Integer;
+begin
+  Result := -1;
+  if FMod <> 0 then
+  begin
+    Hash := GetHash(Name);
+    Result := FBuckets[(Hash and $7FFFFFFF) mod FMod];
+    while (Result <> -1) and
+          ((FItems[Result].Hash <> Hash) or not IsSameUTF8String(FItems[Result].Name, Name)) do
+      Result := FItems[Result].Next;
   end;
 end;
 //------------------------------------------------------------------------------
 
-function TClassStylesList.GetStyle(const classname: UTF8String): UTF8String;
+procedure TClassStylesList.AddAppendStyle(const Name, Style: UTF8String);
 var
-  i: integer;
+  Index: Integer;
+  Hash: Cardinal;
+  Item: PClassStyleListItem;
+  Bucket: PInteger;
 begin
-  i := fList.IndexOf(string(className));
-  if i >= 0 then
-    Result := PAnsStringiRec(fList.objects[i]).ansi
+  Hash := GetHash(Name);
+  Index := FindItemIndex(Hash, Name);
+  if Index <> -1 then
+  begin
+    Item := @FItems[Index];
+    if (Item.Style <> '') and (Item.Style[Length(Item.Style)] <> ';') then
+      Item.Style := Item.Style + ';' + Style
+    else
+      Item.Style := Item.Style + Style;
+  end
   else
-    Result := '';
+  begin
+    if FCount = Length(FItems) then
+      Grow;
+    Index := FCount;
+    Inc(FCount);
+
+    Bucket := @FBuckets[(Hash and $7FFFFFFF) mod FMod];
+    Item := @FItems[Index];
+    Item.Next := Bucket^;
+    Item.Hash := Hash;
+    Item.Name := Name;
+    Item.Style := style;
+    Bucket^ := Index;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TClassStylesList.GetStyle(const Name: UTF8String): UTF8String;
+var
+  Index: Integer;
+begin
+  if FCount = 0 then
+    Result := ''
+  else
+  begin
+    Index := FindItemIndex(GetHash(Name), Name);
+    if Index <> -1 then
+      Result := FItems[Index].Style
+    else
+      Result := '';
+  end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TClassStylesList.Clear;
-var
-  i: integer;
 begin
-  for i := 0 to fList.Count -1 do
-    Dispose(PAnsStringiRec(fList.Objects[i]));
-  fList.Clear;
-end;
-//------------------------------------------------------------------------------
-
-function IsSameAsciiUTF8String(const S1, S2: UTF8String): Boolean;
-var
-  Len: Integer;
-  I: Integer;
-  Ch1, Ch2: UTF8Char;
-begin
-  Len := Length(S1);
-  Result := Len = Length(S2);
-  if Result then
-  begin
-    Result := False;
-    I := 0;
-    while True do
-    begin
-      if I = Len then
-        Break;
-
-      Ch1 := S1[I];
-      Ch2 := S2[I];
-      if Ch1 = Ch2 then
-      begin
-        Inc(I);
-        Continue;
-      end;
-
-      case Ch1 of
-        'A'..'Z': ch1 := UTF8Char(Ord(ch1) xor $20); // toggle upper/lower
-      end;
-
-      if Ch1 <> Ch2 then
-        Exit;
-      Inc(I);
-    end;
-    Result := True;
-  end;
+  FCount := 0;
+  FMod := 0;
+  FItems := nil;
+  FBuckets := nil;
 end;
 
 //------------------------------------------------------------------------------
