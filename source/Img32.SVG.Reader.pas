@@ -76,7 +76,7 @@ type
 {$ENDIF}
     fId             : UTF8String;
     fDrawData       : TDrawData;    //currently both static and dynamic vars
-    function  FindRefElement(refname: UTF8String): TBaseElement;
+    function  FindRefElement(const refname: UTF8String): TBaseElement;
     function GetChildCount: integer;
     function GetChild(index: integer): TBaseElement;
     function FindChild(const idName: UTF8String): TBaseElement;
@@ -3774,7 +3774,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TBaseElement.FindRefElement(refname: UTF8String): TBaseElement;
+function TBaseElement.FindRefElement(const refname: UTF8String): TBaseElement;
 var
   i, len: integer;
   c, endC: PUTF8Char;

@@ -175,7 +175,7 @@ type
 
   TDocTypeEl = class(TXmlEl)
   private
-    procedure   SkipWord(var c, endC: PUTF8Char);
+    function    SkipWord(c, endC: PUTF8Char): PUTF8Char;
     function    ParseEntities(var c, endC: PUTF8Char): Boolean;
   public
     function    ParseAttributes(var c: PUTF8Char; endC: PUTF8Char): Boolean; override;
@@ -515,9 +515,17 @@ end;
 //------------------------------------------------------------------------------
 
 function SkipBlanks(var c: PUTF8Char; endC: PUTF8Char): Boolean;
+var
+  cc: PUTF8Char;
 begin
-  while (c < endC) and (c^ <= space) do inc(c);
-  Result := (c < endC);
+  cc := c;
+  if (cc < endC) and (cc^ <= space) then
+  begin
+    inc(cc);
+    while (cc < endC) and (cc^ <= space) do inc(cc);
+    c := cc;
+  end;
+  Result := (cc < endC);
 end;
 //------------------------------------------------------------------------------
 
@@ -533,27 +541,32 @@ end;
 function SkipStyleBlanks(var c: PUTF8Char; endC: PUTF8Char): Boolean;
 var
   inComment: Boolean;
+  cc: PUTF8Char;
+  ch: UTF8Char;
 begin
   //style content may include multi-line comment blocks
   inComment := false;
-  while (c < endC) do
+  cc := c;
+  while (cc < endC) do
   begin
+    ch := cc^;
     if inComment then
     begin
-      if (c^ = '*') and ((c +1)^ = '/')  then
+      if (ch = '*') and ((cc +1)^ = '/')  then
       begin
         inComment := false;
-        inc(c);
+        inc(cc);
       end;
     end
-    else if (c^ > space) then
+    else if (ch > space) then
     begin
-      inComment := (c^ = '/') and ((c +1)^ = '*');
+      inComment := (ch = '/') and ((cc +1)^ = '*');
       if not inComment then break;
     end;
-    inc(c);
+    inc(cc);
   end;
-  Result := (c < endC);
+  c := cc;
+  Result := (cc < endC);
 end;
 //------------------------------------------------------------------------------
 
@@ -583,7 +596,7 @@ end;
 
 function ParseStyleNameLen(var c: PUTF8Char; endC: PUTF8Char): integer;
 var
-  c2: PUTF8Char;
+  c2, cc: PUTF8Char;
 begin
   Result := 0;
   //nb: style names may start with a hyphen
@@ -591,77 +604,88 @@ begin
   if (c2^ = '-') then inc(c2);
   if not IsAlpha(c2^) then Exit;
 
-  c := c2;
-  c2 := c; inc(c);
-  while c < endC do
+  cc := c2 + 1;
+  while cc < endC do
   begin
-    case c^ of
-      '0'..'9', 'A'..'Z', 'a'..'z', '-': inc(c);
+    case cc^ of
+      '0'..'9', 'A'..'Z', 'a'..'z', '-': inc(cc);
       else break;
     end;
   end;
-  Result := c - c2;
+  c := cc;
+  Result := cc - c2;
 end;
 //------------------------------------------------------------------------------
 
 function ParseNextWord(var c: PUTF8Char; endC: PUTF8Char; out word: UTF8String): Boolean;
 var
-  c2: PUTF8Char;
+  c2, cc: PUTF8Char;
 begin
-  Result := SkipBlanksAndComma(c, endC);
-  if not Result then Exit;
-  c2 := c;
-  while c < endC do
+  if not SkipBlanksAndComma(c, endC) then
   begin
-    case c^ of
-      'A'..'Z', 'a'..'z': inc(c);
+    Result := False;
+    Exit;
+  end;
+  cc := c;
+  c2 := cc;
+  while cc < endC do
+  begin
+    case cc^ of
+      'A'..'Z', 'a'..'z': inc(cc);
       else break;
     end;
   end;
-  ToUTF8String(c2, c, word);
+  c := cc;
+  ToUTF8String(c2, cc, word);
+  Result := True;
 end;
 //------------------------------------------------------------------------------
 
 function ParseNextWordEx(var c: PUTF8Char; endC: PUTF8Char;
   out word: UTF8String): Boolean;
 var
-  isQuoted: Boolean;
-  c2: PUTF8Char;
+  c2, cc: PUTF8Char;
 begin
-  Result := SkipBlanksAndComma(c, endC);
-  if not Result then Exit;
-  isQuoted := (c^) = quote;
-  if isQuoted then
+  if not SkipBlanksAndComma(c, endC) then
+  begin
+    Result := False;
+    Exit;
+  end;
+  cc := c;
+  if cc^ = quote then
   begin
     inc(c);
-    c2 := c;
-    while (c < endC) and (c^ <> quote) do inc(c);
-    ToUTF8String(c2, c, word);
-    inc(c);
+    c2 := cc;
+    while (cc < endC) and (cc^ <> quote) do inc(cc);
+    ToUTF8String(c2, cc, word);
+    inc(cc);
   end else
   begin
-    //Result := IsLowerAlpha(LowerCaseTable[c^]);
-    Result := IsAlpha(c^);
-    if not Result then Exit;
-    c2 := c;
-    inc(c);
-    while c < endC do
+    //Result := IsLowerAlpha(LowerCaseTable[cc^]);
+    if not IsAlpha(cc^) then
     begin
-      case c^ of
-        'A'..'Z', 'a'..'z', '-', '_': inc(c);
+      Result := False;
+      Exit;
+    end;
+    c2 := cc;
+    inc(cc);
+    while cc < endC do
+    begin
+      case cc^ of
+        'A'..'Z', 'a'..'z', '-', '_': inc(cc);
         else break;
       end;
+      inc(cc);
     end;
-    ToUTF8String(c2, c, word);
+    ToUTF8String(c2, cc, word);
   end;
+  c := cc;
+  Result := True;
 end;
 //------------------------------------------------------------------------------
 
-function ParseNameLength(var c: PUTF8Char; endC: PUTF8Char): integer; overload;
-var
-  c2: PUTF8Char;
+function ParseNameLength(c: PUTF8Char; endC: PUTF8Char): PUTF8Char;
 begin
-  c2 := c;
   inc(c);
   while c < endC do
   begin
@@ -670,7 +694,7 @@ begin
       else break;
     end;
   end;
-  Result := c - c2;
+  Result := c;
 end;
 //------------------------------------------------------------------------------
 
@@ -729,7 +753,7 @@ var
   name: UTF8String;
 begin
   c2 := c;
-  ParseNameLength(c, endC);
+  c := ParseNameLength(c, endC);
   ToUTF8String(c2, c, name);
   if name = '' then Result := 0
   else Result := GetHash(name);
@@ -1111,7 +1135,7 @@ var
 begin
   inc(c); //skip ampersand.
   c2 := c; c3 := c;
-  ParseNameLength(c3, endC);
+  c3 := ParseNameLength(c3, endC);
   ToUTF8String(c2, c3, entityName);
   entity := owner.FindEntity(GetHash(entityName));
   Result := (c3^ = ';') and Assigned(entity);
@@ -1596,7 +1620,7 @@ begin
 
     //get one or more class names for each pending style
     c2 := c;
-    ParseNameLength(c, endC);
+    c := ParseNameLength(c, endC);
     ToAsciiLowerUTF8String(c2, c, aclassName);
 
     AddName(String(aclassName));
@@ -1673,8 +1697,8 @@ var
   c2: PUTF8Char;
 begin
   SkipBlanks(c, endC);
-  c2 := c;;
-  ParseNameLength(c, endC);
+  c2 := c;
+  c := ParseNameLength(c, endC);
   ToAsciiLowerUTF8String(c2, c, name);
 
   //load the class's style (ie undotted style) if found.
@@ -1691,12 +1715,16 @@ var
   c2: PUTF8Char;
   //attribName: UTF8String;
 begin
-  Result := SkipBlanks(c, endC);
-  if not Result then Exit;
+  if not SkipBlanks(c, endC) then
+  begin
+    Result := False;
+    Exit;
+  end;
   c2 := c;
-  ParseNameLength(c, endC);
+  c := ParseNameLength(c, endC);
   ToUTF8String(c2, c, attrib.Name);
   attrib.hash := GetHash(attrib.Name);
+  Result := True;
 end;
 //------------------------------------------------------------------------------
 
@@ -1963,10 +1991,11 @@ end;
 // TDocTypeEl
 //------------------------------------------------------------------------------
 
-procedure TDocTypeEl.SkipWord(var c, endC: PUTF8Char);
+function TDocTypeEl.SkipWord(c, endC: PUTF8Char): PUTF8Char;
 begin
   while (c < endC) and (c^ > space) do inc(c);
   inc(c);
+  Result := c;
 end;
 //------------------------------------------------------------------------------
 
@@ -2013,7 +2042,7 @@ begin
       '[': ParseEntities(c, endC);
       '"', '''': ParseQuotedString(c, endC, dummy);
       '>': break;
-      else SkipWord(c, endC);
+      else c := SkipWord(c, endC);
     end;
   end;
   Result := (c < endC) and (c^ = '>');
