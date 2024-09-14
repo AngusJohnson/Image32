@@ -1977,7 +1977,7 @@ begin
     pathLen := Length(paths[i]);
     if pathLen > 0 then
     begin
-      // Skip the start-point if is matches the previous path's end-point
+      // Skip the start-point if it matches the previous path's end-point
       if (i > 0) and PointsEqual(paths[i][0], paths[i -1][high(paths[i -1])]) then
         dec(pathLen);
       inc(len, pathLen);
@@ -1993,14 +1993,19 @@ begin
     if pathLen > 0 then
     begin
       offset := 0;
-      // Skip the start-point if is matches the previous path's end-point
+      // Skip the start-point if it matches the previous path's end-point
       if (i > 0) and PointsEqual(paths[i][0], paths[i -1][high(paths[i -1])]) then
       begin
         dec(pathLen);
         offset := 1;
       end;
-      Move(paths[i][offset], dstPath[len], pathLen * SizeOf(TPointD));
-      inc(len, pathLen);
+      // Skip if we have a path with only one point and that point also matches
+      // the previous path's end-point.
+      if pathLen > 0 then
+      begin
+        Move(paths[i][offset], dstPath[len], pathLen * SizeOf(TPointD));
+        inc(len, pathLen);
+      end;
     end;
   end;
 end;
