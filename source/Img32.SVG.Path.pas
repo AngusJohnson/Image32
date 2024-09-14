@@ -57,7 +57,9 @@ type
     fExtend   : integer;
   protected
     procedure Changed; {$IFDEF INLINE} inline; {$ENDIF}
-    function GetFlattened: TPathD; virtual;
+    procedure RequireFlattened; virtual;
+    function GetFlattened: TPathD; overload;
+    procedure GetFlattened(var Result: TPathD); overload;
     procedure GetFlattenedInternal; virtual; abstract;
     procedure Scale(value: double); virtual;
     function DescaleAndOffset(const pt: TPointD): TPointD; overload;
@@ -89,7 +91,7 @@ type
   TSvgCurvedSeg = class(TSvgPathSeg)
   protected
     pendingScale: double;
-    function GetFlattened: TPathD; override;
+    procedure RequireFlattened; override;
     function GetPreviousCtrlPt: TPointD;
   public
     function GetLastCtrlPt: TPointD; virtual;
@@ -354,7 +356,6 @@ begin
     c := cc;
     Exit;
   end;
-
   ch := cc^;
   Result := (ch >= '0') and (ch <= '9');
   if not Result then Exit;
@@ -505,11 +506,23 @@ begin
     fFlatPath := nil; // DynArrayClear
 end;
 //------------------------------------------------------------------------------
-
-function TSvgPathSeg.GetFlattened: TPathD;
+procedure TSvgPathSeg.RequireFlattened;
 begin
   if fFlatPath = nil then
     GetFlattenedInternal;
+end;
+
+//------------------------------------------------------------------------------
+function TSvgPathSeg.GetFlattened: TPathD;
+begin
+  RequireFlattened;
+  Result := fFlatPath;
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgPathSeg.GetFlattened(var Result: TPathD);
+begin // uses less DynArrayAsg and DynArrayClear calls
+  RequireFlattened;
   Result := fFlatPath;
 end;
 //------------------------------------------------------------------------------
@@ -531,7 +544,7 @@ end;
 
 procedure TSvgStraightSeg.GetFlattenedInternal;
 begin
-  fFlatPath := PrePendPoint(fFirstPt, fCtrlPts);
+  PrePendPoint(fFirstPt, fCtrlPts, fFlatPath);
 end;
 
 //------------------------------------------------------------------------------
@@ -546,7 +559,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgCurvedSeg.GetFlattened: TPathD;
+procedure TSvgCurvedSeg.RequireFlattened;
 begin
   //if the image has been rendered previously at a lower resolution, then
   //redo the flattening otherwise curves my look very rough.
@@ -555,10 +568,7 @@ begin
     pendingScale := Parent.fPendingScale;
     Changed;
   end;
-
-  if fFlatPath = nil then
-    GetFlattenedInternal;
-  Result := fFlatPath;
+  inherited RequireFlattened;
 end;
 //------------------------------------------------------------------------------
 
@@ -1147,7 +1157,7 @@ begin
   Result := nil;
   SetLength(flattenedPaths, fSegsCount);
   for i := 0 to fSegsCount - 1 do
-    flattenedPaths[i] := fSegs[i].GetFlattened;
+    fSegs[i].GetFlattened(flattenedPaths[i]);
   ConcatPaths(Result, flattenedPaths);
 end;
 //------------------------------------------------------------------------------

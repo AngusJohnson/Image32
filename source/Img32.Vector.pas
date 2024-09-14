@@ -71,7 +71,8 @@ type
 
   function NormalizeRect(var rect: TRect): Boolean;
 
-  function PrePendPoint(const pt: TPointD; const p: TPathD): TPathD;
+  function PrePendPoint(const pt: TPointD; const p: TPathD): TPathD; overload;
+  procedure PrePendPoint(const pt: TPointD; const p: TPathD; var Result: TPathD); overload;
   function PrePendPoints(const pt1, pt2: TPointD; const p: TPathD): TPathD;
 
   function Rectangle(const rec: TRect): TPathD; overload;
@@ -3641,14 +3642,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function PrePendPoint(const pt: TPointD; const p: TPathD): TPathD;
+procedure PrePendPoint(const pt: TPointD; const p: TPathD; var Result: TPathD);
 var
   len: integer;
 begin
   len := Length(p);
-  NewPointDArray(Result, len +1, True);
+  SetLengthUninit(Result, len +1);
   Result[0] := pt;
   if len > 0 then Move(p[0], Result[1], len * SizeOf(TPointD));
+end;
+//------------------------------------------------------------------------------
+
+function PrePendPoint(const pt: TPointD; const p: TPathD): TPathD;
+begin
+  PrePendPoint(pt, p, Result);
 end;
 //------------------------------------------------------------------------------
 
@@ -3779,7 +3786,7 @@ end;
 function FlattenCBezier(const firstPt: TPointD; const pts: TPathD;
   tolerance: double = 0.0): TPathD; overload;
 begin
-    Result := FlattenCBezier(PrePendPoint(firstPt, pts), tolerance);
+  Result := FlattenCBezier(PrePendPoint(firstPt, pts), tolerance);
 end;
 //------------------------------------------------------------------------------
 
