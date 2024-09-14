@@ -2864,9 +2864,12 @@ begin
     end;
   end
   else
+  begin
+    SetLength(Result, Length(lines));
     for i := 0 to high(lines) do
-      AppendPath(Result, GrowOpenLine(lines[i], lineWidth,
-        joinStyle, endStyle, miterLimOrRndScale));
+      Result[i] := GrowOpenLine(lines[i], lineWidth,
+        joinStyle, endStyle, miterLimOrRndScale);
+  end;
 end;
 //------------------------------------------------------------------------------
 
