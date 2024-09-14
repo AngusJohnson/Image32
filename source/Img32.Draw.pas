@@ -59,6 +59,17 @@ type
     // RenderProc: x & y refer to pixel coords in the destination image and
     // where x1 is the start (and left) and x2 is the end of the render
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); virtual; abstract;
+    // RenderProcSkip: is called for every skipped line block if
+    // SupportsRenderProcSkip=True and the Rasterize() function skips scanlines.
+    procedure RenderProcSkip(const skippedRect: TRect); virtual;
+    // SetClipRect is called by the Rasterize() function with the
+    // rasterization clipRect. The default implementation does nothing.
+    procedure SetClipRect(const clipRect: TRect); virtual;
+    // If SupportsRenderProcSkip returns True the Rasterize() function
+    // will call RenderProcSkip() for every scanline where it didn't have
+    // anything to rasterize.
+    function SupportsRenderProcSkip: Boolean; virtual;
+
     property ImgWidth: integer read fImgWidth;
     property ImgHeight: integer read fImgHeight;
     property ImgBase: Pointer read fImgBase;
@@ -93,16 +104,16 @@ type
     constructor Create(color: TColor32 = clNone32);
   end;
 
-  // TMaskRenderer masks all pixels inside the OutsideBounds area
-  // where the alpha[]-array is zero. It is a "negative EraseRenderer".
+  // TMaskRenderer masks all pixels inside the clipRect area
+  // where the alpha[]-array is zero.
   TMaskRenderer = class(TCustomRenderer)
   private
-    fOutsideBounds: TRect;
+    fClipRect: TRect;
   protected
+    procedure SetClipRect(const clipRect: TRect); override;
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); override;
-  public
-    constructor Create(const outsideBounds: TRect);
-    procedure SetOutsideBounds(const outsideBounds: TRect);
+    procedure RenderProcSkip(const skippedRect: TRect); override;
+    function SupportsRenderProcSkip: Boolean; override;
   end;
 
   // TCustomRendererCache is used to not create Renderer
@@ -1253,14 +1264,23 @@ var
   scanlines: TArrayOfScanline;
   fragments: PFragment;
   scanline: PScanline;
+  skippedScanlines: integer;
+  skipRenderer: boolean;
 
   // FPC generates wrong code if "count" isn't NativeInt
   FillByteBuffer: procedure(byteBuffer: PByte; windingAccum: PDouble; count: nativeint);
 begin
   // See also https://nothings.org/gamedev/rasterize/
   if not assigned(renderer) then Exit;
+  renderer.SetClipRect(clipRec);
+  skipRenderer := renderer.SupportsRenderProcSkip;
+
   Types.IntersectRect(clipRec2, clipRec, GetBounds(paths));
-  if IsEmptyRect(clipRec2) then Exit;
+  if IsEmptyRect(clipRec2) then
+  begin
+    if skipRenderer then renderer.RenderProcSkip(clipRec);
+    Exit;
+  end;
 
   if (clipRec2.Left = 0) and (clipRec2.Top = 0) then
     paths2 := paths
@@ -1299,16 +1319,35 @@ begin
 {$ENDIF}
         FillByteBuffer := FillByteBufferNegative;
       else
+        if skipRenderer then renderer.RenderProcSkip(clipRec);
         Exit;
     end;
 
+    // Notify the renderer about the parts at the top
+    // that we didn't touch.
+    if skipRenderer and (clipRec2.Top > clipRec.Top) then
+    begin
+      renderer.RenderProcSkip(Rect(clipRec.Left, clipRec.Top,
+                                   clipRec.Right, clipRec2.Top - 1));
+    end;
+
+    skippedScanlines := 0;
     scanline := @scanlines[0];
     for i := 0 to high(scanlines) do
     begin
       if scanline.fragCnt = 0 then
       begin
         inc(scanline);
+        if skipRenderer then inc(skippedScanlines);
         Continue;
+      end;
+
+      // If we have skipped some scanlines, we must notify the renderer.
+      if skipRenderer and (skippedScanlines > 0) then
+      begin
+        renderer.RenderProcSkip(Rect(clipRec.Left, clipRec2.Top + i - skippedScanlines,
+                                     clipRec.Right, clipRec2.Top + i - 1));
+        skippedScanlines := 0;
       end;
 
       // process each scanline to fill the winding count accumulation buffer
@@ -1328,6 +1367,17 @@ begin
         clipRec2.Top + i, @byteBuffer[xli]);
 
       inc(scanline);
+    end;
+
+    // Notify the renderer about the last skipped scanlines
+    if skipRenderer then
+    begin
+      clipRec2.Bottom := clipRec2.top + High(scanlines) - skippedScanlines;
+      if clipRec2.Bottom < clipRec.Bottom then
+      begin
+        renderer.RenderProcSkip(Rect(clipRec.Left, clipRec2.Bottom + 1,
+                                     clipRec.Right, clipRec.Bottom));
+      end;
     end;
   finally
     // cleanup and deallocate memory
@@ -1391,6 +1441,24 @@ begin
   end;
   Result := fCurrLinePtr;
   inc(PByte(Result), x * fPixelSize);
+end;
+// ------------------------------------------------------------------------------
+
+procedure TCustomRenderer.SetClipRect(const clipRect: TRect);
+begin
+  // default: do nothing
+end;
+// ------------------------------------------------------------------------------
+
+procedure TCustomRenderer.RenderProcSkip(const skippedRect: TRect);
+begin
+  // default: do nothing
+end;
+// ------------------------------------------------------------------------------
+
+function TCustomRenderer.SupportsRenderProcSkip: Boolean;
+begin
+  Result := False;
 end;
 
 // ------------------------------------------------------------------------------
@@ -1582,38 +1650,38 @@ end;
 // TMaskRenderer
 // ------------------------------------------------------------------------------
 
-constructor TMaskRenderer.Create(const outsideBounds: TRect);
+procedure TMaskRenderer.SetClipRect(const clipRect: TRect);
 begin
-  inherited Create;
-  fOutsideBounds := outsideBounds;
+  fClipRect := clipRect;
+  // clipping to the image size
+  if fClipRect.Left < 0 then fClipRect.Left := 0;
+  if fClipRect.Top < 0 then fClipRect.Top := 0;
+  if fClipRect.Right > fImgWidth then fClipRect.Right := fImgWidth;
+  if fClipRect.Bottom > fImgHeight then fClipRect.Bottom := fImgHeight;
 end;
-
-procedure TMaskRenderer.SetOutsideBounds(const outsideBounds: TRect);
-begin
-  fOutsideBounds := outsideBounds;
-end;
+// ------------------------------------------------------------------------------
 
 procedure TMaskRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
 var
   p: PColor32;
   i: integer;
 begin
-  // clip to fOutsideBounds
-  if (y < fOutsideBounds.Top) or (y > fOutsideBounds.Bottom) then Exit;
+  // CopyBlend excludes ClipRect.Right/Bottom, so we also
+  // need to exclude it.
+  if (y < fClipRect.Top) or (y >= fClipRect.Bottom) then Exit;
+  if x2 >= fClipRect.Right then x2 := fClipRect.Right - 1;
 
-  if x1 < fOutsideBounds.Left then
+  if x1 < fClipRect.Left then
   begin
-    inc(alpha, fOutsideBounds.Left - x1);
-    x1 := fOutsideBounds.Left;
+    inc(alpha, fClipRect.Left - x1);
+    x1 := fClipRect.Left;
   end;
-  if x2 > fOutsideBounds.Right then
-    x2 := fOutsideBounds.Right;
 
-  p := GetDstPixel(fOutsideBounds.Left, y);
+  p := GetDstPixel(fClipRect.Left, y);
 
   // Clear the area before x1 (inside OutsideBounds)
-  FillChar(p^, (x1 - fOutsideBounds.Left) * SizeOf(TColor32), 0);
-  inc(p, x1 - fOutsideBounds.Left);
+  FillChar(p^, (x1 - fClipRect.Left) * SizeOf(TColor32), 0);
+  inc(p, x1 - fClipRect.Left);
 
   // Fill the area between x1 and x2
   for i := x1 to x2 do
@@ -1630,7 +1698,46 @@ begin
   end;
 
   // Clear the area after x2 (inside OutsideBounds)
-  FillChar(p^, (fOutsideBounds.Right - x2) * SizeOf(TColor32), 0);
+  FillChar(p^, (fClipRect.Right - (x2 + 1)) * SizeOf(TColor32), 0);
+end;
+// ------------------------------------------------------------------------------
+
+procedure TMaskRenderer.RenderProcSkip(const skippedRect: TRect);
+var
+  i, h, w: integer;
+  p: PColor32;
+  r: TRect;
+begin
+  r := skippedRect;
+  if r.Left < fClipRect.Left then r.Left := fClipRect.Left;
+  if r.Top < fClipRect.Top then r.Top := fClipRect.Top;
+  // CopyBlend excludes ClipRect.Right/Bottom, so we also
+  // need to exclude it.
+  if r.Right >= fClipRect.Right then r.Right := fClipRect.Right - 1;
+  if r.Bottom >= fClipRect.Bottom then r.Bottom := fClipRect.Bottom - 1;
+
+  if r.Right < r.Left then Exit;
+  if r.Bottom < r.Top then Exit;
+
+  w := r.Right - r.Left + 1;
+  h := r.Bottom - r.Top + 1;
+  p := GetDstPixel(r.Left, r.Top);
+  if w = fImgWidth then
+    FillChar(p^, w * h * SizeOf(TColor32), 0)
+  else
+  begin
+    for i := 1 to h do
+    begin
+      FillChar(p^, w * SizeOf(TColor32), 0);
+      inc(p, fImgWidth);
+    end;
+  end;
+end;
+
+// ------------------------------------------------------------------------------
+function TMaskRenderer.SupportsRenderProcSkip: Boolean;
+begin
+  Result := True;
 end;
 
 // ------------------------------------------------------------------------------
@@ -1642,7 +1749,7 @@ begin
   inherited Create;
   fColorRenderer := TColorRenderer.Create;
   fAliasedColorRenderer := TAliasedColorRenderer.Create;
-  fMaskRenderer := TMaskRenderer.Create(Rect(0, 0, 0, 0));
+  fMaskRenderer := TMaskRenderer.Create;
 end;
 // ------------------------------------------------------------------------------
 

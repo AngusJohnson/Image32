@@ -978,7 +978,7 @@ begin
     Exit;
   end;
 
-  renderer := TMaskRenderer.Create(outsideBounds);
+  renderer := TMaskRenderer.Create;
   try
     SetLength(polygons, 1);
     polygons[0] := path;
@@ -1010,12 +1010,9 @@ begin
   end;
 
   if rendererCache = nil then
-    renderer := TMaskRenderer.Create(outsideBounds)
+    renderer := TMaskRenderer.Create
   else
-  begin
     renderer := rendererCache.MaskRenderer;
-    renderer.SetOutsideBounds(outsideBounds);
-  end;
   try
     Rasterize(img, paths, outsideBounds, fillRule, renderer);
   finally
