@@ -343,11 +343,23 @@ end;
 
 function GetSingleDigit(var c, endC: PUTF8Char;
   out digit: integer): Boolean;
+var
+  cc: PUTF8Char;
+  ch: UTF8Char;
 begin
-  Result := SkipBlanksAndComma(c, endC) and (c^ >= '0') and (c^ <= '9');
+  cc := SkipBlanksAndComma(c, endC);
+  Result := cc < endC;
+  if not Result then
+  begin
+    c := cc;
+    Exit;
+  end;
+
+  ch := cc^;
+  Result := (ch >= '0') and (ch <= '9');
   if not Result then Exit;
-  digit := Ord(c^) - Ord('0');
-  inc(c);
+  digit := Ord(ch) - Ord('0');
+  c := cc + 1;
 end;
 //------------------------------------------------------------------------------
 

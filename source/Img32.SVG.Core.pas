@@ -165,8 +165,9 @@ type
     procedure   Clear; virtual;
     function    ParseHeader(var c: PUTF8Char; endC: PUTF8Char): Boolean; virtual;
     function    ParseContent(var c: PUTF8Char; endC: PUTF8Char): Boolean; virtual;
-    function    ParseAttribName(var c: PUTF8Char; endC: PUTF8Char; attrib: PSvgAttrib): Boolean;
-    function    ParseAttribValue(var c: PUTF8Char; endC: PUTF8Char; attrib: PSvgAttrib): Boolean;
+    class function ParseAttribName(c, endC: PUTF8Char; attrib: PSvgAttrib): PUTF8Char; {$IFDEF CLASS_STATIC}static;{$ENDIF}
+    class function ParseAttribValue(c, endC: PUTF8Char; attrib: PSvgAttrib): PUTF8Char; {$IFDEF CLASS_STATIC}static;{$ENDIF}
+    class function ParseAttribNameAndValue(c, endC: PUTF8Char; attrib: PSvgAttrib): PUTF8Char; {$IFDEF CLASS_STATIC}static;{$ENDIF}
     function    ParseAttributes(var c: PUTF8Char; endC: PUTF8Char): Boolean; virtual;
     procedure   ParseStyleAttribute(const style: UTF8String);
     property    Attrib[index: integer]: PSvgAttrib read GetAttrib;
@@ -222,7 +223,7 @@ type
   function ParseNextNumEx(var c: PUTF8Char; endC: PUTF8Char; skipComma: Boolean;
     out val: double; out unitType: TUnitType): Boolean;
   function GetHash(c: PUTF8Char; len: integer): cardinal; overload;
-  function GetHash(const name: UTF8String): cardinal; overload;
+  function GetHash(const name: UTF8String): cardinal; overload; {$IFDEF INLINE} inline; {$ENDIF}
   function GetHashCaseSensitive(name: PUTF8Char; nameLen: integer): cardinal;
   function ExtractRef(const href: UTF8String): UTF8String;
   function IsNumPending(var c: PUTF8Char;
@@ -246,7 +247,8 @@ type
   function ClampRange(val, min, max: double): double;
 
   function SkipBlanks(var c: PUTF8Char; endC: PUTF8Char): Boolean;
-  function SkipBlanksAndComma(var current: PUTF8Char; currentEnd: PUTF8Char): Boolean;
+  function SkipBlanksEx(c: PUTF8Char; endC: PUTF8Char): PUTF8Char; {$IFDEF INLINE} inline; {$ENDIF}
+  function SkipBlanksAndComma(c, endC: PUTF8Char): PUTF8Char; {$IFDEF INLINE} inline; {$ENDIF}
 
   procedure ConvertUnicodeToUtf8(memStream: TMemoryStream);
 
@@ -532,12 +534,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SkipBlanksAndComma(var current: PUTF8Char; currentEnd: PUTF8Char): Boolean;
+function SkipBlanksEx(c: PUTF8Char; endC: PUTF8Char): PUTF8Char;
 begin
-  Result := SkipBlanks(current, currentEnd);
-  if not Result or (current^ <> ',') then Exit;
-  inc(current);
-  Result := SkipBlanks(current, currentEnd);
+  while (c < endC) and (c^ <= space) do inc(c);
+  Result := c;
+end;
+//------------------------------------------------------------------------------
+
+function SkipBlanksAndComma(c, endC: PUTF8Char): PUTF8Char;
+begin
+  Result := SkipBlanksEx(c, endC);
+  if (Result >= endC) or (Result^ <> ',') then Exit;
+  Result := SkipBlanksEx(Result + 1, endC);
 end;
 //------------------------------------------------------------------------------
 
@@ -624,12 +632,14 @@ function ParseNextWord(var c: PUTF8Char; endC: PUTF8Char; out word: UTF8String):
 var
   c2, cc: PUTF8Char;
 begin
-  if not SkipBlanksAndComma(c, endC) then
+  cc := SkipBlanksAndComma(c, endC);
+  if cc >= endC then
   begin
+    c := cc;
     Result := False;
     Exit;
   end;
-  cc := c;
+
   c2 := cc;
   while cc < endC do
   begin
@@ -648,13 +658,15 @@ function ParseNextWordHash(var c: PUTF8Char; endC: PUTF8Char; out hash: cardinal
 var
   c2, cc: PUTF8Char;
 begin
-  if not SkipBlanksAndComma(c, endC) then
+  cc := SkipBlanksAndComma(c, endC);
+  if cc >= endC then
   begin
+    c := cc;
     hash := 0;
     Result := False;
     Exit;
   end;
-  cc := c;
+
   c2 := cc;
   while cc < endC do
   begin
@@ -674,13 +686,15 @@ function ParseNextWordExHash(var c: PUTF8Char; endC: PUTF8Char;
 var
   c2, cc: PUTF8Char;
 begin
-  if not SkipBlanksAndComma(c, endC) then
+  cc := SkipBlanksAndComma(c, endC);
+  if cc >= endC then
   begin
+    c := cc;
     hash := 0;
     Result := False;
     Exit;
   end;
-  cc := c;
+
   if cc^ = quote then
   begin
     inc(c);
@@ -690,7 +704,6 @@ begin
     inc(cc);
   end else
   begin
-    //Result := IsLowerAlpha(LowerCaseTable[cc^]);
     if not IsAlpha(cc^) then
     begin
       hash := 0;
@@ -1084,26 +1097,17 @@ end;
 //------------------------------------------------------------------------------
 
 function ParseNextChar(var c: PUTF8Char; endC: PUTF8Char): UTF8Char;
+var
+  cc: PUTF8Char;
 begin
-  Result := #0;
-  if not SkipBlanks(c, endC) then Exit;
-  Result := c^;
-  inc(c);
-end;
-//------------------------------------------------------------------------------
-
-function ParseQuoteChar(var c: PUTF8Char; endC: PUTF8Char): UTF8Char;
-begin
-  if SkipBlanks(c, endC) then
+  cc := SkipBlanksEx(c, endC);
+  if cc >= endC then
+    Result := #0
+  else
   begin
-    Result := c^;
-    if IsQuoteChar(Result) then
-    begin
-      inc(c);
-      Exit;
-    end;
+    Result := cc^;
+    c := cc + 1;
   end;
-  Result := #0;
 end;
 //------------------------------------------------------------------------------
 
@@ -1741,44 +1745,57 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TXmlEl.ParseAttribName(var c: PUTF8Char;
-  endC: PUTF8Char; attrib: PSvgAttrib): Boolean;
-var
-  c2: PUTF8Char;
-  //attribName: UTF8String;
+class function TXmlEl.ParseAttribName(c: PUTF8Char;
+  endC: PUTF8Char; attrib: PSvgAttrib): PUTF8Char;
 begin
-  if not SkipBlanks(c, endC) then
-  begin
-    Result := False;
-    Exit;
-  end;
-  c2 := c;
-  c := ParseNameLength(c, endC);
-  ToUTF8String(c2, c, attrib.Name);
+  Result := SkipBlanksEx(c, endC);
+  if Result >= endC then Exit;
+  c := Result;
+  Result := ParseNameLength(Result, endC);
+  ToUTF8String(c, Result, attrib.Name);
   attrib.hash := GetHash(attrib.Name);
-  Result := True;
 end;
 //------------------------------------------------------------------------------
 
-function TXmlEl.ParseAttribValue(var c: PUTF8Char;
-  endC: PUTF8Char; attrib: PSvgAttrib): Boolean;
+class function TXmlEl.ParseAttribValue(c, endC: PUTF8Char;
+  attrib: PSvgAttrib): PUTF8Char;
+// Parse: [Whitespaces] "=" [Whitespaces] ("'" | "\"") <string> ("'" | "\"")
 var
-  quoteChar : UTF8Char;
-  c2, c3: PUTF8Char;
+  quoteChar: UTF8Char;
+  c2: PUTF8Char;
 begin
-  Result := ParseNextChar(c, endC) = '=';
-  if not Result then Exit;
-  quoteChar := ParseQuoteChar(c, endC);
-  if quoteChar = #0 then Exit;
-  //trim leading and trailing spaces
-  while (c < endC) and (c^ <= space) do inc(c);
-  c2 := c;
-  while (c < endC) and (c^ <> quoteChar) do inc(c);
-  c3 := c;
-  while (c3 > c2) and ((c3 -1)^ <= space) do 
-    dec(c3);
-  ToUTF8String(c2, c3, attrib.value);
-  inc(c); //skip end quote
+  Result := endC;
+
+  // ParseNextChar:
+  c := SkipBlanksEx(c, endC);
+  if (c >= endC) or (c^ <> '=') then Exit;
+  inc(c); // '=' parsed
+
+  // ParseQuoteChar:
+  c := SkipBlanksEx(c, endC);
+  if c >= endC then Exit;
+  quoteChar := c^;
+  if not (quoteChar in [quote, dquote]) then Exit;
+  inc(c); // quote parsed
+
+  //trim leading and trailing spaces in the actual value
+  c := SkipBlanksEx(c, endC);
+  // find value end
+  Result := c;
+  while (Result < endC) and (Result^ <> quoteChar) do inc(Result);
+  c2 := Result;
+  while (c2 > c) and ((c2 -1)^ <= space) do dec(c2);
+
+  ToUTF8String(c, c2, attrib.value);
+  inc(Result); //skip end quote
+end;
+//------------------------------------------------------------------------------
+
+class function TXmlEl.ParseAttribNameAndValue(c, endC: PUTF8Char; attrib: PSvgAttrib): PUTF8Char;
+begin
+  Result := ParseAttribName(c, endC, attrib);
+  if (Result < endC) then
+    Result := ParseAttribValue(Result, endC, attrib);
 end;
 //------------------------------------------------------------------------------
 
@@ -1818,8 +1835,8 @@ begin
     end;
 
     attrib := NewSvgAttrib();
-    if not ParseAttribName(c, endC, attrib) or
-      not ParseAttribValue(c, endC, attrib) then
+    c := ParseAttribNameAndValue(c, endC, attrib);
+    if c >= endC then
     begin
       Dispose(attrib);
       Exit;
@@ -1917,7 +1934,7 @@ function TXmlEl.ParseContent(var c: PUTF8Char; endC: PUTF8Char): Boolean;
 var
   child: TSvgTreeEl;
   entity: PSvgAttrib;
-  c2, tmpC, tmpEndC: PUTF8Char;
+  c2, cc, tmpC, tmpEndC: PUTF8Char;
 begin
   Result := false;
   while SkipBlanks(c, endC) do
@@ -1928,43 +1945,47 @@ begin
       case c^ of
         '!':
           begin
-            if Match(c, '!--') then             //start comment
+            cc := c;
+            if Match(cc, '!--') then             //start comment
             begin
-              inc(c, 3);
-              while (c < endC) and ((c^ <> '-') or
-                not Match(c, '-->')) do inc(c); //end comment
-              inc(c, 3);
+              inc(cc, 3);
+              while (cc < endC) and ((cc^ <> '-') or
+                not Match(cc, '-->')) do inc(cc); //end comment
+              inc(cc, 3);
             end else
             begin
               //it's very likely <![CDATA[
-              c2 := c - 1;
-              if Match(c, '![cdata[') then
+              c2 := cc - 1;
+              if Match(cc, '![cdata[') then
               begin
-                while (c < endC) and ((c^ <> ']') or not Match(c, ']]>')) do
-                  inc(c);
-                ToUTF8String(c2, c, text);
-                inc(c, 3);
+                while (cc < endC) and ((cc^ <> ']') or not Match(cc, ']]>')) do
+                  inc(cc);
+                ToUTF8String(c2, cc, text);
+                inc(cc, 3);
                 if (hash = hStyle) then
                   ParseStyleElementContent(text, owner.classStyles);
               end else
               begin
-                while (c < endC) and (c^ <> '<') do inc(c);
-                ToUTF8String(c2, c, text);
+                while (cc < endC) and (cc^ <> '<') do inc(cc);
+                ToUTF8String(c2, cc, text);
               end;
             end;
+            c := cc;
           end;
         '/', '?':
           begin
             //element closing tag
-            inc(c);
-            if Match(c, name) then
+            cc := c;
+            inc(cc);
+            if Match(cc, name) then
             begin
-              inc(c, Length(name));
+              inc(cc, Length(name));
               //very rarely there's a space before '>'
-              SkipBlanks(c, endC);
-              Result := c^ = '>';
-              inc(c);
+              cc := SkipBlanksEx(cc, endC);
+              Result := cc^ = '>';
+              inc(cc);
             end;
+            c := cc;
             Exit;
           end;
         else
@@ -1993,24 +2014,28 @@ begin
       //text content: and because text can be mixed with one or more
       //<tspan> elements we need to create sub-elements for each text block.
       //And <tspan> elements can even have <tspan> sub-elements.
-      tmpC := c;
+      cc := c;
+      tmpC := cc;
       //preserve a leading space
       if (tmpC -1)^ = space then dec(tmpC);
-      while (c < endC) and (c^ <> '<') do inc(c);
+      while (cc < endC) and (cc^ <> '<') do inc(cc);
       if (hash = hTextPath) then
       begin
-        ToUTF8String(tmpC, c, text);
+        ToUTF8String(tmpC, cc, text);
       end else
       begin
         child := TSvgTreeEl.Create(owner);
         childs.Add(child);
-        ToUTF8String(tmpC, c, child.text);
+        ToUTF8String(tmpC, cc, child.text);
       end;
+      c := cc;
     end else
     begin
-      tmpC := c;
-      while (c < endC) and (c^ <> '<') do inc(c);
-      ToUTF8String(tmpC, c, text);
+      cc := c;
+      tmpC := cc;
+      while (cc < endC) and (cc^ <> '<') do inc(cc);
+      ToUTF8String(tmpC, cc, text);
+      c := cc;
 
       //if <style> element then load styles into owner.classStyles
       if (hash = hStyle) then
@@ -2047,7 +2072,10 @@ begin
     end;
     inc(c, 8);
     attrib := NewSvgAttrib();
-    if not ParseAttribName(c, endC, attrib) then break;
+
+    c := ParseAttribName(c, endC, attrib);
+    if c >= endC then break;
+
     SkipBlanks(c, endC);
     if not IsQuoteChar(c^) then break;
     if not ParseQuotedString(c, endC, attrib.value) then break;
