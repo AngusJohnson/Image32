@@ -1848,7 +1848,7 @@ var
   i: integer;
 begin
   for i := 0 to attribs.Count -1 do
-    DisposeSvgAttrib(PSvgAttrib(attribs[i]));
+    DisposeSvgAttrib(PSvgAttrib(attribs.List[i]));
   attribs.Clear;
 
   for i := 0 to childs.Count -1 do
@@ -2313,11 +2313,10 @@ var
 begin
   //there are usually so few, that there seems little point sorting etc.
   for i := 0 to docType.attribs.Count -1 do
-    if PSvgAttrib(docType.attribs[i]).hash = hash then
-    begin
-      Result := PSvgAttrib(docType.attribs[i]);
-      Exit;
-    end;
+  begin
+    Result := PSvgAttrib(docType.attribs.List[i]);
+    if Result.hash = hash then Exit;
+  end;
   Result := nil;
 end;
 //------------------------------------------------------------------------------
