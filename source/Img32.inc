@@ -42,6 +42,7 @@
   {$DEFINE PBYTE}
   {$DEFINE NEWPOSFUNC}
   {$DEFINE SUPPORTS_POINTERMATH}
+  {$DEFINE CLASS_STATIC}
   {.$DEFINE UITYPES}
   {$DEFINE NESTED_TYPES}
   {$IFNDEF DEBUG}
@@ -79,6 +80,7 @@
           {$DEFINE EXIT_PARAM}                    //added Exit(value)
           {$DEFINE ALPHAFORMAT}                   //added TBitmap.AlphaFormat property
           {$DEFINE SUPPORTS_POINTERMATH}          //added {$POINTERMATH ON/OFF}
+          {$DEFINE CLASS_STATIC}                  //added class static methods
           {$IF COMPILERVERSION >= 21}           //Delphi 2010
             {$DEFINE GESTURES}                    //added screen gesture support
             {$IF COMPILERVERSION >= 23}         //DelphiXE2

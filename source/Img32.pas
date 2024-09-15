@@ -732,7 +732,7 @@ end;
 function InternSetSimpleDynArrayLengthUninit(a: Pointer; count: nativeint; elemSize: integer): Pointer;
 var
   p: PDynArrayRec;
-  oldCount: integer;
+  oldCount: nativeint;
 begin
   if a = nil then
     Result := NewSimpleDynArray(count, elemSize)
@@ -761,7 +761,8 @@ begin
       // SetLength makes a copy of the dyn array to get RefCnt=1
       GetMem(Pointer(p), SizeOf(TDynArrayRec) + count * elemSize);
       if oldCount < 0 then oldCount := 0; // data corruption detected
-      Move(a^, p.Data, Min(oldCount, count) * elemSize);
+      if oldCount > count then oldCount := count;
+      Move(a^, p.Data, oldCount * elemSize);
       TArrayOfByte(a) := nil; // use a non-managed dyn.array type
     end;
 

@@ -76,7 +76,7 @@ type
 {$ENDIF}
     fId             : UTF8String;
     fDrawData       : TDrawData;    //currently both static and dynamic vars
-    function  FindRefElement(refname: UTF8String): TBaseElement;
+    function  FindRefElement(const refname: UTF8String): TBaseElement;
     function GetChildCount: integer;
     function GetChild(index: integer): TBaseElement;
     function FindChild(const idName: UTF8String): TBaseElement;
@@ -3774,7 +3774,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TBaseElement.FindRefElement(refname: UTF8String): TBaseElement;
+function TBaseElement.FindRefElement(const refname: UTF8String): TBaseElement;
 var
   i, len: integer;
   c, endC: PUTF8Char;
@@ -3791,7 +3791,7 @@ begin
     dec(endC); //removes trailing ')'
   end;
   if c^ = '#' then inc(c);
-  ref := ToUTF8String(c, endC);
+  ToUTF8String(c, endC, ref);
   i := fReader.fIdList.IndexOf(string(ref));
   if i >= 0 then
     Result := TBaseElement(fReader.fIdList.Objects[i]) else
@@ -3854,14 +3854,14 @@ procedure BaselineShift_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
 var
   mu: TUnitType;
   val: double;
-  word: UTF8String;
+  hash: cardinal;
   c, endC: PUTF8Char;
 begin
   c := PUTF8Char(value);
   endC := c + Length(value);
-  ParseNextWord(c, endC, word);
+  hash := ParseNextWordHash(c, endC);
   with aOwnerEl.fDrawData.FontInfo do
-    case GetHash(word) of
+    case hash of
       hSuper: baseShift.SetValue(50, utPercent);
       hSub: baseShift.SetValue(-50, utPercent);
       hBaseline: baseShift.SetValue(0, utPixel);
@@ -3996,7 +3996,7 @@ end;
 
 procedure FontFamily_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
 var
-  word: UTF8String;
+  hash: cardinal;
   c, endC: PUTF8Char;
 begin
   with aOwnerEl.fDrawData.FontInfo do
@@ -4004,9 +4004,9 @@ begin
     family := ttfUnknown;
     c := PUTF8Char(value);
     endC := c + Length(value);
-    while ParseNextWordEx(c, endC, word) do
+    while ParseNextWordExHash(c, endC, hash) do
     begin
-      case GetHash(word) of
+      case hash of
         hSans_045_Serif, hArial  : family := ttfSansSerif;
         hSerif, hTimes: family := ttfSerif;
         hMonospace: family := ttfMonospace;
@@ -4039,10 +4039,9 @@ end;
 //------------------------------------------------------------------------------
 
 procedure FontWeight_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
-
 var
   num: double;
-  word: UTF8String;
+  hash: cardinal;
   c, endC: PUTF8Char;
 begin
   c := PUTF8Char(value);
@@ -4052,8 +4051,8 @@ begin
     if IsNumPending(c, endC, false) and
       ParseNextNum(c, endC, false, num) then
         weight := Round(num)
-    else if ParseNextWord(c, endC, word) then
-      case GetHash(word) of
+    else if ParseNextWordHash(c, endC, hash) then
+      case hash of
         hBold   : weight := 600;
         hNormal : weight := 400;
         hBolder : if weight >= 0 then weight := Min(900, weight + 200)
@@ -4242,14 +4241,14 @@ end;
 
 procedure StrokeLineCap_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
 var
-  word: UTF8String;
+  hash: cardinal;
   c, endC: PUTF8Char;
 begin
   c := PUTF8Char(value);
   endC := c + Length(value);
-  ParseNextWord(c, endC, word);
+  hash := ParseNextWordHash(c, endC);
   with aOwnerEl.fDrawData do
-    case GetHash(word) of
+    case hash of
       hButt   : strokeCap := esButt;
       hRound  : strokeCap := esRound;
       hSquare : strokeCap := esSquare;
@@ -4259,14 +4258,14 @@ end;
 
 procedure StrokeLineJoin_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
 var
-  word: UTF8String;
+  hash: cardinal;
   c, endC: PUTF8Char;
 begin
   c := PUTF8Char(value);
   endC := c + Length(value);
-  ParseNextWord(c, endC, word);
+  hash := ParseNextWordHash(c, endC);
   with aOwnerEl.fDrawData do
-    case GetHash(word) of
+    case hash of
       hMiter  : strokeJoin := jsMiter;
       hRound  : strokeJoin := jsRound;
       hBevel  : strokeJoin := jsSquare;
@@ -4557,15 +4556,15 @@ end;
 
 procedure SpreadMethod_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
 var
-  word: UTF8String;
+  hash: cardinal;
   c, endC: PUTF8Char;
 begin
   if not (aOwnerEl is TGradientElement) then Exit;
   c := PUTF8Char(value);
   endC := c + Length(value);
-  ParseNextWord(c, endC, word);
+  hash := ParseNextWordHash(c, endC);
   with TGradientElement(aOwnerEl) do
-    case GetHash(word) of
+    case hash of
       hPad      : spreadMethod := gfsClamp;
       hReflect  : spreadMethod := gfsMirror;
       hRepeat   : spreadMethod := gfsRepeat;
