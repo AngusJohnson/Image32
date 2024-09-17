@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.5                                                             *
-* Date      :  17 July 2024                                                    *
+* Date      :  18 September 2024                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -836,13 +836,10 @@ begin
     c2 := cc;
     inc(cc);
     while cc < endC do
-    begin
       case cc^ of
         'A'..'Z', 'a'..'z', '-', '_': inc(cc);
         else break;
       end;
-      inc(cc);
-    end;
     hash := GetHash(c2, cc - c2);
   end;
   c := cc;
