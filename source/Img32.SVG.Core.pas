@@ -2,7 +2,7 @@ unit Img32.SVG.Core;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.5                                                             *
+* Version   :  4.6                                                             *
 * Date      :  18 September 2024                                               *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
@@ -446,6 +446,7 @@ begin
     Result := 1 else
     Result := sx;
 end;
+//------------------------------------------------------------------------------
 
 function ClampRange(val, min, max: double): double;
   {$IFDEF INLINE} inline; {$ENDIF}
@@ -482,7 +483,8 @@ begin
       end;
 
       case Ch1 of
-        'A'..'Z': ch1 := UTF8Char(Ord(ch1) xor $20); // toggle upper/lower
+        'A'..'Z', 'a'..'z':
+          ch1 := UTF8Char(Ord(ch1) xor $20); // toggle upper/lower
       end;
 
       if Ch1 <> Ch2 then

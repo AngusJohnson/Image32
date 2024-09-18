@@ -11,7 +11,7 @@
 // function is 'BoxDownSampling'. When downsampling, this function generally produces much
 // clearer images than general purpose resamplers (which are much better at upsampling,
 // and doing other affine transformations). However, if for some reason you do wish to use
-// a general purpose resampler while downsampling, then disable this define.
+// a general purpose resampler while downsampling, then comment out (ie disable) this define.
 {$DEFINE USE_DOWNSAMPLER_AUTOMATICALLY}
 
 // The SimplifyPath and SimplifyPaths functions have changed. Specifically the last 
