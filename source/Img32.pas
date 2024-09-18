@@ -31,6 +31,13 @@ type
   {$IF not declared(NativeInt)}
   NativeInt = Integer;
   {$IFEND}
+  {$IF not declared(SizeInt)} // FPC has SizeInt
+    {$IF CompilerVersion < 120}
+  SizeInt = Integer; // Delphi 7-2007 can't use NativeInt with "FOR"
+    {$ELSE}
+  SizeInt = NativeInt;
+    {$IFEND}
+  {$IFEND}
 
   TRect = Types.TRect;
   TColor32 = type Cardinal;
@@ -171,6 +178,8 @@ type
 
   TResamplerFunction = function(img: TImage32; x, y: double): TColor32;
 
+  TGrayscaleMode = (gsmSaturation, gsmLinear, gsmColorimetric);
+
   TImage32 = class(TObject)
   private
     fWidth: integer;
@@ -304,7 +313,8 @@ type
     procedure SetRGB(rgbColor: TColor32); overload;
     procedure SetRGB(rgbColor: TColor32; rec: TRect); overload;
     //Grayscale: Only changes color channels. The alpha channel is untouched.
-    procedure Grayscale;
+    procedure Grayscale(mode: TGrayscaleMode = gsmSaturation;
+      linearAmountPercentage: double = 1.0);
     procedure InvertColors;
     procedure InvertAlphas;
     procedure AdjustHue(percent: Integer);         //ie +/- 100%
@@ -3761,9 +3771,81 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.Grayscale;
+procedure TImage32.Grayscale(mode: TGrayscaleMode;
+  linearAmountPercentage: double);
+var
+  i: SizeInt;
+  cLinear: double;
+  c, lastC, grayC: TColor32;
+  p: PStaticColor32Array;
+  amountCalc: Boolean;
+  oneMinusAmount: double;
 begin
-  AdjustSaturation(-100);
+  if mode = gsmSaturation then
+  begin
+    // linearAmountPercentage has no effect here
+    AdjustSaturation(-100);
+    Exit;
+  end;
+
+  // Colorimetric (perceptual luminance-preserving) conversion to grayscale
+  // See https://en.wikipedia.org/wiki/Grayscale#Converting_color_to_grayscale
+  if IsEmpty then Exit;
+
+  if linearAmountPercentage <= 0.0 then Exit;
+  amountCalc := linearAmountPercentage < 1.0;
+  oneMinusAmount := 1.0 - linearAmountPercentage;
+
+  p := PStaticColor32Array(PixelBase);
+  lastC := 0;
+  grayC := 0;
+  for i := 0 to high(fPixels) do
+  begin
+    c := p[i] and $00FFFFFF;
+    if c <> 0 then
+    begin
+      if c <> lastC then // only do the calculation if the color channels changed
+      begin
+        lastC := c;
+        {$IF DEFINED(ANDROID)}
+        c := SwapRedBlue(c);
+        {$IFEND}
+
+        // We don't divide by 255 here, so can skip some division and multiplications.
+        // That means cLinear is actually "cLinear * 255"
+        cLinear := (0.2126 * Byte(c shr 16)) + (0.7152 * Byte(c shr 8)) + (0.0722 * Byte(c));
+        //cLinear := (0.2126 * TARGB(c).R) + (0.7152 * TARGB(c).G) + (0.0722 * TARGB(c).B);
+
+        if mode = gsmLinear then
+          c := ClampByte(cLinear)
+        else //if mode = gsmColorimetric then
+        begin
+          if cLinear <= (0.0031308 * 255) then // adjust for cLinear being "cLiniear * 255"
+            c := ClampByte(Integer(Round(12.92 * cLinear)))
+          else // for Power we must divide by 255 and then later multipy by 255
+            //c := ClampByte(Integer(Round((1.055 * 255) * Power(cLinear / 255, 1/2.4) - (0.055 * 255))));
+        end;
+
+
+        if not amountCalc then
+          grayC := (c shl 16) or (c shl 8) or c
+        else
+        begin
+          cLinear := c * linearAmountPercentage;
+          grayC := ClampByte(Integer(Round(Byte(lastC shr 16) * oneMinusAmount + cLinear))) shl 16 or
+                   ClampByte(Integer(Round(Byte(lastC shr  8) * oneMinusAmount + cLinear))) shl  8 or
+                   ClampByte(Integer(Round(Byte(lastC       ) * oneMinusAmount + cLinear)));
+        end;
+
+        {$IF DEFINED(ANDROID)}
+        grayC := SwapRedBlue(grayC);
+        {$IFEND}
+      end;
+      p[i] := (p[i] and $FF000000) or grayC;
+    end;
+  end;
+
+  Changed;
 end;
 //------------------------------------------------------------------------------
 
