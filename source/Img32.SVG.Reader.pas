@@ -2136,7 +2136,7 @@ var
 begin
   if not GetSrcAndDst or not Assigned(values) then Exit;
   for i := 0 to 19 do
-    colorMatrix[i] := ClampByte(Round(values[i]*255));
+    colorMatrix[i] := ClampByte(Integer(Round(values[i]*255)));
 
   dx1 := srcImg.Width - RectWidth(srcRec);
   dx2 := dstImg.Width - RectWidth(dstRec);

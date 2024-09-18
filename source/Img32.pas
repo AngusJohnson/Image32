@@ -1944,7 +1944,7 @@ begin
   c := ((255 - abs(2 * hsl.lum - 255)) * hsl.sat) shr 8;
   a := 252 - (hsl.hue mod 85) * 6;
   x := (c * (255 - abs(a))) shr 8;
-  m := hsl.lum - c div 2;
+  m := hsl.lum - c shr 1{div 2}; // Delphi's 64bit compiler can't optimize this
   rgba.A := hsl.alpha;
   case (hsl.hue * 6) shr 8 of
     0: begin rgba.R := c + m; rgba.G := x + m; rgba.B := 0 + m; end;
@@ -4019,7 +4019,7 @@ begin
   pb := PARGB(PixelBase);
   for i := 0 to Width * Height - 1 do
   begin
-    pb.A := ClampByte(Round(pb.A * scale));
+    pb.A := ClampByte(Integer(Round(pb.A * scale)));
     inc(pb);
   end;
   Changed;

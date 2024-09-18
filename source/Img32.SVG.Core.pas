@@ -1630,10 +1630,10 @@ begin
     if ParseNextChar(c, endC) <> ')' then Exit;
     for i := 0 to 3 do if IsFraction(vals[i]) then
       vals[i] := vals[i] * 255;
-    color := ClampByte(Round(vals[3])) shl 24 +
-      ClampByte(Round(vals[0])) shl 16 +
-      ClampByte(Round(vals[1])) shl 8 +
-      ClampByte(Round(vals[2]));
+    color := ClampByte(Integer(Round(vals[3]))) shl 24 +
+      ClampByte(Integer(Round(vals[0]))) shl 16 +
+      ClampByte(Integer(Round(vals[1]))) shl 8 +
+      ClampByte(Integer(Round(vals[2])));
   end
   else if (c^ = '#') then           //#RRGGBB or #RGB
   begin
