@@ -528,7 +528,8 @@ begin
       end;
 
       case Ch1 of
-        'A'..'Z': ch1 := UTF8Char(Ord(ch1) xor $20); // toggle upper/lower
+        'A'..'Z', 'a'..'z':
+          ch1 := UTF8Char(Ord(ch1) xor $20); // toggle upper/lower
       end;
 
       if Ch1 <> Ch2 then
@@ -676,6 +677,7 @@ begin
     begin
       inComment := (ch = '/') and ((c +1)^ = '*');
       if not inComment then break;
+      inc(c);
     end;
     inc(c);
   end;
