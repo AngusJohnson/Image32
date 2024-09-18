@@ -3851,39 +3851,35 @@ end;
 
 procedure TImage32.InvertColors;
 var
-  pc: PARGB;
-  i: Integer;
+  pc: PStaticColor32Array;
+  i: SizeInt;
 begin
-  pc := PARGB(PixelBase);
+  pc := PStaticColor32Array(PixelBase);
   for i := 0 to Width * Height -1 do
-  begin
-    pc.Color := pc.Color xor $00FFFFFF; // keep the alpha channel untouched
-    inc(pc);
-  end;
+    pc[i] := pc[i] xor $00FFFFFF; // keep the alpha channel untouched
   Changed;
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.InvertAlphas;
 var
-  pc: PARGB;
-  i: Integer;
+  pc: PStaticColor32Array;
+  i: SizeInt;
 begin
-  pc := PARGB(PixelBase);
+  pc := PStaticColor32Array(PixelBase);
   for i := 0 to Width * Height -1 do
-  begin
-    pc.A := 255 - pc.A;
-    inc(pc);
-  end;
+    pc[i] := pc[i] xor $FF000000; // keep the color channels untouched
   Changed;
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.AdjustHue(percent: Integer);
 var
-  i: Integer;
+  i: SizeInt;
   hsl: THsl;
   lut: array [byte] of byte;
+  c, lastC, newC: TColor32;
+  p: PStaticColor32Array;
 begin
   percent := percent mod 100;
   if percent < 0 then inc(percent, 100);
@@ -3891,11 +3887,24 @@ begin
   if (percent = 0) or IsEmpty then Exit;
   for i := 0 to 255 do lut[i] := (i + percent) mod 255;
 
+  lastC := 0;
+  newC := 0;
+  p := PStaticColor32Array(fPixels);
   for i := 0 to high(fPixels) do
   begin
-    hsl := RgbToHsl(fPixels[i]);
-    hsl.hue := lut[ hsl.hue ];
-    fPixels[i] := HslToRgb(hsl);
+    c := p[i];
+    c := c and $00FFFFFF;
+    if c <> 0 then
+    begin
+      if c <> lastC then // only do the calculation if the color channels changed
+      begin
+        lastC := C;
+        hsl := RgbToHsl(c);
+        hsl.hue := lut[hsl.hue];
+        newC := HslToRgb(hsl);
+      end;
+      p[i] := (p[i] and $FF000000) or newC; // keep the alpha channel
+    end;
   end;
 
   Changed;
@@ -3904,10 +3913,12 @@ end;
 
 procedure TImage32.AdjustLuminance(percent: Integer);
 var
-  i: Integer;
+  i: SizeInt;
   hsl: THsl;
   pc: double;
   lut: array [byte] of byte;
+  c, lastC, newC: TColor32;
+  p: PStaticColor32Array;
 begin
   if (percent = 0) or IsEmpty then Exit;
   percent := percent mod 101;
@@ -3917,11 +3928,24 @@ begin
   else
     for i := 0 to 255 do lut[i] := Round(i + (i * pc));
 
+  lastC := 0;
+  newC := 0;
+  p := PStaticColor32Array(fPixels);
   for i := 0 to high(fPixels) do
   begin
-    hsl := RgbToHsl(fPixels[i]);
-    hsl.lum := lut[ hsl.lum ];
-    fPixels[i] := HslToRgb(hsl);
+    c := p[i];
+    c := c and $00FFFFFF;
+    if c <> 0 then
+    begin
+      if c <> lastC then // only do the calculation if the color channels changed
+      begin
+        lastC := C;
+        hsl := RgbToHsl(c);
+        hsl.lum := lut[hsl.lum];
+        newC := HslToRgb(hsl);
+      end;
+      p[i] := (p[i] and $FF000000) or newC; // keep the alpha channel
+    end;
   end;
 
   Changed;
@@ -3930,10 +3954,12 @@ end;
 
 procedure TImage32.AdjustSaturation(percent: Integer);
 var
-  i: Integer;
+  i: SizeInt;
   hsl: THsl;
   lut: array [byte] of byte;
   pc: double;
+  c, lastC, newC: TColor32;
+  p: PStaticColor32Array;
 begin
   if (percent = 0) or IsEmpty then Exit;
   percent := percent mod 101;
@@ -3943,12 +3969,24 @@ begin
   else
     for i := 0 to 255 do lut[i] := Round(i + (i * pc));
 
-  // Do the conversion inline without creating new pixel/hsl arrays
+  lastC := 0;
+  newC := 0;
+  p := PStaticColor32Array(fPixels);
   for i := 0 to high(fPixels) do
   begin
-    hsl := RgbToHsl(fPixels[i]);
-    hsl.sat := lut[ hsl.sat ];
-    fPixels[i] := HslToRgb(hsl);
+    c := p[i];
+    c := c and $00FFFFFF;
+    if c <> 0 then
+    begin
+      if c <> lastC then // only do the calculation if the color channels changed
+      begin
+        lastC := C;
+        hsl := RgbToHsl(c);
+        hsl.sat := lut[hsl.sat];
+        newC := HslToRgb(hsl);
+      end;
+      p[i] := (p[i] and $FF000000) or newC; // keep the alpha channel
+    end;
   end;
 
   Changed;
