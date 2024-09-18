@@ -69,7 +69,7 @@ begin
   <div class="code">
     <pre class="brush: delphi;">
   uses Img32, Img32.Vector, 
-	Img32.Fmt.PNG, Img32.Transform;
+  Img32.Fmt.PNG, Img32.Transform;
   ...
   var
     img: TImage32;
@@ -82,7 +82,7 @@ begin
     dst[1].Y := img.Height div 8;
     dst[2].Y := img.Height * 7 div 8;
     if ProjectiveTransform(img, src, dst, NullRect) then
-	  img.SaveToFile('c:\temp\clouds_proj.png');
+    img.SaveToFile('c:\temp\clouds_proj.png');
     img.Free;
   end;
     </pre>
@@ -106,7 +106,7 @@ begin
         img := TImage32.Create;
         img.SetSize(256,256);
         rec := img.Bounds;
-        rec := Img32.Vector.InflateRect(rec, -50,-50);
+        Img32.Vector.InflateRect(rec, -50,-50);
 
         //draw a gradient filled star
         path := Star(PointD(128, 128), 50, 100, 7);
@@ -129,23 +129,26 @@ begin
   <div class="code">
     <pre class="brush: delphi;">
   uses Img32, Img32.Fmt.PNG, Img32.Text, 
-	Img32.Vector, Img32.Draw, Img32.Extra;
-	
-	...
+  Img32.Vector, Img32.Draw, Img32.Extra;
+  
+  ...
   var
-	  img: TImage32;
-	  textOutline: TPathsD;
-	  impactFont: TFontReader;
-	  impact48: TFontCache;
+    img: TImage32;
+    textOutline: TPathsD;
+    impactFont: TFontReader;
+    impact96: TFontCache;
   begin
-	  img := TImage32.Create(400,150);
-	  //Load Windows' Impact TTF font
+    img := TImage32.Create(400,150);
+    // Instruct the font manager to load 
+    // the Windows' Impact TTF font
     FontManager.Load('Impact', 800);
+    // and then get the TFontReader for this font
     impactFont := FontManager.GetFont('Impact'); 
-	  impact48 := TFontCache.Create(impactFont, DpiAware(48));
+    // create character outlines using font size 96
+    impact96 := TFontCache.Create(impactFont, DpiAware(96));
     try
       textOutline := 
-        impact48.GetTextGlyphs(20, 130, 'Image32');
+        impact96.GetTextOutline(20, 130, 'Image32');
       //draw textOutline using shadow &amp; 3D effects
       DrawShadow(img, textOutline, frNonZero, 3);
       DrawPolygon(img, textOutline, frNonZero, $FF00DD00);
@@ -154,8 +157,7 @@ begin
       img.SaveToFile('c:\temp\Image32.png');
     finally
       img.Free;
-      impact48.Free;
-      //impactFont.Free; //managed by FontManager
+      impact96.Free;
     end;
   end;
     </pre>
@@ -185,7 +187,7 @@ begin
   <p> Otherwise use the accompanying <a href="Img32.Panels/_Body.htm"><b>Img32.Panels</b></a> unit which contains the TImage32Panel component. </p>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="_Body.htm"><b>Index</b></a>, <a href="Img32.Panels/_Body.htm">Img32.Panels</a>, <a href="Units/Img32.Draw/_Body.htm">Img32.Draw</a>, <a href="Units/Img32.Draw/Routines/DrawDashedLine.htm">DrawDashedLine</a>, <a href="Units/Img32.Draw/Routines/DrawLine.htm">DrawLine</a>, <a href="Units/Img32.Draw/Routines/DrawPolygon.htm">DrawPolygon</a>, <a href="Units/Img32.Vector/_Body.htm">Img32.Vector</a>, <a href="Units/Img32/Classes/TImage32/_Body.htm">TImage32</a></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 2 May 2024 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.6&nbsp; - &nbsp;Help file built on 18 Sep 2024 <br><br> </p>
 
 </body>
 </html>

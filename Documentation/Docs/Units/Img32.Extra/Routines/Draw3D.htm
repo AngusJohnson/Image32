@@ -19,33 +19,37 @@
   <p>Creates a 3D effect over polygons using light and dark shading. The amount of shading is determined by the height and blurRadius parameters. The colors of the light and dark shading and the shading angle can all be customized, as can the light-to-dark angle. <span class="monobold">angleRads</span> indicates the angle of the light shading relative to the image's center.</p>
   <div class="code">
     <pre class="brush: delphi;">
-  uses Img32, Img32.Fmt.PNG, Img32.Text, 
-    Img32.Draw, Img32.Extra;
+uses Img32, Img32.Fmt.PNG, Img32.Text, 
+  Img32.Vector, Img32.Draw, Img32.Extra;
+  
   ...
   var
     img: TImage32;
-    startPt, endPt: TPointD;
-    paths: TPathsD;
-    lf: TLogFont;
-    fi: TFontInfo;
+    textOutline: TPathsD;
+    impactFont: TFontReader;
+    impact96: TFontCache;
   begin
-    lf := DefaultLogfont;
-    lf.lfFaceName := 'Impact';
-    lf.lfHeight := -96;
-    fi := GetFontInfo(lf);
-
-    startPt := PointD(20, 130);
     img := TImage32.Create(400,150);
-    paths := GetTextOutline(startPt.X, startPt.Y, 
-      'Img32', fi, taLeft, endPt);
-    DrawShadow(img, paths, frNonZero, 4);
-    
-    DrawPolygon(img, paths, frNonZero, $FF00DD00);
-    Draw3D(img, paths, frNonZero, 3, 4);
-    DrawLine(img, paths, 1, clBlack32, esPolygon);
-
-    img.SaveToFile('Img32.text.png');
-    img.Free;
+    // Instruct the font manager to load 
+    // the Windows' Impact TTF font
+    FontManager.Load('Impact', 800);
+    // and then get the TFontReader for this font
+    impactFont := FontManager.GetFont('Impact'); 
+    // create character outlines using font size 96
+    impact96 := TFontCache.Create(impactFont, DpiAware(96));
+    try
+      textOutline := 
+        impact96.GetTextOutline(20, 130, 'Image32');
+      //draw textOutline using shadow &amp; 3D effects
+      DrawShadow(img, textOutline, frNonZero, 3);
+      DrawPolygon(img, textOutline, frNonZero, $FF00DD00);
+      Draw3D(img, textOutline, frNonZero, 3,4);
+      DrawLine(img, textOutline, 1, clBlack32, esPolygon);
+      img.SaveToFile('c:\temp\Image32.png');
+    finally
+      img.Free;
+      impact96.Free;
+    end;
   end;
     </pre>
   </div>
@@ -67,7 +71,7 @@
 
   <div>shadow, polygon, line and Draw3D
   </div>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 2 May 2024 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.6&nbsp; - &nbsp;Help file built on 18 Sep 2024 <br><br> </p>
 
 </body>
 

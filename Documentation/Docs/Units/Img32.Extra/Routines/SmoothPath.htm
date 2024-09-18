@@ -15,7 +15,7 @@
   <h1>SmoothPath</h1>
   <p class="Decl"><b>procedure</b> SmoothPath(<b>const</b> points: TPathD; isClosedPath: Boolean; tension: double = <span class="Number">0</span>; shapeTolerance: double = <span class="Number">0.1</span>): TPathD;</p><br class="half">
 
-  <p> This function performs bicubic interpolation to convert discrete points in a path into an approximation of a smooth curve. Paths may be open or closed.<br><br> <span class="monobold">tension</span>: the relative weighting toward linear interpolation with -1 indicating least tension (maximum curve smoothing) and +1 indicating most tension (no curve smoothing).<br><br> <span class="monobold">shapeTolerance</span>: the minimum distance a vertex can be from an imaginary line drawn between its two adjacent vertices (see <a href="SimplifyPaths.htm">SimplifyPaths</a>).<br> </p>
+  <p> This function performs bicubic interpolation to convert discrete points in a path into a close approximation of a smooth curve. Paths may be open or closed.<br><br> <span class="monobold">tension</span>: Range between -1 and 1 where -1 will produce the most curving, and +1 will produce the least (ie virtually no) curving.<br><br> <span class="monobold">shapeTolerance</span>: the minimum distance a vertex can be from an imaginary line drawn between its two adjacent vertices (see <a href="SimplifyPaths.htm">SimplifyPaths</a>).<br> </p>
   <div class="code">
     <pre class="brush: delphi;">
 uses Img32, Img32.Fmt.PNG, Img32.Draw, Img32.Extra;
@@ -92,7 +92,7 @@ begin
   </div>
   <h2 id="Auto-SeeAlso">See Also</h2>
   <p class="Body"><a href="SimplifyPaths.htm">SimplifyPaths</a></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.4&nbsp; - &nbsp;Help file built on 2 May 2024 <br><br> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.6&nbsp; - &nbsp;Help file built on 18 Sep 2024 <br><br> </p>
 
 </body>
 
