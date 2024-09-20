@@ -2539,7 +2539,8 @@ begin
   end
   else if drawDat.fillColor = clInvalid then
   begin
-    DrawPolygon(img, fillPaths, drawDat.fillRule, clBlack32,
+    DrawPolygon(img, fillPaths, drawDat.fillRule,
+      MergeColorAndOpacity(clBlack32, drawDat.fillOpacity),
       fReader.fCustomRendererCache);
   end
   else
