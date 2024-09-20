@@ -106,7 +106,7 @@ type
   public
     procedure Reset; overload; {$IFDEF INLINE} inline; {$ENDIF}
     procedure Reset(c: TColor32; w: Integer = 1); overload; {$IFDEF INLINE} inline; {$ENDIF}
-    procedure Add(c: TColor32; w: Integer); overload;
+    procedure Add(c: TColor32; w: Integer); overload; {$IFDEF INLINE} inline; {$ENDIF}
     procedure Add(c: TColor32); overload; {$IFDEF INLINE} inline; {$ENDIF}
     procedure Add(const other: TWeightedColor); overload;
       {$IFDEF INLINE} inline; {$ENDIF}
@@ -1136,12 +1136,25 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TWeightedColor.Reset;
+{$IFDEF CPUX64}
+var
+  Zero: Int64;
+{$ENDIF CPUX64}
 begin
+  {$IFDEF CPUX64}
+  Zero := 0;
+  fAddCount := Zero;
+  fAlphaTot := Zero;
+  fColorTotR := Zero;
+  fColorTotG := Zero;
+  fColorTotB := Zero;
+  {$ELSE}
   fAddCount := 0;
   fAlphaTot := 0;
   fColorTotR := 0;
   fColorTotG := 0;
   fColorTotB := 0;
+  {$ENDIF CPUX64}
 end;
 //------------------------------------------------------------------------------
 
@@ -1178,12 +1191,15 @@ var
   a: Cardinal;
 begin
   inc(fAddCount, w);
-  a := w * Byte(c shr 24);
-  if a = 0 then Exit;
-  inc(fAlphaTot, a);
-  inc(fColorTotB, (a * Byte(c)));
-  inc(fColorTotG, (a * Byte(c shr 8)));
-  inc(fColorTotR, (a * Byte(c shr 16)));
+  a := Byte(c shr 24);
+  if (a <> 0) and (w <> 0) then
+  begin
+    a := Integer(a) * w;
+    inc(fAlphaTot, a);
+    inc(fColorTotB, (a * Byte(c)));
+    inc(fColorTotG, (a * Byte(c shr 8)));
+    inc(fColorTotR, (a * Byte(c shr 16)));
+  end;
 end;
 //------------------------------------------------------------------------------
 
