@@ -106,7 +106,15 @@ type
   public
     procedure Reset; overload; {$IFDEF INLINE} inline; {$ENDIF}
     procedure Reset(c: TColor32; w: Integer = 1); overload; {$IFDEF INLINE} inline; {$ENDIF}
-    procedure Add(c: TColor32; w: Integer); overload; {$IFDEF INLINE} inline; {$ENDIF}
+    procedure Add(c: TColor32; w: Integer); overload;
+      {$IFDEF FPC}
+        {$IFDEF INLINE} inline; {$ENDIF}
+      {$ELSE}
+        // Delphi 2006-2009 bug with INLINE ("incompatible type")
+        {$IF CompilerVersion > 20.0}
+          {$IFDEF INLINE} inline; {$ENDIF}
+        {$IFEND}
+      {$ENDIF}
     procedure Add(c: TColor32); overload; {$IFDEF INLINE} inline; {$ENDIF}
     procedure Add(const other: TWeightedColor); overload;
       {$IFDEF INLINE} inline; {$ENDIF}
@@ -1192,9 +1200,9 @@ var
 begin
   inc(fAddCount, w);
   a := Byte(c shr 24);
-  if (a <> 0) and (w <> 0) then
+  if a <> 0 then
   begin
-    a := Integer(a) * w;
+    a := a * Cardinal(w);
     inc(fAlphaTot, a);
     inc(fColorTotB, (a * Byte(c)));
     inc(fColorTotG, (a * Byte(c shr 8)));
