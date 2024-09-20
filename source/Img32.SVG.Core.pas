@@ -243,6 +243,7 @@ type
   procedure ToUTF8String(c, endC: PUTF8Char; var S: UTF8String);
   procedure ToAsciiLowerUTF8String(c, endC: PUTF8Char; var S: UTF8String);
   procedure ToTrimmedUTF8String(c, endC: PUTF8Char; var S: UTF8String);
+  function IsSameUTF8String(const S1, S2: UTF8String): Boolean;
 
   //special parsing functions //////////////////////////////////////////
   procedure ParseStyleElementContent(const value: UTF8String; stylesList: TClassStylesList);
@@ -2680,11 +2681,13 @@ begin
   end;
 end;
 //------------------------------------------------------------------------------
+
 procedure TClassStylesList.Preallocate(AdditionalItemCount: Integer);
 begin
   if AdditionalItemCount > 2 then
     Grow(Length(FItems) + AdditionalItemCount);
 end;
+//------------------------------------------------------------------------------
 
 function TClassStylesList.FindItemIndex(Hash: Cardinal; const Name: UTF8String): Integer;
 begin

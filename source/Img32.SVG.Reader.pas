@@ -62,6 +62,28 @@ type
     bounds        : TRectD;
   end;
 
+  PSvgIdNameHashMapItem = ^TSvgIdNameHashMapItem;
+  TSvgIdNameHashMapItem = record
+    Hash: Cardinal;
+    Next: Integer;
+    Name: UTF8String;
+    Element: TBaseElement;
+  end;
+
+  TSvgIdNameHashMap = class(TObject)
+  private
+    FItems: array of TSvgIdNameHashMapItem;
+    FBuckets: TArrayOfInteger;
+    FCount: Integer;
+    FMod: Cardinal;
+    procedure Grow;
+    function FindItemIndex(Hash: Cardinal; const Name: UTF8String): Integer;
+  public
+    procedure AddOrIgnore(const idName: UTF8String; element: TBaseElement);
+    function FindElement(const idName: UTF8String): TBaseElement;
+    procedure Clear;
+  end;
+
   TSvgReader = class;
 
   TBaseElement = class
@@ -116,7 +138,7 @@ type
     fBackgndImage     : TImage32;
     fTempImage        : TImage32;
     fBlurQuality      : integer;
-    fIdList           : TStringList;
+    fIdList           : TSvgIdNameHashMap;
     fClassStyles      : TClassStylesList;
     fLinGradRenderer  : TLinearGradientRenderer;
     fRadGradRenderer  : TSvgRadialGradientRenderer;
@@ -858,6 +880,110 @@ begin
       end;
     end;
   end;
+end;
+
+//------------------------------------------------------------------------------
+// TSvgIdNameHashMap
+//------------------------------------------------------------------------------
+
+procedure TSvgIdNameHashMap.Grow;
+var
+  Len, I: Integer;
+  Index: Integer;
+begin
+  Len := Length(FItems);
+  if Len < 5 then
+    Len := 5
+  else
+    Len := Len * 2;
+
+  SetLength(FItems, Len);
+  FMod := Cardinal(Len);
+  if not Odd(FMod) then
+    Inc(FMod);
+  SetLengthUninit(FBuckets, FMod);
+  FillChar(FBuckets[0], FMod * SizeOf(FBuckets[0]), $FF);
+
+  // Rehash
+  for I := 0 to FCount - 1 do
+  begin
+    Index := (FItems[I].Hash and $7FFFFFFF) mod FMod;
+    FItems[I].Next := FBuckets[Index];
+    FBuckets[Index] := I;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgIdNameHashMap.FindItemIndex(Hash: Cardinal; const Name: UTF8String): Integer;
+begin
+  Result := -1;
+  if FMod <> 0 then
+  begin
+    Hash := GetHash(Name);
+    Result := FBuckets[(Hash and $7FFFFFFF) mod FMod];
+    while (Result <> -1) and
+          ((FItems[Result].Hash <> Hash) or not IsSameUTF8String(FItems[Result].Name, Name)) do
+      Result := FItems[Result].Next;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgIdNameHashMap.AddOrIgnore(const idName: UTF8String; element: TBaseElement);
+var
+  Index: Integer;
+  Hash: Cardinal;
+  Item: PSvgIdNameHashMapItem;
+  Bucket: PInteger;
+begin
+  Hash := GetHash(idName);
+  Index := FindItemIndex(Hash, idName);
+  if Index <> -1 then
+  begin
+    // ignore
+    {Item := @FItems[Index];
+    Item.Element := element;}
+  end
+  else
+  begin
+    if FCount = Length(FItems) then
+      Grow;
+    Index := FCount;
+    Inc(FCount);
+
+    Bucket := @FBuckets[(Hash and $7FFFFFFF) mod FMod];
+    Item := @FItems[Index];
+    Item.Next := Bucket^;
+    Item.Hash := Hash;
+    Item.Name := idName;
+    Item.Element := element;
+    Bucket^ := Index;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgIdNameHashMap.FindElement(const idName: UTF8String): TBaseElement;
+var
+  Index: Integer;
+begin
+  if FCount = 0 then
+    Result := nil
+  else
+  begin
+    Index := FindItemIndex(GetHash(idName), idName);
+    if Index <> -1 then
+      Result := FItems[Index].Element
+    else
+      Result := nil;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgIdNameHashMap.Clear;
+begin
+  FCount := 0;
+  FMod := 0;
+  FItems := nil;
+  FBuckets := nil;
 end;
 
 //------------------------------------------------------------------------------
@@ -3776,14 +3902,14 @@ end;
 
 function TBaseElement.FindRefElement(const refname: UTF8String): TBaseElement;
 var
-  i, len: integer;
+  len: integer;
   c, endC: PUTF8Char;
   ref: UTF8String;
 begin
   result := nil;
   len := Length(refname);
   if len = 0 then Exit;
-  c := PUTF8Char(refname);
+  c := PUTF8Char(Pointer(refname));
   endC := c + len;
   if Match(c, 'url(') then
   begin
@@ -3791,11 +3917,13 @@ begin
     dec(endC); //removes trailing ')'
   end;
   if c^ = '#' then inc(c);
-  ToUTF8String(c, endC, ref);
-  i := fReader.fIdList.IndexOf(string(ref));
-  if i >= 0 then
-    Result := TBaseElement(fReader.fIdList.Objects[i]) else
-    Result := nil;
+  if c = PUTF8Char(Pointer(refname)) then
+    Result := fReader.fIdList.FindElement(refname)
+  else
+  begin
+    ToUTF8String(c, endC, ref);
+    Result := fReader.fIdList.FindElement(ref);
+  end;
 end;
 
 //------------------------------------------------------------------------------
@@ -3805,7 +3933,7 @@ end;
 procedure Id_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
 begin
   aOwnerEl.fId := value;
-  aOwnerEl.fReader.fIdList.AddObject(string(value), aOwnerEl);
+  aOwnerEl.fReader.fIdList.AddOrIgnore(value, aOwnerEl);
 end;
 //------------------------------------------------------------------------------
 
@@ -4897,17 +5025,13 @@ end;
 
 constructor TSvgReader.Create;
 begin
-  fSvgParser        := TSvgParser.Create;
-  fClassStyles        := TClassStylesList.Create;
-  fLinGradRenderer  := TLinearGradientRenderer.Create;
-  fRadGradRenderer  := TSvgRadialGradientRenderer.Create;
+  fSvgParser           := TSvgParser.Create;
+  fClassStyles         := TClassStylesList.Create;
+  fLinGradRenderer     := TLinearGradientRenderer.Create;
+  fRadGradRenderer     := TSvgRadialGradientRenderer.Create;
   fCustomRendererCache := TCustomRendererCache.Create;
-  fIdList             := TStringList.Create;
-  fIdList.Duplicates  := dupIgnore;
-  fIdList.CaseSensitive := false;
-  fIdList.Sorted      := True;
-  fSimpleDrawList    := TList.Create;
-
+  fIdList              := TSvgIdNameHashMap.Create;
+  fSimpleDrawList      := TList.Create;
 
   fBlurQuality        := 1; //0: draft (faster); 1: good; 2: excellent (slow)
   currentColor        := clBlack32;
