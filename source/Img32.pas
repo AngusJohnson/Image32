@@ -28,9 +28,6 @@ uses
   {$IFDEF UITYPES} UITypes,{$ENDIF} Math;
 
 type
-  {$IF not declared(NativeInt)}
-  NativeInt = Integer;
-  {$IFEND}
   {$IF not declared(SizeInt)} // FPC has SizeInt
     {$IF CompilerVersion < 120}
   SizeInt = Integer; // Delphi 7-2007 can't use NativeInt with "FOR"
