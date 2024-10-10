@@ -3,7 +3,7 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  18 September 2024                                               *
+* Date      :  10 October 2024                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -2529,7 +2529,7 @@ end;
 
 function GrowOpenLine(const line: TPathD; delta: double;
   joinStyle: TJoinStyle; endStyle: TEndStyle;
-  miterLim: double): TPathD;
+  miterLimOrRndScale: double): TPathD;
 var
   len               : integer;
   resCnt, resCap    : integer;
@@ -2686,7 +2686,7 @@ var
       DoMiter(j, k, acos)
     else if (joinStyle = jsMiter) then
     begin
-      if (1 + acos > miterLim) then
+      if (1 + acos > miterLimOrRndScale) then
         DoMiter(j, k, acos) else
         DoSquare(j, k);
     end
@@ -2725,13 +2725,15 @@ begin
   //with very narrow lines, don't get fancy with joins and line ends
   if (delta <= 1) then
   begin
-    joinStyle := jsButt;
-    if endStyle = esRound then endStyle := esSquare;
+    if (joinStyle = jsRound) and (delta * miterLimOrRndScale <=1) then
+      joinStyle := jsButt;
+    if (endStyle = esRound) and (delta * miterLimOrRndScale <=1) then
+      endStyle := esSquare;
   end
   else if joinStyle = jsAuto then
   begin
     if (endStyle = esRound) and
-      (delta >= AutoWidthThreshold) then
+      (delta * miterLimOrRndScale >= AutoWidthThreshold) then
       joinStyle := jsRound
     else
       joinStyle := jsSquare;
@@ -2740,7 +2742,7 @@ begin
   stepsPerRadian := 0;
   if (joinStyle = jsRound) or (endStyle = esRound) then
   begin
-    steps := CalcRoundingSteps(delta);
+    steps := CalcRoundingSteps(delta * miterLimOrRndScale);
 //		if (steps > absDelta * Pi) then // todo - recheck if needed
 //			steps := absDelta * Pi;
     stepSin := sin(TwoPi/steps);
@@ -2749,9 +2751,9 @@ begin
     stepsPerRadian := steps / TwoPi;
   end;
 
-  if miterLim <= 0 then miterLim := DefaultMiterLimit
-  else if miterLim < 2 then miterLim := 2;
-  miterLim := 2 /(sqr(miterLim));
+  if miterLimOrRndScale <= 0 then miterLimOrRndScale := DefaultMiterLimit
+  else if miterLimOrRndScale < 2 then miterLimOrRndScale := 2;
+  miterLimOrRndScale := 2 /(sqr(miterLimOrRndScale));
 
   norms := GetNormals(path);
   resCnt := 0; resCap := 0;
