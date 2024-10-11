@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  18 September 2024                                               *
+* Date      :  11 October 2024                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -3714,6 +3714,7 @@ begin
   if elRectWH.Width.IsValid and elRectWH.Height.IsValid then
   begin
     recWH := elRectWH.GetRectWH(rec, GetRelFracLimit);
+    if recWH.IsEmpty then Exit;
 
     //also scale if necessary
     if not pattBoxWH.IsEmpty then
