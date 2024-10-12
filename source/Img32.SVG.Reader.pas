@@ -2169,6 +2169,7 @@ var
   p1: PColor32;
   p2: PARGB;
   childFuncs: array[0..3] of TFeComponentTransferChild;
+  hasFuncs: array[0..3] of Boolean;
 begin
   if not GetSrcAndDst or (ChildCount = 0) then Exit;
   for i := 0 to 3 do childFuncs[i] := nil;
@@ -2188,6 +2189,7 @@ begin
   for k := 0 to 3 do
     with childFuncs[k] do
     begin
+      hasFuncs[k] := false;
       if not Assigned(childFuncs[k]) then Continue;
       case funcType of
         ftDiscrete:
@@ -2220,6 +2222,7 @@ begin
               bytes[i] := ClampByte(i * slope + d);
           end;
       end;
+      hasFuncs[k] := Assigned(bytes);
     end;
 
   dx1 := srcImg.Width - RectWidth(srcRec);
@@ -2232,14 +2235,10 @@ begin
     begin
       p2.Color := p1^;
 
-      if Assigned(childFuncs[0]) and Assigned(childFuncs[0].bytes) then
-        p2.B := childFuncs[0].bytes[p2.B];
-      if Assigned(childFuncs[1]) and Assigned(childFuncs[1].bytes) then
-        p2.G := childFuncs[1].bytes[p2.G];
-      if Assigned(childFuncs[2]) and Assigned(childFuncs[2].bytes) then
-        p2.R := childFuncs[2].bytes[p2.R];
-      if Assigned(childFuncs[3]) and Assigned(childFuncs[3].bytes) then
-        p2.A := childFuncs[3].bytes[p2.A];
+      if hasFuncs[0] then p2.B := childFuncs[0].bytes[p2.B];
+      if hasFuncs[1] then p2.G := childFuncs[1].bytes[p2.G];
+      if hasFuncs[2] then p2.R := childFuncs[2].bytes[p2.R];
+      if hasFuncs[3] then p2.A := childFuncs[3].bytes[p2.A];
 
       inc(p1); inc(p2);
     end;
