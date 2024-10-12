@@ -3,7 +3,7 @@ unit Img32.Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  18 September 2024                                               *
+* Date      :  12 October 2024                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Miscellaneous routines that don't belong in other modules.      *
@@ -2248,7 +2248,7 @@ end;
 
 procedure GaussianBlur(img: TImage32; rec: TRect; radius: Integer);
 var
-  i, w,h, x,y,yy,z,startz: Integer;
+  i, w,h, highX, x,y,yy,z,startz: Integer;
   gaussTable: array [-MaxBlur .. MaxBlur] of Cardinal;
   wc: TWeightedColor;
   wca: TArrayOfWeightedColor;
@@ -2261,21 +2261,25 @@ begin
   Types.IntersectRect(rec, rec, img.Bounds);
   if IsEmptyRect(rec) or (radius < 1) then Exit
   else if radius > MaxBlur then radius := MaxBlur;
-  for i := 0 to radius do
+
+  gaussTable[0] := {Sqr}(Radius +1);
+  for i := 1 to radius do
   begin
-    gaussTable[i] := Sqr(Radius - i +1);
+    gaussTable[i] := {Sqr}(Radius - i +1);
     gaussTable[-i] := gaussTable[i];
   end;
+
   RectWidthHeight(rec, w, h);
   setLength(wca, w * h);
   NewColor32Array(wcaColor, w * h, True);
   imgWidth := img.Width;
+  highX := imgWidth -1;
   for y := 0 to h -1 do
   begin
     row := PColor32Array(@img.Pixels[(y + rec.Top) * imgWidth + rec.Left]);
     wcRow := PWeightedColorArray(@wca[y * w]);
     for x := 0 to w -1 do
-      for z := max(0, x - radius) to min(img.Width -1, x + radius) do
+      for z := max(0, x - radius) to min(highX, x + radius) do
         wcRow[x].Add(row[z], gaussTable[x-z]);
   end;
 

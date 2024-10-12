@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  11 October 2024                                                 *
+* Date      :  12 October 2024                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -496,7 +496,7 @@ type
     function GetAdjustedBounds(const bounds: TRectD): TRectD;
     function FindNamedImage(const name: UTF8String): TImage32;
     function AddNamedImage(const name: UTF8String): TImage32;
-    function GetNamedImage(const name: UTF8String): TImage32;
+    function GetNamedImage(const name: UTF8String; isIn: Boolean): TImage32;
     procedure Apply(img: TImage32;
       const filterBounds: TRect; const matrix: TMatrixD);
   public
@@ -549,6 +549,32 @@ type
   protected
     values: TArrayOfDouble;
     procedure Apply; override;
+  end;
+
+  TFuncType = (ftIdentity, ftTable, ftDiscrete, ftLinear, ftGamma);
+
+  TFeComponentTransferElement  = class(TFeBaseElement)
+  protected
+    procedure Apply; override;
+  end;
+
+  TFeComponentTransferChild = class(TBaseElement)
+  protected
+    bytes: TArrayOfByte;
+  protected
+    funcType: TFuncType;
+    intercept: double;
+    slope: double;
+    tableValues: TArrayOfDouble;
+  end;
+
+  TFeFuncRElement = class(TFeComponentTransferChild)
+  end;
+  TFeFuncGElement = class(TFeComponentTransferChild)
+  end;
+  TFeFuncBElement = class(TFeComponentTransferChild)
+  end;
+  TFeFuncAElement = class(TFeComponentTransferChild)
   end;
 
   TFeDefuseLightElement = class(TFeBaseElement)
@@ -668,6 +694,12 @@ begin
     hFilter         : Result := TFilterElement;
     hfeBlend        : Result := TFeBlendElement;
     hfeColorMatrix  : Result := TFeColorMatrixElement;
+    hFeComponentTransfer : Result := TFeComponentTransferElement;
+    hFeFuncR        : Result := TFeFuncRElement;
+    hFeFuncG        : Result := TFeFuncGElement;
+    hFeFuncB        : Result := TFeFuncBElement;
+    hFeFuncA        : Result := TFeFuncAElement;
+
     hfeComposite    : Result := TFeCompositeElement;
     hfeDefuseLighting : Result := TFeDefuseLightElement;
     hfeDropShadow   : Result := TFeDropShadowElement;
@@ -1800,59 +1832,30 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFilterElement.GetNamedImage(const name: UTF8String): TImage32;
-var
-  i, len: integer;
-  hash: Cardinal;
+function TFilterElement.GetNamedImage(const name: UTF8String; isIn: Boolean): TImage32;
 begin
-  hash := GetHash(name);
-  case hash of
+  Result := FindNamedImage(name);
+  if not Assigned(Result) then
+    Result := AddNamedImage(name)
+  else if not isIn then
+    Exit;
+
+  case GetHash(name) of
     hBackgroundImage:
-      begin
-        Result := FindNamedImage(name);
-        if not Assigned(Result) then
-          Result := AddNamedImage(name);
-        Result.Copy(fReader.BackgndImage, fFilterBounds, Result.Bounds);
-        Exit;
-      end;
+      Result.Copy(fReader.BackgndImage, fFilterBounds, Result.Bounds);
     hBackgroundAlpha:
       begin
-        Result := FindNamedImage(name);
-        if not Assigned(Result) then
-          Result := AddNamedImage(name);
         Result.Copy(fReader.BackgndImage, fFilterBounds, Result.Bounds);
         Result.SetRGB(clNone32, Result.Bounds);
-        Exit;
       end;
     hSourceGraphic:
-      begin
-        Result := FindNamedImage(name);
-        if not Assigned(Result) then
-          Result := AddNamedImage(name);
-        Result.Copy(fSrcImg, fFilterBounds, Result.Bounds);
-        Exit;
-      end;
+      Result.Copy(fSrcImg, fFilterBounds, Result.Bounds);
     hSourceAlpha:
       begin
-        Result := FindNamedImage(name);
-        if not Assigned(Result) then
-        begin
-          Result := AddNamedImage(name);
-          Result.Copy(fSrcImg, fFilterBounds, Result.Bounds);
-          Result.SetRGB(clBlack32, Result.Bounds);
-        end;
-        Exit;
+        Result.Copy(fSrcImg, fFilterBounds, Result.Bounds);
+        Result.SetRGB(clBlack32, Result.Bounds);
       end;
   end;
-
-  len := Length(fNames);
-  for i := 0 to len -1 do
-    if name = fNames[i] then
-    begin
-      Result := fImages[i];
-      Exit;
-    end;
-  Result := AddNamedImage(name);
 end;
 //------------------------------------------------------------------------------
 
@@ -1872,6 +1875,7 @@ begin
       case TBaseElement(fChilds[i]).fParserEl.hash of
         hfeBlend            : TFeBlendElement(fChilds[i]).Apply;
         hfeColorMatrix      : TFeColorMatrixElement(fChilds[i]).Apply;
+        hFeComponentTransfer : TFeComponentTransferElement(fChilds[i]).Apply;
         hfeComposite        : TFeCompositeElement(fChilds[i]).Apply;
         hfeDefuseLighting   : TFeDefuseLightElement(fChilds[i]).Apply;
         hfeDropShadow       : TFeDropShadowElement(fChilds[i]).Apply;
@@ -1924,15 +1928,15 @@ var
 begin
   pfe := ParentFilterEl;
   if (in1 <> '') then
-    srcImg := pfe.GetNamedImage(in1)
+    srcImg := pfe.GetNamedImage(in1, true)
   else if Assigned(pfe.fLastImg) then
     srcImg := pfe.fLastImg
   else
-    srcImg := pfe.GetNamedImage(SourceImage);
+    srcImg := pfe.GetNamedImage(SourceImage, false);
 
   if (res <> '') then
-    dstImg := pfe.GetNamedImage(res) else
-    dstImg := pfe.GetNamedImage(SourceImage);
+    dstImg := pfe.GetNamedImage(res, false) else
+    dstImg := pfe.GetNamedImage(SourceImage, false);
 
   Result := Assigned(srcImg) and Assigned(dstImg);
   if not Result then Exit;
@@ -1959,7 +1963,7 @@ begin
     dstImg2 := dstImg;
   dstRec2 := GetBounds(dstImg2);
 
-  srcImg2 := pfe.GetNamedImage(in2);
+  srcImg2 := pfe.GetNamedImage(in2, true);
   srcRec2 := GetBounds(srcImg2);
   dstImg2.CopyBlend(srcImg2, srcRec2, dstRec2, BlendToAlphaLine);
   dstImg2.CopyBlend(srcImg,  srcRec,  dstRec2, BlendToAlphaLine);
@@ -2059,7 +2063,7 @@ begin
   pfe := ParentFilterEl;
   if (in2 = '') then Exit;
 
-  srcImg2 := pfe.GetNamedImage(in2);
+  srcImg2 := pfe.GetNamedImage(in2, true);
   srcRec2 := GetBounds(srcImg2); //either filter bounds or image bounds
 
   if (dstImg = srcImg) or (dstImg = srcImg2) then
@@ -2154,6 +2158,96 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// TFeComponentTransferElement
+//------------------------------------------------------------------------------
+
+procedure TFeComponentTransferElement.Apply;
+var
+  i,j,k, dx1,dx2: integer;
+  d: double;
+  rangeSize: integer;
+  p1: PColor32;
+  p2: PARGB;
+  childFuncs: array[0..3] of TFeComponentTransferChild;
+begin
+  if not GetSrcAndDst or (ChildCount = 0) then Exit;
+  for i := 0 to 3 do childFuncs[i] := nil;
+  for i := 0 to ChildCount -1 do
+  begin
+    if Child[i]  is TFeFuncBElement then
+      childFuncs[0] := TFeFuncBElement(Child[i])
+    else if Child[i]  is TFeFuncGElement then
+      childFuncs[1] := TFeFuncGElement(Child[i])
+    else if Child[i]  is TFeFuncRElement then
+      childFuncs[2] := TFeFuncRElement(Child[i])
+    else if Child[i]  is TFeFuncAElement then
+      childFuncs[3] := TFeFuncAElement(Child[i]);
+  end;
+
+  // build each childFuncs' bytes array
+  for k := 0 to 3 do
+    with childFuncs[k] do
+    begin
+      if not Assigned(childFuncs[k]) then Continue;
+      case funcType of
+        ftDiscrete:
+          begin
+            if Length(tableValues) = 0 then Continue;
+            SetLength(bytes, 256);
+            rangeSize := 256 div Length(tableValues);
+            for i:= 0 to High(tableValues) do
+              for j:= 0 to rangeSize -1 do
+                bytes[i*rangeSize + j] := ClampByte(tableValues[i] * 255);
+          end;
+        ftTable:
+          begin
+            if Length(tableValues) < 2 then Continue;
+            SetLength(bytes, 256);
+            rangeSize := 256 div (Length(tableValues) -1);
+            for i:= 0 to High(tableValues) -1 do
+            begin
+              intercept := tableValues[i];
+              slope :=  (tableValues[i+1] - intercept) / rangeSize;
+              for j:= 0 to rangeSize -1 do
+                bytes[i*rangeSize + j] := ClampByte((j * slope + intercept) * 255);
+            end;
+          end;
+        ftLinear:
+          begin
+            SetLength(bytes, 256);
+            d := intercept * 255;
+            for i:= 0 to 255 do
+              bytes[i] := ClampByte(i * slope + d);
+          end;
+      end;
+    end;
+
+  dx1 := srcImg.Width - RectWidth(srcRec);
+  dx2 := dstImg.Width - RectWidth(dstRec);
+  p1 := @srcImg.Pixels[srcRec.Top * srcImg.Width + srcRec.Left];
+  p2 := @dstImg.Pixels[dstRec.Top * dstImg.Width + dstRec.Left];
+  for i := srcRec.Top to srcRec.Bottom -1 do
+  begin
+    for j := srcRec.Left to srcRec.Right -1 do
+    begin
+      p2.Color := p1^;
+
+      if Assigned(childFuncs[0]) and Assigned(childFuncs[0].bytes) then
+        p2.B := childFuncs[0].bytes[p2.B];
+      if Assigned(childFuncs[1]) and Assigned(childFuncs[1].bytes) then
+        p2.G := childFuncs[1].bytes[p2.G];
+      if Assigned(childFuncs[2]) and Assigned(childFuncs[2].bytes) then
+        p2.R := childFuncs[2].bytes[p2.R];
+      if Assigned(childFuncs[3]) and Assigned(childFuncs[3].bytes) then
+        p2.A := childFuncs[3].bytes[p2.A];
+
+      inc(p1); inc(p2);
+    end;
+    inc(p1, dx1); inc(p2, dx2);
+  end;
+end;
+
+//------------------------------------------------------------------------------
 // TFeDefuseLightElement
 //------------------------------------------------------------------------------
 
@@ -2189,7 +2283,7 @@ var
 begin
   if not GetSrcAndDst then Exit;
   pfe := ParentFilterEl;
-  dropShadImg := pfe.GetNamedImage(tmpFilterImg);
+  dropShadImg := pfe.GetNamedImage(tmpFilterImg, false);
   dropShadImg.Copy(srcImg, srcRec, dropShadImg.Bounds);
 
   off := offset.GetPoint(RectD(pfe.fObjectBounds), GetRelFracLimit);
@@ -2242,13 +2336,14 @@ end;
 
 procedure TFeGaussElement.Apply;
 begin
-  if not GetSrcAndDst or (stdDev = InvalidD) then Exit;
+  if (stdDev = InvalidD) or not GetSrcAndDst then Exit;
+
   if srcImg <> dstImg then
     dstImg.Copy(srcImg, srcRec, dstRec);
-
-  // FastGaussianBlur is a very good approximation and also very much faster.
-  // Empirically stdDev * PI/4 more closely emulates other renderers.
-  FastGaussianBlur(dstImg, dstRec, Ceil(stdDev * (PI/4) * ParentFilterEl.fScale));
+  //GaussianBlur(dstImg, dstRec, Round(stdDev * ParentFilterEl.fScale));
+  // FastGaussianBlur is a very good approximation and also much faster.
+  // However, empirically stdDev/4 more closely emulates other renderers.
+  FastGaussianBlur(dstImg, dstRec, Ceil(stdDev/4 * ParentFilterEl.fScale));
 end;
 
 //------------------------------------------------------------------------------
@@ -2273,7 +2368,7 @@ begin
         if Assigned(tmpImg) then
           tmpImg.CopyBlend(srcImg, srcRec, tmpImg.Bounds, BlendToAlphaLine)
         else if srcImg = pfe.fSrcImg then
-          tmpImg := pfe.GetNamedImage(SourceImage)
+          tmpImg := pfe.GetNamedImage(SourceImage, false)
         else
           tmpImg := srcImg;
       end;
@@ -2311,7 +2406,7 @@ begin
 
   if srcImg = dstImg then
   begin
-    tmpImg := pfe.GetNamedImage(tmpFilterImg);
+    tmpImg := pfe.GetNamedImage(tmpFilterImg, false);
     tmpImg.Copy(srcImg, srcRec, tmpImg.Bounds);
     dstImg.Clear(dstRec);
     dstImg.Copy(tmpImg, tmpImg.Bounds, dstOffRec);
@@ -3953,6 +4048,76 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure Intercept_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
+var
+  c, endC: PUTF8Char;
+  val: double;
+begin
+  if (value = '') or not (aOwnerEl is TFeComponentTransferChild) then Exit;
+  c := PUTF8Char(value);
+  endC := c + Length(value);
+  with TFeComponentTransferChild(aOwnerEl) do
+    if ParseNextNum(c, endC, false, val) then
+      intercept := val else
+      intercept := 1;
+end;
+//------------------------------------------------------------------------------
+
+procedure Slope_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
+var
+  c, endC: PUTF8Char;
+  val: double;
+begin
+  if (value = '') or not (aOwnerEl is TFeComponentTransferChild) then Exit;
+  c := PUTF8Char(value);
+  endC := c + Length(value);
+  with TFeComponentTransferChild(aOwnerEl) do
+    if ParseNextNum(c, endC, false, val) then
+      slope := val else
+      slope := 1;
+end;
+//------------------------------------------------------------------------------
+
+procedure TableValues_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
+var
+  c, endC: PUTF8Char;
+  val: double;
+  len: integer;
+begin
+  if (value = '') or not (aOwnerEl is TFeComponentTransferChild) then
+    Exit;
+  with TFeComponentTransferChild(aOwnerEl) do
+  begin
+    len := 0;
+    tableValues := nil;
+    c := PUTF8Char(value);
+    endC := c + Length(value);
+    while ParseNextNum(c, endC, true, val) do
+    begin
+      SetLength(tableValues, len +1);
+      tableValues[len] := val;
+      inc(len);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure Type_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
+begin
+  if (value = '') or not (aOwnerEl is TFeComponentTransferChild) then Exit;
+  with TFeComponentTransferChild(aOwnerEl) do
+  begin
+    case value[1] of
+      'D','d': funcType := ftDiscrete;
+      'G','g': funcType := ftGamma;
+      'L','l': funcType := ftLinear;
+      'T','t': funcType := ftTable;
+      else funcType := ftIdentity;
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
 procedure LetterSpacing_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
 begin
   with TTextElement(aOwnerEl) do
@@ -4901,12 +5066,13 @@ begin
       hId:                    Id_Attrib(self, value);
       hIn:                    In_Attrib(self, value);
       hIn2:                   In2_Attrib(self, value);
+      hIntercept:             Intercept_Attrib(self, value);
       hk1:                    K1_Attrib(self, value);
       hk2:                    K2_Attrib(self, value);
       hk3:                    K3_Attrib(self, value);
       hk4:                    K4_Attrib(self, value);
       hletter_045_spacing:    LetterSpacing_Attrib(self, value);
-  //    hlighting_045_color:    LightingColor_Attrib(self, value);
+      //hlighting_045_color:    LightingColor_Attrib(self, value);
       hMarker_045_End:        MarkerEnd_Attrib(self, value);
       hMarkerHeight:          Height_Attrib(self, value);
       hMarker_045_Mid:        MarkerMiddle_Attrib(self, value);
@@ -4927,6 +5093,7 @@ begin
       hRx:                    Rx_Attrib(self, value);
       hRy:                    Ry_Attrib(self, value);
       hspecularExponent:      SpectacularExponent(self, value);
+      hSlope:                 Slope_Attrib(self, value);
       hSpreadMethod:          SpreadMethod_Attrib(self, value);
       hstdDeviation:          StdDev_Attrib(self, value);
       hStop_045_Color:        StopColor_Attrib(self, value);
@@ -4937,10 +5104,12 @@ begin
       hstroke_045_miterlimit: StrokeMiterLimit_Attrib(self, value);
       hStroke_045_Opacity:    StrokeOpacity_Attrib(self, value);
       hStroke_045_Width:      StrokeWidth_Attrib(self, value);
+      hTableValues:           TableValues_Attrib(self, value);
       hText_045_Anchor:       TextAlign_Attrib(self, value);
       hText_045_Decoration:   TextDecoration_Attrib(self, value);
       hTextLength:            TextLength_Attrib(self, value);
       hTransform:             Transform_Attrib(self, value);
+      hType:                  Type_Attrib(self, value);
       hValues:                Values_Attrib(self, value);
       hViewbox:               Viewbox_Attrib(self, value);
       hVisibility:            Visibility_Attrib(self, value);

@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  18 September 2024                                               *
+* Date      :  12 October 2024                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -572,6 +572,8 @@ const
   angle345 = TwoPi - angle15;
   angle360 = TwoPi;
 
+  div255: Double = 1 / 255;
+
 var
   //Resampling function identifiers (initialized in Img32.Resamplers)
   rNearestResampler : integer;
@@ -651,8 +653,6 @@ const
   Trunc: function(Value: Double): Integer = __Trunc;
 {$ENDIF CPUX86}
 
-const
-  div255 : Double = 1 / 255;
 type
   TByteArray = array[0..MaxInt -1] of Byte;
   PByteArray = ^TByteArray;
