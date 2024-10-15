@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  12 October 2024                                                 *
+* Date      :  15 October 2024                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -2169,19 +2169,18 @@ var
   p1: PColor32;
   p2: PARGB;
   childFuncs: array[0..3] of TFeComponentTransferChild;
-  hasFuncs: array[0..3] of Boolean;
 begin
   if not GetSrcAndDst or (ChildCount = 0) then Exit;
   for i := 0 to 3 do childFuncs[i] := nil;
   for i := 0 to ChildCount -1 do
   begin
-    if Child[i]  is TFeFuncBElement then
+    if Child[i] is TFeFuncBElement then
       childFuncs[0] := TFeFuncBElement(Child[i])
-    else if Child[i]  is TFeFuncGElement then
+    else if Child[i] is TFeFuncGElement then
       childFuncs[1] := TFeFuncGElement(Child[i])
-    else if Child[i]  is TFeFuncRElement then
+    else if Child[i] is TFeFuncRElement then
       childFuncs[2] := TFeFuncRElement(Child[i])
-    else if Child[i]  is TFeFuncAElement then
+    else if Child[i] is TFeFuncAElement then
       childFuncs[3] := TFeFuncAElement(Child[i]);
   end;
 
@@ -2189,7 +2188,6 @@ begin
   for k := 0 to 3 do
     with childFuncs[k] do
     begin
-      hasFuncs[k] := false;
       if not Assigned(childFuncs[k]) then Continue;
       case funcType of
         ftDiscrete:
@@ -2198,7 +2196,7 @@ begin
             SetLength(bytes, 256);
             rangeSize := 256 div Length(tableValues);
             for i:= 0 to High(tableValues) do
-              for j:= 0 to rangeSize -1 do
+              for j:= 0 to rangeSize do
                 bytes[i*rangeSize + j] := ClampByte(tableValues[i] * 255);
           end;
         ftTable:
@@ -2210,7 +2208,7 @@ begin
             begin
               intercept := tableValues[i];
               slope :=  (tableValues[i+1] - intercept) / rangeSize;
-              for j:= 0 to rangeSize -1 do
+              for j:= 0 to rangeSize do
                 bytes[i*rangeSize + j] := ClampByte((j * slope + intercept) * 255);
             end;
           end;
@@ -2222,8 +2220,11 @@ begin
               bytes[i] := ClampByte(i * slope + d);
           end;
       end;
-      hasFuncs[k] := Assigned(bytes);
     end;
+
+  for k := 0 to 3 do
+    if Assigned(childFuncs[k]) and not Assigned(childFuncs[k].bytes) then
+      childFuncs[k] := nil;
 
   dx1 := srcImg.Width - RectWidth(srcRec);
   dx2 := dstImg.Width - RectWidth(dstRec);
@@ -2234,12 +2235,10 @@ begin
     for j := srcRec.Left to srcRec.Right -1 do
     begin
       p2.Color := p1^;
-
-      if hasFuncs[0] then p2.B := childFuncs[0].bytes[p2.B];
-      if hasFuncs[1] then p2.G := childFuncs[1].bytes[p2.G];
-      if hasFuncs[2] then p2.R := childFuncs[2].bytes[p2.R];
-      if hasFuncs[3] then p2.A := childFuncs[3].bytes[p2.A];
-
+      if Assigned(childFuncs[0]) then p2.B := childFuncs[0].bytes[p2.B];
+      if Assigned(childFuncs[1]) then p2.G := childFuncs[1].bytes[p2.G];
+      if Assigned(childFuncs[2]) then p2.R := childFuncs[2].bytes[p2.R];
+      if Assigned(childFuncs[3]) then p2.A := childFuncs[3].bytes[p2.A];
       inc(p1); inc(p2);
     end;
     inc(p1, dx1); inc(p2, dx2);
@@ -2341,8 +2340,8 @@ begin
     dstImg.Copy(srcImg, srcRec, dstRec);
   //GaussianBlur(dstImg, dstRec, Round(stdDev * ParentFilterEl.fScale));
   // FastGaussianBlur is a very good approximation and also much faster.
-  // However, empirically stdDev/4 more closely emulates other renderers.
-  FastGaussianBlur(dstImg, dstRec, Ceil(stdDev/4 * ParentFilterEl.fScale));
+  // However, empirically stdDev/2 more closely emulates other renderers.
+  FastGaussianBlur(dstImg, dstRec, Ceil(stdDev/2 * ParentFilterEl.fScale));
 end;
 
 //------------------------------------------------------------------------------
