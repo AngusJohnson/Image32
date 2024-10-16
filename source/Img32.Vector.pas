@@ -435,10 +435,12 @@ type
   function GetClosestPtOnRotatedEllipse(const ellipseRect: TRectD;
     ellipseRotation: double; const pt: TPointD): TPointD;
 
-  // RoughOutline: these are **rough** because outlines are untidy, with
-  // numerous self-intersections and negative area regions. (This untidiness
-  // will be hidden as long as NonZero fill rule is applied when rendering, and
+  // RoughOutline: outlines are **rough** because they will contain numerous
+  // self-intersections and negative area regions. (This untidiness will be
+  // hidden as long as the NonZero fill rule is applied when rendering, and
   // this function will be **much** faster than Img32.Clipper.InflatePaths.)
+  // The 'scale' parameter doesn't actually scale the returned outline, it's
+  // only a warning of future scaling and used to guide the returned precision.
   // RoughOutline is intended mostly for internal use.
   function RoughOutline(const line: TPathD; lineWidth: double;
     joinStyle: TJoinStyle; endStyle: TEndStyle;
