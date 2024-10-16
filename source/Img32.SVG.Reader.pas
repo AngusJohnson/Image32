@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  15 October 2024                                                 *
+* Date      :  17 October 2024                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -77,7 +77,7 @@ type
     FCount: Integer;
     FMod: Cardinal;
     procedure Grow;
-    function FindItemIndex(Hash: Cardinal; const Name: UTF8String): Integer;
+    function FindItemIndex(const Name: UTF8String): Integer;
   public
     procedure AddOrIgnore(const idName: UTF8String; element: TBaseElement);
     function FindElement(const idName: UTF8String): TBaseElement;
@@ -946,17 +946,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TSvgIdNameHashMap.FindItemIndex(Hash: Cardinal; const Name: UTF8String): Integer;
+function TSvgIdNameHashMap.FindItemIndex(const Name: UTF8String): Integer;
+var
+  hash: Cardinal;
 begin
   Result := -1;
-  if FMod <> 0 then
-  begin
-    Hash := GetHash(Name);
-    Result := FBuckets[(Hash and $7FFFFFFF) mod FMod];
-    while (Result <> -1) and
-          ((FItems[Result].Hash <> Hash) or not IsSameUTF8String(FItems[Result].Name, Name)) do
+  if FMod = 0 then Exit;
+  Hash := GetHash(Name);
+  Result := FBuckets[(Hash and $7FFFFFFF) mod FMod];
+  while (Result <> -1) and
+    ((FItems[Result].Hash <> Hash) or
+    not IsSameUTF8String(FItems[Result].Name, Name)) do
       Result := FItems[Result].Next;
-  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -967,29 +968,23 @@ var
   Item: PSvgIdNameHashMapItem;
   Bucket: PInteger;
 begin
-  Hash := GetHash(idName);
-  Index := FindItemIndex(Hash, idName);
-  if Index <> -1 then
-  begin
-    // ignore
-    {Item := @FItems[Index];
-    Item.Element := element;}
-  end
-  else
-  begin
-    if FCount = Length(FItems) then
-      Grow;
-    Index := FCount;
-    Inc(FCount);
+  Index := FindItemIndex(idName);
+  if Index >= 0 then
+    Exit; // already exists so ignore;
 
-    Bucket := @FBuckets[(Hash and $7FFFFFFF) mod FMod];
-    Item := @FItems[Index];
-    Item.Next := Bucket^;
-    Item.Hash := Hash;
-    Item.Name := idName;
-    Item.Element := element;
-    Bucket^ := Index;
-  end;
+  // add new item
+  if FCount = Length(FItems) then Grow;
+  Index := FCount;
+  Inc(FCount);
+
+  Hash := GetHash(idName);
+  Bucket := @FBuckets[(Hash and $7FFFFFFF) mod FMod];
+  Item := @FItems[Index];
+  Item.Next := Bucket^;
+  Item.Hash := Hash;
+  Item.Name := idName;
+  Item.Element := element;
+  Bucket^ := Index;
 end;
 //------------------------------------------------------------------------------
 
@@ -1001,11 +996,10 @@ begin
     Result := nil
   else
   begin
-    Index := FindItemIndex(GetHash(idName), idName);
-    if Index <> -1 then
+    Index := FindItemIndex(idName);
+    if Index < 0 then
+      Result := nil else
       Result := FItems[Index].Element
-    else
-      Result := nil;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2778,7 +2772,7 @@ var
   i: integer;
   dashOffset, sw: double;
   dashArray: TArrayOfDouble;
-  lim, scale: Double;
+  miterLim, scale: Double;
   strokeClr: TColor32;
   strokePaths: TPathsD;
   refEl: TBaseElement;
@@ -2802,10 +2796,7 @@ begin
       sw := GetValueXY(bounds, 0);
   end;
 
-  if joinStyle = jsMiter then
-    lim := drawDat.strokeMitLim else
-    lim := scale;
-
+  miterLim := drawDat.strokeMitLim;
   if drawDat.strokeColor = clCurrent then
     drawDat.strokeColor := fReader.currentColor;
 
@@ -2832,11 +2823,13 @@ begin
         paths := GetDashedPath(drawPathsC[i], true, dashArray, @dashOffset);
         AppendPath(strokePaths, paths);
       end;
-      strokePaths := RoughOutline(strokePaths, sw, joinStyle, endStyle, lim);
+      strokePaths :=
+        RoughOutline(strokePaths, sw, joinStyle, endStyle, miterLim, scale);
     end else
     begin
       endStyle := esPolygon;
-      strokePaths := RoughOutline(drawPathsC, sw, joinStyle, endStyle, lim);
+      strokePaths :=
+        RoughOutline(drawPathsC, sw, joinStyle, endStyle, miterLim, scale);
     end;
   end else
   begin
@@ -2852,7 +2845,8 @@ begin
         fReader.fCustomRendererCache);
       Exit;
     end;
-    strokePaths := RoughOutline(drawPathsO, sw, joinStyle, endStyle, lim);
+    strokePaths :=
+      RoughOutline(drawPathsO, sw, joinStyle, endStyle, miterLim, scale);
   end;
   strokePaths := MatrixApply(strokePaths, drawDat.matrix);
 
