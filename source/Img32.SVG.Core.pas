@@ -1,4 +1,4 @@
-unit Img32.SVG.Core;
+﻿unit Img32.SVG.Core;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
@@ -95,8 +95,11 @@ type
   TFontDecoration = (fdUndefined, fdNone, fdUnderline, fdStrikeThrough);
   TSvgTextAlign = (staUndefined, staLeft, staCenter, staRight, staJustify);
 
+  UTF8Strings = array of UTF8String;
+
   TSVGFontInfo = record
-    family      : TTtfFontFamily;
+    family      : TFontFamily;
+    nameOptions : UTF8Strings;
     size        : double;
     spacing     : double;
     textLength  : double;
@@ -259,6 +262,9 @@ type
   function SkipBlanksEx(c: PUTF8Char; endC: PUTF8Char): PUTF8Char; {$IFDEF INLINE} inline; {$ENDIF}
   function SkipBlanksAndComma(c, endC: PUTF8Char): PUTF8Char; {$IFDEF INLINE} inline; {$ENDIF}
 
+  function GetCommaSeparatedArray(const str: UTF8String): UTF8Strings;
+  function TrimQuotes(const str: UTF8String): UTF8String;
+
   procedure ConvertUnicodeToUtf8(memStream: TMemoryStream);
 
   function GetScale(src, dst: double): double;
@@ -268,7 +274,6 @@ type
 
 type
   TSetOfUTF8Char = set of UTF8Char;
-  UTF8Strings = array of UTF8String;
 
 function CharInSet(chr: UTF8Char; const chrs: TSetOfUTF8Char): Boolean;
 
@@ -604,6 +609,59 @@ begin
     while (j <= len) and (str[j] <= #32) do inc(j);
     i := j;
   end;
+end;
+//------------------------------------------------------------------------------
+
+function TrimQuotes(const str: UTF8String): UTF8String;
+var
+  i, len: integer;
+begin
+  len := Length(str);
+  i := 1;
+  while (i < len) and (str[i] <= space) do inc(i);
+
+  if (i < len) and (str[i] in [quote, dquote]) then
+  begin
+    inc(i);
+    while (len > i) and not (str[len] in [quote, dquote]) do dec(len);
+    if len = i then
+      Result := str else
+      Result := Copy(str, i, len - i);
+  end
+  else
+    Result := str
+end;
+//------------------------------------------------------------------------------
+
+function GetCommaSeparatedArray(const str: UTF8String): UTF8Strings;
+var
+  i,j,k, cnt, len: integer;
+const
+  separator: Utf8Char = ',';
+begin
+  // nb: separator is NOT escaped.
+  if separator = #32 then
+  begin
+    Result := Split(str);
+    Exit;
+  end;
+
+  len := Length(str);
+  cnt := 1;
+  for i := 1 to len do
+    if (str[i] = separator) then inc(cnt);
+  SetLength(Result, cnt);
+  j := 0;
+  k := 1;
+  for i := 1 to len do
+  begin
+    if (str[i] <> separator) then Continue;
+    Result[j] := TrimQuotes(Copy(str, k, i-k));
+    inc(j);
+    k := i + 1;
+  end;
+  if len >= k then
+    Result[j] := TrimQuotes(Copy(str, k, len-k +1));
 end;
 //------------------------------------------------------------------------------
 
@@ -1438,12 +1496,12 @@ begin
     begin
       hash := ParseNextWordHashed(c, endC);
       case hash of
-        hSans_045_Serif   : fontInfo.family := ttfSansSerif;
-        hSerif            : fontInfo.family := ttfSerif;
-        hMonospace        : fontInfo.family := ttfMonospace;
+        hSans_045_Serif   : fontInfo.family := tfSansSerif;
+        hSerif            : fontInfo.family := tfSerif;
+        hMonospace        : fontInfo.family := tfMonospace;
         hBold             : fontInfo.weight := 600;
         hItalic           : fontInfo.italic := sfsItalic;
-        hNormal           : 
+        hNormal           :
           begin
             fontInfo.weight := 400;
             fontInfo.italic := sfsNone;
