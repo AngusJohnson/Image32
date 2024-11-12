@@ -1,4 +1,4 @@
-﻿unit Img32.SVG.Core;
+unit Img32.SVG.Core;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
@@ -99,7 +99,7 @@ type
 
   TSVGFontInfo = record
     family      : TFontFamily;
-    nameOptions : UTF8Strings;
+    familyNames : UTF8Strings;
     size        : double;
     spacing     : double;
     textLength  : double;
