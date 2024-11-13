@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  16 October 2024                                                 *
+* Date      :  14 November 2024                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -615,17 +615,18 @@ end;
 function TrimQuotes(const str: UTF8String): UTF8String;
 var
   i, len: integer;
+  savedQuote: UTF8Char;
 begin
   len := Length(str);
   i := 1;
   while (i < len) and (str[i] <= space) do inc(i);
-
   if (i < len) and (str[i] in [quote, dquote]) then
   begin
+    savedQuote := str[i];
     inc(i);
-    while (len > i) and not (str[len] in [quote, dquote]) do dec(len);
-    if len = i then
-      Result := str else
+    while (len > i) and (str[len] <= space) do dec(len);
+    if (len = i) or (str[len] <> savedQuote) then
+      Result := str else  // oops!
       Result := Copy(str, i, len - i);
   end
   else
@@ -639,13 +640,7 @@ var
 const
   separator: Utf8Char = ',';
 begin
-  // nb: separator is NOT escaped.
-  if separator = #32 then
-  begin
-    Result := Split(str);
-    Exit;
-  end;
-
+  // precondition: commas CANNOT be embedded
   len := Length(str);
   cnt := 1;
   for i := 1 to len do
