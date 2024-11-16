@@ -406,7 +406,7 @@ type
 {$ENDIF}
     function GetGlyphInfo(unicode: Cardinal; out paths: TPathsD;
       out nextX: integer; out glyphMetrics: TGlyphMetrics): Boolean;
-    property Typeface: TFontFamily read fFontInfo.family;
+    property FontFamily: TFontFamily read fFontInfo.family;
     property FontInfo: TFontInfo read GetFontInfo;
     property Weight: integer read GetWeight; //range 100-900
   end;
@@ -2718,7 +2718,7 @@ begin
       Continue;
     end
     else
-      unicodes[j] := Ord(text[i]);
+      unicodes[j] := Ord(WideChar(text[i]));
     inc(j);
   end;
   len := j;
@@ -3870,10 +3870,10 @@ begin
     // if a font family is specified, then only return true
     // when finding the glyph within that font family
     if (Result > 0) and ((fntFamily = tfUnknown) or
-      (fntFamily = reader.Typeface)) then
+      (fntFamily = reader.FontFamily)) then
     begin
       fontReader := reader;
-      break;
+      Exit;
     end;
   end;
   Result := 0;
