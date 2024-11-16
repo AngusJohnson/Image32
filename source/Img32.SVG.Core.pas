@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  14 November 2024                                                *
+* Date      :  16 November 2024                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -284,6 +284,7 @@ const
   quote       = '''';
   dquote      = '"';
   space       = #32;
+  comma       = ',';
   SvgDecimalSeparator = '.'; //do not localize
 
   {$I Img32.SVG.HashConsts.inc}
@@ -595,18 +596,18 @@ begin
   spcCnt := 0;
   i := 1;
   len := Length(str);
-  while (len > 0) and (str[len] <= #32) do dec(len);
-  while (i <= len) and (str[i] <= #32) do inc(i);
+  while (len > 0) and (str[len] <= space) do dec(len);
+  while (i <= len) and (str[i] <= space) do inc(i);
   for j := i + 1 to len do
-    if (str[j] <= #32) and (str[j -1] > #32) then inc(spcCnt);
+    if (str[j] <= space) and (str[j -1] > space) then inc(spcCnt);
   SetLength(Result, spcCnt +1);
   for k := 0 to spcCnt do
   begin
     j := i;
-    while (j <= len) and (str[j] > #32) do inc(j);
+    while (j <= len) and (str[j] > space) do inc(j);
     SetLength(Result[k], j -i);
     Move(str[i], Result[k][1], j -i);
-    while (j <= len) and (str[j] <= #32) do inc(j);
+    while (j <= len) and (str[j] <= space) do inc(j);
     i := j;
   end;
 end;
@@ -637,20 +638,18 @@ end;
 function GetCommaSeparatedArray(const str: UTF8String): UTF8Strings;
 var
   i,j,k, cnt, len: integer;
-const
-  separator: Utf8Char = ',';
 begin
   // precondition: commas CANNOT be embedded
   len := Length(str);
   cnt := 1;
   for i := 1 to len do
-    if (str[i] = separator) then inc(cnt);
+    if (str[i] = comma) then inc(cnt);
   SetLength(Result, cnt);
   j := 0;
   k := 1;
   for i := 1 to len do
   begin
-    if (str[i] <> separator) then Continue;
+    if (str[i] <> comma) then Continue;
     Result[j] := TrimQuotes(Copy(str, k, i-k));
     inc(j);
     k := i + 1;
@@ -1294,9 +1293,9 @@ var
   len: integer;
 begin
   // trim left
-  while (c < endC) and (c^ <= #32) do Inc(c);
+  while (c < endC) and (c^ <= space) do Inc(c);
   // trim right
-  while (endC > c) and (endC[-1] <= #32) do Dec(endC);
+  while (endC > c) and (endC[-1] <= space) do Dec(endC);
 
   len := endC - c;
   SetLength(S, len);

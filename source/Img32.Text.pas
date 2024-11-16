@@ -3,7 +3,7 @@ unit Img32.Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  18 September 2024                                               *
+* Date      :  16 November 2024                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -88,7 +88,7 @@ type
   TFormat4Rec = record
     startCode    : Word;
     endCode      : Word;
-    idDelta       : Word;
+    idDelta      : Word;
     rangeOffset  : Word;
   end;
 
@@ -348,13 +348,12 @@ type
     fTbl_post          : TFontTable_Post;
     fTbl_loca2         : TArrayOfWord;
     fTbl_loca4         : TArrayOfCardinal;
-    fCmapTblRecs       : TArrayOfCmapTblRec;
     fKernTable         : TArrayOfKernRecs;
 
-    fCmapFormat        : Word;
-    fFormat0CodeMap    : array[0..255] of byte;
+    fFormat0CodeMap    : array of byte;
     fFormat4CodeMap    : array of TFormat4Rec;
     fFormat12CodeMap   : array of TFormat12Group;
+    fFormat4Offset     : integer;
 
     function GetTables: Boolean;
     function GetTable_name: Boolean;
@@ -945,7 +944,6 @@ end;
 procedure TFontReader.Clear;
 begin
   fTables               := nil;
-  fCmapTblRecs          := nil;
   fFormat4CodeMap       := nil;
   fFormat12CodeMap      := nil;
   fKernTable            := nil;
@@ -1199,11 +1197,14 @@ function TFontReader.GetTable_cmap: Boolean;
 var
   i,j         : integer;
   segCount    : integer;
+  format      : WORD;
   reserved    : WORD;
-  offset      : Cardinal;
   format4Rec  : TCmapFormat4;
   format12Rec : TCmapFormat12;
   cmapTbl     : TFontTable;
+  cmapTblRecs : array of TCmapTblRec;
+label
+  format4Error;
 begin
   Result := false;
   cmapTbl := fTables[fTblIdxes[tblCmap]];
@@ -1214,85 +1215,90 @@ begin
   GetWord(fStream, fTbl_cmap.numTables);
 
   //only use the unicode table (0: always first)
-  SetLength(fCmapTblRecs, fTbl_cmap.numTables);
+  SetLength(cmapTblRecs, fTbl_cmap.numTables);
   for i := 0 to fTbl_cmap.numTables -1 do
   begin
-    GetWord(fStream, fCmapTblRecs[i].platformID);
-    GetWord(fStream, fCmapTblRecs[i].encodingID);
-    GetCardinal(fStream, fCmapTblRecs[i].offset);
+    GetWord(fStream, cmapTblRecs[i].platformID);
+    GetWord(fStream, cmapTblRecs[i].encodingID);
+    GetCardinal(fStream, cmapTblRecs[i].offset);
   end;
 
-  // prefer USC-4 (encodingID=10) over USC-2 (encodingID=1)
-  j := -1;
-  for i := fTbl_cmap.numTables -1 downto 0 do
+  for i := 0 to fTbl_cmap.numTables -1 do
   begin
-    if (fCmapTblRecs[i].platformID <> 0) and
-      (fCmapTblRecs[i].platformID <> 3) then Continue;
-    j := i;
-    if fCmapTblRecs[i].encodingID = 10 then Break;
-  end;
-  if j < 0 then Exit;
-  fStream.Position := cmapTbl.offset + fCmapTblRecs[j].offset;
-  GetWord(fStream, fCmapFormat);
+    with cmapTblRecs[i] do
+      if (platformID = 0) or (platformID = 3) then
+        fStream.Position := cmapTbl.offset + offset
+      else
+        Continue;
+    GetWord(fStream, format);
 
-  case fCmapFormat of
-    0:
-      begin
-        GetWord(fStream, format4Rec.length);
-        GetWord(fStream, format4Rec.language);
-        for i := 0 to 255 do
-          GetByte(fStream, fFormat0CodeMap[i]);
-        fFontInfo.glyphCount := 255;
-      end;
-    4: //USC-2
-      begin
-        GetWord(fStream, format4Rec.length);
-        GetWord(fStream, format4Rec.language);
-
-        fFontInfo.glyphCount := 0;
-        GetWord(fStream, format4Rec.segCountX2);
-        segCount := format4Rec.segCountX2 shr 1;
-        GetWord(fStream, format4Rec.searchRange);
-        GetWord(fStream, format4Rec.entrySelector);
-        GetWord(fStream, format4Rec.rangeShift);
-        SetLength(fFormat4CodeMap, segCount);
-        for i := 0 to segCount -1 do
-          GetWord(fStream, fFormat4CodeMap[i].endCode);
-        if fFormat4CodeMap[segCount-1].endCode <> $FFFF then Exit; //error
-        GetWord(fStream, reserved);
-        if reserved <> 0 then Exit; //error
-        for i := 0 to segCount -1 do
-          GetWord(fStream, fFormat4CodeMap[i].startCode);
-        if fFormat4CodeMap[segCount-1].startCode <> $FFFF then Exit; //error
-        for i := 0 to segCount -1 do
-          GetWord(fStream, fFormat4CodeMap[i].idDelta);
-        offset := fStream.Position;
-        for i := 0 to segCount -1 do
+    case format of
+      0:
         begin
-          GetWord(fStream, fFormat4CodeMap[i].rangeOffset);
-          if fFormat4CodeMap[i].rangeOffset > 0 then
-            inc(fFormat4CodeMap[i].rangeOffset, offset);
+          if Assigned(fFormat0CodeMap) then Continue;
+          GetWord(fStream, format4Rec.length);
+          GetWord(fStream, format4Rec.language);
+          SetLength(fFormat0CodeMap, 256);
+          for j := 0 to 255 do
+            GetByte(fStream, fFormat0CodeMap[j]);
+          fFontInfo.glyphCount := 255;
         end;
-      end;
-    12: //USC-4
-      begin
-        GetWord(fStream, reserved);
-        GetCardinal(fStream, format12Rec.length);
-        GetCardinal(fStream, format12Rec.language);
-        GetCardinal(fStream, format12Rec.nGroups);
-        SetLength(fFormat12CodeMap, format12Rec.nGroups);
-        for i := 0 to format12Rec.nGroups -1 do
-          with fFormat12CodeMap[i] do
-          begin
-            GetCardinal(fStream, startCharCode);
-            GetCardinal(fStream, endCharCode);
-            GetCardinal(fStream, startGlyphCode);
-          end;
-      end;
-    else
-      Exit; // unsupported
+      4: //USC-2
+        begin
+          if Assigned(fFormat4CodeMap) then Continue;
+          GetWord(fStream, format4Rec.length);
+          GetWord(fStream, format4Rec.language);
+
+          fFontInfo.glyphCount := 0;
+          GetWord(fStream, format4Rec.segCountX2);
+          segCount := format4Rec.segCountX2 shr 1;
+          GetWord(fStream, format4Rec.searchRange);
+          GetWord(fStream, format4Rec.entrySelector);
+          GetWord(fStream, format4Rec.rangeShift);
+          SetLength(fFormat4CodeMap, segCount);
+          for j := 0 to segCount -1 do
+            GetWord(fStream, fFormat4CodeMap[j].endCode);
+          if fFormat4CodeMap[segCount-1].endCode <> $FFFF then
+            GoTo format4Error;
+          GetWord(fStream, reserved);
+          if reserved <> 0 then
+            GoTo format4Error;
+          for j := 0 to segCount -1 do
+            GetWord(fStream, fFormat4CodeMap[j].startCode);
+          if fFormat4CodeMap[segCount-1].startCode <> $FFFF then
+            GoTo format4Error;
+          for j := 0 to segCount -1 do
+            GetWord(fStream, fFormat4CodeMap[j].idDelta);
+
+          fFormat4Offset := fStream.Position;
+          for j := 0 to segCount -1 do
+            GetWord(fStream, fFormat4CodeMap[j].rangeOffset);
+          if Assigned(fFormat12CodeMap) then Break
+          else Continue;
+
+          format4Error:
+          fFormat4CodeMap := nil;
+        end;
+      12: //USC-4
+        begin
+          if Assigned(fFormat12CodeMap) then Continue;
+          GetWord(fStream, reserved);
+          GetCardinal(fStream, format12Rec.length);
+          GetCardinal(fStream, format12Rec.language);
+          GetCardinal(fStream, format12Rec.nGroups);
+          SetLength(fFormat12CodeMap, format12Rec.nGroups);
+          for j := 0 to format12Rec.nGroups -1 do
+            with fFormat12CodeMap[j] do
+            begin
+              GetCardinal(fStream, startCharCode);
+              GetCardinal(fStream, endCharCode);
+              GetCardinal(fStream, startGlyphCode);
+            end;
+          if Assigned(fFormat4CodeMap) then Break;
+        end;
+    end;
   end;
-  Result := true;
+  Result := Assigned(fFormat4CodeMap) or Assigned(fFormat12CodeMap);
 end;
 //------------------------------------------------------------------------------
 
@@ -1302,32 +1308,36 @@ var
   w: WORD;
 begin
   result := 0; //default to the 'missing' glyph
-  case fCmapFormat of
-    0: if codePoint <= 255 then Result := fFormat0CodeMap[codePoint];
-    4:
-      for i := 0 to High(fFormat4CodeMap) do
-        with fFormat4CodeMap[i] do
-          if codePoint <= endCode then
+  if (codePoint < 256) and Assigned(fFormat0CodeMap) then
+    Result := fFormat0CodeMap[codePoint]
+  else if Assigned(fFormat12CodeMap) then
+  begin
+    for i := 0 to High(fFormat12CodeMap) do
+      with fFormat12CodeMap[i] do
+        if codePoint <= endCharCode then
+        begin
+          if codePoint < startCharCode then Break;
+          result := (startGlyphCode + Word(codePoint) - startCharCode);
+          Break;
+        end;
+  end
+  else if (codePoint < $FFFF) and Assigned(fFormat4CodeMap) then
+  begin
+    for i := 0 to High(fFormat4CodeMap) do
+      with fFormat4CodeMap[i] do
+        if codePoint <= endCode then
+        begin
+          if codePoint < startCode then Break;
+          if rangeOffset > 0 then
           begin
-            if codePoint < startCode then Break;
-            if rangeOffset > 0 then
-            begin
-              fStream.Position := rangeOffset + 2 * (i + Word(codePoint) - startCode);
-              GetWord(fStream, w);
-              if w < fTbl_maxp.numGlyphs then Result := w;
-            end else
-              result := (idDelta + codePoint) and $FFFF;
-            Break;
-          end;
-    12:
-      for i := 0 to High(fFormat12CodeMap) do
-        with fFormat12CodeMap[i] do
-          if codePoint <= endCharCode then
-          begin
-            if codePoint < startCharCode then Break;
-            result := (startGlyphCode + Word(codePoint) - startCharCode);
-            Break;
-          end;
+            fStream.Position := fFormat4Offset +
+              rangeOffset + 2 * (i + Word(codePoint) - startCode);
+            GetWord(fStream, w);
+            if w < fTbl_maxp.numGlyphs then Result := w;
+          end else
+            result := (idDelta + codePoint) and $FFFF;
+          Break;
+        end;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2029,7 +2039,7 @@ begin
   glyphIdx := GetGlyphIdxUsingCmap(unicode);
   if (glyphIdx = 0) then
   begin
-    if (unicode > 32) and Assigned(fFontManager)  then
+    if (unicode > 32) and Assigned(fFontManager) then
       glyphIdx := fFontManager.FindReaderContainingGlyph(unicode,
         fFontInfo.family, altFontReader);
     if (glyphIdx > 0) then
