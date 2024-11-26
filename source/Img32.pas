@@ -480,15 +480,15 @@ type
 
   {$IFDEF MSWINDOWS}
   //Color32: Converts a Graphics.TColor value into a TColor32 value.
-  function Color32(rgbColor: Integer): TColor32; overload;
+  function Color32(rgbColor: Integer): TColor32; overload; {$IFDEF INLINE} inline; {$ENDIF}
 
   procedure FixPalette(p: PARGB; count: integer);
   {$ENDIF}
-  function Color32(a, r, g, b: Byte): TColor32; overload;
+  function Color32(a, r, g, b: Byte): TColor32; overload; {$IFDEF INLINE} inline; {$ENDIF}
 
   //RGBColor: Converts a TColor32 value into a COLORREF value
-  function RGBColor(color: TColor32): Cardinal;
-  function InvertColor(color: TColor32): TColor32;
+  function RGBColor(color: TColor32): Cardinal; {$IFDEF INLINE} inline; {$ENDIF}
+  function InvertColor(color: TColor32): TColor32; {$IFDEF INLINE} inline; {$ENDIF}
 
   //RgbToHsl: See https://en.wikipedia.org/wiki/HSL_and_HSV
   function RgbToHsl(color: TColor32): THsl;
@@ -500,8 +500,8 @@ type
 
   function GetAlpha(color: TColor32): Byte;  {$IFDEF INLINE} inline; {$ENDIF}
 
-  function PointD(const X, Y: Double): TPointD; overload;
-  function PointD(const pt: TPoint): TPointD; overload;
+  function PointD(const X, Y: Double): TPointD; overload; {$IFDEF INLINE} inline; {$ENDIF}
+  function PointD(const pt: TPoint): TPointD; overload; {$IFDEF INLINE} inline; {$ENDIF}
 
   function RectD(left, top, right, bottom: double): TRectD; overload;
   function RectD(const rec: TRect): TRectD; overload;
@@ -512,10 +512,10 @@ type
     {$IFDEF INLINE} inline; {$ENDIF}
   function ClampRange(val, min, max: double): double; overload;
     {$IFDEF INLINE} inline; {$ENDIF}
-  function IncPColor32(pc: Pointer; cnt: Integer): PColor32;
+  function IncPColor32(pc: Pointer; cnt: Integer): PColor32; {$IFDEF INLINE} inline; {$ENDIF}
 
   procedure NormalizeAngle(var angle: double; tolerance: double = Pi/360);
-  function GrayScale(color: TColor32): TColor32;
+  function GrayScale(color: TColor32): TColor32; {$IFDEF INLINE} inline; {$ENDIF}
 
   //DPIAware: Useful for DPIAware sizing of images and their container controls.
   //It scales values relative to the display's resolution (PixelsPerInch).

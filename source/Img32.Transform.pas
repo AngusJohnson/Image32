@@ -3,7 +3,7 @@ unit Img32.Transform;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  26 November 2024                                                *
+* Date      :  27 November 2024                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Affine and projective transformation routines for TImage32      *
@@ -1196,7 +1196,7 @@ end;
 
 procedure TWeightedColor.Add(c: TColor32; w: Integer);
 var
-  a: Cardinal;
+  a: Int64;
 begin
   inc(fAddCount, w);
   a := Byte(c shr 24);
@@ -1204,9 +1204,9 @@ begin
   begin
     a := a * Cardinal(w);
     inc(fAlphaTot, a);
-    inc(fColorTotB, (Int64(a) * Byte(c)));
-    inc(fColorTotG, (Int64(a) * Byte(c shr 8)));
-    inc(fColorTotR, (Int64(a) * Byte(c shr 16)));
+    inc(fColorTotB, (a * Byte(c)));
+    inc(fColorTotG, (a * Byte(c shr 8)));
+    inc(fColorTotR, (a * Byte(c shr 16)));
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1214,7 +1214,7 @@ end;
 procedure TWeightedColor.Add(c: TColor32);
 // Optimized for w=1
 var
-  a: Cardinal;
+  a: Int64;
 begin
   inc(fAddCount);
   a := Byte(c shr 24);
@@ -1238,7 +1238,7 @@ end;
 
 procedure TWeightedColor.Subtract(c: TColor32; w: Integer);
 var
-  a: Cardinal;
+  a: Int64;
 begin
   dec(fAddCount, w);
   a := w * Byte(c shr 24);
@@ -1253,7 +1253,7 @@ end;
 procedure TWeightedColor.Subtract(c: TColor32);
 // Optimized for w=1
 var
-  a: Cardinal;
+  a: Int64;
 begin
   dec(fAddCount);
   a := Byte(c shr 24);
@@ -1277,7 +1277,7 @@ end;
 
 function TWeightedColor.AddSubtract(addC, subC: TColor32): Boolean;
 var
-  a: Cardinal;
+  a: Int64;
 begin
   // add+subtract => fAddCount stays the same
 
@@ -1309,7 +1309,7 @@ end;
 
 function TWeightedColor.AddNoneSubtract(c: TColor32): Boolean;
 var
-  a: Cardinal;
+  a: Int64;
 begin
   // add+subtract => fAddCount stays the same
 
