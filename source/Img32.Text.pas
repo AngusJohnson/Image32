@@ -3,7 +3,7 @@ unit Img32.Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  16 November 2024                                                *
+* Date      :  29 November 2024                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -324,7 +324,7 @@ type
     // is found, or a TFontReader is found but not in the specified family.
     // When the latter occurs, fntReader will be assigned and index will be > 0.
     function FindReaderContainingGlyph(missingUnicode: Word;
-      fntFamily: TFontFamily; out fontReader: TFontReader): integer;
+      fntFamily: TFontFamily; out glyphIdx: integer): TFontReader;
     function Delete(fontReader: TFontReader): Boolean;
     property MaxFonts: integer read fMaxFonts write SetMaxFonts;
   end;
@@ -2031,20 +2031,26 @@ var
   tbl_hmtx: TFontTable_Hmtx;
   pathsEx: TPathsEx;
   altFontReader: TFontReader;
+  scale: double;
 begin
   paths  := nil;
   Result := IsValidFontFormat;
   if not Result then Exit;
 
+  scale := 1.0;
   glyphIdx := GetGlyphIdxUsingCmap(unicode);
   if (glyphIdx = 0) then
   begin
+    altFontReader := nil;
     if (unicode > 32) and Assigned(fFontManager) then
-      glyphIdx := fFontManager.FindReaderContainingGlyph(unicode,
-        fFontInfo.family, altFontReader);
-    if (glyphIdx > 0) then
-      glyphMetrics := altFontReader.GetGlyphMetricsInternal(glyphIdx, pathsEx)
-    else
+      altFontReader := fFontManager.FindReaderContainingGlyph(unicode,
+        fFontInfo.family, glyphIdx);
+    if Assigned(altFontReader) and (glyphIdx > 0) then
+    begin
+      glyphMetrics := altFontReader.GetGlyphMetricsInternal(glyphIdx, pathsEx);
+      if altFontReader.FontInfo.unitsPerEm <> FontInfo.unitsPerEm then
+        scale := FontInfo.unitsPerEm / altFontReader.FontInfo.unitsPerEm;
+    end else
       glyphMetrics := GetGlyphMetricsInternal(glyphIdx, pathsEx);
   end else
     glyphMetrics := GetGlyphMetricsInternal(glyphIdx, pathsEx);
@@ -2053,6 +2059,7 @@ begin
   pathsEx := ConvertSplinesToBeziers(pathsEx);
   nextX   := tbl_hmtx.advanceWidth;
   paths := FlattenPathExBeziers(PathsEx);
+  if scale <> 1.0 then paths := ScalePath(paths, scale);
 end;
 
 function TFontReader.GetFontInfo: TFontInfo;
@@ -2680,7 +2687,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function ConvertSurrogatePair(hiSurrogate, loSurrogate: Cardinal): Int64;
+function ConvertSurrogatePair(hiSurrogate, loSurrogate: Cardinal): Cardinal;
   {$IFDEF INLINE} inline; {$ENDIF}
 begin
   Result := ((hiSurrogate - $D800) shl 10) + (loSurrogate - $DC00) + $10000;
@@ -2852,7 +2859,7 @@ function TFontCache.AddGlyph(unicode: Cardinal): PGlyphInfo;
 var
   dummy: integer;
 const
-  minLength = 0.25;
+  minLength = 0.1;
 begin
 
   New(Result);
@@ -2864,8 +2871,7 @@ begin
   begin
     Result.contours := ScalePath(Result.contours, fScale);
     //text rendering is about twice as fast when excess detail is removed
-    Result.contours :=
-      StripNearDuplicates(Result.contours, minLength, true);
+    Result.contours := StripNearDuplicates(Result.contours, minLength, true);
   end;
 
   if fFlipVert then VerticalFlip(Result.contours);
@@ -3857,26 +3863,26 @@ end;
 //------------------------------------------------------------------------------
 
 function TFontManager.FindReaderContainingGlyph(missingUnicode: Word;
-  fntFamily: TFontFamily; out fontReader: TFontReader): integer;
+  fntFamily: TFontFamily; out glyphIdx: integer): TFontReader;
 var
   i: integer;
   reader: TFontReader;
 begin
-  fontReader := nil;
-  for i := 1 to fFontList.Count -1 do
+  result := nil;
+  for i := 0 to fFontList.Count -1 do
   begin
     reader := TFontReader(fFontList[i]);
-    Result := reader.GetGlyphIdxUsingCmap(missingUnicode);
+    glyphIdx := reader.GetGlyphIdxUsingCmap(missingUnicode);
     // if a font family is specified, then only return true
     // when finding the glyph within that font family
-    if (Result > 0) and ((fntFamily = tfUnknown) or
-      (fntFamily = reader.FontFamily)) then
+    if (glyphIdx > 0) and ((fntFamily = tfUnknown) or
+      (reader.FontFamily = tfUnknown) or (fntFamily = reader.FontFamily)) then
     begin
-      fontReader := reader;
+      Result := reader;
       Exit;
     end;
   end;
-  Result := 0;
+  glyphIdx := 0;
 end;
 //------------------------------------------------------------------------------
 
