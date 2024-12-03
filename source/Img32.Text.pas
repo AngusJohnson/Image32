@@ -3,7 +3,7 @@ unit Img32.Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  29 November 2024                                                *
+* Date      :  3 December 2024                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -3785,7 +3785,7 @@ end;
 function FontFamilyToInt(family: TFontFamily): integer;
   {$IFDEF INLINE} inline; {$ENDIF}
 begin
-  Result := Ord(family);
+  Result := Ord(family) +1;
 end;
 //------------------------------------------------------------------------------
 
@@ -3794,24 +3794,23 @@ function TFontManager.GetBestMatchFont(const fontInfo: TFontInfo): TFontReader;
   function GetStyleDiff(const macstyles1, macstyles2: TMacStyles): integer;
     {$IFDEF INLINE} inline; {$ENDIF}
   begin
-    // top priority (shl 8)
-    Result := Abs(StylesToInt(macstyles1) - StylesToInt(macstyles2)) * 256;
-    // weight bold vs italic equally ...
-    if Result = 512 then Result := 256;
+    // top priority
+    Result := (((Byte(macstyles1) xor $FF) or
+      (Byte(macstyles2) xor $FF)) and $3) * 256;
   end;
 
   function GetFontFamilyDiff(const family1, family2: TFontFamily): integer;
     {$IFDEF INLINE} inline; {$ENDIF}
   begin
-    // second priority (shl 5)
-    Result := Abs(FontFamilyToInt(family1) - FontFamilyToInt(family2)) * 32;
+    // second priority
+    Result := Abs(FontFamilyToInt(family1) - FontFamilyToInt(family2)) * 8;
   end;
 
   function GetShortNameDiff(const name1, name2: string): integer;
     {$IFDEF INLINE} inline; {$ENDIF}
   begin
     // third priority (shl 3)
-    if SameText(name1, name2) then Result := 0 else Result := 8;
+    if SameText(name1, name2) then Result := 0 else Result := 4;
   end;
 
   function GetFullNameDiff(const fiToMatch: TFontInfo; const candidateName: string): integer;
@@ -3823,11 +3822,10 @@ function TFontManager.GetBestMatchFont(const fontInfo: TFontInfo): TFontReader;
     if Assigned(fiToMatch.familyNames) then
     begin
       for i := 0 to High(fiToMatch.familyNames) do
-        if SameText(fiToMatch.familyNames[i], candidateName) then
-          Exit;
+        if SameText(fiToMatch.familyNames[i], candidateName) then Exit;
     end
     else if SameText(fiToMatch.faceName, candidateName) then Exit;
-    Result := 1;
+    Result := 2;
   end;
 
   function CompareFontInfos(const fiToMatch, fiCandidate: TFontInfo): integer;
