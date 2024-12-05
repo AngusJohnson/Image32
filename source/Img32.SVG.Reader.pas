@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  29 November 2024                                                *
+* Date      :  5 December 2024                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -131,9 +131,6 @@ type
     function  Height    : TValue;
   end;
 
-  TStyleElement = class(TBaseElement)
-  end;
-
   TSvgReader = class
   private
     fSvgParser        : TSvgParser;
@@ -217,14 +214,16 @@ type
     constructor Create(parent: TBaseElement; svgEl: TSvgXmlEl); override;
   end;
 
-  //-------------------------------------
+  TStyleElement = class(TBaseElement)
+  public
+    constructor Create(parent: TBaseElement; svgEl: TSvgXmlEl); override;
+  end;
 
   // TImageElement only supports *embedded* jpg & png images.
   // And it requires Img32.Fmt.JPG & Img32.Fmt.PNG to be included
   // in the USES clause of at least one of the application's units.
   // (nb: If using the FMX framework, then add Img32.FMX instead of
   // Img32.Fmt.JPG & Img32.Fmt.PNG to the USES clause.)
-
   TImageElement = class(TBaseElement)
   private
     fRefEl: UTF8String;
@@ -235,14 +234,7 @@ type
     destructor Destroy; override;
   end;
 
-  //-------------------------------------
-
   TShapeElement = class(TBaseElement)
-//  private
-//    procedure SimpleDrawFill(const paths: TPathsD;
-//      fillRule: TFillRule; color: TColor32);
-//    procedure SimpleDrawStroke(const paths: TPathsD; width: double;
-//      joinStyle: TJoinStyle; endStyle: TEndStyle; color: TColor32);
   protected
     hasPaths    : Boolean;
     drawPathsO  : TPathsD; //open only
@@ -1029,6 +1021,17 @@ constructor TDefsElement.Create(parent: TBaseElement; svgEl: TSvgXmlEl);
 begin
   inherited;
   fDrawData.visible := false;
+end;
+
+//------------------------------------------------------------------------------
+// TStyleElement
+//------------------------------------------------------------------------------
+
+constructor TStyleElement.Create(parent: TBaseElement; svgEl: TSvgXmlEl);
+begin
+  inherited;
+  fDrawData.visible := false;
+  // See ParseStyleElementContent in Img32.Core.
 end;
 
 //------------------------------------------------------------------------------
@@ -3876,11 +3879,19 @@ procedure TSvgElement.Draw(image: TImage32; drawDat: TDrawData);
 var
   sx, sy: double;
 begin
-  if (fReader.RootElement <> self) and not viewboxWH.IsEmpty then
+  if (fReader.RootElement <> self) then
   begin
-    sx := image.Width / viewboxWH.Width;
-    sy := image.Height / viewboxWH.Height;
-    MatrixScale(drawDat.matrix, sx, sy);
+    if (elRectWH.left.rawVal <> InvalidD) or (elRectWH.top.rawVal <> InvalidD) then
+    begin
+      MatrixExtractScale(drawDat.matrix, sx, sy);
+      MatrixTranslate(drawDat.matrix, elRectWH.left.rawVal * sx, elRectWH.top.rawVal *sy);
+    end;
+    if not viewboxWH.IsEmpty then
+    begin
+      sx := image.Width / viewboxWH.Width;
+      sy := image.Height / viewboxWH.Height;
+      MatrixScale(drawDat.matrix, sx, sy);
+    end;
   end;
   inherited;
 end;

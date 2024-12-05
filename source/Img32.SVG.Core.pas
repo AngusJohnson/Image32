@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  29 November 2024                                                *
+* Date      :  5 December 2024                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -1924,7 +1924,6 @@ begin
   //load the class's style (ie undotted style) if found.
   style := owner.classStyles.GetStyle(name);
   if style <> '' then ParseStyleAttribute(style);
-
   Result := ParseAttributes(c, endC);
 end;
 //------------------------------------------------------------------------------
@@ -2026,7 +2025,7 @@ begin
       Exit;
     end;
 
-    attribs.Add(attrib);    
+    attribs.Add(attrib);
     case attrib.hash of
       hId     : idAttrib := attrib;
       hClass  : classAttrib := attrib;
@@ -2745,9 +2744,9 @@ end;
 function TClassStylesList.FindItemIndex(const Name: UTF8String): Integer;
 begin
   Result := -1;
+  FNameHash := GetHash(Name);
   if FMod <> 0 then
   begin
-    FNameHash := GetHash(Name);
     Result := FBuckets[(FNameHash and $7FFFFFFF) mod FMod];
     while (Result <> -1) and
       ((FItems[Result].Hash <> FNameHash) or
