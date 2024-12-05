@@ -3,7 +3,7 @@ unit Img32.Fmt.PNG;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  18 September 2024                                               *
+* Date      :  6 December 2024                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 * Purpose   :  PNG file format extension for TImage32                          *
@@ -193,8 +193,11 @@ var
   png         : TPngImage;
   dst         : PARGB;
   srcColor    : PByte;
-  palentries  : array[0..255] of TPaletteEntry;
+  palentries  : array of TPaletteEntry;
+  palSize     : integer;
+  palIs4Bits  : Boolean;
   usingPal    : Boolean;
+  palOdd      : Boolean;
   transpColor : TColor32;
 begin
   img32.BeginUpdate;
@@ -203,44 +206,71 @@ begin
     png.LoadFromStream(stream);
     img32.SetSize(png.Width, png.Height);
 
-    //bytesPerRow := PByte(png.Scanline[1]) - PByte(png.Scanline[0]);
-    //usingPal := (Abs(bytesPerRow) = png.Width) and (png.Palette <> 0);
     usingPal := (png.Header.BitDepth <= 8) and (png.Palette <> 0);
 
     if usingPal then
     begin
-      GetPaletteEntries(png.Palette, 0, 256, palentries);
-      FixPalette(@palentries[0], 256);
-    end;
-
-    for i := 0 to img32.Height -1 do
-    begin
-      dst      := PARGB(img32.PixelRow[i]);
-      srcColor := png.Scanline[i];
-
-      if usingPal then
+      palSize := 256;
+      SetLength(palentries, palSize);
+      GetPaletteEntries(png.Palette, 0, 256, palentries[0]);
+      if (Cardinal(palentries[255]) = 0) and (Cardinal(palentries[254]) = 0) then
       begin
-        transpColor := TColor32(png.transparentColor) or $FF000000;
+        palSize := 253;
+        while Cardinal(palentries[palSize -1]) = 0 do dec(palSize);
+      end;
+      palIs4Bits := palSize <= 16; // each pal index uses only 4 bits
+      FixPalette(@palentries[0], palSize);
+
+      transpColor := TColor32(png.transparentColor) or $FF000000;
+      for i := 0 to img32.Height -1 do
+      begin
+        dst      := PARGB(img32.PixelRow[i]);
+        srcColor := png.Scanline[i];
+        palOdd   := false;
         for j := 0 to img32.Width -1 do
         begin
-          dst.Color := TColor32(palentries[srcColor^]);
-          if dst.Color = transpColor then
-            dst.Color := clNone32;
-          inc(srcColor);
+          if not palIs4Bits then
+          begin
+            dst.Color := TColor32(palentries[srcColor^]);
+            inc(srcColor);
+          end
+          else if palOdd then
+          begin
+            dst.Color := TColor32(palentries[srcColor^ and $F]);
+            palOdd := false;
+            inc(srcColor);
+          end else
+          begin
+            dst.Color := TColor32(palentries[srcColor^ shr 4]);
+            palOdd := true;
+          end;
+          if dst.Color = transpColor then dst.Color := clNone32;
           inc(dst);
         end;
-      end
-      else if png.Transparent and
-        (png.Header.ColorType = COLOR_RGBALPHA) or
+      end;
+    end
+
+    else if png.Transparent and
+          (png.Header.ColorType = COLOR_RGBALPHA) or
           (png.Header.ColorType = COLOR_GRAYSCALEALPHA) then
+    begin
+      for i := 0 to img32.Height -1 do
       begin
+        dst      := PARGB(img32.PixelRow[i]);
+        srcColor := png.Scanline[i];
         CopyLineWithAlpha(dst, PByte(png.AlphaScanline[i]), srcColor, img32.Width);
-      end else
+      end;
+    end else
+
+    begin
+      for i := 0 to img32.Height -1 do
       begin
+        dst      := PARGB(img32.PixelRow[i]);
+        srcColor := png.Scanline[i];
         CopyLineWithoutAlpha(dst, srcColor, img32.Width);
       end;
-
     end;
+
   finally
     png.Free;
     img32.EndUpdate;
