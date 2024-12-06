@@ -3,7 +3,7 @@ unit Img32.Fmt.PNG;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  6 December 2024                                                 *
+* Date      :  7 December 2024                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2023                                         *
 * Purpose   :  PNG file format extension for TImage32                          *
@@ -25,9 +25,9 @@ type
     class function IsValidImageStream(stream: TStream): Boolean; override;
     function LoadFromStream(stream: TStream;
       img32: TImage32; imgIndex: integer = 0): Boolean; override;
-    // SaveToStream: the compressionQuality parameter is ignored here
+    // SaveToStream: compressionQuality range is 0 .. 9 (ZLIB compression)
     procedure SaveToStream(stream: TStream;
-      img32: TImage32; compressionQuality: integer = 0); override;
+      img32: TImage32; compressionQuality: integer = 7); override;
     class function CanCopyToClipboard: Boolean; override;
     class function CopyToClipboard(img32: TImage32): Boolean; override;
     class function CanPasteFromClipboard: Boolean; override;
@@ -87,7 +87,7 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TImageFormat_PNG.SaveToStream(stream: TStream;
-  img32: TImage32; compressionQuality: integer = 0);
+  img32: TImage32; compressionQuality: integer);
 var
   png: TPortableNetworkGraphic;
 begin
@@ -95,6 +95,7 @@ begin
   img32.BeginUpdate;
   png := TPortableNetworkGraphic.Create;
   try
+    png.CompressionLevel := Max(0, Min(9, compressionQuality));
     png.SetSize(img32.Width, img32.Height);
     png.PixelFormat := pf32bit;
     Move(img32.PixelBase^, png.ScanLine[0]^, img32.Width * img32.Height *4);
@@ -280,7 +281,7 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TImageFormat_PNG.SaveToStream(stream: TStream;
-  img32: TImage32; compressionQuality: integer = 0);
+  img32: TImage32; compressionQuality: integer);
 var
   i,j: integer;
   png: TPngImage;
@@ -289,6 +290,7 @@ var
 begin
   png := TPngImage.CreateBlank(COLOR_RGBALPHA, 8, img32.Width, img32.Height);
   try
+    png.CompressionLevel := Max(0, Min(9, compressionQuality));
     png.CreateAlpha;
     for i := 0 to img32.Height -1 do
     begin
