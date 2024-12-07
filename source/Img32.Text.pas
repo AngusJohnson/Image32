@@ -234,17 +234,17 @@ type
     //maxMemType1   : Cardinal;
   end;
 
-  ArrayOfUnicodeString = array of UnicodeString;
+  ArrayOfUtf8String = array of Utf8String;
 
   TFontInfo = record                  //a custom summary record
     fontFormat     : TFontFormat;
     family         : TFontFamily;
-    familyNames    : ArrayOfUnicodeString;
-    faceName       : UnicodeString;
-    fullFaceName   : UnicodeString;
-    style          : UnicodeString;
-    copyright      : UnicodeString;
-    manufacturer   : UnicodeString;
+    familyNames    : ArrayOfUtf8String;
+    faceName       : Utf8String;
+    fullFaceName   : Utf8String;
+    style          : Utf8String;
+    copyright      : Utf8String;
+    manufacturer   : Utf8String;
     dateCreated    : TDatetime;
     dateModified   : TDatetime;
     macStyles      : TMacStyles;
@@ -315,7 +315,7 @@ type
     constructor Create;
     destructor Destroy; override;
     procedure Clear;
-    function GetFont(const fontName: string): TFontReader;
+    function GetFont(const fontName: Utf8String): TFontReader;
 {$IFDEF MSWINDOWS}
     function Load(const fontName: string; Weight: Integer = FW_NORMAL; Italic: Boolean = False): TFontReader;
 {$ENDIF}
@@ -861,41 +861,51 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetWideString(stream: TStream; length: integer): UnicodeString;
+function GetWideString(stream: TStream; length: integer): Utf8String;
 var
   i: integer;
   w: WORD;
+  s: UnicodeString;
 begin
   length := length div 2;
-  setLength(Result, length);
+  setLength(s, length);
   for i := 1 to length do
   begin
     GetWord(stream, w); //nb: reverses byte order
     if w = 0 then
     begin
-      SetLength(Result, i -1);
+      SetLength(s, i -1);
       break;
     end;
-    result[i] := WideChar(w);
+    s[i] := WideChar(w);
    end;
+   Result := Utf8String(s);
 end;
 //------------------------------------------------------------------------------
 
-function GetAnsiString(stream: TStream; len: integer): string;
+function GetUtf8String(stream: TStream; len: integer): Utf8String;
 var
   i: integer;
-  ansi: UTF8String;
 begin
-  setLength(ansi, len+1);
-  ansi[len+1] := #0;
-  stream.Read(ansi[1], len);
-  result := string(ansi);
+  setLength(Result, len+1);
+  Result[len+1] := #0;
+  stream.Read(Result[1], len);
   for i := 1 to length(Result) do
     if Result[i] = #0 then
     begin
       SetLength(Result, i -1);
       break;
     end;
+end;
+//------------------------------------------------------------------------------
+
+function SameText(const text1, text2: Utf8String): Boolean; overload;
+var
+  len: integer;
+begin
+  len := Length(text1);
+  Result := (Length(text2) = len) and
+    ((len = 0) or CompareMem(@text1[1], @text2[1], len));
 end;
 
 //------------------------------------------------------------------------------
@@ -1399,7 +1409,7 @@ end;
 //------------------------------------------------------------------------------
 
 function GetNameRecString(stream: TStream;
-  const nameRec: TNameRec; offset: cardinal): UnicodeString;
+  const nameRec: TNameRec; offset: cardinal): Utf8String;
 var
   sPos, len: integer;
 begin
@@ -1407,7 +1417,7 @@ begin
   stream.Position := offset + nameRec.offset;
   if IsUnicode(nameRec.platformID) then
     Result := GetWideString(stream, nameRec.length) else
-    Result := UnicodeString(GetAnsiString(stream, nameRec.length));
+    Result := GetUtf8String(stream, nameRec.length);
   len := Length(Result);
   if (len > 0) and (Result[len] = #0) then SetLength(Result, len -1);
   stream.Position := sPos;
@@ -3475,7 +3485,7 @@ begin
   else if Assigned(font) then
     with TWordInfo(fList.Items[index]) do
     begin
-      aWord := newWord;
+      aWord := UnicodeString(newWord);
       length := 1;
       while (length < len) and (aWord[length+1] > #32) do
         inc(length);
@@ -3625,7 +3635,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFontManager.GetFont(const fontName: string): TFontReader;
+function TFontManager.GetFont(const fontName: Utf8String): TFontReader;
 var
   i: integer;
 begin
@@ -3651,7 +3661,7 @@ begin
   if fFontList.Count >= fMaxFonts then
     raise Exception.Create(rsTooManyFonts);
 
-  Result := GetFont(fontname);
+  Result := GetFont(Utf8String(fontname));
   if Assigned(Result) then Exit;
 
   Result := TFontReader.Create;
@@ -3789,7 +3799,7 @@ function TFontManager.GetBestMatchFont(const fontInfo: TFontInfo): TFontReader;
     Result := Abs(FontFamilyToInt(family1) - FontFamilyToInt(family2)) * 8;
   end;
 
-  function GetShortNameDiff(const name1, name2: UnicodeString): integer;
+  function GetShortNameDiff(const name1, name2: Utf8String): integer;
     {$IFDEF INLINE} inline; {$ENDIF}
   begin
     // third priority (shl 3)
@@ -3797,7 +3807,7 @@ function TFontManager.GetBestMatchFont(const fontInfo: TFontInfo): TFontReader;
   end;
 
   function GetFullNameDiff(const fiToMatch: TFontInfo;
-    const candidateName: UnicodeString): integer;
+    const candidateName: Utf8String): integer;
   var
     i: integer;
   begin

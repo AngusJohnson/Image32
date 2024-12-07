@@ -1077,12 +1077,9 @@ begin
   c := PUTF8Char(s);
   if not Match(c, 'data:image/') then Exit;
 
-  if Match(@c[11], 'jpg;base64,') then offset := 22
+  if      Match(@c[11], 'jpg;base64,') then offset := 22
   else if Match(@c[11], 'jpeg;base64,') then offset := 23
   else if Match(@c[11], 'png;base64,') then offset := 22
-  else if Match(@c[11], 'jpg;base64,') then offset := 20
-  else if Match(@c[11], 'jpeg;base64,') then offset := 21
-  else if Match(@c[11], 'png;base64,') then offset := 20
   else Exit;
 
   ms := TMemoryStream.Create;
@@ -5405,7 +5402,7 @@ begin
   len := Length(svgFontInfo.familyNames);
   SetLength(fi.familyNames, len);
   for i := 0 to len -1 do
-    fi.familyNames[i] := string(svgFontInfo.familyNames[i]);
+    fi.familyNames[i] := svgFontInfo.familyNames[i];
 
   if svgFontInfo.italic = sfsItalic then
     Include(fi.macStyles, msItalic);

@@ -2006,9 +2006,9 @@ end;
 
 function NameToId(Name: PChar): Longint;
 begin
-  if Cardinal(PWord(Name)) < 30 then
+  if Name < Pointer(30) then
   begin
-    Result := Cardinal(PWord(Name))
+    Result := Longint(Name)
   end else
   begin
     if Name^ = '#' then inc(Name);
