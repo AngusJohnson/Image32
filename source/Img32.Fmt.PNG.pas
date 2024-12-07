@@ -27,7 +27,7 @@ type
       img32: TImage32; imgIndex: integer = 0): Boolean; override;
     // SaveToStream: compressionQuality range is 0 .. 9 (ZLIB compression)
     procedure SaveToStream(stream: TStream;
-      img32: TImage32; compressionQuality: integer = 7); override;
+      img32: TImage32; compressionQuality: integer = defaultCompression); override;
     class function CanCopyToClipboard: Boolean; override;
     class function CopyToClipboard(img32: TImage32): Boolean; override;
     class function CanPasteFromClipboard: Boolean; override;
@@ -95,7 +95,9 @@ begin
   img32.BeginUpdate;
   png := TPortableNetworkGraphic.Create;
   try
-    png.CompressionLevel := Max(0, Min(9, compressionQuality));
+    if compressionQuality = defaultCompression then
+      png.CompressionLevel := 7 else
+      png.CompressionLevel := Max(0, Min(9, compressionQuality));
     png.SetSize(img32.Width, img32.Height);
     png.PixelFormat := pf32bit;
     Move(img32.PixelBase^, png.ScanLine[0]^, img32.Width * img32.Height *4);
@@ -290,7 +292,9 @@ var
 begin
   png := TPngImage.CreateBlank(COLOR_RGBALPHA, 8, img32.Width, img32.Height);
   try
-    png.CompressionLevel := Max(0, Min(9, compressionQuality));
+    if compressionQuality = defaultCompression then
+      png.CompressionLevel := 7 else
+      png.CompressionLevel := Max(0, Min(9, compressionQuality));
     png.CreateAlpha;
     for i := 0 to img32.Height -1 do
     begin
@@ -422,7 +426,7 @@ end;
 
 initialization
   TImage32.RegisterImageFormatClass('PNG', TImageFormat_PNG, cpHigh);
-  CF_PNG     := RegisterClipboardFormat('PNG');
+  CF_PNG      := RegisterClipboardFormat('PNG');
   CF_IMAGEPNG := RegisterClipboardFormat('image/png');
 {$IFEND}
 

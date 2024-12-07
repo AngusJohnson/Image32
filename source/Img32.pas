@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  26 November 2024                                                *
+* Date      :  7 December 2024                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -85,6 +85,8 @@ const
   clDarkBtn32  = TColor32($FFE8E8E8);
   clBtnFace32  = TColor32($FFF0F0F0);
   clLiteBtn32  = TColor32($FFF8F8F8);
+
+  defaultCompression = -1;
 
 {$IFDEF ZEROBASEDSTR}
   {$ZEROBASEDSTRINGS OFF}
@@ -337,8 +339,10 @@ type
     class function GetImageFormatClass(const ext: string): TImageFormatClass; overload;
     class function GetImageFormatClass(stream: TStream): TImageFormatClass; overload;
     class function IsRegisteredFormat(const ext: string): Boolean;
-    function SaveToFile(filename: string; quality: integer = 0): Boolean;
-    function SaveToStream(stream: TStream; const FmtExt: string): Boolean;
+    function SaveToFile(filename: string;
+      compressionQuality: integer = defaultCompression): Boolean;
+    function SaveToStream(stream: TStream; const FmtExt: string;
+      compressionQuality: integer = defaultCompression): Boolean;
     function LoadFromFile(const filename: string): Boolean;
     function LoadFromStream(stream: TStream; imgIdx: integer = 0): Boolean;
     function LoadFromResource(const resName: string; resType: PChar): Boolean;
@@ -2952,7 +2956,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImage32.SaveToFile(filename: string; quality: integer = 0): Boolean;
+function TImage32.SaveToFile(filename: string; compressionQuality: integer): Boolean;
 var
   fileFormatClass: TImageFormatClass;
 begin
@@ -2965,14 +2969,15 @@ begin
   if assigned(fileFormatClass) then
     with fileFormatClass.Create do
     try
-      result := SaveToFile(filename, self, quality);
+      result := SaveToFile(filename, self, compressionQuality);
     finally
       free;
     end;
 end;
 //------------------------------------------------------------------------------
 
-function TImage32.SaveToStream(stream: TStream; const FmtExt: string): Boolean;
+function TImage32.SaveToStream(stream: TStream;
+  const FmtExt: string; compressionQuality: integer): Boolean;
 var
   fileFormatClass: TImageFormatClass;
 begin
@@ -2981,7 +2986,7 @@ begin
   if assigned(fileFormatClass) then
     with fileFormatClass.Create do
     try
-      SaveToStream(stream, self);
+      SaveToStream(stream, self, compressionQuality);
       result := true;
     finally
       free;
