@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  7 December 2024                                                 *
+* Date      :  16 December 2024                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -600,7 +600,9 @@ var
 
   //AND BECAUSE OLDER DELPHI COMPILERS (OLDER THAN D2006)
   //DON'T SUPPORT RECORD METHODS
-  procedure RectWidthHeight(const rec: TRect; out width, height: Integer);
+  procedure RectWidthHeight(const rec: TRect; out width, height: Integer); overload;
+  {$IFDEF INLINE} inline; {$ENDIF}
+  procedure RectWidthHeight(const rec: TRectD; out width, height: double); overload;
   {$IFDEF INLINE} inline; {$ENDIF}
   function RectWidth(const rec: TRect): Integer;
   {$IFDEF INLINE} inline; {$ENDIF}
@@ -1607,6 +1609,13 @@ end;
 //------------------------------------------------------------------------------
 
 procedure RectWidthHeight(const rec: TRect; out width, height: Integer);
+begin
+  width := rec.Right - rec.Left;
+  height := rec.Bottom - rec.Top;
+end;
+//------------------------------------------------------------------------------
+
+procedure RectWidthHeight(const rec: TRectD; out width, height: double);
 begin
   width := rec.Right - rec.Left;
   height := rec.Bottom - rec.Top;

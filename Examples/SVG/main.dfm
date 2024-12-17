@@ -2,8 +2,8 @@ object Form1: TForm1
   Left = 298
   Top = 205
   Caption = 'Svg101'
-  ClientHeight = 854
-  ClientWidth = 1420
+  ClientHeight = 1079
+  ClientWidth = 1665
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -20,30 +20,29 @@ object Form1: TForm1
     Left = 348
     Top = 0
     Width = 10
-    Height = 778
+    Height = 1033
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
+    ExplicitHeight = 778
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 778
-    Width = 1420
-    Height = 76
+    Top = 1033
+    Width = 1665
+    Height = 46
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
     Panels = <>
-    ExplicitTop = 777
-    ExplicitWidth = 1406
   end
   object ListBox1: TListBox
     Left = 0
     Top = 0
     Width = 348
-    Height = 778
+    Height = 1033
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
@@ -55,7 +54,6 @@ object Form1: TForm1
     TabOrder = 1
     Visible = False
     OnClick = ListBox1Click
-    ExplicitHeight = 777
   end
   object MainMenu1: TMainMenu
     Left = 248
@@ -101,11 +99,25 @@ object Form1: TForm1
       ShortCut = 121
       OnClick = OpeninBrowser1Click
     end
+    object FindinExplorer1: TMenuItem
+      Caption = 'Find in Explorer'
+      ShortCut = 122
+      OnClick = FindinExplorer1Click
+    end
   end
   object SaveDialog1: TSaveDialog
     DefaultExt = '.jpg'
     Filter = 'Image Files (*.png;*.jpg)'
     Left = 407
     Top = 56
+  end
+  object PopupMenu2: TPopupMenu
+    Left = 512
+    Top = 64
+    object Copy1: TMenuItem
+      Caption = '&Copy'
+      ShortCut = 16451
+      OnClick = Copy1Click
+    end
   end
 end

@@ -39,8 +39,7 @@ procedure TMainForm.FormCreate(Sender: TObject);
 var
   arialFont: TFontReader;
 begin
-  FontManager.Load('Arial', 800);
-  arialFont := FontManager.GetFont('Arial');
+  arialFont := FontManager.LoadFontReader('Arial');
   arial12 := TFontCache.Create(arialFont, DPIAware(12));
   arial16 := TFontCache.Create(arialFont, DPIAware(16));
 

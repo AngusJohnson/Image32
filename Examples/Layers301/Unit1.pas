@@ -321,7 +321,7 @@ begin
   //prepare for a hatched background design layer (see FormResize below).
   layeredImg32.AddLayer(TLayer32);
 
-  fr := FontManager.Load('Arial');
+  fr := FontManager.LoadFontReader('Arial');
   arial12 := TFontCache.Create(fr, DPIAware(12));
   arial14 := TFontCache.Create(fr, DPIAware(14));
 

@@ -112,8 +112,7 @@ const
 
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
-  FontManager.Load('Arial', 800);
-  fontReader := FontManager.GetFont('Arial');
+  fontReader := FontManager.LoadFontReader('Arial');
   fontCache12 := TFontCache.Create(fontReader, DPIAware(12));
   fontCache16 := TFontCache.Create(fontReader, DPIAware(16));
   fontCache125 := TFontCache.Create(fontReader, DPIAware(125));

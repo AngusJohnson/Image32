@@ -36,6 +36,9 @@ type
     Splitter1: TSplitter;
     SaveAs1: TMenuItem;
     SaveDialog1: TSaveDialog;
+    FindinExplorer1: TMenuItem;
+    PopupMenu2: TPopupMenu;
+    Copy1: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure Exit1Click(Sender: TObject);
@@ -46,6 +49,8 @@ type
     procedure PopupMenu11Click(Sender: TObject);
     procedure OpeninBrowser1Click(Sender: TObject);
     procedure SaveAs1Click(Sender: TObject);
+    procedure FindinExplorer1Click(Sender: TObject);
+    procedure Copy1Click(Sender: TObject);
   protected
     folder: string;
     filename: string;
@@ -67,8 +72,7 @@ implementation
 {$ENDIF}
 
 uses
-  Img32, Img32.Vector, Img32.Draw,
-  Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.SVG, Img32.Text;
+  Img32, Img32.Fmt.PNG, Img32.Fmt.JPG, Img32.Fmt.SVG, Img32.Text;
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -135,27 +139,17 @@ begin
   {$ENDIF}
   ImagePanel.ParentBackground := false;
   ImagePanel.Color := clBtnFace;
+  ImagePanel.PopupMenu := PopupMenu2;
   rec := ImagePanel.InnerClientRect;
   ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
 
-//  FontManager.Load('Segoe UI');
-  FontManager.Load('Arial Bold');
-  FontManager.Load('Arial Italic');
-  FontManager.Load('Arial Bold Italic');
-  FontManager.Load('Times New Roman');
-  FontManager.Load('Times New Roman Bold');
-  FontManager.Load('Times New Roman Italic');
-  FontManager.Load('Times New Roman Bold Italic');
+  FontManager.LoadFontReaderFamily('Arial');
+  FontManager.LoadFontReaderFamily('Times New Roman');
+  FontManager.LoadFontReader('Segoe UI Symbol');
+  FontManager.LoadFontReader('Segoe UI Emoji');
 
-  FontManager.Load('Symbol');
-  FontManager.Load('Webdings');
-  FontManager.Load('Wingdings');
-  FontManager.Load('Segoe UI Symbol');
-
-  OpenFile('.\Sample SVGs 1\textpath2.svg');
-  //OpenFile('.\*.svg');
+  OpenFile('.\Sample SVGs 1\Nested.svg');
   ListSVGFilesInFolder;
-  DrawCurrentItem;
 end;
 //------------------------------------------------------------------------------
 
@@ -175,7 +169,6 @@ begin
   len := Length(Result);
   if (len > 0) and (Result[len] <> '\') then
     Result := Result + '\';
-
 end;
 //------------------------------------------------------------------------------
 
@@ -217,8 +210,13 @@ begin
   OpenDialog1.InitialDir := folder;
   ListSVGFilesInFolder;
   i := ListBox1.Items.IndexOf(self.filename);
-  if i <> ListBox1.ItemIndex then
-    ListBox1.ItemIndex := i else
+  if (i < 0) and (ListBox1.Items.Count > 0) then
+  begin
+    ListBox1.ItemIndex := 0;
+    DrawCurrentItem;
+  end else if i <> ListBox1.ItemIndex then
+    ListBox1.ItemIndex := i
+  else
     DrawCurrentItem;
 end;
 //------------------------------------------------------------------------------
@@ -249,6 +247,17 @@ begin
    OpenDocument(PChar(fn));
 end;
 //------------------------------------------------------------------------------
+
+procedure TForm1.FindinExplorer1Click(Sender: TObject);
+var
+  fn: string;
+begin
+  if ListBox1.ItemIndex < 0 then Exit;
+  fn := AppendSlash(folder) + ListBox1.Items[ListBox1.ItemIndex];
+  ShellExecute(0, nil, 'explorer.exe', PChar('/select,'+fn), nil, SW_SHOWNORMAL);
+end;
+//------------------------------------------------------------------------------
+
 
 procedure TForm1.WMDropFiles(var Msg: TMessage);
 var
@@ -288,6 +297,7 @@ begin
   ImagePanel.Image.BeginUpdate;
   Screen.Cursor := crHourGlass;
   try
+    //ImagePanel.Image.SetSize(4800,3200);
     ImagePanel.Image.SetSize(RectWidth(rec), RectHeight(rec));
     ImagePanel.Image.LoadFromFile(svgFilenameAndPath);
   finally
@@ -318,6 +328,12 @@ procedure TForm1.SaveAs1Click(Sender: TObject);
 begin
   if SaveDialog1.Execute then
     ImagePanel.Image.SaveToFile(SaveDialog1.FileName);
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.Copy1Click(Sender: TObject);
+begin
+  ImagePanel.CopyToClipboard;
 end;
 //------------------------------------------------------------------------------
 

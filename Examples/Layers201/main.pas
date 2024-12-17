@@ -245,12 +245,13 @@ begin
 
   layeredImage := TLayeredImage32.Create;
   //layeredImage.Resampler := rNearestResampler; //draft quality (fast)
-  layeredImage.Resampler := rBiLinearResampler;  //high quality (pretty fast)
+  //layeredImage.Resampler := rBiLinearResampler;  //high quality (pretty fast)
+  layeredImage.Resampler := rWeightedBilinear;  //even higher quality (pretty fast)
   //layeredImage.Resampler := rBiCubicResampler; //best quality (slower)
 
   layeredImage.AddLayer(TLayer32); //for background hatching
 
-  fontReader := FontManager.Load('Arial Bold');
+  fontReader := FontManager.LoadFontReader('Arial Bold');
   fontCache := TFontCache.Create(fontReader, DPIAware(48));
   words := TStringList.Create;
   resStream := TResourceStream.Create(HInstance, 'WORDS', RT_RCDATA);
@@ -397,6 +398,9 @@ begin
     delayedMovePending := true;
   end else
     DelayedMouseMove(Sender, Shift, pt.X, pt.Y);
+
+//   if assigned(targetLayer) then
+//     targetLayer.Image.SaveToFile('c:\temp\tmp.png');
 end;
 //------------------------------------------------------------------------------
 
@@ -505,6 +509,7 @@ begin
   if not OpenDialog1.Execute then Exit;
   //create a raster image layer
   layer := layeredImage.AddLayer(TMyRasterLayer32) as TRotLayer32;
+  layer.Image.Resampler := rBiLinearResampler;//rNearestResampler;
   with TMyRasterLayer32(layer) do
     Init(OpenDialog1.FileName, layeredImage.MidPoint);
   SetTargetLayer(layer);

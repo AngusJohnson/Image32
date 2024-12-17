@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  5 December 2024                                                 *
+* Date      :  11 December 2024                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -1111,6 +1111,7 @@ procedure TImageElement.Draw(image: TImage32; drawDat: TDrawData);
 var
   dstRecD: TRectD;
   tmp: TImage32;
+  tmpScale: TPointD;
 begin
   dstRecD := Self.elRectWH.GetRectD(0,0);
   MatrixMultiply2(fDrawData.matrix, drawDat.matrix);
@@ -1125,6 +1126,13 @@ begin
 
   if fImage <> nil then
   begin
+    if elRectWH.IsValid then
+    begin
+      tmpScale.X := elRectWH.width.rawVal / fImage.Width;
+      tmpScale.Y := elRectWH.Height.rawVal / fImage.Height;
+      MatrixScale(drawDat.matrix, tmpScale.X, tmpScale.Y);
+    end;
+
     tmp := TImage32.Create();
     try
       tmp.AssignSettings(fImage);

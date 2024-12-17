@@ -148,8 +148,8 @@ var
   txtPaths: TPathsD;
   outerRec, innerRec, tmpRec, imageRec: TRect;
 
-  wordList: TWordInfoList;
-  pageMetrics: TTextPageMetrics;
+  chunkedText: TChunkedText;
+  pageMetrics: TPageTextMetrics;
   imgBooks: TImage32;
   noto14Cache: TFontCache;
   notoSansReg : TFontReader;
@@ -207,38 +207,16 @@ begin
 
     //break text string into a TWordInfoList and use that to get the
     //metrics of how many lines of text will fit on left of image
-    wordList := TWordInfoList.Create;
+    chunkedText := TChunkedText.Create;
     try
-      wordList.SetText(essay, noto14Cache);
-      pageMetrics := GetPageMetrics(RectWidth(tmpRec), wordList);
+      chunkedText.SetText(essay, noto14Cache);
+      pageMetrics := chunkedText.GetPageMetrics(RectWidth(tmpRec));
       //calculate lines that will fit on left of image
       lineCnt := Trunc(RectHeight(tmpRec) / noto14Cache.LineHeight);
       //now get the text glyph outlines and draw them
-      txtPaths := noto14Cache.GetTextOutline(tmpRec,
-        wordList, pageMetrics, taJustify, 0, lineCnt);
-      if useClearType then
-        DrawPolygon_ClearType(imgMain, txtPaths, frNonZero, clBlack32) else
-        DrawPolygon(imgMain, txtPaths, frNonZero, clBlack32);
-
-      inc(lineCnt);
-      if lineCnt < pageMetrics.lineCount then
-      begin
-        //getting the index of the word starting the next line
-        i := pageMetrics.wordListOffsets[lineCnt];
-        //delete all the words just drawn from wordList
-        wordList.DeleteRange(0, i-1);
-        //get new pagemetrics using full 'page' width
-        innerRec.Top := tmpRec.Top + Round(lineCnt * noto14Cache.LineHeight);
-        pageMetrics := GetPageMetrics(RectWidth(innerRec),wordList);
-        //now get the text glyph outlines and draw them
-        txtPaths := noto14Cache.GetTextOutline(innerRec,
-          wordList, pageMetrics, taJustify, 0, -1);
-        if useClearType then
-          DrawPolygon_ClearType(imgMain, txtPaths, frNonZero, clBlack32) else
-          DrawPolygon(imgMain, txtPaths, frNonZero, clBlack32);
-      end;
+      chunkedText.DrawText(imgMain, tmpRec, taJustify, tvaMiddle);
     finally
-      wordList.Free;
+      chunkedText.Free;
     end;
 
   finally
@@ -262,7 +240,7 @@ var
   ir         : TImageRenderer;
   lgr        : TLinearGradientRenderer;
   fontReader : TFontReader;
-  font : TFontCache;
+  font       : TFontCache;
   numGlyphs  : array[1..12] of TPathsD;
 begin
   imgClockface.SetSize(
@@ -372,7 +350,7 @@ begin
     //DRAW THE "MAKER'S MARK"
     recI := Img32.Vector.Rect(recD);
     recI.Bottom := recI.Top + clockRadius;
-    DrawText(imgClockface, recI, 'angusj', taCenter, tvaMiddle, font);
+    DrawText(imgClockface, RectD(recI), 'angusj', font);
 
     fontReader.LoadFromResource('FONT_NSB', RT_RCDATA); //noto sans bold
     font.FontHeight := font.FontHeight * 1.5;
