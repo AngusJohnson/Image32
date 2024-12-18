@@ -341,7 +341,8 @@ type
     function LoadFromStream(stream: TStream): TFontReader;
     function LoadFromResource(const resName: string; resType: PChar): TFontReader;
     function LoadFromFile(const filename: string): TFontReader;
-    function GetBestMatchFont(const fontInfo: TFontInfo): TFontReader;
+    function GetBestMatchFont(const fontInfo: TFontInfo): TFontReader; overload;
+    function GetBestMatchFont(const styles: TMacStyles): TFontReader; overload;
     // FindReaderContainingGlyph: will return false either when no TFontReader
     // is found, or a TFontReader is found but not in the specified family.
     // When the latter occurs, fntReader will be assigned and index will be > 0.
@@ -3865,25 +3866,43 @@ function TFontManager.GetBestMatchFont(const fontInfo: TFontInfo): TFontReader;
   end;
 
 var
-  i, bestIdx, bestDiff, currDiff: integer;
+  i, bestDiff, currDiff: integer;
+  fr: TFontReader;
 begin
   Result := nil;
-  if fFontList.Count = 0 then Exit;
-
   bestDiff := MaxInt;
-  bestIdx := -1;
   for i := 0 to fFontList.Count -1 do
   begin
-    currDiff := CompareFontInfos(fontInfo, TFontReader(fFontList[i]).fFontInfo);
+    fr := TFontReader(fFontList[i]);
+    currDiff := CompareFontInfos(fontInfo, fr.fFontInfo);
     if (currDiff < bestDiff) then
     begin
-      bestIdx := i;
+      Result := fr;
+      if currDiff = 0 then Break; // can't do better :)
       bestDiff := currDiff;
-      if bestDiff = 0 then Break; // can't do better :)
     end;
   end;
-  if bestIdx >= 0 then
-    Result := TFontReader(fFontList[bestIdx]);
+end;
+//------------------------------------------------------------------------------
+
+function TFontManager.GetBestMatchFont(const styles: TMacStyles): TFontReader;
+var
+  i, bestDiff, currDiff: integer;
+  fr: TFontReader;
+begin
+  Result := nil;
+  bestDiff := MaxInt;
+  for i := 0 to fFontList.Count -1 do
+  begin
+    fr := TFontReader(fFontList[i]);
+    currDiff := (((Byte(styles) xor $FF) or (Byte(fr.fFontInfo.macStyles) xor $FF)) and $3);
+    if (currDiff < bestDiff) then
+    begin
+      Result := fr;
+      if currDiff = 0 then Break; // can't do any better :)
+      bestDiff := currDiff;
+    end;
+  end;
 end;
 //------------------------------------------------------------------------------
 

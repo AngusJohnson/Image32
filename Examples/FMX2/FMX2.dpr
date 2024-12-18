@@ -1,6 +1,8 @@
 program FMX2;
 
-{$R *.dres}
+
+
+
 
 uses
   System.StartUpCopy,
