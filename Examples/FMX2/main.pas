@@ -24,17 +24,11 @@ type
     procedure FormKeyDown(Sender: TObject; var Key: Word; var KeyChar: Char; Shift: TShiftState);
     procedure Timer1Timer(Sender: TObject);
     procedure FormResize(Sender: TObject);
-    procedure FormActivate(Sender: TObject);
   private
     margin: integer;
     clockRadius: integer;
     handWidth: double;
     secHandLen, minHandLen, hrHandLen: double;
-
-    clBackground32, clDarkRed32: TColor32;
-    clDarkMaroon32, clNearWhite32, clMidGreen32: TColor32;
-    clLightGray32, clDarkGray32: TColor32;
-
     imgMain, imgClockface: TImage32;
     essay: string;
     procedure DrawTextTab;
@@ -45,13 +39,6 @@ type
 
 var
   MainForm: TMainForm;
-  clDarkRed32     : TColor32;
-  clDarkMaroon32  : TColor32;
-  clMidGreen32    : TColor32;
-  clBackground32  : TColor32;
-  clNearWhite32   : TColor32;
-  clLightGray32   : TColor32;
-  clDarkGray32    : TColor32;
 
 implementation
 
@@ -63,6 +50,15 @@ implementation
 
 uses
   Img32.Vector, Img32.Draw, Img32.Extra, Img32.FMX, Img32.Clipper2;
+
+const
+  clDarkRed32      : TColor32 = $FFCC0000;
+  clDarkMaroon32   : TColor32 = $FF400000;
+  clMidGreen32     : TColor32 = $FF00A000;
+  clBackground32   : TColor32 = $FFF8F8F8;
+  clNearWhite32    : TColor32 = $FFF4F4F4;
+  clLightGray32    : TColor32 = $FFB0B0B0;
+  clDarkGray32     : TColor32 = $FF999999;
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions
@@ -77,27 +73,30 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure CopyImage32ToFmxCanvas(img: TImage32; canvas: TCanvas; srcRec, dstRec: TRectF);
+procedure CopyImage32ToFmxCanvas(img: TImage32; canvas: TCanvas; dstRec: TRectF);
 var
-  src, dst: TBitmapData;
+  i: integer;
   tmpBitmap: TBitmap;
+  srcBD, dstBD: TBitmapData;
 begin
   if not Assigned(img) then Exit;
-  tmpBitmap := TBitmap.Create;
+  tmpBitmap := TBitmap.Create(img.Width, img.Height);
   try
-    src := TBitMapData.Create(Round(srcRec.Width), Round(srcRec.Height), TPixelFormat.BGRA);
-    src.Data := img.PixelBase;
-    src.Pitch := img.Width * 4;
-    tmpBitmap.SetSize(img.Width, img.Height);
-    if tmpBitmap.Map(TMapAccess.Write, dst) then
+    srcBD := TBitMapData.Create(img.Width, img.Height, TPixelFormat.BGRA);
+    srcBD.Data := img.PixelBase;
+    srcBD.Pitch := img.Width * 4;
+    if tmpBitmap.Map(TMapAccess.Write, dstBD) then // creates a map to 'dst'
     try
-      dst.Copy(src);
+      //dstBD.Copy(srcBD);
+      for i := 0 to dstBD.Height - 1 do
+        Move(srcBD.GetScanline(i)^, dstBD.GetScanline(i)^, dstBD.BytesPerLine);
     finally
-      tmpBitmap.Unmap(dst);
+      tmpBitmap.Unmap(dstBD);
     end;
 
+    // scale draw tmpBitmap onto the canvas
     Canvas.Lock;
-    Canvas.DrawBitmap(tmpBitmap, srcRec, dstRec, 1);
+    Canvas.DrawBitmap(tmpBitmap, RectF(0,0,img.Width, img.Height), dstRec, 1);
     Canvas.UnLock;
   finally
     tmpBitmap.Free;
@@ -128,19 +127,6 @@ end;
 
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
-
-  clDarkRed32     := $FFCC0000;
-  clDarkMaroon32  := $FF400000;
-  clMidGreen32    := $FF00A000;
-  clBackground32  := $FFF8F8F8;
-  clNearWhite32   := $FFF4F4F4;
-  clLightGray32   := $FFB0B0B0;
-  clDarkGray32    := $FF999999;
-{$IFDEF ANDROID}
-  clDarkRed32 := SwapRedBlue(clDarkRed32);
-  clDarkMaroon32 := SwapRedBlue(clDarkMaroon32);
-{$ENDIF}
-
   // load 2 fonts, 'regular' and 'bold' ...
   FontManager.LoadFromResource('FONT_NSR', RT_RCDATA);
   FontManager.LoadFromResource('FONT_NSB', RT_RCDATA);
@@ -153,6 +139,7 @@ begin
   essay := StringReplace(essay, '\n', #10, [rfReplaceAll]);
 
   Layout1.Scale.Point := PointF(1/DpiAwareOne,1/DpiAwareOne);
+  TabControl1Change(nil);
 end;
 //------------------------------------------------------------------------------
 
@@ -499,7 +486,7 @@ var
 begin
   srcRec := RectF(0,0,imgMain.Width,imgMain.Height);
   dstRec := TranslateRectF(srcRec, (layout1.Width - imgMain.Width)/2, margin);
-  CopyImage32ToFmxCanvas(imgMain, Canvas, srcRec, dstRec);
+  CopyImage32ToFmxCanvas(imgMain, Canvas, dstRec);
 end;
 //------------------------------------------------------------------------------
 
@@ -507,12 +494,6 @@ procedure TMainForm.FormResize(Sender: TObject);
 begin
   if Visible then
     TabControl1Change(nil);
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.FormActivate(Sender: TObject);
-begin
-  TabControl1Change(nil);
 end;
 //------------------------------------------------------------------------------
 
