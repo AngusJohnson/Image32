@@ -651,30 +651,55 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure HatchBackground(img: TImage32; const rec: TRect;
-  color1: TColor32 = clWhite32; color2: TColor32= $FFE8E8E8;
-  hatchSize: Integer = 10); overload;
+procedure InternHatchBackground(img: TImage32; const rec: TRect;
+  color1, color2: TColor32; hatchSize: Integer = 10);
 var
-  i,j: Integer;
+  i, j, imgWidth: Integer;
   pc: PColor32;
   colors: array[boolean] of TColor32;
   hatch: Boolean;
+  c: TColor32;
+  x: integer;
 begin
   colors[false] := color1;
   colors[true] := color2;
-  img.BeginUpdate;
-  try
-    for i := rec.Top to rec.Bottom -1 do
+  imgWidth := img.Width;
+
+  for i := rec.Top to rec.Bottom -1 do
+  begin
+    pc := @img.Pixels[i * imgWidth + rec.Left];
+    hatch := Odd(i div hatchSize);
+
+    x := (rec.Left + 1) mod hatchSize;
+    if x = 0 then hatch := not hatch;
+    for j := rec.Left to rec.Right -1 do
     begin
-      pc := @img.Pixels[i * img.Width + rec.Left];
-      hatch := Odd(i div hatchSize);
-      for j := rec.Left to rec.Right -1 do
+      c := pc^;
+      if c = 0 then
+        pc^ := colors[hatch]
+      else if c and $FF000000 <> $FF000000 then
+        pc^ := BlendToOpaque(colors[hatch], c);
+      inc(pc);
+      inc(x);
+      if x >= hatchSize then
       begin
-        if (j + 1) mod hatchSize = 0 then hatch := not hatch;
-        pc^ := BlendToOpaque(colors[hatch], pc^);
-       inc(pc);
+        x := 0;
+        hatch := not hatch;
       end;
     end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure HatchBackground(img: TImage32; const rec: TRect;
+  color1: TColor32 = clWhite32; color2: TColor32= $FFE8E8E8;
+  hatchSize: Integer = 10); overload;
+begin
+  if (rec.Right < rec.Left) or (rec.Right - rec.Left <= 0) then Exit;
+
+  img.BeginUpdate;
+  try
+    InternHatchBackground(img, rec, color1, color2, hatchSize);
   finally
     img.EndUpdate;
   end;
