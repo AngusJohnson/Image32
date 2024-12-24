@@ -1150,11 +1150,13 @@ end;
 
 procedure TGroupElement.Draw(image: TImage32; drawDat: TDrawData);
 var
-  clipEl    : TBaseElement;
-  maskEl    : TBaseElement;
+  clipEl    : TClipPathElement;
+  maskEl    : TMaskElement;
   tmpImg    : TImage32;
   clipPaths : TPathsD;
   clipRec   : TRect;
+  dstClipRec: TRect;
+  offsetX, offsetY: integer;
 begin
   if fChilds.Count = 0 then Exit;
 
@@ -1162,13 +1164,13 @@ begin
   if drawDat.fillRule = frNegative then
     drawDat.fillRule := frNonZero;
 
-  maskEl := FindRefElement(drawDat.maskElRef);
-  clipEl := FindRefElement(drawDat.clipElRef);
+  maskEl := TMaskElement(FindRefElement(drawDat.maskElRef));
+  clipEl := TClipPathElement(FindRefElement(drawDat.clipElRef));
   if Assigned(clipEl) then
   begin
-    with TClipPathElement(clipEl) do
+    drawDat.clipElRef := '';
+    with clipEl do
     begin
-      drawDat.clipElRef := '';
       GetPaths(drawDat);
       clipPaths := CopyPaths(drawPathsF);
 
@@ -1177,19 +1179,30 @@ begin
     end;
     if IsEmptyRect(clipRec) then Exit;
 
+    // Translate the clipPaths, the matix and the clipRec to minimize
+    // the size of the mask image.
+    dstClipRec := clipRec; // save for blending tmpImg to image
+    offsetX := -clipRec.Left;
+    offsetY := -clipRec.Top;
+    if offsetX > 0 then offsetX := 0;
+    if offsetY > 0 then offsetY := 0;
+    if (offsetX < 0) or (offsetY < 0) then
+    begin
+      MatrixTranslate(drawDat.matrix, offsetX, offsetY); // for DrawChildren
+      clipPaths := TranslatePath(clipPaths, offsetX, offsetY);
+      TranslateRect(clipRec, offsetX, offsetY);
+    end;
+
     //nb: it's not safe to use fReader.TempImage when calling DrawChildren
-    tmpImg := TImage32.Create(Image.Width, Image.Height);
+    tmpImg := TImage32.Create(Min(image.Width, clipRec.Right), Min(image.Height, clipRec.Bottom));
     try
       DrawChildren(tmpImg, drawDat);
-      with TClipPathElement(clipEl) do
-      begin
-        if fDrawData.fillRule = frNegative then
-          EraseOutsidePaths(tmpImg, clipPaths, frNonZero, clipRec,
-            fReader.fCustomRendererCache) else
-          EraseOutsidePaths(tmpImg, clipPaths, fDrawData.fillRule, clipRec,
-            fReader.fCustomRendererCache);
-      end;
-      image.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlphaLine);
+      if clipEl.fDrawData.fillRule = frNegative then
+        EraseOutsidePaths(tmpImg, clipPaths, frNonZero, clipRec,
+          fReader.fCustomRendererCache) else
+        EraseOutsidePaths(tmpImg, clipPaths, clipEl.fDrawData.fillRule, clipRec,
+          fReader.fCustomRendererCache);
+      image.CopyBlend(tmpImg, clipRec, dstClipRec, BlendToAlphaLine);
     finally
       tmpImg.Free;
     end;
@@ -1198,16 +1211,31 @@ begin
   else if Assigned(maskEl) then
   begin
     drawDat.maskElRef := '';
-    with TMaskElement(maskEl) do
+    with maskEl do
     begin
       GetPaths(drawDat);
       clipRec := maskRec;
     end;
-    tmpImg := TImage32.Create(image.Width, image.Height);
+
+    // Translate the maskRec, the matix and the clipRec to minimize
+    // the size of the mask image.
+    dstClipRec := clipRec; // save for blending tmpImg to image
+    offsetX := -clipRec.Left;
+    offsetY := -clipRec.Top;
+    if offsetX > 0 then offsetX := 0;
+    if offsetY > 0 then offsetY := 0;
+    if (offsetX < 0) or (offsetY < 0) then
+    begin
+      MatrixTranslate(drawDat.matrix, offsetX, offsetY); // for DrawChildren
+      TranslateRect(clipRec, offsetX, offsetY);
+      TranslateRect(maskEl.maskRec, offsetX, offsetY);
+    end;
+
+    tmpImg := TImage32.Create(Min(image.Width, clipRec.Right), Min(image.Height, clipRec.Bottom));
     try
       DrawChildren(tmpImg, drawDat);
       TMaskElement(maskEl).ApplyMask(tmpImg, drawDat);
-      image.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlphaLine);
+      image.CopyBlend(tmpImg, clipRec, dstClipRec, BlendToAlphaLine);
     finally
       tmpImg.Free;
     end;
@@ -1403,7 +1431,7 @@ procedure TMaskElement.ApplyMask(img: TImage32; const drawDat: TDrawData);
 var
   tmpImg: TImage32;
 begin
-  tmpImg := TImage32.Create(img.Width, img.Height);
+  tmpImg := TImage32.Create(Min(img.Width, maskRec.Right), Min(img.Height, maskRec.Bottom));
   try
     DrawChildren(tmpImg, drawDat);
     img.CopyBlend(tmpImg, maskRec, maskRec, BlendBlueChannelLine);
