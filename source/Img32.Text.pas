@@ -18,7 +18,6 @@ uses
   {$IFDEF MSWINDOWS} Windows, ShlObj, ActiveX, {$ENDIF}
   Types, SysUtils, Classes, Math,
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults,{$ENDIF}
-  Character,
   Img32, Img32.Draw, Img32.Vector;
 
 type
@@ -1137,7 +1136,7 @@ var
   hdl: HFont;
 begin
   Result := false;
-  hdl := CreateFontIndirect(logfont);
+  hdl := CreateFontIndirect({$IFDEF FPC}@{$ENDIF}logfont);
   if hdl > 0 then
   try
     Result := LoadUsingFontHdl(hdl);
@@ -1739,6 +1738,7 @@ begin
     setLength(result[i], contourEnds[i] - contourEnds[i-1]);
 
   repeats := 0;
+  flag := 0; // help the compiler with "flag isn't initialized"
   for i := 0 to High(result) do
   begin
     for j := 0 to High(result[i]) do
@@ -2560,7 +2560,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function IsSurrogate(c: Char): Boolean;
+function IsSurrogate(c: WideChar): Boolean;
   {$IFDEF INLINE} inline; {$ENDIF}
 begin
   Result := (c >= #$D800) and (c <= #$DFFF);
@@ -2994,7 +2994,12 @@ var
   rotatePt: TPointD;
 begin
   rotatePt := PointD(x,y);
-  if not assigned(font) or not font.IsValidFont then Exit;
+  if not assigned(font) or not font.IsValidFont then
+  begin
+    Result.X := 0.0;
+    Result.Y := 0.0;
+    Exit;
+  end;
   glyphs := font.GetAngledTextGlyphs(x, y,
     text, angleRadians, rotatePt, Result);
   DrawPolygon(image, glyphs, frNonZero, textColor);
@@ -3535,8 +3540,7 @@ begin
   if lineHeight > recHeight then Exit;
 
   // only draw visible lines
-  while true do
-  begin
+  repeat
     totalHeight :=
       lineHeight * (endlineNum - startlineNum + 1) +
       lineHeightAdjust * (endlineNum - startlineNum);
@@ -3548,7 +3552,7 @@ begin
       tvaBottom: inc(startlineNum);
       else dec(endlineNum);
     end;
-  end;
+  until False;
 
   i := pm.wordListOffsets[startlineNum];
   top := Chunk[i].ascent + rec.Top;
@@ -3940,7 +3944,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FontSorterProc(const fontreader1, fontreader2: Pointer): integer;
+function FontSorterProc(fontreader1, fontreader2: Pointer): integer;
 var
   fr1: TFontReader absolute fontreader1;
   fr2: TFontReader absolute fontreader2;
