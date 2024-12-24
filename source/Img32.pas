@@ -29,10 +29,12 @@ uses
 
 type
   {$IF not declared(SizeInt)} // FPC has SizeInt
-    {$IF CompilerVersion < 120}
+    {$IF CompilerVersion < 20.0}
   SizeInt = Integer; // Delphi 7-2007 can't use NativeInt with "FOR"
+  SizeUInt = Cardinal; // Delphi 7-2007 can't use NativeUInt with "FOR"
     {$ELSE}
   SizeInt = NativeInt;
+  SizeUInt = NativeUInt;
     {$IFEND}
   {$IFEND}
 
@@ -214,7 +216,7 @@ type
       const srcRec, dstRec: TRect; blendFunc: TBlendFunction);
     procedure CopyInternalLine(src: TImage32;
       const srcRec, dstRec: TRect; blendLineFunc: TBlendLineFunction);
-    function CopyBlendInternal(src: TImage32; srcRec, dstRec: TRect;
+    function CopyBlendInternal(src: TImage32; const srcRec: TRect; dstRec: TRect;
       blendFunc: TBlendFunction = nil; blendLineFunc: TBlendLineFunction = nil): Boolean; overload;
     procedure  Changed; virtual;
     procedure  Resized; virtual;
@@ -1464,19 +1466,7 @@ end;
 function BlendBlueChannel(bgColor, blueMask: TColor32): TColor32;
 begin
   Result := (bgColor and $00FFFFFF) or
-            (TColor32(MulTable[bgColor shr 24, blueMask shr 24]) shl 24);
-end;
-//------------------------------------------------------------------------------
-
-procedure BlendBlueChannelLine(bgColor, blueMask: PColor32; width: nativeint);
-begin
-  while width > 0 do
-  begin
-    PARGB(bgColor).A := MulTable[PARGB(bgColor).A, PARGB(blueMask).A];
-    inc(bgColor);
-    inc(blueMask);
-    dec(width);
-  end;
+            (TColor32(MulTable[bgColor shr 24, Byte(blueMask)]) shl 24);
 end;
 //------------------------------------------------------------------------------
 
@@ -1491,6 +1481,21 @@ end;
 //------------------------------------------------------------------------------
 
 {$RANGECHECKS OFF} // negative array index is used
+
+procedure BlendBlueChannelLine(bgColor, blueMask: PColor32; width: nativeint);
+begin
+  inc(bgColor, width);
+  inc(blueMask, width);
+  width := -width;
+  while width < 0 do
+  begin
+    PStaticARGBArray(bgColor)[width].A :=
+      MulTable[PStaticARGBArray(bgColor)[width].A,
+               PStaticARGBArray(blueMask)[width].B];
+    inc(width);
+  end;
+end;
+//------------------------------------------------------------------------------
 
 procedure BlendInvertedMaskLine(bgColor, alphaMask: PColor32; width: nativeint);
 var
@@ -3205,7 +3210,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TImage32.CopyBlendInternal(src: TImage32; srcRec, dstRec: TRect;
+function TImage32.CopyBlendInternal(src: TImage32; const srcRec: TRect; dstRec: TRect;
   blendFunc: TBlendFunction; blendLineFunc: TBlendLineFunction): Boolean;
 var
   tmp: TImage32;

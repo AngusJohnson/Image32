@@ -1137,7 +1137,7 @@ var
   hdl: HFont;
 begin
   Result := false;
-  hdl := CreateFontIndirect(logfont);
+  hdl := CreateFontIndirect(@logfont);
   if hdl > 0 then
   try
     Result := LoadUsingFontHdl(hdl);
@@ -3940,7 +3940,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FontSorterProc(const fontreader1, fontreader2: Pointer): integer;
+function FontSorterProc(fontreader1, fontreader2: Pointer): integer;
 var
   fr1: TFontReader absolute fontreader1;
   fr2: TFontReader absolute fontreader2;
