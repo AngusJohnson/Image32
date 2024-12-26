@@ -155,11 +155,10 @@ var
   innerMargin, halfInnerRecWidth: integer;
   rectangle: TPathD;
   outerRec, innerRec, tmpRec, imageRec: TRect;
-
+  chunkMetrics  : TPageTextMetrics;
   regularFR     : TFontReader;
   regularCache  : TFontCache;
   chunkedText   : TChunkedText;
-  pageMetrics   : TPageTextMetrics;
   imgBooks      : TImage32;
 begin
   Timer1.Enabled := false;
@@ -196,16 +195,26 @@ begin
   //get the rect to contain text on the left ...
   tmpRec := innerRec;
   tmpRec.Right := tmpRec.Left + halfInnerRecWidth - innerMargin;
+  tmpRec.Bottom := tmpRec.Top + imgBooks.Height;
 
   regularFR := FontManager.GetBestMatchFont([]);
-
   regularCache := TFontCache.Create(regularFR, DPIAware(14));
   chunkedText := TChunkedText.Create;
   try
     chunkedText.SetText(essay, regularCache);
-    pageMetrics := chunkedText.GetPageMetrics(RectWidth(tmpRec));
-    //now get the text glyph outlines and draw them
-    chunkedText.DrawText(imgMain, tmpRec, taJustify, tvaTop);
+    // draw the text to the left of the image
+    chunkMetrics := chunkedText.DrawText(imgMain, tmpRec, taJustify, tvaTop, 0);
+    // if there's text that didn't fit on the left of the image, then
+    // draw the remaining text below the image
+    if chunkMetrics.pendingChuckIdx >= 0 then
+    begin
+      tmpRec.Top := tmpRec.Top + Ceil(chunkMetrics.pageHeight);
+      tmpRec.Right := innerRec.Right;
+      tmpRec.Bottom := innerRec.Bottom;
+      chunkedText.DrawText(imgMain, tmpRec, taJustify, tvaTop,
+        chunkMetrics.pendingChuckIdx, chunkMetrics.lineHeight);
+    end;
+
   finally
     chunkedText.Free;
     regularCache.Free;

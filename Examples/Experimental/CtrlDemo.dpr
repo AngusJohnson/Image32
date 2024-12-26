@@ -33,11 +33,10 @@ type
   //(See TCtrlStorageManager.EventAndPropertyHandler)
   TEventPropertyHandler1 = class(TEventPropertyHandler)
   private
-    fArial14: TFontCache;
-    fArial18: TFontCache;
-    fArialStatic: TFontCache;
-    fSvgList  : TSvgImageList32;
-    fSvgList2 : TSvgImageList32;
+    fArial14      : TFontCache;
+    fUnscaledFont : TFontCache;
+    fSvgList      : TSvgImageList32;
+    fSvgList2     : TSvgImageList32;
   public
     procedure SaveClick(Sender: TObject);
     procedure SliderClick(Sender: TObject);
@@ -46,8 +45,7 @@ type
     procedure DesignModeClick(Sender: TObject);
 
     property Arial14: TFontCache read fArial14 write fArial14;
-    property Arial18: TFontCache read fArial18 write fArial18;
-    property ArialStatic: TFontCache read fArialStatic write fArialStatic;
+    property UnscaledFont: TFontCache read fUnscaledFont write fUnscaledFont;
     property svgList   : TSvgImageList32 read fSvgList write fSvgList;
     property svgList2  : TSvgImageList32 read fSvgList2 write fSvgList2;
   end;
@@ -82,7 +80,7 @@ var
   arrowCursor : HIcon;
 
 const
-  DoLoadFromStorage = true;//false;//
+  DoLoadFromStorage = false;//true;//
 
 //------------------------------------------------------------------------------
 //Miscellaneous functions
@@ -178,9 +176,9 @@ begin
 
   with eventPropHandler1 do
   begin
-    ArialStatic.FontHeight := DpiAware(14) * loadScale;
+    UnscaledFont.FontHeight := DpiAware(14) * loadScale;
     arial14.FontHeight := DpiAware(14) * loadScale * scale;
-    arial18.FontHeight := DpiAware(18) * loadScale * scale;
+    //arial18.FontHeight := DpiAware(18) * loadScale * scale;
 
     ImgSz := Round(imageSize64 * loadScale * scale);
     svgList.DefaultWidth := ImgSz;
@@ -478,6 +476,24 @@ begin
       Result := DefWindowProc(hWnd, uMsg, wParam, lParam);
   end;
 end;
+//------------------------------------------------------------------------------
+
+function GetUnicodeTextResouce(const resName: string; resType: PChar): UnicodeString;
+var
+  len: integer;
+  rs: TResourceStream;
+begin
+  rs := TResourceStream.Create(hInstance, resName, resType);
+  try
+    //nb: skipping unicode BOM
+    rs.Position := 2;
+    len := rs.Size div 2 -1;
+    SetLength(Result, len);
+    rs.ReadBuffer(Result[1], len *2);
+  finally
+    rs.Free;
+  end;
+end;
 
 //------------------------------------------------------------------------------
 // Setup numerouse form controls (ie. if not loading from file storage)
@@ -491,25 +507,14 @@ var
   pagePnl     : TPagePnlCtrl;
   topPnlCtrl  : TPanelCtrl;
   sliderCtrl  : TSliderCtrl;
-  lorem       : string;
-  rs          : TResourceStream;
 begin
   prevScale := 1;
   bevelSize := DPIAware(2);
-  rs := TResourceStream.CreateFromID(hInstance, 1, 'TEXT');
-  try
-    SetLength(lorem, rs.Size div 2 -1);
-    rs.Position := 2;
-    rs.ReadBuffer(lorem[1], rs.Size -2);
-  finally
-    rs.Free;
-  end;
-
   layeredImg32 := storageMngr.AddChild(TLayeredImage32) as TLayeredImage32;
 
   //outer ctrl that's an easy way to create a margin around a page ctrl
   rootCtrl := layeredImg32.AddLayer(TPanelCtrl) as TPanelCtrl;
-  rootCtrl.Font := eventPropHandler1.arialStatic;
+  rootCtrl.Font := eventPropHandler1.UnscaledFont;
   rootCtrl.CanFocus := false;
   rootCtrl.Color := clBtnFace32;
   rootCtrl.Margin := 50;
@@ -659,7 +664,7 @@ begin
   with layeredImg32.AddLayer(TEditCtrl, pagePnl) as TEditCtrl do
   begin
     SetInnerBounds(DPIAware(RectD(180, 220, 400, 250)));
-    Text := 'This is a test.';
+    Text := 'Try editing me :).';
     BevelHeight := bevelSize;
   end;
 
@@ -748,8 +753,7 @@ begin
 
   with layeredImg32.AddLayer(TMemoCtrl, pagePnl) as TMemoCtrl do
   begin
-    Text := lorem;
-    Font := eventPropHandler1.arial18;
+    Text := GetUnicodeTextResouce('LOREM', 'TEXT');
     BevelHeight := bevelSize;
     AutoPosition := apClient;
     ScrollV := RootOwner.AddLayer(TScrollCtrl, nil) as TScrollCtrl;
@@ -789,7 +793,7 @@ begin
   sizeCursor  := LoadCursor(0, IDC_SIZEALL);
   handCursor  := LoadCursor(0, IDC_HAND);
   arrowCursor := LoadCursor(0, IDC_ARROW);
-  fontReader  := FontManager.Load('Arial');
+  fontReader  := FontManager.LoadFontReader('Arial');
 
   eventPropHandler1 := TEventPropertyHandler1.Create;
   with eventPropHandler1 do
@@ -797,8 +801,8 @@ begin
     //nb: all the following objects will be freed by eventPropHandler1
 
     arial14 := TFontCache.Create(fontReader, DPIAware(14));
-    arialStatic := TFontCache.Create(fontReader, DPIAware(14));
-    arial18 := TFontCache.Create(fontReader, DPIAware(18));
+    UnscaledFont := TFontCache.Create(fontReader, DPIAware(14));
+    //arial18 := TFontCache.Create(fontReader, DPIAware(18));
 
     svgList  := TSvgImageList32.Create;
     svgList.ResourceName := 'SVG';  //automatically loads resource

@@ -12,32 +12,32 @@ object MainForm: TMainForm
   OnDestroy = FormDestroy
   OnKeyDown = FormKeyDown
   OnResize = FormResize
-  DesignerMasterStyle = 0
+  DesignerMasterStyle = 3
   object TabControl1: TTabControl
     Align = Client
     Size.Width = 477.000000000000000000
     Size.Height = 569.000000000000000000
     Size.PlatformDefault = False
-    TabHeight = 30.000000000000000000
+    TabHeight = 49.000000000000000000
     TabIndex = 0
     TabOrder = 1
     TabPosition = Bottom
     OnChange = TabControl1Change
     Sizes = (
       477s
-      539s
+      520s
       477s
-      539s
+      520s
       477s
-      539s)
+      520s)
     object TabItem1: TTabItem
       CustomIcon = <
         item
         end>
       TextSettings.Trimming = None
       IsSelected = True
-      Size.Width = 41.000000000000000000
-      Size.Height = 30.000000000000000000
+      Size.Width = 159.000000000000000000
+      Size.Height = 49.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
       TabOrder = 0
@@ -52,8 +52,8 @@ object MainForm: TMainForm
       TextSettings.Font.Family = 'Arial'
       TextSettings.Trimming = None
       IsSelected = False
-      Size.Width = 49.000000000000000000
-      Size.Height = 30.000000000000000000
+      Size.Width = 159.000000000000000000
+      Size.Height = 49.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
       TabOrder = 0
@@ -67,8 +67,8 @@ object MainForm: TMainForm
         end>
       TextSettings.Trimming = None
       IsSelected = False
-      Size.Width = 49.000000000000000000
-      Size.Height = 30.000000000000000000
+      Size.Width = 159.000000000000000000
+      Size.Height = 49.000000000000000000
       Size.PlatformDefault = False
       StyleLookup = ''
       TabOrder = 0

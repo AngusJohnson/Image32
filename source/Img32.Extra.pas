@@ -3,7 +3,7 @@ unit Img32.Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  21 December 2024                                                *
+* Date      :  26 December 2024                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Miscellaneous routines that don't belong in other modules.      *
@@ -653,7 +653,7 @@ end;
 
 procedure HatchBackground(img: TImage32; const rec: TRect;
   color1: TColor32 = clWhite32; color2: TColor32= $FFE8E8E8;
-  hatchSize: Integer = 10); overload;
+  hatchSize: Integer = 10);
 var
   i,j: Integer;
   pc: PColor32;
@@ -671,7 +671,7 @@ begin
       for j := rec.Left to rec.Right -1 do
       begin
         if (j + 1) mod hatchSize = 0 then hatch := not hatch;
-        pc^ := BlendToOpaque(colors[hatch], pc^);
+        pc^ := BlendToOpaque(pc^, colors[hatch]);
        inc(pc);
       end;
     end;
