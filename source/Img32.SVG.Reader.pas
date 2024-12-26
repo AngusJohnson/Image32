@@ -137,6 +137,8 @@ type
     fBkgndColor       : TColor32;
     fBackgndImage     : TImage32;
     fTempImage        : TImage32;
+    fTempImageWidth   : integer;
+    fTempImageHeight  : integer;
     fBlurQuality      : integer;
     fIdList           : TSvgIdNameHashMap;
     fLinGradRenderer  : TLinearGradientRenderer;
@@ -149,6 +151,8 @@ type
     fSimpleDrawList   : TList;
     function  LoadInternal: Boolean;
     function  GetIsEmpty: Boolean;
+    function  GetTempImage: TImage32;
+    procedure InitTempImage;
     procedure SetBlurQuality(quality: integer);
   protected
     userSpaceBounds : TRectD;
@@ -157,7 +161,7 @@ type
     property  RadGradRenderer: TSvgRadialGradientRenderer read fRadGradRenderer;
     property  LinGradRenderer: TLinearGradientRenderer read fLinGradRenderer;
     property  BackgndImage   : TImage32 read fBackgndImage;
-    property  TempImage      : TImage32 read fTempImage;
+    property  TempImage      : TImage32 read GetTempImage;
   public
     constructor Create;
     destructor Destroy; override;
@@ -5321,14 +5325,39 @@ begin
     img.Clear(fBkgndColor);
 
   img.BeginUpdate;
-  fTempImage := TImage32.Create(img.Width, img.Height);
+  // Delay the creation of the TempImage until it is actually needed.
+  // Not all SVGs need it.
+  fTempImageWidth := img.Width;
+  fTempImageHeight := img.Height;
   try
-    fTempImage.BlockNotify;
     fRootElement.Draw(img, di);
   finally
-    fTempImage.Free;
+    fTempImageWidth := 0;
+    fTempImageHeight := 0;
+    FreeAndNil(fTempImage);
     img.EndUpdate;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgReader.InitTempImage;
+var
+  Pixels: TArrayOfColor32;
+begin
+  // Create an uninitialized image. It is cleared by the caller before it is used.
+  NewColor32Array(Pixels, fTempImageWidth * fTempImageHeight, True);
+  fTempImage := TImage32.Create(Pixels, fTempImageWidth, fTempImageHeight);
+  fTempImage.BlockNotify;
+end;
+
+//------------------------------------------------------------------------------
+function TSvgReader.GetTempImage: TImage32;
+begin
+  // Use an additional method to execute the dyn-array management
+  // only if we create the TempImage.
+  if fTempImage = nil then
+    InitTempImage;
+  Result := fTempImage;
 end;
 //------------------------------------------------------------------------------
 
