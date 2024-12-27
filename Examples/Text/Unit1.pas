@@ -363,7 +363,6 @@ end;
 procedure TForm1.Draw;
 var
   rec: TRect;
-  lineHeightAdjust: double;
   align: TTextAlign;
   valign: TTextVAlign;
 begin
@@ -377,12 +376,8 @@ begin
   else valign := tvaBottom;
 
   ResetPanelImage($FFFDFDFD);
-  rec := Rect(40, 0, imgPanel.Image.Width -40, imgPanel.Image.Height);
-
-  // the mono font's line height is consistently larger than the regular font's.
-  lineHeightAdjust := 0.66 * (monoSpaceCache.LineHeight - regularCache.LineHeight);
-
-  chunkedText.DrawText(imgPanel.Image, rec, align, valign, -lineHeightAdjust);
+  rec := Rect(40, 40, imgPanel.Image.Width -40, imgPanel.Image.Height - 40);
+  chunkedText.DrawText(imgPanel.Image, rec, align, valign, 0);
   imgPanel.Invalidate;
 end;
 //------------------------------------------------------------------------------

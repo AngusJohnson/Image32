@@ -3,7 +3,7 @@ unit Img32.Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  17 December 2024                                                *
+* Date      :  26 December 2024                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -18,7 +18,6 @@ uses
   {$IFDEF MSWINDOWS} Windows, ShlObj, ActiveX, {$ENDIF}
   Types, SysUtils, Classes, Math,
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults,{$ENDIF}
-  Character,
   Img32, Img32.Draw, Img32.Vector;
 
 type
@@ -438,12 +437,14 @@ type
   end;
 
   TPageTextMetrics = record
-    lineCount       : integer;
-    maxLineWidth    : double;
-    wordListOffsets : TArrayOfInteger;
+    lineCount             : integer;
+    pageWidth             : double;
+    pageHeight            : double;
+    lineHeight            : double;
+    pendingChuckIdx       : integer;
+    chunkIdxAtStartOfLine : TArrayOfInteger;
     justifyDeltas   : TArrayOfDouble;
     lineWidths      : TArrayOfDouble;
-    lineHeights     : TArrayOfDouble;
   end;
 
   TFontCache = class;
@@ -452,16 +453,16 @@ type
   TTextChunk = class
   private
     index         : integer;
-    chunk         : UnicodeString;
     chunkLen      : integer;
+    ascent        : double;
+    paths         : TArrayOfPathsD;
+  public
+    text          : UnicodeString;
     width         : double;
     height        : double;
-    ascent        : double;
     fillColor     : TColor32;
     penColor      : TColor32;
     penWidth      : double;
-    paths         : TArrayOfPathsD;
-  public
     constructor Create(owner: TChunkedText;
       const chunk: UnicodeString; index: integer; fontCache: TFontCache;
       fillColor: TColor32; penColor: TColor32; penWidth: double);
@@ -489,6 +490,8 @@ type
     procedure DeleteChunkRange(startIdx, endIdx: Integer);
     procedure AddNewline(font: TFontCache);
     procedure AddSpace(font: TFontCache); overload;
+    function  GetPageMetrics(pageWidth, pageHeight, lineHeight: double;
+      startingChunk: integer): TPageTextMetrics;
     function InsertTextChunk(font: TFontCache; index: integer;
       const chunk: UnicodeString; fillColor: TColor32 = clBlack32;
       penColor: TColor32 = clNone32; penWidth: double = 1.0): TTextChunk;
@@ -498,13 +501,11 @@ type
     procedure SetText(const text: UnicodeString;
       font: TFontCache; fillColor: TColor32 = clBlack32;
       penColor: TColor32 = clNone32; penWidth: double = 1.0);
-    function GetPageMetrics(maxLineWidth: double): TPageTextMetrics;
-    procedure DrawText(image: TImage32; const rec: TRect;
+    // DrawText: see Examples/FMX2, Examples/Text & Examples/Experimental apps.
+    function DrawText(image: TImage32; const rec: TRect;
       textAlign: TTextAlign; textAlignV: TTextVAlign;
-      lineHeightAdjust: double = 0.0;
-      startlineNum: integer = 0; endlineNum: integer = 0);
-
-
+      startChunk: integer; lineHeight: double = 0.0): TPageTextMetrics;
+    procedure ApplyNewFont(font: TFontCache);
     property Chunk[index: integer]: TTextChunk read GetChunk; default;
     property Text: UnicodeString read GetText;
   end;
@@ -541,10 +542,11 @@ type
     function IsValidFont: Boolean;
     function GetAscent: double;
     function GetDescent: double;
+    function GetGap: double;
     function GetLineHeight: double;
     function GetYyHeight: double;
     function GetTextOutlineInternal(x, y: double; const text: UnicodeString;
-      out glyphs: TArrayOfPathsD; out nextX: double): Boolean;
+      underlineIdx: integer; out glyphs: TArrayOfPathsD; out nextX: double): Boolean;
     procedure UpdateFontReaderLastUsedTime;
   public
     constructor Create(fontReader: TFontReader = nil; fontHeight: double = 10); overload;
@@ -558,12 +560,14 @@ type
     procedure DeleteRecipient(recipient: INotifyRecipient);
     function GetCharInfo(charOrdinal: Cardinal): PGlyphInfo;
 
-    function GetTextOutline(x, y: double;
-      const text: UnicodeString): TPathsD; overload;
-    function GetTextOutline(x, y: double;
-      const text: UnicodeString; out nextX: double): TPathsD; overload;
+    function GetTextOutline(x, y: double; const text: UnicodeString): TPathsD; overload;
+    function GetTextOutline(const rec: TRectD; const text: UnicodeString;
+      ta: TTextAlign; tav: TTextVAlign; underlineIdx: integer = 0): TPathsD; overload;
+    function GetTextOutline(x, y: double; const text: UnicodeString;
+      out nextX: double; underlineIdx: integer = 0): TPathsD; overload;
+
     function GetVerticalTextOutline(x, y: double;
-      const text: UnicodeString; interCharSpace: double =0): TPathsD;
+      const text: UnicodeString; interCharSpace: double = 0.0): TPathsD;
 
     function GetAngledTextGlyphs(x, y: double; const text: UnicodeString;
       angleRadians: double; const rotatePt: TPointD;
@@ -573,19 +577,18 @@ type
     function GetTextWidth(const text: UnicodeString): double;
     function GetSpaceWidth: double;
 
-    property Ascent: double read GetAscent;
-    property Descent: double read GetDescent;
-
-    property FontHeight: double read fFontHeight write SetFontHeight;
-    property FontReader: TFontReader read
-      fFontReader write SetFontReader;
-    property InvertY: boolean read fFlipVert write SetFlipVert;
-    property Kerning: boolean read fUseKerning write fUseKerning;
-    property LineHeight: double read GetLineHeight;
-    property YyHeight: double read GetYyHeight;
-    property Scale : double read fScale;
-    property Underlined: Boolean read fUnderlined write fUnderlined;
-    property StrikeOut: Boolean read fStrikeOut write fStrikeOut;
+    property Ascent     : double read GetAscent;
+    property Descent    : double read GetDescent;
+    property LineGap    : double read GetGap;
+    property FontHeight : double read fFontHeight write SetFontHeight;
+    property FontReader : TFontReader read fFontReader write SetFontReader;
+    property InvertY    : boolean read fFlipVert write SetFlipVert;
+    property Kerning    : boolean read fUseKerning write fUseKerning;
+    property LineHeight : double read GetLineHeight;
+    property YyHeight   : double read GetYyHeight;
+    property Scale      : double read fScale;
+    property Underlined : Boolean read fUnderlined write fUnderlined;
+    property StrikeOut  : Boolean read fStrikeOut write fStrikeOut;
   end;
 
   function DrawText(image: TImage32; x, y: double;
@@ -648,6 +651,7 @@ var
 
 const
   lineFrac = 0.05;
+  Space = ' ';
 
 //------------------------------------------------------------------------------
 // Miscellaneous functions
@@ -1137,7 +1141,7 @@ var
   hdl: HFont;
 begin
   Result := false;
-  hdl := CreateFontIndirect(logfont);
+  hdl := CreateFontIndirect({$IFDEF FPC}@{$ENDIF}logfont);
   if hdl > 0 then
   try
     Result := LoadUsingFontHdl(hdl);
@@ -1739,6 +1743,7 @@ begin
     setLength(result[i], contourEnds[i] - contourEnds[i-1]);
 
   repeats := 0;
+  flag := 0; // help the compiler with "flag isn't initialized"
   for i := 0 to High(result) do
   begin
     for j := 0 to High(result[i]) do
@@ -2062,37 +2067,37 @@ begin
   nextX   := glyphInfo.hmtx.advanceWidth;
   glyphInfo.unicode := unicode;
 end;
+//------------------------------------------------------------------------------
 
 function TFontReader.GetFontInfo: TFontInfo;
 begin
   if not IsValidFontFormat then
   begin
-    result.faceName := '';
-    result.fullFaceName := '';
-    result.style := '';
-    result.unitsPerEm := 0;
-  end else
-  begin
-    result := fFontInfo;
-    //and updated the record with everything except the strings
-    result.unitsPerEm  := fTbl_head.unitsPerEm;
-    result.xMin        := fTbl_head.xMin;
-    result.xMax        := fTbl_head.xMax;
-    result.yMin        := fTbl_head.yMin;
-    result.yMax        := fTbl_head.yMax;
-
-    //note: the following three fields "represent the design
-    //intentions of the font's creator rather than any computed value"
-    //https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6hhea.html
-    result.ascent      := fTbl_hhea.ascent;
-    result.descent     := abs(fTbl_hhea.descent);
-    result.lineGap     := fTbl_hhea.lineGap;
-
-    result.advWidthMax := fTbl_hhea.advWidthMax;
-    result.minLSB      := fTbl_hhea.minLSB;
-    result.minRSB      := fTbl_hhea.minRSB;
-    result.xMaxExtent  := fTbl_hhea.xMaxExtent;
+    FillChar(Result, SizeOf(Result), 0);
+    Exit;
   end;
+
+  result := fFontInfo;
+  if result.unitsPerEm > 0 then Exit;
+
+  //and updated the record with everything except the strings
+  result.unitsPerEm  := fTbl_head.unitsPerEm;
+  result.xMin        := fTbl_head.xMin;
+  result.xMax        := fTbl_head.xMax;
+  result.yMin        := fTbl_head.yMin;
+  result.yMax        := fTbl_head.yMax;
+
+  //note: the following three fields "represent the design
+  //intentions of the font's creator rather than any computed value"
+  //https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6hhea.html
+
+  result.ascent      := fTbl_hhea.ascent;
+  result.descent     := abs(fTbl_hhea.descent);
+  result.lineGap     := fTbl_hhea.lineGap;
+  result.advWidthMax := fTbl_hhea.advWidthMax;
+  result.minLSB      := fTbl_hhea.minLSB;
+  result.minRSB      := fTbl_hhea.minRSB;
+  result.xMaxExtent  := fTbl_hhea.xMaxExtent;
 end;
 //------------------------------------------------------------------------------
 
@@ -2347,8 +2352,7 @@ end;
 
 function TFontCache.GetAscent: double;
 begin
-  if not IsValidFont then
-    Result := 0
+  if not IsValidFont then Result := 0
   else with fFontReader.FontInfo do
     Result := Max(ascent, yMax) * fScale;
 end;
@@ -2356,17 +2360,23 @@ end;
 
 function TFontCache.GetDescent: double;
 begin
-  if not IsValidFont then
-    Result := 0
+  if not IsValidFont then Result := 0
   else with fFontReader.FontInfo do
     Result := Max(descent, -yMin) * fScale;
+end;
+//------------------------------------------------------------------------------
+
+function TFontCache.GetGap: double;
+begin
+  if not IsValidFont then Result := 0
+  else Result := fFontReader.FontInfo.lineGap * fScale;
 end;
 //------------------------------------------------------------------------------
 
 function TFontCache.GetLineHeight: double;
 begin
   if not IsValidFont then Result := 0
-  else Result := Ascent + Descent;
+  else Result := Ascent + Descent + LineGap;
 end;
 //------------------------------------------------------------------------------
 
@@ -2485,8 +2495,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFontCache.GetTextOutline(x, y: double;
-  const text: UnicodeString): TPathsD;
+function TFontCache.GetTextOutline(x, y: double; const text: UnicodeString): TPathsD;
 var
   dummy: double;
 begin
@@ -2494,15 +2503,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFontCache.GetTextOutline(x, y: double;
-  const text: UnicodeString; out nextX: double): TPathsD;
+function TFontCache.GetTextOutline(x, y: double; const text: UnicodeString;
+  out nextX: double; underlineIdx: integer): TPathsD;
 var
   i, j: integer;
   arrayOfGlyphs: TArrayOfPathsD;
   resultCount: integer;
 begin
   Result := nil;
-  if not GetTextOutlineInternal(x, y, text, arrayOfGlyphs, nextX) then Exit;
+  if not GetTextOutlineInternal(x, y,
+    text, underlineIdx, arrayOfGlyphs, nextX) then Exit;
 
   // pre allocate the Result array
   resultCount := 0;
@@ -2516,6 +2526,52 @@ begin
     for j := 0 to high(arrayOfGlyphs[i]) do
     begin
       Result[resultCount] := arrayOfGlyphs[i][j];
+      inc(resultCount);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TFontCache.GetTextOutline(const rec: TRectD; const text: UnicodeString;
+  ta: TTextAlign; tav: TTextVAlign; underlineIdx: integer): TPathsD;
+var
+  i, highI, j: integer;
+  dummy, dx, dy: double;
+  arrayOfGlyphs: TArrayOfPathsD;
+  resultCount: integer;
+  rec2: TRectD;
+begin
+  Result := nil;
+  if not GetTextOutlineInternal(0, 0, text,
+    underlineIdx, arrayOfGlyphs, dummy) or (arrayOfGlyphs = nil) then Exit;
+
+  highI := High(arrayOfGlyphs);
+  rec2 := GetBoundsD(arrayOfGlyphs);
+
+  case ta of
+    taRight: dx := rec.Right - rec2.Width;
+    taCenter: dx := rec.Left + (rec.Width - rec2.Width)/ 2;
+    else dx := rec.Left;
+  end;
+
+  case tav of
+    tvaMiddle: dy := rec.Top - rec2.Top + (rec.Height - rec2.Height)/ 2;
+    tvaBottom: dy := rec.Bottom - Descent;
+    else dy := rec.Top + Ascent;
+  end;
+
+  // pre allocate the Result array
+  resultCount := 0;
+  for i := 0 to highI do
+    inc(resultCount, Length(arrayOfGlyphs[i]));
+  SetLength(Result, resultCount);
+
+  resultCount := 0;
+  for i := 0 to highI do
+  begin
+    for j := 0 to high(arrayOfGlyphs[i]) do
+    begin
+      Result[resultCount] := TranslatePath(arrayOfGlyphs[i][j], dx, dy);
       inc(resultCount);
     end;
   end;
@@ -2552,7 +2608,7 @@ begin
       dy := - yMin * scale;   //yMin = char descent
     end;
     AppendPath(Result, TranslatePath(glyphInfo.paths, x + dx, y));
-    if text[i] = #32 then
+    if text[i] = Space then
       y := y + dy - interCharSpace else
       y := y + dy + interCharSpace;
   end;
@@ -2560,7 +2616,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function IsSurrogate(c: Char): Boolean;
+function IsSurrogate(c: WideChar): Boolean;
   {$IFDEF INLINE} inline; {$ENDIF}
 begin
   Result := (c >= #$D800) and (c <= #$DFFF);
@@ -2575,7 +2631,8 @@ end;
 //------------------------------------------------------------------------------
 
 function TFontCache.GetTextOutlineInternal(x, y: double;
-  const text: UnicodeString; out glyphs: TArrayOfPathsD; out nextX: double): Boolean;
+  const text: UnicodeString; underlineIdx: integer;
+  out glyphs: TArrayOfPathsD; out nextX: double): Boolean;
 var
   i,j, len  : integer;
   dx,y2,w   : double;
@@ -2627,6 +2684,16 @@ begin
     currGlyph := TranslatePath(glyphInfo.paths, nextX, y);
     dx := glyphInfo.hmtx.advanceWidth * fScale;
     AppendPath(glyphs, currGlyph);
+
+    if not fUnderlined and (underlineIdx -1 = i) then
+    begin
+      w := LineHeight * lineFrac;
+      y2 := y + 1.5 * (1 + w);
+      SetLength(currGlyph, 1);
+      currGlyph[0] := Rectangle(nextX, y2, nextX +dx, y2 + w);
+      AppendPath(glyphs, currGlyph);
+    end;
+
     nextX := nextX + dx;
     prevGlyphKernList := glyphInfo.kernList;
   end;
@@ -2978,7 +3045,7 @@ begin
   case valign of
     tvaMiddle: dy := (rec.Top + rec.Bottom - rec2.Top) * 0.5;
     tvaBottom: dy := rec.Bottom - rec2.Bottom;
-    else dy := rec.Top;
+    else dy := rec.Top + font.Ascent;
   end;
   glyphs := TranslatePath(glyphs, dx, dy);
   DrawPolygon(image, glyphs, frNonZero, textColor);
@@ -2994,7 +3061,11 @@ var
   rotatePt: TPointD;
 begin
   rotatePt := PointD(x,y);
-  if not assigned(font) or not font.IsValidFont then Exit;
+  if not assigned(font) or not font.IsValidFont then
+  begin
+    Result := NullPointD;
+    Exit;
+  end;
   glyphs := font.GetAngledTextGlyphs(x, y,
     text, angleRadians, rotatePt, Result);
   DrawPolygon(image, glyphs, frNonZero, textColor);
@@ -3040,7 +3111,7 @@ begin
       end;
       glyphs := TranslatePath( glyphInfo.paths, x + dx, y);
       DrawPolygon(image, glyphs, frNonZero, cr);
-      if text[i] = #32 then
+      if text[i] = Space then
         y := y + dy - interCharSpace else
         y := y + dy + interCharSpace;
     end;
@@ -3130,7 +3201,7 @@ begin
       dec(charsThatFit);
     until offsets[charsThatFit] <= dist;
     //break text WORD boundaries
-    while (charsThatFit > 1) and (text[charsThatFit] <> #32) do
+    while (charsThatFit > 1) and (text[charsThatFit] <> Space) do
       dec(charsThatFit);
     if charsThatFit = 0 then charsThatFit := 1;
   end;
@@ -3164,7 +3235,7 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// TWordInfo
+// TTextChunk class
 //------------------------------------------------------------------------------
 
 constructor TTextChunk.Create(owner: TChunkedText;
@@ -3178,7 +3249,7 @@ begin
   else if index > listCnt then index := listCnt;
 
   self.index := index;
-  self.chunk  := chunk;
+  self.text  := chunk;
   self.chunkLen := Length(chunk);
   self.fillColor := fillColor;
   self.penColor := penColor;
@@ -3186,7 +3257,7 @@ begin
 
   if Assigned(fontCache) then
   begin
-    fontCache.GetTextOutlineInternal(0,0, chunk, self.paths, self.width);
+    fontCache.GetTextOutlineInternal(0,0, chunk, 0, self.paths, self.width);
     self.height := fontCache.LineHeight;
     self.ascent := fontCache.Ascent;
   end else
@@ -3241,7 +3312,7 @@ var
 begin
   Result := '';
   for i := 0 to Count -1 do
-    Result := Result + TTextChunk(fList.Items[i]).chunk;
+    Result := Result + TTextChunk(fList.Items[i]).text;
 end;
 //------------------------------------------------------------------------------
 
@@ -3259,8 +3330,8 @@ begin
     nlChunk.ascent := fLastFont.Ascent;
   end else
   begin
-    nlChunk := InsertTextChunk(font, MaxInt, #32, clNone32, clNone32, 0);
-    nlChunk.chunk := #10;
+    nlChunk := InsertTextChunk(font, MaxInt, Space, clNone32, clNone32, 0);
+    nlChunk.text := #10;
     fSpaceWidth := nlChunk.width;
     fLastFont := font;
   end;
@@ -3276,13 +3347,13 @@ begin
   if (fLastFont = font) then
   begin
     // this is much faster as it bypasses font.GetTextOutlineInternal
-    spaceChunk := InsertTextChunk(nil, MaxInt, #32, clNone32, clNone32, 0);
+    spaceChunk := InsertTextChunk(nil, MaxInt, Space, clNone32, clNone32, 0);
     spaceChunk.width := fSpaceWidth;
     spaceChunk.height := fLastFont.LineHeight;
     spaceChunk.ascent := fLastFont.Ascent;
   end else
   begin
-    spaceChunk := InsertTextChunk(font, MaxInt, #32, clNone32, clNone32, 0);
+    spaceChunk := InsertTextChunk(font, MaxInt, Space, clNone32, clNone32, 0);
     fLastFont := font;
     fSpaceWidth := spaceChunk.width;
   end;
@@ -3369,16 +3440,16 @@ begin
   Inc(pEnd, Length(text));
   while p < pEnd do
   begin
-    if (p^ <= #32) then
+    if (p^ <= Space) then
     begin
-      if (p^ = #32) then AddSpace(font)
+      if (p^ = Space) then AddSpace(font)
       else if (p^ = #10) then AddNewline(font);
       inc(p);
     end else
     begin
       p2 := p;
       inc(p);
-      while (p < pEnd) and (p^ > #32) do inc(p);
+      while (p < pEnd) and (p^ > Space) do inc(p);
       len := p - p2;
       SetLength(s, len);
       Move(p2^, s[1], len * SizeOf(Char));
@@ -3388,190 +3459,186 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TChunkedText.GetPageMetrics(maxLineWidth: double): TPageTextMetrics;
+function TChunkedText.GetPageMetrics(pageWidth, pageHeight, lineHeight: double;
+  startingChunk: integer): TPageTextMetrics;
 var
-  arrayCnt, arrayCap: integer;
-
-  procedure CalcLineWidthsAndJustify(idx: integer);
-  var
-    i, j, k, spcCnt: integer;
-    x, lineHeight: double;
-    forceLeftAlign: Boolean;
-  begin
-    j := Result.wordListOffsets[idx] -1;
-    if j < 0 then Exit;
-
-    forceLeftAlign := GetChunk(j).chunk = #10;
-    i := Result.wordListOffsets[idx -1];
-
-    while (j > i) and (GetChunk(j).chunk = #32) do
-      dec(j);
-
-    spcCnt := 0;
-    x := 0;
-    lineHeight := 0;
-    for k := i to j do
-      with GetChunk(k) do
-      begin
-        if chunk = #32 then inc(spcCnt);
-        x := x + width;
-        if height > lineHeight then lineHeight := height;
-      end;
-    Result.lineWidths[idx-1] := x;
-    Result.lineHeights[idx-1] := lineHeight;
-    if not forceLeftAlign and (spcCnt > 0) then
-      Result.justifyDeltas[idx-1] := (Result.maxLineWidth - x)/spcCnt;
-  end;
+  arrayCnt, arrayCap    : integer;
+  currentChunkIdx       : integer;
+  chunkIdxAtStartOfLine : integer;
+  cummulativeHeight     : double;
+  linesOverflow         : Boolean;
 
   procedure SetResultLength(len: integer);
   begin
-    SetLength(Result.wordListOffsets, len);
+    SetLength(Result.chunkIdxAtStartOfLine, len);
     SetLength(Result.justifyDeltas, len);
     SetLength(Result.lineWidths, len);
-    SetLength(Result.lineHeights, len);
   end;
 
-  procedure AddLine(i: integer);
+  procedure AddLine;
+  var
+    i, spcCnt, ChunkIdxAtEndOfLine: integer;
+    x: double;
   begin
     if arrayCnt = arrayCap then
     begin
       inc(arrayCap, 16);
       SetResultLength(arrayCap);
     end;
-    inc(Result.lineCount);
-    Result.wordListOffsets[arrayCnt] := i;
-    Result.justifyDeltas[arrayCnt] := 0.0;
-    if (arrayCnt > 0) then
-      CalcLineWidthsAndJustify(arrayCnt);
+    ChunkIdxAtEndOfLine := currentChunkIdx -1;
+    while (ChunkIdxAtEndOfLine > chunkIdxAtStartOfLine) and
+      (Chunk[ChunkIdxAtEndOfLine].text = Space) do
+        Dec(ChunkIdxAtEndOfLine);
+
+    x := 0; spcCnt := 0;
+    for i := chunkIdxAtStartOfLine to ChunkIdxAtEndOfLine do
+      with Chunk[i] do
+      begin
+        if text = Space then inc(spcCnt);
+        x := x + width;
+      end;
+    Result.lineWidths[arrayCnt] := x;
+    Result.lineHeight := lineHeight;
+    Result.chunkIdxAtStartOfLine[arrayCnt] := chunkIdxAtStartOfLine;
+    if spcCnt = 0 then
+      Result.justifyDeltas[arrayCnt] := 0 else
+      Result.justifyDeltas[arrayCnt] := (Result.pageWidth - x)/spcCnt;
     inc(arrayCnt);
+    cummulativeHeight := cummulativeHeight + lineHeight;
+    linesOverflow := cummulativeHeight > pageHeight;
   end;
 
 var
-  i,j, cnt: integer;
-  x: double;
-  wc: TTextChunk;
+  currentX: double;
+  chunk: TTextChunk;
 begin
-  Result.lineCount := 0;
-  Result.maxLineWidth := maxLineWidth;
-  Result.wordListOffsets := nil;
+  FillChar(Result, SizeOf(Result), 0);
   arrayCnt := 0; arrayCap := 0;
-  if (Count = 0) then Exit;
+  if (Count = 0) or (startingChunk >= Count) then Exit;
 
-  i := 0; j := 0;
-  cnt := Count;
-  x := 0;
+  Result.pageWidth := pageWidth;
+  Result.pendingChuckIdx := startingChunk;
+  currentChunkIdx := startingChunk;
+  chunkIdxAtStartOfLine := startingChunk;
+  currentX := 0;
 
-  while (i < cnt) do
+  pageHeight := pageHeight - GetChunk(currentChunkIdx).ascent;
+  cummulativeHeight := 0;
+
+  while (currentChunkIdx < Count) do
   begin
-    wc := GetChunk(i);
-    if (i = j) and (wc.chunk = #32) then
+    chunk := GetChunk(currentChunkIdx);
+    if (chunk.text = #10) then
     begin
-      inc(i); inc(j); Continue;
-    end;
-
-    if (wc.chunk = #10) then
-    begin
-      AddLine(j);
-      inc(i); j := i; x := 0;
+      AddLine;
+      Result.justifyDeltas[arrayCnt-1] := 0;
+      inc(currentChunkIdx);
+      chunkIdxAtStartOfLine := currentChunkIdx;
+      currentX := 0;
+      if linesOverflow then Break;
     end
-    else if (x + wc.width > maxLineWidth) then
+    else if (currentX + chunk.width > pageWidth) then
     begin
-      if j = i then Break; //chunk is too long for line. ??hiphenate
-      AddLine(j);
-      j := i; x := 0;
+      // break if a single chunk is too long for a whole line.
+      // todo - hypenate
+      if (chunkIdxAtStartOfLine = currentChunkIdx) then Break;
+
+      AddLine;
+      if linesOverflow then Break;
+      // don't allow spaces to wrap to the front of the following line
+      while (currentChunkIdx < Count) and
+        (GetChunk(currentChunkIdx).text = Space) do
+          inc(currentChunkIdx);
+
+      chunkIdxAtStartOfLine := currentChunkIdx;
+      currentX := 0;
     end else
     begin
-      x := x + wc.width;
-      inc(i);
+      currentX := currentX + chunk.width;
+      inc(currentChunkIdx);
     end;
   end;
 
-  if (j < cnt) then AddLine(j); //add end short line
-  AddLine(cnt);
-  dec(Result.lineCount);
+  if not linesOverflow and
+    (currentChunkIdx > chunkIdxAtStartOfLine) then AddLine;
+  Result.lineCount := arrayCnt;
+  Result.pageHeight := cummulativeHeight;
   SetResultLength(arrayCnt);
+  Result.pendingChuckIdx := currentChunkIdx;
+  if arrayCnt = 0 then Exit;
+
   //make sure the 'real' last line isn't justified.
-  Result.justifyDeltas[arrayCnt-2] := 0;
+  Result.justifyDeltas[arrayCnt-1] := 0;
+
   //nb: the 'lineWidths' for the very last line may be longer
   //than maxLineWidth when a WORD's width exceeds 'maxLineWidth
 end;
 //------------------------------------------------------------------------------
 
-procedure TChunkedText.DrawText(image: TImage32; const rec: TRect;
+function TChunkedText.DrawText(image: TImage32; const rec: TRect;
   textAlign: TTextAlign; textAlignV: TTextVAlign;
-  lineHeightAdjust: double; startlineNum: integer; endlineNum: integer);
+  startChunk: integer; lineHeight: double): TPageTextMetrics;
 var
   i,j, recWidth, recHeight: integer;
   a,b: integer;
-  x,y, lineHeight, totalHeight, lineWidth, spcDx: double;
-  pm: TPageTextMetrics;
+  x,y, totalHeight, lineWidth, spcDx: double;
   pp: TPathsD;
   top: double;
 begin
-  RectWidthHeight(rec, recWidth, recHeight);
-  pm := GetPageMetrics(recWidth);
+  FillChar(Result, SizeOf(Result), 0);
+  if Count = 0 then Exit;
 
-  if startlineNum < 0 then startlineNum := 0;
-  if (endlineNum <= 0) or (endlineNum >= pm.lineCount) then
-    endlineNum := pm.lineCount -1;
-  if (startlineNum > endlineNum) then Exit;
+  Result.pendingChuckIdx := startChunk;
+  RectWidthHeight(rec, recWidth, recHeight);
 
   // LINE HEIGHTS ...............
   // Getting lineheights based on a given font's ascent and descent values
-  // works well only when a single font is used. Unfortunately, when multiple
-  // fonts are used, line spacing becomes uneven.
+  // works well only when a single font is used. Unfortunately, when using
+  // multiple fonts, line spacing becomes uneven and looks ugly.
   // An alternative approach is to measure the highest and lowest bounds of all
-  // the glyphs in a line, and use these to derive a line height. But this
-  // approach also has problems, especially when lines contain no glyphs, or
-  // when they only contain glyphs with minimal heights (-----------).
-  // A third approach, and the approach used here, is to get the maximum of
-  // every lines' height and use that value for every line. But this approach
-  // tends to produce larger than desired line heights.
+  // the glyphs in a line, and use these and a fixed inter line space
+  // to derive variable line heights. But this approach also has problems,
+  // especially when lines contain no glyphs, or when they only contain glyphs
+  // with minimal heights (----------). So this too can look ugly.
+  // A third approach, is to get the maximum of every lines' height and use
+  // that value for every line. But this approach tends to produce undesirably
+  // large line heights.
+  // A fourth approach is to use the height of the very first text chunk.
+  // And a final approach ia simply to use a user defined line height
 
-  lineHeight := 0;
-  for i := startlineNum to endlineNum do
-    lineHeight := Max(lineHeight, pm.lineHeights[i]);
-  lineHeight := lineHeight * 0.9; // just looks better empirically
-  if lineHeight > recHeight then Exit;
+  if lineHeight = 0 then
+    lineHeight := Chunk[0].height;
+  Result := GetPageMetrics(recWidth, recHeight, lineHeight, startChunk);
+  if (Result.lineCount = 0) or (lineHeight > recHeight) then Exit;
 
   // only draw visible lines
-  while true do
-  begin
-    totalHeight :=
-      lineHeight * (endlineNum - startlineNum + 1) +
-      lineHeightAdjust * (endlineNum - startlineNum);
-    if (endlineNum = startlineNum) or (totalHeight <= recHeight) then Break;
-    case textAlignV of
-      tvaMiddle: if Odd(endlineNum - startlineNum) then
-        dec(endlineNum) else
-        inc(startlineNum);
-      tvaBottom: inc(startlineNum);
-      else dec(endlineNum);
-    end;
-  end;
+  totalHeight := lineHeight * Result.lineCount;
+  Result.pageHeight := totalHeight;
 
-  i := pm.wordListOffsets[startlineNum];
-  top := Chunk[i].ascent + rec.Top;
+  i := Result.chunkIdxAtStartOfLine[0];
+  top := rec.Top + Chunk[i].ascent;
 
   case textAlignV of
     tvaMiddle: y := top + (RecHeight - totalHeight) /2 -1;
-    tvaBottom: y := rec.bottom - totalHeight + Chunk[i].ascent - lineHeightAdjust;
+    tvaBottom: y := rec.bottom - totalHeight + Chunk[i].ascent;
     else y := top;
   end;
 
-  for i := startlineNum to endlineNum do
+  for i := 0 to Result.lineCount -1 do
   begin
-    a := pm.wordListOffsets[i];
-    b := pm.wordListOffsets[i+1] -1;
+    a := Result.chunkIdxAtStartOfLine[i];
+    if i = Result.lineCount -1 then
+      b := Result.pendingChuckIdx -1 else
+      b := Result.chunkIdxAtStartOfLine[i+1] -1;
     if textAlign = taJustify then
-      spcDx := pm.justifyDeltas[i] else
+      spcDx := Result.justifyDeltas[i] else
       spcDx := 0;
-    lineWidth := pm.lineWidths[i];
+    lineWidth := Result.lineWidths[i];
 
     //ingore trailing spaces
     while (b >= a) do
       with GetChunk(b) do
-        if chunk <= #32 then
+        if text <= Space then
           dec(b) else
           break;
 
@@ -3583,20 +3650,35 @@ begin
 
     for j := a to b do
       with GetChunk(j) do
-        if chunk > #32 then
+        if text > Space then
         begin
           pp := MergePathsArray(paths);
           pp := TranslatePath(pp, x, y);
           DrawPolygon(image, pp, frNonZero, fillColor);
-          DrawLine(image, pp, penWidth, penColor, esPolygon);
+          if (GetAlpha(penColor) > 0) and (penWidth > 0) then
+            DrawLine(image, pp, penWidth, penColor, esPolygon);
           x := x + width;
         end else
         begin
           x := x + width + spcDx;
         end;
-
-    y := y + lineHeight + lineHeightAdjust;
+    y := y + lineHeight;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TChunkedText.ApplyNewFont(font: TFontCache);
+var
+  i: integer;
+begin
+  if not Assigned(font) then Exit;
+  for i := 0 to Count -1 do
+    with Chunk[i] do
+    begin
+      font.GetTextOutlineInternal(0,0, text, 0, paths, width);
+      height := font.LineHeight;
+      ascent := font.Ascent;
+    end;
 end;
 
 //------------------------------------------------------------------------------
@@ -3940,7 +4022,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FontSorterProc(const fontreader1, fontreader2: Pointer): integer;
+function FontSorterProc(fontreader1, fontreader2: Pointer): integer;
 var
   fr1: TFontReader absolute fontreader1;
   fr2: TFontReader absolute fontreader2;

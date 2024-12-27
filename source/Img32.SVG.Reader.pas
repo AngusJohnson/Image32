@@ -137,6 +137,8 @@ type
     fBkgndColor       : TColor32;
     fBackgndImage     : TImage32;
     fTempImage        : TImage32;
+    fTempImageWidth   : integer;
+    fTempImageHeight  : integer;
     fBlurQuality      : integer;
     fIdList           : TSvgIdNameHashMap;
     fLinGradRenderer  : TLinearGradientRenderer;
@@ -149,6 +151,8 @@ type
     fSimpleDrawList   : TList;
     function  LoadInternal: Boolean;
     function  GetIsEmpty: Boolean;
+    function  GetTempImage: TImage32;
+    procedure InitTempImage;
     procedure SetBlurQuality(quality: integer);
   protected
     userSpaceBounds : TRectD;
@@ -157,7 +161,7 @@ type
     property  RadGradRenderer: TSvgRadialGradientRenderer read fRadGradRenderer;
     property  LinGradRenderer: TLinearGradientRenderer read fLinGradRenderer;
     property  BackgndImage   : TImage32 read fBackgndImage;
-    property  TempImage      : TImage32 read fTempImage;
+    property  TempImage      : TImage32 read GetTempImage;
   public
     constructor Create;
     destructor Destroy; override;
@@ -1150,11 +1154,13 @@ end;
 
 procedure TGroupElement.Draw(image: TImage32; drawDat: TDrawData);
 var
-  clipEl    : TBaseElement;
-  maskEl    : TBaseElement;
+  clipEl    : TClipPathElement;
+  maskEl    : TMaskElement;
   tmpImg    : TImage32;
   clipPaths : TPathsD;
   clipRec   : TRect;
+  dstClipRec: TRect;
+  offsetX, offsetY: integer;
 begin
   if fChilds.Count = 0 then Exit;
 
@@ -1162,13 +1168,13 @@ begin
   if drawDat.fillRule = frNegative then
     drawDat.fillRule := frNonZero;
 
-  maskEl := FindRefElement(drawDat.maskElRef);
-  clipEl := FindRefElement(drawDat.clipElRef);
+  maskEl := TMaskElement(FindRefElement(drawDat.maskElRef));
+  clipEl := TClipPathElement(FindRefElement(drawDat.clipElRef));
   if Assigned(clipEl) then
   begin
-    with TClipPathElement(clipEl) do
+    drawDat.clipElRef := '';
+    with clipEl do
     begin
-      drawDat.clipElRef := '';
       GetPaths(drawDat);
       clipPaths := CopyPaths(drawPathsF);
 
@@ -1177,19 +1183,30 @@ begin
     end;
     if IsEmptyRect(clipRec) then Exit;
 
+    // Translate the clipPaths, the matix and the clipRec to minimize
+    // the size of the mask image.
+    dstClipRec := clipRec; // save for blending tmpImg to image
+    offsetX := -clipRec.Left;
+    offsetY := -clipRec.Top;
+    if offsetX > 0 then offsetX := 0;
+    if offsetY > 0 then offsetY := 0;
+    if (offsetX < 0) or (offsetY < 0) then
+    begin
+      MatrixTranslate(drawDat.matrix, offsetX, offsetY); // for DrawChildren
+      clipPaths := TranslatePath(clipPaths, offsetX, offsetY);
+      TranslateRect(clipRec, offsetX, offsetY);
+    end;
+
     //nb: it's not safe to use fReader.TempImage when calling DrawChildren
-    tmpImg := TImage32.Create(Image.Width, Image.Height);
+    tmpImg := TImage32.Create(Min(image.Width, clipRec.Right), Min(image.Height, clipRec.Bottom));
     try
       DrawChildren(tmpImg, drawDat);
-      with TClipPathElement(clipEl) do
-      begin
-        if fDrawData.fillRule = frNegative then
-          EraseOutsidePaths(tmpImg, clipPaths, frNonZero, clipRec,
-            fReader.fCustomRendererCache) else
-          EraseOutsidePaths(tmpImg, clipPaths, fDrawData.fillRule, clipRec,
-            fReader.fCustomRendererCache);
-      end;
-      image.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlphaLine);
+      if clipEl.fDrawData.fillRule = frNegative then
+        EraseOutsidePaths(tmpImg, clipPaths, frNonZero, clipRec,
+          fReader.fCustomRendererCache) else
+        EraseOutsidePaths(tmpImg, clipPaths, clipEl.fDrawData.fillRule, clipRec,
+          fReader.fCustomRendererCache);
+      image.CopyBlend(tmpImg, clipRec, dstClipRec, BlendToAlphaLine);
     finally
       tmpImg.Free;
     end;
@@ -1198,16 +1215,31 @@ begin
   else if Assigned(maskEl) then
   begin
     drawDat.maskElRef := '';
-    with TMaskElement(maskEl) do
+    with maskEl do
     begin
       GetPaths(drawDat);
       clipRec := maskRec;
     end;
-    tmpImg := TImage32.Create(image.Width, image.Height);
+
+    // Translate the maskRec, the matix and the clipRec to minimize
+    // the size of the mask image.
+    dstClipRec := clipRec; // save for blending tmpImg to image
+    offsetX := -clipRec.Left;
+    offsetY := -clipRec.Top;
+    if offsetX > 0 then offsetX := 0;
+    if offsetY > 0 then offsetY := 0;
+    if (offsetX < 0) or (offsetY < 0) then
+    begin
+      MatrixTranslate(drawDat.matrix, offsetX, offsetY); // for DrawChildren
+      TranslateRect(clipRec, offsetX, offsetY);
+      TranslateRect(maskEl.maskRec, offsetX, offsetY);
+    end;
+
+    tmpImg := TImage32.Create(Min(image.Width, clipRec.Right), Min(image.Height, clipRec.Bottom));
     try
       DrawChildren(tmpImg, drawDat);
       TMaskElement(maskEl).ApplyMask(tmpImg, drawDat);
-      image.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlphaLine);
+      image.CopyBlend(tmpImg, clipRec, dstClipRec, BlendToAlphaLine);
     finally
       tmpImg.Free;
     end;
@@ -1403,7 +1435,7 @@ procedure TMaskElement.ApplyMask(img: TImage32; const drawDat: TDrawData);
 var
   tmpImg: TImage32;
 begin
-  tmpImg := TImage32.Create(img.Width, img.Height);
+  tmpImg := TImage32.Create(Min(img.Width, maskRec.Right), Min(img.Height, maskRec.Bottom));
   try
     DrawChildren(tmpImg, drawDat);
     img.CopyBlend(tmpImg, maskRec, maskRec, BlendBlueChannelLine);
@@ -5321,14 +5353,39 @@ begin
     img.Clear(fBkgndColor);
 
   img.BeginUpdate;
-  fTempImage := TImage32.Create(img.Width, img.Height);
+  // Delay the creation of the TempImage until it is actually needed.
+  // Not all SVGs need it.
+  fTempImageWidth := img.Width;
+  fTempImageHeight := img.Height;
   try
-    fTempImage.BlockNotify;
     fRootElement.Draw(img, di);
   finally
-    fTempImage.Free;
+    fTempImageWidth := 0;
+    fTempImageHeight := 0;
+    FreeAndNil(fTempImage);
     img.EndUpdate;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgReader.InitTempImage;
+var
+  Pixels: TArrayOfColor32;
+begin
+  // Create an uninitialized image. It is cleared by the caller before it is used.
+  NewColor32Array(Pixels, fTempImageWidth * fTempImageHeight, True);
+  fTempImage := TImage32.Create(Pixels, fTempImageWidth, fTempImageHeight);
+  fTempImage.BlockNotify;
+end;
+
+//------------------------------------------------------------------------------
+function TSvgReader.GetTempImage: TImage32;
+begin
+  // Use an additional method to execute the dyn-array management
+  // only if we create the TempImage.
+  if fTempImage = nil then
+    InitTempImage;
+  Result := fTempImage;
 end;
 //------------------------------------------------------------------------------
 

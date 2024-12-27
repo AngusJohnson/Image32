@@ -3,7 +3,7 @@ unit Img32.Ctrl;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  0.0 (Experimental)                                              *
-* Date      :  16 March 2024                                                   *
+* Date      :  26 December 2024                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 *                                                                              *
@@ -22,7 +22,7 @@ interface
 {$I Img32.inc}
 
 uses
-  SysUtils, Classes, Math, Types, Character,
+  SysUtils, Classes, Math, Types, TypInfo, Character,
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults,{$ENDIF}
   Img32, Img32.Storage, Img32.Vector, Img32.Text, Img32.Layers, Img32.Fmt.SVG;
 
@@ -129,6 +129,7 @@ type
     fEnabled      : Boolean;
     fRootCtrl     : TCustomCtrl;
     fColor        : TColor32;
+    fFontColor    : TColor32;
     fDblClicked   : Boolean;
     fCanFocus     : Boolean;
     fAutoPosition : TAutoPosition;
@@ -186,6 +187,7 @@ type
     property Enabled    : Boolean read fEnabled write SetEnabled;
     property FocusedCtrl: TCustomCtrl read GetFocusedCtrl;
     property Font       : TFontCache read GetFont write SetFont;
+    property FontColor  : TColor32 read fFontColor write fFontColor;
     property HasFocus   : Boolean read GetHasFocus;
     property RootCtrl   : TCustomCtrl read fRootCtrl;
     property Shortcut   : TShortcut read fShortcut write SetShortcut;
@@ -345,22 +347,20 @@ type
 
   TMemoCtrl = class(TScrollingCtrl)
   private
-    fTopLine      : integer;
-    fWordList     : TWordInfoList;
-    fLineHeight   : double;
-    fTextMargin   : TPointD;
-    fPageMetrics  : TTextPageMetrics;
-    fCursorWordIdx: TPoint;
-    fCursorMoved  : Boolean;
-    fSelStart     : TPoint;
-    fSelEnd       : TPoint;
-    fBuffer       : TImage32;
-    fSelectRect   : TRectD;
-    fDoFullPaint  : Boolean;
-    procedure FillWordList;
+    fTopLine        : integer;
+    fChunkedText    : TChunkedText;
+    fTextMargin     : TPointD;
+    fPageMetrics    : TPageTextMetrics;
+    fCursorChunkIdx : TPoint;
+    fCursorMoved    : Boolean;
+    fSelStart       : TPoint;
+    fSelEnd         : TPoint;
+    fBuffer         : TImage32;
+    fTextRect       : TRectD;
+    fSelectRect     : TRectD;
+    procedure CheckPageMetrics;
     function  GetVisibleLines: integer;
     procedure SetTextMargin(const margin: TPointD);
-    procedure InvalidatePos;
     procedure ScrollCaretIntoView;
   protected
     procedure SetFont(font: TFontCache); override;
@@ -382,21 +382,19 @@ type
     procedure SetInnerBounds(const newBounds: TRectD); override;
     function WordIdxToPos(const wordIdx: TPoint): TPointD;
     function PosToWordIdx(const relPos: TPointD): TPoint;
-    property TextMargin: TPointD read fTextMargin write SetTextMargin;
+    property TextMargin : TPointD read fTextMargin write SetTextMargin;
   end;
 
   TEditCtrl = class(TScrollingCtrl)
   private
-    fWordList     : TWordInfoList;
-    fPageMetrics  : TTextPageMetrics;
-    fLineHeight   : double;
-    fTextMargin   : TPointD;
-    fCursorWordIdx: TPoint;
-    fCursorMoved  : Boolean;
-    fSelStart     : TPoint;
-    fSelEnd       : TPoint;
-    procedure TextChanged(Sender: TObject);
-    procedure GetWordList;
+    fChunkedText    : TChunkedText;
+    fPageMetrics    : TPageTextMetrics;
+    fLineHeight     : double;
+    fTextMargin     : TPointD;
+    fCursorChunkIdx : TPoint;
+    fCursorMoved    : Boolean;
+    fSelStart       : TPoint;
+    fSelEnd         : TPoint;
     function GetTextRect(stripMargins: Boolean): TRectD;
     procedure SetTextMargin(const margin: TPointD);
   protected
@@ -410,13 +408,15 @@ type
     procedure Repaint; override;
     function  ReadProperty(const propName, propVal: string): Boolean; override;
     procedure WriteProperties; override;
+    function GetText: string;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
-    function WordIdxToPos(const wordIdx: TPoint): TPointD;
-    function PosToWordIdx(const relPos: TPointD): TPoint;
+    function ChunkIdxToPos(const wordIdx: TPoint): TPointD;
+    function PosToChunkIdx(const relPos: TPointD): TPoint;
     property TextMargin: TPointD read fTextMargin write SetTextMargin;
+    property Text       : string read GetText write SetText;
   end;
 
   TButtonCtrl = class(TCustomCtrl)
@@ -902,7 +902,7 @@ procedure DrawBtnInternal(Image: TImage32; const p: TPathD;
 var
   dx    : double;
   pp    : TPathsD;
-  rec2  : TRect;
+  rec2  : TRectD;
   ulIdx : integer;
 begin
   if not enabled then pressed := false;
@@ -924,7 +924,7 @@ begin
   ulIdx := Pos('&', caption);
   if ulIdx > 0 then Delete(caption, ulIdx, 1);
 
-  rec2 := GetBounds(p);
+  rec2 := GetBoundsD(p);
   if padding > 0 then
     Img32.Vector.InflateRect(rec2, -Round(padding), -Round(padding));
   if (GetAlpha(textColor) < 3) or (Trim(caption) = '') then Exit;
@@ -958,10 +958,10 @@ begin
   with rec do
     rec2 := RectD(Left, Top, Left + radius, Top + radius);
   Result := MakePath([rec.Left, rec.Bottom]);
-  AppendPath(Result, arc(rec2, angle180, angle270));
+  ConcatPaths(Result, arc(rec2, angle180, angle270));
   TranslateRect(rec2, rec.Width - radius, 0);
   p2 := arc(rec2, angle270, angle0);
-  AppendPath(Result, p2);
+  ConcatPaths(Result, p2);
   AppendPoint(Result, rec.BottomRight);
 end;
 //------------------------------------------------------------------------------
@@ -1221,11 +1221,12 @@ begin
       if not Assigned(fRootCtrl) then fRootCtrl := self;
       self.fRootCtrl := fRootCtrl;
     end;
-  Color       := clBtnFace32;
-  fEnabled    := true;
-  fCanFocus   := true;
-  fBevelHeight:= dpiAware(2);
-  OuterMargin := DPIAware(5);
+  fColor        := clBtnFace32;
+  fFontColor    := clBlack32;
+  fEnabled      := true;
+  fCanFocus     := true;
+  fBevelHeight  := dpiAware(2);
+  OuterMargin   := DPIAware(5);
 end;
 //------------------------------------------------------------------------------
 
@@ -1639,7 +1640,7 @@ begin
 
   rec := Rect(InnerRect);
   TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
-  pp := fUsableFont.GetTextOutline(rec, caption, taLeft, tvaTop, ulIdx);
+  pp := fUsableFont.GetTextOutline(RectD(rec), caption, taCenter, tvaMiddle, ulIdx);
   dx := fUsableFont.LineHeight/24;
   pp := TranslatePath(pp, -dx, -dx);
   DrawPolygon(Image, pp, frNonZero, clWhite32);
@@ -1712,7 +1713,7 @@ begin
 //  DrawEdge(Image, rec, clSilver32, clWhite32, bh);
   Img32.Vector.InflateRect(rec, -i, 0);
   if GetUsableFont then
-    DrawText(Image, rec, fText, taLeft, tvaTop, fUsableFont);
+    DrawText(Image, rec.Left, rec.Top, fText, fUsableFont, fFontColor);
 end;
 
 //------------------------------------------------------------------------------
@@ -1810,7 +1811,7 @@ begin
     fScrollH.SetInnerBounds(rec);
     clientRect.Bottom := clientRect.Bottom - scrollHsize;
   end;
-  if Assigned(fScrollV) and fScrollV.Visible then
+  if Assigned(fScrollV) and (fScrollV.Visible or fScrollV.fAutoHide) then
   begin
     if fScrollV.fSize = 0 then
       scrollVsize := fUsableFont.LineHeight * scrollScale else
@@ -2292,12 +2293,10 @@ begin
 
       if Assigned(img) then
         rec.Left := rec.Left + img.Width + spaceW*2;
-      recI := Rect(rec);
 
-      DrawText(Image, recI, fItems[i],
-        taLeft, tvaMiddle, fUsableFont, clWhite32);
+      DrawText(Image, rec, fItems[i], fUsableFont, clWhite32, taLeft, tvaMiddle);
       TranslateRect(rec, hbh, hbh);
-      DrawText(Image, recI, fItems[i], taLeft, tvaMiddle, fUsableFont);
+      DrawText(Image, rec, fItems[i], fUsableFont, clBlack32, taLeft, tvaMiddle);
       TranslateRect(rec, -hbh, itemH -hbh);
 
       if Assigned(img) then
@@ -2626,20 +2625,18 @@ begin
   inherited;
   fBuffer := TImage32.Create;
   fBuffer.BlockNotify;
-  fWordList := TWordInfoList.Create;
+  fChunkedText := TChunkedText.Create;
   Color := clWhite32;
   BlendFunc  := nil; //assumes edit controls will always be fully opaque.
   fTextMargin := PointD(20, 5);
-  fCursorWordIdx := NullPoint;
-  fDoFullPaint := true;
-  //fPageMetrics.lineCount := -1;
+  fCursorChunkIdx := InvalidPoint;
 end;
 //------------------------------------------------------------------------------
 
 destructor TMemoCtrl.Destroy;
 begin
   ScrollV.Free;
-  fWordList.Free;
+  fChunkedText.Free;
   fBuffer.Free;
   inherited;
 end;
@@ -2655,10 +2652,54 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMemoCtrl.FillWordList;
+procedure TMemoCtrl.CheckPageMetrics;
+var
+  ScrollVAutoHide : Boolean;
+  scrollShowing   : Boolean;
+  rec: TRectD;
 begin
-  fWordList.SetText(fText, fUsableFont);
-  fDoFullPaint := true;
+  if not GetUsableFont then Exit;
+  rec  := InnerRect;
+  TranslateRect(rec, outerMargin, outerMargin);
+  if HasFocus then
+    InflateRect(rec, -TextMargin.X - fBevelHeight, -TextMargin.Y - fBevelHeight)
+  else
+    InflateRect(rec, -TextMargin.X, -TextMargin.Y);
+
+  //start by assuming ScrollV is NOT required
+  ScrollVAutoHide := assigned(ScrollV) and ScrollV.AutoHide;
+  scrollShowing := Assigned(ScrollV) and ScrollV.Visible;
+  if not ScrollVAutoHide and scrollShowing then
+    rec.Right := rec.Right - ScrollV.Width;
+
+  if (fPageMetrics.pageWidth > 0) and (rec.Width = fTextRect.Width) and
+    (rec.Height = fTextRect.Height) then Exit;
+
+  fTextRect := rec;
+  fPageMetrics := fChunkedText.GetPageMetrics(fTextRect.Width,
+    MaxDouble, fUsableFont.LineHeight, 0);
+
+  if fPageMetrics.pageHeight < fTextRect.Height then
+  begin
+    if scrollShowing and ScrollVAutoHide then ScrollV.Visible := false;
+  end
+  else if ScrollVAutoHide and Assigned(ScrollV) then
+  begin
+    if not scrollShowing then ScrollV.Visible := true;
+    fTextRect.Right := fTextRect.Right - ScrollV.Width;
+    fPageMetrics := fChunkedText.GetPageMetrics(fTextRect.Width,
+      MaxDouble, fUsableFont.LineHeight, 0);
+  end;
+
+  if Assigned(ScrollV) and ScrollV.Visible then
+  begin
+    with fPageMetrics do
+    begin
+      ScrollV.Max := Round(pageHeight);
+      ScrollV.Step := Round(lineHeight);
+    end;
+    ScrollV.Invalidate;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -2666,9 +2707,11 @@ procedure TMemoCtrl.SetFont(font: TFontCache);
 begin
   inherited;
   if not Assigned(fUsableFont) then Exit;
+  fPageMetrics.pageWidth := 0; // force a fPageMetrics refresh
+  fPageMetrics.lineHeight := fUsableFont.LineHeight;
   if fText <> '' then
-    fWordList.ApplyNewFont(fUsableFont);
-  fDoFullPaint := true;
+    fChunkedText.ApplyNewFont(fUsableFont);
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2676,27 +2719,23 @@ procedure TMemoCtrl.ScrollCaretIntoView;
 var
   visLines: integer;
 begin
-  visLines := GetVisibleLines;
-  if fCursorWordIdx.X < fPageMetrics.wordListOffsets[fTopLine] then
-  begin
-    while fCursorWordIdx.X < fPageMetrics.wordListOffsets[fTopLine] do
-      dec(fTopLine);
-    ScrollV.Position := fTopLine * fLineHeight;
-    Invalidate;
-    fDoFullPaint := true;
-  end
-  else if (fTopLine + visLines < fPageMetrics.lineCount) and
-    (fCursorWordIdx.X >= fPageMetrics.wordListOffsets[fTopLine + visLines]) then
-  begin
-    while (fTopLine + visLines < fPageMetrics.lineCount) and
-      (fCursorWordIdx.X >= fPageMetrics.wordListOffsets[fTopLine + visLines]) do
-        inc(fTopLine);
-    ScrollV.Position := fTopLine * fLineHeight;
-    Invalidate;
-    fDoFullPaint := true;
-  end
-  else
-    InvalidatePos;
+//  visLines := GetVisibleLines;
+//  if fCursorChunkIdx.X < fPageMetrics.chunkIdxAtStartOfLine[fTopLine] then
+//  begin
+//    while fCursorChunkIdx.X < fPageMetrics.chunkIdxAtStartOfLine[fTopLine] do
+//      dec(fTopLine);
+//    ScrollV.Position := fTopLine * fPageMetrics.lineHeight;
+//    Invalidate;
+//  end
+//  else if (fTopLine + visLines < fPageMetrics.lineCount) and
+//    (fCursorChunkIdx.X >= fPageMetrics.chunkIdxAtStartOfLine[fTopLine + visLines]) then
+//  begin
+//    while (fTopLine + visLines < fPageMetrics.lineCount) and
+//      (fCursorChunkIdx.X >= fPageMetrics.chunkIdxAtStartOfLine[fTopLine + visLines]) do
+//        inc(fTopLine);
+//    ScrollV.Position := fTopLine * fPageMetrics.lineHeight;
+//    Invalidate;
+//  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -2705,56 +2744,53 @@ procedure TMemoCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
   function GetPrev(ctrlDown: Boolean): Boolean;
   begin
     Result := true;
-    InvalidatePos;
     if ctrlDown then
     begin
-      if (fCursorWordIdx.Y = 0) and (fCursorWordIdx.X > 0) then
+      if (fCursorChunkIdx.Y = 0) and (fCursorChunkIdx.X > 0) then
       begin
-        dec(fCursorWordIdx.X);
-        while (fCursorWordIdx.X > 0) and
-          (fWordList[fCursorWordIdx.X].aWord = #32) do
-            dec(fCursorWordIdx.X);
-      end else if fCursorWordIdx.Y > 0 then fCursorWordIdx.Y := 0
+        dec(fCursorChunkIdx.X);
+        while (fCursorChunkIdx.X > 0) and
+          (fChunkedText[fCursorChunkIdx.X].text = #32) do
+            dec(fCursorChunkIdx.X);
+      end else if fCursorChunkIdx.Y > 0 then fCursorChunkIdx.Y := 0
       else Result := false
     end
-    else if fCursorWordIdx.Y > 0 then dec(fCursorWordIdx.Y)
-    else if fCursorWordIdx.X = 0 then Result := false
+    else if fCursorChunkIdx.Y > 0 then dec(fCursorChunkIdx.Y)
+    else if fCursorChunkIdx.X = 0 then Result := false
     else
     begin
-      dec(fCursorWordIdx.X);
-      with fWordList[fCursorWordIdx.X] do
-        fCursorWordIdx.Y := length-1;
+      dec(fCursorChunkIdx.X);
+      fCursorChunkIdx.Y := Length(fChunkedText[fCursorChunkIdx.X].text) -1;
     end;
     ScrollCaretIntoView;
   end;
 
   function GetNext(ctrlDown: Boolean): Boolean;
   var
-    lastWord: Boolean;
+    lastChunk: Boolean;
   begin
-    Result := fCursorWordIdx.X < fWordList.Count;
+    Result := fCursorChunkIdx.X < fChunkedText.Count;
     if not Result then Exit;
 
-    InvalidatePos;
-    lastWord := fCursorWordIdx.X = fWordList.Count -1;
-    if ctrlDown and not lastWord then
+    lastChunk := fCursorChunkIdx.X = fChunkedText.Count -1;
+    if ctrlDown and not lastChunk then
     begin
-      inc(fCursorWordIdx.X);
-      fCursorWordIdx.Y := 0;
-      while (fWordList[fCursorWordIdx.X].aWord = #32) do
+      inc(fCursorChunkIdx.X);
+      fCursorChunkIdx.Y := 0;
+      while (fChunkedText[fCursorChunkIdx.X].text = #32) do
       begin
-        if fCursorWordIdx.X = fWordList.Count -1 then break;
-        inc(fCursorWordIdx.X);
+        if fCursorChunkIdx.X = fChunkedText.Count -1 then break;
+        inc(fCursorChunkIdx.X);
       end;
     end
-    else if fCursorWordIdx.Y < fWordList[fCursorWordIdx.X].length -1 then
-      inc(fCursorWordIdx.Y)
-    else if lastWord then
+    else if fCursorChunkIdx.Y < Length(fChunkedText[fCursorChunkIdx.X].text) -1 then
+      inc(fCursorChunkIdx.Y)
+    else if lastChunk then
       Result := false
     else
     begin
-      inc(fCursorWordIdx.X);
-      fCursorWordIdx.Y := 0;
+      inc(fCursorChunkIdx.X);
+      fCursorChunkIdx.Y := 0;
     end;
     ScrollCaretIntoView;
   end;
@@ -2775,20 +2811,20 @@ begin
       begin
         if HasShiftKey(shift) then
         begin
-          if PointsEqual(fSelStart, fCursorWordIdx) then
+          if PointsEqual(fSelStart, fCursorChunkIdx) then
           begin
             GetPrev(ctrlDown);
-            fSelStart := fCursorWordIdx;
+            fSelStart := fCursorChunkIdx;
           end else
           begin
             GetPrev(ctrlDown);
-            fSelEnd := fCursorWordIdx;
+            fSelEnd := fCursorChunkIdx;
           end;
         end else
         begin
           GetPrev(ctrlDown);
-          fSelStart := fCursorWordIdx;
-          fSelEnd := fCursorWordIdx;
+          fSelStart := fCursorChunkIdx;
+          fSelEnd := fCursorChunkIdx;
         end;
         Key := 0;
         fCursorMoved := true;
@@ -2797,39 +2833,37 @@ begin
       begin
         if HasShiftKey(Shift) then
         begin
-          if PointsEqual(fSelStart, fCursorWordIdx) then
+          if PointsEqual(fSelStart, fCursorChunkIdx) then
           begin
             GetNext(ctrlDown);
-            fSelStart := fCursorWordIdx;
+            fSelStart := fCursorChunkIdx;
           end else
           begin
             GetNext(ctrlDown);
-            fSelEnd := fCursorWordIdx;
+            fSelEnd := fCursorChunkIdx;
           end;
         end else
         begin
           GetNext(ctrlDown);
-          fSelStart := fCursorWordIdx;
-          fSelEnd := fCursorWordIdx;
+          fSelStart := fCursorChunkIdx;
+          fSelEnd := fCursorChunkIdx;
         end;
         Key := 0;
         fCursorMoved := true;
       end;
     VK_UP:
       begin
-        pos := WordIdxToPos(fCursorWordIdx);
-        pos.Y := pos.Y - fLineHeight;
-        InvalidatePos;
-        fCursorWordIdx := PosToWordIdx(pos);
+        pos := WordIdxToPos(fCursorChunkIdx);
+        pos.Y := pos.Y - fPageMetrics.lineHeight;
+        fCursorChunkIdx := PosToWordIdx(pos);
         ScrollCaretIntoView;
         Key := 0;
       end;
     VK_DOWN:
       begin
-        pos := WordIdxToPos(fCursorWordIdx);
-        pos.Y := pos.Y + fLineHeight;
-        InvalidatePos;
-        fCursorWordIdx := PosToWordIdx(pos);
+        pos := WordIdxToPos(fCursorChunkIdx);
+        pos.Y := pos.Y + fPageMetrics.lineHeight;
+        fCursorChunkIdx := PosToWordIdx(pos);
         ScrollCaretIntoView;
         Key := 0;
       end;
@@ -2842,10 +2876,10 @@ end;
 procedure TMemoCtrl.DoDblClick;
 begin
   inherited;
-  if not IsValid(fCursorWordIdx) then Exit;
-  fSelStart := Types.Point(fCursorWordIdx.X, 0);
-  fSelEnd := Types.Point(fCursorWordIdx.X +1, 0);
-  fCursorWordIdx := fSelEnd;
+  if not IsValid(fCursorChunkIdx) then Exit;
+  fSelStart := Types.Point(fCursorChunkIdx.X, 0);
+  fSelEnd := Types.Point(fCursorChunkIdx.X +1, 0);
+  fCursorChunkIdx := fSelEnd;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -2864,18 +2898,18 @@ begin
   inherited;
   if button <> mbLeft then Exit;
 
-  InvalidatePos;
   relPos := MakeRelative(PointD(pt));
-  fCursorWordIdx := PosToWordIdx(relPos);
+  fCursorChunkIdx := PosToWordIdx(relPos);
+
   if Shift = ssShift then
   begin
-    fSelEnd := fCursorWordIdx;
+    fSelEnd := fCursorChunkIdx;
   end else
   begin
-    fSelStart := fCursorWordIdx;
-    fSelEnd := fCursorWordIdx;
+    fSelStart := fCursorChunkIdx;
+    fSelEnd := fCursorChunkIdx;
   end;
-  InvalidatePos;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2883,14 +2917,19 @@ procedure TMemoCtrl.SetScrollV(scrollVert: TScrollCtrl);
 begin
   inherited;
   if Assigned(ScrollV) then
-    ScrollV.Step := Round(fLineHeight);
+    ScrollV.Step := Round(fPageMetrics.lineHeight);
 end;
 //------------------------------------------------------------------------------
 
 procedure TMemoCtrl.SetText(const text: string);
 begin
   inherited;
-  if GetUsableFont then FillWordList;
+  if not GetUsableFont then Exit;
+  fPageMetrics.lineHeight := fUsableFont.LineHeight;
+  fPageMetrics.pageWidth := 0; // force a fPageMetrics refresh
+  fChunkedText.SetText(text, fUsableFont);
+  fTopLine := 0;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2899,15 +2938,12 @@ begin
   if PointsEqual(margin, fTextMargin) then Exit;
   fTextMargin := margin;
   Invalidate;
-  fDoFullPaint := true;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMemoCtrl.SetInnerBounds(const newBounds: TRectD);
 begin
   inherited;
-  fTopLine := 0;
-  fDoFullPaint := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -2916,7 +2952,7 @@ var
   i       : integer;
   x, spcW : double;
   chrOffs : TArrayOfDouble;
-  wordInfo: TWordInfo;
+  chunk   : TTextChunk;
 begin
   Result := NullPointD;
   if not GetUsableFont then Exit;
@@ -2924,36 +2960,36 @@ begin
   //get WordIdx's start of line index
   i := 0;
   while (i < fPageMetrics.lineCount) and
-    (wordIdx.X >= fPageMetrics.wordListOffsets[i+1]) do inc(i);
+    (wordIdx.X >= fPageMetrics.chunkIdxAtStartOfLine[i+1]) do inc(i);
 
   //with the line index we now have Y pos
-  Result.Y := (i - fTopLine) * fLineHeight;
+  Result.Y := (i - fTopLine) * fPageMetrics.lineHeight;
 
   //and get the justify offset for spaces
   spcW := fPageMetrics.justifyDeltas[i];
 
   //get the start of the word
-  i := fPageMetrics.wordListOffsets[i];
+  i := fPageMetrics.chunkIdxAtStartOfLine[i];
   x := 0;
   while (i < wordIdx.X) do
-    with fWordList[i] do
+    with fChunkedText[i] do
     begin
-      if aWord = #32 then
+      if text = #32 then
         x := x + width + spcW else
         x := x + width;
       inc(i);
     end;
 
-  if wordIdx.X >= fWordList.Count then
+  if wordIdx.X >= fChunkedText.Count then
   begin
     with fPageMetrics do
       Result.X := lineWidths[High(lineWidths)];
   end else
   begin
-    wordInfo := fWordList[wordIdx.X];
-    chrOffs := fUsableFont.GetCharOffsets(wordInfo.aWord);
-    if wordIdx.Y >= wordInfo.length then
-      x := x + chrOffs[wordInfo.length-1];
+    chunk := fChunkedText[wordIdx.X];
+    chrOffs := fUsableFont.GetCharOffsets(chunk.text);
+    if wordIdx.Y >= length(chunk.text) then
+      x := x + chrOffs[length(chunk.text) -1] else
       x := x + chrOffs[wordIdx.Y];
     Result.X := x +1;
   end;
@@ -2968,65 +3004,62 @@ var
   i: integer;
   x,x2,y2     : double;
   spcW, chrW  : double;
-  wordInfo: TWordInfo;
-  offs    : TArrayOfDouble;
+  offs        : TArrayOfDouble;
+  chunk       : TTextChunk;
 begin
   Result := NullPoint;
-  if not GetUsableFont or (fPageMetrics.lineCount = 0) then Exit;
+  if not GetUsableFont or (fPageMetrics.pageWidth = 0) then Exit;
 
   x2 := relPos.X - fTextMargin.X;
   y2 := relPos.Y - fTextMargin.Y;
 
-  i := Floor(y2 / fLineHeight);
+  i := Floor(y2 / fPageMetrics.lineHeight);
   inc(i, fTopLIne);
   if i >= fPageMetrics.lineCount then
   begin
-    Result.X := fWordList.Count;
+    Result.X := fChunkedText.Count;
     Exit;
   end
   else if i < 0 then
     Exit;
 
   //get start of line
-  Result.X := fPageMetrics.wordListOffsets[i];
+  Result.X := fPageMetrics.chunkIdxAtStartOfLine[i];
 
-  //and also the justify offset for spaces
+  //and also the justify amounts for spaces
   spcW := fPageMetrics.justifyDeltas[i];
 
   //now offset to the correct word.
   x := 0;
-  wordInfo := nil;
-  while (Result.X < fWordList.Count) do
+  chunk := nil;
+  while (Result.X < fChunkedText.Count) do
   begin
-    wordInfo := fWordList[Result.X];
-    if wordInfo.aWord =  #10 then
-      break
-    else if wordInfo.aWord =  #32 then
-      chrW := wordInfo.width + spcW else
-      chrW := wordInfo.width;
+    chunk := fChunkedText[Result.X];
+    if chunk.text =  #10 then break
+    else if chunk.text =  #32 then
+      chrW := chunk.width + spcW else
+      chrW := chunk.width;
 
     if x + chrW > x2 then break;
     inc(Result.X);
     x := x + chrW;
   end;
 
-  if (Result.X >= fWordList.Count) then
+  if (Result.X >= fChunkedText.Count) then
   begin
-    Result.X := fWordList.Count;
+    Result.X := fChunkedText.Count;
     Exit;
   end;
 
-  if wordInfo.aWord = #10 then
-    Exit;
+  if not Assigned(chunk) or (chunk.text = #10) then Exit;
 
   //and calc the char offset.
-  offs := fUsableFont.GetCharOffsets(wordInfo.aWord);
+  offs := fUsableFont.GetCharOffsets(chunk.text);
 
-  if (wordInfo.aWord = #32) and
-    (x2 - x > (wordInfo.width + spcW)/2) then
-      inc(Result.X)
+  if (chunk.text = #32) and
+    (x2 - x > (chunk.width + spcW)/2) then inc(Result.X)
   else
-    while (Result.Y < wordInfo.length-1) and
+    while (Result.Y < length(chunk.text) -1) and
       (x + offs[Result.Y] + (offs[Result.Y+1] -
         offs[Result.Y]) *0.5 < x2) do
           inc(Result.Y);
@@ -3035,21 +3068,22 @@ end;
 
 function TMemoCtrl.GetVisibleLines: integer;
 begin
-  if (fLineHeight > 0) and (fPageMetrics.lineCount > 0) then
-    Result := Trunc((Height - fBevelHeight*2 - fTextMargin.Y*2)/fLineHeight)
-  else
-    Result := 0;
+  with fPageMetrics do
+    if (lineHeight > 0) and (lineCount > 0) then
+      Result := Trunc(fTextRect.Height / lineHeight)
+    else
+      Result := 0;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMemoCtrl.DoScroll(dx, dy: double);
+var
+  visibleLines: integer;
 begin
-  //fScrollOffsetY := fScrollOffsetY + dy;
-  //fTopLine := Round(fScrollOffsetY/fLineHeight);
-  fTopLine := Round(ScrollV.Position/fLineHeight);
-  if fTopLine >= Length(fPageMetrics.WordListOffsets) then
-    fTopLine := High(fPageMetrics.WordListOffsets);
-  fDoFullPaint := true;
+  fTopLine := Trunc(ScrollV.Position / fPageMetrics.lineHeight);
+  visibleLines := GetVisibleLines;
+  if fTopLine > fPageMetrics.lineCount - visibleLines then
+    fTopLine := fPageMetrics.lineCount - visibleLines;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -3057,144 +3091,57 @@ end;
 procedure TMemoCtrl.FontChanged;
 begin
   inherited;
-  if not Assigned(fUsableFont) then
-  begin
-    fLineHeight := 0;
-    Exit;
-  end;
-  fLineHeight := fUsableFont.LineHeight;
-  if Assigned(ScrollV) then ScrollV.Step := Round(fLineHeight);
-  fDoFullPaint := true;
-  if (Length(Text) = 0) then Exit;
-  if (fWordList.Count = 0) then
-    FillWordList else
-    fWordList.ApplyNewFont(fUsableFont);
-end;
-//------------------------------------------------------------------------------
-
-procedure TMemoCtrl.InvalidatePos;
-var
-  om: integer;
-  d: double;
-  rec: TRectD;
-begin
-  d := fLineHeight/4;
-  rec.TopLeft := WordIdxToPos(fCursorWordIdx);
-  rec.BottomRight := PointD(rec.Left, rec.Top + fLineHeight);
-  InflateRect(rec, d, d);
-  om := Round(OuterMargin);
-  TranslateRect(rec, Round(om-TextMargin.X+10), Round(om-TextMargin.Y -6));
+  fPageMetrics.pageWidth := 0; // force a fPageMetrics refresh
+  if not Assigned(fUsableFont) or (fChunkedText.Count = 0) then Exit;
+  fChunkedText.ApplyNewFont(fUsableFont);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TMemoCtrl.Repaint;
 var
-  i, bottomline: integer;
-  bh, textWidth: double;
+  i: integer;
+  bh: double;
   p   : TPathD;
-  pp  : TPathsD;
-  textRecD, rec: TRectD;
-  ri: TRect;
+  rec: TRectD;
   selStartPt, selStartP2, selEndPt, selEndPt2: TPointD;
-  ScrollVAutoHide: Boolean;
-  scrollShowing: Boolean;
 begin
-
+  if not GetUsableFont then Exit;
   bh  := fBevelHeight;
-  scrollShowing := Assigned(ScrollV) and ScrollV.Visible;
-  ScrollVAutoHide := assigned(ScrollV) and ScrollV.AutoHide;
-  //if fPageMetrics is stale, re-draw the whole edit window
-  if fDoFullPaint then
+
+  rec  := InnerRect;
+  TranslateRect(rec, outerMargin, outerMargin);
+
+  image.Clear;
+  fCursorMoved := false; //unset fast redraw
+  image.FillRect(Rect(rec), color);
+  DrawEdge(Image, rec, clSilver32, clWhite32, bh);
+
+  if HasFocus then
   begin
-    fDoFullPaint := false;
-    image.Clear;
-    fCursorMoved := false; //unset fast redraw
-    rec  := InnerRect;
-    TranslateRect(rec, outerMargin, outerMargin);
-    ri := Rect(rec);
-    image.FillRect(ri, color);
-    DrawEdge(Image, rec, clSilver32, clWhite32, bh);
-    textRecD := rec;
-
-    if HasFocus then
-    begin
-      Img32.Vector.InflateRect(rec, bh, bh);
-      DrawLine(Image, Rectangle(rec),fBevelHeight,clDefDark32,esPolygon);
-    end;
-
-    InflateRect(textRecD, -TextMargin.X, -TextMargin.Y);
-    //initially assume ScrollV is NOT required unless forced.
-    if not ScrollVAutoHide and scrollShowing then
-      textRecD.Right := textRecD.Right - ScrollV.Width;
-    if not GetUsableFont then Exit;
-
-    textWidth := textRecD.Width;
-    fPageMetrics := GetPageMetrics(textWidth, fWordList);
-
-    if ScrollVAutoHide then
-    begin
-      if (fPageMetrics.lineCount > GetVisibleLines) then
-      begin
-        //text exceeds space so vscroll is needed and
-        //must redo GetPageMetrics
-        if not ScrollV.Visible then
-        begin
-          ScrollV.Visible := true;
-          scrollShowing := true;
-        end;
-
-        textRecD.Right := textRecD.Right - ScrollV.Width;
-        textWidth := textWidth - ScrollV.Width;
-        fPageMetrics := GetPageMetrics(textWidth, fWordList);
-      end
-      else if ScrollV.Visible then
-        ScrollV.Visible := false;
-    end;
-
-    if scrollShowing then
-      ScrollV.Max := Round(fLineHeight*fPageMetrics.lineCount +
-        fLineHeight/2 + fTextMargin.Y*2 + fBevelHeight*2);
-
-    pp := fUsableFont.GetTextOutline(Rect(textRecD), fWordList,
-      fPageMetrics, taJustify, fTopLine, fTopLine + GetVisibleLines -1);
-
-    DrawPolygon(Image, pp, frNonZero, clBlack32);
-    //copy the edit window to reuse
-    fBuffer.Assign(Image);
-  end else
-  begin
-    textRecD  := InnerRect;
-    TranslateRect(textRecD, outerMargin, outerMargin);
-    InflateRect(textRecD, -TextMargin.X, -TextMargin.Y);
-    if scrollShowing then
-      textRecD.Right := textRecD.Right - ScrollV.Width;
-
-    rec := UpdateInfo.priorPosition;
-    ri := Rect(rec);
-    Image.Copy(fBuffer, ri, ri);
-    //Image.FillRect(ri, clRed32);
-
-//    TranslateRect(fSelectRect, -OuterMargin, -OuterMargin);
-//    if fCursorMoved and not fullRefresh and
-//      not fSelectRect.IsEmpty then
-//        Invalidate(fSelectRect); //invalidate old selection
+    Img32.Vector.InflateRect(rec, bh, bh);
+    DrawLine(Image, Rectangle(rec),fBevelHeight,clDefDark32,esPolygon);
   end;
 
-  if not IsValid(fCursorWordIdx) then Exit;
+  CheckPageMetrics;
+
+  fChunkedText.DrawText(Image, Rect(fTextRect), taJustify, tvaTop,
+    fPageMetrics.chunkIdxAtStartOfLine[fTopLine]);
+
+  if not IsValid(fCursorChunkIdx) then Exit;
 
   if IsValid(fSelStart) and IsValid(fSelEnd)  and
     not PointsEqual(fSelStart, fSelEnd) then
   begin
     selStartPt := WordIdxToPos(fSelStart);
-    selStartP2 := PointD(selStartPt.X, selStartPt.Y + fLineHeight);
+    selStartP2 := PointD(selStartPt.X, selStartPt.Y + fPageMetrics.lineHeight);
     selEndPt := WordIdxToPos(fSelEnd);
-    selEndPt2 := PointD(selEndPt.X, selEndPt.Y + fLineHeight);
+    selEndPt2 := PointD(selEndPt.X, selEndPt.Y + fPageMetrics.lineHeight);
 
     //get the update region
-    fSelectRect.Left := textRecD.Left + TextMargin.X;
+    fSelectRect.Left := fTextRect.Left + TextMargin.X;
     fSelectRect.Top := selStartPt.Y + TextMargin.Y;
-    fSelectRect.Right := textRecD.Right + TextMargin.X;
+    fSelectRect.Right := fTextRect.Right + TextMargin.X;
     fSelectRect.Bottom := selEndPt2.Y + TextMargin.Y;
     fSelectRect.Normalize;
 
@@ -3203,44 +3150,42 @@ begin
       //single line selection
       p := MakePath([selStartPt.X, selStartPt.Y,
         selEndPt.X, selEndPt.Y,
-        selEndPt.X, selEndPt.Y + fLineHeight,
-        selStartPt.X, selStartPt.Y + fLineHeight]);
+        selEndPt.X, selEndPt.Y + fPageMetrics.lineHeight,
+        selStartPt.X, selStartPt.Y + fPageMetrics.lineHeight]);
       DrawPolygon(Image, p, frNonZero, $20000000);
     end else
     begin
       //multi-line selection - we'll assume (pro tempore) that pt2 is below pt
-      p := MakePath([selStartPt.X, selStartPt.Y, textRecD.Right, selStartPt.Y,
-        textRecD.Right, selStartP2.Y, selStartPt.X, selStartP2.Y]);
+      p := MakePath([selStartPt.X, selStartPt.Y, fTextRect.Right, selStartPt.Y,
+        fTextRect.Right, selStartP2.Y, selStartPt.X, selStartP2.Y]);
       DrawPolygon(Image, p, frNonZero, $20000000);
       while (selStartP2.Y + 1 < selEndPt.Y) do
       begin
-        selStartPt := PointD(textRecD.Left, selStartP2.Y);
-        selStartP2 := PointD(textRecD.Left, selStartP2.Y + fLineHeight);
-        p := MakePath([selStartPt.X, selStartPt.Y, textRecD.Right, selStartPt.Y,
-          textRecD.Right, selStartP2.Y, selStartPt.X, selStartP2.Y]);
+        selStartPt := PointD(fTextRect.Left, selStartP2.Y);
+        selStartP2 := PointD(fTextRect.Left, selStartP2.Y + fPageMetrics.lineHeight);
+        p := MakePath([selStartPt.X, selStartPt.Y, fTextRect.Right, selStartPt.Y,
+          fTextRect.Right, selStartP2.Y, selStartPt.X, selStartP2.Y]);
         DrawPolygon(Image, p, frNonZero, $20000000);
       end;
       p := MakePath([selEndPt.X, selEndPt.Y,
-        selEndPt.X, selEndPt.Y + fLineHeight,
-        textRecD.Left, selEndPt.Y + fLineHeight,
-        textRecD.Left, selEndPt.Y]);
+        selEndPt.X, selEndPt.Y + fPageMetrics.lineHeight,
+        fTextRect.Left, selEndPt.Y + fPageMetrics.lineHeight,
+        fTextRect.Left, selEndPt.Y]);
       DrawPolygon(Image, p, frNonZero, $20000000);
     end;
 
   end else
     fSelectRect := NullRectD;
 
-  bottomline := fTopLine + GetVisibleLines -1;
-  if bottomline < FPageMetrics.lineCount -1 then
-    i := fPageMetrics.WordListOffsets[bottomline +1] else
-    i := fWordList.Count;
-  if not IsValid(fCursorWordIdx) or
-    (fCursorWordIdx.X < fPageMetrics.WordListOffsets[fTopLine]) or
-    (fCursorWordIdx.X >= i) then Exit;
+  i := fTopLine + GetVisibleLines;
+  if not IsValid(fCursorChunkIdx) or
+    (fCursorChunkIdx.X < fPageMetrics.chunkIdxAtStartOfLine[fTopLine]) or
+    (i >= fPageMetrics.lineCount) or
+    (fCursorChunkIdx.X >= fPageMetrics.chunkIdxAtStartOfLine[i]) then Exit;
 
-  i := Ceil(fLineHeight * 0.1);
-  selStartPt := WordIdxToPos(fCursorWordIdx);
-  selEndPt := PointD(selStartPt.X, selStartPt.Y + fLineHeight);
+  i := Ceil(fPageMetrics.lineHeight * 0.1);
+  selStartPt := WordIdxToPos(fCursorChunkIdx);
+  selEndPt := PointD(selStartPt.X, selStartPt.Y + fPageMetrics.lineHeight);
   selStartPt.Y := selStartPt.Y + i;
   selEndPt.Y := selEndPt.Y - i;
 
@@ -3283,37 +3228,24 @@ end;
 constructor TEditCtrl.Create(parent: TLayer32; const name: string);
 begin
   inherited;
-  fWordList := TWordInfoList.Create;
-  fWordList.OnChanged := TextChanged;
+  fChunkedText := TChunkedText.Create;
   Color := clWhite32;
   BlendFunc  := nil; //assumes edit controls will always be fully opaque.
   fTextMargin := DPIAware(PointD(5, 1));
-  fCursorWordIdx := NullPoint;
+  fCursorChunkIdx := NullPoint;
 end;
 //------------------------------------------------------------------------------
 
 destructor TEditCtrl.Destroy;
 begin
-  fWordList.Free;
+  fChunkedText.Free;
   inherited;
 end;
 //------------------------------------------------------------------------------
 
-procedure TEditCtrl.GetWordList;
+function TEditCtrl.GetText: string;
 begin
-  if not Assigned(fUsableFont) then Exit;
-  if fWordList.Count = 0 then
-  begin
-    fWordList.OnChanged := nil;
-    fWordList.SetText(fText, fUsableFont);
-    fWordList.OnChanged := TextChanged;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TEditCtrl.TextChanged(Sender: TObject);
-begin
-  text := fWordList.Text;
+  Result := fChunkedText.Text;
 end;
 //------------------------------------------------------------------------------
 
@@ -3321,7 +3253,8 @@ procedure TEditCtrl.SetFont(font: TFontCache);
 begin
   inherited;
   if not Assigned(fUsableFont) then Exit;
-  fWordList.ApplyNewFont(font);
+  fChunkedText.ApplyNewFont(font);
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -3335,7 +3268,7 @@ procedure TEditCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
       if (curr.Y = 0) and (curr.X > 0) then
       begin
         dec(curr.X);
-        while (curr.X > 0) and (fWordList[curr.X].aWord = #32) do
+        while (curr.X > 0) and (fChunkedText[curr.X].text = #32) do
           dec(curr.X);
       end else if curr.Y > 0 then curr.Y := 0
       else Result := false
@@ -3345,8 +3278,7 @@ procedure TEditCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
     else
     begin
       dec(curr.X);
-      with fWordList[curr.X] do
-        curr.Y := length-1;
+      curr.Y := length(fChunkedText[curr.X].text) -1;
     end;
   end;
 
@@ -3355,21 +3287,21 @@ procedure TEditCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
     lastWord: Boolean;
   begin
     Result := true;
-    lastWord := curr.X = fWordList.Count;
+    lastWord := curr.X = fChunkedText.Count;
     if ctrlDown and not lastWord then
     begin
       inc(curr.X);
-      if curr.X = fWordList.Count then Exit;
+      if curr.X = fChunkedText.Count then Exit;
       curr.Y := 0;
-      while (fWordList[curr.X].aWord = #32) do
+      while (fChunkedText[curr.X].text = #32) do
       begin
         inc(curr.X);
-        if curr.X = fWordList.Count then break;
+        if curr.X = fChunkedText.Count then break;
       end;
     end
     else if lastWord then
       Result := false
-    else if curr.Y < fWordList[curr.X].length -1 then
+    else if curr.Y < length(fChunkedText[curr.X].text) -1 then
       inc(curr.Y)
     else
     begin
@@ -3379,14 +3311,12 @@ procedure TEditCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
   end;
 
 var
-  pos: TPointD;
   ctrlDown: Boolean;
-  wordInfo: TWordInfo;
   newWord, newWord2: string;
   ch: Char;
+  chunk: TTextChunk;
 begin
-  if not GetUsableFont or
-    not IsValid(fCursorWordIdx) then
+  if not GetUsableFont or not IsValid(fCursorChunkIdx) then
   begin
     inherited;
     Exit;
@@ -3394,110 +3324,108 @@ begin
 
   ctrlDown := HasCtrlKey(shift);
   case key of
-    VK_LEFT:
+    VK_UP, VK_LEFT:
       begin
         if HasShiftKey(shift) then
         begin
-          if PointsEqual(fSelStart, fCursorWordIdx) then
+          if PointsEqual(fSelStart, fCursorChunkIdx) then
           begin
-            GetPrev(fCursorWordIdx, ctrlDown);
-            fSelStart := fCursorWordIdx;
+            GetPrev(fCursorChunkIdx, ctrlDown);
+            fSelStart := fCursorChunkIdx;
           end else
           begin
-            GetPrev(fCursorWordIdx, ctrlDown);
-            fSelEnd := fCursorWordIdx;
+            GetPrev(fCursorChunkIdx, ctrlDown);
+            fSelEnd := fCursorChunkIdx;
           end;
         end else
         begin
-          GetPrev(fCursorWordIdx, ctrlDown);
-          fSelStart := fCursorWordIdx;
-          fSelEnd := fCursorWordIdx;
+          GetPrev(fCursorChunkIdx, ctrlDown);
+          fSelStart := fCursorChunkIdx;
+          fSelEnd := fCursorChunkIdx;
         end;
         Key := 0;
         fCursorMoved := true;
         Invalidate;
       end;
-    VK_RIGHT:
+    VK_DOWN, VK_RIGHT:
       begin
         if HasShiftKey(shift) then
         begin
-          if PointsEqual(fSelStart, fCursorWordIdx) then
+          if PointsEqual(fSelStart, fCursorChunkIdx) then
           begin
-            GetNext(fCursorWordIdx, ctrlDown);
-            fSelStart := fCursorWordIdx;
+            GetNext(fCursorChunkIdx, ctrlDown);
+            fSelStart := fCursorChunkIdx;
           end else
           begin
-            GetNext(fCursorWordIdx, ctrlDown);
-            fSelEnd := fCursorWordIdx;
+            GetNext(fCursorChunkIdx, ctrlDown);
+            fSelEnd := fCursorChunkIdx;
           end;
         end else
         begin
-          GetNext(fCursorWordIdx, ctrlDown);
-          fSelStart := fCursorWordIdx;
-          fSelEnd := fCursorWordIdx;
+          GetNext(fCursorChunkIdx, ctrlDown);
+          fSelStart := fCursorChunkIdx;
+          fSelEnd := fCursorChunkIdx;
         end;
         Key := 0;
         fCursorMoved := true;
-        Invalidate;
-      end;
-    VK_UP:
-      begin
-        pos := WordIdxToPos(fCursorWordIdx);
-        pos.Y := pos.Y - fLineHeight;
-        fCursorWordIdx := PosToWordIdx(pos);
-        Key := 0;
-        Invalidate;
-      end;
-    VK_DOWN:
-      begin
-        pos := WordIdxToPos(fCursorWordIdx);
-        pos.Y := pos.Y + fLineHeight;
-        fCursorWordIdx := PosToWordIdx(pos);
-        Key := 0;
         Invalidate;
       end;
     VK_DELETE:
-      if (fCursorWordIdx.X < fWordList.Count) then
+      if (fCursorChunkIdx.X < fChunkedText.Count) then
       begin
-        wordInfo := fWordList[fCursorWordIdx.X];
+        chunk := fChunkedText[fCursorChunkIdx.X];
         try
-          newWord := wordInfo.aWord;
-          Delete(newWord, fCursorWordIdx.Y+1, 1);
-          fWordList.Edit(fUsableFont, fCursorWordIdx.X, newWord);
-          if fCursorWordIdx.Y = wordInfo.length then
-            GetNext(fCursorWordIdx, false);
+          newWord := chunk.text;
+          Delete(newWord, fCursorChunkIdx.Y+1, 1);
+          fChunkedText.DeleteChunk(fCursorChunkIdx.X);
+          if (newWord <> '') then
+          begin
+            fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkIdx.X, newWord, fFontColor);
+            if fCursorChunkIdx.Y = length(newWord) then GetNext(fCursorChunkIdx, false);
+          end else if (fCursorChunkIdx.X > 0) and
+            (fCursorChunkIdx.X < fChunkedText.Count) and
+            (fChunkedText[fCursorChunkIdx.X -1].text[1] > Space) and
+            (fChunkedText[fCursorChunkIdx.X].text[1] > Space) then
+          begin
+            newWord := fChunkedText[fCursorChunkIdx.X -1].text +
+              fChunkedText[fCursorChunkIdx.X].text;
+            Dec(fCursorChunkIdx.X);
+            fCursorChunkIdx.Y := Length(fChunkedText[fCursorChunkIdx.X].text);
+            fChunkedText.DeleteChunk(fCursorChunkIdx.X);
+            fChunkedText.DeleteChunk(fCursorChunkIdx.X);
+            fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkIdx.X, newWord);
+          end else
+            fCursorChunkIdx.Y := 0;
           Key := 0;
           Invalidate;
         except
         end;
       end;
     VK_BACK:
-      if (fCursorWordIdx.X > 0) or (fCursorWordIdx.Y > 0) then
+      if (fCursorChunkIdx.X > 0) or (fCursorChunkIdx.Y > 0) then
       begin
-        GetPrev(fCursorWordIdx, false);
+        GetPrev(fCursorChunkIdx, false);
         Key := VK_DELETE;
         DoKeyDown(key, Shift);
         Exit;
       end;
     VK_SPACE:
       begin
-        if (fCursorWordIdx.Y = 0) then
+        if (fCursorChunkIdx.Y = 0) then
         begin
-          fWordList.InsertSpace(fUsableFont, fCursorWordIdx.X);
-          inc(fCursorWordIdx.X);
+          fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkIdx.X, space);
+          inc(fCursorChunkIdx.X);
         end else
         begin
-          wordInfo := fWordList[fCursorWordIdx.X];
-          with wordInfo do
-          begin
-            newWord := copy(aWord, 1, fCursorWordIdx.Y);
-            newWord2 := copy(aWord, fCursorWordIdx.Y +1, length);
-            fWordList.Edit(fUsableFont, fCursorWordIdx.X, newWord);
-            inc(fCursorWordIdx.X);
-            fWordList.InsertWord(fUsableFont, fCursorWordIdx.X, newWord2);
-            fWordList.InsertSpace(fUsableFont, fCursorWordIdx.X);
-            dec(fCursorWordIdx.X);
-          end;
+          chunk := fChunkedText[fCursorChunkIdx.X];
+          newWord := copy(chunk.text, 1, fCursorChunkIdx.Y);
+          newWord2 := copy(chunk.text, fCursorChunkIdx.Y +1, length(chunk.text));
+          fChunkedText.DeleteChunk(fCursorChunkIdx.X);
+          fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkIdx.X, newWord2);
+          fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkIdx.X, space);
+          fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkIdx.X, newWord);
+          inc(fCursorChunkIdx.X, 2);
+          fCursorChunkIdx.Y := 0;
         end;
         Key := 0;
         Invalidate;
@@ -3508,29 +3436,31 @@ begin
       ch := Char(Key);
       if not HasShiftKey(shift) then ch := ch.ToLower;
 
-      if (fCursorWordIdx.X = 0) and (fCursorWordIdx.Y = 0) then
+      chunk := fChunkedText[fCursorChunkIdx.X];
+      if (fCursorChunkIdx.X = 0) and (fCursorChunkIdx.Y = 0) then
       begin
-        fWordList.AddWord(fUsableFont, ch);
-      end else if (fCursorWordIdx.Y > 0) then
+        fChunkedText.AddTextChunk(fUsableFont, ch);
+      end else if (fCursorChunkIdx.Y > 0) then
       begin
-        wordInfo := fWordList[fCursorWordIdx.X];
-        newWord := wordInfo.aWord;
-        insert(ch, newWord, fCursorWordIdx.Y +1);
-        fWordList.Edit(fUsableFont, fCursorWordIdx.X, newWord);
+        newWord := chunk.text;
+        insert(ch, newWord, fCursorChunkIdx.Y +1);
+        fChunkedText.DeleteChunk(fCursorChunkIdx.X);
+        fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkIdx.X, newWord, fFontColor);
       end else
       begin
-        GetPrev(fCursorWordIdx, false);
-        newWord := fWordList[fCursorWordIdx.X].aWord;
-        fWordList.Edit(fUsableFont, fCursorWordIdx.X, newWord + ch);
+        GetPrev(fCursorChunkIdx, false);
+        newWord := chunk.text + ch;
+        fChunkedText.DeleteChunk(fCursorChunkIdx.X);
+        fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkIdx.X, newWord, fFontColor);
       end;
-      wordInfo := fWordList[fCursorWordIdx.X];
+      chunk := fChunkedText[fCursorChunkIdx.X]; //ie fresh chunk :)
 
-      if fCursorWordIdx.Y = High(wordInfo.aWord) then
+      if fCursorChunkIdx.Y = High(chunk.text) then
       begin
-        inc(fCursorWordIdx.X);
-        fCursorWordIdx.Y := 0;
+        inc(fCursorChunkIdx.X);
+        fCursorChunkIdx.Y := 0;
       end else
-        inc(fCursorWordIdx.Y);
+        inc(fCursorChunkIdx.Y);
       Key := 0;
       Invalidate;
     end else
@@ -3542,10 +3472,10 @@ end;
 procedure TEditCtrl.DoDblClick;
 begin
   inherited;
-  if not IsValid(fCursorWordIdx) then Exit;
-  fSelStart := Types.Point(fCursorWordIdx.X, 0);
-  fSelEnd := Types.Point(fCursorWordIdx.X +1, 0);
-  fCursorWordIdx := fSelEnd;
+  if not IsValid(fCursorChunkIdx) then Exit;
+  fSelStart := Types.Point(fCursorChunkIdx.X, 0);
+  fSelEnd := Types.Point(fCursorChunkIdx.X +1, 0);
+  fCursorChunkIdx := fSelEnd;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -3564,23 +3494,29 @@ begin
   if button <> mbLeft then Exit;
 
   relPos := MakeRelative(PointD(pt));
-  fCursorWordIdx := PosToWordIdx(relPos);
+  fCursorChunkIdx := PosToChunkIdx(relPos);
   if Shift = ssShift then
   begin
-    fSelEnd := fCursorWordIdx;
+    fSelEnd := fCursorChunkIdx;
   end else
   begin
-    fSelStart := fCursorWordIdx;
-    fSelEnd := fCursorWordIdx;
+    fSelStart := fCursorChunkIdx;
+    fSelEnd := fCursorChunkIdx;
   end;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TEditCtrl.SetText(const text: string);
+var
+  rec: TRectD;
 begin
   inherited;
-  if GetUsableFont then GetWordList;
+  if not GetUsableFont then Exit;
+  fChunkedText.SetText(text, fUsableFont, fFontColor);
+  rec := GetTextRect(true);
+  fPageMetrics := fChunkedText.GetPageMetrics(rec.Width, rec.Height, 0.0, 0);
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -3623,12 +3559,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TEditCtrl.WordIdxToPos(const wordIdx: TPoint): TPointD;
+function TEditCtrl.ChunkIdxToPos(const wordIdx: TPoint): TPointD;
 var
   i,j, om : integer;
   bh      : double;
   chrOffs : TArrayOfDouble;
-  wordInfo: TWordInfo;
+  chunk   : TTextChunk;
 begin
   Result := NullPointD;
   if not GetUsableFont or not IsValid(wordIdx) then Exit;
@@ -3637,31 +3573,33 @@ begin
   bh := fBevelHeight;
   Result.Y := om + bh + fTextMargin.Y;
   Result.X := om + bh + fTextMargin.X;
-  if fWordList.Count = 0 then Exit;
+  if fChunkedText.Count = 0 then Exit;
 
-  if wordIdx.X > fWordList.Count then
-    j := fWordList.Count else
+  if wordIdx.X > fChunkedText.Count then
+    j := fChunkedText.Count else
     j := wordIdx.X;
 
   for i := 0 to j-1 do
-    Result.X := Result.X + fWordList[i].width;
+    Result.X := Result.X + fChunkedText[i].width;
 
-  if j = fWordList.Count then Exit;
+  if j = fChunkedText.Count then Exit;
 
-  wordInfo := fWordList[j];
-  chrOffs := fUsableFont.GetCharOffsets(wordInfo.aWord);
-  if wordIdx.Y >= wordInfo.length then
-    Result.X := Result.X + chrOffs[wordInfo.length-1];
+  chunk := fChunkedText[j];
+  chrOffs := fUsableFont.GetCharOffsets(chunk.text);
+  if wordIdx.Y >= length(chunk.text) then
+    Result.X := Result.X + chrOffs[length(chunk.text) -1];
     Result.X := Result.X + chrOffs[wordIdx.Y];
 end;
 //------------------------------------------------------------------------------
 
-function TEditCtrl.PosToWordIdx(const relPos: TPointD): TPoint;
+function TEditCtrl.PosToChunkIdx(const relPos: TPointD): TPoint;
 var
+  len     : integer;
   x,d, bh : double;
   textRec : TRectD;
-  wordInfo: TWordInfo;
+  cwDiv2  : double;
   offs    : TArrayOfDouble;
+  chunk   : TTextChunk;
 begin
   Result  := NullPoint;
   textRec := GetTextRect(false);
@@ -3669,46 +3607,55 @@ begin
 
   d := 0;
   x := relPos.X - fTextMargin.X - bh;
-  wordInfo := nil;
-  while (Result.X < fWordList.Count) do
+
+  chunk := nil;
+  while (Result.X < fChunkedText.Count) do
   begin
-    wordInfo := fWordList[Result.X];
-    if d + wordInfo.width >= x then Break;
-    d := d + wordInfo.width;
+    chunk := fChunkedText[Result.X];
+    if d + chunk.width >= x then Break;
+    d := d + chunk.width;
     inc(Result.X);
   end;
 
-  if (Result.X = fWordList.Count) or (wordInfo.aWord[1] < #32) then Exit;
+  if (chunk = nil) or (Result.X = fChunkedText.Count) or
+    (chunk.text[1] < #32) then Exit;
 
   //and calc the char offset.
   if not GetUsableFont then Exit;
-  offs := fUsableFont.GetCharOffsets(wordInfo.aWord);
+  offs := fUsableFont.GetCharOffsets(chunk.text);
 
   d := x - d;
-  while (Result.Y < wordInfo.length-1) and
-    (d > offs[Result.Y+1]) do
-      inc(Result.Y);
+  len := length(chunk.text);
+  cwDiv2 := (offs[1] - offs[0]) * 0.5;
+  while (Result.Y < len) and (d > offs[Result.Y] + cwDiv2) do
+  begin
+    inc(Result.Y);
+    cwDiv2 := (offs[Result.Y+1] - offs[Result.Y]) * 0.5;
+  end;
+
+  if (Result.Y = len) then
+  begin
+    inc(Result.X);
+    Result.Y := 0;
+  end;
+
 end;
 //------------------------------------------------------------------------------
 
 procedure TEditCtrl.FontChanged;
 begin
   inherited;
-  if not Assigned(fUsableFont) then Exit;
-
-  if (fWordList.Count = 0) and (Length(Text) > 0) then
-    GetWordList else
-    fWordList.ApplyNewFont(font);
+  if not Assigned(fUsableFont) or (fChunkedText.Count = 0) then Exit;
+  fChunkedText.ApplyNewFont(font);
   SetInnerBounds(GetInnerBounds);
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TEditCtrl.Repaint;
 var
   om: integer;
-  pp  : TPathsD;
   textRecD, rec: TRectD;
-  textRecI: TRect;
   lh: Double;
   selStartPt, selEndPt: TPointD;
 begin
@@ -3716,11 +3663,6 @@ begin
   if not GetUsableFont then Exit;
   fLineHeight := fUsableFont.LineHeight;
   textRecD := GetTextRect(true);
-
-  textRecI := Rect(textRecD);
-  fPageMetrics := GetPageMetrics(textRecD.Width, fWordList);
-  pp := fUsableFont.GetTextOutline(textRecI,
-    fWordList, fPageMetrics, taLeft, 0, 1);
 
   if HasFocus then
   begin
@@ -3730,12 +3672,12 @@ begin
     DrawShadowRect(Image, Rect(rec), OuterMargin);
     DrawLine(Image, Rectangle(rec), FocusLineWidth, clDefDark32, esPolygon);
   end;
-  DrawPolygon(Image, pp, frNonZero, clBlack32);
 
+  fPageMetrics :=
+    fChunkedText.DrawText(Image, Rect(textRecD), taLeft, tvaMiddle, 0);
   if not HasFocus then Exit;
-
   lh := fLineHeight /10;
-  selStartPt := WordIdxToPos(fCursorWordIdx);
+  selStartPt := ChunkIdxToPos(fCursorChunkIdx);
   selEndPt := TranslatePoint(selStartPt, 0, fLineHeight- lh);
   selStartPt.Y := selStartPt.Y + lh;
   DrawLine(Image, selStartPt, selEndPt, lh, clDefDark32);
@@ -4078,7 +4020,7 @@ begin
             InflateRect(rec, -pad, -pad);
             TranslateRect(rec, pDelta, pDelta);
           end;
-          DrawText(Image, Rect(rec), fText, taLeft, tvaMiddle, fUsableFont);
+          DrawText(Image, rec, fText, fUsableFont, fFontColor, taLeft, tvaMiddle);
         end;
       tpTop:
         begin
@@ -4096,7 +4038,7 @@ begin
             InflateRect(rec, -pad, -pad);
             TranslateRect(rec, pDelta, pDelta);
           end;
-          DrawText(Image, Rect(rec), fText, taCenter, tvaTop, fUsableFont);
+          DrawText(Image, rec, fText, fUsableFont, fFontColor, taCenter, tvaTop);
         end;
       tpRight:
         begin
@@ -4114,7 +4056,7 @@ begin
             InflateRect(rec, -pad -bh, -pad -bh);
             TranslateRect(rec, pDelta, pDelta);
           end;
-          DrawText(Image, Rect(rec), fText, taRight, tvaMiddle, fUsableFont);
+          DrawText(Image, rec, fText, fUsableFont, fFontColor, taRight, tvaMiddle);
         end;
       tpBottom:
         begin
@@ -4132,7 +4074,7 @@ begin
             InflateRect(rec, -pad, -pad);
             TranslateRect(rec, pDelta, pDelta);
           end;
-          DrawText(Image, Rect(rec), fText, taCenter, tvaBottom, fUsableFont);
+          DrawText(Image, rec, fText, fUsableFont, fFontColor, taCenter, tvaBottom);
         end;
     end;
   finally
@@ -4264,7 +4206,7 @@ begin
     rec.Left := rec.Left + j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
-    pp := fUsableFont.GetTextOutline(Rect(rec), caption, taLeft, tvaMiddle, i);
+    pp := fUsableFont.GetTextOutline(rec, caption, taLeft, tvaMiddle);
     dx := fUsableFont.LineHeight/24;
     pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
@@ -4282,7 +4224,7 @@ begin
     rec.Right := rec.Right - j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
-    pp := fUsableFont.GetTextOutline(Rect(rec), fText, taRight, tvaMiddle);
+    pp := fUsableFont.GetTextOutline(rec, fText, taRight, tvaMiddle);
     dx := fUsableFont.LineHeight/24;
     pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
@@ -4362,7 +4304,7 @@ begin
     rec.Left := rec.Left + j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
-    pp := fUsableFont.GetTextOutline(Rect(rec), fText, taLeft, tvaMiddle);
+    pp := fUsableFont.GetTextOutline(rec, fText, taLeft, tvaMiddle);
     dx := fUsableFont.LineHeight/24;
     pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
@@ -4379,7 +4321,7 @@ begin
     rec.Right := rec.Right - j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
-    pp := fUsableFont.GetTextOutline(Rect(rec), fText, taRight, tvaMiddle);
+    pp := fUsableFont.GetTextOutline(rec, fText, taRight, tvaMiddle);
     dx := fUsableFont.LineHeight/24;
     pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
@@ -4913,8 +4855,8 @@ begin
   rec := InnerRect;
   TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   rec2 := Rect(rec);
-  //hatch the background.
-  HatchBackground(Image, rec2, clWhite32, clBtnFace32, DPIAware(2));
+
+  HatchBackground(Image, rec2, clWhite32, clBtnFace32, DPIAware(3));
   //draw the outer border
   DrawEdge(Image, rec, clSilver32, clWhite32, fBevelHeight);
   //draw the progress
@@ -4931,8 +4873,8 @@ begin
   Image.FillRect(rec2, c);
 
   if GetUsableFont then
-    DrawText(Image, Rect(rec),
-      Floattostr(Position), taCenter, tvaMiddle, fUsableFont);
+    DrawText(Image, rec, Floattostr(Position),
+      fUsableFont, fFontColor, taCenter, tvaMiddle);
 end;
 //------------------------------------------------------------------------------
 
@@ -5067,7 +5009,7 @@ begin
   rec := InnerRect;
   TranslateRect(rec, OuterMargin, OuterMargin);
   recI := Rect(rec);
-  HatchBackground(Image, recI, clWhite32, clBtnFace32, DPIAware(2));
+  HatchBackground(Image, recI, clWhite32, clBtnFace32, DPIAware(3));
 
   //draw the outer border
   DrawEdge(Image, recI, clSilver32, clWhite32, BevelHeight);
@@ -5107,8 +5049,8 @@ begin
   if not GetUsableFont then Exit;
   if fPressed then
     TranslateRect(rec, DPIAwareOne, DPIAwareOne);
-  DrawText(Image, Rect(rec),
-    Floattostr(fPosition), taCenter, tvaMiddle, fUsableFont);
+  DrawText(Image, rec, Floattostr(fPosition),
+    fUsableFont, fFontColor, taCenter, tvaMiddle);
 end;
 //------------------------------------------------------------------------------
 
@@ -5506,8 +5448,7 @@ procedure TScrollCtrl.DoMouseMove(button: TMouseButton;
 var
   pt2: TPointD;
 begin
-  if (fScrollState = scNormal) or
-    not Assigned(fTargetCtrl) then Exit;
+  if (fScrollState = scNormal) or not Assigned(fTargetCtrl) then Exit;
   pt2 := MakeRelative(PointD(pt));
 
   if (fScrollState <> scScrollBtn) and
@@ -5614,7 +5555,7 @@ begin
   rec := InnerRect;
   TranslateRect(rec, OuterMargin, OuterMargin);
   recI := Rect(rec);
-  HatchBackground(Image, recI, clWhite32, clBtnFace32, DPIAware(2));
+  HatchBackground(Image, recI, clWhite32, clBtnFace32, DPIAware(3));
 
   rec2 := rec;
   if fOrientation = soVertical then
