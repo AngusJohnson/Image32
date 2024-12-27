@@ -3,7 +3,7 @@ unit Img32.Extra;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  26 December 2024                                                *
+* Date      :  28 December 2024                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2024                                         *
 * Purpose   :  Miscellaneous routines that don't belong in other modules.      *
@@ -676,8 +676,7 @@ begin
     begin
       c := pc^;
       if c = 0 then
-        pc^ := colors[hatch]
-      else if c and $FF000000 <> $FF000000 then
+        pc^ := colors[hatch] else
         pc^ := BlendToOpaque(c, colors[hatch]);
       inc(pc);
       inc(x);
@@ -695,8 +694,7 @@ procedure HatchBackground(img: TImage32; const rec: TRect;
   color1: TColor32 = clWhite32; color2: TColor32= $FFE8E8E8;
   hatchSize: Integer = 10); overload;
 begin
-  if (rec.Right < rec.Left) or (rec.Right - rec.Left <= 0) then Exit;
-
+  if (rec.Right <= rec.Left) or (rec.Bottom - rec.Top <= 0) then Exit;
   img.BeginUpdate;
   try
     InternHatchBackground(img, rec, color1, color2, hatchSize);
