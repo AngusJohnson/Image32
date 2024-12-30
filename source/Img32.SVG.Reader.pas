@@ -2493,7 +2493,11 @@ begin
         GetPaths(drawDat);
         AppendPath(self.drawPathsO, drawPathsO);
         AppendPath(self.drawPathsC, drawPathsC);
+        MatrixApply(DrawData.matrix, self.drawPathsC);
+        MatrixApply(DrawData.matrix, self.drawPathsO);
       end;
+  MatrixApply(DrawData.matrix, drawPathsC);
+  MatrixApply(DrawData.matrix, drawPathsO);
   drawPathsF := CopyPaths(drawPathsC);
   AppendPath(drawPathsF, drawPathsO);
 end;
