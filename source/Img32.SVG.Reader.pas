@@ -232,6 +232,7 @@ type
   private
     fRefEl: UTF8String;
     fImage: TImage32;
+    fTransparent: Boolean;
   protected
     procedure Draw(image: TImage32; drawDat: TDrawData); override;
   public
@@ -1126,6 +1127,7 @@ begin
   begin
     ReadRefElImage(fRefEl, fImage);
     fRefEl := ''; // ie avoid reloading fImage
+    fTransparent := fImage.HasTransparency;
   end;
 
   if fImage <> nil then
@@ -1141,7 +1143,12 @@ begin
     try
       tmp.AssignSettings(fImage);
       MatrixApply(drawDat.matrix, fImage, tmp);
-      image.Copy(tmp, tmp.Bounds, Rect(dstRecD));
+      // CopyBlend is slower than Copy, so only use it if we have a
+      // transparent image.
+      if fTransparent then
+        image.CopyBlend(tmp, tmp.Bounds, Rect(dstRecD), BlendToAlphaLine)
+      else
+        image.Copy(tmp, tmp.Bounds, Rect(dstRecD));
     finally
       tmp.Free;
     end;
