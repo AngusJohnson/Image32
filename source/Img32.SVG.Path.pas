@@ -3,9 +3,9 @@ unit Img32.SVG.Path;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  18 September 2024                                               *
+* Date      :  1 January 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2024                                         *
+* Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
 * Purpose   :  Essential structures and functions to read SVG Path elements    *
 *                                                                              *
@@ -276,8 +276,8 @@ type
 
   UTF8Strings = array of UTF8String;
 
-  function GetSvgArcInfoRect(const p1, p2: TPointD; radii: TPointD; phi_rads: double;
-    fA, fS: boolean): TRectD;
+  function GetSvgArcInfoRect(const p1, p2: TPointD;
+    radii: TPointD; phi_rads: double; fA, fS: boolean): TRectD;
 
 implementation
 

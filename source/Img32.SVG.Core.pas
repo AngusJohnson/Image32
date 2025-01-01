@@ -3,9 +3,9 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  5 December 2024                                                 *
+* Date      :  1 January 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2024                                         *
+* Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
 * Purpose   :  Essential structures and functions to read SVG files            *
 *                                                                              *
@@ -19,7 +19,7 @@ interface
 {$I Img32.inc}
 
 uses
-  SysUtils, Classes, Types, Math,
+  SysUtils, Classes, Types, Math, StrUtils,
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults,{$ENDIF}
   Img32, Img32.Vector, Img32.Text, Img32.Transform;
 
@@ -94,20 +94,22 @@ type
   TSvgItalicSyle  = (sfsUndefined, sfsNone, sfsItalic);
   TFontDecoration = (fdUndefined, fdNone, fdUnderline, fdStrikeThrough);
   TSvgTextAlign = (staUndefined, staLeft, staCenter, staRight, staJustify);
+  TSpacesInText = (sitUndefined, sitIgnore, sitPreserve);
 
   UTF8Strings = array of UTF8String;
 
   TSVGFontInfo = record
-    family      : TFontFamily;
-    familyNames : UTF8Strings;
-    size        : double;
-    spacing     : double;
-    textLength  : double;
-    italic      : TSvgItalicSyle;
-    weight      : Integer;
-    align       : TSvgTextAlign;
-    decoration  : TFontDecoration;
-    baseShift   : TValue;
+    family        : TFontFamily;
+    familyNames   : UTF8Strings;
+    size          : double;
+    spacing       : double;
+    spacesInText  : TSpacesInText;
+    textLength    : double;
+    italic        : TSvgItalicSyle;
+    weight        : Integer;
+    align         : TSvgTextAlign;
+    decoration    : TFontDecoration;
+    baseShift     : TValue;
   end;
 
   //////////////////////////////////////////////////////////////////////
@@ -244,7 +246,12 @@ type
   function ScaleDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfDouble;
   function Match(c: PUTF8Char; const compare: UTF8String): Boolean; overload;
   function Match(const compare1, compare2: UTF8String): Boolean; overload;
-  procedure ToUTF8String(c, endC: PUTF8Char; var S: UTF8String);
+  procedure ToUTF8String(c, endC: PUTF8Char; var S: UTF8String;
+    spacesInText: TSpacesInText = sitIgnore);
+  function TrimMultiSpacesUtf8(const text: Utf8String): Utf8String;
+  function TrimMultiSpacesUnicode(const text: UnicodeString): UnicodeString;
+  function StripNewlines(const s: UTF8String): UTF8String; overload;
+  function StripNewlines(const s: UnicodeString): UnicodeString; overload;
   procedure ToAsciiLowerUTF8String(c, endC: PUTF8Char; var S: UTF8String);
   procedure ToTrimmedUTF8String(c, endC: PUTF8Char; var S: UTF8String);
   function IsSameUTF8String(const S1, S2: UTF8String): Boolean;
@@ -1305,7 +1312,98 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure ToUTF8String(c, endC: PUTF8Char; var S: UTF8String);
+function ReversePosEx(utf8: utf8Char;
+  const text: Utf8String; startIdx: integer): integer; overload;
+{$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result := Max(0, Min(Length(text), startidx));
+  while (Result > 0) and (text[Result] <> utf8) do Dec(Result);
+end;
+//------------------------------------------------------------------------------
+
+function TrimMultiSpacesUtf8(const text: Utf8String): Utf8String;
+var
+  i, len: integer;
+begin
+  Result := text;
+  len := Length(Result);
+  for i := 1 to len do
+    if Result[i] < #32 then Result[i] := #32;
+  i := ReversePosEx(space, Result, len);
+  while i > 1 do
+  begin
+    Dec(i);
+    while (i > 0) and (Result[i] = space) do
+    begin
+      Delete(Result, i, 1);
+      Dec(i);
+    end;
+    i := ReversePosEx(space, Result, i);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function ReversePosEx(c: WideChar;
+  const text: UnicodeString; startIdx: integer): integer; overload;
+{$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result := Max(0, Min(Length(text), startidx));
+  while (Result > 0) and (text[Result] <> c) do Dec(Result);
+end;
+//------------------------------------------------------------------------------
+
+function TrimMultiSpacesUnicode(const text: UnicodeString): UnicodeString;
+var
+  i, len: integer;
+begin
+  Result := text;
+  len := Length(Result);
+  for i := 1 to len do
+    if Result[i] < #32 then Result[i] := #32;
+  i := ReversePosEx(space, Result, len);
+  while i > 1 do
+  begin
+    Dec(i);
+    while (i > 0) and (Result[i] = space) do
+    begin
+      Delete(Result, i, 1);
+      Dec(i);
+    end;
+    i := ReversePosEx(space, Result, i);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function StripNewlines(const s: UTF8String): UTF8String;
+var
+  i: integer;
+begin
+  Result := s;
+  i := Length(Result);
+  while i > 0 do
+  begin
+    if Result[i] < space then Delete(Result, i, 1);
+    Dec(i);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function StripNewlines(const s: UnicodeString): UnicodeString;
+var
+  i: integer;
+begin
+  Result := s;
+  i := Length(Result);
+  while i > 0 do
+  begin
+    if Result[i] < space then Delete(Result, i, 1);
+    Dec(i);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure ToUTF8String(c, endC: PUTF8Char;
+  var S: UTF8String; spacesInText: TSpacesInText);
 var
   len: integer;
 begin
@@ -1313,6 +1411,9 @@ begin
   SetLength(S, len);
   if len = 0 then Exit;
   Move(c^, PUTF8Char(S)^, len * SizeOf(UTF8Char));
+  if spacesInText <> sitPreserve then
+    S := TrimMultiSpacesUtf8(S);
+  S := StripNewlines(S);
 end;
 //------------------------------------------------------------------------------
 
@@ -2128,7 +2229,9 @@ var
   c2, cc, tmpC, tmpEndC: PUTF8Char;
 begin
   Result := false;
-  while SkipBlanks(c, endC) do
+  // note: don't trim spaces at the start of text content.
+  // Space trimming will be done later IF and when required.
+  while (hash = hTSpan) or SkipBlanks(c, endC) do
   begin
     if (c^ = '<') then
     begin
@@ -2202,23 +2305,18 @@ begin
     end
     else if (hash = hTSpan) or (hash = hText) or (hash = hTextPath) then
     begin
-      //text content: and because text can be mixed with one or more
-      //<tspan> elements we need to create sub-elements for each text block.
-      //And <tspan> elements can even have <tspan> sub-elements.
+      // assume this is text content, and because text can also be mixed
+      // with any number of nested <tspan> elements, always put text
+      // content inside a pseudo 'self closed' <tspan> element
       cc := c;
       tmpC := cc;
-      //preserve a leading space
-      if (tmpC -1)^ = space then dec(tmpC);
       while (cc < endC) and (cc^ <> '<') do inc(cc);
-      if (hash = hTextPath) then
-      begin
-        ToUTF8String(tmpC, cc, text);
-      end else
-      begin
-        child := TSvgXmlEl.Create(owner);
-        childs.Add(child);
-        ToUTF8String(tmpC, cc, child.text);
-      end;
+      child := TSvgXmlEl.Create(owner);
+      child.name := 'tspan';
+      child.hash := GetHash('tspan');
+      child.selfClosed := true;
+      childs.Add(child);
+      ToUTF8String(tmpC, cc, child.text);
       c := cc;
     end else
     begin
