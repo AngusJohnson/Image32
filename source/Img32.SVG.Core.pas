@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  1 January 2025                                                  *
+* Date      :  2 January 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -614,7 +614,8 @@ begin
     j := i;
     while (j <= len) and (str[j] > space) do inc(j);
     SetLength(Result[k], j -i);
-    Move(str[i], Result[k][1], j -i);
+    if j > i then
+      Move(str[i], Result[k][1], j -i);
     while (j <= len) and (str[j] <= space) do inc(j);
     i := j;
   end;
