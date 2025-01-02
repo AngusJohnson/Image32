@@ -2232,7 +2232,7 @@ begin
   Result := false;
   // note: don't trim spaces at the start of text content.
   // Space trimming will be done later IF and when required.
-  while (hash = hTSpan) or SkipBlanks(c, endC) do
+  while (hash = hTSpan) or (hash = hTextArea) or SkipBlanks(c, endC) do
   begin
     if (c^ = '<') then
     begin
@@ -2310,23 +2310,29 @@ begin
       // with any number of nested <tspan> elements, always put text
       // content inside a pseudo 'self closed' <tspan> element
       cc := c;
-      tmpC := cc;
       while (cc < endC) and (cc^ <> '<') do inc(cc);
       child := TSvgXmlEl.Create(owner);
       child.name := 'tspan';
       child.hash := GetHash('tspan');
       child.selfClosed := true;
       childs.Add(child);
-      ToUTF8String(tmpC, cc, child.text);
+      ToUTF8String(c, cc, child.text);
+      c := cc;
+    end
+    else if (hash = hTextArea) then
+    begin
+      // also assume this is text content, but don't create
+      // pseudo <tspan> elements inside <textarea> elements
+      cc := c;
+      while (cc < endC) and (cc^ <> '<') do inc(cc);
+      ToUTF8String(c, cc, text);
       c := cc;
     end else
     begin
       cc := c;
-      tmpC := cc;
       while (cc < endC) and (cc^ <> '<') do inc(cc);
-      ToUTF8String(tmpC, cc, text);
+      ToUTF8String(c, cc, text);
       c := cc;
-
       //if <style> element then load styles into owner.classStyles
       if (hash = hStyle) then
         ParseStyleElementContent(text, owner.classStyles);

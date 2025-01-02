@@ -116,6 +116,7 @@ const
   hOrient                     = $EFF6C65A;    // Orient
   hOut                        = $12067E90;    // Out
   hOver                       = $C9B82D21;    // Over
+  hOverflow_045_Wrap          = $C0B6980D;    // Overflow-Wrap
   hOverlay                    = $383BEA5E;    // Overlay
   hPad                        = $4A0CAD48;    // Pad
   hPath                       = $AD8A7AB5;    // Path
@@ -172,6 +173,7 @@ const
   hText                       = $7F3B51AB;    // Text
   hText_045_Anchor            = $D0D82FE8;    // Text-Anchor
   hText_045_Decoration        = $3BC20862;    // Text-Decoration
+  hTextArea                   = $0A75EDBF;    // TextArea
   hTextLength                 = $DA75EDC0;    // TextLength
   hTextPath                   = $18F2748E;    // TextPath
   hTimes                      = $FF0E1FBE;    // Times
@@ -186,11 +188,14 @@ const
   hViewbox                    = $AEF665C8;    // Viewbox
   hVisibility                 = $9F832B01;    // Visibility
   hvisible                    = $96C79D31;    // visible
+  hWhite_045_Space            = $0A1C0679;    // White-Space
   hWidth                      = $96BEECA0;    // Width
+  hWord_045_Break             = $A99E7C27;    // Word-Break
   hX                          = $9303A5E5;    // X
   hX1                         = $74A7DE27;    // X1
   hX2                         = $168E21F1;    // X2
   hXlink_058_Href             = $2BDA798B;    // Xlink:Href
+  hxml_058_space              = $0AB6D0D6;    // xml:space
   hXor                        = $4D86273A;    // Xor
   hY                          = $80950108;    // Y
   hY1                         = $7F247680;    // Y1

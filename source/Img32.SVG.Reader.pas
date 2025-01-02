@@ -124,7 +124,7 @@ type
   TShapeElement = class(TBaseElement)
   protected
     hasPaths    : Boolean;
-    hasGotPaths : Boolean;
+    pathsLoaded : Boolean;
     drawPathsO  : TPathsD; //open only
     drawPathsC  : TPathsD; //closed only
     function GetBounds: TRectD; virtual;
@@ -387,6 +387,11 @@ type
     function  GetBounds: TRectD; override;
   public
     constructor Create(parent: TBaseElement; svgEl: TSvgXmlEl); override;
+  end;
+
+  TTextAreaElement = class(TShapeElement)
+  protected
+    procedure GetPaths(const drawDat: TDrawData); override;
   end;
 
   TMarkerElement = class(TShapeElement)
@@ -691,7 +696,6 @@ begin
     hFeFuncG        : Result := TFeFuncGElement;
     hFeFuncB        : Result := TFeFuncBElement;
     hFeFuncA        : Result := TFeFuncAElement;
-
     hfeComposite    : Result := TFeCompositeElement;
     hfeDefuseLighting : Result := TFeDefuseLightElement;
     hfeDropShadow   : Result := TFeDropShadowElement;
@@ -721,6 +725,7 @@ begin
     hSwitch         : Result := TSwitchElement;
     hSymbol         : Result := TSymbolElement;
     hText           : Result := TTextElement;
+    hTextArea       : Result := TTextAreaElement;
     hTextPath       : Result := TTextPathElement;
     hTSpan          : Result := TTSpanElement;
     hUse            : Result := TUseElement;
@@ -1267,10 +1272,12 @@ var
   el: TBaseElement;
   dx, dy: double;
 begin
-  if Assigned(drawPathsC) or Assigned(drawPathsO) or (fRefEl = '') then Exit;
+  if pathsLoaded or (fRefEl = '') then Exit;
 
   el := FindRefElement(fRefEl);
   if not Assigned(el) or not (el is TShapeElement) then Exit;
+  pathsLoaded := true;
+
   with TShapeElement(el) do
   begin
     GetPaths(drawDat);
@@ -2475,7 +2482,8 @@ procedure TClipPathElement.GetPaths(const drawDat: TDrawData);
 var
   i: integer;
 begin
-  if hasGotPaths then Exit;
+  if pathsLoaded then Exit;
+  pathsLoaded := true;
   for i := 0 to fChilds.Count -1 do
     if TBaseElement(fChilds[i]) is TShapeElement then
       with TShapeElement(fChilds[i]) do
@@ -2501,6 +2509,7 @@ begin
   inherited;
   elRectWH.Init;
   hasPaths := true;
+  //pathsLoaded := false;
   fDrawData.visible := true;
   if fXmlEl.name = '' then Exit;
 end;
@@ -2988,7 +2997,8 @@ var
   isClosed: Boolean;
   path: TPathD;
 begin
-  if Assigned(drawPathsC) or Assigned(drawPathsO) then Exit;
+  if pathsLoaded then Exit;
+  pathsLoaded := true;
   MatrixExtractScale(drawDat.matrix, scalePending);
   for i := 0 to fSvgPaths.Count -1 do
   begin
@@ -3024,8 +3034,8 @@ end;
 
 procedure TPolyElement.GetPaths(const drawDat: TDrawData);
 begin
-  if Assigned(drawPathsC) or Assigned(drawPathsO) then Exit;
-  if not Assigned(path) then Exit;
+  if pathsLoaded or not Assigned(path) then Exit;
+  pathsLoaded := true;
   if (fXmlEl.hash = hPolygon) then
   begin
     AppendPath(drawPathsC, path);                    //hPolygon
@@ -3094,8 +3104,9 @@ end;
 
 procedure TLineElement.GetPaths(const drawDat: TDrawData);
 begin
-  if not Assigned(drawPathsO) then
-    AppendPath(drawPathsO, path);
+  if pathsLoaded then Exit;
+  pathsLoaded := true;
+  AppendPath(drawPathsO, path);
 end;
 //------------------------------------------------------------------------------
 
@@ -3131,8 +3142,8 @@ var
   path  : TPathD;
   r: double;
 begin
-  if Assigned(drawPathsC) then Exit;
-  if not radius.IsValid then Exit;
+  if pathsLoaded or not radius.IsValid then Exit;
+  pathsLoaded := true;
   r := radius.GetValueXY(drawDat.bounds, GetRelFracLimit);
   pt := centerPt.GetPoint(drawDat.bounds, GetRelFracLimit);
   MatrixExtractScale(drawDat.matrix, scalePending);
@@ -3166,7 +3177,8 @@ var
   rad       : TPointD;
   centPt    : TPointD;
 begin
-  if Assigned(drawPathsC) then Exit;
+  if pathsLoaded then Exit;
+  pathsLoaded := true;
   rad := radius.GetPoint(drawDat.bounds, GetRelFracLimit);
   centPt := centerPt.GetPoint(drawDat.bounds, GetRelFracLimit);
   with centPt do
@@ -3201,11 +3213,12 @@ var
   bounds: TRectD;
   path  : TPathD;
 begin
-  if Assigned(drawPathsC) then Exit;
+  if pathsLoaded then Exit;
   if elRectWH.width.HasFontUnits then
     bounds := elRectWH.GetRectD(drawDat.fontInfo.size, GetRelFracLimit) else
     bounds := elRectWH.GetRectD(drawDat.bounds, GetRelFracLimit);
   if bounds.IsEmpty then Exit;
+  pathsLoaded := true;
 
   radXY := radius.GetPoint(bounds, GetRelFracLimit);
   if (radXY.X > 0) or (radXY.Y > 0) then
@@ -3279,9 +3292,7 @@ begin
     startX := 0;
 
   //get child paths (which also updates currentPt)
-  hasGotPaths := false;
   GetPaths(drawDat);
-  hasGotPaths := true;
 
   case drawDat.FontInfo.align of
     staCenter:
@@ -3390,9 +3401,8 @@ begin
   // TTSpanElement.GetPaths will be called twice -
   // once by TTextElement.Draw, and once by TTSpanElement.Draw
   // (which calls TShapeElement.Draw).
-  if Assigned(drawPathsC) or
-    ((ChildCount > 0) and Assigned(TShapeElement(Child[0]).drawPathsC)) then
-      Exit;
+  if pathsLoaded then Exit;
+  pathsLoaded := (ChildCount = 0) or TShapeElement(Child[0]).pathsLoaded;
 
   di := drawDat;
   UpdateDrawInfo(di, self);
@@ -3604,11 +3614,12 @@ var
   el: TBaseElement;
   i: integer;
 begin
-  if Assigned(drawPathsC) then Exit;
+  if pathsLoaded then Exit;
 
   fSvgReader.GetBestFont(drawDat.FontInfo);
   if (drawDat.FontInfo.size < 2) or
     not Assigned(fSvgReader.fFontCache) then Exit;
+  pathsLoaded := true;
 
   el := fParent;
   while Assigned(el) and not (el is TTextElement) do
@@ -3638,6 +3649,73 @@ begin
 {$ENDIF}
     Result := textEl.fDrawData.bounds else
     Result := inherited GetBounds;
+end;
+
+//------------------------------------------------------------------------------
+// TTextAreaElement
+//------------------------------------------------------------------------------
+
+procedure TTextAreaElement.GetPaths(const drawDat: TDrawData);
+var
+  x,y       : double;
+  scale     : double;
+  fontSize  : double;
+  lnHeight  : double;
+  di        : TDrawData;
+  mat       : TMatrixD;
+  text      : Utf8String;
+  s         : UnicodeString;
+  textRec   : TRectD;
+  chunkText : TChunkedText;
+const
+  margin = 2;
+begin
+  if pathsLoaded then Exit;
+  text := fXmlEl.text;
+  if not elRectWH.width.IsValid or not elRectWH.height.IsValid or
+    (text = '') then Exit;
+  pathsLoaded := true;
+
+  di := drawDat;
+  UpdateDrawInfo(di, self);
+  if drawDat.FontInfo.size = 0 then
+    fontSize := 16.0 else
+    fontSize := drawDat.FontInfo.size;
+  fSvgReader.GetBestFont(di.FontInfo);
+  if not Assigned(fSvgReader.fFontCache) then Exit;
+  scale := fontSize / fSvgReader.fFontCache.FontHeight;
+
+  if elRectWH.left.IsValid then
+    x := elRectWH.left.rawVal / scale else
+    x := 0;
+  if elRectWH.top.IsValid then
+    y := elRectWH.top.rawVal / scale else
+    y := 0;
+
+  {$IFDEF UNICODE}
+  s := UTF8ToUnicodeString(HtmlDecode(text));
+  {$ELSE}
+  s := Utf8Decode(HtmlDecode(text));
+  {$ENDIF}
+  s := FixSpaces(s);
+
+  lnHeight := fSvgReader.fFontCache.LineHeight;
+  textRec := RectD(x + margin, y + margin,
+    x + elRectWH.width.rawVal / scale - 2*margin,
+    y + elRectWH.height.rawVal / scale - 2*margin);
+
+  chunkText := TChunkedText.Create;
+  try
+    chunkText.SetText(s, fSvgReader.fFontCache);
+    drawPathsC := chunkText.GetTextGlyphs(Rect(textRec),
+      taLeft, tvaTop, lnHeight*0.85);
+  finally
+    chunkText.Free;
+  end;
+
+  mat := IdentityMatrix;
+  MatrixScale(mat, scale);
+  MatrixApply(mat, drawPathsC);
 end;
 
 //------------------------------------------------------------------------------

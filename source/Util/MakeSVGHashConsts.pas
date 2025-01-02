@@ -393,6 +393,7 @@ begin
       AddName('feFuncG');
       AddName('feFuncR');
       AddName('feGaussianBlur');
+      AddName('feImage');
       AddName('feMerge');
       AddName('feMergeNode');
       AddName('feOffset');
@@ -419,6 +420,7 @@ begin
       AddName('hidden');
       AddName('Href');
       AddName('Id');
+      AddName('Image');
       AddName('In');
       AddName('In2');
       AddName('Intercept');
@@ -459,6 +461,7 @@ begin
       AddName('Orient');
       AddName('Out');
       AddName('Over');
+      AddName('Overflow-Wrap');
       AddName('Overlay');
       AddName('Pad');
       AddName('Path');
@@ -515,6 +518,7 @@ begin
       AddName('Text');
       AddName('Text-Anchor');
       AddName('Text-Decoration');
+      AddName('TextArea');
       AddName('TextLength');
       AddName('TextPath');
       AddName('Times');
@@ -529,11 +533,14 @@ begin
       AddName('Viewbox');
       AddName('Visibility');
       AddName('visible');
+      AddName('White-Space');
+      AddName('Word-Break');
       AddName('Width');
       AddName('X');
       AddName('X1');
       AddName('X2');
       AddName('Xlink:Href');
+      AddName('xml:space');
       AddName('Xor');
       AddName('Y');
       AddName('Y1');
