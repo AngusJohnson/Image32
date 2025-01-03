@@ -206,13 +206,13 @@ begin
     chunkMetrics := chunkedText.DrawText(imgMain, tmpRec, taJustify, tvaTop, 0);
     // if there's text that didn't fit on the left of the image, then
     // draw the remaining text below the image
-    if chunkMetrics.pendingChuckIdx >= 0 then
+    if chunkMetrics.nextChuckIdx > 0 then
     begin
       tmpRec.Top := tmpRec.Top + Ceil(chunkMetrics.pageHeight);
       tmpRec.Right := innerRec.Right;
       tmpRec.Bottom := innerRec.Bottom;
       chunkedText.DrawText(imgMain, tmpRec, taJustify, tvaTop,
-        chunkMetrics.pendingChuckIdx, chunkMetrics.lineHeight);
+        chunkMetrics.nextChuckIdx, chunkMetrics.lineHeight);
     end;
 
   finally

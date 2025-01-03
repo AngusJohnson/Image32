@@ -148,7 +148,7 @@ begin
   FontManager.LoadFontReader('Segoe UI Symbol');
   FontManager.LoadFontReader('Segoe UI Emoji');
 
-  OpenFile('.\Sample SVGs 1\Nested.svg');
+  OpenFile('.\Sample SVGs 1\arcs.svg');
   ListSVGFilesInFolder;
 end;
 //------------------------------------------------------------------------------

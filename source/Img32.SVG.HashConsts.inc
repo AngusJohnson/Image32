@@ -145,6 +145,7 @@ const
   hSlope                      = $4774735C;    // Slope
   hSourceAlpha                = $F891B958;    // SourceAlpha
   hSourceGraphic              = $A4DB1DC2;    // SourceGraphic
+  hspace                      = $488AD9F6;    // space
   hspecularExponent           = $93D520E8;    // specularExponent
   hSpreadMethod               = $A08CEB57;    // SpreadMethod
   hSquare                     = $20E48144;    // Square
@@ -195,7 +196,6 @@ const
   hX1                         = $74A7DE27;    // X1
   hX2                         = $168E21F1;    // X2
   hXlink_058_Href             = $2BDA798B;    // Xlink:Href
-  hxml_058_space              = $0AB6D0D6;    // xml:space
   hXor                        = $4D86273A;    // Xor
   hY                          = $80950108;    // Y
   hY1                         = $7F247680;    // Y1

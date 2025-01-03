@@ -490,6 +490,7 @@ begin
       AddName('Slope');
       AddName('SourceAlpha');
       AddName('SourceGraphic');
+      AddName('space'); // xml:space
       AddName('specularExponent');
       AddName('SpreadMethod');
       AddName('Square');
@@ -540,7 +541,6 @@ begin
       AddName('X1');
       AddName('X2');
       AddName('Xlink:Href');
-      AddName('xml:space');
       AddName('Xor');
       AddName('Y');
       AddName('Y1');

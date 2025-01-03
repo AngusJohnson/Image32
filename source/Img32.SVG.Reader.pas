@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  1 January 2025                                                  *
+* Date      :  3 January 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -3320,6 +3320,7 @@ begin
   SetLength(Result, len);
   if len = 0 then Exit;
 
+  // allow a single leading space char
   if text[1] <= #32 then
     Result[1] := #32 else
     Result[1] := text[1];
@@ -3327,14 +3328,16 @@ begin
   j := 1;
   for i := 2 to len do
   begin
-    if text[i] <= #32 then
+    if (text[i] <= #32) then
     begin
-      if Result[j] = #32 then Continue
-      else Result[j+1] := #32;
-    end
-    else
-      Result[j+1] := text[i];
-    inc(j);
+      if (Result[j] = #32) then Continue;
+      inc(j);
+      Result[j] := #32;
+    end else
+    begin
+      inc(j);
+      Result[j] := text[i];
+    end;
   end;
   SetLength(Result, j);
 end;
@@ -3657,7 +3660,6 @@ end;
 
 procedure TTextAreaElement.GetPaths(const drawDat: TDrawData);
 var
-  x,y       : double;
   scale     : double;
   fontSize  : double;
   lnHeight  : double;
@@ -3666,9 +3668,8 @@ var
   text      : Utf8String;
   s         : UnicodeString;
   textRec   : TRectD;
-  chunkText : TChunkedText;
 const
-  margin = 2;
+  margin = 1;
 begin
   if pathsLoaded then Exit;
   text := fXmlEl.text;
@@ -3685,32 +3686,26 @@ begin
   if not Assigned(fSvgReader.fFontCache) then Exit;
   scale := fontSize / fSvgReader.fFontCache.FontHeight;
 
-  if elRectWH.left.IsValid then
-    x := elRectWH.left.rawVal / scale else
-    x := 0;
-  if elRectWH.top.IsValid then
-    y := elRectWH.top.rawVal / scale else
-    y := 0;
-
   {$IFDEF UNICODE}
   s := UTF8ToUnicodeString(HtmlDecode(text));
   {$ELSE}
   s := Utf8Decode(HtmlDecode(text));
   {$ENDIF}
   s := FixSpaces(s);
+  s := StringReplace(s, '<tbreak/>', #10, [rfReplaceAll, rfIgnoreCase]);
 
   lnHeight := fSvgReader.fFontCache.LineHeight;
-  textRec := RectD(x + margin, y + margin,
-    x + elRectWH.width.rawVal / scale - 2*margin,
-    y + elRectWH.height.rawVal / scale - 2*margin);
 
-  chunkText := TChunkedText.Create;
+  textRec := elRectWH.GetRectD(di.bounds.Width, di.bounds.Height, 1);
+  textRec := ScaleRect(textRec, 1/scale);
+  InflateRect(textRec, -margin, -margin);
+
+  with TChunkedText.Create(s, fSvgReader.fFontCache) do
   try
-    chunkText.SetText(s, fSvgReader.fFontCache);
-    drawPathsC := chunkText.GetTextGlyphs(Rect(textRec),
-      taLeft, tvaTop, lnHeight*0.85);
+    // and compress the lineheight a little
+    drawPathsC := GetTextGlyphs(Rect(textRec), taLeft, tvaTop, 0, lnHeight * 0.8);
   finally
-    chunkText.Free;
+    Free;
   end;
 
   mat := IdentityMatrix;

@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  2 January 2025                                                  *
+* Date      :  3 January 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -76,6 +76,7 @@ type
     procedure Init;
     function  GetRectD(const relSize: TRectD; assumeRelValBelow: Double): TRectD; overload;
     function  GetRectD(relSize: double; assumeRelValBelow: Double): TRectD; overload;
+    function  GetRectD(relSizeX, relSizeY: double; assumeRelValBelow: Double): TRectD; overload;
     function  GetRectWH(const relSize: TRectD; assumeRelValBelow: Double): TRectWH;
     function  IsValid: Boolean;
     function  IsEmpty: Boolean;
@@ -2223,6 +2224,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function IsTextAreaTbreak(var c: PUTF8Char; endC: PUTF8Char): Boolean;
+const
+  // https://www.w3.org/TR/SVGTiny12/text.html#tbreakElement
+  tbreak: PUTF8Char = '<tbreak/>';
+begin
+  Result := (c + 9 < endC) and CompareMem(c, tbreak, 9);
+  if Result then inc(c, 8);
+end;
+//------------------------------------------------------------------------------
+
 function TXmlEl.ParseContent(var c: PUTF8Char; endC: PUTF8Char): Boolean;
 var
   child: TSvgXmlEl;
@@ -2324,7 +2335,8 @@ begin
       // also assume this is text content, but don't create
       // pseudo <tspan> elements inside <textarea> elements
       cc := c;
-      while (cc < endC) and (cc^ <> '<') do inc(cc);
+      while (cc < endC) and
+        ((cc^ <> '<') or IsTextAreaTbreak(cc, endC)) do inc(cc);
       ToUTF8String(c, cc, text);
       c := cc;
     end else
@@ -2771,6 +2783,21 @@ begin
 
   Result.Right := Result.Left + width.GetValue(relSize, assumeRelValBelow);
   Result.Bottom := Result.Top + height.GetValue(relSize, assumeRelValBelow);
+end;
+//------------------------------------------------------------------------------
+
+function TValueRecWH.GetRectD(relSizeX, relSizeY: double; assumeRelValBelow: Double): TRectD;
+begin
+  if not left.IsValid then
+    Result.Left := 0 else
+    Result.Left := left.GetValue(relSizeX, assumeRelValBelow);
+
+  if not top.IsValid then
+    Result.Top := 0 else
+    Result.Top := top.GetValue(relSizeY, assumeRelValBelow);
+
+  Result.Right := Result.Left + width.GetValue(relSizeX, assumeRelValBelow);
+  Result.Bottom := Result.Top + height.GetValue(relSizeY, assumeRelValBelow);
 end;
 //------------------------------------------------------------------------------
 
