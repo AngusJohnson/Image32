@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  3 January 2025                                                  *
+* Date      :  5 January 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -248,7 +248,7 @@ type
   function Match(c: PUTF8Char; const compare: UTF8String): Boolean; overload;
   function Match(const compare1, compare2: UTF8String): Boolean; overload;
   procedure ToUTF8String(c, endC: PUTF8Char; var S: UTF8String;
-    spacesInText: TSpacesInText = sitIgnore);
+    spacesInText: TSpacesInText = sitUndefined);
   function TrimMultiSpacesUtf8(const text: Utf8String): Utf8String;
   function TrimMultiSpacesUnicode(const text: UnicodeString): UnicodeString;
   function StripNewlines(const s: UTF8String): UTF8String; overload;
@@ -285,6 +285,7 @@ type
   TSetOfUTF8Char = set of UTF8Char;
 
 function CharInSet(chr: UTF8Char; const chrs: TSetOfUTF8Char): Boolean;
+function DecodeUtf8ToWideString(const utf8: UTF8String): WideString;
 
 const
   clInvalid   = $00010001;
@@ -2072,7 +2073,7 @@ begin
   c2 := Result;
   while (c2 > c) and ((c2 -1)^ <= space) do dec(c2);
 
-  ToUTF8String(c, c2, attrib.value);
+  ToUTF8String(c, c2, attrib.value, sitPreserve);
   inc(Result); //skip end quote
 end;
 //------------------------------------------------------------------------------
@@ -2327,7 +2328,7 @@ begin
       child.hash := GetHash('tspan');
       child.selfClosed := true;
       childs.Add(child);
-      ToUTF8String(c, cc, child.text);
+      ToUTF8String(c, cc, child.text, sitPreserve);
       c := cc;
     end
     else if (hash = hTextArea) then
@@ -2337,7 +2338,7 @@ begin
       cc := c;
       while (cc < endC) and
         ((cc^ <> '<') or IsTextAreaTbreak(cc, endC)) do inc(cc);
-      ToUTF8String(c, cc, text);
+      ToUTF8String(c, cc, text, sitPreserve);
       c := cc;
     end else
     begin
@@ -2604,6 +2605,76 @@ begin
     end;
     inc(c);
   end;
+end;
+
+//------------------------------------------------------------------------------
+// Miscellaneous functions
+//------------------------------------------------------------------------------
+
+function DecodeUtf8ToWideString(const utf8: UTF8String): WideString;
+var
+  i,j, len: Integer;
+  c, cp: Cardinal;
+  codePoints: TArrayOfCardinal;
+begin
+  Result := '';
+  if utf8 = '' then Exit;
+  len := Length(utf8);
+
+  // first decode utf8String to codepoints
+  SetLength(codePoints, len);
+  i := 1;
+  j := 0;
+  while i <= len do
+  begin
+    c := Ord(utf8[i]);
+    if c and $80 = 0 then // c < 128
+    begin
+      codePoints[j] := c;
+      inc(i); inc(j);
+    end
+    else if c and $E0 = $C0 then
+    begin
+      if i = len then break;
+      codePoints[j] := (c and $1F) shl 6 + (Ord(utf8[i+1]) and $3F);
+      inc(i, 2); inc(j);
+    end
+    else if c and $F0 = $E0 then
+    begin
+      if i > len - 2 then break;
+      codePoints[j] := (c and $F) shl 12 +
+        ((Ord(utf8[i+1]) and $3F) shl 6) + ((Ord(utf8[i+2]) and $3F));
+      inc(i, 3); inc(j);
+    end else
+    begin
+      if (i > len - 3) or (c shr 3 <> $1E) then break;
+      codePoints[j] := (c and $7) shl 18 + ((Ord(utf8[i+1]) and $3F) shl 12) +
+        ((Ord(utf8[i+2]) and $3F) shl 6) + (Ord(utf8[i+3]) and $3F);
+      inc(i, 4); inc(j);
+    end;
+  end;
+  len := j; // there are now 'j' valid codepoints
+  j := 0;
+
+  // make room in the result for surrogate paired chars, and
+  // convert codepoints into the result (a Utf16 Widestring)
+  SetLength(Result, len *2);
+  for i := 0 to len -1 do
+  begin
+    inc(j);
+    cp := codePoints[i];
+    if (cp < $D7FF) or (cp = $E000) or (cp = $FFFF) then
+    begin
+      Result[j] := WideChar(cp);
+    end else if (cp > $FFFF) and (cp < $110000) then
+    begin
+      Dec(cp, $10000);
+      Result[j] := WideChar($D800 + (cp shr 10));
+      inc(j);
+      Result[j] := WideChar($DC00 + (cp and $3FF));
+    end;
+  end;
+  SetLength(Result, j);
 end;
 
 //------------------------------------------------------------------------------

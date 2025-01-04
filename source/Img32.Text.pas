@@ -3,7 +3,7 @@ unit Img32.Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  3 January 2025                                                  *
+* Date      :  5 January 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -2720,39 +2720,17 @@ function TFontCache.GetTextOutlineInternal(x, y: double;
   const text: UnicodeString; underlineIdx: integer; out glyphs: TArrayOfPathsD;
   out offsets: TArrayOfDouble; out nextX: double): Boolean;
 var
-  i,j, len  : integer;
-  dx,y2,w   : double;
-  unicodes  : TArrayOfCardinal;
-  glyphInfo : PGlyphInfo;
-  currGlyph : TPathsD;
+  i,j, len    : integer;
+  dx,y2,w     : double;
+  codepoints  : TArrayOfCardinal;
+  glyphInfo   : PGlyphInfo;
+  currGlyph   : TPathsD;
   prevGlyphKernList: TArrayOfTKern;
-  hasSurrogate: Boolean;
 begin
-  len := Length(text);
-  unicodes := nil;
-  setLength(unicodes, len);
-  hasSurrogate := false;
-  j := 0;
-  for i := 1 to len do
-  begin
-    if hasSurrogate then
-    begin
-      unicodes[j] := ConvertSurrogatePair(Ord(text[i -1]), Ord(text[i]));
-      hasSurrogate := false;
-    end
-    else if IsSurrogate(text[i]) then
-    begin
-      hasSurrogate := true;
-      Continue;
-    end
-    else
-      unicodes[j] := Ord(WideChar(text[i]));
-    inc(j);
-  end;
-  len := j;
-  setLength(unicodes, len);
   Result := true;
-  GetMissingGlyphs(unicodes);
+  codePoints := GetTextCodePoints(text);
+  len := Length(codepoints);
+  GetMissingGlyphs(codepoints);
 
   SetLength(offsets, len);
   nextX := x;
@@ -2760,7 +2738,7 @@ begin
   for i := 0 to len -1 do
   begin
     offsets[i] := nextX;
-    glyphInfo := GetCharInfo(unicodes[i]);
+    glyphInfo := GetCharInfo(codepoints[i]);
     if not assigned(glyphInfo) then Break;
     if fUseKerning and assigned(prevGlyphKernList) then
     begin

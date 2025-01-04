@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.6                                                             *
-* Date      :  3 January 2025                                                  *
+* Date      :  5 January 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -802,6 +802,9 @@ begin
 
     if fontInfo.align <> staUndefined then
       drawDat.fontInfo.align := fontInfo.align;
+
+    if fontInfo.spacesInText <> sitUndefined then
+      drawDat.fontInfo.spacesInText := fontInfo.spacesInText;
 
     if (thisElement is TTextElement) or
       (fontInfo.decoration <> fdUndefined) then
@@ -3259,7 +3262,7 @@ var
   i: integer;
 begin
   for i := 0 to fChilds.Count -1 do
-    if fChilds[i] is TTSpanElement then
+    if TBaseElement(fChilds[i]) is TTSpanElement then
       TTSpanElement(fChilds[i]).DoOffsetX(dx);
 end;
 //------------------------------------------------------------------------------
@@ -3269,7 +3272,7 @@ var
   i: integer;
 begin
   for i := 0 to fChilds.Count -1 do
-    if fChilds[i] is TShapeElement then
+    if TBaseElement(fChilds[i]) is TShapeElement then
       TShapeElement(fChilds[i]).GetPaths(drawDat);
 end;
 //------------------------------------------------------------------------------
@@ -3440,11 +3443,7 @@ begin
 
   if (Length(text) > 0) and (fontSize > 1) then
   begin
-    {$IFDEF UNICODE}
-    s := UTF8ToUnicodeString(HtmlDecode(text));
-    {$ELSE}
-    s := Utf8Decode(HtmlDecode(text));
-    {$ENDIF}
+    s := DecodeUtf8ToWideString(HtmlDecode(text));
     s := FixSpaces(s);
 
     if IsBlankText(s) then
@@ -3648,7 +3647,7 @@ begin
 {$IFDEF UNICODE}
   if IsBlankText(UTF8ToUnicodeString(fXmlEl.text)) then
 {$ELSE}
-  if IsBlankText(Utf8Decode(text)) then
+  if IsBlankText(Utf8Decode(fXmlEl.text)) then
 {$ENDIF}
     Result := textEl.fDrawData.bounds else
     Result := inherited GetBounds;
@@ -4175,24 +4174,31 @@ end;
 //------------------------------------------------------------------------------
 
 procedure Href_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
-var
-  el: TBaseElement;
 begin
-  el := aOwnerEl;
-  case el.fXmlEl.Hash of
+  case aOwnerEl.fXmlEl.Hash of
     hFeImage:
-      TFeImageElement(el).refEl := ExtractRef(value);
+      TFeImageElement(aOwnerEl).refEl := ExtractRef(value);
     hImage:
-      TImageElement(el).fRefEl := ExtractRef(value);
+      TImageElement(aOwnerEl).fRefEl := ExtractRef(value);
     hUse:
-      TUseElement(el).fRefEl := ExtractRef(value);
+      TUseElement(aOwnerEl).fRefEl := ExtractRef(value);
     hTextPath:
-      TTextPathElement(el).pathName := ExtractRef(value);
-    else if el is TFillElement then
-      TFillElement(el).refEl := ExtractRef(value);
+      TTextPathElement(aOwnerEl).pathName := ExtractRef(value);
+    else if aOwnerEl is TFillElement then
+      TFillElement(aOwnerEl).refEl := ExtractRef(value);
   end;
 end;
 //------------------------------------------------------------------------------
+
+procedure Space_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
+begin
+  case aOwnerEl.fXmlEl.Hash of
+    hText: if value = 'preserve' then
+      TTextPathElement(aOwnerEl).fDrawData.fontInfo.spacesInText := sitPreserve;
+  end;
+end;
+//------------------------------------------------------------------------------
+
 
 procedure BaselineShift_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
 var
@@ -5146,6 +5152,7 @@ begin
       hRy:                    Ry_Attrib(self, value);
       hspecularExponent:      SpectacularExponent(self, value);
       hSlope:                 Slope_Attrib(self, value);
+      hSpace:                 Space_Attrib(self, value);
       hSpreadMethod:          SpreadMethod_Attrib(self, value);
       hstdDeviation:          StdDev_Attrib(self, value);
       hStop_045_Color:        StopColor_Attrib(self, value);
