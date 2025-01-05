@@ -2,22 +2,30 @@
 
 <head>
 
-  <title>CreatePalette</title>
+  <title>TReduceType</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css">
 <script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
 </head>
 
 <body bgcolor="#FFFFFF">
-  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.CQ</a><span class="active">CreatePalette</span>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.CQ</a><span class="active">TReduceType</span>
   </div><br><br>
 
-  <h1>CreatePalette</h1>
-  <p class="Decl"><b>function</b> CreatePalette(image: TImage32; MaxColors: integer): TArrayOfColor32;</p>
-  <p>Creates the best palette for the given number of colors.</p>
+  <h1>TReduceType</h1>
+
+  <p class="Decl">TReduceType = (rtSimple, rtMedianCut, rtFrequency);</p>
+  <p> Specifies the algorithm used to perform color reduction. 
+    <ul>
+      <li><b>Simple</b>: simple algorithm that uses an <a href="https://en.wikipedia.org/wiki/Octree"><b>Octree</b></a> structure.</li>
+      <li><a href="https://en.wikipedia.org/wiki/Median_cut"><b>Median Cut</b></a>: an algorithm that's widely used to create reduced color palettes.</li>
+      <li><b>Frequency</b>: a simple algorithm that chooses palette colors according to those with the highest frequency of use. (This algorithm rarely produces useful palettes.)</li>
+    </ul> </p>
+  <p class="hidden"> <a href="../Routines/ReduceImage.htm"> </p>
+
   <h2 id="Auto-SeeAlso">See Also</h2>
-  <p class="Body"><a href="CreatePaletteEx.htm">CreatePaletteEx</a></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.6&nbsp; - &nbsp;Help file built on 18 Sep 2024 <br><br> </p>
+  <p class="Body"><a href="../Routines/ReduceImage.htm">ReduceImage</a></p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.7&nbsp; - &nbsp;Help file built on 6 Jan 2025 <br><br> </p>
 
 </body>
 

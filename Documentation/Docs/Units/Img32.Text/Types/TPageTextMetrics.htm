@@ -1,48 +1,66 @@
 <html>
 <head>
-  <title>TTable_Glyf</title>
+  <title>TPageTextMetrics</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="../../../../Styles/Default.css" type="text/css"><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../CodeScripts/bootstrap.js"></script>
 </head>
 <body bgcolor="#FFFFFF">
-  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Text</a><span class="active">TTable_Glyf</span>
+  <div class="menu" id="menu"><a class="ancestor" href="../../../_Body.htm">Index</a><a class="ancestor" href="../_Body.htm">Img32.Text</a><span class="active">TPageTextMetrics</span>
   </div><br><br>
 
-  <h1>TTable_Glyf</h1>
+  <h1>TPageTextMetrics</h1>
   <p class="Decl"> 
     <table style="padding:0 20px; border:0">
       <tr>
-        <td colspan="2">TTable_Glyf = <b>record</b>
+        <td colspan="2">TPageTextMetrics = <b>record</b>
         </td>
       </tr>
       <tr>
-        <td class="field"> numContours
+        <td class="field"> lineCount
         </td>
-        <td class="type">: Int16;
-        </td>
-      </tr>
-      <tr>
-        <td class="field"> xMin
-        </td>
-        <td class="type">: Int16;
+        <td class="type">: integer;
         </td>
       </tr>
       <tr>
-        <td class="field"> yMin
+        <td class="field"> pageWidth
         </td>
-        <td class="type">: Int16;
-        </td>
-      </tr>
-      <tr>
-        <td class="field"> xMax
-        </td>
-        <td class="type">: Int16;
+        <td class="type">: double;
         </td>
       </tr>
       <tr>
-        <td class="field"> yMax
+        <td class="field"> pageHeight
         </td>
-        <td class="type">: Int16;
+        <td class="type">: double;
+        </td>
+      </tr>
+      <tr>
+        <td class="field"> lineHeight
+        </td>
+        <td class="type">: double;
+        </td>
+      </tr>
+      <tr>
+        <td class="field"> nextChuckIdx
+        </td>
+        <td class="type">: integer;
+        </td>
+      </tr>
+      <tr>
+        <td class="field"> startOfLineIdx
+        </td>
+        <td class="type">: TArrayOfInteger;
+        </td>
+      </tr>
+      <tr>
+        <td class="field"> justifyDeltas
+        </td>
+        <td class="type">: TArrayOfDouble;
+        </td>
+      </tr>
+      <tr>
+        <td class="field"> lineWidths
+        </td>
+        <td class="type">: TArrayOfDouble;
         </td>
       </tr>
       <tr>
@@ -52,8 +70,11 @@
         </td>
       </tr>
     </table> </p>
-  <p> </p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.6&nbsp; - &nbsp;Help file built on 18 Sep 2024 <br><br> </p>
+  <p>
+  </p>
+  <p class="Hidden"> 
+    <!--<a href="../Routines/GetPageMetrics.htm"></a>--> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.7&nbsp; - &nbsp;Help file built on 6 Jan 2025 <br><br> </p>
 
 </body>
 </html>

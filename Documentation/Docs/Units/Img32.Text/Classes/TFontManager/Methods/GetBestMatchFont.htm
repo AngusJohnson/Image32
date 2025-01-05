@@ -15,34 +15,34 @@
   </div><br><br>
 
   <h1>TFontManager.GetBestMatchFont</h1>
-  <p class="Decl"><b>function</b> GetBestMatchFont(<b>const</b> fontInfo: <a href="../../../Types/TFontInfo.htm"><b>TFontInfo</b></a>): <a href="../../TFontReader/_Body.htm"><b>TFontReader</b></a>;</p><br class="half">
+  <p class="Decl"><b>function</b> GetBestMatchFont(<b>const</b> fontInfo: <a href="../../../Types/TFontInfo.htm"><b>TFontInfo</b></a>): <a href="../../TFontReader/_Body.htm"><b>TFontReader</b></a>; overload;</p>
+
+  <p class="Decl"><b>function</b> GetBestMatchFont(<b>const</b> styles: <a href="../../../Types/TMacStyles.htm"><b>TMacStyles</b></a>): <a href="../../TFontReader/_Body.htm"><b>TFontReader</b></a>; overload;</p><br class="half">
 
   <p> 
     <div class="code">
       <pre class="brush: delphi;">
 var
-  fontInfo: TFontInfo;
-  sansBoldFont: TFontReader;
+  frItalic: TFontReader;
+  frItal14Cache: TFontCache;
 begin
-  FontManager.Load('Arial');
-  FontManager.Load('Arial Bold');
-  FontManager.Load('Arial Italic');
-  FontManager.Load('Arial Bold Italic');
-  FontManager.Load('Times New Roman');
-  FontManager.Load('Times New Roman Bold');
-  FontManager.Load('Times New Roman Italic');
-  FontManager.Load('Times New Roman Bold Italic');
-
-  //now find the font that best matches - bold sans-serif
-  FillChar(fontInfo, SizeOf(fontInfo), 0);
-  fontInfo.fontFamily := ttfSansSerif;
-  fontInfo.macStyles := [msBold];
-  sansBoldFont := FontManager.GetBestMatchFont(fontInfo);
+  // FontManager.LoadFontReaderFamily loads regular, 
+  // italic, bold and bold-italic fonts (if available)
+  FontManager.LoadFontReaderFamily('Arial');
+  frItalic := FontManager.GetBestMatchFont([msItalic]);
+  // create a TFontCache object with frItalic  
+  frItal14Cache := TFontCache.Create(frItalic, DPIAware(14));
+  try
+    // and draw some text with frItal14Cache 
+    
+  finally
+    frItal14Cache.Free;
+  end;
       </pre>
     </div> </p>
   <h2 id="Auto-SeeAlso">See Also</h2>
-  <p class="Body"><a href="../../TFontReader/_Body.htm">TFontReader</a>, <a href="../../../Types/TFontInfo.htm">TFontInfo</a></p>
-  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.6&nbsp; - &nbsp;Help file built on 18 Sep 2024 <br><br> </p>
+  <p class="Body"><a href="../../TFontReader/_Body.htm">TFontReader</a>, <a href="../../../Types/TFontInfo.htm">TFontInfo</a>, <a href="../../../Types/TMacStyles.htm">TMacStyles</a></p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.7&nbsp; - &nbsp;Help file built on 6 Jan 2025 <br><br> </p>
 
 </body>
 

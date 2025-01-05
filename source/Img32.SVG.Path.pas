@@ -2,8 +2,8 @@ unit Img32.SVG.Path;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.6                                                             *
-* Date      :  1 January 2025                                                  *
+* Version   :  4.7                                                             *
+* Date      :  6 January 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -59,7 +59,7 @@ type
     procedure Changed; {$IFDEF INLINE} inline; {$ENDIF}
     procedure RequireFlattened; virtual;
     function GetFlattened: TPathD; overload;
-    procedure GetFlattened(var Result: TPathD); overload;
+    procedure GetFlattened2(var Result: TPathD); overload;
     procedure GetFlattenedInternal; virtual; abstract;
     procedure Scale(value: double); virtual;
     function DescaleAndOffset(const pt: TPointD): TPointD; overload;
@@ -520,7 +520,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSvgPathSeg.GetFlattened(var Result: TPathD);
+procedure TSvgPathSeg.GetFlattened2(var Result: TPathD);
 begin // uses less DynArrayAsg and DynArrayClear calls
   RequireFlattened;
   Result := fFlatPath;
@@ -1157,7 +1157,7 @@ begin
   Result := nil;
   SetLength(flattenedPaths, fSegsCount);
   for i := 0 to fSegsCount - 1 do
-    fSegs[i].GetFlattened(flattenedPaths[i]);
+    fSegs[i].GetFlattened2(flattenedPaths[i]);
   ConcatPaths(Result, flattenedPaths);
 end;
 //------------------------------------------------------------------------------

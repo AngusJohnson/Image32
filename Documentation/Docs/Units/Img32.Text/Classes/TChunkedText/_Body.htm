@@ -1,0 +1,42 @@
+<html>
+
+<head>
+
+  <title>TChunkedText</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet" href="../../../../../Styles/Default.css" type="text/css">
+
+  <meta name="Ancestor" content="">
+<script type="text/javascript" src="../../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../../CodeScripts/bootstrap.js"></script>
+</head>
+
+<body bgcolor="#FFFFFF">
+  <div class="menu" id="menu"><a class="ancestor" href="../../../../_Body.htm">Index</a><a class="ancestor" href="../../_Body.htm">Img32.Text</a><span class="active">TChunkedText</span>
+  </div><br><br>
+
+  <h1>TChunkedText</h1>
+  <p> The <span class="monobold">TChunkedText</span> A class that encapsulates a list of font formatted text 'chunks' (usually space seperated words) that greatly speeds up displaying word-wrapped text.<br><br> Here's an abbreviated example of its use from the FMX2 sample application:<br> 
+    <div class="code">
+      <pre class="brush: delphi;">
+
+  essay := TextResourceToString('ESSAY', RT_RCDATA, TEncoding.Unicode);
+  essay := StringReplace(essay, '\n', #10, [rfReplaceAll]);  
+  
+  regularFR := FontManager.GetBestMatchFont([]);
+  regularCache := TFontCache.Create(regularFR, DPIAware(14));
+  chunkedText := TChunkedText.Create(essay, regularCache);
+  try
+    chunkedText.DrawText(imgMain, displayRec, taJustify, tvaTop, 0);
+  finally
+    chunkedText.Free;
+    regularCache.Free;
+  end;
+      </pre>
+    </div> </p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.7&nbsp; - &nbsp;Help file built on 6 Jan 2025 <br><br> </p>
+
+</body>
+
+</html>

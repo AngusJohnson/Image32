@@ -1,0 +1,65 @@
+<html>
+
+<head>
+
+  <title>LoadFontReaderFamily</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet" href="../../../../../../Styles/Default.css" type="text/css">
+<script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shCore.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushDelphi.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCpp.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/SyntaxHighlighter/scripts/shBrushCSharp.js"></script><link rel="stylesheet" type="text/css" href="../../../../../../Styles/default.css"/><link rel="stylesheet" type="text/css" href="../../../../../../Menu/menu.css"/><link rel="stylesheet" type="text/css" href="../../../../../../CodeScripts/SyntaxHighlighter/styles/shCoreDefault.css"/><link rel="stylesheet" type="text/css" href="../../../../../../CodeScripts/SyntaxHighlighter/styles/shThemeDefault.css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"><script type="text/javascript" src="../../../../../../Menu/menu.js"></script><script type="text/javascript" src="../../../../../../CodeScripts/bootstrap.js"></script>
+</head>
+
+<body bgcolor="#FFFFFF">
+  <div class="menu" id="menu"><a class="ancestor" href="../../../../../_Body.htm">Index</a><a class="ancestor" href="../../../_Body.htm">Img32.Text</a><a class="ancestor" href="../_Body.htm">TFontManager</a><span class="active">LoadFontReaderFamily</span>
+  </div><br><br>
+
+  <h1>TFontManager.LoadFontReaderFamily</h1>
+  <p class="Decl"><b>function</b> LoadFontReaderFamily(<b>const</b> fontName: <b>string</b>): Boolean; <b>overload</b>;</p>
+
+  <p class="Decl"><b>function</b> LoadFontReaderFamily(<b>const</b> fontName: <b>string</b>; <b>out</b> fontReaderFamily: <a href="../../../Types/TFontReaderFamily.htm"><b>TFontReaderFamily</b></a>): Boolean; <b>overload</b>;</p><br class="half">
+
+  <p><span class="maroon"><b>This function is for Windows only.</b></span></p>
+  <p> Example 1: 
+    <div class="code">
+      <pre class="brush: delphi;">
+var
+  frItalic: TFontReader;
+  frItal14Cache: TFontCache;
+begin
+  FontManager.LoadFontReaderFamily('Arial');
+  frItalic := FontManager.GetBestMatchFont([msItalic]);
+  // do something with frItalic  
+  frItal14Cache := TFontCache.Create(frItalic, DPIAware(14));
+  try
+    // and draw some text with frItal14Cache     
+  finally
+    frItal14Cache.Free;
+  end;
+      </pre>
+    </div> </p>
+  <p> Example 2: 
+    <div class="code">
+      <pre class="brush: delphi;">
+var
+  arialFamily: TFontReaderFamily;
+begin
+  if not FontManager.LoadFontReaderFamily('Arial', arialFamily) or
+    not Assigned(arialFamily.italicFR) then Exit;
+  // do something with arialFamily.italicFR  
+  frItal14Cache := 
+    TFontCache.Create(arialFamily.italicFR, DPIAware(14));
+  try
+    // and draw some text with frItal14Cache     
+  finally
+    frItal14Cache.Free;
+  end;
+      </pre>
+    </div> </p>
+  <h2 id="Auto-SeeAlso">See Also</h2>
+  <p class="Body"><a href="../../../Types/TFontReaderFamily.htm">TFontReaderFamily</a></p>
+  <p class="Copyright" id="auto"> <br><br> Copyright &copy;2010-2023 Angus Johnson&nbsp; - &nbsp;Image32 4.7&nbsp; - &nbsp;Help file built on 6 Jan 2025 <br><br> </p>
+
+</body>
+
+</html>
