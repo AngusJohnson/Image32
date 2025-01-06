@@ -495,6 +495,7 @@ begin
       AddName('SpreadMethod');
       AddName('Square');
       AddName('Start');
+      AddName('StartOffset');
       AddName('stdDeviation');
       AddName('Stop-Color');
       AddName('Stop-Opacity');

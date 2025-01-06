@@ -150,6 +150,7 @@ const
   hSpreadMethod               = $A08CEB57;    // SpreadMethod
   hSquare                     = $20E48144;    // Square
   hStart                      = $84DC271F;    // Start
+  hStartOffset                = $688E51A0;    // StartOffset
   hstdDeviation               = $00D13F6A;    // stdDeviation
   hStop                       = $930CA7F2;    // Stop
   hStop_045_Color             = $9FD6E0BE;    // Stop-Color

@@ -15,8 +15,8 @@ Version 4.7
 * There have been significant improvements in SVG file reading
 * There have also been significant improvements in managing text rendering.
   These include a new TChunkedText class and changes in the TFontManager class.
-* Andreas Hausladen has continues to contribute changes that improve performance.
-* This release also contains a number of bug fixes (see issues #102..#125 in the GitHub repository).
+* Andreas Hausladen has continued to contribute changes that improve performance.
+* Additional bug fixes (see issues #102..#125 in the GitHub repository).
 Version 4.6 
 * This release contains many bug fixes (see issues #10..#101) in the 
 GitHub repository.

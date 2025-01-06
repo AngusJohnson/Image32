@@ -381,7 +381,8 @@ type
 
   TTextPathElement = class(TShapeElement)
   protected
-    pathName: UTF8String; //name (id) of path element
+    pathName  : UTF8String; //name (id) of path element
+    offset    : TValuePt;
     procedure GetPathsInternal(el: TBaseElement;
       topTextEl: TTextElement; const drawDat: TDrawData);
     procedure GetPaths(const drawDat: TDrawData); override;
@@ -1128,8 +1129,11 @@ begin
   if (fRefEl <> '') and not Assigned(fImage) then
   begin
     ReadRefElImage(fRefEl, fImage);
-    fRefEl := ''; // ie avoid reloading fImage
-    fTransparent := fImage.HasTransparency;
+    if Assigned(fImage) then
+    begin
+      fRefEl := ''; // ie avoid reloading fImage
+      fTransparent := fImage.HasTransparency;
+    end;
   end;
 
   if fImage <> nil then
@@ -3518,7 +3522,8 @@ var
   d, outX       : double;
   fontScale     : double;
   spacing       : double;
-  spanEl, se   : TTSpanElement;
+  spanEl        : TTSpanElement;
+  parentTSpanEl : TTSpanElement;
   pathEl        : TPathElement;
   dd            : TDrawData;
   unicodeText   : UnicodeString;
@@ -3563,12 +3568,30 @@ begin
   // These have been created inside real <tspan> elements in order to provide
   // a safe way to manage text mixed with nested <tspan> elements.
 
+  if offset.X.IsValid then
+    topTextEl.currentPt.X := Max(0,
+      topTextEl.currentPt.X + Round(offset.X.rawVal / fontScale));
+
   if spanEl.fParent is TTSpanElement then
-    se := TTSpanElement(spanEl.fParent) else
-    se :=  spanEl;
-  if se.offset.Y.IsValid then
+  begin
+    parentTSpanEl := TTSpanElement(spanEl.fParent);
+    if parentTSpanEl.offset.X.IsValid then
+        topTextEl.currentPt.X := Max(0,
+          topTextEl.currentPt.X +
+          Round(parentTSpanEl.offset.X.rawVal / fontScale));
+    if parentTSpanEl.offset.Y.IsValid then
+        topTextEl.currentPt.Y := topTextEl.currentPt.Y +
+          Round(parentTSpanEl.offset.Y.rawVal / fontScale);
+  end else if spanEl.offset.Y.IsValid then
+  begin
+    if spanEl.offset.X.IsValid then
+      topTextEl.currentPt.X := Max(0,
+        topTextEl.currentPt.X +
+        Round(spanEl.offset.X.rawVal / fontScale));
+    if spanEl.offset.Y.IsValid then
       topTextEl.currentPt.Y := topTextEl.currentPt.Y +
-        Round(se.offset.Y.rawVal / fontScale);
+        Round(spanEl.offset.Y.rawVal / fontScale);
+  end;
 
   //adjust glyph spacing when fFontInfo.textLength is assigned.
   len := Length(unicodeText);
@@ -4558,6 +4581,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure StartOffset_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
+var
+  val: double;
+begin
+  if (aOwnerEl is TTextPathElement) and
+    UTF8StringToFloat(value, val) then
+    TTextPathElement(aOwnerEl).offset.X.SetValue(val);
+end;
+//------------------------------------------------------------------------------
+
 procedure StopColor_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
 var
   acolor: TColor32;
@@ -4826,8 +4859,12 @@ begin
       TFeDropShadowElement(aOwnerEl).offset.X.SetValue(val, mu);
     hfeOffset:
       TFeOffsetElement(aOwnerEl).offset.X.SetValue(val, mu);
-    hText, hTSpan:
+    hText:
       TTextElement(aOwnerEl).offset.X.SetValue(val, mu);
+    hTSpan:
+      TTSpanElement(aOwnerEl).offset.X.SetValue(val, mu);
+    hTextPath:
+      TTextPathElement(aOwnerEl).offset.X.SetValue(val, mu);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -5162,6 +5199,7 @@ begin
       hSpace:                 Space_Attrib(self, value);
       hSpreadMethod:          SpreadMethod_Attrib(self, value);
       hstdDeviation:          StdDev_Attrib(self, value);
+      hStartOffset:           StartOffset_Attrib(self, value);
       hStop_045_Color:        StopColor_Attrib(self, value);
       hStop_045_Opacity:      StopOpacity_Attrib(self, value);
       hStroke:                Stroke_Attrib(self, value);
