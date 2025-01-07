@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.7                                                             *
-* Date      :  7 January 2025                                                  *
+* Date      :  8 January 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -388,6 +388,9 @@ type
   end;
 
   TTextPathElement = class(TTextSubElement)
+  private
+    pathEl: TPathElement;
+    scale: double;
   protected
     pathName  : UTF8String; //name (id) of path element
     procedure GetPathsInternal(el: TBaseElement; const drawDat: TDrawData);
@@ -3584,12 +3587,10 @@ procedure TTextPathElement.GetPathsInternal(el: TBaseElement;
 var
   i, len        : integer;
   charsThatFit  : integer;
-  d, outX       : double;
-  fontScale     : double;
   spacing       : double;
+  textWidth     : double;
+  outX          : double;
   spanEl        : TTSpanElement;
-  spanEl2       : TTSpanElement;
-  pathEl        : TPathElement;
   dd            : TDrawData;
   unicodeText   : UnicodeString;
   pathDist      : double;
@@ -3601,12 +3602,18 @@ begin
   if not (el is TTSpanElement) then Exit;
   spanEl := TTSpanElement(el);
   if Assigned(spanEl.drawPathsC) then Exit;
+  spanEl.pathsLoaded := true;
 
   dd := drawDat;
   UpdateDrawInfo(dd, el);
   UpdateFontInfo(dd, el);
 
-  spanEl.pathsLoaded := true;
+  if spanEl.offset.X.IsValid then
+    textEl.currentPt.X := Max(0, textEl.currentPt.X +
+      Round(spanEl.offset.X.rawVal / scale));
+  if spanEl.offset.Y.IsValid then
+    textEl.currentPt.Y := textEl.currentPt.Y +
+      Round(spanEl.offset.Y.rawVal / scale);
 
   if spanEl.fXmlEl.text = '' then
   begin
@@ -3615,6 +3622,10 @@ begin
       GetPathsInternal(spanEl.Child[i], dd);
     Exit;
   end;
+
+  // nb: <tspan> elements that own text will always be pseudo <tspan> elements.
+  // Pseudo <tspan> elements have been created inside real <tspan> elements to
+  // provide a reliable way to manage text mixed with nested <tspan> elements.
 
   //trim CRLFs and multiple spaces
   {$IFDEF UNICODE}
@@ -3626,66 +3637,34 @@ begin
     unicodeText := TrimMultiSpacesUnicode(unicodeText) else
     unicodeText := StripNewlines(unicodeText);
 
-  el := FindRefElement(pathName);
-  if not (el is TPathElement) then Exit;
-  pathEl := TPathElement(el);
-  fSvgReader.GetBestFont(dd.FontInfo);
-  fontScale := dd.FontInfo.size/fSvgReader.fFontCache.FontHeight;
-  spacing := dd.FontInfo.spacing /fontScale;
-  // nb: <tspan> elements that own text will always be pseudo <tspan> elements.
-  // Pseudo <tspan> elements have been created inside real <tspan> elements to
-  // provide a reliable way to manage text mixed with nested <tspan> elements.
-
-  if offset.X.IsValid then
-    textEl.currentPt.X := Max(0,
-      textEl.currentPt.X + Round(offset.X.rawVal / fontScale));
-
-  if spanEl.fParent is TTSpanElement then
-  begin
-    spanEl2 := TTSpanElement(spanEl.fParent);
-    if spanEl2.offset.X.IsValid then
-        textEl.currentPt.X := Max(0, textEl.currentPt.X +
-          Round(spanEl2.offset.X.rawVal / fontScale));
-    if spanEl2.offset.Y.IsValid then
-        textEl.currentPt.Y := textEl.currentPt.Y +
-          Round(spanEl2.offset.Y.rawVal / fontScale);
-  end else if spanEl.offset.Y.IsValid then
-  begin
-    if spanEl.offset.X.IsValid then
-      textEl.currentPt.X := Max(0, textEl.currentPt.X +
-        Round(spanEl.offset.X.rawVal / fontScale));
-    if spanEl.offset.Y.IsValid then
-      textEl.currentPt.Y := textEl.currentPt.Y +
-        Round(spanEl.offset.Y.rawVal / fontScale);
-  end;
-
   //adjust glyph spacing when fFontInfo.textLength is assigned.
+  spacing := dd.FontInfo.spacing /scale;
   len := Length(unicodeText);
   if (len < 2) then spacing := 0
   else if (dd.FontInfo.align = staJustify) and
     (pathEl.fsvgPaths.count = 1) then
     with TPathElement(pathEl) do
     begin
-      Flatten(0, fontScale, tmpPath, isClosed);
+      Flatten(0, scale, tmpPath, isClosed);
       pathDist := GetPathDistance(tmpPath);
-      d := fSvgReader.fFontCache.GetTextWidth(unicodeText);
-      spacing := (pathDist/fontScale) - d;
+      textWidth := fSvgReader.fFontCache.GetTextWidth(unicodeText);
+      spacing := (pathDist/scale) - textWidth;
       spacing := spacing / (len -1);
     end
   else if (dd.FontInfo.textLength > 0) then
   begin
-    d := fSvgReader.fFontCache.GetTextWidth(unicodeText);
-    spacing := (dd.FontInfo.textLength/fontScale) - d;
+    textWidth := fSvgReader.fFontCache.GetTextWidth(unicodeText);
+    spacing := (dd.FontInfo.textLength/scale) - textWidth;
     spacing := spacing / (len -1);
   end;
 
   with pathEl do
   begin
     mat := fDrawData.matrix;
-    MatrixScale(mat, 1/fontScale);
+    MatrixScale(mat, 1/scale);
     for i := 0 to fSvgPaths.Count -1 do
     begin
-      Flatten(i, fontScale, tmpPath, isClosed);
+      Flatten(i, scale, tmpPath, isClosed);
       //'path' is temporarily scaled to accommodate fReader.fFontCache's
       //static fontheight. The returned glyphs will be de-scaled later.
       MatrixApply(mat, tmpPath);
@@ -3699,7 +3678,7 @@ begin
       textEl.currentPt := NullPointD;
     end;
   end;
-  spanEl.drawPathsC := ScalePath(spanEl.drawPathsC, fontScale);
+  spanEl.drawPathsC := ScalePath(spanEl.drawPathsC, scale);
 
   for i := 0 to spanEl.ChildCount -1 do
     GetPathsInternal(spanEl.Child[i], dd);
@@ -3709,11 +3688,28 @@ end;
 procedure TTextPathElement.GetPaths(const drawDat: TDrawData);
 var
   i: integer;
+  dd: TDrawData;
+  el: TBaseElement;
 begin
   if pathsLoaded or not Assigned(fSvgReader.fFontCache) then Exit;
   pathsLoaded := true;
   GetTextEl;
   if not Assigned(textEl) then Exit;
+
+  dd := drawDat;
+  UpdateDrawInfo(dd, self);
+  UpdateFontInfo(dd, self);
+
+  el := FindRefElement(pathName);
+  if not (el is TPathElement) then Exit;
+  pathEl := TPathElement(el);
+  fSvgReader.GetBestFont(dd.FontInfo);
+  scale := dd.FontInfo.size/fSvgReader.fFontCache.FontHeight;
+
+  if offset.X.IsValid then
+    textEl.currentPt.X := Max(0,
+      textEl.currentPt.X + Round(offset.X.rawVal / scale));
+
   // nb: recursive
   for i := 0 to ChildCount -1 do
     GetPathsInternal(Child[i], drawDat);
