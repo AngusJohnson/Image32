@@ -3,7 +3,7 @@ unit Img32.Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.7                                                             *
-* Date      :  6 January 2025                                                  *
+* Date      :  8 January 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -3266,6 +3266,7 @@ begin
     while (currentPathIdx < pathLenMin1) and
       (cummDists[currentPathIdx +1] < glyphCenterOnPath) do
         inc(currentPathIdx);
+    if currentPathIdx = pathLenMin1 then Dec(currentPathIdx);
     unitVector := GetUnitVector(path[currentPathIdx], path[currentPathIdx +1]);
     tmpPaths := RotatePath(glyph.paths,
       PointD(glyphCenterX, -y), GetAngle(NullPointD, unitVector));
