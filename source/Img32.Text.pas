@@ -3099,8 +3099,20 @@ var
   glyphs: TPathsD;
   dx,dy: double;
   rec2: TRectD;
+  chunkedText: TChunkedText;
 begin
   if (text = '') or not assigned(font) or not font.IsValidFont then Exit;
+  if align = taJustify then
+  begin
+    chunkedText := TChunkedText.Create(text, font, textColor);
+    try
+      chunkedText.DrawText( image, Rect(rec), taJustify, valign, 0);
+    finally
+      chunkedText.Free;
+    end;
+    Exit;
+  end;
+
   glyphs := font.GetTextOutline(0,0, text);
   rec2 := GetBoundsD(glyphs);
   case align of
