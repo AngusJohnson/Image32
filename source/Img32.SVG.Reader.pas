@@ -3708,7 +3708,11 @@ begin
 
   if offset.X.IsValid then
     textEl.currentPt.X := Max(0,
-      textEl.currentPt.X + Round(offset.X.rawVal / scale));
+      textEl.currentPt.X +
+      Round(offset.X.GetValue(dd.bounds.Width, 1) / scale));
+  if offset.Y.IsValid then
+    textEl.currentPt.Y :=
+      textEl.currentPt.Y + Round(offset.Y.rawVal / scale);
 
   // nb: recursive
   for i := 0 to ChildCount -1 do

@@ -298,7 +298,7 @@ type
   PGlyphInfo = ^TGlyphInfo;
   //TGlyphInfo: another custom record
   TGlyphInfo = record
-    unicode    : integer;
+    codepoint  : integer;
     glyphIdx   : WORD;
     unitsPerEm : integer;
     glyf       : TFontTable_Glyf;
@@ -427,7 +427,7 @@ type
     procedure AddRecipient(recipient: INotifyRecipient);
     procedure DeleteRecipient(recipient: INotifyRecipient);
     function IsValidFontFormat: Boolean;
-    function HasGlyph(unicode: Cardinal): Boolean;
+    function HasGlyph(codepoint: Cardinal): Boolean;
     function LoadFromStream(stream: TStream): Boolean;
     function LoadFromResource(const resName: string; resType: PChar): Boolean;
     function LoadFromFile(const filename: string): Boolean;
@@ -436,7 +436,7 @@ type
     function Load(const logFont: TLogFont): Boolean; overload;
     function LoadUsingFontHdl(hdl: HFont): Boolean;
 {$ENDIF}
-    function GetGlyphInfo(unicode: Cardinal;
+    function GetGlyphInfo(codepoint: Cardinal;
       out nextX: integer; out glyphInfo: TGlyphInfo): Boolean;
     property FontFamily: TFontFamily read fFontInfo.family;
     property FontInfo: TFontInfo read GetFontInfo;
@@ -549,7 +549,7 @@ type
     fStrikeOut         : Boolean;
     procedure NotifyRecipients(notifyFlag: TImg32Notification);
     function FoundInList(charOrdinal: Cardinal): Boolean;
-    function AddGlyph(unicode: Cardinal): PGlyphInfo;
+    function AddGlyph(codepoint: Cardinal): PGlyphInfo;
     procedure VerticalFlip(var paths: TPathsD);
     procedure SetFlipVert(value: Boolean);
     procedure SetFontHeight(newHeight: double);
@@ -577,7 +577,7 @@ type
     procedure ReceiveNotification(Sender: TObject; notify: TImg32Notification);
     procedure AddRecipient(recipient: INotifyRecipient);
     procedure DeleteRecipient(recipient: INotifyRecipient);
-    function GetCharInfo(charOrdinal: Cardinal): PGlyphInfo;
+    function GetGlyphInfo(codepoint: Cardinal): PGlyphInfo;
 
     function GetTextOutline(x, y: double; const text: UnicodeString): TPathsD; overload;
     function GetTextOutline(const rec: TRectD; const text: UnicodeString;
@@ -586,7 +586,7 @@ type
       out nextX: double; underlineIdx: integer = 0): TPathsD; overload;
 
     function GetVerticalTextOutline(x, y: double;
-      const text: UnicodeString; interCharSpace: double = 0.0): TPathsD;
+      const text: UnicodeString; lineHeight: double = 0.0): TPathsD;
 
     function GetAngledTextGlyphs(x, y: double; const text: UnicodeString;
       angleRadians: double; const rotatePt: TPointD;
@@ -630,10 +630,9 @@ type
   const text: UnicodeString; font: TFontCache;
   textColor: TColor32 = clBlack32): TPointD;
 
-  function DrawVerticalText(image: TImage32;
-    x, y, interCharSpace: double;
-    const text: UnicodeString; font: TFontCache;
-    textColor: TColor32 = clBlack32): double;
+  procedure DrawVerticalText(image: TImage32;
+    x, y: double; const text: UnicodeString; font: TFontCache;
+    lineHeight: double = 0.0; textColor: TColor32 = clBlack32);
 
   function GetTextOutlineOnPath(const text: UnicodeString;
     const path: TPathD; font: TFontCache; textAlign: TTextAlign;
@@ -2061,9 +2060,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFontReader.HasGlyph(unicode: Cardinal): Boolean;
+function TFontReader.HasGlyph(codepoint: Cardinal): Boolean;
 begin
-  Result := GetGlyphIdxUsingCmap(unicode) > 0;
+  Result := GetGlyphIdxUsingCmap(codepoint) > 0;
 end;
 //------------------------------------------------------------------------------
 
@@ -2096,18 +2095,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFontReader.GetGlyphInfo(unicode: Cardinal;
+function TFontReader.GetGlyphInfo(codepoint: Cardinal;
   out nextX: integer; out glyphInfo: TGlyphInfo): Boolean;
 var
   glyphIdx: WORD;
 begin
   Result := IsValidFontFormat;
   if not Result then Exit;
-  glyphIdx := GetGlyphIdxUsingCmap(unicode);
+  glyphIdx := GetGlyphIdxUsingCmap(codepoint);
   glyphInfo := GetGlyphInfoInternal(glyphIdx);
   glyphInfo.hmtx := GetGlyphHorzMetrics(glyphIdx);
   nextX   := glyphInfo.hmtx.advanceWidth;
-  glyphInfo.unicode := unicode;
+  glyphInfo.codepoint := codepoint;
 end;
 //------------------------------------------------------------------------------
 
@@ -2352,7 +2351,7 @@ begin
   while l <= r do
   begin
     Result := (l + r) shr 1;
-    i := integer(PGlyphInfo(glyphList[Result]).unicode) - integer(charOrdinal);
+    i := integer(PGlyphInfo(glyphList[Result]).codepoint) - integer(charOrdinal);
     if i < 0 then
     begin
       l := Result +1
@@ -2428,8 +2427,8 @@ var
   minY, maxY: double;
 begin
   //nb: non-inverted Y coordinates.
-  maxY := GetCharInfo(ord('Y')).glyf.yMax;
-  minY := GetCharInfo(ord('y')).glyf.yMin;
+  maxY := GetGlyphInfo(ord('Y')).glyf.yMax;
+  minY := GetGlyphInfo(ord('y')).glyf.yMin;
   Result := (maxY - minY) * fScale;
 end;
 //------------------------------------------------------------------------------
@@ -2467,18 +2466,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFontCache.GetCharInfo(charOrdinal: Cardinal): PGlyphInfo;
+function TFontCache.GetGlyphInfo(codepoint: Cardinal): PGlyphInfo;
 var
   listIdx: integer;
 begin
   Result := nil;
+  if not IsValidFont then Exit;
   if not fSorted then Sort;
-  listIdx := FindInSortedList(charOrdinal, fGlyphInfoList);
+  listIdx := FindInSortedList(codepoint, fGlyphInfoList);
   if listIdx < 0 then
-  begin
-    if not IsValidFont then Exit;
-    Result := AddGlyph(Ord(charOrdinal));
-  end else
+    Result := AddGlyph(codepoint) else
     Result := PGlyphInfo(fGlyphInfoList[listIdx]);
 end;
 //------------------------------------------------------------------------------
@@ -2546,7 +2543,7 @@ begin
   prevGlyphKernList := nil;
   for i := 0 to High(codePoints) do
   begin
-    glyphInfo := GetCharInfo(codePoints[i]);
+    glyphInfo := GetGlyphInfo(codePoints[i]);
     if not assigned(glyphInfo) then Break;
     if fUseKerning and assigned(prevGlyphKernList) then
     begin
@@ -2589,7 +2586,7 @@ end;
 
 function TFontCache.GetSpaceWidth: double;
 begin
-  Result := GetCharInfo(32).hmtx.advanceWidth * fScale;
+  Result := GetGlyphInfo(32).hmtx.advanceWidth * fScale;
 end;
 //------------------------------------------------------------------------------
 
@@ -2679,38 +2676,40 @@ end;
 //------------------------------------------------------------------------------
 
 function TFontCache.GetVerticalTextOutline(x, y: double;
-  const text: UnicodeString; interCharSpace: double): TPathsD;
+  const text: UnicodeString; lineHeight: double): TPathsD;
 var
-  i, xxMax: integer;
+  i, cnt, xxMax: integer;
   glyphInfo: PGlyphInfo;
-  dx, dy: double;
+  dx: double;
+  codePoints: TArrayOfCardinal;
+  glyphInfos: array of PGlyphInfo;
 begin
   Result := nil;
   if not IsValidFont then Exit;
 
+  codePoints := GetTextCodePoints(text);
   xxMax := 0;
-  for i := 1 to Length(text) do
+  cnt := Length(codePoints);
+  SetLength(glyphInfos, cnt);
+  for i := 0 to cnt -1 do
   begin
-    glyphInfo := GetCharInfo(ord(text[i]));
-    if not assigned(glyphInfo) then Exit;
-    with glyphInfo.glyf do
+    glyphInfos[i] := GetGlyphInfo(codePoints[i]);
+    if not assigned(glyphInfos[i]) then Exit;
+    with glyphInfos[i].glyf do
       if xMax > xxMax then
          xxMax := xMax;
   end;
 
-  for i := 1 to Length(text) do
+  if lineHeight = 0.0 then
+    lineHeight := self.LineHeight;
+
+  for i := 0 to cnt -1 do
   begin
-    glyphInfo := GetCharInfo(ord(text[i]));
+    glyphInfo := glyphInfos[i];
     with glyphInfo.glyf do
-    begin
       dx :=  (xxMax - xMax) * 0.5 * scale;
-      y := y + yMax  * scale; //yMax = char ascent
-      dy := - yMin * scale;   //yMin = char descent
-    end;
     AppendPath(Result, TranslatePath(glyphInfo.paths, x + dx, y));
-    if text[i] = SPACE then
-      y := y + dy - interCharSpace else
-      y := y + dy + interCharSpace;
+    y := y + lineHeight;
   end;
   UpdateFontReaderLastUsedTime;
 end;
@@ -2738,7 +2737,7 @@ begin
   for i := 0 to len -1 do
   begin
     offsets[i] := nextX;
-    glyphInfo := GetCharInfo(codepoints[i]);
+    glyphInfo := GetGlyphInfo(codepoints[i]);
     if not assigned(glyphInfo) then Break;
     if fUseKerning and assigned(prevGlyphKernList) then
     begin
@@ -2867,7 +2866,7 @@ end;
 
 function GlyphSorter(glyph1, glyph2: pointer): integer;
 begin
-  Result := PGlyphInfo(glyph1).unicode - PGlyphInfo(glyph2).unicode;
+  Result := PGlyphInfo(glyph1).codepoint - PGlyphInfo(glyph2).codepoint;
 end;
 //------------------------------------------------------------------------------
 
@@ -2877,7 +2876,7 @@ begin
   fGlyphInfoList.Sort(TComparer<PGlyphInfo>.Construct(
     function (const glyph1, glyph2: PGlyphInfo): integer
     begin
-      Result := glyph1.unicode - glyph2.unicode;
+      Result := glyph1.codepoint - glyph2.codepoint;
     end));
 {$ELSE}
   fGlyphInfoList.Sort(GlyphSorter);
@@ -2886,7 +2885,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TFontCache.AddGlyph(unicode: Cardinal): PGlyphInfo;
+function TFontCache.AddGlyph(codepoint: Cardinal): PGlyphInfo;
 var
   dummy: integer;
   altFontReader: TFontReader;
@@ -2897,16 +2896,16 @@ const
 begin
 
   New(Result);
-  Result.unicode := unicode;
-  if not fFontReader.GetGlyphInfo(unicode, dummy, Result^) or
+  Result.codepoint := codepoint;
+  if not fFontReader.GetGlyphInfo(codepoint, dummy, Result^) or
     (Result.glyphIdx = 0) then
   begin
     // to get here the unicode char is not supported by fFontReader
     altFontReader :=
-      aFontManager.FindReaderContainingGlyph(unicode, tfUnknown, glyphIdx);
+      aFontManager.FindReaderContainingGlyph(codepoint, tfUnknown, glyphIdx);
     if Assigned(altFontReader) then
     begin
-      altFontReader.GetGlyphInfo(unicode, dummy, Result^);
+      altFontReader.GetGlyphInfo(codepoint, dummy, Result^);
       altFontReader.LastUsedTime := now;
       scale := fFontReader.FontInfo.unitsPerEm / altFontReader.FontInfo.unitsPerEm;
       if scale <> 1.0 then
@@ -3150,53 +3149,23 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DrawVerticalText(image: TImage32; x, y, interCharSpace: double;
+procedure DrawVerticalText(image: TImage32; x, y: double;
   const text: UnicodeString; font: TFontCache;
-  textColor: TColor32 = clBlack32): double;
+  lineHeight: double; textColor: TColor32);
 var
-  i, xxMax: integer;
   glyphs: TPathsD;
-  glyphInfo: PGlyphInfo;
-  dx, dy, scale: double;
   cr: TCustomRenderer;
 begin
-  Result := y;
   if not assigned(font) or not font.IsValidFont or (text = '') then Exit;
-
-  xxMax := 0;
-  for i := 1 to Length(text) do
-  begin
-    glyphInfo := font.GetCharInfo(ord(text[i]));
-    if not assigned(glyphInfo) then Exit;
-    with glyphInfo.glyf do
-      if xMax > xxMax then
-         xxMax := xMax;
-  end;
-
+  glyphs := font.GetVerticalTextOutline(x,y, text, lineHeight);
   if image.AntiAliased then
     cr := TColorRenderer.Create(textColor) else
     cr := TAliasedColorRenderer.Create(textColor);
   try
-    scale := font.Scale;
-    for i := 1 to Length(text) do
-    begin
-      glyphInfo := font.GetCharInfo(ord(text[i]));
-      with glyphInfo.glyf do
-      begin
-        dx :=  (xxMax - xMax) * 0.5 * scale;
-        y := y + yMax  * scale; //yMax = char ascent
-        dy := - yMin * scale;   //yMin = char descent
-      end;
-      glyphs := TranslatePath( glyphInfo.paths, x + dx, y);
-      DrawPolygon(image, glyphs, frNonZero, cr);
-      if text[i] = SPACE then
-        y := y + dy - interCharSpace else
-        y := y + dy + interCharSpace;
-    end;
+    DrawPolygon(image, glyphs, frNonZero, cr);
   finally
     cr.Free;
   end;
-  Result := y;
 end;
 //------------------------------------------------------------------------------
 
@@ -3258,15 +3227,19 @@ begin
   currentPathIdx := 0;
   for i := 1 to charsThatFit do
   begin
-    glyph :=  font.GetCharInfo(Ord(text[i]));
+    glyph :=  font.GetGlyphInfo(Ord(text[i]));
     with glyph^ do
       glyphCenterX := (glyf.xMax - glyf.xMin) * font.Scale * 0.5;
     glyphCenterOnPath := x + glyphCenterX;
-    x := x + glyph.hmtx.advanceWidth * font.Scale + charSpacing;
     while (currentPathIdx < pathLenMin1) and
       (cummDists[currentPathIdx +1] < glyphCenterOnPath) do
         inc(currentPathIdx);
-    if currentPathIdx = pathLenMin1 then Dec(currentPathIdx);
+    if currentPathIdx = pathLenMin1 then
+    begin
+      charsThatFit := i; // nb 1 base vs 0 base :)
+      Break;
+    end;
+    x := x + glyph.hmtx.advanceWidth * font.Scale + charSpacing;
     unitVector := GetUnitVector(path[currentPathIdx], path[currentPathIdx +1]);
     tmpPaths := RotatePath(glyph.paths,
       PointD(glyphCenterX, -y), GetAngle(NullPointD, unitVector));
