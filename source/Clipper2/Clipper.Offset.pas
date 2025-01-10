@@ -2,7 +2,7 @@ unit Clipper.Offset;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Date      :  12 August 2024                                                  *
+* Date      :  22 November 2024                                                *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2024                                         *
 * Purpose   :  Path Offset (Inflate/Shrink)                                    *
@@ -997,15 +997,11 @@ begin
     // (ie over-shrunk paths) are removed.
 {$IFDEF USINGZ}
     AddPoint(GetPerpendic(fInPath[j], fNorms[k], fGroupDelta), fInPath[j].Z);
-{$ELSE}
-    AddPoint(GetPerpendic(fInPath[j], fNorms[k], fGroupDelta));
-{$ENDIF}
-    // when the angle is almost flat (cos_a ~= 1),
-    // it's safe to skip inserting this middle point
-		if (cosA < 0.999) then AddPoint(fInPath[j]); // (#405, #873)
-{$IFDEF USINGZ}
+    AddPoint(fInPath[j]); // (#405, #873)
     AddPoint(GetPerpendic(fInPath[j], fNorms[j], fGroupDelta), fInPath[j].Z);
 {$ELSE}
+    AddPoint(GetPerpendic(fInPath[j], fNorms[k], fGroupDelta));
+    AddPoint(fInPath[j]); // (#405, #873)
     AddPoint(GetPerpendic(fInPath[j], fNorms[j], fGroupDelta));
 {$ENDIF}
   end

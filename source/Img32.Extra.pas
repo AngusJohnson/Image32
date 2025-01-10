@@ -2,8 +2,8 @@ unit Img32.Extra;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.7                                                             *
-* Date      :  6 January 2025                                                  *
+* Version   :  4.8                                                             *
+* Date      :  10 January 2025                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  Miscellaneous routines that don't belong in other modules.      *
@@ -651,14 +651,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure InternHatchBackground(img: TImage32; const rec: TRect;
+procedure InternalHatchBackground(img: TImage32; const rec: TRect;
   color1, color2: TColor32; hatchSize: Integer = 10);
 var
   i, j, imgWidth: Integer;
   pc: PColor32;
   colors: array[boolean] of TColor32;
   hatch: Boolean;
-  c: TColor32;
   x: integer;
 begin
   colors[false] := color1;
@@ -674,10 +673,10 @@ begin
     if x = 0 then hatch := not hatch;
     for j := rec.Left to rec.Right -1 do
     begin
-      c := pc^;
-      if c = 0 then
-        pc^ := colors[hatch] else
-        pc^ := BlendToOpaque(c, colors[hatch]);
+      if pc^ = 0 then
+        pc^ := colors[hatch]
+      else if GetAlpha(pc^) < 196 then
+        pc^ := BlendToOpaque(colors[hatch], pc^);
       inc(pc);
       inc(x);
       if x >= hatchSize then
@@ -697,7 +696,7 @@ begin
   if (rec.Right <= rec.Left) or (rec.Bottom - rec.Top <= 0) then Exit;
   img.BeginUpdate;
   try
-    InternHatchBackground(img, rec, color1, color2, hatchSize);
+    InternalHatchBackground(img, rec, color1, color2, hatchSize);
   finally
     img.EndUpdate;
   end;
@@ -2330,16 +2329,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-type
-  {$IFDEF SUPPORTS_POINTERMATH}
-    {$POINTERMATH ON}
-  PStaticColor32Array = ^TColor32;
-    {$POINTERMATH OFF}
-  {$ELSE} // Delphi 7-2007
-  PStaticColor32Array = ^TStaticColor32Array;
-  TStaticColor32Array = array[0..MaxInt div SizeOf(TColor32) - 1] of TColor32;
-  {$ENDIF}
-
 procedure BoxBlurHLine(src, dst: PColor32; srcRiOffset: nativeint;
   count, w: integer; dstLast: PColor32; var v: TWeightedColor);
 var
@@ -2364,7 +2353,7 @@ begin
   begin
     while count > 0 do
     begin
-      if val.AddSubtract(PStaticColor32Array(s)[srcRiOffset], s^) then
+      if val.AddSubtract(PColor32Array(s)[srcRiOffset], s^) then
         lastColor := val.Color;
       inc(s);
       d^ := lastColor;
@@ -2482,7 +2471,7 @@ begin
   begin
     while count > 0 do
     begin
-      if val.AddSubtract(PStaticColor32Array(s)[srcRiOffset], s^) then
+      if val.AddSubtract(PColor32Array(s)[srcRiOffset], s^) then
         lastColor := val.Color;
       inc(PByte(s), widthBytes);
       d^ := lastColor;

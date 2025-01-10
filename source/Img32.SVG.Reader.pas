@@ -2,8 +2,8 @@ unit Img32.SVG.Reader;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.7                                                             *
-* Date      :  8 January 2025                                                  *
+* Version   :  4.8                                                             *
+* Date      :  10 January 2025                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -2874,12 +2874,17 @@ procedure TShapeElement.DrawFilled(img: TImage32;
 var
   refEl: TBaseElement;
   rec: TRect;
+  opacity: Byte;
 begin
   if not assigned(paths) then Exit;
   if drawDat.fillColor = clCurrent then
     drawDat.fillColor := fSvgReader.currentColor;
   if drawDat.fillRule = frNegative then
     drawDat.fillRule := frNonZero;
+
+  if not IsValid(drawDat.fillOpacity) then
+    opacity := 255 else
+    opacity := ClampByte(drawDat.fillOpacity * 255);
 
   if (drawDat.fillEl <> '') then
   begin
@@ -2888,15 +2893,21 @@ begin
     begin
       if refEl is TRadGradElement then
       begin
-        with TRadGradElement(refEl), fSvgReader do
-          if PrepareRenderer(RadGradRenderer, drawDat) then
-            DrawPolygon(img, paths, drawDat.fillRule, RadGradRenderer);
+        with TRadGradElement(refEl) do
+        begin
+          fSvgReader.RadGradRenderer.Opacity := opacity;
+          if PrepareRenderer(fSvgReader.RadGradRenderer, drawDat) then
+            DrawPolygon(img, paths, drawDat.fillRule, fSvgReader.RadGradRenderer);
+        end;
       end
       else if refEl is TLinGradElement then
       begin
-        with TLinGradElement(refEl), fSvgReader do
-          if PrepareRenderer(LinGradRenderer, drawDat) then
-            DrawPolygon(img, paths, drawDat.fillRule, LinGradRenderer);
+        with TLinGradElement(refEl) do
+        begin
+          fSvgReader.LinGradRenderer.Opacity := opacity;
+          if PrepareRenderer(fSvgReader.LinGradRenderer, drawDat) then
+            DrawPolygon(img, paths, drawDat.fillRule, fSvgReader.LinGradRenderer);
+        end;
       end
       else if refEl is TPatternElement then
       begin
@@ -2940,6 +2951,7 @@ var
   joinStyle: TJoinStyle;
   bounds: TRectD;
   paths2: TPathsD;
+  opacity: Byte;
 begin
   if not Assigned(paths) then Exit;
   MatrixExtractScale(drawDat.matrix, scale);
@@ -2967,6 +2979,10 @@ begin
 
   with drawDat do
     strokeClr := MergeColorAndOpacity(strokeColor, strokeOpacity);
+
+  if not IsValid(drawDat.strokeOpacity) then
+    opacity := 255 else
+    opacity := ClampByte(drawDat.strokeOpacity * 255);
 
   if isClosed then
   begin
@@ -3016,25 +3032,33 @@ begin
     if refEl is TRadGradElement then
     begin
       with TRadGradElement(refEl) do
+      begin
+        fSvgReader.RadGradRenderer.Opacity := opacity;
         PrepareRenderer(fSvgReader.RadGradRenderer, drawDat);
+      end;
       DrawPolygon(img, strokePaths, frNonZero, fSvgReader.RadGradRenderer);
     end
     else if refEl is TLinGradElement then
     begin
       with TLinGradElement(refEl) do
+      begin
+        fSvgReader.LinGradRenderer.Opacity := opacity;
         PrepareRenderer(fSvgReader.LinGradRenderer, drawDat);
+      end;
       DrawPolygon(img, strokePaths, frNonZero, fSvgReader.LinGradRenderer);
     end
     else if refEl is TPatternElement then
       with TPatternElement(refEl) do
       begin
+        imgRenderer.Opacity := opacity;
         PrepareRenderer(imgRenderer, drawDat);
         DrawLine(img, strokePaths,  1, imgRenderer, esPolygon, joinStyle, scale);
         DrawPolygon(img, strokePaths, frNonZero, imgRenderer);
       end;
   end else
   begin
-    DrawPolygon(img, strokePaths, frNonZero, strokeClr, fSvgReader.fCustomRendererCache);
+    DrawPolygon(img, strokePaths,
+      frNonZero, strokeClr, fSvgReader.fCustomRendererCache);
   end;
 end;
 
@@ -3631,7 +3655,7 @@ begin
   {$IFDEF UNICODE}
   unicodeText := UTF8ToUnicodeString(HtmlDecode(spanEl.fXmlEl.text));
   {$ELSE}
-  unicodeText := UnicodeString(Utf8Decode(HtmlDecode(spanEl.text)));
+  unicodeText := UnicodeString(Utf8Decode(HtmlDecode(spanEl.fXmlEl.text)));
   {$ENDIF}
   if dd.fontInfo.spacesInText <> sitPreserve then
     unicodeText := TrimMultiSpacesUnicode(unicodeText) else

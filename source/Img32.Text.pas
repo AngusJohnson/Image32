@@ -2,8 +2,8 @@ unit Img32.Text;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.7                                                             *
-* Date      :  8 January 2025                                                  *
+* Version   :  4.8                                                             *
+* Date      :  10 January 2025                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -699,25 +699,24 @@ procedure GetMeaningfulDateTime(const secsSince1904: Uint64;
   out yy,mo,dd, hh,mi,ss: cardinal);
 const
   dayInYrAtMthStart: array[boolean, 0..12] of cardinal =
-    ((0,31,59,90,120,151,181,212,243,273,304,334,365), // non-leap year
-    (0,31,60,91,121,152,182,213,244,274,305,335,366)); // leap year
+    ((0,31,59,90,120,151,181,212,243,273,304,334,365),  // non-leap year
+    (0,31,60,91,121,152,182,213,244,274,305,335,366));  // leap year
 var
   isLeapYr: Boolean;
 const
-  january       = 1;
   maxValidYear  = 2100;
   secsPerHour   = 3600;
   secsPerDay    = 86400;
   secsPerNormYr = 31536000;
   secsPerLeapYr = secsPerNormYr + secsPerDay;
-  secsPer4Years = secsPerNormYr * 3 + secsPerLeapYr; //126230400;
+  secsPer4Years = secsPerNormYr * 3 + secsPerLeapYr;    // 126230400;
 begin
   // Leap years are divisble by 4, except for centuries which are not
   // leap years unless they are divisble by 400. (Hence 2000 was a leap year,
   // but 1900 was not. But 1904 was a leap year because it's divisble by 4.)
   // Validate at http://www.mathcats.com/explore/elapsedtime.html
 
-  ss := (secsSince1904 div secsPer4Years);       // count '4years' since 1904
+  ss := (secsSince1904 div secsPer4Years);    // count '4years' since 1904
 
   // manage invalid dates
   if (secsSince1904 = 0) or
@@ -729,20 +728,20 @@ begin
   end;
   yy := 1904 + (ss * 4);
 
-  ss := secsSince1904 mod secsPer4Years;         // secs since last leap yr
+  ss := secsSince1904 mod secsPer4Years;      // secs since last leap yr
   isLeapYr := ss < secsPerLeapYr;
   if not isLeapYr then
   begin
     dec(ss, secsPerLeapYr);
     yy := yy + (ss div secsPerNormYr) + 1;
-    ss := ss mod secsPerNormYr;                  // remaining secs in final year
+    ss := ss mod secsPerNormYr;               // remaining secs in final year
   end;
-  dd := 1 + ss div secsPerDay;                   // day number in final year
-  mo := january; // 1
+  dd := 1 + ss div secsPerDay;                // day number in final year
+  mo := 1;                                    // 1, because mo is base 1
   while dayInYrAtMthStart[isLeapYr, mo] < dd do inc(mo);
   // remaining secs in month
   ss := ss - (dayInYrAtMthStart[isLeapYr, mo -1] * secsPerDay);
-  dd := 1 + (ss div secsPerDay);
+  dd := 1 + (ss div secsPerDay);              // because dd is base 1 too
   ss := ss mod secsPerDay;
   hh := ss div secsPerHour;
   ss := ss mod secsPerHour;
@@ -2650,20 +2649,16 @@ end;
 function TFontCache.GetTextOutline(const rec: TRectD; const text: UnicodeString;
   ta: TTextAlign; tav: TTextVAlign; underlineIdx: integer): TPathsD;
 var
-  i, highI, j: integer;
   dummy2, dx, dy: double;
   arrayOfGlyphs: TArrayOfPathsD;
   dummy1: TArrayOfDouble;
-  resultCount: integer;
   rec2: TRectD;
 begin
   Result := nil;
   if not GetTextOutlineInternal(0, 0, text, underlineIdx,
     arrayOfGlyphs, dummy1, dummy2) or (arrayOfGlyphs = nil) then Exit;
 
-  highI := High(arrayOfGlyphs);
   rec2 := GetBoundsD(arrayOfGlyphs);
-
   case ta of
     taRight: dx := rec.Right - rec2.Width;
     taCenter: dx := rec.Left + (rec.Width - rec2.Width)/ 2;
@@ -3640,8 +3635,9 @@ begin
   currentChunkIdx := startingChunk;
   chunkIdxAtStartOfLine := startingChunk;
   currentX := 0;
+  linesOverflow := false;
 
-  pageHeight := pageHeight - GetChunk(currentChunkIdx).ascent;
+  pageHeight := pageHeight - lineHeight;
   cummulativeHeight := 0;
 
   while not linesOverflow and (currentChunkIdx < Count) do
