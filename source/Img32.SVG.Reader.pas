@@ -359,14 +359,15 @@ type
 
   TTSpanElement = class;
 
-  // TTextElement: although this is a TShapeElement descendant, it's really
-  // only a container for <tspan> and <textpath> elements. (See Draw method.)
+  // TTextElement: although a TShapeElement descendant, it's really just
+  // a container for other TShapeElements (<tspan>, <textpath> etc).
   TTextElement = class(TShapeElement)
   protected
     offset      : TValuePt;
     textDx      : double;
+    angle       : TArrayOfDouble;
     currentPt   : TPointD;
-    currSpanEl  : TTSpanElement;
+    currSpanEl  : TTSpanElement; //the current 'real' <tspan>
     procedure Draw(img: TImage32; drawDat: TDrawData); override;
   public
     constructor Create(parent: TBaseElement; svgEl: TSvgXmlEl); override;
@@ -374,14 +375,15 @@ type
 
   TTextSubElement = class(TShapeElement)
   protected
-    offset    : TValuePt;
-    textEl    : TTextElement;
+    offset      : TValuePt;
+    textEl      : TTextElement;
     function GetTextEl: TTextElement;
   end;
 
   TTSpanElement = class(TTextSubElement)
   protected
-    chunkDx   : double;
+    chunkDx     : double;
+    angle       : TArrayOfDouble;
     procedure GetPaths(const drawDat: TDrawData); override;
   public
     procedure Draw(image: TImage32; drawDat: TDrawData); override;
@@ -905,6 +907,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+// Note: This MatrixApply() is a function, whereas in Img32.Transform it's a procedure.
 function MatrixApply(const paths: TPathsD; const matrix: TMatrixD): TPathsD; overload;
 var
   i,j,len,len2: integer;
@@ -936,24 +939,39 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function FixSpaces(const text: UnicodeString): UnicodeString;
+function FixSpaces(const text: UnicodeString; trimLeadingSpace: Boolean): UnicodeString;
 var
   i,j, len: integer;
 begin
   //changes \r\n\t chars to spaces
   //and trims consecutive spaces
-
   len  := Length(text);
   SetLength(Result, len);
   if len = 0 then Exit;
 
-  // allow a single leading space char
-  if text[1] <= #32 then
-    Result[1] := #32 else
-    Result[1] := text[1];
+  if trimLeadingSpace then
+  begin
+    i := 1;
+    while (i <= len) and (text[i] <= #32) do inc(i);
+    if i > len then
+    begin
+      Result := '';
+      Exit;
+    end;
+    Result[1] := text[i];
+    inc(i);
+  end else
+  begin
+    // allow a single leading space char
+    if text[1] <= #32 then
+      Result[1] := #32
+    else
+      Result[1] := text[1];
+    i := 2;
+  end;
 
   j := 1;
-  for i := 2 to len do
+  for i := i to len do
   begin
     if (text[i] <= #32) then
     begin
@@ -3369,11 +3387,13 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TTextElement.Draw(img: TImage32; drawDat: TDrawData);
-var
-  startX: double;
 begin
   UpdateDrawInfo(drawDat, self);
   UpdateFontInfo(drawDat, self);
+
+  fSvgReader.GetBestFont(drawDat.FontInfo);
+  if not Assigned(fSvgReader.fFontCache) then Exit;
+  if drawDat.fontInfo.size = 0 then drawDat.fontInfo.size := 16;
 
   if offset.X.IsValid then
     currentPt.X := offset.X.rawVal
@@ -3389,16 +3409,12 @@ begin
   else
     currentPt.Y := 0;
 
-  fSvgReader.GetBestFont(drawDat.FontInfo);
-  if not Assigned(fSvgReader.fFontCache) then Exit;
-  if drawDat.fontInfo.size = 0 then drawDat.fontInfo.size := 16;
-
-  startX := currentPt.X;
+  textDx := 0;
   currSpanEl := nil;
+
   //get child paths (which also updates currentPt)
   GetPaths(drawDat);
 
-  textDx := currentPt.X - startX;
   DrawChildren(img, drawDat);
 end;
 
@@ -3427,11 +3443,16 @@ end;
 
 procedure TTSpanElement.GetPaths(const drawDat: TDrawData);
 var
-  tmpX, offsetX, scale, fontSize, bs: double;
+  tmpX, startX, fontScale, fontSize, bs: double;
+  i,j, len  : integer;
   di        : TDrawData;
   s         : UnicodeString;
   mat       : TMatrixD;
-  el        : TBaseElement;
+  tmpPaths  : TPathsD;
+  codepoints: TArrayOfCardinal;
+  angles    : TArrayOfDouble;
+  glyphInfo : PGlyphInfo;
+  glyphRec  : TRectD;
 begin
   // 1. We only want to process this method once even though it's called twice,
   //    first indirectly by TTextElement.Draw, and then by TTSpanElement.Draw.
@@ -3442,7 +3463,10 @@ begin
 
   di := drawDat;
   if ChildCount > 0 then
+  begin
+    UpdateDrawInfo(di, self);
     UpdateFontInfo(di, self);
+  end;
 
   if drawDat.FontInfo.size = 0 then
     fontSize := 16.0 else
@@ -3458,41 +3482,99 @@ begin
   //by not changing the fontCache.FontHeight, the quality of
   //small font render improves very significantly (though of course
   //this requires additional glyph scaling and offsetting).
-  scale := fontSize / fSvgReader.fFontCache.FontHeight;
+  fontScale := fontSize / fSvgReader.fFontCache.FontHeight;
 
   if elRectWH.left.IsValid then
-  begin
     textEl.currentPt.X := elRectWH.left.rawVal;
-    textEl.currSpanEl := nil;
-  end;
   if elRectWH.top.IsValid then
     textEl.currentPt.Y := elRectWH.top.rawVal;
+
+  if offset.X.IsValid then
+    textEl.currentPt.X := textEl.currentPt.X + offset.X.GetValue(0, 0);
+  if offset.Y.IsValid then
+    textEl.currentPt.Y := textEl.currentPt.Y + offset.Y.GetValue(0, 0);
+
+  // only 'virtual' (dummy) <tspan> elements are self-closing, and
+  // mostly their parents are 'real' <tspan> elements. However,
+  // virtual <tspan> elements can also have <text> element parents.
+  if not fXmlEl.selfClosed then
+  begin
+    textEl.currSpanEl := self;
+    angles := nil;
+  end
+  else if (fParent is TTSpanElement) then
+  begin
+    if Assigned(TTSpanElement(fParent).angle) then
+      angles := TTSpanElement(fParent).angle else
+      angles := textEl.angle;
+  end else
+  begin
+    angles := textEl.angle;
+    textEl.currSpanEl := nil;
+  end;
 
   chunkDx := 0;
   if (Length(fXmlEl.text) > 0) and (fontSize > 1) then
   begin
+    // this should be a virtual (dummy) <tspan> element
+    //assert(fXmlEl.selfClosed);
     s := DecodeUtf8ToWideString(HtmlDecode(fXmlEl.text));
-    s := FixSpaces(s);
+    // don't allow a space at the beginning of a text element
+    s := FixSpaces(s, (fParent = textEl) and (self = textEl.Child[0]));
 
     if IsBlankText(s) then
     begin
       drawPathsC := nil;
-      tmpX := drawDat.fontInfo.textLength;
+      // don't allow a space at the beginning of a text element
+      if (self = textEl.Child[0]) then Exit;
+      tmpX := fSvgReader.fFontCache.GetSpaceWidth;
+    end
+    else if Assigned(angles) then
+    begin
+      drawPathsC := nil;
+      tmpPaths := nil;
+      tmpX := 0;
+      codepoints := fSvgReader.fFontCache.GetTextCodePoints(s);
+      // make sure 'angles' is at least the length of codepoints
+      len := Length(codepoints);
+      if len > Length(angles) then
+      begin
+        j := High(angles);
+        SetLength(angles, len); // extend angles
+        for i := j +1 to len -1 do angles[i] := angles[j];
+      end;
+      // now get each rotated glyph and append to drawPathsC ...
+      for i := 0 to len -1 do
+      begin
+        glyphInfo := fSvgReader.fFontCache.GetGlyphInfo(codepoints[i]);
+        if Assigned(glyphInfo.paths) then
+        begin
+          glyphRec := GetBoundsD(glyphInfo.paths);
+          tmpPaths := RotatePath(glyphInfo.paths, glyphRec.MidPoint, angles[i]);
+          if i > 0 then
+            tmpPaths := TranslatePath(tmpPaths, tmpX, 0);
+          AppendPath(drawPathsC, tmpPaths);
+          tmpX := tmpX +
+            glyphInfo.hmtx.advanceWidth * fSvgReader.fFontCache.Scale +1;
+        end else
+          tmpX := tmpX + fSvgReader.fFontCache.GetSpaceWidth;
+      end;
     end else
+    begin
       drawPathsC := fSvgReader.fFontCache.GetTextOutline(0, 0, s, tmpX);
-    chunkDx := tmpX * scale;
+    end;
+
+    chunkDx := tmpX * fontScale;
+    if Assigned(textEl.currSpanEl) then
+      with textEl.currSpanEl do
+        chunkDx := chunkDx + self.chunkDx;
+    textEl.textDx := textEl.textDx + chunkDx;
 
     with textEl.currentPt do
     begin
-      offsetX := X;
+      startX := X;
       X := X + chunkDx;
     end;
-
-    if offset.X.IsValid then
-      textEl.currentPt.X := textEl.currentPt.X + offset.X.GetValue(0, 0);
-    if offset.Y.IsValid then
-      textEl.currentPt.Y := textEl.currentPt.Y + offset.Y.GetValue(0, 0);
-
 
     if Assigned(drawPathsC) then // eg. unassigned if a space char
     begin
@@ -3500,10 +3582,9 @@ begin
         if not baseShift.IsValid then
           bs := 0 else
           bs := baseShift.GetValue(size, GetRelFracLimit);
-
       mat := IdentityMatrix;
-      MatrixScale(mat, scale);
-      MatrixTranslate(mat, offsetX, textEl.currentPt.Y - bs);
+      MatrixScale(mat, fontScale);
+      MatrixTranslate(mat, startX, textEl.currentPt.Y - bs);
       MatrixApply(mat, drawPathsC);
     end;
   end;
@@ -3511,25 +3592,6 @@ begin
   // nested <tspan> elements are always possible,
   // except when self is a pseudo 'selfClosed' <tspan> element
   inherited GetPaths(di); // gets any children paths
-
-  if chunkDx > 0 then
-  begin
-    el := fParent;
-    if (el is TTSpanElement) then
-    begin
-      while (el is TTSpanElement) and (el <> textEl.currSpanEl) do
-        with TTSpanElement(fParent) do
-        begin
-          chunkDx := chunkDx + self.chunkDx;
-          el := el.fParent;
-        end;
-      if Assigned(textEl.currSpanEl) then
-        with textEl.currSpanEl do
-          chunkDx := chunkDx + self.chunkDx;
-    end else
-      textEl.currSpanEl := self;
-  end;
-
 end;
 //------------------------------------------------------------------------------
 
@@ -3539,7 +3601,7 @@ var
   filled      : Boolean;
   tmpRec      : TRect;
   fillPaths   : TPathsD;
-  realTSpan   : TTSpanElement;
+  dd          : TDrawData;
 begin
   if ChildCount = 0 then
     fDrawData := fParent.fDrawData
@@ -3549,20 +3611,25 @@ begin
     UpdateFontInfo(drawDat, self);
   end;
 
+  if not fXmlEl.selfClosed then
+  begin
+    // DrawChildren and exit ...
+    inherited;
+    Exit;
+  end;
+
   filled := IsFilled(drawDat);
   stroked := IsStroked(drawDat);
-  GetPaths(drawDat);
-
   if Assigned(drawPathsC) and Assigned(textEl) then
   begin
+    // a <tspan> element that contains text (and a path) must be virtual.
+    // But its parent may be another <tspan>, or a <text> or a <textarea>.
+
     tmpRec := Rect(GetBounds);
     if not IsEmptyRect(tmpRec) then
       drawDat.bounds := RectD(tmpRec);
 
-    // nb: a <tspan> element that contains text (and a path) must be virtual
-    realTSpan := TTSpanElement(fParent);
-
-    if realTSpan.elRectWH.left.IsValid then
+    if (fParent is TTSpanElement) and fParent.elRectWH.left.IsValid then
     begin
       case drawDat.FontInfo.align of
         staCenter: drawPathsC := TranslatePath(drawPathsC, -chunkDx * 0.5, 0);
@@ -3585,11 +3652,17 @@ begin
       DrawFilled(image, fillPaths, drawDat);
     end;
     if stroked then
+    begin
+      // for some as yet unknown reason, text stroke-width
+      // is being rendered about twice as wide as expected
+      dd := drawDat;
+      dd.strokeWidth.rawVal := dd.strokeWidth.rawVal * 0.5;
+
       // it's slightly more efficient to apply the matrix
       // inside DrawStroke() rather than here.
-      DrawStroke(image, drawPathsC, drawDat, true);
+      DrawStroke(image, drawPathsC, dd, true);
+    end;
   end;
-  inherited; // DrawChildren
 end;
 
 //------------------------------------------------------------------------------
@@ -3627,6 +3700,7 @@ begin
   spanEl := TTSpanElement(el);
   if Assigned(spanEl.drawPathsC) then Exit;
   spanEl.pathsLoaded := true;
+  spanEl.GetTextEl;
 
   dd := drawDat;
   UpdateDrawInfo(dd, el);
@@ -3803,7 +3877,7 @@ begin
   {$ELSE}
   s := Utf8Decode(HtmlDecode(text));
   {$ENDIF}
-  s := FixSpaces(s);
+  s := FixSpaces(s, false);
   s := StringReplace(s, '<tbreak/>', #10, [rfReplaceAll, rfIgnoreCase]);
 
   lnHeight := fSvgReader.fFontCache.LineHeight;
@@ -4800,6 +4874,29 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure Rotate_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
+var
+  i, cnt: integer;
+  angle: TArrayOfDouble;
+  c, endC: PUTF8Char;
+begin
+  SetLength(angle, Length(value));
+  c := PUTF8Char(value);
+  endC := c + Length(value);
+  cnt := 0;
+  while ParseNextNum(c, endC, true, angle[cnt]) do inc(cnt);
+  SetLength(angle, cnt);
+
+  for i := 0 to cnt -1 do
+    angle[i] := DegToRad(angle[i]);
+
+  if aOwnerEl is TTextElement then
+    TTextElement(aOwnerEl).angle := angle
+  else if aOwnerEl is TTSpanElement then
+    TTSpanElement(aOwnerEl).angle := angle;
+end;
+//------------------------------------------------------------------------------
+
 procedure Transform_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
 begin
   with aOwnerEl.fDrawData do
@@ -5297,6 +5394,7 @@ begin
       hRefX:                  Rx_Attrib(self, value);
       hRefY:                  Ry_Attrib(self, value);
       hResult:                Result_Attrib(self, value);
+      hRotate:                Rotate_Attrib(self, value);
       hRx:                    Rx_Attrib(self, value);
       hRy:                    Ry_Attrib(self, value);
       hspecularExponent:      SpectacularExponent(self, value);

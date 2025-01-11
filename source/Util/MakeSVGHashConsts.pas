@@ -480,6 +480,7 @@ begin
       AddName('RefY');
       AddName('Repeat');
       AddName('Result');
+      AddName('Rotate');
       AddName('Round');
       AddName('Rx');
       AddName('Ry');

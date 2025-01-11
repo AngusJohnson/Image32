@@ -675,7 +675,7 @@ begin
     begin
       if pc^ = 0 then
         pc^ := colors[hatch]
-      else if GetAlpha(pc^) < 196 then
+      else if GetAlpha(pc^) < 255 then
         pc^ := BlendToOpaque(colors[hatch], pc^);
       inc(pc);
       inc(x);

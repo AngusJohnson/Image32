@@ -251,6 +251,8 @@ type
     spacesInText: TSpacesInText = sitUndefined);
   function TrimMultiSpacesUtf8(const text: Utf8String): Utf8String;
   function TrimMultiSpacesUnicode(const text: UnicodeString): UnicodeString;
+  function ConvertNewlines(const s: UTF8String): UTF8String; overload;
+  function ConvertNewlines(const s: UnicodeString): UnicodeString; overload;
   function StripNewlines(const s: UTF8String): UTF8String; overload;
   function StripNewlines(const s: UnicodeString): UnicodeString; overload;
   procedure ToAsciiLowerUTF8String(c, endC: PUTF8Char; var S: UTF8String);
@@ -1405,6 +1407,44 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function ConvertNewlines(const s: UTF8String): UTF8String; overload;
+var
+  i: integer;
+begin
+  Result := s;
+  i := Length(Result);
+  while i > 0 do
+  begin
+    if Result[i] < space then
+    begin
+      if Result[i] = #10 then
+        Result[i] := space else
+        Delete(Result, i, 1);
+    end;
+    Dec(i);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function ConvertNewlines(const s: UnicodeString): UnicodeString; overload;
+var
+  i: integer;
+begin
+  Result := s;
+  i := Length(Result);
+  while i > 0 do
+  begin
+    if Result[i] < space then
+    begin
+      if Result[i] = #10 then
+        Result[i] := space else
+        Delete(Result, i, 1);
+    end;
+    Dec(i);
+  end;
+end;
+//------------------------------------------------------------------------------
+
 procedure ToUTF8String(c, endC: PUTF8Char;
   var S: UTF8String; spacesInText: TSpacesInText);
 var
@@ -1416,7 +1456,7 @@ begin
   Move(c^, PUTF8Char(S)^, len * SizeOf(UTF8Char));
   if spacesInText <> sitPreserve then
     S := TrimMultiSpacesUtf8(S);
-  S := StripNewlines(S);
+  S := ConvertNewlines(S);
 end;
 //------------------------------------------------------------------------------
 
@@ -2237,14 +2277,16 @@ end;
 
 function TXmlEl.ParseContent(var c: PUTF8Char; endC: PUTF8Char): Boolean;
 var
-  child: TSvgXmlEl;
-  entity: PSvgAttrib;
-  c2, cc, tmpC, tmpEndC: PUTF8Char;
+  child             : TSvgXmlEl;
+  entity            : PSvgAttrib;
+  c2, cc            : PUTF8Char;
+  tmpC, tmpEndC     : PUTF8Char;
 begin
   Result := false;
   // note: don't trim spaces at the start of text content.
-  // Space trimming will be done later IF and when required.
-  while (hash = hTSpan) or (hash = hTextArea) or SkipBlanks(c, endC) do
+  // Text space trimming will be done later IF and when required.
+  while (hash = hText) or (hash = hTSpan) or
+    (hash = hTextArea) or SkipBlanks(c, endC) do
   begin
     if (c^ = '<') then
     begin
@@ -2326,7 +2368,7 @@ begin
       child := TSvgXmlEl.Create(owner);
       child.name := 'tspan';
       child.hash := GetHash('tspan');
-      child.selfClosed := true;
+      child.selfClosed := true; ////////////////////// :)))
       childs.Add(child);
       ToUTF8String(c, cc, child.text, sitPreserve);
       c := cc;

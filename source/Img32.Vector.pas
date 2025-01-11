@@ -2428,12 +2428,6 @@ begin
   if scale = 0 then scale := 1.0;
 
   absDelta := Abs(delta);
-  if absDelta < MinStrokeWidth/2 then
-  begin
-    if delta < 0 then
-      delta := -MinStrokeWidth/2 else
-      delta := MinStrokeWidth/2;
-  end;
   if absDelta * scale < 1 then
     joinStyle := jsButt
   else if joinStyle = jsAuto then
@@ -2442,6 +2436,14 @@ begin
       joinStyle := jsSquare else
       joinStyle := jsRound;
   end;
+
+  if absDelta < MinStrokeWidth/2 then
+  begin
+    if delta < 0 then
+      delta := -MinStrokeWidth/2 else
+      delta := MinStrokeWidth/2;
+  end;
+
 
   if assigned(normals) then
     norms := normals else

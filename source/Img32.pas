@@ -99,8 +99,8 @@ type
   {$IFDEF SUPPORTS_POINTERMATH}
   // Works for Delphi 2009 and newer. For FPC, POINTERMATH is
   // a requirement for negative indices. Otherwise 32bit and 64bit
-  // code would behave differently since FPC doesn't default to
-  // sign-extending the index variable of type Integer when it's used
+  // code would behave differently since FPC doesn't otherwise
+  // sign-extend the index variable of type Integer when it's used
   // as an array-index into an array with an unsigned index range.
   // i32:=-1; i64:=-1 => i32=i64 but @arr[i32] <> @arr[i64]
 
