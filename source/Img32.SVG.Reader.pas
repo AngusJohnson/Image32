@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  10 January 2025                                                 *
+* Date      :  12 January 2025                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -368,6 +368,7 @@ type
     angle       : TArrayOfDouble;
     currentPt   : TPointD;
     currSpanEl  : TTSpanElement; //the current 'real' <tspan>
+    lastChrSpc  : Boolean;
     procedure Draw(img: TImage32; drawDat: TDrawData); override;
   public
     constructor Create(parent: TBaseElement; svgEl: TSvgXmlEl); override;
@@ -3409,6 +3410,7 @@ begin
   else
     currentPt.Y := 0;
 
+  lastChrSpc := false;
   textDx := 0;
   currSpanEl := nil;
 
@@ -3518,16 +3520,19 @@ begin
   begin
     // this should be a virtual (dummy) <tspan> element
     //assert(fXmlEl.selfClosed);
-    s := DecodeUtf8ToWideString(HtmlDecode(fXmlEl.text));
-    // don't allow a space at the beginning of a text element
-    s := FixSpaces(s, (fParent = textEl) and (self = textEl.Child[0]));
+
+    s := DecodeUtf8ToUnicode(HtmlDecode(fXmlEl.text));
+    // don't allow a dup. spaces or a space at the beginning of a text
+    s := FixSpaces(s, textEl.lastChrSpc or
+      ((fParent = textEl) and (self = textEl.Child[0])));
 
     if IsBlankText(s) then
     begin
       drawPathsC := nil;
-      // don't allow a space at the beginning of a text element
-      if (self = textEl.Child[0]) then Exit;
+      // don't allow duplicate spaces or a space at the beginning of text
+      if textEl.lastChrSpc or (self = textEl.Child[0]) then Exit;
       tmpX := fSvgReader.fFontCache.GetSpaceWidth;
+      textEl.lastChrSpc := true;
     end
     else if Assigned(angles) then
     begin
@@ -3543,6 +3548,8 @@ begin
         SetLength(angles, len); // extend angles
         for i := j +1 to len -1 do angles[i] := angles[j];
       end;
+
+      textEl.lastChrSpc := (codepoints[len -1] = 32);
       // now get each rotated glyph and append to drawPathsC ...
       for i := 0 to len -1 do
       begin
@@ -3554,14 +3561,13 @@ begin
           if i > 0 then
             tmpPaths := TranslatePath(tmpPaths, tmpX, 0);
           AppendPath(drawPathsC, tmpPaths);
-          tmpX := tmpX +
-            glyphInfo.hmtx.advanceWidth * fSvgReader.fFontCache.Scale +1;
-        end else
-          tmpX := tmpX + fSvgReader.fFontCache.GetSpaceWidth;
+        end;
+        tmpX := tmpX + glyphInfo.hmtx.advanceWidth * fSvgReader.fFontCache.Scale;
       end;
     end else
     begin
       drawPathsC := fSvgReader.fFontCache.GetTextOutline(0, 0, s, tmpX);
+      textEl.lastChrSpc := s[length(s)] = space;
     end;
 
     chunkDx := tmpX * fontScale;
@@ -3601,7 +3607,6 @@ var
   filled      : Boolean;
   tmpRec      : TRect;
   fillPaths   : TPathsD;
-  dd          : TDrawData;
 begin
   if ChildCount = 0 then
     fDrawData := fParent.fDrawData
@@ -3644,23 +3649,22 @@ begin
       end;
     end;
 
+    // todo - 1. implement paint-order - fill stroke vs stroke fill
+    //        2. wavy and colored underlines
+
+    if stroked then
+    begin
+      // it's slightly more efficient to apply the matrix
+      // inside DrawStroke() rather than here.
+      DrawStroke(image, drawPathsC, drawDat, true);
+    end;
+
     if filled then
     begin
       // it's slightly more efficient to apply the matrix here
       // rather than inside DrawFilled().
       fillPaths := MatrixApply(drawPathsC, drawDat.matrix);
       DrawFilled(image, fillPaths, drawDat);
-    end;
-    if stroked then
-    begin
-      // for some as yet unknown reason, text stroke-width
-      // is being rendered about twice as wide as expected
-      dd := drawDat;
-      dd.strokeWidth.rawVal := dd.strokeWidth.rawVal * 0.5;
-
-      // it's slightly more efficient to apply the matrix
-      // inside DrawStroke() rather than here.
-      DrawStroke(image, drawPathsC, dd, true);
     end;
   end;
 end;
@@ -3726,11 +3730,7 @@ begin
   // provide a reliable way to manage text mixed with nested <tspan> elements.
 
   //trim CRLFs and multiple spaces
-  {$IFDEF UNICODE}
-  unicodeText := UTF8ToUnicodeString(HtmlDecode(spanEl.fXmlEl.text));
-  {$ELSE}
-  unicodeText := UnicodeString(Utf8Decode(HtmlDecode(spanEl.fXmlEl.text)));
-  {$ENDIF}
+  unicodeText := DecodeUtf8ToUnicode(HtmlDecode(spanEl.fXmlEl.text));
   if dd.fontInfo.spacesInText <> sitPreserve then
     unicodeText := TrimMultiSpacesUnicode(unicodeText) else
     unicodeText := StripNewlines(unicodeText);
@@ -3872,11 +3872,7 @@ begin
   if not Assigned(fSvgReader.fFontCache) then Exit;
   scale := fontSize / fSvgReader.fFontCache.FontHeight;
 
-  {$IFDEF UNICODE}
-  s := UTF8ToUnicodeString(HtmlDecode(text));
-  {$ELSE}
-  s := Utf8Decode(HtmlDecode(text));
-  {$ENDIF}
+  s := DecodeUtf8ToUnicode(HtmlDecode(text));
   s := FixSpaces(s, false);
   s := StringReplace(s, '<tbreak/>', #10, [rfReplaceAll, rfIgnoreCase]);
 
@@ -4645,11 +4641,12 @@ end;
 procedure TextDecoration_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
 begin
   with aOwnerEl.fDrawData.FontInfo do
-    case GetHash(value) of
-      hUnderline        : decoration := fdUnderline;
-      hline_045_through : decoration := fdStrikeThrough;
-      else                decoration := fdNone;
-    end;
+    if PosEx('underline', value) > 0 then
+      decoration := fdUnderline
+    else if PosEx('line-through', value) > 0 then
+      decoration := fdStrikeThrough
+    else
+      decoration := fdNone;
 end;
 //------------------------------------------------------------------------------
 

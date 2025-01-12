@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.7                                                             *
-* Date      :  6 January 2025                                                  *
+* Date      :  12 January 2025                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -247,6 +247,7 @@ type
   function ScaleDashArray(const dblArray: TArrayOfDouble; scale: double): TArrayOfDouble;
   function Match(c: PUTF8Char; const compare: UTF8String): Boolean; overload;
   function Match(const compare1, compare2: UTF8String): Boolean; overload;
+  function PosEx(const subStr: utf8String; const text: Utf8String; startIdx: integer = 1): integer;
   procedure ToUTF8String(c, endC: PUTF8Char; var S: UTF8String;
     spacesInText: TSpacesInText = sitUndefined);
   function TrimMultiSpacesUtf8(const text: Utf8String): Utf8String;
@@ -287,7 +288,7 @@ type
   TSetOfUTF8Char = set of UTF8Char;
 
 function CharInSet(chr: UTF8Char; const chrs: TSetOfUTF8Char): Boolean;
-function DecodeUtf8ToWideString(const utf8: UTF8String): WideString;
+function DecodeUtf8ToUnicode(const utf8: UTF8String): UnicodeString;
 
 const
   clInvalid   = $00010001;
@@ -1314,6 +1315,24 @@ begin
   SetLength(S, len);
   if len = 0 then Exit;
   Move(c^, PUTF8Char(S)^, len * SizeOf(UTF8Char));
+end;
+//------------------------------------------------------------------------------
+
+function PosEx(const subStr: UTF8String; const text: Utf8String; startIdx: integer): integer;
+var
+  i, maxI, len, subStrLen: integer;
+begin
+  len := Length(Text);
+  subStrLen := Length(subStr);
+  maxI := len - subStrLen +1;
+  for i := Max(1, startIdx) to maxI do
+  begin
+    if (text[i] <> subStr[1]) or
+      not CompareMem(@text[i], @subStr[1], subStrLen) then Continue;
+    Result := i;
+    Exit;
+  end;
+  Result := 0;
 end;
 //------------------------------------------------------------------------------
 
@@ -2653,7 +2672,7 @@ end;
 // Miscellaneous functions
 //------------------------------------------------------------------------------
 
-function DecodeUtf8ToWideString(const utf8: UTF8String): WideString;
+function DecodeUtf8ToUnicode(const utf8: UTF8String): UnicodeString;
 var
   i,j, len: Integer;
   c, cp: Cardinal;
@@ -2699,7 +2718,7 @@ begin
   j := 0;
 
   // make room in the result for surrogate paired chars, and
-  // convert codepoints into the result (a Utf16 Widestring)
+  // convert codepoints into the result (a Utf16 string)
   SetLength(Result, len *2);
   for i := 0 to len -1 do
   begin
