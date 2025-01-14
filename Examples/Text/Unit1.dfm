@@ -19,6 +19,7 @@ object Form1: TForm1
   Position = poScreenCenter
   OnCreate = FormCreate
   OnDestroy = FormDestroy
+  OnMouseDown = ImgPanelMouseDown
   OnResize = FormResize
   PixelsPerInch = 192
   TextHeight = 29
@@ -31,9 +32,14 @@ object Form1: TForm1
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
-    Panels = <>
+    Panels = <
+      item
+        Width = 380
+      end
+      item
+        Width = 800
+      end>
     ParentFont = True
-    SimplePanel = True
     UseSystemFont = False
   end
   object MainMenu1: TMainMenu

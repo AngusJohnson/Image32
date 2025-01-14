@@ -31,9 +31,13 @@ type
     procedure FormResize(Sender: TObject);
     procedure Font1Click(Sender: TObject);
     procedure mnuAlignJustifiedClick(Sender: TObject);
+    procedure ImgPanelMouseDown(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
   protected
+    procedure DrawChunkEvent(chunk: TTextChunk; const chunkRec: TRectD);
   public
     chunkedText: TChunkedText;
+    pageMetrics: TPageTextMetrics;
     imgPanel: TImage32Panel;
 
     regularCache: TFontCache;
@@ -44,8 +48,7 @@ type
 
     procedure Draw;
     procedure ResetPanelImage(color: TColor32);
-    function LoadFontFamily(const fontFaceName: string): Boolean;
-    procedure UpdateFontHeight;
+    function LoadFontFamily(const logFont: TLogFont): TFontLoadResult;
   end;
 
 var
@@ -146,13 +149,14 @@ begin
       Move(p2^, s[1], len * SizeOf(Char));
       if fsBold in Styles then
       begin
+        // for basic underline support ...
         font.Underlined := true;
-        chunkedText.AddTextChunk(font, s, clMaroon32, clNone32, 0);
+        chunkedText.AddTextChunk(font, s, clMaroon32);
         font.Underlined := false;
       end else if fsItalic in Styles then
-        chunkedText.AddTextChunk(font, s, clNavy32, clNone32, 0)
+        chunkedText.AddTextChunk(font, s, clNavy32)
       else
-        chunkedText.AddTextChunk(font, s, clBlack32, clNone32, 0);
+        chunkedText.AddTextChunk(font, s, clBlack32);
     end;
   end;
 end;
@@ -216,8 +220,9 @@ var
   monoFR: TFontReader;
 begin
   currentFont := DefaultLogfont;
-  LoadFontFamily('Arial');
-  StatusBar1.SimpleText := Format(' %s, %d', [currentFont.lfFaceName, currentFont.lfHeight]);
+  LoadFontFamily(currentFont);
+  StatusBar1.Panels[0].Text := Format(' %s, %d', [currentFont.lfFaceName, currentFont.lfHeight]);
+  StatusBar1.Panels[1].Text := 'Clicking on a word will wavy underline it :)';
   FontManager.LoadFontReader('Segoe UI Emoji');
 
   monoFR := FontManager.LoadFontReader('Courier New Bold');
@@ -229,11 +234,16 @@ begin
   MyVerySimpleChunkifyTextProc(essay, chunkedText,
     regularCache, italicCache, boldCache, boldItalCache, monoSpaceCache);
 
+  //for i := 4 to 14 do chunkedText[i].backColor := clYellow32;
+  chunkedText.OnDrawChunk := DrawChunkEvent;
+
+
   imgPanel := TImage32Panel.Create(self);
   imgPanel.Parent := self;
   imgPanel.align := alClient;
   imgPanel.AllowFileDrop := false;
   imgPanel.AllowZoom := false;
+  imgPanel.OnMouseDown := ImgPanelMouseDown;
 end;
 //------------------------------------------------------------------------------
 
@@ -259,19 +269,20 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TForm1.Font1Click(Sender: TObject);
+var
+  tmpLogFont: TLogFont;
 begin
-  if not DoFontDialog(currentFont) then Exit;
+  tmpLogFont := currentFont;
+  if not DoFontDialog(tmpLogFont) then Exit;
+  if LoadFontFamily(tmpLogFont) = flrInvalid then Exit;
+  currentFont := tmpLogFont;
 
-  if not LoadFontFamily(currentFont.lfFaceName) then
-    UpdateFontHeight;
-
+  StatusBar1.Panels[0].Text :=
+    Format(' %s, %d', [currentFont.lfFaceName, currentFont.lfHeight]);
   chunkedText.Clear;
   MyVerySimpleChunkifyTextProc(essay, chunkedText,
     regularCache, italicCache, boldCache, boldItalCache, monoSpaceCache);
-
   Draw;
-  StatusBar1.SimpleText := Format(' %s, %d', [currentFont.lfFaceName, currentFont.lfHeight]);
-  StatusBar1.Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -281,22 +292,23 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TForm1.LoadFontFamily(const fontFaceName: string): Boolean;
+function TForm1.LoadFontFamily(const logFont: TLogFont): TFontLoadResult;
 var
   frf: TFontReaderFamily;
   fontHeight: double;
+  fontFaceName: string;
 begin
-  // convert the device independant font point size into the pixel height
-  fontHeight := GetFontPixelHeight(currentFont.lfHeight);
-
   // LoadFontReaderFamily gets the available TFontReader objects for
   // the various styles associated with a specific font face name.
   // The function will return false if not fonts match the given face name.
   // When the function returns true, at least frf.regularFR will be assigned.
   // TFontReader objects for the styled fonts may, or may not be assigned.
+  fontFaceName := logFont.lfFaceName;
   Result := FontManager.LoadFontReaderFamily(fontFaceName, frf);
+  if Result = flrInvalid then Exit;
 
-  if not Result then Exit;
+  // convert the device independant font point size into the pixel height
+  fontHeight := GetFontPixelHeight(logFont.lfHeight);
 
   if Assigned(regularCache) then
   begin
@@ -342,29 +354,13 @@ end;
 
 //------------------------------------------------------------------------------
 
-procedure TForm1.UpdateFontHeight;
-var
-  height: double;
-begin
-  height := GetFontPixelHeight(currentFont.lfHeight);
-  if Assigned(regularCache) then
-    regularCache.FontHeight := height;
-  if Assigned(boldCache) then
-    boldCache.FontHeight := height;
-  if Assigned(italicCache) then
-    italicCache.FontHeight := height;
-  if Assigned(boldItalCache) then
-    boldItalCache.FontHeight := height;
-  if Assigned(monoSpaceCache) then
-    monoSpaceCache.FontHeight := height;
-end;
-//------------------------------------------------------------------------------
-
 procedure TForm1.Draw;
 var
   rec: TRect;
   align: TTextAlign;
   valign: TTextVAlign;
+const
+  margin = 40;
 begin
   if mnuAlignLeft.Checked then align := taLeft
   else if mnuAlignCenter.Checked then align := taCenter
@@ -376,8 +372,12 @@ begin
   else valign := tvaBottom;
 
   ResetPanelImage($FFFDFDFD);
-  rec := Rect(40, 40, imgPanel.Image.Width -40, imgPanel.Image.Height - 40);
-  chunkedText.DrawText(imgPanel.Image, rec, align, valign, 0);
+  rec := Rect(margin, margin,
+    imgPanel.Image.Width -margin, imgPanel.Image.Height - margin);
+
+  // draw chunked essay (and update pageMetrics) ...
+  imgPanel.Image.Clear;
+  pageMetrics := chunkedText.DrawText(imgPanel.Image, rec, align, valign, 0);
   imgPanel.Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -390,6 +390,39 @@ begin
   rec := imgPanel.InnerClientRect;
   RectWidthHeight(rec, w,h);
   imgPanel.Image.SetSize(w, h);
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.ImgPanelMouseDown(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  chunkIdx, chunkChrOffset: integer;
+  chunk: TTextChunk;
+  ulp: TPathD;
+begin
+  // first, remove any prior wavy underlines :)
+  Draw;
+
+  // now get the chunk under the click point ...
+  if not chunkedText.GetChunkAndChrOffsetFromPt(pageMetrics,
+    imgPanel.ClientToImage(img32.Vector.Point(X,Y)), chunkIdx, chunkChrOffset) then
+      Exit;
+
+  // and draw a green wavy line under that chunk ...
+  chunk := chunkedText[chunkIdx];
+  ulp := regularCache.GetUnderlineOutline(chunk.left,
+    chunk.left + chunk.width, chunk.top + chunk.ascent, InvalidD, true);
+  DrawPolygon(imgPanel.Image, ulp, frNonZero, clGreen32);
+end;
+//------------------------------------------------------------------------------
+
+procedure TForm1.DrawChunkEvent(chunk: TTextChunk; const chunkRec: TRectD);
+begin
+  // usually filling behind chunks is done by setting the chunk's fillColor
+  // property, but this event demonstrates that it can also be used for this
+  // purpose (and numerous other purposes) ...
+  if (chunk.index > 3) and (chunk.index < 15) then
+    imgPanel.Image.FillRect(Rect(chunkRec), $33FFFF00);
 end;
 //------------------------------------------------------------------------------
 
