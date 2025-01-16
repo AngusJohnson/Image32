@@ -48,7 +48,7 @@ type
 
     procedure Draw;
     procedure ResetPanelImage(color: TColor32);
-    function LoadFontFamily(const logFont: TLogFont): TFontLoadResult;
+    function LoadFontFamily(const logFont: TLogFont): TLoadFontResult;
   end;
 
 var
@@ -274,7 +274,7 @@ var
 begin
   tmpLogFont := currentFont;
   if not DoFontDialog(tmpLogFont) then Exit;
-  if LoadFontFamily(tmpLogFont) = flrInvalid then Exit;
+  if LoadFontFamily(tmpLogFont) = lfrInvalid then Exit;
   currentFont := tmpLogFont;
 
   StatusBar1.Panels[0].Text :=
@@ -292,7 +292,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TForm1.LoadFontFamily(const logFont: TLogFont): TFontLoadResult;
+function TForm1.LoadFontFamily(const logFont: TLogFont): TLoadFontResult;
 var
   frf: TFontReaderFamily;
   fontHeight: double;
@@ -305,7 +305,7 @@ begin
   // TFontReader objects for the styled fonts may, or may not be assigned.
   fontFaceName := logFont.lfFaceName;
   Result := FontManager.LoadFontReaderFamily(fontFaceName, frf);
-  if Result = flrInvalid then Exit;
+  if Result = lfrInvalid then Exit;
 
   // convert the device independant font point size into the pixel height
   fontHeight := GetFontPixelHeight(logFont.lfHeight);
@@ -404,7 +404,7 @@ begin
   Draw;
 
   // now get the chunk under the click point ...
-  if not chunkedText.GetChunkAndChrOffsetFromPt(pageMetrics,
+  if not chunkedText.GetChunkAndGlyphOffsetAtPt(pageMetrics,
     imgPanel.ClientToImage(img32.Vector.Point(X,Y)), chunkIdx, chunkChrOffset) then
       Exit;
 
@@ -421,7 +421,7 @@ begin
   // usually filling behind chunks is done by setting the chunk's fillColor
   // property, but this event demonstrates that it can also be used for this
   // purpose (and numerous other purposes) ...
-  if (chunk.index > 3) and (chunk.index < 15) then
+  if (chunk.index > 3) and (chunk.index < 17) then
     imgPanel.Image.FillRect(Rect(chunkRec), $33FFFF00);
 end;
 //------------------------------------------------------------------------------

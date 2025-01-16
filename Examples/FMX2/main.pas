@@ -212,7 +212,8 @@ begin
     // draw the remaining text below the image
     if (chunkMetrics.nextChuckIdx < chunkedText.Count) then
     begin
-      tmpRec.Top := tmpRec.Top + Ceil(chunkMetrics.pageHeight);
+      with chunkMetrics do
+        tmpRec.Top := tmpRec.Top + Ceil(lineCount * lineHeight);
       tmpRec.Right := innerRec.Right;
       tmpRec.Bottom := innerRec.Bottom;
       chunkedText.DrawText(imgMain, tmpRec, taJustify, tvaTop,
