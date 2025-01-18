@@ -24,6 +24,8 @@ Extensive documentation can be found [**here**](http://www.angusj.com/image32/Do
 ![svg1](https://user-images.githubusercontent.com/5280692/170443316-f5c88659-c0cd-4e68-8933-ddcfd2aa4b8a.png)<br>
 <a href="http://www.angusj.com/image32/Videos/svg101.mp4" target="_blank"><b>SVG101 video</b></a><br>
 
+![image32_text](https://github.com/user-attachments/assets/b37c5590-ea5d-49ec-b13c-6053986b181d)<br>
+
 ![Vectorize](https://user-images.githubusercontent.com/5280692/180627317-5a10f862-6070-4753-ac3d-c714dfa4dc8f.png)<br>
 <a href="http://www.angusj.com/image32/Videos/vectorize.mp4" target="_blank"><b>Vectorize video</b></a><br>
 
