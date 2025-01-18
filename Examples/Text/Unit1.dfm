@@ -1,13 +1,13 @@
 object Form1: TForm1
-  Left = 514
-  Top = 310
+  Left = 383
+  Top = 304
   Margins.Left = 6
   Margins.Top = 6
   Margins.Right = 6
   Margins.Bottom = 6
   Caption = 'Image32 Text'
-  ClientHeight = 924
-  ClientWidth = 1577
+  ClientHeight = 916
+  ClientWidth = 1283
   Color = clBtnFace
   TransparentColorValue = clBtnFace
   Font.Charset = DEFAULT_CHARSET
@@ -26,21 +26,23 @@ object Form1: TForm1
   object StatusBar1: TStatusBar
     Left = 0
     Top = 872
-    Width = 1577
-    Height = 52
+    Width = 1283
+    Height = 44
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
     Panels = <
       item
-        Width = 380
+        Width = 480
       end
       item
-        Width = 800
+        Width = 400
       end>
     ParentFont = True
     UseSystemFont = False
+    ExplicitTop = 774
+    ExplicitWidth = 1294
   end
   object MainMenu1: TMainMenu
     Left = 112

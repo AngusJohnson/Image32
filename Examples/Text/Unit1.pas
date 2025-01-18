@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls, Commdlg,
-  Img32, Img32.Panels, Img32.Text, Vcl.Dialogs;
+  Img32, Img32.Panels, Img32.Text, Dialogs;
 
 type
   TForm1 = class(TForm)
@@ -52,7 +52,7 @@ type
   end;
 
 var
-  essay: string;
+  essay: UnicodeString;
   Form1: TForm1;
   currentFont: TLogFont;
 
@@ -71,7 +71,7 @@ uses
 // MyVerySimpleChunkifyTextProc parses a string of text and breaks it up
 // into chunks that will sensibly word-wrap. It also applies different fonts
 // and styles as instructed by a very simple (custom) text markup.
-procedure MyVerySimpleChunkifyTextProc(const text: string;
+procedure MyVerySimpleChunkifyTextProc(const text: UnicodeString;
   chunkedText: TChunkedText;
   fontNormal, fontItalic, fontBold, fontBoldItalic, fontMonoSpace: TFontCache);
 var
@@ -146,7 +146,7 @@ begin
       while (p < pEnd) and (p^ > #32) and (p^ <> '<') do inc(p);
       len := p - p2;
       SetLength(s, len);
-      Move(p2^, s[1], len * SizeOf(Char));
+      Move(p2^, s[1], len * SizeOf(WideChar));
       if fsBold in Styles then
       begin
         // for basic underline support ...
@@ -181,16 +181,41 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TextResourceToString(resId: integer; const resType: string): string;
+function Utf8TextResourceToUnicodeString(resId: integer;
+  const resType: string): UnicodeString;
 var
   rs: TResourceStream;
   sl: TStringList;
+{$ifndef unicode}
+  srcLen, dstLen, bomLen: integer;
+  utf8Str: string;
+{$endif}
 begin
   rs := TResourceStream.CreateFromID(hInstance, resId, PChar(resType));
   sl := TStringList.Create;
   try
+{$ifdef unicode}
     sl.LoadFromStream(rs, TEncoding.UTF8);
     Result := sl.Text;
+{$else}
+    Result := '';
+    srcLen := rs.Size;
+    if srcLen < 3 then Exit;
+    SetLength(utf8Str, 3);
+    rs.Read(utf8Str[1], 3);
+    if (utf8Str[1] = #$EF) and
+      (utf8Str[2] = #$BB) and (utf8Str[3] = #$BF) then
+        bomLen := 3 else
+        bomLen := 0;
+    srcLen := srcLen - bomLen;
+    SetLength(utf8Str, srcLen);
+    rs.Position := bomLen;
+    rs.Read(utf8Str[1], srcLen);
+    dstLen := MultiByteToWideChar(CP_UTF8, 0, PChar(@utf8Str[1]), -1, nil , 0);
+    SetLength(Result, dstLen);
+    MultiByteToWideChar(CP_UTF8, 0,
+      PChar(@utf8Str[1]), srcLen, PWideChar(Result), dstLen);
+{$endif}
   finally
     sl.Free;
     rs.Free;
@@ -198,22 +223,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function DefaultLogfont: TLogFont;
-begin
-  FillChar(Result, sizeof(Result), 0);
-  with Result do
-  begin
-    lfHeight := 12; //nb: +ve values (point size) are device independant
-    lfWeight := FW_NORMAL;
-    lfCharSet := DEFAULT_CHARSET;
-    lfOutPrecision := OUT_OUTLINE_PRECIS;
-    lfClipPrecision := CLIP_DEFAULT_PRECIS;
-    lfQuality := PROOF_QUALITY;
-    lfPitchAndFamily := DEFAULT_PITCH or FF_DONTCARE;
-    lfFaceName := 'Arial'#0;
-  end;
-end;
-//------------------------------------------------------------------------------
+const
+  DefaultLogfont: TLogFont = (
+    lfHeight: 12;
+    lfWeight: FW_NORMAL;
+    lfCharSet: DEFAULT_CHARSET;
+    lfOutPrecision: OUT_OUTLINE_PRECIS;
+    lfClipPrecision: CLIP_DEFAULT_PRECIS;
+    lfQuality: PROOF_QUALITY;
+    lfPitchAndFamily: DEFAULT_PITCH or FF_DONTCARE;
+    lfFaceName: 'Arial'#0);
 
 procedure TForm1.FormCreate(Sender: TObject);
 var
@@ -221,14 +240,11 @@ var
 begin
   currentFont := DefaultLogfont;
   LoadFontFamily(currentFont);
-  StatusBar1.Panels[0].Text := Format(' %s, %d', [currentFont.lfFaceName, currentFont.lfHeight]);
-  StatusBar1.Panels[1].Text := 'Clicking on a word will wavy underline it :)';
   FontManager.LoadFontReader('Segoe UI Emoji');
-
   monoFR := FontManager.LoadFontReader('Courier New Bold');
   monoSpaceCache := TFontCache.Create(monoFR, GetFontPixelHeight(currentFont.lfHeight));
 
-  essay := TextResourceToString(1, 'TEXT');
+  essay := Utf8TextResourceToUnicodeString(1, 'TEXT');
 
   chunkedText := TChunkedText.Create;
   MyVerySimpleChunkifyTextProc(essay, chunkedText,
@@ -237,6 +253,8 @@ begin
   //for i := 4 to 14 do chunkedText[i].backColor := clYellow32;
   chunkedText.OnDrawChunk := DrawChunkEvent;
 
+  StatusBar1.Panels[0].Text := Format(' %s, %d', [currentFont.lfFaceName, currentFont.lfHeight]);
+  StatusBar1.Panels[1].Text := 'Clicking on a word will wavy underline it :)';
 
   imgPanel := TImage32Panel.Create(self);
   imgPanel.Parent := self;
