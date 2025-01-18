@@ -13,7 +13,7 @@ Image32 is a comprehensive 2D graphics library written entirely in Delphi Pascal
 
 Extensive documentation can be found [**here**](http://www.angusj.com/image32/Docs/_Body.htm).
 
-### Images from demo sample applications
+### Images &amp; videos from demo sample applications
 
 ![Layers201](https://user-images.githubusercontent.com/5280692/170442888-f64c2a1b-c99d-46fa-8e76-210706b484b0.png)<br>
 <a href="http://www.angusj.com/image32/Videos/layers201.mp4" target="_blank"><b>Layers201 video</b></a><br>
