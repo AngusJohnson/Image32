@@ -3,7 +3,7 @@ unit Img32.Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  17 January 2025                                                 *
+* Date      :  22 January 2025                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -696,6 +696,9 @@ type
   function FontManager: TFontManager;
 
 implementation
+
+uses
+  Img32.Transform;
 
 resourcestring
   rsChunkedTextRangeError  =
@@ -1979,19 +1982,14 @@ end;
 //------------------------------------------------------------------------------
 
 procedure AffineTransform(const a,b,c,d,e,f: double; var pathsEx: TPathsEx);
-const
-  q = 9.2863575e-4; // 33/35536
 var
   i,j: integer;
-  m0,n0,m,n,xx,me,nf: double;
+  mat: TMatrixD;
 begin
-  m0 := max(abs(a), abs(b));
-  n0 := max(abs(c), abs(d));
-
-  if (m0 = 0) or (n0 = 0) then
+  // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6glyf.html
+  if ((a = 0) and (b = 0)) or ((c = 0) and (d = 0)) then
   begin
     if (e = 0) and (f = 0) then Exit;
-
     for i := 0 to High(pathsEx) do
       for j := 0 to High(pathsEx[i]) do
         with pathsEx[i][j].pt do
@@ -1999,23 +1997,18 @@ begin
           X := X + e;
           y := Y + f;
         end;
-
   end else
   begin
-    // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6glyf.html
+    mat[0,0] := a;
+    mat[0,1] := b;
+    mat[1,0] := c;
+    mat[1,1] := d;
+    mat[2][0] := e;
+    mat[2][1] := f;
 
-    if (abs(a)-abs(c))< q then m := 2 * m0 else m := m0;
-    if (abs(b)-abs(d))< q then n := 2 * n0 else n := n0;
-
-    me := m*e; nf := n*f;
     for i := 0 to High(pathsEx) do
       for j := 0 to High(pathsEx[i]) do
-        with pathsEx[i][j].pt do
-        begin
-          xx :=a*X + c*Y + me;
-          y := b*X + d*Y + nf; // (#23)
-          X := xx;
-        end;
+        MatrixApply(mat, pathsEx[i][j].pt);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2025,9 +2018,9 @@ function TFontReader.GetCompositeGlyph(var tbl_glyf: TFontTable_Glyf;
 var
   streamPos: integer;
   flag, glyphIndex: WORD;
-  arg1b, arg2b: ShortInt;
-  arg1i, arg2i: Int16;
-  tmp: single;
+  arg1_i8, arg2_i8: ShortInt;
+  arg1_i16, arg2_i16: Int16;
+  tmp_single: single;
   a,b,c,d,e,f: double;
   componentPaths: TPathsEx;
   component_tbl_glyf: TFontTable_Glyf;
@@ -2055,56 +2048,59 @@ begin
 
     if (flag and ARG_1_AND_2_ARE_WORDS <> 0) then
     begin
-      GetInt16(fStream, arg1i);
-      GetInt16(fStream, arg2i);
+      GetInt16(fStream, arg1_i16);
+      GetInt16(fStream, arg2_i16);
       if (flag and ARGS_ARE_XY_VALUES <> 0) then
       begin
-        e := arg1i;
-        f := arg2i;
+        e := arg1_i16;
+        f := arg2_i16;
       end;
     end else
     begin
-      GetShortInt(fStream, arg1b);
-      GetShortInt(fStream, arg2b);
+      GetShortInt(fStream, arg1_i8);
+      GetShortInt(fStream, arg2_i8);
       if (flag and ARGS_ARE_XY_VALUES <> 0) then
       begin
-        e := arg1b;
-        f := arg2b;
+        e := arg1_i8;
+        f := arg2_i8;
       end;
     end;
 
     if (flag and WE_HAVE_A_SCALE <> 0) then
     begin
-      Get2Dot14(fStream, tmp);
-      a := tmp; d := tmp;
+      Get2Dot14(fStream, tmp_single);
+      a := tmp_single; d := tmp_single;
     end
     else if (flag and WE_HAVE_AN_X_AND_Y_SCALE <> 0) then
     begin
-      Get2Dot14(fStream, tmp); a := tmp;
-      Get2Dot14(fStream, tmp); d := tmp;
+      Get2Dot14(fStream, tmp_single); a := tmp_single;
+      Get2Dot14(fStream, tmp_single); d := tmp_single;
     end
     else if (flag and WE_HAVE_A_TWO_BY_TWO <> 0) then
     begin
-      Get2Dot14(fStream, tmp); a := tmp;
-      Get2Dot14(fStream, tmp); b := tmp;
-      Get2Dot14(fStream, tmp); c := tmp;
-      Get2Dot14(fStream, tmp); d := tmp;
+      Get2Dot14(fStream, tmp_single); a := tmp_single;
+      Get2Dot14(fStream, tmp_single); b := tmp_single;
+      Get2Dot14(fStream, tmp_single); c := tmp_single;
+      Get2Dot14(fStream, tmp_single); d := tmp_single;
     end;
 
-
-    streamPos := fStream.Position;
     component_tbl_hmtx := tbl_hmtx;
+
+    // GetGlyphPaths() will change the stream position, so save it.
+    streamPos := fStream.Position;
     componentPaths := GetGlyphPaths(glyphIndex, component_tbl_hmtx, component_tbl_glyf);
+    // return to saved stream position
     fStream.Position := streamPos;
 
     if (flag and ARGS_ARE_XY_VALUES <> 0) then
-      AffineTransform(a,b,c,d,e,f, componentPaths);
+      AffineTransform(a,b,c,d,e,f, componentPaths); // (#131)
 
     if (flag and USE_MY_METRICS <> 0) then
       tbl_hmtx := component_tbl_hmtx;               // (#24)
 
     if component_tbl_glyf.numContours > 0 then
     begin
+      if tbl_glyf.numContours < 0 then tbl_glyf.numContours := 0;
       inc(tbl_glyf.numContours, component_tbl_glyf.numContours);
       tbl_glyf.xMin := Min(tbl_glyf.xMin, component_tbl_glyf.xMin);
       tbl_glyf.xMax := Max(tbl_glyf.xMax, component_tbl_glyf.xMax);
