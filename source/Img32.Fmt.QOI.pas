@@ -99,7 +99,7 @@ end;
 
 function ReadByte(var p: PByte): Byte; {$IFDEF INLINE} inline; {$ENDIF}
 begin
-  Result := Byte(p^); //nb: Delphi 7 compatability
+  Result := Byte(p^); //nb: Delphi 7 compatibility
   inc(p);
 end;
 

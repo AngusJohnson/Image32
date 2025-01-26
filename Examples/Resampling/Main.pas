@@ -302,7 +302,7 @@ const
   loopCnt     = 20;
   // when performing multiple transformations then using a matrix
   // that combines these into a single transformation will be faster
-  useMatix    = false;//true;//
+  useMatrix    = false;//true;//
 begin
   dpi5 := DPIAware(5);
   dpi8 := DPIAware(8);
@@ -335,7 +335,7 @@ begin
     begin
       img.LoadFromResource('BEETLE', 'PNG');
       ResumeTimer(tr);
-      if useMatix then
+      if useMatrix then
         AffineTransformImage(img, mat)
       else begin
         img.Scale(scale);
@@ -356,7 +356,7 @@ begin
     begin
       img.LoadFromResource('BEETLE', 'PNG');
       ResumeTimer(tr);
-      if useMatix then
+      if useMatrix then
         AffineTransformImage(img, mat)
       else begin
         img.Scale(scale);
@@ -375,7 +375,7 @@ begin
     begin
       img.LoadFromResource('BEETLE', 'PNG');
       ResumeTimer(tr);
-      if useMatix then
+      if useMatrix then
         AffineTransformImage(img, mat)
       else begin
         img.Scale(scale);
@@ -393,7 +393,7 @@ begin
     begin
       img.LoadFromResource('BEETLE', 'PNG');
       ResumeTimer(tr);
-      if useMatix then
+      if useMatrix then
         AffineTransformImage(img, mat)
       else begin
         img.Scale(scale);
@@ -460,7 +460,7 @@ var
   rec, displayRect: TRect;
   mat             : TMatrixD;
 const
-  useMatix    = false;//true;//
+  useMatrix    = false;//true;//
 begin
   dpi8 := DPIAware(8);
 
@@ -511,7 +511,7 @@ begin
     img.SetSize(100,1);
     for i := 0 to 99 do
       img.Pixels[i] := RainbowColor(i/100);
-    if useMatix then
+    if useMatrix then
       AffineTransformImage(img, mat, true)
     else
     begin
@@ -534,7 +534,7 @@ begin
     img.SetSize(100,1);
     for i := 0 to 99 do
       img.Pixels[i] := RainbowColor(i/100);
-    if useMatix then
+    if useMatrix then
       AffineTransformImage(img, mat, true)
     else
     begin
@@ -558,7 +558,7 @@ begin
     img.SetSize(100,1);
     for i := 0 to 99 do
       img.Pixels[i] := RainbowColor(i/100);
-    if useMatix then
+    if useMatrix then
       AffineTransformImage(img, mat, true)
     else
     begin
@@ -581,7 +581,7 @@ begin
     img.SetSize(100,1);
     for i := 0 to 99 do
       img.Pixels[i] := RainbowColor(i/100);
-    if useMatix then
+    if useMatrix then
       AffineTransformImage(img, mat, true)
     else
     begin

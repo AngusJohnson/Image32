@@ -1069,7 +1069,7 @@ begin
     end;
 
     val := v64;
-    // Use Double for the remaining digits and loose precision (we are beyong 16 digits anyway)
+    // Use Double for the remaining digits and loose precision (we are beyond 16 digits anyway)
     if (Result < endC) and (Result >= blockEndC) then
     begin
       while Result < endC do
@@ -2232,7 +2232,7 @@ var
   attrib: PSvgAttrib;
 begin
   //there are 4 ways to load styles (in ascending precedence) -
-  //1. a class element style (called during element contruction)
+  //1. a class element style (called during element construction)
   //2. a non-element class style (called via a class attribute)
   //3. an inline style (called via a style attribute)
   //4. an id specific class style

@@ -141,9 +141,9 @@ type
 
   //A INotifyRecipient receives change notifications though a property
   //interface from a single NotifySender (eg a Font property).
-  //A NotifySender can send change notificatons to multiple NotifyRecipients
+  //A NotifySender can send change notifications to multiple NotifyRecipients
   //(eg where multiple object use the same font property). NotifyRecipients can
-  //still receive change notificatons from mulitple NotifySenders, but it
+  //still receive change notifications from multiple NotifySenders, but it
   //must use a separate property for each NotifySender. (Also there's little
   //benefit in using INotifySender and INotifyRecipient interfaces where there
   //will only be one receiver - eg scroll - scrolling window.)
@@ -478,7 +478,7 @@ type
   function BlendToAlpha(bgColor, fgColor: TColor32): TColor32;
   function BlendToAlpha3(bgColor, fgColor: TColor32; blendOpacity: Byte): TColor32;
   procedure BlendToAlphaLine(bgColor, fgColor: PColor32; width: nativeint);
-  //BlendMask: Whereever the mask is, preserves the background
+  //BlendMask: Wherever the mask is, preserves the background
   function BlendMask(bgColor, alphaMask: TColor32): TColor32;
   procedure BlendMaskLine(bgColor, alphaMask: PColor32; width: nativeint);
   function BlendAltMask(bgColor, alphaMask: TColor32): TColor32;
@@ -1098,7 +1098,7 @@ begin
     //combine alphas ...
     bgA := not MulTable[not fgA, not bgA];
     fgWeight := DivTable[fgA, bgA];     // fgWeight = amount foreground color
-                                        // contibutes to the result color
+                                        // contributes to the result color
 
     R     := PByteArray(@MulTable[fgWeight]);      // ie weight of foreground
     InvR  := PByteArray(@MulTable[not fgWeight]);  // ie weight of background
@@ -1128,7 +1128,7 @@ begin
     //combine alphas ...
     bgA := not MulTable[not fgA, not bgA];
     fgWeight := DivTable[fgA, bgA];     // fgWeight = amount foreground color
-                                        // contibutes to the result color
+                                        // contributes to the result color
 
     R     := PByteArray(@MulTable[fgWeight]);      // ie weight of foreground
     InvR  := PByteArray(@MulTable[not fgWeight]);  // ie weight of background
@@ -1166,7 +1166,7 @@ begin
     //combine alphas ...
     newBgA := not MulTable[not fgA, not bgA];
     fgWeight := DivTable[fgA, newBgA]; //fgWeight = amount foreground color
-                                       //contibutes to total (result) color
+                                       //contributes to total (result) color
 
     R     := PByteArray(@MulTable[fgWeight]);      //ie weight of foreground
     InvR  := PByteArray(@MulTable[not fgWeight]);  //ie weight of foreground
@@ -1264,7 +1264,7 @@ LabelBgAlphaIsZero:
     bgA := bgCol shr 24;
     bgA := not MulTable[not fgA, not bgA];
     fgWeight := DivTable[fgA, bgA]; //fgWeight = amount foreground color
-                                    //contibutes to total (result) color
+                                    //contributes to total (result) color
 
     R     := PByteArray(@MulTable[fgWeight]);      //ie weight of foreground
     InvR  := PByteArray(@MulTable[not fgWeight]);  //ie weight of foreground
@@ -1323,7 +1323,7 @@ begin
           //combine alphas ...
           bgA := not MulTable[not fgA, not bgA];
           fgWeight := DivTable[fgA, bgA]; //fgWeight = amount foreground color
-                                          //contibutes to total (result) color
+                                          //contributes to total (result) color
 
           R     := PByteArray(@MulTable[fgWeight]);      //ie weight of foreground
           InvR  := PByteArray(@MulTable[not fgWeight]);  //ie weight of foreground
@@ -2666,7 +2666,7 @@ begin
 
   if w * h = 0 then Exit;
   Types.IntersectRect(recClipped, rec, Bounds);
-  //if recClipped is wholely outside the bounds of the image ...
+  //if recClipped is completely outside the bounds of the image ...
   if IsEmptyRect(recClipped) then
   begin
     //rec is considered valid even when completely outside the image bounds,
@@ -2675,7 +2675,7 @@ begin
     Exit;
   end;
 
-  //if recClipped is wholely within the bounds of the image ...
+  //if recClipped is completely within the bounds of the image ...
   if RectsEqual(recClipped, rec) then
   begin
     pDst := @Result[0];
@@ -3012,7 +3012,7 @@ begin
     c := PixelBase;
     for i := 0 to Width * Height -1 do
     begin
-      //ignore colors with signifcant transparency
+      //ignore colors with significant transparency
       if GetAlpha(c^)  > $80 then
         allColors[c^ and $FFFFFF] := 1;
       inc(c);
@@ -3910,7 +3910,7 @@ begin
         begin
           if cLinear <= (0.0031308 * 255) then // adjust for cLinear being "cLiniear * 255"
             c := ClampByte(Integer(Round(12.92 * cLinear)))
-          else // for Power we must divide by 255 and then later multipy by 255
+          else // for Power we must divide by 255 and then later multiply by 255
             //c := ClampByte(Integer(Round((1.055 * 255) * Power(cLinear / 255, 1/2.4) - (0.055 * 255))));
         end;
 

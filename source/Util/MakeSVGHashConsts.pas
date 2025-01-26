@@ -107,7 +107,7 @@ var
     s: string;
     n: Char;
   begin
-    //hypens etc not allowed in const names
+    //hyphens etc not allowed in const names
     len := Length(name);
     //accommodate prepended 'h' plus (?) non-alphaNum.
     SetLength(Result, len +1 + 5*(5));

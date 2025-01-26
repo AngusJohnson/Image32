@@ -325,7 +325,7 @@ begin
   Result := FontManager.LoadFontReaderFamily(fontFaceName, frf);
   if Result = lfrInvalid then Exit;
 
-  // convert the device independant font point size into the pixel height
+  // convert the device independent font point size into the pixel height
   fontHeight := GetFontPixelHeight(logFont.lfHeight);
 
   if Assigned(regularCache) then

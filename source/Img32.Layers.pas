@@ -583,7 +583,7 @@ begin
   if not Assigned(parent) then
     CreateInternal(nil, name)
   else if parent.InheritsFrom(TLayer32) then
-    //this constructor is commonly overrided in descendant layer classes
+    //this constructor is commonly overridden in descendant layer classes
     Create(TLayer32(parent), name)
   else
   begin

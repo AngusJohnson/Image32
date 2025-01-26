@@ -386,7 +386,7 @@ begin
   // let m2 = slope at pixel_c (using slope of pixel_d - pixel_b)
   // then t(0) = aa(0^3) + bb(0^2) + cc(0) + dd = dd
   // then t(1) = aa(1^3) + bb(1^2) + cc(1) + dd = aa + bb + cc + dd
-  // differentiating parametic equation at t'(0) and t'(1) ...
+  // differentiating parametric equation at t'(0) and t'(1) ...
   // t'(0) = m0 = 3*aa(0^2) + 2*bb(0) + cc = cc
   // t'(1) = m1 = 3*aa(1^2) + 2*bb(1) + cc = 3*aa + 2*bb + cc
   // t(0)  = dd                 ::EQ1
@@ -539,8 +539,8 @@ begin
   inc(pDst, count);
   count := -count;
 
-  // This function is optmized with the assumption that if a pixel has a certain
-  // alpha channel, then the propability that the following pixels have the same
+  // This function is optimized with the assumption that if a pixel has a certain
+  // alpha channel, then the probability that the following pixels have the same
   // alpha channel, is very high.
 
   c := PColor32Array(pSrc)[count];
