@@ -3,7 +3,7 @@ unit Img32.Panels;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.7                                                             *
-* Date      :  16 January 2025                                                 *
+* Date      :  26 January 2025                                                 *
 * Website   :  http:// $1ww.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  Component that displays images on a TPanel descendant           *
@@ -65,6 +65,7 @@ type
     fOnScrolling    : TNotifyEvent;
     fOnZooming      : TNotifyEvent;
     fOnMouseWheel   : TMouseWheelEvent;
+    fCursor         : TCursor;
 {$IFDEF GESTURES}
     fLastDistance: integer;
     fLastLocation: TPoint;
@@ -73,6 +74,7 @@ type
     fBkgChBrdColor1 : TColor32;
     fBkgChBrdColor2 : TColor32;
     fBkgChBrdSize : Integer;
+    procedure SetCursor(cursor: TCursor);
     procedure UpdateOffsetDelta(resetOrigin: Boolean);
     function  GetMinScrollBtnSize: integer;
     function  GetDstOffset: TPoint;
@@ -163,6 +165,7 @@ type
     property OnMouseWheel: TMouseWheelEvent read FOnMouseWheel write FOnMouseWheel;
     property OnScrolling: TNotifyEvent read fOnScrolling write fOnScrolling;
     property OnZooming: TNotifyEvent read fOnZooming write fOnZooming;
+    property Cursor: TCursor read fCursor write SetCursor;
   end;
 
   TImage32Panel = class(TBaseImgPanel)
@@ -388,6 +391,7 @@ begin
   fAutoCenter := true;
   fFocusedColor := RgbColor(clActiveCaption);
   fUnfocusedColor := clBtnFace;
+  fCursor := inherited Cursor;
   fScale := 1.0;
   fScaleMin := 0.05;
   fScaleMax := 20;
@@ -771,7 +775,7 @@ begin
       fScrollbarHorz.MouseOver := false;
       fScrollbarVert.MouseOver := false;
     end;
-    cursor := crDefault;
+    cursor := fCursor;
     inherited;
     Exit;
   end;
@@ -790,7 +794,7 @@ begin
           if not fScrollbarVert.MouseOver then Invalidate;
           fScrollbarVert.MouseOver := true;
         end else
-          cursor := crDefault;
+          cursor := fCursor;
       end
       else if (Y >= rec.Bottom) and (fScrollbarHorz.btnSize > 0) then
       begin
@@ -798,7 +802,7 @@ begin
         if not fScrollbarHorz.MouseOver then Invalidate;
         fScrollbarHorz.MouseOver := true;
       end else
-        cursor := crDefault;
+        cursor := fCursor;
     end;
     Exit;
   end;
@@ -1142,6 +1146,13 @@ begin
       Message.Result := 1 else
       Message.Result := 0;
   end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TBaseImgPanel.SetCursor(cursor: TCursor);
+begin
+  inherited Cursor := cursor;
+  fCursor := cursor;
 end;
 //------------------------------------------------------------------------------
 
