@@ -116,7 +116,7 @@ begin
   timer := TTimer.Create(self);
   timer.OnTimer := Timer1Timer;
   //There are 60 images to cycle through here every second so, given that the
-  //time to execute the OnTimer event is negligble, I'd expect to set the timer
+  //time to execute the OnTimer event is negligible, I'd expect to set the timer
   //interval to about 17 msec (ie 1000/60), though Delphi's TTimer (a wrapper
   //for Windows' SetTimer / WM_TIMER event) isn't very accurate.
   timer.Interval := 15;

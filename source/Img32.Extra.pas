@@ -45,7 +45,7 @@ procedure DrawGlow(img: TImage32; const polygon: TPathD;
 procedure DrawGlow(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; color: TColor32; blurRadius: integer); overload;
 
-//FloodFill: If no CompareFunc is provided, FloodFill will fill whereever
+//FloodFill: If no CompareFunc is provided, FloodFill will fill wherever
 //adjoining pixels exactly match the starting pixel - Point(x,y).
 procedure FloodFill(img: TImage32; x, y: Integer; newColor: TColor32;
   tolerance: Byte = 0; compareFunc: TCompareFunctionEx = nil);

@@ -1322,7 +1322,7 @@ begin
       clipRec := maskRec;
     end;
 
-    // Translate the maskRec, the matix and the clipRec to minimize
+    // Translate the maskRec, the matrix and the clipRec to minimize
     // the size of the mask image.
     dstClipRec := clipRec; // save for blending tmpImg to image
     offsetX := -clipRec.Left;

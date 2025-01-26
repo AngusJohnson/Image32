@@ -14,7 +14,7 @@
      from Wikimedia Commons
      plot-range: 0 to 2pi
      plotted with three different cubic bezier-curves
-     the bezier-controll-points are calculated to give a very accurate result.
+     the bezier-control-points are calculated to give a very accurate result.
      symbols in "Computer Modern" (TeX) font embedded
      created with a plain text editor using GNU/Linux
 
@@ -357,7 +357,7 @@
       </g>
     </g>
 
-    <!-- the controll points lie on the tangents of the function.
+    <!-- the control points lie on the tangents of the function.
          they are furthermore positioned in a way to minimize the average
          quadratic distance between the bezier-curve and the function. -->
     

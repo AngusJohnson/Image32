@@ -506,7 +506,7 @@ begin
 end;
 // ------------------------------------------------------------------------------
 
-// Here "const" is used for opimization reasons, to skip the
+// Here "const" is used for optimization reasons, to skip the
 // dyn-array reference counting. "const" for dyn-arrays doesn't
 // prevent one from changing the array's content.
 procedure ReverseColors(const colors: TArrayOfGradientColor);
@@ -1848,7 +1848,7 @@ procedure TCustomGradientRenderer.SetParameters(startColor, endColor: TColor32;
   gradFillStyle: TGradientFillStyle = gfsClamp);
 begin
   SetGradientFillStyle(gradFillStyle);
-  // reset gradient colors if perviously set
+  // reset gradient colors if previously set
   SetLength(fGradientColors, 2);
   fGradientColors[0].offset := 0;
   fGradientColors[0].color := startColor;

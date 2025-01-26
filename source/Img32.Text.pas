@@ -354,7 +354,7 @@ type
     function GetBestMatchFont(const fontInfo: TFontInfo): TFontReader; overload;
     function GetBestMatchFont(const styles: TMacStyles): TFontReader; overload;
     // FindReaderContainingGlyph: returns a TFontReader object containing the
-    // specified glyph, otherwise nil. If a fontfamily is spedified, then the
+    // specified glyph, otherwise nil. If a fontfamily is specified, then the
     // search is limited to within that font family. If a TFontReader is found
     // then the out 'glyphIdx' parameter contains the index to the glyph
     // matching the supplied codepoint.
@@ -486,7 +486,7 @@ type
   TDrawChunkEvent = procedure(chunk: TTextChunk; const chunkRec: TRectD) of object;
 
   // TChunkedText: A font formatted list of text 'chunks' (usually space
-  // seperated words) that will greatly speed up displaying word-wrapped text.
+  // separated words) that will greatly speed up displaying word-wrapped text.
   TChunkedText = class
   private
     fSpaceWidth   : double;
@@ -586,7 +586,7 @@ type
     procedure Clear;
     // TFontCache is both an INotifySender and an INotifyRecipient.
     // It receives notifications from a TFontReader object and it sends
-    // notificiations to any number of TFontCache object users
+    // notifications to any number of TFontCache object users
     procedure ReceiveNotification(Sender: TObject; notify: TImg32Notification);
     procedure AddRecipient(recipient: INotifyRecipient);
     procedure DeleteRecipient(recipient: INotifyRecipient);
@@ -736,9 +736,9 @@ const
   secsPerLeapYr = secsPerNormYr + secsPerDay;
   secsPer4Years = secsPerNormYr * 3 + secsPerLeapYr;    // 126230400;
 begin
-  // Leap years are divisble by 4, except for centuries which are not
-  // leap years unless they are divisble by 400. (Hence 2000 was a leap year,
-  // but 1900 was not. But 1904 was a leap year because it's divisble by 4.)
+  // Leap years are divisible by 4, except for centuries which are not
+  // leap years unless they are divisible by 400. (Hence 2000 was a leap year,
+  // but 1900 was not. But 1904 was a leap year because it's divisible by 4.)
   // Validate at http://www.mathcats.com/explore/elapsedtime.html
 
   ss := (secsSince1904 div secsPer4Years);    // count '4years' since 1904
@@ -3234,7 +3234,7 @@ function GetTextOutlineOnPath(const text: UnicodeString;
   out charsThatFit: integer; out outX: double): TPathsD;
 var
   pathLen, pathLenMin1: integer;
-  cummDists: TArrayOfDouble; // cummulative distances
+  cummDists: TArrayOfDouble; // cumulative distances
   i, currentPathIdx: integer;
   textWidth, glyphCenterX, glyphCenterOnPath, dist, dx: double;
   glyph: PGlyphInfo;

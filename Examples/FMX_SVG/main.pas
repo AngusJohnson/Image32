@@ -79,7 +79,7 @@ begin
   // generated (raster) images to their display sizes, specify image sizes
   // BEFORE loading. (This isn't important here because the size differences
   // between the native SVG and display image sizes will be small, but this
-  // 'pre-sizing' will be important whenever there will be signficant scaling.)
+  // 'pre-sizing' will be important whenever there will be significant scaling.)
   // Of course 'pre-sizing' only works with SVG images because image resampling
   // can't be bypassed when scaling raster images (PNG, BMP formats etc.)
   img.SetSize(w, h);
