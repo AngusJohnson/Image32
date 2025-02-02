@@ -4,10 +4,10 @@ unit Img32.Extra;
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
 * Date      :  2 February 2025                                                 *
-* Website   :  http://www.angusj.com                                           *
+* Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  Miscellaneous routines that don't belong in other modules.      *
-* License   :  http://www.boost.org/LICENSE_1_0.txt                            *
+* License   :  https://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
 interface
@@ -63,7 +63,7 @@ procedure Emboss(img: TImage32; radius: Integer = 1; depth: Integer = 10;
   luminance: Integer = 75; preserveColor: Boolean = false);
 
 // Sharpen: Radius range is 1 - 10; amount range is 1 - 50.<br>
-// see https:// en.wikipedia.org/wiki/Unsharp_masking
+// see https://en.wikipedia.org/wiki/Unsharp_masking
 procedure Sharpen(img: TImage32; radius: Integer = 2; amount: Integer = 10);
 
 // Hatch: This will overwrite the image and ignore any transparency
@@ -91,7 +91,7 @@ procedure ReplaceExactColor(img: TImage32; oldColor, newColor: TColor32);
 
 // RemoveColor: Removes the specified color from the image, even from
 // pixels that are a blend of colors including the specified color.<br>
-// see https:// stackoverflow.com/questions/9280902/
+// see https://stackoverflow.com/questions/9280902/
 procedure RemoveColor(img: TImage32; color: TColor32);
 procedure RemoveExactColor(img: TImage32; color: TColor32);
 // RemoveAllExceptColor: Opposite of RemoveColor

@@ -4,10 +4,10 @@ unit Img32.Panels;
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
 * Date      :  2 Febuary 2025                                                  *
-* Website   :  http://www.angusj.com                                           *
+* Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  Component that displays images on a TPanel descendant           *
-* License   :  http://www.boost.org/LICENSE_1_0.txt                            *
+* License   :  https://www.boost.org/LICENSE_1_0.txt                           *
 *******************************************************************************)
 
 interface
