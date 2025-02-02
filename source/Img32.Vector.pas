@@ -2,8 +2,8 @@ unit Img32.Vector;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.7                                                             *
-* Date      :  6 January 2025                                                  *
+* Version   :  4.8                                                             *
+* Date      :  2 February 2025                                                 *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -159,13 +159,11 @@ type
     pathEnd: TPathEnd; amount: double): TPathD;
 
   //GetDashPath: Returns a polyline (not polygons)
-  function GetDashedPath(const path: TPathD;
-    closed: Boolean; const pattern: TArrayOfDouble;
-    patternOffset: PDouble): TPathsD;
+  function GetDashedPath(const path: TPathD; closed: Boolean;
+    const pattern: TArrayOfDouble; patternOffset: PDouble): TPathsD;
 
-  function GetDashedOutLine(const path: TPathD;
-    closed: Boolean; const pattern: TArrayOfDouble;
-    patternOffset: PDouble; lineWidth: double;
+  function GetDashedOutLine(const path: TPathD; closed: Boolean;
+    const pattern: TArrayOfDouble; patternOffset: PDouble; lineWidth: double;
     joinStyle: TJoinStyle; endStyle: TEndStyle): TPathsD;
 
   function TranslatePoint(const pt: TPoint; dx, dy: integer): TPoint; overload;
@@ -2454,7 +2452,7 @@ begin
   stepsPerRadian := 0;
   if joinStyle = jsRound then
   begin
-    steps := CalcRoundingSteps(delta * scale);
+    steps := 2 * CalcRoundingSteps(delta * scale);
     stepSin := sin(TwoPi/steps);
     stepCos := cos(TwoPi/steps);
 		if (delta < 0) then stepSin := -stepSin;
@@ -2746,7 +2744,7 @@ begin
   stepsPerRadian := 0;
   if (joinStyle = jsRound) or (endStyle = esRound) then
   begin
-    steps := CalcRoundingSteps(delta * scale);
+    steps := 2 * CalcRoundingSteps(delta * scale);
     stepSin := sin(TwoPi/steps);
     stepCos := cos(TwoPi/steps);
 		if (delta < 0) then stepSin := -stepSin;
@@ -3441,9 +3439,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetDashedPath(const path: TPathD;
-  closed: Boolean; const pattern: TArrayOfDouble;
-  patternOffset: PDouble): TPathsD;
+function GetDashedPath(const path: TPathD; closed: Boolean;
+  const pattern: TArrayOfDouble; patternOffset: PDouble): TPathsD;
 var
   i, highI, paIdx: integer;
   vecs, path2, dash: TPathD;

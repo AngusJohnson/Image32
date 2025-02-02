@@ -3,9 +3,9 @@ unit Img32.Ctrl;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  0.0 (Experimental)                                              *
-* Date      :  26 December 2024                                                *
+* Date      :  2 February 2025                                                 *
 * Website   :  http://www.angusj.com                                           *
-* Copyright :  Angus Johnson 2019-2024                                         *
+* Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
 * Purpose   :  Drawing controls (buttons, labels, edits, tabs, pages etc.)     *
 *              This unit is EXPERIMENTAL. To do this properly would be a huge  *
@@ -2672,14 +2672,13 @@ begin
   if not ScrollVAutoHide and scrollShowing then
     rec.Right := rec.Right - ScrollV.Width;
 
-  if (fPageMetrics.pageWidth > 0) and (rec.Width = fTextRect.Width) and
+  if (RectWidth(fPageMetrics.bounds) > 0) and (rec.Width = fTextRect.Width) and
     (rec.Height = fTextRect.Height) then Exit;
 
   fTextRect := rec;
-  fPageMetrics := fChunkedText.GetPageMetrics(fTextRect.Width,
-    MaxDouble, fUsableFont.LineHeight, 0);
+  fPageMetrics := fChunkedText.GetPageMetrics(Rect(fTextRect), fUsableFont.LineHeight, 0);
 
-  if fPageMetrics.pageHeight < fTextRect.Height then
+  if RectHeight(fPageMetrics.bounds) < fTextRect.Height then
   begin
     if scrollShowing and ScrollVAutoHide then ScrollV.Visible := false;
   end
@@ -2687,15 +2686,14 @@ begin
   begin
     if not scrollShowing then ScrollV.Visible := true;
     fTextRect.Right := fTextRect.Right - ScrollV.Width;
-    fPageMetrics := fChunkedText.GetPageMetrics(fTextRect.Width,
-      MaxDouble, fUsableFont.LineHeight, 0);
+    fPageMetrics := fChunkedText.GetPageMetrics(Rect(fTextRect), fUsableFont.LineHeight, 0);
   end;
 
   if Assigned(ScrollV) and ScrollV.Visible then
   begin
     with fPageMetrics do
     begin
-      ScrollV.Max := Round(pageHeight);
+      ScrollV.Max := Round(RectHeight(bounds));
       ScrollV.Step := Round(lineHeight);
     end;
     ScrollV.Invalidate;
@@ -2707,7 +2705,7 @@ procedure TMemoCtrl.SetFont(font: TFontCache);
 begin
   inherited;
   if not Assigned(fUsableFont) then Exit;
-  fPageMetrics.pageWidth := 0; // force a fPageMetrics refresh
+  fPageMetrics.bounds := NullRect; // force a fPageMetrics refresh
   fPageMetrics.lineHeight := fUsableFont.LineHeight;
   if fText <> '' then
     fChunkedText.ApplyNewFont(fUsableFont);
@@ -2716,8 +2714,8 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TMemoCtrl.ScrollCaretIntoView;
-var
-  visLines: integer;
+//var
+//  visLines: integer;
 begin
 //  visLines := GetVisibleLines;
 //  if fCursorChunkIdx.X < fPageMetrics.chunkIdxAtStartOfLine[fTopLine] then
@@ -2926,7 +2924,7 @@ begin
   inherited;
   if not GetUsableFont then Exit;
   fPageMetrics.lineHeight := fUsableFont.LineHeight;
-  fPageMetrics.pageWidth := 0; // force a fPageMetrics refresh
+  fPageMetrics.bounds := NullRect; // force a fPageMetrics refresh
   fChunkedText.SetText(text, fUsableFont);
   fTopLine := 0;
   Invalidate;
@@ -2960,7 +2958,7 @@ begin
   //get WordIdx's start of line index
   i := 0;
   while (i < fPageMetrics.lineCount) and
-    (wordIdx.X >= fPageMetrics.chunkIdxAtStartOfLine[i+1]) do inc(i);
+    (wordIdx.X >= fPageMetrics.startOfLineIdx[i+1]) do inc(i);
 
   //with the line index we now have Y pos
   Result.Y := (i - fTopLine) * fPageMetrics.lineHeight;
@@ -2969,7 +2967,7 @@ begin
   spcW := fPageMetrics.justifyDeltas[i];
 
   //get the start of the word
-  i := fPageMetrics.chunkIdxAtStartOfLine[i];
+  i := fPageMetrics.startOfLineIdx[i];
   x := 0;
   while (i < wordIdx.X) do
     with fChunkedText[i] do
@@ -2987,7 +2985,7 @@ begin
   end else
   begin
     chunk := fChunkedText[wordIdx.X];
-    chrOffs := fUsableFont.GetCharOffsets(chunk.text);
+    chrOffs := fUsableFont. GetGlyphOffsets(chunk.text);
     if wordIdx.Y >= length(chunk.text) then
       x := x + chrOffs[length(chunk.text) -1] else
       x := x + chrOffs[wordIdx.Y];
@@ -3008,7 +3006,7 @@ var
   chunk       : TTextChunk;
 begin
   Result := NullPoint;
-  if not GetUsableFont or (fPageMetrics.pageWidth = 0) then Exit;
+  if not GetUsableFont or (fPageMetrics.bounds.IsEmpty) then Exit;
 
   x2 := relPos.X - fTextMargin.X;
   y2 := relPos.Y - fTextMargin.Y;
@@ -3024,7 +3022,7 @@ begin
     Exit;
 
   //get start of line
-  Result.X := fPageMetrics.chunkIdxAtStartOfLine[i];
+  Result.X := fPageMetrics.startOfLineIdx[i];
 
   //and also the justify amounts for spaces
   spcW := fPageMetrics.justifyDeltas[i];
@@ -3054,7 +3052,7 @@ begin
   if not Assigned(chunk) or (chunk.text = #10) then Exit;
 
   //and calc the char offset.
-  offs := fUsableFont.GetCharOffsets(chunk.text);
+  offs := fUsableFont.GetGlyphOffsets(chunk.text);
 
   if (chunk.text = #32) and
     (x2 - x > (chunk.width + spcW)/2) then inc(Result.X)
@@ -3091,7 +3089,7 @@ end;
 procedure TMemoCtrl.FontChanged;
 begin
   inherited;
-  fPageMetrics.pageWidth := 0; // force a fPageMetrics refresh
+  fPageMetrics.bounds := NullRect; // force a fPageMetrics refresh
   if not Assigned(fUsableFont) or (fChunkedText.Count = 0) then Exit;
   fChunkedText.ApplyNewFont(fUsableFont);
   Invalidate;
@@ -3126,7 +3124,7 @@ begin
   CheckPageMetrics;
 
   fChunkedText.DrawText(Image, Rect(fTextRect), taJustify, tvaTop,
-    fPageMetrics.chunkIdxAtStartOfLine[fTopLine]);
+    fPageMetrics.startOfLineIdx[fTopLine]);
 
   if not IsValid(fCursorChunkIdx) then Exit;
 
@@ -3179,9 +3177,9 @@ begin
 
   i := fTopLine + GetVisibleLines;
   if not IsValid(fCursorChunkIdx) or
-    (fCursorChunkIdx.X < fPageMetrics.chunkIdxAtStartOfLine[fTopLine]) or
+    (fCursorChunkIdx.X < fPageMetrics.startOfLineIdx[fTopLine]) or
     (i >= fPageMetrics.lineCount) or
-    (fCursorChunkIdx.X >= fPageMetrics.chunkIdxAtStartOfLine[i]) then Exit;
+    (fCursorChunkIdx.X >= fPageMetrics.startOfLineIdx[i]) then Exit;
 
   i := Ceil(fPageMetrics.lineHeight * 0.1);
   selStartPt := WordIdxToPos(fCursorChunkIdx);
@@ -3515,7 +3513,7 @@ begin
   if not GetUsableFont then Exit;
   fChunkedText.SetText(text, fUsableFont, fFontColor);
   rec := GetTextRect(true);
-  fPageMetrics := fChunkedText.GetPageMetrics(rec.Width, rec.Height, 0.0, 0);
+  fPageMetrics := fChunkedText.GetPageMetrics(Rect(rec), 0.0, 0);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -3585,7 +3583,7 @@ begin
   if j = fChunkedText.Count then Exit;
 
   chunk := fChunkedText[j];
-  chrOffs := fUsableFont.GetCharOffsets(chunk.text);
+  chrOffs := fUsableFont.GetGlyphOffsets(chunk.text);
   if wordIdx.Y >= length(chunk.text) then
     Result.X := Result.X + chrOffs[length(chunk.text) -1];
     Result.X := Result.X + chrOffs[wordIdx.Y];
@@ -3622,7 +3620,7 @@ begin
 
   //and calc the char offset.
   if not GetUsableFont then Exit;
-  offs := fUsableFont.GetCharOffsets(chunk.text);
+  offs := fUsableFont.GetGlyphOffsets(chunk.text);
 
   d := x - d;
   len := length(chunk.text);
@@ -4855,8 +4853,8 @@ begin
   rec := InnerRect;
   TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   rec2 := Rect(rec);
+  Hatch(Image, rec2, clWhite32, clBtnFace32, DPIAware(3));
 
-  HatchBackground(Image, rec2, clWhite32, clBtnFace32, DPIAware(3));
   //draw the outer border
   DrawEdge(Image, rec, clSilver32, clWhite32, fBevelHeight);
   //draw the progress
@@ -5009,7 +5007,7 @@ begin
   rec := InnerRect;
   TranslateRect(rec, OuterMargin, OuterMargin);
   recI := Rect(rec);
-  HatchBackground(Image, recI, clWhite32, clBtnFace32, DPIAware(3));
+  Hatch(Image, recI, clWhite32, clBtnFace32, DPIAware(3));
 
   //draw the outer border
   DrawEdge(Image, recI, clSilver32, clWhite32, BevelHeight);
@@ -5555,7 +5553,7 @@ begin
   rec := InnerRect;
   TranslateRect(rec, OuterMargin, OuterMargin);
   recI := Rect(rec);
-  HatchBackground(Image, recI, clWhite32, clBtnFace32, DPIAware(3));
+  Hatch(Image, recI, clWhite32, clBtnFace32, DPIAware(3));
 
   rec2 := rec;
   if fOrientation = soVertical then

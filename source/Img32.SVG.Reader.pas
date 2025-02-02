@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  25 January 2025                                                 *
+* Date      :  2 Febuary 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -5562,9 +5562,9 @@ begin
   begin
     if viewboxWH.IsEmpty then
     begin
+      if not elRectWH.IsValid then Exit;  // should never happen
       viewboxWH.Width := elRectWH.width.GetValue(defaultSvgWidth, 0);
       viewboxWH.height := elRectWH.height.GetValue(defaultSvgHeight, 0);
-      if viewboxWH.IsEmpty then Exit;  // this should never happen
     end;
 
     fBackgndImage := img;

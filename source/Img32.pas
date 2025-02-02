@@ -271,9 +271,10 @@ type
     procedure Assign(src: TImage32);
     procedure AssignTo(dst: TImage32);
     procedure AssignSettings(src: TImage32);
-    //AssignPixelArray: Replaces the content and takes ownership of src.
-    //  Uses src for the pixels without copying it.
-    procedure AssignPixelArray(const src: TArrayOfColor32; width: Integer; height: Integer);
+    // AssignPixelArray: Replaces the image content and
+    // takes ownership of 'src' unless forceCopy is true
+    procedure AssignPixelArray(const src: TArrayOfColor32;
+      width: Integer; height: Integer; forceCopy: Boolean = false);
 
     //SetSize: Erases any current image, and fills with the specified color.
     procedure SetSize(newWidth, newHeight: Integer; color: TColor32 = 0);
@@ -1075,9 +1076,9 @@ begin
     bw := PByteArray(@MulTable[not fgA]); //ie weight of background
 
     Result := $FF000000
-              or (TColor32(Byte(fw[Byte(fgColor shr 16)] + bw[Byte(bgColor shr 16)])) shl 16)
-              or (TColor32(Byte(fw[Byte(fgColor shr 8 )] + bw[Byte(bgColor shr  8)])) shl  8)
-              or (TColor32(Byte(fw[Byte(fgColor       )] + bw[Byte(bgColor       )]))       );
+      or (TColor32(Byte(fw[Byte(fgColor shr 16)] + bw[Byte(bgColor shr 16)])) shl 16)
+      or (TColor32(Byte(fw[Byte(fgColor shr 8 )] + bw[Byte(bgColor shr  8)])) shl  8)
+      or (TColor32(Byte(fw[Byte(fgColor       )] + bw[Byte(bgColor       )]))       );
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1104,9 +1105,9 @@ begin
     InvR  := PByteArray(@MulTable[not fgWeight]);  // ie weight of background
 
     Result := bgA shl 24
-              or (TColor32(R[Byte(fgColor shr 16)] + InvR[Byte(bgColor shr 16)]) shl 16)
-              or (TColor32(R[Byte(fgColor shr 8 )] + InvR[Byte(bgColor shr  8)]) shl  8)
-              or (TColor32(R[Byte(fgColor)       ] + InvR[Byte(bgColor)       ])       );
+      or (TColor32(R[Byte(fgColor shr 16)] + InvR[Byte(bgColor shr 16)]) shl 16)
+      or (TColor32(R[Byte(fgColor shr 8 )] + InvR[Byte(bgColor shr  8)]) shl  8)
+      or (TColor32(R[Byte(fgColor)       ] + InvR[Byte(bgColor)       ])       );
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1134,9 +1135,9 @@ begin
     InvR  := PByteArray(@MulTable[not fgWeight]);  // ie weight of background
 
     Result := bgA shl 24
-              or (TColor32(R[Byte(fgColor shr 16)] + InvR[Byte(bgColor shr 16)]) shl 16)
-              or (TColor32(R[Byte(fgColor shr 8 )] + InvR[Byte(bgColor shr  8)]) shl  8)
-              or (TColor32(R[Byte(fgColor)       ] + InvR[Byte(bgColor)       ])       );
+      or (TColor32(R[Byte(fgColor shr 16)] + InvR[Byte(bgColor shr 16)]) shl 16)
+      or (TColor32(R[Byte(fgColor shr 8 )] + InvR[Byte(bgColor shr  8)]) shl  8)
+      or (TColor32(R[Byte(fgColor)       ] + InvR[Byte(bgColor)       ])       );
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2426,7 +2427,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.AssignPixelArray(const src: TArrayOfColor32; width: Integer; height: Integer);
+procedure TImage32.AssignPixelArray(const src: TArrayOfColor32;
+  width: Integer; height: Integer; forceCopy: Boolean = false);
 var
   wasResized: Boolean;
 begin
@@ -2436,12 +2438,16 @@ begin
     raise Exception.Create(rsInvalidImageArrayData);
 
   wasResized := (fWidth <> width) or (fHeight <> height);
-
   BeginUpdate;
   try
     fWidth := width;
     fHeight := height;
-    fPixels := src;
+    if forceCopy then
+    begin
+      SetLength(fPixels, width * height);
+      Move(src[0], fPixels[0], width * height * SizeOf(TColor32));
+    end else
+      fPixels := src;
   finally
     EndUpdate;
   end;

@@ -2,8 +2,8 @@ unit Img32.Layers;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
-* Version   :  4.7                                                             *
-* Date      :  6 January 2025                                                  *
+* Version   :  4.8                                                             *
+* Date      :  2 Febuary 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  Layered images support                                          *
@@ -74,7 +74,6 @@ type
 {$IFNDEF NO_STORAGE}
     fStreamingRec   : TRectWH;
 {$ENDIF}
-    fDesignerLayer  : Boolean;
     function  GetMidPoint: TPointD;
     procedure SetVisible(value: Boolean);
     procedure SetHeight(value: double);
@@ -91,7 +90,8 @@ type
     procedure SetOuterMargin(value: double);
     procedure CreateInternal(parent: TStorage = nil; const name: string = '');
   protected
-    UpdateInfo : TUpdateInfo;
+    fIsDesignLayer  : Boolean;
+    fUpdateInfo     : TUpdateInfo;
     procedure SetDesignerLayer(value: Boolean);
     function  GetUpdateNeeded: Boolean;
     procedure DoBeforeMerge; virtual;
@@ -111,6 +111,7 @@ type
     procedure SetOpacity(value: Byte); virtual;
     procedure ImageChanged(Sender: TImage32); virtual;
     procedure UpdateLayeredImage(newLayeredImage: TLayeredImage32);
+    property  UpdateInfo: TUpdateInfo read fUpdateInfo;
     property  UpdateNeeded : Boolean read GetUpdateNeeded;
   public
     constructor Create(parent: TStorage = nil; const name: string = ''); overload; override;
@@ -152,7 +153,7 @@ type
     //Portions of child layers residing outside this region  will be clipped.
     property   ClipPath: TPathsD read fClipPath write SetClipPath;
     procedure  Offset(dx, dy: double); overload; virtual;
-    property   IsDesignerLayer: Boolean read fDesignerLayer;
+    property   IsDesignerLayer: Boolean read fIsDesignLayer write SetDesignerLayer;
     property   InnerBounds: TRectD read GetInnerBounds;
     property   InnerRect: TRectD read GetInnerRectD;
     property   OuterBounds: TRectD read GetOuterBounds;
@@ -235,6 +236,7 @@ type
     fPaths    : TPathsD;
     fOnDraw   : TNotifyEvent;
     procedure RepositionAndDraw;
+    function  GetPositionAdjustedPaths: TPathsD;
   protected
     procedure SetPaths(const newPaths: TPathsD); virtual;
     procedure Draw; virtual;
@@ -245,7 +247,10 @@ type
     function  Rotate(angleDelta: double): Boolean; override;
     procedure UpdateHitTestMask(const vectorRegions: TPathsD); virtual;
     procedure UpdateHitTestMaskFromImage;
+    procedure AppendPoint(const pt: TPointD);
+    procedure AppendPath(const path: TPathD);
     property  Paths: TPathsD read fPaths write SetPaths;
+    property  PathsPositionAdjusted: TPathsD read GetPositionAdjustedPaths;
     property  OnDraw: TNotifyEvent read fOnDraw write fOnDraw;
   end;
 
@@ -579,7 +584,7 @@ end;
 
 constructor TLayer32.Create(parent: TStorage; const name: string);
 begin
-  fDesignerLayer := true; //must do this first
+  fIsDesignLayer := true; //must do this first
   if not Assigned(parent) then
     CreateInternal(nil, name)
   else if parent.InheritsFrom(TLayer32) then
@@ -612,9 +617,9 @@ begin
   begin
     Invalidate;
     rec := OuterBounds;
-    if not UpdateInfo.priorPosition.IsEmpty then
+    if not fUpdateInfo.priorPosition.IsEmpty then
     begin
-      rec := Parent.MakeAbsolute(UpdateInfo.priorPosition);
+      rec := Parent.MakeAbsolute(fUpdateInfo.priorPosition);
       with fLayeredImage do
         fInvalidRect := UnionRect(fInvalidRect, rec);
     end;
@@ -628,7 +633,7 @@ end;
 
 procedure TLayer32.SetDesignerLayer(value: Boolean);
 begin
-  fDesignerLayer := value;
+  fIsDesignLayer := value;
 end;
 //------------------------------------------------------------------------------
 
@@ -653,7 +658,7 @@ end;
 
 function TLayer32.GetUpdateNeeded: Boolean;
 begin
-     Result := (UpdateInfo.updateMethod <> umNone);
+     Result := (fUpdateInfo.updateMethod <> umNone);
 end;
 //------------------------------------------------------------------------------
 
@@ -661,14 +666,14 @@ procedure TLayer32.Invalidate;
 var
   layer : TLayer32;
 begin
-  if (UpdateInfo.updateMethod = umSelf) then Exit;
-  UpdateInfo.updateMethod := umSelf;
+  if (fUpdateInfo.updateMethod = umSelf) then Exit;
+  fUpdateInfo.updateMethod := umSelf;
 
   layer := Parent;
   while Assigned(layer) do
   begin
-    if layer.UpdateInfo.updateMethod <> umNone then Break;
-    layer.UpdateInfo.updateMethod := umChild;
+    if layer.fUpdateInfo.updateMethod <> umNone then Break;
+    layer.fUpdateInfo.updateMethod := umChild;
     layer := layer.Parent;
   end;
 end;
@@ -1118,16 +1123,16 @@ begin
     begin
       if not Visible or
          (hideDesigners and IsDesignerLayer) or
-         (UpdateInfo.updateMethod = umNone) then
+         (fUpdateInfo.updateMethod = umNone) then
            Continue;
 
-      if UpdateInfo.updateMethod = umSelf then
+      if fUpdateInfo.updateMethod = umSelf then
       begin
-        rec := Parent.MakeAbsolute(UpdateInfo.priorPosition);
+        rec := Parent.MakeAbsolute(fUpdateInfo.priorPosition);
         with fLayeredImage do
           fInvalidRect := UnionRect(fInvalidRect, rec);
-        UpdateInfo.priorPosition := OuterBounds;
-        rec := Parent.MakeAbsolute(UpdateInfo.priorPosition);
+        fUpdateInfo.priorPosition := OuterBounds;
+        rec := Parent.MakeAbsolute(fUpdateInfo.priorPosition);
         with fLayeredImage do
           fInvalidRect := UnionRect(fInvalidRect, rec);
       end;
@@ -1180,7 +1185,7 @@ begin
          Continue;
 
       //recursive merge
-      if (UpdateInfo.updateMethod <> umNone) then
+      if (fUpdateInfo.updateMethod <> umNone) then
         Merge(hideDesigners, updateRect);
 
       if Assigned(fMergeImage) then
@@ -1250,7 +1255,7 @@ begin
     end;
   end;
 
-  with UpdateInfo do
+  with fUpdateInfo do
   begin
     priorPosition := OuterBounds;
     updateMethod := umNone;
@@ -1381,7 +1386,7 @@ end;
 procedure  TGroupLayer32.PreMerge(hideDesigners: Boolean);
 begin
   inherited;
-  if (self <> Root) and (UpdateInfo.updateMethod <> umNone) then
+  if (self <> Root) and (fUpdateInfo.updateMethod <> umNone) then
     UpdateGroupBounds;
 end;
 //------------------------------------------------------------------------------
@@ -1590,6 +1595,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function  TVectorLayer32.GetPositionAdjustedPaths: TPathsD;
+begin
+  Result := TranslatePath(fPaths, -Left + fOuterMargin, -Top  + fOuterMargin);
+end;
+//------------------------------------------------------------------------------
+
 procedure TVectorLayer32.SetInnerBounds(const newBounds: TRectD);
 var
   w,h: double;
@@ -1625,6 +1636,33 @@ begin
   fPaths := TranslatePath(fPaths, dx,dy);
   if fAutoPivot and not PointsEqual(fPivotPt, InvalidPointD) then
     fPivotPt := TranslatePoint(fPivotPt, dx,dy);
+end;
+//------------------------------------------------------------------------------
+
+procedure TVectorLayer32.AppendPoint(const pt: TPointD);
+var
+  highPaths, lenPts: integer;
+begin
+  highPaths := High(fPaths);
+  if highPaths < 0 then
+  begin
+    SetLength(fPaths, 1);
+    SetLength(fPaths[0], 1);
+    fPaths[0][0] := pt;
+  end else
+  begin
+    lenPts := Length(fPaths[highPaths]);
+    SetLength(fPaths[highPaths], lenPts +1);
+    fPaths[highPaths][lenPts] := pt;
+  end;
+  RepositionAndDraw;
+end;
+//------------------------------------------------------------------------------
+
+procedure TVectorLayer32.AppendPath(const path: TPathD);
+begin
+  Img32.Vector.AppendPath(fPaths, path);
+  RepositionAndDraw;
 end;
 //------------------------------------------------------------------------------
 
@@ -1730,6 +1768,8 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TRasterLayer32.ImageChanged(Sender: TImage32);
+var
+  rec: TRect;
 begin
   if (Sender = MasterImage) then
   begin
@@ -1754,7 +1794,8 @@ begin
     begin
       Image.BlockNotify;
       try
-        Image.CropTransparentPixels;
+        rec := Image.CropTransparentPixels;
+        PositionAt(Left + rec.Left, Top + rec.Top);
         MasterImage.Assign(Image);
       finally
         Image.UnblockNotify;
@@ -2054,7 +2095,7 @@ end;
 constructor TLayeredImage32.Create(parent: TStorage; const name: string);
 begin
   inherited;
-  fBackColor := clBtnFace32;
+  fBackColor := clNone32;
   fResampler := DefaultResampler;
   fLastUpdateType := utUndefined;
 
@@ -2170,7 +2211,7 @@ end;
 
 function TLayeredImage32.GetRepaintNeeded: Boolean;
 begin
-  Result := Root.UpdateInfo.updateMethod <> umNone;
+  Result := Root.fUpdateInfo.updateMethod <> umNone;
 end;
 //------------------------------------------------------------------------------
 

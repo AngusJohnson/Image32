@@ -191,7 +191,7 @@ procedure TMyVectorLayer32.Draw;
 var
   pp: TPathsD;
 begin
-  pp := TranslatePath(Paths, -Left +OuterMargin, -Top +OuterMargin);
+  pp := PathsPositionAdjusted;
   DrawShadow(Image, pp, frEvenOdd, OuterMargin, angle45, clGray32, true);
   DrawPolygon(Image, pp, frEvenOdd, BrushColor);
   Draw3D(Image, pp, frEvenOdd, DPIAware(2.5), 2);
