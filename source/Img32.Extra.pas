@@ -874,7 +874,7 @@ begin
 
   if preserveAlpha then
   begin
-    a := TARGB(oldColor).A shl 24;
+    a := TARGB(oldColor).A;
     newColor := newColor and $FFFFFF;
     for i := 0 to img.Width * img.Height -1 do
     begin

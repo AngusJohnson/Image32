@@ -1419,7 +1419,7 @@ begin
   fPixelSize := pixelSize;
 
   fCurrLinePtr := fImgBase;
-  fCurrY       := 0;
+  fCurrY       := -1;
   result       := true;
 end;
 // ------------------------------------------------------------------------------
@@ -2266,6 +2266,7 @@ end;
 constructor TInverseRenderer.Create(bkImg: TImage32);
 begin
   inherited Create;
+  fCurrBackY := -1;
   // bkImg, when assigned, is the background master image
   // and fImage is very likely a transparent (layered) image
   fBackImage := bkImg;
@@ -2740,7 +2741,7 @@ end;
 procedure DrawInvertedDashedLine(img: TImage32;
   const line: TPathD; dashPattern: TArrayOfDouble;
   patternOffset: PDouble; lineWidth: double; endStyle: TEndStyle;
-  joinStyle: TJoinStyle = jsAuto);
+  joinStyle: TJoinStyle);
 begin
   DrawInvertedDashedLine(img, nil, line,
     dashPattern, patternOffset, lineWidth, endStyle, joinStyle);
@@ -2749,8 +2750,8 @@ end;
 
 procedure DrawInvertedDashedLine(img: TImage32;
   const lines: TPathsD; dashPattern: TArrayOfDouble;
-  patternOffset: PDouble; lineWidth: double;
-  endStyle: TEndStyle; joinStyle: TJoinStyle = jsAuto);
+  patternOffset: PDouble; lineWidth: double; endStyle: TEndStyle;
+  joinStyle: TJoinStyle);
 var
   i: integer;
 begin

@@ -1292,6 +1292,7 @@ begin
   fImage.SetSize(200,200);
   fAllowCopy := true;
   fAllowPaste := true;
+  DoubleBuffered := true;
 end;
 //------------------------------------------------------------------------------
 

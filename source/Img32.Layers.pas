@@ -233,8 +233,9 @@ type
   //or transforms Paths when bounds change
   TVectorLayer32 = class(TRotLayer32)
   private
-    fPaths    : TPathsD;
-    fOnDraw   : TNotifyEvent;
+    fPaths      : TPathsD;
+    fIsDrawing  : Boolean;
+    fOnDraw     : TNotifyEvent;
     procedure RepositionAndDraw;
     function  GetPositionAdjustedPaths: TPathsD;
   protected
@@ -474,6 +475,7 @@ resourcestring
   rsUpdateRotateGroupError = 'UpdateRotateGroup - invalid group';
   rsLayeredImage32Error    = 'TLayeredImage32: ''root'' must be a TGroupLayer32';
   rsLayer32Error           = 'TLayer32 - children must also be TLayer32';
+  rsVectorLayer32Error     = 'TVectorLayer32 - updating Paths during draw events will cause recursion.';
 
 //------------------------------------------------------------------------------
 // TLayerNotifyImage32
@@ -1590,8 +1592,9 @@ procedure TVectorLayer32.SetPaths(const newPaths: TPathsD);
 begin
   fPaths := CopyPaths(newPaths);
   fPivotPt := InvalidPointD;
-  if Assigned(fPaths) then RepositionAndDraw
-  else inherited SetInnerBounds(NullRectD);
+  if not Assigned(fPaths) then inherited SetInnerBounds(NullRectD)
+  else if fIsDrawing then Raise Exception.Create(rsVectorLayer32Error)
+  else RepositionAndDraw;
 end;
 //------------------------------------------------------------------------------
 
@@ -1688,7 +1691,10 @@ procedure TVectorLayer32.Draw;
 begin
   //to draw the layer, either override this event
   //in a descendant class or assign the OnDraw property
-  if Assigned(fOnDraw) then fOnDraw(self);
+  if not Assigned(fOnDraw) then Exit;
+  fIsDrawing := true;
+  fOnDraw(self);
+  fIsDrawing := false;
 end;
 //------------------------------------------------------------------------------
 

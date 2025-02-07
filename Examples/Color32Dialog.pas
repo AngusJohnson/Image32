@@ -3,7 +3,7 @@ unit Color32Dialog;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  2 Febuary 2025                                                  *
+* Date      :  3 Febuary 2025                                                  *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
@@ -30,8 +30,8 @@ type
     tbAlpha: TTrackBar;
     eAlpha: TEdit;
     Label4: TLabel;
-    Button1: TButton;
-    Button2: TButton;
+    Bok: TButton;
+    bCancel: TButton;
     Label5: TLabel;
     tbMain: TTrackBar;
     procedure FormCreate(Sender: TObject);
@@ -89,10 +89,10 @@ begin
   begin
     Parent := self;
     Left := 0;
-    Top := 416;
-    Width := 400;
-    Height := 83;
-    BorderWidth := 8;
+    Top := DpiAware(208);
+    Width := DpiAware(200);
+    Height := DpiAware(41);
+    BorderWidth := DpiAware(4);
     TabStop := False;
     OnMouseDown := ipMainMouseDown;
     OnMouseMove := ipMainMouseMove;
@@ -105,9 +105,9 @@ begin
     Parent := self;
     Left := 0;
     Top := 0;
-    Width := 400;
-    Height := 400;
-    BorderWidth := 12;
+    Width := DpiAware(200);
+    Height := DpiAware(200);
+    BorderWidth := DpiAware(6);
     TabStop := False;
     OnMouseDown := ipSubMainMouseDown;
     OnMouseMove := ipSubMainMouseMove;
@@ -118,10 +118,10 @@ begin
   with ipColor do
   begin
     Parent := self;
-    Left := 17;
-    Top := 597;
-    Width := 161;
-    Height := 68;
+    Left := DpiAware(8);
+    Top := bOK.Top;
+    Width := DpiAware(80);
+    Height := DpiAware(34);
     BorderWidth := 1;
     TabStop := False;
   end;
@@ -162,10 +162,12 @@ var
   pc  : PColor32;
   pt  : TPointD;
   p   : TPathD;
+  dpi2: integer;
 begin
   if fBlockUpd then Exit;
   try
     fBlockUpd := true;
+    dpi2 := DPIAware(2);
 
     // update ipMain
     RectWidthHeight(ipMain.InnerClientRect, w,h);
@@ -175,7 +177,7 @@ begin
       tbMain.Position := Round(tbMain.Max * fHsl.hue / 255);
 
     j := tbMain.Position;
-    for i := Max(0,j -3) to Min(w -1, j +3) do
+    for i := Max(0,j -dpi2) to Min(w -1, j +dpi2) do
       ipMain.Image.Pixels[i] := clBlack32;
     ipMain.Image.Resize(w, h); //stretch image vertically
 
@@ -208,10 +210,10 @@ begin
     p := Ellipse(RectD(pt.X-r,pt.Y-r,pt.X+r,pt.Y+r));
 
     if (pt.Y / fSize > 0.55) then
-      DrawLine(ipSubMain.Image, p, 3.5, clWhite32, esPolygon) else
-      DrawLine(ipSubMain.Image, p, 3.5, clBlack32, esPolygon);
+      DrawLine(ipSubMain.Image, p, dpi2, clWhite32, esPolygon) else
+      DrawLine(ipSubMain.Image, p, dpi2, clBlack32, esPolygon);
 
-    eHexColor.Text := inttohex(fArgb.Color);
+    eHexColor.Text := inttohex(fArgb.Color, 8);
     ipColor.Image.Clear(fArgb.Color);
 
     if fArgb.A < 200 then
@@ -362,9 +364,6 @@ begin
   ClampRange(pt.X, 0, fSize); ClampRange(pt.Y, 0, fSize);
   fHsl.sat := ClampByte(127 * (fSize-pt.X) /fSize + 127 * (fSize-pt.Y) /fSize);
   fHsl.lum := ClampByte(127 * pt.X/fSize + 127 * (fSize-pt.Y) /fSize);
-
-//  Caption := format('sat: %d; lum: %d', [fHsl.sat, fHsl.lum]);
-
   fARGB.Color := HslToRgb(fHsl);
   UpdateCtrls(nil);
 end;
