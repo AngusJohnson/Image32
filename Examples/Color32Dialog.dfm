@@ -7,8 +7,8 @@ object Color32DialogForm: TColor32DialogForm
   Margins.Bottom = 6
   BorderStyle = bsDialog
   Caption = 'Color32'
-  ClientHeight = 670
-  ClientWidth = 796
+  ClientHeight = 636
+  ClientWidth = 735
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -20,7 +20,7 @@ object Color32DialogForm: TColor32DialogForm
   PixelsPerInch = 192
   TextHeight = 41
   object Label1: TLabel
-    Left = 452
+    Left = 430
     Top = 32
     Width = 58
     Height = 41
@@ -32,8 +32,8 @@ object Color32DialogForm: TColor32DialogForm
     FocusControl = eRed
   end
   object Label2: TLabel
-    Left = 452
-    Top = 164
+    Left = 430
+    Top = 156
     Width = 87
     Height = 41
     Margins.Left = 6
@@ -44,8 +44,8 @@ object Color32DialogForm: TColor32DialogForm
     FocusControl = eGreen
   end
   object Label3: TLabel
-    Left = 452
-    Top = 304
+    Left = 430
+    Top = 288
     Width = 64
     Height = 41
     Margins.Left = 6
@@ -56,8 +56,8 @@ object Color32DialogForm: TColor32DialogForm
     FocusControl = eBlue
   end
   object Label4: TLabel
-    Left = 452
-    Top = 444
+    Left = 430
+    Top = 424
     Width = 83
     Height = 41
     Margins.Left = 6
@@ -68,8 +68,8 @@ object Color32DialogForm: TColor32DialogForm
     FocusControl = eAlpha
   end
   object Label5: TLabel
-    Left = 194
-    Top = 594
+    Left = 186
+    Top = 566
     Width = 18
     Height = 41
     Margins.Left = 6
@@ -79,9 +79,9 @@ object Color32DialogForm: TColor32DialogForm
     Caption = '#'
   end
   object eHexColor: TEdit
-    Left = 216
-    Top = 596
-    Width = 152
+    Left = 204
+    Top = 568
+    Width = 164
     Height = 41
     Margins.Left = 6
     Margins.Top = 6
@@ -98,10 +98,10 @@ object Color32DialogForm: TColor32DialogForm
     OnChange = eHexColorChange
   end
   object tbRed: TTrackBar
-    Left = 452
-    Top = 94
-    Width = 300
-    Height = 64
+    Left = 430
+    Top = 90
+    Width = 286
+    Height = 68
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
@@ -111,13 +111,14 @@ object Color32DialogForm: TColor32DialogForm
     Frequency = 16
     Position = 255
     TabOrder = 2
-    ThumbLength = 40
+    ThumbLength = 52
+    TickStyle = tsNone
     OnChange = tbBlueChange
   end
   object eRed: TEdit
-    Left = 670
+    Left = 638
     Top = 28
-    Width = 82
+    Width = 78
     Height = 49
     Margins.Left = 6
     Margins.Top = 6
@@ -128,10 +129,10 @@ object Color32DialogForm: TColor32DialogForm
     OnChange = eGreenChange
   end
   object tbGreen: TTrackBar
-    Left = 452
-    Top = 210
-    Width = 300
-    Height = 64
+    Left = 430
+    Top = 200
+    Width = 286
+    Height = 68
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
@@ -141,13 +142,14 @@ object Color32DialogForm: TColor32DialogForm
     Frequency = 16
     Position = 255
     TabOrder = 4
-    ThumbLength = 40
+    ThumbLength = 52
+    TickStyle = tsNone
     OnChange = tbBlueChange
   end
   object eGreen: TEdit
-    Left = 670
-    Top = 160
-    Width = 82
+    Left = 638
+    Top = 152
+    Width = 78
     Height = 49
     Margins.Left = 6
     Margins.Top = 6
@@ -158,10 +160,10 @@ object Color32DialogForm: TColor32DialogForm
     OnChange = eGreenChange
   end
   object tbBlue: TTrackBar
-    Left = 452
-    Top = 366
-    Width = 300
-    Height = 64
+    Left = 430
+    Top = 350
+    Width = 286
+    Height = 68
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
@@ -171,13 +173,14 @@ object Color32DialogForm: TColor32DialogForm
     Frequency = 16
     Position = 255
     TabOrder = 6
-    ThumbLength = 40
+    ThumbLength = 52
+    TickStyle = tsNone
     OnChange = tbBlueChange
   end
   object eBlue: TEdit
-    Left = 670
-    Top = 302
-    Width = 82
+    Left = 638
+    Top = 286
+    Width = 78
     Height = 49
     Margins.Left = 6
     Margins.Top = 6
@@ -188,10 +191,10 @@ object Color32DialogForm: TColor32DialogForm
     OnChange = eGreenChange
   end
   object tbAlpha: TTrackBar
-    Left = 452
-    Top = 508
-    Width = 300
-    Height = 62
+    Left = 430
+    Top = 484
+    Width = 286
+    Height = 68
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
@@ -201,13 +204,14 @@ object Color32DialogForm: TColor32DialogForm
     Frequency = 16
     Position = 255
     TabOrder = 8
-    ThumbLength = 40
+    ThumbLength = 52
+    TickStyle = tsNone
     OnChange = tbBlueChange
   end
   object eAlpha: TEdit
-    Left = 670
-    Top = 442
-    Width = 82
+    Left = 638
+    Top = 422
+    Width = 78
     Height = 49
     Margins.Left = 6
     Margins.Top = 6
@@ -218,10 +222,10 @@ object Color32DialogForm: TColor32DialogForm
     OnChange = eGreenChange
   end
   object Bok: TButton
-    Left = 584
-    Top = 582
-    Width = 168
-    Height = 66
+    Left = 556
+    Top = 554
+    Width = 160
+    Height = 62
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
@@ -232,10 +236,10 @@ object Color32DialogForm: TColor32DialogForm
     TabOrder = 9
   end
   object bCancel: TButton
-    Left = 400
-    Top = 582
-    Width = 166
-    Height = 66
+    Left = 380
+    Top = 554
+    Width = 158
+    Height = 62
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
@@ -247,9 +251,9 @@ object Color32DialogForm: TColor32DialogForm
   end
   object tbMain: TTrackBar
     Left = 0
-    Top = 498
-    Width = 384
-    Height = 64
+    Top = 484
+    Width = 390
+    Height = 68
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
@@ -258,7 +262,8 @@ object Color32DialogForm: TColor32DialogForm
     PageSize = 16
     Frequency = 16
     TabOrder = 0
-    ThumbLength = 40
+    ThumbLength = 52
+    TickStyle = tsNone
     OnChange = tbMainChange
   end
 end

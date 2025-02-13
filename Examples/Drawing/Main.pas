@@ -259,8 +259,6 @@ var
   buttonSize: integer;
 const
   // offsets to the red dot hotspots on cursors (relative to cursor size)
-//  hotXs: array[0..9] of double = (0.71, 0.42, 0.89, 0.5, 0.86, 0.64, 0.89, 0.93);
-//  hotYs: array[0..9] of double = (0.71, 0.37, 0.25, 0.5, 0.93, 0.70, 0.50, 0.93);
   hotXs: array[0..9] of double = (0.40, 0.89, 0.52, 0.5, 0.64, 0.89, 0.93, 0.86, 0.71, 0.42);
   hotYs: array[0..9] of double = (0.10, 0.25, 0.37, 0.5, 0.70, 0.50, 0.93, 0.93, 0.71, 0.37);
 begin
@@ -496,7 +494,7 @@ begin
       Exit;
 
   // todo - of course make LINEWIDTH user defined
-  if ToolIdx in [SELECT, WAND] then lineWidth := DpiAware(1)
+  if ToolIdx in [SELECT, WAND] then lineWidth := DpiAware(2)
   else if ToolIdx = TXT then lineWidth := 0
   else lineWidth := DpiAware(10);
 
@@ -795,16 +793,10 @@ end;
 procedure TfmMain.VectorPanelDraw(Sender: TObject);
 var
   len                   : integer;
-  q, buttonSize         : double;
-  backgroundImg         : TImage32;
   pp                    : TPathsD;
   p                     : TPathD;
-  rec                   : TRectD;
-  currentDesignerLayer  : TVectorLayer32;
   currentDrawingLayer   : TVectorLayer32;
-  dashPattern           : TArrayOfDouble;
 begin
-  buttonSize := Max(DpiAware(5), lineWidth);
   currentDrawingLayer := TVectorLayer32(layeredImage[TopLayerIdx -1]);
   with currentDrawingLayer do
   begin
@@ -819,9 +811,12 @@ begin
         begin
           p := PathsPositionAdjusted[0];
           if Assigned(p) then
+          begin
+            DrawPolygon(Image, p, frNonZero, backColor);
             DrawLine(Image, p, lineWidth, foreColor, esClosed, jsRound);
+          end;
         end;
-      IRREGPOLY:
+      else {IRREGPOLY:}
         begin
           Image.Clear;
           pp := PathsPositionAdjusted;
@@ -841,14 +836,10 @@ end;
 
 procedure TfmMain.VectorPanelDesign(Sender: TObject);
 var
-  len                   : integer;
-  q, buttonSize         : double;
+  buttonSize            : double;
   backgroundImg         : TImage32;
   pp                    : TPathsD;
-  p                     : TPathD;
-  rec                   : TRectD;
   currentDesignerLayer  : TVectorLayer32;
-  currentDrawingLayer   : TVectorLayer32;
   dashPattern           : TArrayOfDouble;
 begin
   buttonSize := Max(DpiAware(5), lineWidth);

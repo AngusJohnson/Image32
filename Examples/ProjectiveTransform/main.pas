@@ -155,6 +155,11 @@ begin
   //non-layered image (on right side of form)
   transformedImage := TImage32.Create;
 
+  // load a sample image and set sensible transformation points
+  with rasterLayer do
+    MasterImage.LoadFromFile('.\sample3.jpg');
+  ResetImage;
+  srcPts := MakePath([259,10, 614,13, 684,499, 189,507]);
 end;
 //------------------------------------------------------------------------------
 
@@ -169,7 +174,7 @@ procedure TForm1.ResizeLayeredImage;
 var
   i: integer;
   rec: TRect;
-  scale: double;
+  layerScale: double;
 begin
   //rasterLayer.MasterImage is the unscaled 'source' image.
   //rasterlayer.Image is the scaled version of MasterImage (scaled to fit
@@ -181,7 +186,7 @@ begin
       Image.Assign(MasterImage);
       Image.ScaleToFit(pnlLeft.ClientWidth, pnlLeft.ClientHeight);
 
-      scale := Image.Width/oldImageWidth;
+      layerScale := Image.Width/oldImageWidth;
       oldImageWidth := Image.Width;
 
       //now scale the control points
@@ -190,7 +195,7 @@ begin
 
       if Assigned(srcPts) then
       begin
-        srcPts := ScalePath(srcPts, scale);
+        srcPts := ScalePath(srcPts, layerScale);
       end else
       begin
         rec := Image.Bounds;
@@ -204,7 +209,7 @@ begin
 
       if assigned(dstPts) then
       begin
-        dstPts := ScalePath(dstPts, scale);
+        dstPts := ScalePath(dstPts, layerScale);
         dstBtnGroup := CreateButtonGroup(layeredImage.Root, dstPts,
           bsRound, DefaultButtonSize, clBlue32);
       end;
@@ -347,7 +352,7 @@ end;
 procedure TForm1.OnIdle(Sender: TObject; var Done: Boolean);
 var
   offRec, rec: TRect;
-  scale: double;
+  layerScale: double;
   scaledSrc, scaledDst: TPathD;
 begin
   //we only do (relatively slow) transforms when the message queue is empty
@@ -365,14 +370,14 @@ begin
   //transform the master image not the scaled image
   with rasterLayer do
   begin
-    scale := MasterImage.Width/Image.Width;
+    layerScale := MasterImage.Width/Image.Width;
     transformedImage.Assign(MasterImage);
   end;
 
   //scale the control points to the master image
-  scaledSrc := ScalePath(srcPts, scale);
-  scaledDst := ScalePath(dstPts, scale);
-  offRec := ScaleRect(offRec, scale);
+  scaledSrc := ScalePath(srcPts, layerScale);
+  scaledDst := ScalePath(dstPts, layerScale);
+  offRec := ScaleRect(offRec, layerScale);
 
   //TRANSFORM...
   transformedImage.Resampler := rBicubicResampler;

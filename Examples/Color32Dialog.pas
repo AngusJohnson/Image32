@@ -82,6 +82,16 @@ var
   i,w,h: integer;
 begin
 
+  // TTrackBar controls aren't being read correctly
+  // from DFM streams in all versions of Delphi, so ...
+  for i := 0 to ComponentCount -1 do
+    if Components[i] is TTrackBar then
+      with TTrackBar(Components[i]) do
+      begin
+        Height := DPIAware(34);
+        ThumbLength := DPIAware(26);
+      end;
+
   // create ImagePanel components dynamically, in case
   // ImagePanels haven't been installed in the IDE
   ipMain := TImage32Panel.Create(self);
@@ -89,10 +99,10 @@ begin
   begin
     Parent := self;
     Left := 0;
-    Top := DpiAware(208);
+    Top := DpiAware(206);
     Width := DpiAware(200);
-    Height := DpiAware(41);
-    BorderWidth := DpiAware(4);
+    Height := DpiAware(32);
+    BorderWidth := DpiAware(2);
     TabStop := False;
     OnMouseDown := ipMainMouseDown;
     OnMouseMove := ipMainMouseMove;

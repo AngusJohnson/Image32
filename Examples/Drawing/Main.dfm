@@ -6,8 +6,8 @@ object fmMain: TfmMain
   Margins.Right = 6
   Margins.Bottom = 6
   Caption = 'Drawing'
-  ClientHeight = 1108
-  ClientWidth = 1244
+  ClientHeight = 1038
+  ClientWidth = 1194
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -24,30 +24,32 @@ object fmMain: TfmMain
   object pnlTools: TPanel
     Left = 0
     Top = 0
-    Width = 208
-    Height = 1056
+    Width = 202
+    Height = 992
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
     Align = alLeft
     TabOrder = 0
+    ExplicitHeight = 950
   end
   object pnlMain: TPanel
-    Left = 208
+    Left = 202
     Top = 0
-    Width = 1036
-    Height = 1056
+    Width = 992
+    Height = 992
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
     Align = alClient
     TabOrder = 1
+    ExplicitHeight = 950
     object TabControl1: TTabControl
       Left = 1
       Top = 1
-      Width = 1034
+      Width = 990
       Height = 48
       Margins.Left = 6
       Margins.Top = 6
@@ -62,19 +64,19 @@ object fmMain: TfmMain
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 1056
-    Width = 1244
-    Height = 52
+    Top = 992
+    Width = 1194
+    Height = 46
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
     Panels = <
       item
-        Width = 300
+        Width = 600
       end
       item
-        Width = 1000
+        Width = 2000
       end>
   end
   object MainMenu1: TMainMenu

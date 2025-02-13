@@ -325,7 +325,7 @@ begin
 
   transformType := ttAffineRotate;
   transformLayer.UpdateHitTestMask;
-  transformLayer.ResetAngle;
+  transformLayer.Reset;
 
   transformLayer.AutoPivot := not allowRotatePivotMove;
   if allowRotatePivotMove then
