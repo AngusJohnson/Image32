@@ -32,7 +32,6 @@ object fmMain: TfmMain
     Margins.Bottom = 6
     Align = alLeft
     TabOrder = 0
-    ExplicitHeight = 950
   end
   object pnlMain: TPanel
     Left = 202
@@ -45,7 +44,6 @@ object fmMain: TfmMain
     Margins.Bottom = 6
     Align = alClient
     TabOrder = 1
-    ExplicitHeight = 950
     object TabControl1: TTabControl
       Left = 1
       Top = 1

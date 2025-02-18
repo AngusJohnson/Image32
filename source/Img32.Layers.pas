@@ -87,12 +87,12 @@ type
     function  GetPrevLayerInGroup: TLayer32;
     function  GetLayer32Parent: TLayer32;
     procedure SetLayer32Parent(parent: TLayer32);
-    procedure SetOuterMargin(value: double);
     procedure CreateInternal(parent: TStorage = nil; const name: string = '');
   protected
     fIsDesignLayer  : Boolean;
     fUpdateInfo     : TUpdateInfo;
     procedure SetDesignerLayer(value: Boolean);
+    procedure SetOuterMargin(value: double); virtual;
     function  GetUpdateNeeded: Boolean;
     procedure DoBeforeMerge; virtual;
     procedure PreMerge(hideDesigners: Boolean); virtual;
@@ -240,8 +240,11 @@ type
     fIsDrawing  : Boolean;
     fOnDraw     : TNotifyEvent;
     procedure RepositionAndDraw;
-    function  GetPositionAdjustedPaths: TPathsD;
+    function  GetRelativePaths: TPathsD;
   protected
+    // we need to accommodate drawing bezier splines on TVectorLayer32 where
+    // the drawn path goes well outside the stored control points (Paths).
+    //procedure SetOuterMargin(value: double); override;
     procedure SetPaths(const newPaths: TPathsD); virtual;
     procedure Draw; virtual;
   public
@@ -255,7 +258,7 @@ type
     procedure AppendPoint(const pt: TPointD);
     procedure AppendPath(const path: TPathD);
     property  Paths: TPathsD read fPaths write SetPaths;
-    property  PathsPositionAdjusted: TPathsD read GetPositionAdjustedPaths;
+    property  PathsRelativeToLayer: TPathsD read GetRelativePaths;
     property  OnDraw: TNotifyEvent read fOnDraw write fOnDraw;
   end;
 
@@ -1617,7 +1620,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function  TVectorLayer32.GetPositionAdjustedPaths: TPathsD;
+function  TVectorLayer32.GetRelativePaths: TPathsD;
 begin
   Result := TranslatePath(fPaths, -Left + fOuterMargin, -Top  + fOuterMargin);
 end;

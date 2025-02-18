@@ -159,7 +159,7 @@ begin
     PenWidth := DpiAware(1.5);
   end;
 
-  p := PathsPositionAdjusted;
+  p := PathsRelativeToLayer;
   DrawPolygon(Image, p, frEvenOdd, BrushColor);
   DrawLine(Image, p, PenWidth, PenColor, esPolygon);
   UpdateHitTestMask(p);

@@ -191,7 +191,7 @@ procedure TMyVectorLayer32.Draw;
 var
   pp: TPathsD;
 begin
-  pp := PathsPositionAdjusted;
+  pp := PathsRelativeToLayer;
   DrawShadow(Image, pp, frEvenOdd, OuterMargin, angle45, clGray32, true);
   DrawPolygon(Image, pp, frEvenOdd, BrushColor);
   Draw3D(Image, pp, frEvenOdd, DPIAware(2.5), 2);
@@ -233,9 +233,6 @@ procedure TMainForm.FormCreate(Sender: TObject);
 var
   resStream: TResourceStream;
 begin
-  //This TImage32Panel component allows very easy zooming and scrolling.
-  //(The following would also be a little simpler if TImage32Panel was
-  //installed in Delphi's IDE - using Image32's designtime package.)
   Image32Panel1 := TImage32Panel.Create(self);
   Image32Panel1.Parent := self;
   Image32Panel1.Align := alClient;

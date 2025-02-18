@@ -66,10 +66,13 @@ type
     procedure mnuEditBackColorClick(Sender: TObject);
   private
     undoRedo      : TUndoRedo;
-    lineWidth     : double;
+    penWidth     : double;
+    buttonSize    : integer;
     mouseDown     : Boolean;
     layerStarted  : Boolean;
-    ToolIdx       : integer;
+    toolIdx       : integer;
+    clickIdx      : integer;
+    moveOvrIdx    : integer;
     masterImage   : TImage32;
     layeredImage  : TLayeredImage32;
     foreColor     : TColor32;
@@ -97,7 +100,7 @@ implementation
 
 uses
   Img32.Draw, Img32.Extra, Img32.Vector, Color32Dialog, DialogsEx,
-  Img32.FMT.BMP, Img32.Fmt.SVG, Img32.Text,
+  Img32.FMT.BMP, Img32.FMT.PNG, Img32.Fmt.SVG, Img32.Text,
   Img32.Clipper2, Img32.Vectorizer;
 
 const
@@ -195,6 +198,8 @@ begin
   current := (current +1) mod undoCount;
   // do a strict copy because it's not safe to reference count 'copy'
   len := Length(img.Pixels);
+  if len = 0 then Exit;
+
   SetLength(undos[current], len);
   Move(img.Pixels[0], undos[current][0], len * SizeOf(TColor32));
 end;
@@ -253,10 +258,9 @@ end;
 
 procedure TfmMain.FormCreate(Sender: TObject);
 var
-  i, hotX, hotY: integer;
+  i, hotX, hotY, tbSize: integer;
   cursorSize  : TSize;
   tmpImg: TImage32;
-  buttonSize: integer;
 const
   // offsets to the red dot hotspots on cursors (relative to cursor size)
   hotXs: array[0..9] of double = (0.40, 0.89, 0.52, 0.5, 0.64, 0.89, 0.93, 0.86, 0.71, 0.42);
@@ -270,15 +274,19 @@ begin
 
   FontManager.LoadFontReaderFamily('Arial');
 
-  buttonSize := dpiAware(48);
-  pnlTools.ClientWidth := buttonSize * 2;
-  ToolIdx := HAND;
+  tbSize := dpiAware(48);
+  pnlTools.ClientWidth := tbSize * 2;
+  toolIdx := HAND;
   ActiveControl := imgPanel;
   cursorSize := GetCursorSize;
   DoubleBuffered := true;
   foreColor := clGreen32;
   backColor := $40338833;
+  moveOvrIdx := -1;
 
+  // obviously penWidth will become a user defined variable
+  penWidth := DpiAware(10.0);
+  buttonSize := Max(DpiAware(5), Round(penWidth));
 
   imgPanel := TImage32Panel.Create(self);
   with imgPanel do
@@ -300,17 +308,17 @@ begin
     begin
       Parent := pnlTools;
       if Odd(i) then
-        Left := buttonSize else
+        Left := tbSize else
         Left := 0;
-      Top := (i div 2) * buttonSize;
-      Width := buttonSize;
-      Height := buttonSize;
+      Top := (i div 2) * tbSize;
+      Width := tbSize;
+      Height := tbSize;
       BorderWidth := 4;
       Color := clBtnFace;
       Image.SetSize(DpiAware(32), DpiAware(32));
       Image.LoadFromResource(toolIconNames[i], 'SVG');
       TabStop := false;
-      if i = ToolIdx then
+      if i = toolIdx then
         UnFocusedColor := FocusedColor;
       OnClick := toolPnlClick;
     end;
@@ -320,9 +328,9 @@ begin
   begin
     Parent := pnlTools;
     Left := 0;
-    Top := Length(toolIconNames) div 2 * buttonSize + 20;
-    Width := buttonSize;
-    Height := buttonSize;
+    Top := Length(toolIconNames) div 2 * tbSize + 20;
+    Width := tbSize;
+    Height := tbSize;
     TabStop := false;
     BorderWidth := 4;
     Image.Clear(foreColor);
@@ -334,10 +342,10 @@ begin
   with backPanel do
   begin
     Parent := pnlTools;
-    Left := buttonSize;
+    Left := tbSize;
     Top := forePanel.Top;
-    Width := buttonSize;
-    Height := buttonSize;
+    Width := tbSize;
+    Height := tbSize;
     TabStop := false;
     BorderWidth := 4;
     Color := clBtnFace;
@@ -460,9 +468,67 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function IsValidCSpline(const path: TPathD): Boolean;
+var
+  len: integer;
+begin
+  len := Length(path);
+  Result := (len > 3) and not Odd(len);
+end;
+//------------------------------------------------------------------------------
+
+function IsCSplineCtrlPt(idx: integer): Boolean;
+begin
+  // except for the first control pt, every other
+  // control pt preceeds an on-path point
+  Result := (idx = 1) or ((idx > 1) and not Odd(idx)); // 1,2,4,6,8,10 etc
+end;
+//------------------------------------------------------------------------------
+
+function GetClickIndex(const path: TPathD;
+  const pt: TPointD; ctrlPtRadius: double): integer;
+var
+  i, highI: integer;
+begin
+  Result := -1; // not found
+  highI := High(path);
+  if highI < 1 then Exit;
+  // make sure control-points get preference over on-path points
+  for i := highI div 2 downto 1 do
+  begin
+    if (Abs(pt.X - path[i*2].X) < ctrlPtRadius) and
+      (Abs(pt.Y - path[i*2].Y) < ctrlPtRadius) then
+    begin
+      Result := i*2;
+      Exit;
+    end;
+    if (Abs(pt.X - path[i*2+1].X) < ctrlPtRadius) and
+      (Abs(pt.Y - path[i*2+1].Y) < ctrlPtRadius) then
+    begin
+      Result := i*2+1;
+      Exit;
+    end;
+  end;
+
+  if (Abs(pt.X - path[1].X) < ctrlPtRadius) and
+    (Abs(pt.Y - path[1].Y) < ctrlPtRadius) then
+  begin
+    Result := 1;
+    Exit;
+  end;
+  if (Abs(pt.X - path[0].X) < ctrlPtRadius) and
+    (Abs(pt.Y - path[0].Y) < ctrlPtRadius) then
+  begin
+    Result := 0;
+    Exit;
+  end;
+end;
+//------------------------------------------------------------------------------
+
 procedure TfmMain.imgPanelMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
+  i                   : integer;
   pt                  : TPointD;
   tmp                 : TImage32;
   p                   : TPathD;
@@ -478,7 +544,7 @@ var
 begin
   //STARTS **OR CONTINUES** AN EXISTING LAYER
 
-  if (Button <> mbLeft) and not (ToolIdx in [FILL, DROPPER]) then
+  if (Button <> mbLeft) and not (toolIdx in [FILL, DROPPER]) then
   begin
     EndLayer;
     Exit;
@@ -493,16 +559,11 @@ begin
     (pt.Y < 0) or (pt.Y >= masterImage.Height) then
       Exit;
 
-  // todo - of course make LINEWIDTH user defined
-  if ToolIdx in [SELECT, WAND] then lineWidth := DpiAware(2)
-  else if ToolIdx = TXT then lineWidth := 0
-  else lineWidth := DpiAware(10);
-
   if not layerStarted then layeredImage.Clear;
 
-  if (ToolIdx = FILL) then
+  if (toolIdx = FILL) then
     // do nothing here
-  else if (ToolIdx = DROPPER) then
+  else if (toolIdx = DROPPER) then
   begin
     with Point(pt) do
       SetColor((button = mbLeft), masterImage.pixel[X,Y]);
@@ -513,28 +574,37 @@ begin
     // must be starting a new drawing op - so create new layers
     layeredImage.SetSize(MasterImage.Width, MasterImage.Height);
 
+    // first add a hatched background layer
+    with TRasterLayer32(layeredImage.AddLayer(TRasterLayer32)) do
+    begin
+      AutoCrop := false;
+      Image.SetSize(layeredImage.Width, layeredImage.Height);
+      HatchBackground(Image);
+      IsDesignerLayer := true;
+    end;
+
     // copy masterImage into layeredImage ready to merge with other layers
     with TRasterLayer32(layeredImage.AddLayer(TRasterLayer32)).Image do
       Assign(Self.MasterImage);
 
     // create a 'drawing' layer for all tools except selection tools
-    if not (ToolIdx in [SELECT, WAND]) then
+    if not (toolIdx in [SELECT, WAND]) then
     begin
       currentDrawingLayer :=
         TVectorLayer32(layeredImage.AddLayer(TVectorLayer32));
       with currentDrawingLayer do
       begin
-        OuterMargin := lineWidth;
+        OuterMargin := penWidth +1;
         OnDraw := VectorPanelDraw;
       end;
     end;
 
-    // and always create a design layer as the top layer
+    // and ALWAYS create a design layer as the top layer
     currentDesignerLayer :=
       TVectorLayer32(layeredImage.AddLayer(TVectorLayer32));
     with currentDesignerLayer do
     begin
-      OuterMargin := lineWidth;
+      OuterMargin := penWidth +1;
       OnDraw := VectorPanelDesign;
       IsDesignerLayer := true;
     end;
@@ -542,12 +612,12 @@ begin
   end else
   begin
     currentDesignerLayer := TVectorLayer32(layeredImage[TopLayerIdx]);
-    if ToolIdx in [SELECT, WAND] then
+    if toolIdx in [SELECT, WAND] then
       currentDrawingLayer := nil else
       currentDrawingLayer := TVectorLayer32(layeredImage[TopLayerIdx-1]);
   end;
 
-  case ToolIdx of
+  case toolIdx of
 
     SELECT:
       begin
@@ -609,14 +679,44 @@ begin
         layerStarted := true;
       end;
 
-    LINE, IRREGPOLY:
+    LINE:
+      begin
+        with currentDesignerLayer do
+        begin
+          pp := Paths;
+          if not Assigned(pp) then
+            i := -1 else
+            i := GetClickIndex(Paths[0], pt, buttonSize);
+          if i < 0 then
+          begin
+            // not clicking an existing pt, so add both an on-path & a ctrl-pt
+            AppendPoint(pt);
+            AppendPoint(pt);
+            pp := Paths;
+            i := Length(pp[0]);
+            if i = 2 then clickIdx := 1 else clickIdx := i -2;
+          end else
+            clickIdx := i;
+        end;
+
+        if Length(pp[0]) >= 4 then
+        begin
+          pp := CopyPaths(pp);
+          pp[0] := FlattenCSpline(pp[0]);
+          currentDrawingLayer.Paths := pp;
+        end;
+        mouseDown := true;
+        layerStarted := true;
+      end;
+
+    IRREGPOLY:
       begin
         // currentDesignerLayer path only contains start and end points
-        pp := currentDesignerLayer.Paths;
-        if not Assigned(pp) then SetLength(pp, 1);
-        if Length(pp[0]) > 1 then SetLength(pp[0], 1);
-        AppendPoint(pp[0], pt);
-        currentDesignerLayer.Paths := pp;
+        // but currentDrawingLayer path contains all points
+        with currentDesignerLayer do
+          if (Length(Paths) > 0) and (Length(Paths[0]) = 2) then
+            Paths[0][1] := pt else
+            AppendPoint(pt);
         currentDrawingLayer.AppendPoint(pt);
         mouseDown := true;
         layerStarted := true;
@@ -630,10 +730,10 @@ begin
           SetLength(p, 2);
           p[0] := pp[0][0];
           p[1] := pt;
-          with layeredImage[0] do
+          with layeredImage[1] do
           begin
             p := TranslatePath(p, -Left +OuterMargin, -Top  +OuterMargin);
-            EraseLine(Image, p, lineWidth, esRound, jsRound);
+            EraseLine(Image, p, penWidth, esRound, jsRound);
           end;
           pp[0][0] := pt;
           currentDesignerLayer.Paths := pp;
@@ -649,8 +749,9 @@ begin
           FloodFill(masterImage, Round(pt.X), Round(pt.Y), foreColor, 48) else
           FloodFill(masterImage, Round(pt.X), Round(pt.Y), backColor, 48);
         imgPanel.Image.Assign(masterImage);
-        undoRedo.Add(masterImage);
         HatchBackground(imgPanel.Image);
+
+        undoRedo.Add(masterImage);
         mouseDown := false;
         layerStarted := false;
         Exit;
@@ -670,7 +771,7 @@ begin
         with currentDrawingLayer do
         begin
           Paths := font.GetTextOutline(pt.X, pt.Y, text);
-          pp := PathsPositionAdjusted;
+          pp := PathsRelativeToLayer;
           DrawPolygon(Image, pp, frNonZero, foreColor);
         end;
       finally
@@ -687,17 +788,18 @@ begin
 
   StatusBar1.Panels[0].Text := Format(' %1.0n, %1.0n',[pt.X, pt.Y]);
   imgPanel.Image.Assign(layeredImage.GetMergedImage());
-  HatchBackground(imgPanel.Image);
 end;
 //------------------------------------------------------------------------------
 
 procedure TfmMain.imgPanelMouseMove(Sender: TObject;
   Shift: TShiftState; X, Y: Integer);
 var
+  i                   : integer;
   pt                  : TPointD;
   p                   : TPathD;
   pp                  : TPathsD;
   rec                 : TRectD;
+  isOutsideImage      : Boolean;
   currentDesignerLayer: TVectorLayer32;
   currentDrawingLayer: TVectorLayer32;
 begin
@@ -706,15 +808,36 @@ begin
   // update cursor position in statusbar
   if (pt.X < 0) or (pt.X >= masterImage.Width) or
     (pt.Y < 0) or (pt.Y >= masterImage.Height) then
-      StatusBar1.Panels[0].Text := '' else
-      StatusBar1.Panels[0].Text := Format(' %1.0n, %1.0n',[pt.X, pt.Y]);
+  begin
+    StatusBar1.Panels[0].Text := '';
+    isOutsideImage := True;
+  end else
+  begin
+    StatusBar1.Panels[0].Text := Format(' %1.0n, %1.0n',[pt.X, pt.Y]);
+    isOutsideImage := False;
+  end;
 
-  if not mouseDown then Exit;
+  if not mouseDown then
+  begin
+    if isOutsideImage or (toolIdx <> LINE) or (TopLayerIdx < 0) then Exit;
+    currentDesignerLayer := TVectorLayer32(layeredImage[TopLayerIdx]);
+    if not Assigned(currentDesignerLayer.Paths) then Exit;
+    i := GetClickIndex(currentDesignerLayer.Paths[0], pt, buttonSize);
+    if i < 0 then
+    begin
+      if moveOvrIdx < i then Exit;
+      moveOvrIdx := -1;
+    end else
+      moveOvrIdx := i;
+    VectorPanelDesign(currentDesignerLayer);
+    imgPanel.Image.Assign(layeredImage.GetMergedImage());
+    Exit;
+  end;
 
   currentDesignerLayer := TVectorLayer32(layeredImage[TopLayerIdx]);
   with currentDesignerLayer do
   begin
-    case ToolIdx of
+    case toolIdx of
 
       SELECT:
         begin
@@ -745,6 +868,21 @@ begin
           end;
         end;
 
+      LINE:
+        begin
+          currentDesignerLayer := TVectorLayer32(layeredImage[TopLayerIdx]);
+          currentDrawingLayer := TVectorLayer32(layeredImage[TopLayerIdx -1]);
+          pp := currentDesignerLayer.Paths;
+          pp[0][clickIdx] := pt;
+          currentDesignerLayer.Paths := pp;
+          if Length(pp[0]) >= 4 then
+          begin
+            pp := CopyPaths(pp);
+            pp[0] := FlattenCSpline(pp[0]);
+            currentDrawingLayer.Paths := pp;
+          end;
+        end;
+
       ERASE:
         begin
           pp := Paths;
@@ -753,10 +891,10 @@ begin
             SetLength(p, 2);
             p[0] := pp[0][0];
             p[1] := pt;
-            with layeredImage[0] do
+            with layeredImage[1] do
             begin
               p := TranslatePath(p, -Left +OuterMargin, -Top  +OuterMargin);
-              EraseLine(Image, p, lineWidth, esRound, jsRound);
+              EraseLine(Image, p, penWidth, esRound, jsRound);
             end;
             pp[0][0] := pt;
             Paths := pp;
@@ -778,7 +916,6 @@ begin
     end;
   end;
   imgPanel.Image.Assign(layeredImage.GetMergedImage());
-  HatchBackground(imgPanel.Image);
 end;
 //------------------------------------------------------------------------------
 
@@ -786,7 +923,91 @@ procedure TfmMain.imgPanelMouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   if not mouseDown then Exit;
+  clickIdx := -1;
   mouseDown := False;
+end;
+//------------------------------------------------------------------------------
+
+procedure TfmMain.VectorPanelDesign(Sender: TObject);
+var
+  i, highI              : integer;
+  backgroundImg         : TImage32;
+  p                     : TPathD;
+  pp                    : TPathsD;
+  currentDesignerLayer  : TVectorLayer32;
+  dashPattern           : TArrayOfDouble;
+begin
+  currentDesignerLayer := TVectorLayer32(layeredImage[TopLayerIdx]);
+  with currentDesignerLayer do
+  begin
+    case toolIdx of
+      SELECT, WAND:
+        begin
+          // draw on currentDesignerLayer
+          pp := PathsRelativeToLayer;
+          backgroundImg := TImage32.Create(masterImage);
+          try
+            backgroundImg.Crop(Rect(OuterBounds));
+            SetLength(dashPattern, 2);
+            dashPattern[0] := DpiAware(5); dashPattern[1] := DpiAware(5);
+            DrawInvertedDashedLine(Image, backgroundImg,
+              PathsRelativeToLayer, dashPattern, nil, DpiAware(2.0), esPolygon);
+          finally
+            backgroundImg.Free;
+          end;
+        end;
+      LINE:
+        begin
+          // draw cubic bezier control points from **currentDrawLayer**
+          Image.Clear;
+          pp := PathsRelativeToLayer;
+          if (Length(pp[0]) > 2) and not IsValidCSpline(pp[0]) then Exit;
+
+          highI := High(pp[0]);
+          if highI < 1 then Exit;
+
+          SetLength(p, 2);
+          if (highI > 0) then
+          begin
+            p[0] := pp[0][0]; p[1] := pp[0][1];
+            DrawDashedLine(Image, p, [10,10], nil, 1, clRed32, esButt);
+          end;
+          for i := 1 to highI div 2 do
+          begin
+            p[0] := pp[0][i*2]; p[1] := pp[0][i*2 +1];
+            DrawDashedLine(Image, p, [10,10], nil, 1, clRed32, esButt);
+          end;
+
+          if moveOvrIdx = 0 then
+            DrawButton(Image, pp[0][0], buttonSize, clLime32, bsRound, [ba3D]) else
+            DrawButton(Image, pp[0][0], buttonSize, clBlue32, bsRound, [ba3D]);
+          if moveOvrIdx = 1 then
+            DrawButton(Image, pp[0][1], buttonSize, clLime32, bsRound, [ba3D]) else
+            DrawButton(Image, pp[0][1], buttonSize, clRed32, bsRound, [ba3D]);
+
+          for i := highI downto 2 do
+          begin
+            if i = moveOvrIdx then
+              DrawButton(Image, pp[0][i], buttonSize, clLime32, bsRound, [ba3D])
+            else if IsCSplineCtrlPt(i) then
+              DrawButton(Image, pp[0][i], buttonSize, clRed32, bsRound, [ba3D])
+            else
+              DrawButton(Image, pp[0][i], buttonSize, clBlue32, bsRound, [ba3D])
+          end;
+
+        end;
+      REGPOLY, IRREGPOLY, ERASE:
+        begin
+          pp := PathsRelativeToLayer;
+          if (Length(pp[0]) > 1) and (toolIdx <> ERASE) then
+          begin
+            DrawButton(Image, pp[0][0], buttonSize, clRed32, bsRound, [ba3D]);
+            DrawButton(Image, pp[0][1], buttonSize, clLime32, bsRound, [ba3D])
+          end else
+            DrawButton(Image, pp[0][0], buttonSize, clLime32, bsRound, [ba3D]);
+        end;
+    end;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -800,77 +1021,36 @@ begin
   currentDrawingLayer := TVectorLayer32(layeredImage[TopLayerIdx -1]);
   with currentDrawingLayer do
   begin
-    case ToolIdx of
+    case toolIdx of
       LINE:
         begin
           Image.Clear;
-          DrawLine(Image, PathsPositionAdjusted,
-            lineWidth, foreColor, esRound, jsRound);
+          // draw the already flattened cubic bezier spline
+          pp := PathsRelativeToLayer;
+          DrawLine(Image, pp, penWidth, foreColor, esRound, jsRound);
         end;
       REGPOLY:
         begin
-          p := PathsPositionAdjusted[0];
+          p := PathsRelativeToLayer[0];
           if Assigned(p) then
           begin
             DrawPolygon(Image, p, frNonZero, backColor);
-            DrawLine(Image, p, lineWidth, foreColor, esClosed, jsRound);
+            DrawLine(Image, p, penWidth, foreColor, esClosed, jsRound);
           end;
         end;
       else {IRREGPOLY:}
         begin
           Image.Clear;
-          pp := PathsPositionAdjusted;
+          pp := PathsRelativeToLayer;
           if not Assigned(pp) then Exit;
           len := Length(pp[0]);
           if len > 2 then
           begin
             DrawPolygon(Image, pp, frNonZero, backColor);
-            DrawLine(Image, pp, lineWidth, foreColor, esPolygon, jsRound);
+            if toolIdx <> TXT then
+              DrawLine(Image, pp, penWidth, foreColor, esPolygon, jsRound);
           end else
-            DrawLine(Image, pp, lineWidth, foreColor, esRound, jsRound);
-        end;
-    end;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TfmMain.VectorPanelDesign(Sender: TObject);
-var
-  buttonSize            : double;
-  backgroundImg         : TImage32;
-  pp                    : TPathsD;
-  currentDesignerLayer  : TVectorLayer32;
-  dashPattern           : TArrayOfDouble;
-begin
-  buttonSize := Max(DpiAware(5), lineWidth);
-  currentDesignerLayer := TVectorLayer32(layeredImage[TopLayerIdx]);
-  with currentDesignerLayer do
-  begin
-    case ToolIdx of
-      SELECT, WAND:
-        begin
-          // draw on currentDesignerLayer
-          pp := PathsPositionAdjusted;
-          backgroundImg := TImage32.Create(masterImage);
-          try
-            backgroundImg.Crop(Rect(OuterBounds));
-            SetLength(dashPattern, 2);
-            dashPattern[0] := DpiAware(5); dashPattern[1] := DpiAware(5);
-            DrawInvertedDashedLine(Image, backgroundImg,
-              PathsPositionAdjusted, dashPattern, nil, lineWidth, esPolygon);
-          finally
-            backgroundImg.Free;
-          end;
-        end;
-      LINE, REGPOLY, IRREGPOLY, ERASE:
-        begin
-          pp := PathsPositionAdjusted;
-          if (Length(pp[0]) > 1) and (ToolIdx <> ERASE) then
-          begin
-            DrawButton(Image, pp[0][0], buttonSize, clRed32, bsRound, [ba3D]);
-            DrawButton(Image, pp[0][1], buttonSize, clLime32, bsRound, [ba3D])
-          end else
-            DrawButton(Image, pp[0][0], buttonSize, clLime32, bsRound, [ba3D]);
+            DrawLine(Image, pp, penWidth, foreColor, esRound, jsRound);
         end;
     end;
   end;
@@ -881,33 +1061,34 @@ procedure TfmMain.EndLayer;
 begin
   if not layerStarted then Exit;
   layerStarted := false;
-  masterImage.Assign(layeredImage.GetMergedImage(true));
 
+  masterImage.Assign(layeredImage.GetMergedImage(true));
   imgPanel.Image.Assign(masterImage);
   HatchBackground(imgPanel.Image);
+
   layeredImage.Clear;
-  if not (ToolIdx in [SELECT, WAND]) then
+  if not (toolIdx in [SELECT, WAND]) then
     undoRedo.Add(masterImage);
 end;
 //------------------------------------------------------------------------------
 
 procedure TfmMain.toolPnlClick(Sender: TObject);
 begin
-  if TComponent(Sender).ComponentIndex = ToolIdx then Exit;
-  with TImage32Panel(pnlTools.Components[ToolIdx]) do
+  if TComponent(Sender).ComponentIndex = toolIdx then Exit;
+  with TImage32Panel(pnlTools.Components[toolIdx]) do
   begin
     UnFocusedColor := clBtnFace;
     invalidate;
   end;
   with TImage32Panel(Sender) do
   begin
-    ToolIdx := ComponentIndex;
+    toolIdx := ComponentIndex;
     UnFocusedColor := FocusedColor;
   end;
   imgPanel.SetFocus;
-  imgPanel.Cursor := ToolIdx +1;
+  imgPanel.Cursor := toolIdx +1;
 
-  case ToolIdx of
+  case toolIdx of
     2,3: StatusBar1.Panels[1].Text := rsLinePolyDrawingTip;
     else StatusBar1.Panels[1].Text := '';
   end;
@@ -952,6 +1133,11 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TfmMain.mnuUndoClick(Sender: TObject);
+var
+  len: integer;
+  pp: TPathsD;
+  currentDesignerLayer: TVectorLayer32;
+  currentDrawingLayer: TVectorLayer32;
 begin
   if not layerStarted then
   begin
@@ -960,8 +1146,37 @@ begin
       AssignPixelArray(undoRedo.Undo, Width, Height, true);
   end else
   begin
-    layeredImage.Clear;
-    layerStarted := false;
+    case toolIdx of
+      LINE:
+        begin
+          currentDesignerLayer := TVectorLayer32(layeredImage[TopLayerIdx]);
+          currentDrawingLayer := TVectorLayer32(layeredImage[TopLayerIdx -1]);
+          pp := currentDesignerLayer.Paths;
+          len := Length(pp[0]) -2;
+          if len > 0 then
+          begin
+            SetLength(pp[0], len);
+            currentDesignerLayer.Paths := pp;
+            pp := CopyPaths(pp);
+            pp[0] := FlattenCSpline(pp[0]);
+            currentDrawingLayer.Paths := pp;
+            imgPanel.Image.Assign(layeredImage.GetMergedImage());
+            Exit;
+          end else
+          begin
+            layeredImage.Clear;
+            layerStarted := false;
+          end;
+        end;
+
+      else
+      begin
+        layeredImage.Clear;
+        layerStarted := false;
+      end;
+    end;
+
+
   end;
   imgPanel.Image.Assign(masterImage);
   HatchBackground(imgPanel.Image);
@@ -981,15 +1196,20 @@ end;
 procedure TfmMain.mnuDelSelectClick(Sender: TObject);
 var
   pp: TPathsD;
+  currentDesignerLayer: TVectorLayer32;
 begin
-  if not layerStarted or not (ToolIdx in [SELECT, WAND]) then Exit;
-  pp := TVectorLayer32(layeredImage[1]).Paths;
-  layerStarted := false;
-  layeredImage.Clear;
-  if not Assigned(pp) then Exit;
-  ErasePolygon(masterImage, pp, frEvenOdd);
-  imgPanel.Image.Assign(masterImage);
-  HatchBackground(imgPanel.Image);
+  if not layerStarted or not (toolIdx in [SELECT, WAND]) then Exit;
+  currentDesignerLayer := TVectorLayer32(layeredImage[TopLayerIdx]);
+  pp := currentDesignerLayer.Paths;
+
+  if layeredImage[1] is TRasterLayer32 then
+    with TRasterLayer32(layeredImage[1]) do
+    begin
+      pp := TranslatePath(pp, -left + OuterMargin, -top + OuterMargin);
+      ErasePolygon(Image, pp, frEvenOdd);
+    end;
+  masterImage.Assign(layeredImage.GetMergedImage(true));
+  imgPanel.Image.Assign(layeredImage.GetMergedImage());
   undoRedo.Add(masterImage);
 end;
 //------------------------------------------------------------------------------
