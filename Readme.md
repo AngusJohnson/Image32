@@ -29,5 +29,5 @@ Extensive documentation can be found [**here**](http://www.angusj.com/image32/Do
 ![Vectorize](https://user-images.githubusercontent.com/5280692/180627317-5a10f862-6070-4753-ac3d-c714dfa4dc8f.png)<br>
 <a href="http://www.angusj.com/image32/Videos/vectorize.mp4" target="_blank"><b>Vectorize video</b></a><br>
 
-![drawing2](https://github.com/user-attachments/assets/867e5224-fcdd-46b8-b418-5d1656cd065c)<br>
+![drawing](https://github.com/user-attachments/assets/7682e9bf-bbc6-4ad0-8988-b5bf9eb982ab)<br>
 <a href="http://www.angusj.com/image32/Videos/drawing.mp4" target="_blank"><b>Drawing video</b></a><br>
