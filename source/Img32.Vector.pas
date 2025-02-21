@@ -3,7 +3,7 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  2 February 2025                                                 *
+* Date      :  21 February 2025                                                *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -2263,6 +2263,7 @@ end;
 
 function CalcRoundingSteps(radius: double): double;
 begin
+  if radius < 0 then radius := Abs(radius);
   //the results of this function have been derived empirically
   //and may need further adjustment
   if radius < 0.55 then result := 4
