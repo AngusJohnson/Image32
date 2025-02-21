@@ -78,6 +78,23 @@ object Color32DialogForm: TColor32DialogForm
     Margins.Bottom = 6
     Caption = '#'
   end
+  object lblHue: TLabel
+    Left = 366
+    Top = 488
+    Width = 48
+    Height = 41
+    Hint = 'Hue'
+    Margins.Left = 6
+    Margins.Top = 6
+    Margins.Right = 6
+    Margins.Bottom = 6
+    Alignment = taRightJustify
+    AutoSize = False
+    Caption = '000'
+    FocusControl = eRed
+    ParentShowHint = False
+    ShowHint = True
+  end
   object eHexColor: TEdit
     Left = 204
     Top = 568
@@ -252,14 +269,14 @@ object Color32DialogForm: TColor32DialogForm
   object tbMain: TTrackBar
     Left = 0
     Top = 484
-    Width = 390
+    Width = 362
     Height = 68
     Margins.Left = 6
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
     Max = 255
-    PageSize = 16
+    PageSize = 10
     Frequency = 16
     TabOrder = 0
     ThumbLength = 52

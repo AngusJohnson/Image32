@@ -110,8 +110,8 @@ const
   toolIconNames: array [0..9] of string = ('HAND', 'LINE', 'IRREGPOLY',
     'REGPOLY', 'TEXT', 'ERASE', 'DROPPER', 'FILL', 'SELECT', 'WAND');
 
-  defaultImageWidth = 800;
-  defaultImageHeight = 600;
+  defaultImageWidth = 400;
+  defaultImageHeight = 300;
 
 resourcestring
   rsLinePolyDrawingTip = 'Left click to add vertices. Right click to end layer';
@@ -263,10 +263,11 @@ var
   tmpImg: TImage32;
 const
   // offsets to the red dot hotspots on cursors (relative to cursor size)
-  hotXs: array[0..9] of double = (0.40, 0.89, 0.52, 0.5, 0.64, 0.89, 0.93, 0.86, 0.71, 0.42);
-  hotYs: array[0..9] of double = (0.10, 0.25, 0.37, 0.5, 0.70, 0.50, 0.93, 0.93, 0.71, 0.37);
+  hotXs: array[0..9] of double = (0.40, 0.89, 0.52, 0.5, 0.95, 0.87, 0.93, 0.86, 0.71, 0.42);
+  hotYs: array[0..9] of double = (0.10, 0.25, 0.37, 0.5, 0.82, 0.87, 0.93, 0.93, 0.71, 0.37);
 begin
-  masterImage := TImage32.Create(defaultImageWidth, defaultImageHeight);
+  masterImage := TImage32.Create(
+    DPIAware(defaultImageWidth), DPIAware(defaultImageHeight));
   masterImage.Clear(clNone32);
 
   undoRedo := TUndoRedo.Create;
@@ -1201,6 +1202,7 @@ begin
   if not layerStarted or not (toolIdx in [SELECT, WAND]) then Exit;
   currentDesignerLayer := TVectorLayer32(layeredImage[TopLayerIdx]);
   pp := currentDesignerLayer.Paths;
+  if not Assigned(pp) then Exit;
 
   if layeredImage[1] is TRasterLayer32 then
     with TRasterLayer32(layeredImage[1]) do

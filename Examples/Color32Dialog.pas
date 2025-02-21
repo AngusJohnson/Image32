@@ -34,6 +34,7 @@ type
     bCancel: TButton;
     Label5: TLabel;
     tbMain: TTrackBar;
+    lblHue: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure tbMainChange(Sender: TObject);
     procedure tbBlueChange(Sender: TObject);
@@ -158,6 +159,10 @@ begin
     fRainbow[i] := HslToRgb(fHsl);
   end;
   fHsl.hue := 0;
+  eHexColor.Font.Style := [fsBold];
+  lblHue.Font.Color := clGray;
+  lblHue.Left := ipMain.Left + ipMain.Width - lblHue.Width;
+  tbMain.Width := lblHue.Left - tbMain.Left;
 
   UpdateCtrls(nil);
 end;
@@ -178,6 +183,8 @@ begin
   try
     fBlockUpd := true;
     dpi2 := DPIAware(2);
+
+    lblHue.Caption := inttostr(fHsl.hue);
 
     // update ipMain
     RectWidthHeight(ipMain.InnerClientRect, w,h);
@@ -219,7 +226,7 @@ begin
 
     p := Ellipse(RectD(pt.X-r,pt.Y-r,pt.X+r,pt.Y+r));
 
-    if (pt.Y / fSize > 0.55) then
+    if (pt.X * 255/fSize) - (pt.Y * 255/fSize) <= 0.0 then
       DrawLine(ipSubMain.Image, p, dpi2, clWhite32, esPolygon) else
       DrawLine(ipSubMain.Image, p, dpi2, clBlack32, esPolygon);
 
