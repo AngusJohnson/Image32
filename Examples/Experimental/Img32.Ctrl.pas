@@ -3,14 +3,14 @@ unit Img32.Ctrl;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  0.0 (Experimental)                                              *
-* Date      :  2 February 2025                                                 *
-* Website   :  http://www.angusj.com                                           *
+* Date      :  24 Febuary 2025                                                 *
+* Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
 * Purpose   :  Drawing controls (buttons, labels, edits, tabs, pages etc.)     *
 *              This unit is EXPERIMENTAL. To do this properly would be a huge  *
-*              task and I doubt there will be sufficient interest to just that *
-*              effort since I'm largely reinventing the wheel (ie FMX).        *
+*              task and I doubt there will be sufficient interest to justify   *
+*              the effort since I'm largely reinventing the wheel (ie FMX).    *
 *                                                                              *
 * License   :  Use, modification & distribution is subject to                  *
 *              Boost Software License Ver 1                                    *
@@ -693,6 +693,9 @@ var
   clDefMid32  :   TColor32 = $FF33FF33;
   clDefLite32 :   TColor32 = $FFDDEEDD;
 
+  tickPaths   :   TPathsD;
+  checkPaths  :   TPathsD;
+
 implementation
 
 uses
@@ -1021,7 +1024,7 @@ begin
     lh := DPIAware(12);
 
   bh := bevHeight;
-  hbh := bevHeight/2;
+  hbh := bh/2;
   r := lh/3;
 
   totalW := offsets[len];
@@ -1037,7 +1040,10 @@ begin
       rec := RectD(hbh + offsets[i], bh, hbh + offsets[i+1], bh + tabHeight);
       p := GetTabOutLine(rec, r);
       DrawBtnInternal(img, p, captions[i], font,
-        bevHeight, 0, false, true, color, textColor, 0, 0, false);
+        hbh, 0, false, true, color, textColor, 0, 0, false);
+      p := TranslatePath(p, -1, -1);
+      DrawLine(img, p, 1, clGray32, esPolygon);
+      p := TranslatePath(p, 1, 1);
     end;
 
     //draw tabs following selected tab
@@ -1046,21 +1052,28 @@ begin
       rec := RectD(hbh + offsets[i], bh, hbh + offsets[i+1], bh + tabHeight);
       p := GetTabOutLine(rec, r);
       DrawBtnInternal(img, p, captions[i], font,
-        bevHeight, 0, false, true, color, textColor, 0, 0, false);
+        hbh, 0, false, true, color, textColor, 0, 0, false);
+      p := TranslatePath(p, 1, -1);
+      DrawLine(img, p, 1, clGray32, esPolygon);
+      p := TranslatePath(p, -1, 1);
     end;
 
     //draw selected tab
-    rec := RectD(hbh + offsets[selectedIdx], bh,
+    rec := RectD(hbh + offsets[selectedIdx], bh+4,
       hbh + offsets[selectedIdx+1], bh + tabHeight);
     img32.Vector.InflateRect(rec, 0, bh);
     p := GetTabOutLine(rec, r);
     DrawBtnInternal(img, p, captions[selectedIdx], font,
-      bevHeight, 0, false, true, selColor, selTextColor, -Round(hbh), 0, false);
+      hbh, 0, false, true, selColor, selTextColor, -Round(hbh), 0, false);
     p := Grow(p, nil, hbh, jsRound, 2);
     DrawLine(img, p, DPIAware(1.2), clLiteGrey32, esSquare);
 
+    p := TranslatePath(p, 0, -1);
+    DrawLine(img, p, 1, clGray32, esPolygon);
+    p := TranslatePath(p, 0, 1);
+
     recI.Left := Round(offsets[0]);
-    recI.Top := Round(bh);
+    recI.Top := Round(bh)-1;
     recI.Right := recI.Left + img.Width;
     recI.Bottom := recI.Top + img.Height;
     Image.CopyBlend(img, img.Bounds, recI, BlendToAlpha);
@@ -1082,9 +1095,10 @@ procedure DrawCheckboxCtrl(Image: TImage32; const rec: TRect;
   bevHeight: double; triState: TTriState = tsNo; preferTick: Boolean = false;
   color: TColor32 = clWhite32; enabled: Boolean = true);
 var
-  d     : double;
+  d,w   : double;
   hbh,pw: double;
   p     : TPathD;
+  pp    : TPathsD;
   rec2  : TRectD;
 begin
   if not enabled then triState := tsUnknown;
@@ -1102,25 +1116,28 @@ begin
   case triState of
     tsUnknown :
       begin
-        d := Ceil(d/6);
-        Img32.Vector.InflateRect(rec2, -d, -d);
-        rec2.BottomRight := TranslatePoint(rec2.BottomRight, 1,1);
-        DrawPolygon(Image, Rectangle(rec2), frNonZero, clLiteGray32);
+        w := RectWidth(rec);
+        pp := ScalePath(checkPaths, w * 0.6 /100);
+        pp := TranslatePath(pp, rec.Left + w * 0.2, rec.Top + w * 0.2);
+        DrawPolygon(Image, pp, frEvenOdd, SetAlpha(clDefDark32, $88));
+//        d := Ceil(d/6);
+//        Img32.Vector.InflateRect(rec2, -d, -d);
+//        rec2.BottomRight := TranslatePoint(rec2.BottomRight, 1,1);
+//        DrawPolygon(Image, Rectangle(rec2), frNonZero, clLiteGray32);
       end;
     tsYes :
       begin
-        pw := d/5;
-        d := Ceil(d/4);
-        Img32.Vector.InflateRect(rec2, -d, -d);
-
         if preferTick then
         begin
-          p := MakePath([42,60, 88,12, 48,91, 10,64, 21,42]);
-          p := ScalePath(p, RectWidth(rec)/100);
-          p := TranslatePath(p, rec.Left, rec.Top);
+          w := RectWidth(rec);
+          p := ScalePath(tickPaths[0],  w * 0.8 /100);
+          p := TranslatePath(p, rec.Left + w *0.1, rec.Top + w *0.1);
           DrawPolygon(Image, p, frEvenOdd, clDefDark32);
         end else
         begin
+          pw := d/5;
+          d := Ceil(d/4);
+          Img32.Vector.InflateRect(rec2, -d, -d);
           rec2.BottomRight := TranslatePoint(rec2.BottomRight, 1,1);
           DrawLine(Image, rec2.TopLeft, rec2.BottomRight, pw, clDefDark32);
           DrawLine(Image, PointD(rec2.Left, rec2.Bottom),
@@ -1137,8 +1154,9 @@ procedure DrawRadioCtrl(Image: TImage32; const ellipse: TPathD;
 var
   d     : double;
   rec2  : TRectD;
-  bc,fc : TColor32;
+  bc    : TColor32;
   p     : TPathD;
+  pp    : TPathsD;
 begin
   rec2 := GetBoundsD(ellipse);
   d := min(rec2.Width, rec2.Height) - bevHeight;
@@ -1154,60 +1172,25 @@ begin
   if bevHeight > 0 then
     DrawEdge(Image, ellipse, clSilver32, clWhite32, bevHeight);
 
+
   case triState of
-    tsUnknown : fc := clLiteGray32;
-    tsYes     : fc := clDefDark32;
+    tsUnknown :
+      begin
+        pp := ScalePath(checkPaths, d * 0.7 /100);
+        pp := TranslatePath(pp, rec2.Left + d * 0.22, rec2.Top  + d * 0.22);
+        DrawPolygon(Image, pp, frEvenOdd, SetAlpha(clDefDark32, $88));
+        //fc := clLiteGray32;
+      end;
+    tsYes     :
+      begin
+        d := Ceil(d/5);
+        p := Grow(ellipse, nil, -d, jsAuto, 0);
+        DrawPolygon(Image, p, frNonZero, clDefDark32);
+      end
     else Exit;
   end;
-
-  d := Ceil(d/5);
-  p := Grow(ellipse, nil, -d, jsAuto, 0);
-  DrawPolygon(Image, p, frNonZero, fc);
 end;
-//------------------------------------------------------------------------------
 
-//function DrawPageCtrl(Image: TImage32;
-//  const captions: array of string; font: TFontCache;
-//  const pageRect: TRect; selectedIdx: integer;
-//  bevHeight: double;  tabWidth: integer = 0; tabHeight: integer = 0;
-//  inactiveTabColor: TColor32 = clLiteBtn32;
-//  inactiveTextColor: TColor32 = clDarkGray32;
-//  activeTabColor: TColor32 = clDarkBtn32;
-//  activeTextColor: TColor32 = clBlack32): TTabCtrlMetrics;
-//var
-//  hbh  : integer;
-//  p   : TPathD;
-//  pt1 : TPointD;
-//  pt2 : TPointD;
-//begin
-//  hbh := Ceil(bevHeight/2);
-//  Result := DrawTabCtrl(Image, captions, font,
-//    Types.Point(pageRect.Left + hbh*2, pageRect.Top),
-//    bevHeight, selectedIdx, tabWidth, tabHeight,
-//    inactiveTabColor, inactiveTextColor, activeTabColor, activeTextColor);
-//
-//  pt1.X := Result.offsets[selectedIdx];
-//  pt1.Y := Result.bounds.Bottom;
-//
-//  pt2.X := Result.offsets[selectedIdx +1];
-//  pt2.Y := Result.bounds.Bottom;
-//
-//  with Result.bounds do
-//  begin
-//    DrawLine(Image, PointD(Left, Bottom), PointD(Right, Bottom), hbh, activeTabColor);
-//    Image.Clear(Rect(Left, Bottom, pageRect.Right, pageRect.Bottom), activeTabColor);
-//  end;
-//
-//  SetLength(p, 6);
-//  p[0] := pt2;
-//  p[1] := PointD(pageRect.Right -hbh, Result.bounds.Bottom);
-//  p[2] := PointD(pageRect.Right -hbh, pageRect.Bottom -hbh);
-//  p[3] := PointD(pageRect.Left +hbh, pageRect.Bottom -hbh);
-//  p[4] := PointD(pageRect.Left +hbh, Result.bounds.Bottom);
-//  p[5] := pt1;
-//  DrawEdge(Image, p, clWhite32, clSilver32, bevHeight, false);
-//end;
-//
 //------------------------------------------------------------------------------
 // TCustomCtrl
 //------------------------------------------------------------------------------
@@ -1699,7 +1682,6 @@ end;
 procedure TStatusbarCtrl.Repaint;
 var
   rec: TRect;
-  i: integer;
   bh: double;
 begin
   if not (Parent is TPanelCtrl) then Exit;
@@ -1708,12 +1690,10 @@ begin
   TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   bh := fBevelHeight;
   DrawEdge(Image, rec, clWhite32, clSilver32, bh);
-  i := DPIAware(5);
-//  Img32.Vector.InflateRect(rec, -i, -i);
-//  DrawEdge(Image, rec, clSilver32, clWhite32, bh);
-  Img32.Vector.InflateRect(rec, -i, 0);
+  Img32.Vector.InflateRect(rec, -DPIAware(10), -Round(bh));
   if GetUsableFont then
-    DrawText(Image, rec.Left, rec.Top, fText, fUsableFont, fFontColor);
+    DrawText(Image, rec.Left, rec.Top + fUsableFont.Ascent ,
+      fText, fUsableFont, fFontColor);
 end;
 
 //------------------------------------------------------------------------------
@@ -4522,6 +4502,7 @@ begin
     PointD(rec.Right-bh, pt1.Y), hbh, self.Color);
 
   Image.Clear(Rect(RectD(bh, rec.Top+ h, rec.Right, rec.Bottom)), self.Color);
+
   SetLength(p, 6);
   p[0] := pt2;
   p[1] := PointD(rec.Right, pt1.Y);
@@ -4530,6 +4511,10 @@ begin
   p[4] := PointD(rec.Left, pt1.Y);
   p[5] := pt1;
   DrawEdge(Image, p, clWhite32, clSilver32, bh, false);
+  DrawLine(Image, PointD(rec.Left +bh, rec.Bottom),
+    PointD(rec.Right-bh, rec.Bottom), 1, clGray32);
+  DrawLine(Image, PointD(rec.Right, rec.Top + h +1),
+    PointD(rec.Right, rec.Bottom), 1, clGray32);
 end;
 //------------------------------------------------------------------------------
 
@@ -6103,6 +6088,25 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// Initialization procedures
+//------------------------------------------------------------------------------
+
+procedure InitPaths;
+begin
+  // 100 x 100 vector icons
+  SetLength(checkPaths, 2);
+  checkPaths[0] := MakePath([
+    100,33.76, 94.18,49.56, 78.07,61.75, 58.32,66.42, 58.32,66,
+    31.14,66, 31.14,47.37, 58.32,47.37, 62.63,44.95, 70.12,40.08,
+    72.82,33.76, 70.12,27.43, 62.63,22.57, 52.09,20.25, 40.91,21.03,
+    31.61,24.72, 26.38,30.50, 0,25.61, 11.28,11.21, 31.27,1.95, 55.37,0,
+    78.07,5.76, 94.18,17.95 ]);
+  checkPaths[1] := MakePath([33,74.58, 65,74.58, 65,100, 33,100]);
+
+  SetLength(tickPaths, 1);
+  tickPaths[0] :=
+    MakePath([41.02, 60.75, 100, 0, 48.71, 100, 0, 65.82, 14.10, 37.97]);
+end;
 //------------------------------------------------------------------------------
 
 procedure RegisterClasses;
@@ -6130,5 +6134,6 @@ end;
 
 initialization
   RegisterClasses;
+  InitPaths;
 
 end.

@@ -303,7 +303,8 @@ begin
         if storageMngr.RepaintRequired then
           InvalidateRect(hWnd, nil, false);
 
-        statusCtrl.Text := storageMngr.RootCtrl.FocusedCtrl.Name;
+        if Assigned(storageMngr.RootCtrl.FocusedCtrl) then
+          statusCtrl.Text := storageMngr.RootCtrl.FocusedCtrl.Name;
       end;
     WM_MOUSEMOVE:
       begin
@@ -517,7 +518,7 @@ begin
   rootCtrl.Font := eventPropHandler1.UnscaledFont;
   rootCtrl.CanFocus := false;
   rootCtrl.Color := clBtnFace32;
-  rootCtrl.Margin := 50;
+  rootCtrl.Margin := DPIAware(10);
 
   statusCtrl :=
     layeredImg32.AddLayer(TStatusbarCtrl, rootCtrl) as TStatusbarCtrl;
@@ -526,6 +527,7 @@ begin
     BevelHeight := DPIAware(1.5);
     Color := clNone32;
     AutoPosition := apBottom;
+    Text := 'Status bar';
   end;
 
   topPnlCtrl := layeredImg32.AddLayer(TPanelCtrl, rootCtrl) as TPanelCtrl;
@@ -783,7 +785,7 @@ begin
   //Create the main window and center it
   mainHdl := CreateWindow('IMG32_DEMO', 'Demo',
               WS_OVERLAPPEDWINDOW, 0, 0,
-              DpiAware(800), DpiAware(600), 0, 0, Inst, nil);
+              DpiAware(720), DpiAware(480), 0, 0, Inst, nil);
   CenterForm(mainHdl);
 
   imageSize64 := DpiAware(64.0);
@@ -851,5 +853,5 @@ begin
   eventPropHandler1.Free;
   //nb: fontReader is freed by Img32.Text.FontManager
 
-  Halt(0);
+  //Halt(0);
 end.

@@ -32,6 +32,77 @@ object fmMain: TfmMain
     Margins.Bottom = 6
     Align = alLeft
     TabOrder = 0
+    object lblValue1: TLabel
+      Left = 20
+      Top = 388
+      Width = 120
+      Height = 41
+      Margins.Left = 6
+      Margins.Top = 6
+      Margins.Right = 6
+      Margins.Bottom = 6
+      Caption = 'lblValue1'
+      FocusControl = eValue1
+      Visible = False
+    end
+    object lblValue2: TLabel
+      Left = 20
+      Top = 514
+      Width = 120
+      Height = 41
+      Margins.Left = 6
+      Margins.Top = 6
+      Margins.Right = 6
+      Margins.Bottom = 6
+      Caption = 'lblValue2'
+      FocusControl = eValue2
+      Visible = False
+    end
+    object eValue1: TEdit
+      Left = 20
+      Top = 432
+      Width = 122
+      Height = 49
+      Margins.Left = 6
+      Margins.Top = 6
+      Margins.Right = 6
+      Margins.Bottom = 6
+      NumbersOnly = True
+      TabOrder = 0
+      Text = '0'
+      Visible = False
+      OnChange = eValue1Change
+    end
+    object eValue2: TEdit
+      Left = 20
+      Top = 560
+      Width = 122
+      Height = 49
+      Margins.Left = 6
+      Margins.Top = 6
+      Margins.Right = 6
+      Margins.Bottom = 6
+      NumbersOnly = True
+      TabOrder = 1
+      Text = '0'
+      Visible = False
+      OnChange = eValue2Change
+    end
+    object cbValue: TCheckBox
+      Left = 20
+      Top = 640
+      Width = 170
+      Height = 49
+      Margins.Left = 6
+      Margins.Top = 6
+      Margins.Right = 6
+      Margins.Bottom = 6
+      Caption = '&Y=X'
+      Checked = True
+      State = cbChecked
+      TabOrder = 2
+      Visible = False
+    end
   end
   object pnlMain: TPanel
     Left = 202

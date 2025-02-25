@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Math,
   Controls, Forms, Dialogs, ExtCtrls, ComCtrls, Menus,
-  Img32, Img32.Layers, Img32.Panels;
+  Img32, Img32.Layers, Img32.Panels, StdCtrls;
 
 
 const
@@ -50,6 +50,11 @@ type
     N4: TMenuItem;
     mnuEditForeColor: TMenuItem;
     mnuEditBackColor: TMenuItem;
+    eValue1: TEdit;
+    eValue2: TEdit;
+    lblValue1: TLabel;
+    lblValue2: TLabel;
+    cbValue: TCheckBox;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormKeyPress(Sender: TObject; var Key: Char);
@@ -64,9 +69,12 @@ type
     procedure mnuDelSelectClick(Sender: TObject);
     procedure Exit1Click(Sender: TObject);
     procedure mnuEditBackColorClick(Sender: TObject);
+    procedure eValue1Change(Sender: TObject);
+    procedure eValue2Change(Sender: TObject);
   private
     undoRedo      : TUndoRedo;
-    penWidth     : double;
+    penWidth      : double;
+    edgeCount     : integer;
     buttonSize    : integer;
     mouseDown     : Boolean;
     layerStarted  : Boolean;
@@ -117,6 +125,69 @@ resourcestring
   rsLinePolyDrawingTip = 'Left click to add vertices. Right click to end layer';
 
 //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+type
+  TNormalizeType = (ntMin, ntAvg, ntMax);
+
+function GetNormalizedSquare(const pt1, pt2: TPointD; nt: TNormalizeType): TRectD;
+var
+  q: double;
+begin
+  if pt1.X <= pt2.X then
+  begin
+    Result.Left := pt1.X;
+    Result.Right := pt2.X;
+  end else
+  begin
+    Result.Left := pt2.X;
+    Result.Right := pt1.X;
+  end;
+  if pt1.Y <= pt2.Y then
+  begin
+    Result.Top := pt1.Y;
+    Result.Bottom := pt2.Y;
+  end else
+  begin
+    Result.Top := pt2.Y;
+    Result.Bottom := pt1.Y;
+  end;
+  case nt of
+    ntMin:
+      begin
+        q := Min(Result.Width, Result.Height);
+      end;
+    ntAvg:
+      begin
+        q := Average(Result.Width, Result.Height);
+      end;
+    else {ntMax:}
+      begin
+        q := Max(Result.Width, Result.Height);
+      end;
+  end;
+  Result.Left := Result.Left + (Result.Width - q)/2;
+  Result.Top := Result.Top + (Result.Height - q)/2;
+  Result.Right := Result.Left + q;
+  Result.Bottom := Result.Top + q;
+end;
+//------------------------------------------------------------------------------
+
+function IsValidCSpline(const path: TPathD): Boolean;
+var
+  len: integer;
+begin
+  len := Length(path);
+  Result := (len > 3) and not Odd(len);
+end;
+//------------------------------------------------------------------------------
+
+function IsCSplineCtrlPt(idx: integer): Boolean;
+begin
+  // except for the first control pt, every other
+  // control pt preceeds an on-path point
+  Result := (idx = 1) or ((idx > 1) and not Odd(idx)); // 1,2,4,6,8,10 etc
+end;
 //------------------------------------------------------------------------------
 
 function GetCursorSize: TSize;
@@ -251,6 +322,95 @@ begin
   current := (current + 1) mod undoCount;
   Result := undos[current];
 end;
+//------------------------------------------------------------------------------
+
+(*
+// OffsetPath - this is a very simple ofsetting function
+function OffsetPath(const path: TPathD; delta: double; isClosed: Boolean): TPathD;
+var
+  i,j,k, len: integer;
+  norms: TPathD;
+  q, absDelta, cosA: double;
+const
+  cos45 = 0.7071067812; // Sqrt(0.5)
+  C = (2*cos45 -1);
+  C2 = (1 - C);
+begin
+  norms := GetNormals(path);
+  len := Length(path);
+  if len < 2 then len := 0;
+  SetLength(Result, len *2);
+  if len = 0 then Exit;
+  absDelta := Abs(delta);
+
+  if isClosed then
+  begin
+    j := len -1;
+    k := 0;
+    for i := 0 to len -1 do
+    begin
+      cosA := DotProduct(norms[j], norms[i]);
+      if cosA < -0.5 then // hard-coded miterlimit (2)
+      begin
+        // The squared here is a very good but not perfect offset, since its
+        // midpoint won't usually be exactly delta distance from path[i].
+        // (Perfect offsets are possible but computationally more expensive.)
+        Result[k] := PointD(
+          path[i].X + delta * norms[j].X + (cosA*C2 - C) * absDelta * norms[j].Y,
+          path[i].Y + delta * norms[j].Y - (cosA*C2 - C) * absDelta * norms[j].X);
+        Result[k+1] := PointD(
+          path[i].X + delta * norms[i].X - (cosA*C2 - C) * absDelta * norms[i].Y,
+          path[i].Y + delta * norms[i].Y + (cosA*C2 - C) * absDelta * norms[i].X);
+        //q := Distance(MidPoint(Result[k],Result[k+1]), path[i]);
+        inc(k, 2);
+      end else
+      begin
+        q := delta / (cosA +1);
+        Result[k] := PointD(
+          path[i].X + q * (norms[j].X + norms[i].X),
+         path[i].Y + q * (norms[j].Y + norms[i].Y));
+        inc(k);
+      end;
+      j := i;
+    end;
+    SetLength(Result, k);
+  end else
+  begin
+    Result[0] := PointD(
+      path[0].X + delta * norms[0].X {+ absDelta * norms[0].Y},
+      path[0].Y + delta * norms[0].Y {- absDelta * norms[0].X});
+    j := 0;
+    k := 1;
+    for i := 1 to len -2 do
+    begin
+      cosA := DotProduct(norms[j], norms[i]);
+      if cosA < -0.5 then // hard-coded miterlimit (3)
+      begin
+        Result[k] := PointD(
+          path[i].X + delta * norms[j].X + (cosA*C2 - C) * absDelta * norms[j].Y,
+          path[i].Y + delta * norms[j].Y - (cosA*C2 - C) * absDelta * norms[j].X);
+        Result[k+1] := PointD(
+          path[i].X + delta * norms[i].X - (cosA*C2 - C) * absDelta * norms[i].Y,
+          path[i].Y + delta * norms[i].Y + (cosA*C2 - C) * absDelta * norms[i].X);
+        inc(k, 2);
+      end else
+      begin
+        q := delta / (cosA +1);
+        Result[k] := PointD(
+          path[i].X + q * (norms[j].X + norms[i].X),
+          path[i].Y + q * (norms[j].Y + norms[i].Y));
+        inc(k);
+      end;
+      j := i;
+    end;
+    j := len -1;
+    Result[k] := PointD(
+      path[j].X + delta * norms[j-1].X {- absDelta * norms[j-1].Y},
+      path[j].Y + delta * norms[j-1].Y {+ absDelta * norms[j-1].X});
+    SetLength(Result, k+1);
+  end;
+end;
+*)
 
 //------------------------------------------------------------------------------
 // TfmMain class
@@ -263,8 +423,8 @@ var
   tmpImg: TImage32;
 const
   // offsets to the red dot hotspots on cursors (relative to cursor size)
-  hotXs: array[0..9] of double = (0.40, 0.89, 0.52, 0.5, 0.95, 0.87, 0.93, 0.86, 0.71, 0.42);
-  hotYs: array[0..9] of double = (0.10, 0.25, 0.37, 0.5, 0.82, 0.87, 0.93, 0.93, 0.71, 0.37);
+  hotXs: array[0..9] of double = (0.40, 0.89, 0.52, 0.5, 0.95, 0.87, 0.87, 0.86, 0.71, 0.5);
+  hotYs: array[0..9] of double = (0.10, 0.25, 0.37, 0.5, 0.82, 0.87, 0.87, 0.93, 0.71, 0.5);
 begin
   masterImage := TImage32.Create(
     DPIAware(defaultImageWidth), DPIAware(defaultImageHeight));
@@ -329,7 +489,7 @@ begin
   begin
     Parent := pnlTools;
     Left := 0;
-    Top := Length(toolIconNames) div 2 * tbSize + 20;
+    Top := Length(toolIconNames) div 2 * tbSize + DPIAware(10);
     Width := tbSize;
     Height := tbSize;
     TabStop := false;
@@ -354,6 +514,11 @@ begin
     HatchBackground(Image);
     OnClick := mnuEditBackColorClick;
   end;
+
+  lblValue1.Top := forePanel.top + forePanel.Height +  DPIAware(10);
+  eValue1.Top := lblValue1.top + lblValue1.Height +  DPIAware(10);
+  lblValue2.Top := eValue1.top + eValue1.Height +  DPIAware(10);
+  eValue2.Top := lblValue2.top + lblValue2.Height +  DPIAware(10);
 
   // create and install 32bit custom cursors ...
   tmpImg := TImage32.Create(cursorSize.cx, cursorSize.cy);
@@ -408,81 +573,6 @@ end;
 function CompareExact(master, current: TColor32; tolerance: Integer): Boolean;
 begin
   Result := master = current;
-end;
-//------------------------------------------------------------------------------
-
-function GetNormalizedRect(const pt1, pt2: TPointD): TRectD;
-begin
-  if pt1.X <= pt2.X then
-  begin
-    Result.Left := pt1.X;
-    Result.Right := pt2.X;
-  end else
-  begin
-    Result.Left := pt2.X;
-    Result.Right := pt1.X;
-  end;
-  if pt1.Y <= pt2.Y then
-  begin
-    Result.Top := pt1.Y;
-    Result.Bottom := pt2.Y;
-  end else
-  begin
-    Result.Top := pt2.Y;
-    Result.Bottom := pt1.Y;
-  end;
-end;
-//------------------------------------------------------------------------------
-
-type
-  TNormalizeType = (ntMin, ntAvg, ntMax);
-
-function GetNormalizedSquare(const pt1, pt2: TPointD; nt: TNormalizeType): TRectD;
-var
-  q: double;
-begin
-  if pt1.X <= pt2.X then
-  begin
-    Result.Left := pt1.X;
-    Result.Right := pt2.X;
-  end else
-  begin
-    Result.Left := pt2.X;
-    Result.Right := pt1.X;
-  end;
-  if pt1.Y <= pt2.Y then
-  begin
-    Result.Top := pt1.Y;
-    Result.Bottom := pt2.Y;
-  end else
-  begin
-    Result.Top := pt2.Y;
-    Result.Bottom := pt1.Y;
-  end;
-  case nt of
-    ntMin: q := Min(Result.Width, Result.Height);
-    ntAvg: q := Average(Result.Width, Result.Height);
-    else {ntMax:} q := Max(Result.Width, Result.Height);
-  end;
-  Result.Right := Result.Left + q;
-  Result.Bottom := Result.Top + q;
-end;
-//------------------------------------------------------------------------------
-
-function IsValidCSpline(const path: TPathD): Boolean;
-var
-  len: integer;
-begin
-  len := Length(path);
-  Result := (len > 3) and not Odd(len);
-end;
-//------------------------------------------------------------------------------
-
-function IsCSplineCtrlPt(idx: integer): Boolean;
-begin
-  // except for the first control pt, every other
-  // control pt preceeds an on-path point
-  Result := (idx = 1) or ((idx > 1) and not Odd(idx)); // 1,2,4,6,8,10 etc
 end;
 //------------------------------------------------------------------------------
 
@@ -605,7 +695,7 @@ begin
       TVectorLayer32(layeredImage.AddLayer(TVectorLayer32));
     with currentDesignerLayer do
     begin
-      OuterMargin := penWidth +1;
+      OuterMargin := Max(penWidth +1, buttonSize);
       OnDraw := VectorPanelDesign;
       IsDesignerLayer := true;
     end;
@@ -672,8 +762,10 @@ begin
           else pp[0][1] := pt;
           currentDesignerLayer.Paths := pp;
 
-          rec := GetNormalizedSquare(pp[0][0], pp[0][1], ntAvg);
-          pp[0] := Ellipse(rec, 5);
+          if cbValue.Checked then
+            rec := GetNormalizedSquare(pp[0][0], pp[0][1], ntAvg) else
+            rec := GetBoundsD(pp[0]);
+          pp[0] := Ellipse(rec, edgeCount);
           currentDrawingLayer.Paths := pp;
         end;
         mouseDown := true;
@@ -682,30 +774,46 @@ begin
 
     LINE:
       begin
-        with currentDesignerLayer do
+        cbValue.Enabled := false;
+        if cbValue.Checked then
         begin
-          pp := Paths;
-          if not Assigned(pp) then
-            i := -1 else
-            i := GetClickIndex(Paths[0], pt, buttonSize);
-          if i < 0 then
+          // freeform
+          // currentDesignerLayer path will only contains start and
+          // end points but currentDrawingLayer path contains all points
+          with currentDesignerLayer do
+            if (Length(Paths) > 0) and (Length(Paths[0]) = 2) then
+              Paths[0][1] := pt else
+              AppendPoint(pt);
+          currentDrawingLayer.AppendPoint(pt);
+        end else
+        begin
+          // bezier path
+          with currentDesignerLayer do
           begin
-            // not clicking an existing pt, so add both an on-path & a ctrl-pt
-            AppendPoint(pt);
-            AppendPoint(pt);
             pp := Paths;
-            i := Length(pp[0]);
-            if i = 2 then clickIdx := 1 else clickIdx := i -2;
-          end else
-            clickIdx := i;
+            if not Assigned(pp) then
+              i := -1 else
+              i := GetClickIndex(Paths[0], pt, buttonSize);
+            if i < 0 then
+            begin
+              // not clicking an existing pt, so add both an on-path & a ctrl-pt
+              AppendPoint(pt);
+              AppendPoint(pt);
+              pp := Paths;
+              i := Length(pp[0]);
+              if i = 2 then clickIdx := 1 else clickIdx := i -2;
+            end else
+              clickIdx := i;
+          end;
+
+          if Length(pp[0]) >= 4 then
+          begin
+            pp := CopyPaths(pp);
+            pp[0] := FlattenCSpline(pp[0]);
+            currentDrawingLayer.Paths := pp;
+          end;
         end;
 
-        if Length(pp[0]) >= 4 then
-        begin
-          pp := CopyPaths(pp);
-          pp[0] := FlattenCSpline(pp[0]);
-          currentDrawingLayer.Paths := pp;
-        end;
         mouseDown := true;
         layerStarted := true;
       end;
@@ -862,25 +970,41 @@ begin
 
           if Length(pp[0]) > 1 then
           begin
-            rec := GetNormalizedSquare(pp[0][0], pp[0][1], ntAvg);
+            if cbValue.Checked then
+              rec := GetNormalizedSquare(pp[0][0], pp[0][1], ntAvg) else
+              rec := GetBoundsD(pp[0]);
             SetLength(pp, 1);
-            pp[0] := Ellipse(rec, 5);
+            pp[0] := Ellipse(rec, edgeCount);
             TVectorLayer32(layeredImage[TopLayerIdx-1]).Paths := pp;
           end;
         end;
 
       LINE:
         begin
-          currentDesignerLayer := TVectorLayer32(layeredImage[TopLayerIdx]);
-          currentDrawingLayer := TVectorLayer32(layeredImage[TopLayerIdx -1]);
-          pp := currentDesignerLayer.Paths;
-          pp[0][clickIdx] := pt;
-          currentDesignerLayer.Paths := pp;
-          if Length(pp[0]) >= 4 then
+          if cbValue.Checked then
           begin
-            pp := CopyPaths(pp);
-            pp[0] := FlattenCSpline(pp[0]);
-            currentDrawingLayer.Paths := pp;
+            // freeform
+            pp := Paths; // currentDesignerLayer
+            SetLength(pp[0], 2);
+            pp[0][1] := pt;
+            Paths := pp;
+
+            currentDrawingLayer := TVectorLayer32(layeredImage[TopLayerIdx-1]);
+            currentDrawingLayer.AppendPoint(pt);
+            Paths := SimplifyPaths(Paths, 1.0, false);
+          end else
+          begin
+            // bezier path
+            currentDrawingLayer := TVectorLayer32(layeredImage[TopLayerIdx -1]);
+            pp := Paths; // currentDesignerLayer
+            pp[0][clickIdx] := pt;
+            Paths := pp;
+            if Length(pp[0]) >= 4 then
+            begin
+              pp := CopyPaths(pp);
+              pp[0] := FlattenCSpline(pp[0]);
+              currentDrawingLayer.Paths := pp;
+            end;
           end;
         end;
 
@@ -959,43 +1083,55 @@ begin
         end;
       LINE:
         begin
-          // draw cubic bezier control points from **currentDrawLayer**
-          Image.Clear;
-          pp := PathsRelativeToLayer;
-          if (Length(pp[0]) > 2) and not IsValidCSpline(pp[0]) then Exit;
-
-          highI := High(pp[0]);
-          if highI < 1 then Exit;
-
-          SetLength(p, 2);
-          if (highI > 0) then
+          if cbValue.Checked then
           begin
-            p[0] := pp[0][0]; p[1] := pp[0][1];
-            DrawDashedLine(Image, p, [10,10], nil, 1, clRed32, esButt);
-          end;
-          for i := 1 to highI div 2 do
+            // freeform
+            pp := PathsRelativeToLayer;
+            if (Length(pp[0]) > 1) and (toolIdx <> ERASE) then
+            begin
+              DrawButton(Image, pp[0][0], buttonSize, clRed32, bsRound, [ba3D]);
+              DrawButton(Image, pp[0][1], buttonSize, clLime32, bsRound, [ba3D])
+            end else
+              DrawButton(Image, pp[0][0], buttonSize, clLime32, bsRound, [ba3D]);
+          end else
           begin
-            p[0] := pp[0][i*2]; p[1] := pp[0][i*2 +1];
-            DrawDashedLine(Image, p, [10,10], nil, 1, clRed32, esButt);
+            // draw cubic bezier control points from **currentDrawLayer**
+            Image.Clear;
+            pp := PathsRelativeToLayer;
+            if (Length(pp[0]) > 2) and not IsValidCSpline(pp[0]) then Exit;
+
+            highI := High(pp[0]);
+            if highI < 1 then Exit;
+
+            SetLength(p, 2);
+            if (highI > 0) then
+            begin
+              p[0] := pp[0][0]; p[1] := pp[0][1];
+              DrawDashedLine(Image, p, [10,10], nil, 1, clRed32, esButt);
+            end;
+            for i := 1 to highI div 2 do
+            begin
+              p[0] := pp[0][i*2]; p[1] := pp[0][i*2 +1];
+              DrawDashedLine(Image, p, [10,10], nil, 1, clRed32, esButt);
+            end;
+
+            if moveOvrIdx = 0 then
+              DrawButton(Image, pp[0][0], buttonSize, clLime32, bsRound, [ba3D]) else
+              DrawButton(Image, pp[0][0], buttonSize, clBlue32, bsRound, [ba3D]);
+            if moveOvrIdx = 1 then
+              DrawButton(Image, pp[0][1], buttonSize, clLime32, bsRound, [ba3D]) else
+              DrawButton(Image, pp[0][1], buttonSize, clRed32, bsRound, [ba3D]);
+
+            for i := highI downto 2 do
+            begin
+              if i = moveOvrIdx then
+                DrawButton(Image, pp[0][i], buttonSize, clLime32, bsRound, [ba3D])
+              else if IsCSplineCtrlPt(i) then
+                DrawButton(Image, pp[0][i], buttonSize, clRed32, bsRound, [ba3D])
+              else
+                DrawButton(Image, pp[0][i], buttonSize, clBlue32, bsRound, [ba3D])
+            end;
           end;
-
-          if moveOvrIdx = 0 then
-            DrawButton(Image, pp[0][0], buttonSize, clLime32, bsRound, [ba3D]) else
-            DrawButton(Image, pp[0][0], buttonSize, clBlue32, bsRound, [ba3D]);
-          if moveOvrIdx = 1 then
-            DrawButton(Image, pp[0][1], buttonSize, clLime32, bsRound, [ba3D]) else
-            DrawButton(Image, pp[0][1], buttonSize, clRed32, bsRound, [ba3D]);
-
-          for i := highI downto 2 do
-          begin
-            if i = moveOvrIdx then
-              DrawButton(Image, pp[0][i], buttonSize, clLime32, bsRound, [ba3D])
-            else if IsCSplineCtrlPt(i) then
-              DrawButton(Image, pp[0][i], buttonSize, clRed32, bsRound, [ba3D])
-            else
-              DrawButton(Image, pp[0][i], buttonSize, clBlue32, bsRound, [ba3D])
-          end;
-
         end;
       REGPOLY, IRREGPOLY, ERASE:
         begin
@@ -1026,7 +1162,6 @@ begin
       LINE:
         begin
           Image.Clear;
-          // draw the already flattened cubic bezier spline
           pp := PathsRelativeToLayer;
           DrawLine(Image, pp, penWidth, foreColor, esRound, jsRound);
         end;
@@ -1070,10 +1205,43 @@ begin
   layeredImage.Clear;
   if not (toolIdx in [SELECT, WAND]) then
     undoRedo.Add(masterImage);
+
+  cbValue.Enabled := true;
 end;
 //------------------------------------------------------------------------------
 
 procedure TfmMain.toolPnlClick(Sender: TObject);
+
+  procedure SetValue1(const caption: string = ''; value: integer = 0);
+  begin
+    if caption = '' then
+    begin
+      lblValue1.Visible := false;
+      eValue1.Visible := false;
+    end else
+    begin
+      lblValue1.Caption := caption;
+      lblValue1.Visible := true;
+      eValue1.text := Inttostr(value);
+      eValue1.Visible := true;
+    end;
+  end;
+
+  procedure SetValue2(const caption: string = ''; value: integer = 0);
+  begin
+    if caption = '' then
+    begin
+      lblValue2.Visible := false;
+      eValue2.Visible := false;
+    end else
+    begin
+      lblValue2.Caption := caption;
+      lblValue2.Visible := true;
+      eValue2.text := Inttostr(value);
+      eValue2.Visible := true;
+    end;
+  end;
+
 begin
   if TComponent(Sender).ComponentIndex = toolIdx then Exit;
   with TImage32Panel(pnlTools.Components[toolIdx]) do
@@ -1090,10 +1258,61 @@ begin
   imgPanel.Cursor := toolIdx +1;
 
   case toolIdx of
-    2,3: StatusBar1.Panels[1].Text := rsLinePolyDrawingTip;
-    else StatusBar1.Panels[1].Text := '';
+    HAND, TXT, DROPPER, FILL, SELECT, WAND:
+      begin
+        SetValue1;
+        SetValue2;
+        StatusBar1.Panels[1].Text := '';
+        cbValue.Visible := false;
+      end;
+    LINE:
+      begin
+        SetValue1('Pen &Width:', Round(penWidth));
+        SetValue2;
+        StatusBar1.Panels[1].Text := rsLinePolyDrawingTip;
+        cbValue.Caption := '&Freeform';
+        cbValue.Checked := false;
+        cbValue.Visible := true;
+        cbValue.Top := eValue1.top + eValue1.Height +  DPIAware(10);
+      end;
+    IRREGPOLY:
+      begin
+        SetValue1('Pen &Width:', Round(penWidth));
+        SetValue2;
+        StatusBar1.Panels[1].Text := rsLinePolyDrawingTip;
+        cbValue.Visible := false;
+      end;
+    REGPOLY:
+      begin
+        SetValue1('Pen &Width:', Round(penWidth));
+        SetValue2('Edge &Count:', edgeCount);
+        StatusBar1.Panels[1].Text := '';
+        cbValue.Caption := '&Y=X';
+        cbValue.Checked := true;
+        cbValue.Visible := true;
+        cbValue.Top := eValue2.top + eValue2.Height +  DPIAware(10);
+      end;
+    ERASE:
+      begin
+        SetValue1('Pen &Width:', Round(penWidth));
+        SetValue2;
+        StatusBar1.Panels[1].Text := '';
+        cbValue.Visible := false;
+      end;
   end;
   EndLayer;
+end;
+//------------------------------------------------------------------------------
+
+procedure TfmMain.eValue1Change(Sender: TObject);
+begin
+  penWidth := StrToIntDef(eValue1.Text, 1);
+end;
+//------------------------------------------------------------------------------
+
+procedure TfmMain.eValue2Change(Sender: TObject);
+begin
+  edgeCount := StrToIntDef(eValue2.Text, 0);
 end;
 //------------------------------------------------------------------------------
 
@@ -1167,6 +1386,7 @@ begin
           begin
             layeredImage.Clear;
             layerStarted := false;
+            cbValue.Enabled := true;
           end;
         end;
 
@@ -1176,8 +1396,6 @@ begin
         layerStarted := false;
       end;
     end;
-
-
   end;
   imgPanel.Image.Assign(masterImage);
   HatchBackground(imgPanel.Image);

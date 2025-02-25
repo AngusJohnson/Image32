@@ -186,7 +186,7 @@ function SmoothPath(const path: TPathD; isClosedPath: Boolean;
 function SmoothPaths(const paths: TPathsD; isClosedPath: Boolean;
   tension: double = 0; shapeTolerance: double = 0.1): TPathsD;
 
-procedure SymmetricCropTransparent(img: TImage32);
+function SymmetricCropTransparent(img: TImage32): TPoint;
 
 // Three additional blend functions (see TImage32.CopyBlend)
 function BlendAverage(bgColor, fgColor: TColor32): TColor32;
@@ -305,12 +305,13 @@ end;
 
 // SymmetricCropTransparent: after cropping, the image's midpoint
 // will be the same pixel as before cropping. (Important for rotating.)
-procedure SymmetricCropTransparent(img: TImage32);
+function SymmetricCropTransparent(img: TImage32): TPoint;
 var
   rec: TRect;
 begin
   rec := GetSymmetricCropTransparentRect(img);
-  if (rec.Top > 0) or (rec.Left > 0) then img.Crop(rec);
+  Result := rec.TopLeft;
+  if (Result.X > 0) or (Result.Y > 0) then img.Crop(rec);
 end;
 //------------------------------------------------------------------------------
 
@@ -868,13 +869,13 @@ var
   i: Integer;
 begin
   c := PARGB(img.PixelBase);
+  a := TARGB(oldColor).A;
   r := TARGB(oldColor).R;
   g := TARGB(oldColor).G;
   b := TARGB(oldColor).B;
 
   if preserveAlpha then
   begin
-    a := TARGB(oldColor).A;
     newColor := newColor and $FFFFFF;
     for i := 0 to img.Width * img.Height -1 do
     begin
@@ -885,7 +886,8 @@ begin
   end else
     for i := 0 to img.Width * img.Height -1 do
     begin
-      if (Abs(c.R - r) <= channelTolerance) and
+      if (Abs(c.A - a) <= channelTolerance) and
+        (Abs(c.R - r) <= channelTolerance) and
         (Abs(c.G - g) <= channelTolerance) and
         (Abs(c.B - b) <= channelTolerance) then c.Color := newColor;
       inc(c);

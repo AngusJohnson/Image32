@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  10 January 2025                                                 *
+* Date      :  24 Febuary 2025                                                 *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -535,6 +535,7 @@ type
   function ArrayOfHSLToArrayColor32(const hslArr: TArrayofHSL): TArrayOfColor32;
 
   function GetAlpha(color: TColor32): Byte;  {$IFDEF INLINE} inline; {$ENDIF}
+  function SetAlpha(color: TColor32; alpha: Byte): TColor32; {$IFDEF INLINE} inline; {$ENDIF}
 
   function PointD(const X, Y: Double): TPointD; overload; {$IFDEF INLINE} inline; {$ENDIF}
   function PointD(const pt: TPoint): TPointD; overload; {$IFDEF INLINE} inline; {$ENDIF}
@@ -1734,6 +1735,12 @@ end;
 function GetAlpha(color: TColor32): Byte;
 begin
   Result := Byte(color shr 24);
+end;
+//------------------------------------------------------------------------------
+
+function SetAlpha(color: TColor32; alpha: Byte): TColor32;
+begin
+  Result := (color and $FFFFFF) or (alpha shl 24);
 end;
 //------------------------------------------------------------------------------
 

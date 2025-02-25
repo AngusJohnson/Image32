@@ -1467,29 +1467,30 @@ end;
 
 function GetNormals(const path: TPathD): TPathD;
 var
-  i, highI: integer;
-  last: TPointD;
+  i,j, highI: integer;
 begin
   highI := High(path);
   NewPointDArray(result, highI+1, True);
   if highI < 0 then Exit;
+  j := highI -1;
+  while (j >= 0) and PointsEqual(path[j], path[j+1]) do dec(j);
 
-  last := NullPointD;
-  for i := 0 to highI -1 do
+  if j < 0 then // all points on path are identical
   begin
-    if GetUnitNormal(path[i], path[i+1], result[i]) then
-      last := result[i] else
-      result[i] := last;
-  end;
-  if GetUnitNormal(path[highI], path[0], result[highI]) then
-    last := result[highI];
-
-  for i := 0 to highI do
+    for i := 0 to highI do
+      result[i] := NullPointD;
+  end else
   begin
-    if (result[i].X <> 0) or (result[i].Y <> 0) then Break;
-    result[i] := last;
+    GetUnitNormal(path[j], path[j+1], result[j]);
+    for i := j +1 to highI do
+      if GetUnitNormal(path[i], path[0], result[i]) then
+        j := i else
+        result[i] := result[j];
+    for i := 0 to j - 1 do
+      if GetUnitNormal(path[i], path[i+1], result[i]) then
+        j := i else
+        result[i] := result[j];
   end;
-
 end;
 //------------------------------------------------------------------------------
 
@@ -3136,7 +3137,7 @@ begin
     centre := rec.MidPoint;
     radius := PointD(Width * 0.5, Height  * 0.5);
   end;
-  if steps < 4 then
+  if steps < 3 then
     steps := Round(CalcRoundingSteps(rec.width + rec.height));
   GetSinCos(2 * Pi / Steps, sinA, cosA);
   delta.x := cosA; delta.y := sinA;

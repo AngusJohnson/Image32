@@ -1273,7 +1273,7 @@ var
   FillByteBuffer: procedure(byteBuffer: PByte; windingAccum: PDouble; count: nativeint);
 begin
   // See also https://nothings.org/gamedev/rasterize/
-  if not assigned(renderer) then Exit;
+  if not assigned(paths) or not assigned(renderer) then Exit;
   renderer.SetClipRect(clipRec);
   skipRenderer := renderer.SupportsRenderProcSkip;
 
