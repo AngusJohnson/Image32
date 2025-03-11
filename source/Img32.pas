@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  24 Febuary 2025                                                 *
+* Date      :  11 March 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -661,6 +661,8 @@ var
     uninitialized: boolean = False);
   procedure NewIntegerArray(var a: TArrayOfInteger; count: nativeint;
     uninitialized: boolean = False);
+  procedure NewDoubleArray(var a: TArrayOfDouble; count: nativeint;
+    uninitialized: boolean = False);
   procedure NewByteArray(var a: TArrayOfByte; count: nativeint;
     uninitialized: boolean = False);
   procedure NewPointDArray(var a: TPathD; count: nativeint;
@@ -852,11 +854,26 @@ begin
 {$ELSE}
   if a <> nil then
   begin
-    if uninitialized and CanReuseDynArray(a, count) then
-      Exit;
+    if uninitialized and CanReuseDynArray(a, count) then Exit;
     a := nil;
   end;
   Pointer(a) := NewSimpleDynArray(count, SizeOf(Integer), uninitialized);
+{$IFEND}
+end;
+//------------------------------------------------------------------------------
+
+procedure NewDoubleArray(var a: TArrayOfDouble; count: nativeint;
+  uninitialized: boolean = False);
+begin
+{$IF COMPILERVERSION < 16}
+  SetLength(a, count);
+{$ELSE}
+  if a <> nil then
+  begin
+    if uninitialized and CanReuseDynArray(a, count) then Exit;
+    a := nil;
+  end;
+  Pointer(a) := NewSimpleDynArray(count, SizeOf(Double), uninitialized);
 {$IFEND}
 end;
 //------------------------------------------------------------------------------
@@ -868,8 +885,7 @@ begin
 {$ELSE}
   if a <> nil then
   begin
-    if uninitialized and CanReuseDynArray(a, count) then
-      Exit;
+    if uninitialized and CanReuseDynArray(a, count) then Exit;
     a := nil;
   end;
   Pointer(a) := NewSimpleDynArray(count, SizeOf(Byte), uninitialized);

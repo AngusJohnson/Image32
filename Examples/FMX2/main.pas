@@ -6,7 +6,7 @@ uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   System.Math, FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs,
   FMX.StdCtrls, FMX.Platform, FMX.Surfaces, FMX.Controls.Presentation,
-  FMX.Layouts, FMX.TabControl, Img32, Img32.Text;
+  FMX.Layouts, FMX.TabControl, Img32;
 
 type
   TMainForm = class(TForm)
@@ -49,7 +49,8 @@ implementation
 {$ZEROBASEDSTRINGS OFF}
 
 uses
-  Img32.Vector, Img32.Draw, Img32.Extra, Img32.FMX, Img32.Clipper2;
+  Img32.Vector, Img32.Draw, Img32.Extra, Img32.FMX,
+  Img32.Text, Img32.TextChunks, Img32.Clipper2;
 
 const
   clDarkRed32      : TColor32 = $FFCC0000;
@@ -207,17 +208,17 @@ begin
 
     chunkedText.SetText(essay, regularCache);
     // draw the text to the left of the image
-    chunkMetrics := chunkedText.DrawText(imgMain, tmpRec, taJustify, tvaTop, 0);
+    chunkMetrics := chunkedText.DrawText(imgMain, tmpRec, taJustify, tvaTop);
     // if there's text that didn't fit on the left of the image, then
     // draw the remaining text below the image
-    if (chunkMetrics.nextChuckIdx < chunkedText.Count) then
+    if (chunkMetrics.nextStartPos.X < chunkedText.Count) then
     begin
       with chunkMetrics do
-        tmpRec.Top := tmpRec.Top + Ceil(lineCount * lineHeight);
+        tmpRec.Top := tmpRec.Top + Ceil(visibleLines * lineHeight);
       tmpRec.Right := innerRec.Right;
       tmpRec.Bottom := innerRec.Bottom;
       chunkedText.DrawText(imgMain, tmpRec, taJustify, tvaTop,
-        chunkMetrics.nextChuckIdx, chunkMetrics.lineHeight);
+        chunkMetrics.nextStartPos, chunkMetrics.lineHeight);
     end;
 
   finally

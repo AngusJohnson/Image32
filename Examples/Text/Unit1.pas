@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls,
   Forms, Math, Types, Menus, ExtCtrls, ComCtrls, Commdlg,
-  Img32, Img32.Panels, Img32.Text, Dialogs;
+  Img32, Img32.Panels, Img32.Text, Img32.TextChunks, Dialogs;
 
 type
   TForm1 = class(TForm)
@@ -136,7 +136,7 @@ begin
 
     if (p^ <= #32) then
     begin
-      if (p^ = #32) then chunkedText.AddSpace(font)
+      if (p^ = #32) then chunkedText.AddSpaces(1, font)
       else if (p^ = #10) then chunkedText.AddNewline(font);
       inc(p);
     end else
@@ -395,7 +395,7 @@ begin
 
   // draw chunked essay (and update pageMetrics) ...
   imgPanel.Image.Clear;
-  pageMetrics := chunkedText.DrawText(imgPanel.Image, rec, align, valign, 0);
+  pageMetrics := chunkedText.DrawText(imgPanel.Image, rec, align, valign);
   imgPanel.Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -414,22 +414,25 @@ end;
 procedure TForm1.ImgPanelMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 var
-  chunkIdx, chunkChrOffset: integer;
-  chunk: TTextChunk;
-  ulp: TPathD;
+  chunk     : TTextChunk;
+  ChunkPos  : TPoint;
+  rec       : TRectD;
+  ulp       : TPathD;
 begin
   // first, remove any prior wavy underlines :)
   Draw;
 
   // now get the chunk under the click point ...
   if not chunkedText.GetChunkAndGlyphOffsetAtPt(pageMetrics,
-    imgPanel.ClientToImage(img32.Vector.Point(X,Y)), chunkIdx, chunkChrOffset) then
+    imgPanel.ClientToImage( img32.Vector.Point(X,Y)), ChunkPos) then
       Exit;
 
   // and draw a green wavy line under that chunk ...
-  chunk := chunkedText[chunkIdx];
-  ulp := regularCache.GetUnderlineOutline(chunk.left,
-    chunk.left + chunk.width, chunk.top + chunk.ascent, InvalidD, true);
+  chunk := chunkedText[ChunkPos.X];
+  rec := chunkedText.GetChunkRect(pageMetrics, ChunkPos.X);
+  //DrawPolygon(imgPanel.Image, rectangle(rec), frNonZero, $2000FF00);
+  ulp := regularCache.GetUnderlineOutline(rec.left,
+    rec.Right, rec.top + chunk.ascent, InvalidD, true, 3.0);
   DrawPolygon(imgPanel.Image, ulp, frNonZero, clGreen32);
 end;
 //------------------------------------------------------------------------------

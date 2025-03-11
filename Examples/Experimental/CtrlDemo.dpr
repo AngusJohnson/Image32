@@ -42,6 +42,7 @@ type
     procedure SliderClick(Sender: TObject);
     procedure Slider2Click(Sender: TObject);
     procedure ClickMe(Sender: TObject);
+    procedure CheckboxClick(Sender: TObject);
     procedure DesignModeClick(Sender: TObject);
 
     property Arial14: TFontCache read fArial14 write fArial14;
@@ -252,6 +253,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TEventPropertyHandler1.CheckboxClick(Sender: TObject);
+begin
+  with (Sender as TCheckboxCtrl) do
+    case TriState of
+      tsUnknown : TriState := tsYes;
+      tsYes     : TriState := tsNo;
+      tsNo      : TriState := tsUnknown;
+    end;
+end;
+//------------------------------------------------------------------------------
+
 procedure TEventPropertyHandler1.DesignModeClick(Sender: TObject);
 begin
   designing := TCheckboxCtrl(Sender).TriState = tsChecked;
@@ -264,12 +276,13 @@ end;
 
 function WindowProc(hWnd, uMsg,	wParam: WPARAM; lParam: LPARAM): Integer; stdcall;
 var
-  key : Word;
-  w,h : integer;
-  pt  : TPoint;
-  ps  : TPAINTSTRUCT;
-  dc  : HDC;
-  img : TImage32;
+  key   : Word;
+  chr   : Char;
+  w,h   : integer;
+  pt    : TPoint;
+  ps    : TPAINTSTRUCT;
+  dc    : HDC;
+  img   : TImage32;
   dx,dy : integer;
   rec   : TRectD;
   shift : TShiftState;
@@ -279,7 +292,8 @@ begin
     WM_LBUTTONDOWN:
       begin
         Result := 0;
-        clickPt := Img32.vector.Point(LoWord(lParam), HiWord(lParam));
+        clickPt :=
+          Img32.vector.Point(SmallInt(LoWord(lParam)), SmallInt(HiWord(lParam)));
         if designing then
         begin
           clickLayer := layeredImg32.GetLayerAt(clickPt);
@@ -309,7 +323,8 @@ begin
     WM_MOUSEMOVE:
       begin
         Result := 0;
-        pt := Img32.vector.Point(LoWord(lParam), HiWord(lParam));
+        pt :=
+          Img32.vector.Point(SmallInt(LoWord(lParam)), SmallInt(HiWord(lParam)));
         dx := pt.X - clickPt.X; dy := pt.Y - clickPt.Y;
 
         if designing then
@@ -356,7 +371,8 @@ begin
     WM_LBUTTONUP:
       begin
         if designing then clickLayer := nil;
-        clickPt := Img32.vector.Point(LoWord(lParam), HiWord(lParam));
+        clickPt :=
+          Img32.vector.Point(SmallInt(LoWord(lParam)), SmallInt(HiWord(lParam)));
         storageMngr.MouseUp(mbLeft, WParamToShiftState(wParam), clickPt);
         if storageMngr.RepaintRequired then
           InvalidateRect(hWnd, nil, false);
@@ -364,6 +380,12 @@ begin
       end;
     WM_MOUSEWHEEL:
       begin
+        if designing then clickLayer := nil;
+        clickPt :=
+          Img32.vector.Point(SmallInt(LoWord(lParam)), SmallInt(HiWord(lParam)));
+        if storageMngr.MouseWheel(WParamToShiftState(wParam),
+          SmallInt(HiWord(wParam)), clickPt) and storageMngr.RepaintRequired then
+            InvalidateRect(hWnd, nil, false);
         Result := 0;
       end;
     WM_SYSCOMMAND:
@@ -371,6 +393,17 @@ begin
         Result := 0 else //stops beeps with Alt key combos
         Result := DefWindowProc(hWnd, uMsg, wParam, lParam);
     WM_SYSKEYDOWN,
+    WM_CHAR:
+      begin
+        if not designing then
+        begin
+          chr := Char(wParam);
+          storageMngr.KeyPress(chr);
+          if storageMngr.RepaintRequired then
+            InvalidateRect(hWnd, nil, false);
+        end;
+        Result := 0;
+      end;
     WM_KEYDOWN:
       begin
         key := Word(wParam);
@@ -594,6 +627,8 @@ begin
   // PAGE 1 ///////////////////////////////////////////////////////
   pagePnl := pageCtrl.Panel[0];
   //pagePnl.Color := $20FFFF00; //try it :)
+  pagePnl.ScrollH := pagePnl.AddChild(TScrollCtrl) as TScrollCtrl;
+  pagePnl.ScrollV := pagePnl.AddChild(TScrollCtrl) as TScrollCtrl;
 
   with layeredImg32.AddLayer(TButtonCtrl, pagePnl) as TButtonCtrl do
   begin
@@ -632,6 +667,8 @@ begin
     Text := 'Tri-state checkbox';
     SetInnerBounds(DPIAware(RectD(180, 50, 380, 70)));
     BevelHeight := bevelSize;
+    AutoState := false; // handle state changes manually in OnClick events
+    Onclick := eventPropHandler1.CheckboxClick;
   end;
 
   with layeredImg32.AddLayer(TRadioBtnCtrl, pagePnl) as TRadioBtnCtrl do
@@ -679,7 +716,7 @@ begin
     MaxVisibleItems := 6;
     Margin := 0;//2;
     ImageList := eventPropHandler1.svgList2;
-    ScrollV := layeredImg32.AddLayer(TScrollCtrl, nil) as TScrollCtrl;
+    ScrollV := AddChild(TScrollCtrl) as TScrollCtrl;
     ScrollV.Name := 'ListScroll';
   end;
 
@@ -689,10 +726,8 @@ begin
   //pagePnl.Color := $20FF00FF;
   //pagePnl.Margin := DPIAware(50); //margin only works for autopositioned ctrls
   //add vertical and horizontal scrollbars
-  pagePnl.ScrollH :=
-    layeredImg32.AddLayer(TScrollCtrl, pagePnl) as TScrollCtrl;
-  pagePnl.ScrollV :=
-    layeredImg32.AddLayer(TScrollCtrl, pagePnl) as TScrollCtrl;
+  pagePnl.ScrollH := pagePnl.AddChild(TScrollCtrl) as TScrollCtrl;
+  pagePnl.ScrollV := pagePnl.AddChild(TScrollCtrl) as TScrollCtrl;
   //pagePnl.ScrollH.ScrollSize := DPIAware(16);
 
   with layeredImg32.AddLayer(TLabelCtrl, pagePnl,'') as TLabelCtrl do
@@ -758,7 +793,8 @@ begin
     Text := GetUnicodeTextResouce('LOREM', 'TEXT');
     BevelHeight := bevelSize;
     AutoPosition := apClient;
-    ScrollV := RootOwner.AddLayer(TScrollCtrl, nil) as TScrollCtrl;
+    ScrollV := AddChild(TScrollCtrl) as TScrollCtrl;
+    ScrollV.Name := 'MemoScroll';
     OuterMargin := 40;
   end;
 end;

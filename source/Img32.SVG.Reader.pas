@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  2 Febuary 2025                                                  *
+* Date      :  11 March 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -22,7 +22,7 @@ uses
   SysUtils, Classes, Types, Math,
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults,{$ENDIF}
   Img32, Img32.SVG.Core, Img32.SVG.Path, Img32.Vector,
-  Img32.Draw, Img32.Text, Img32.Transform;
+  Img32.Draw, Img32.Text, Img32.TextChunks, Img32.Transform;
 
 {$IFDEF ZEROBASEDSTR}
   {$ZEROBASEDSTRINGS OFF}
@@ -3891,7 +3891,8 @@ begin
   with TChunkedText.Create(s, fSvgReader.fFontCache) do
   try
     // and compress the lineheight a little
-    drawPathsC := GetTextGlyphs(Rect(textRec), taLeft, tvaTop, 0, lnHeight * 0.8);
+    drawPathsC := GetTextGlyphs(Rect(textRec),
+      taLeft, tvaTop, NullPoint, lnHeight * 0.8);
   finally
     Free;
   end;
