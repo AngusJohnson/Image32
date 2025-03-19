@@ -71,6 +71,8 @@ type
     MnuShadow0: TMenuItem;
     MnuShadow5: TMenuItem;
     MnuShadow10: TMenuItem;
+    CopytoClipboard1: TMenuItem;
+    N6: TMenuItem;
     procedure mnuExitClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -94,6 +96,7 @@ type
     procedure AddImage1Click(Sender: TObject);
     procedure ChangeColor1Click(Sender: TObject);
     procedure mnuHideHatchingClick(Sender: TObject);
+    procedure CopytoClipboard1Click(Sender: TObject);
   private
     layeredImg32  : TLayeredImage32;
     clickedLayer  : TLayer32;
@@ -353,6 +356,26 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TMainForm.CopytoClipboard1Click(Sender: TObject);
+begin
+  // GetMergedImage's True parameter hides design layers
+  // (ie the hatched background and any layer sizing buttons)
+  layeredImg32.GetMergedImage(true).CopyToClipBoard;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainForm.mnuExitClick(Sender: TObject);
+begin
+  if Assigned(targetLayer) then
+  begin
+    if targetLayer.Parent is TRotLayer32 then
+      SetTargetLayer(TRotLayer32(targetLayer.Parent)) else
+      SetTargetLayer(nil);
+  end else
+    Close;
+end;
+//------------------------------------------------------------------------------
+
 procedure TMainForm.FormResize(Sender: TObject);
 var
   w,h: integer;
@@ -598,18 +621,6 @@ procedure TMainForm.pnlMainMouseUp(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
   clickedLayer := nil;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMainForm.mnuExitClick(Sender: TObject);
-begin
-  if Assigned(targetLayer) then
-  begin
-    if targetLayer.Parent is TRotLayer32 then
-      SetTargetLayer(TRotLayer32(targetLayer.Parent)) else
-      SetTargetLayer(nil);
-  end else
-    Close;
 end;
 //------------------------------------------------------------------------------
 

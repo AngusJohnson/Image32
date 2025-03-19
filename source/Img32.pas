@@ -3,7 +3,7 @@ unit Img32;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  11 March 2025                                                   *
+* Date      :  20 March 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  The core module of the Image32 library                          *
@@ -439,7 +439,9 @@ type
   PHsl = ^THsl;
   TArrayofHSL = array of THsl;
 
-  TTriState = (tsUnknown = 0, tsYes = 1, tsChecked = 1, tsNo = 2, tsUnchecked = 2);
+  // TTriState - assigning multiple enum const for a given value prevents streaming
+  // TTriState = (tsUnknown = 0, tsYes = 1, tsChecked = 1, tsNo = 2, tsNo = UnChecked);
+  TTriState = (tsUnknown, tsYes, tsNo);
 
   PPointD = ^TPointD;
   TPathD = array of TPointD;       //nb: watch for ambiguity with Clipper.pas

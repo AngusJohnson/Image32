@@ -3,7 +3,7 @@ unit Img32.Layers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  11 Febuary 2025                                                 *
+* Date      :  20 March 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  Layered images support                                          *
@@ -16,6 +16,7 @@ interface
 
 uses
   SysUtils, Classes, Math, Types,
+  {$IFDEF USE_FILE_STORAGE} TypInfo, {$ENDIF}
   Img32, Img32.Storage, Img32.Draw, Img32.Extra,
   Img32.Vector, Img32.Transform;
 type
@@ -71,8 +72,10 @@ type
     fBlendFunc      : TBlendFunction; //defaults to BlendToAlpha
     fLayeredImage   : TLayeredImage32;
     fClipPath       : TPathsD;  //used in conjunction with fClipImage
-{$IFNDEF NO_STORAGE}
+{$IFDEF USE_FILE_STORAGE}
     fStreamingRec   : TRectWH;
+    procedure SetLeft(value: double);
+    procedure SetTop(value: double);
 {$ENDIF}
     function  GetMidPoint: TPointD;
     procedure SetVisible(value: Boolean);
@@ -102,10 +105,8 @@ type
     function  GetInnerRectD: TRectD;
     function  GetInnerBounds: TRectD;
     function  GetOuterBounds: TRectD;
-{$IFNDEF NO_STORAGE}
+{$IFDEF USE_FILE_STORAGE}
     procedure BeginRead; override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
     procedure EndRead; override;
 {$ENDIF}
     procedure SetOpacity(value: Byte); virtual;
@@ -157,23 +158,29 @@ type
     property   InnerBounds: TRectD read GetInnerBounds;
     property   InnerRect: TRectD read GetInnerRectD;
     property   OuterBounds: TRectD read GetOuterBounds;
-    property   CursorId: integer read fCursorId write fCursorId;
-    property   Height: double read fHeight write SetHeight;
     property   Image: TImage32 read fImage;
-    property   Left: double read fLeft;
     property   MidPoint: TPointD read GetMidPoint;
-    property   Opacity: Byte read fOpacity write SetOpacity;
-    property   OuterMargin: double read fOuterMargin write SetOuterMargin;
     property   Parent: TLayer32 read GetLayer32Parent write SetLayer32Parent;
     property   Root: TGroupLayer32 read GetRoot;
     property   RootOwner: TLayeredImage32 read fLayeredImage;
-    property   Top: double read fTop;
-    property   Visible: Boolean read fVisible write SetVisible;
-    property   Width: double read fWidth write SetWidth;
     property   UserData: TObject read fUserData write fUserData;
     property   BlendFunc: TBlendFunction read fBlendFunc write SetBlendFunc;
     property   PrevLayerInGroup: TLayer32 read GetPrevLayerInGroup;
     property   NextLayerInGroup: TLayer32 read GetNextLayerInGroup;
+{$IFDEF USE_FILE_STORAGE}
+  published
+    property   Left: double read fLeft write SetLeft;
+    property   Top: double read fTop write SetTop;
+{$ELSE}
+    property   Left: double read fLeft;
+    property   Top: double read fTop;
+{$ENDIF}
+    property   CursorId: integer read fCursorId write fCursorId;
+    property   Height: double read fHeight write SetHeight;
+    property   Opacity: Byte read fOpacity write SetOpacity;
+    property   OuterMargin: double read fOuterMargin write SetOuterMargin;
+    property   Visible: Boolean read fVisible write SetVisible;
+    property   Width: double read fWidth write SetWidth;
   end;
 
   TGroupLayer32 = class(TLayer32)
@@ -218,15 +225,14 @@ type
     procedure Scale(sx, sy: double); virtual;
   protected
     procedure SetPivotPt(const pivot: TPointD); virtual;
-{$IFNDEF NO_STORAGE}
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
-{$ENDIF}
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     function    Rotate(angleDelta: double): Boolean; virtual;
     procedure Reset;
     procedure Offset(dx, dy: double); override;
+{$IFDEF USE_FILE_STORAGE}
+  published
+{$ENDIF}
     property  Angle: double read fAngle write SetAngle;
     property  PivotPt: TPointD read GetPivotPt write SetPivotPt;
     property  AutoPivot: Boolean read fAutoPivot write SetAutoPivot;
@@ -242,9 +248,6 @@ type
     procedure RepositionAndDraw;
     function  GetRelativePaths: TPathsD;
   protected
-    // we need to accommodate drawing bezier splines on TVectorLayer32 where
-    // the drawn path goes well outside the stored control points (Paths).
-    //procedure SetOuterMargin(value: double); override;
     procedure SetPaths(const newPaths: TPathsD); virtual;
     procedure Draw; virtual;
   public
@@ -294,6 +297,7 @@ type
   private
     fSizingStyle: TSizingStyle;
   public
+    constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     property SizingStyle: TSizingStyle read fSizingStyle write fSizingStyle;
   end;
 
@@ -384,10 +388,6 @@ type
     procedure SetResampler(newSamplerId: integer);
     function GetRepaintNeeded: Boolean;
   protected
-{$IFNDEF NO_STORAGE}
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
-{$ENDIF}
     property  InvalidRect: TRectD read fInvalidRect;
   public
     constructor Create(parent: TStorage = nil; const name: string = ''); overload; override;
@@ -412,17 +412,20 @@ type
     function  DetachRoot: TGroupLayer32;
     function  AttachRoot(newRoot: TGroupLayer32): Boolean;
 
-    property Resampler: integer read fResampler write SetResampler;
-    property BackgroundColor: TColor32 read fBackColor write SetBackColor;
     property Bounds: TRect read fBounds;
     property Count: integer read GetRootLayersCount;
-    property Height: integer read GetHeight write SetHeight;
     property Image: TImage32 read GetImage;
     property Layer[index: integer]: TLayer32 read GetLayer; default;
     property MidPoint: TPointD read GetMidPoint;
     property Root: TGroupLayer32 read fRoot;
-    property Width: integer read GetWidth write SetWidth;
     property RepaintNeeded : Boolean read GetRepaintNeeded;
+{$IFDEF USE_FILE_STORAGE}
+  published
+{$ENDIF}
+    property BackgroundColor: TColor32 read fBackColor write SetBackColor;
+    property Resampler: integer read fResampler write SetResampler;
+    property Height: integer read GetHeight write SetHeight;
+    property Width: integer read GetWidth write SetWidth;
   end;
 
 function CreateSizingButtonGroup(targetLayer: TLayer32;
@@ -706,7 +709,9 @@ end;
 
 procedure TLayer32.ImageChanged(Sender: TImage32);
 begin
+{$IFDEF USE_FILE_STORAGE}
   if (StorageState = ssLoading) then Exit;
+{$ENDIF}
   fWidth := Image.Width -fOuterMargin *2;
   fHeight := Image.Height -fOuterMargin *2;
   Invalidate;
@@ -717,7 +722,9 @@ procedure TLayer32.SetSize(width, height: double);
 var
   w,h: integer;
 begin
+{$IFDEF USE_FILE_STORAGE}
   if StorageState = ssDestroying then Exit;
+{$ENDIF}
   fWidth := width; fHeight := height;
   w := Ceil(fWidth + fOuterMargin *2);
   h := Ceil(fHeight + fOuterMargin *2);
@@ -805,15 +812,38 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+{$IFDEF USE_FILE_STORAGE}
+procedure TLayer32.SetLeft(value: double);
+begin
+  fLeft := value;
+  fStreamingRec.Left := value;
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.SetTop(value: double);
+begin
+  fTop := value;
+  fStreamingRec.Top := value;
+end;
+//------------------------------------------------------------------------------
+{$ENDIF}
+
+
 procedure TLayer32.SetHeight(value: double);
 begin
   SetSize(fWidth, value);
+{$IFDEF USE_FILE_STORAGE}
+  fStreamingRec.Height := fHeight;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
 procedure TLayer32.SetWidth(value: double);
 begin
   SetSize(value, fHeight);
+{$IFDEF USE_FILE_STORAGE}
+  fStreamingRec.Width := fWidth;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -828,7 +858,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-{$IFNDEF NO_STORAGE}
+{$IFDEF USE_FILE_STORAGE}
 procedure TLayer32.BeginRead;
 var
   stgParent: TStorage;
@@ -844,47 +874,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayer32.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit;
-  if propName = 'Left' then
-    fStreamingRec.Left := GetDoubleProp(propVal, Result)
-  else if propName = 'Top' then
-    fStreamingRec.Top := GetDoubleProp(propVal, Result)
-  else if propName = 'Width' then
-    fStreamingRec.Width := GetDoubleProp(propVal, Result)
-  else if propName = 'Height' then
-    fStreamingRec.Height := GetDoubleProp(propVal, Result)
-  else if propName = 'OuterMargin' then
-    OuterMargin := GetIntProp(propVal, Result)
-  else if propName = 'Visible' then
-    fVisible := GetBoolProp(propVal, Result)
-  else if propName = 'Opacity' then
-    fOpacity := GetIntProp(propVal, Result)
-  else if propName = 'CursorId' then
-    fCursorId := GetIntProp(propVal, Result);
-end;
-//------------------------------------------------------------------------------
-
 procedure TLayer32.EndRead;
 begin
   if fStreamingRec.IsValid then
       SetInnerBounds(fStreamingRec.RectD);
-end;
-//------------------------------------------------------------------------------
-
-procedure TLayer32.WriteProperties;
-begin
-  inherited;
-  WriteDoubleProp('Left', Left);
-  WriteDoubleProp('Top', Top);
-  WriteDoubleProp('Width', Width);
-  WriteDoubleProp('Height', Height);
-  if CursorId <> 0 then WriteIntProp('CursorId', CursorId);
-  if Opacity < 255 then WriteIntProp('Opacity', Opacity);
-  if OuterMargin > 0 then WriteDoubleProp('OuterMargin', OuterMargin);
-  if not Visible then WriteBoolProp('Visible', false);
 end;
 //------------------------------------------------------------------------------
 {$ENDIF}
@@ -1220,8 +1213,8 @@ begin
 
       //get srcRect (offset to childLayer coords)
       //and further adjust dstRect to accommodate OuterMargin
-      srcRect.Left := Floor(dstRect.Left - Left + fOuterMargin);
-      srcRect.Top := Floor(dstRect.Top - Top + fOuterMargin);
+      srcRect.Left := Floor(dstRect.Left - fLeft + fOuterMargin);
+      srcRect.Top := Floor(dstRect.Top - fTop + fOuterMargin);
       srcRect.Right := srcRect.Left + RectWidth(dstRect);
       srcRect.Bottom := srcRect.Top + RectHeight(dstRect);
     end;
@@ -1283,7 +1276,7 @@ begin
 
   if (self is TGroupLayer32) then
     pt2 := pt else
-    pt2 := TranslatePoint(pt, -Left, -Top);
+    pt2 := TranslatePoint(pt, -fLeft, -fTop);
 
   //if 'pt2' is outside the clip mask then don't continue
   if Assigned(fClipImage) then
@@ -1308,8 +1301,8 @@ begin
         else
         begin
           if TARGB(fHitTest.htImage.Pixel[
-            Round(pt2.X -left + fOuterMargin),
-            Round(pt2.Y -top + fOuterMargin)]).A >= 128 then
+            Round(pt2.X -fLeft + fOuterMargin),
+            Round(pt2.Y -fTop + fOuterMargin)]).A >= 128 then
               Result := childLayer;
           if Assigned(Result) and not childLayer.HasChildren then Exit;
         end;
@@ -1557,31 +1550,6 @@ begin
   fAutoPivot := val;
   fPivotPt := InvalidPointD;
 end;
-//------------------------------------------------------------------------------
-
-{$IFNDEF NO_STORAGE}
-function TRotLayer32.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit
-  else if propName = 'Angle' then
-    fAngle := GetDoubleProp(propVal, Result)
-  else if propName = 'AutoPivot' then
-    fAutoPivot := GetBoolProp(propVal, Result)
-  else if propName = 'PivotPt' then
-    fPivotPt := GetPointDProp(propVal, Result)
-  else Result := false;
-end;
-//------------------------------------------------------------------------------
-
-procedure TRotLayer32.WriteProperties;
-begin
-  inherited;
-  WriteDoubleProp('Angle', Angle);
-  WritePointDProp('PivotPt', PivotPt);
-  WriteBoolProp('AutoPivot', AutoPivot)
-end;
-{$ENDIF}
 
 //------------------------------------------------------------------------------
 // TVectorLayer32 class
@@ -1622,7 +1590,7 @@ end;
 
 function  TVectorLayer32.GetRelativePaths: TPathsD;
 begin
-  Result := TranslatePath(fPaths, -Left + fOuterMargin, -Top  + fOuterMargin);
+  Result := TranslatePath(fPaths, -fLeft + fOuterMargin, -fTop  + fOuterMargin);
 end;
 //------------------------------------------------------------------------------
 
@@ -1821,7 +1789,7 @@ begin
       try
         if fAutoCrop then
           fCropMargins := SymmetricCropTransparent(Image);
-        PositionAt(Left + fCropMargins.X, Top + fCropMargins.Y);
+        PositionAt(fLeft + fCropMargins.X, fTop + fCropMargins.Y);
         MasterImage.Assign(Image);
       finally
         Image.UnblockNotify;
@@ -1962,6 +1930,21 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// TSizingGroupLayer32 class
+//------------------------------------------------------------------------------
+
+constructor TSizingGroupLayer32.Create(parent: TLayer32 = nil; const name: string = '');
+begin
+  inherited;
+  SetDesignerLayer(true);
+{$IFDEF USE_FILE_STORAGE}
+  IgnoreOnWrite := true;
+{$ENDIF}
+end;
+//------------------------------------------------------------------------------
+
+
+//------------------------------------------------------------------------------
 // TRotatingGroupLayer32 class
 //------------------------------------------------------------------------------
 
@@ -1969,6 +1952,9 @@ constructor TRotatingGroupLayer32.Create(parent: TLayer32; const name: string);
 begin
   inherited;
   SetDesignerLayer(true);
+{$IFDEF USE_FILE_STORAGE}
+  IgnoreOnWrite := true;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -2002,7 +1988,7 @@ begin
   begin
     SetInnerBounds(rec2);
     q := DPIAware(2);
-    pt := TranslatePoint(pivot, -Left, -Top);
+    pt := TranslatePoint(pivot, -fLeft, -fTop);
     DrawDashedLine(Image, Circle(pt, dist - q),
       dashes, nil, q, clRed32, esPolygon);
   end;
@@ -2076,6 +2062,9 @@ constructor TButtonGroupLayer32.Create(parent: TLayer32 = nil; const name: strin
 begin
   inherited;
   SetDesignerLayer(true);
+{$IFDEF USE_FILE_STORAGE}
+  IgnoreOnWrite := true;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -2110,6 +2099,9 @@ begin
   fEnabled := true;
   fHitTest.enabled := fEnabled;
   SetButtonAttributes(bsRound, DefaultButtonSize, clGreen32);
+{$IFDEF USE_FILE_STORAGE}
+  IgnoreOnWrite := true;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -2161,7 +2153,10 @@ begin
   fResampler := DefaultResampler;
   fLastUpdateType := utUndefined;
 
+{$IFDEF USE_FILE_STORAGE}
   if StorageState = ssLoading then Exit;
+{$ENDIF}
+  // automatically create a TGroupLayer32 root control
   fRoot := AddChild(TGroupLayer32) as TGroupLayer32;
 end;
 //------------------------------------------------------------------------------
@@ -2173,33 +2168,6 @@ begin
   fRoot.SetSize(width, Height);
 end;
 //------------------------------------------------------------------------------
-
-{$IFNDEF NO_STORAGE}
-function  TLayeredImage32.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  if propName = 'Resampler' then
-    Resampler := GetIntProp(propVal, Result)
-  else if propName = 'BackgroundColor' then
-    BackgroundColor := GetColorProp(propVal, Result)
-  else if propName = 'Width' then
-    Width := GetIntProp(propVal, Result)
-  else if propName = 'Height' then
-    Height := GetIntProp(propVal, Result)
-  else
-    Result := false;
-end;
-//------------------------------------------------------------------------------
-
-procedure TLayeredImage32.WriteProperties;
-begin
-  inherited;
-  WriteIntProp('Resampler', Resampler);
-  WriteColorProp('BackgroundColor', BackgroundColor);
-  WriteIntProp('Width', Width);
-  WriteIntProp('Height', Height);
-end;
-//------------------------------------------------------------------------------
-{$ENDIF}
 
 procedure TLayeredImage32.SetSize(width, height: integer);
 begin
@@ -2295,7 +2263,7 @@ end;
 
 function TLayeredImage32.GetLayer(index: integer): TLayer32;
 begin
-  if Assigned(fRoot) then
+  if GetRootLayersCount > 0 then
     Result := fRoot[index] else
     Result := nil;
 end;
@@ -2351,15 +2319,21 @@ end;
 
 function TLayeredImage32.InsertChild(index: integer; storeClass: TStorageClass): TStorage;
 begin
-  Result := inherited InsertChild(index, storeClass);
-  if (StorageState = ssLoading) and (ChildCount = 1) then
+  if ChildCount = 0 then
   begin
-    if not (Result is TGroupLayer32) then
-      raise Exception.Create(rsLayeredImage32Error);
-    fRoot := TGroupLayer32(Result);
-    fRoot.Name := rsRoot;
-    fRoot.fLayeredImage := self;
-  end;
+    Result := inherited InsertChild(index, storeClass);
+{$IFDEF USE_FILE_STORAGE}
+    if (StorageState = ssLoading) then
+    begin
+      if not (Result is TGroupLayer32) then
+        raise Exception.Create(rsLayeredImage32Error);
+      fRoot := TGroupLayer32(Result);
+      fRoot.Name := rsRoot;
+      fRoot.fLayeredImage := self;
+    end;
+{$ENDIF}
+  end else
+    Result := fRoot.InsertChild(index, storeClass);
 end;
 //------------------------------------------------------------------------------
 
@@ -2752,7 +2726,7 @@ initialization
   InitDashes;
   DefaultButtonSize := dpiAware1*10;
 
-{$IFNDEF NO_STORAGE}
+{$IFDEF USE_FILE_STORAGE}
   RegisterStorageClass(TLayeredImage32);
   RegisterStorageClass(TLayer32);
   RegisterStorageClass(TGroupLayer32);

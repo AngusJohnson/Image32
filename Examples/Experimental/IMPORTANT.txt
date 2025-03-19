@@ -1,5 +1,5 @@
 IMPORTANT:
 
-To compile this application, you'll need to comment out 
-the compiler directive {$DEFINE NO_STORAGE} in Img32.inc 
-(that's found in the 'source' folder).
+To compile this application, you'll need to un-comment 
+the compiler directive {$DEFINE USE_FILE_STORAGE} in Img32.inc 
+(in the 'source' folder).

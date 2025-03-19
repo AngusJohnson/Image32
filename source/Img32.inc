@@ -1,8 +1,8 @@
 // While "storage" is still technically experimental,
 // it does allow file system storage of layered objects etc 
-// Comment out the following preprocessor define if you do wish to 
-// use storage (eg to compile the experimental 'CtrlDemo' in Examples).
-{$DEFINE NO_STORAGE}   
+// Uncomment the following preprocessor define if you do wish to 
+// use file storage (eg to compile the experimental 'CtrlDemo' in Examples).
+{.$DEFINE USE_FILE_STORAGE}   
 
 // default rotation direction is clockwise with positive angles
 {.$DEFINE CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}

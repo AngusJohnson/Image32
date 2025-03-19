@@ -35,14 +35,20 @@ object MainForm: TMainForm
       'Selecting a layer before adding a new one will create a nested c' +
       'hild layer'
     UseSystemFont = False
-    ExplicitTop = 767
-    ExplicitWidth = 896
   end
   object MainMenu1: TMainMenu
     Left = 112
-    Top = 72
+    Top = 88
     object File1: TMenuItem
       Caption = '&File'
+      object CopytoClipboard1: TMenuItem
+        Caption = 'Copy to Clipboard'
+        ShortCut = 16451
+        OnClick = CopytoClipboard1Click
+      end
+      object N6: TMenuItem
+        Caption = '-'
+      end
       object Exit1: TMenuItem
         Caption = 'E&xit'
         ShortCut = 27
@@ -128,8 +134,8 @@ object MainForm: TMainForm
         OnClick = mnuDeleteLayerClick
       end
       object ChangeColor1: TMenuItem
-        Caption = '&Change Color ...'
-        ShortCut = 16451
+        Caption = 'C&hange Color ...'
+        ShortCut = 16456
         OnClick = ChangeColor1Click
       end
     end
