@@ -39,8 +39,6 @@ object MainForm: TMainForm
     TabIndex = 0
     TabStop = False
     OnChange = TabControl1Change
-    ExplicitWidth = 1127
-    ExplicitHeight = 850
   end
   object StatusBar1: TStatusBar
     Left = 0
@@ -54,7 +52,5 @@ object MainForm: TMainForm
     Panels = <>
     SimplePanel = True
     SimpleText = '  Ctrl + MouseWheel --> to zoom in or out'
-    ExplicitTop = 850
-    ExplicitWidth = 1127
   end
 end

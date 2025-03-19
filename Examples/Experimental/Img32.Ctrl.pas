@@ -1101,7 +1101,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetVaribleWidthTabOffsets(const captions: array of string;
+function GetVariableWidthTabOffsets(const captions: array of string;
   font: TFontCache; startingOffset: double): TArrayOfDouble;
 var
   i, len  : integer;
@@ -4918,7 +4918,7 @@ begin
   bh := fBevelHeight;
   if fTabWidth > 0 then
     fTabOffsets := MakeCumulativeArray(BevelHeight, fTabWidth, len) else
-    fTabOffsets := GetVaribleWidthTabOffsets(tabs, fUsableFont, BevelHeight);
+    fTabOffsets := GetVariableWidthTabOffsets(tabs, fUsableFont, BevelHeight);
 
   if StorageState = ssLoading then Exit;
   for i := 0 to len -1 do

@@ -185,7 +185,7 @@ end;
 function IsCSplineCtrlPt(idx: integer): Boolean;
 begin
   // except for the first control pt, every other
-  // control pt preceeds an on-path point
+  // control pt precedes an on-path point
   Result := (idx = 1) or ((idx > 1) and not Odd(idx)); // 1,2,4,6,8,10 etc
 end;
 //------------------------------------------------------------------------------
@@ -325,7 +325,7 @@ end;
 //------------------------------------------------------------------------------
 
 (*
-// OffsetPath - this is a very simple ofsetting function
+// OffsetPath - this is a very simple offsetting function
 function OffsetPath(const path: TPathD; delta: double; isClosed: Boolean): TPathD;
 var
   i,j,k, len: integer;

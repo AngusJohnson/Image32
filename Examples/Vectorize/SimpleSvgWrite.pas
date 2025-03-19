@@ -77,7 +77,7 @@ const
 
 function ColorToHtml(color: Cardinal): string;
 begin
-  Result := Format('#%6.6x', [color and $FFFFFF]);;
+  Result := Format('#%6.6x', [color and $FFFFFF]);
 end;
 
 function GetAlpha(clr: Cardinal): double;

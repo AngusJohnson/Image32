@@ -30,8 +30,6 @@ object MainForm: TMainForm
     Panels = <>
     SimplePanel = True
     SimpleText = '  Use <Shift> to Scroll, Ctrl> to Zoom, and <Num> to Scale'
-    ExplicitTop = 823
-    ExplicitWidth = 832
   end
   object MainMenu1: TMainMenu
     Left = 32

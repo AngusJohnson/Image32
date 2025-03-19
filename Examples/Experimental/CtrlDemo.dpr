@@ -512,7 +512,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetUnicodeTextResouce(const resName: string; resType: PChar): UnicodeString;
+function GetUnicodeTextResource(const resName: string; resType: PChar): UnicodeString;
 var
   len: integer;
   rs: TResourceStream;
@@ -790,7 +790,7 @@ begin
 
   with layeredImg32.AddLayer(TMemoCtrl, pagePnl) as TMemoCtrl do
   begin
-    Text := GetUnicodeTextResouce('LOREM', 'TEXT');
+    Text := GetUnicodeTextResource('LOREM', 'TEXT');
     BevelHeight := bevelSize;
     AutoPosition := apClient;
     ScrollV := AddChild(TScrollCtrl) as TScrollCtrl;

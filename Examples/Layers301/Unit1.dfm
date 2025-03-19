@@ -35,8 +35,6 @@ object MainForm: TMainForm
       'Selecting a layer before adding a new one will create a nested c' +
       'hild layer'
     UseSystemFont = False
-    ExplicitTop = 767
-    ExplicitWidth = 896
   end
   object MainMenu1: TMainMenu
     Left = 112

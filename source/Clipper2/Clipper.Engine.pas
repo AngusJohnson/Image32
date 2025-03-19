@@ -4039,7 +4039,7 @@ function TPolyPath64.AddChild(const path: TPath64): TPolyPathBase;
 begin
   Result := TPolyPath64.Create;
   Result.Parent := self;
-  TPolyPath64(Result).FPath := path;;
+  TPolyPath64(Result).FPath := path;
   ChildList.Add(Result);
 end;
 //------------------------------------------------------------------------------

@@ -34,8 +34,6 @@ object Form1: TForm1
     ParentFont = True
     SimplePanel = True
     UseSystemFont = False
-    ExplicitTop = 723
-    ExplicitWidth = 726
   end
   object MainMenu1: TMainMenu
     Left = 112
