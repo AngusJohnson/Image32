@@ -175,7 +175,7 @@ begin
   result := RootOwner.AddLayer(
     TMyVectorLayer32, Parent, Name) as TMyVectorLayer32;
   Result.Paths := CopyPaths(Paths);
-  Result.PositionAt(Left+50, Top+ 50);
+  Result.PositionAt(Left + 50, Top + 50);
 end;
 //------------------------------------------------------------------------------
 
@@ -214,8 +214,8 @@ begin
   rec := Img32.Vector.GetBoundsD(tmp);
   with centerPt do
     tmp := TranslatePath(tmp,
-      X - rec.Left - rec.Width/2,
-      Y -rec.Top - rec.Height/2);
+      X - rec.Left - rec.Width / 2,
+      Y -rec.Top - rec.Height / 2);
   Paths := tmp;
 end;
 

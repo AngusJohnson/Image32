@@ -186,7 +186,7 @@ begin
       Image.Assign(MasterImage);
       Image.ScaleToFit(pnlLeft.ClientWidth, pnlLeft.ClientHeight);
 
-      layerScale := Image.Width/oldImageWidth;
+      layerScale := Image.Width / oldImageWidth;
       oldImageWidth := Image.Width;
 
       //now scale the control points
@@ -370,7 +370,7 @@ begin
   //transform the master image not the scaled image
   with rasterLayer do
   begin
-    layerScale := MasterImage.Width/Image.Width;
+    layerScale := MasterImage.Width / Image.Width;
     transformedImage.Assign(MasterImage);
   end;
 
@@ -503,13 +503,13 @@ end;
 
 procedure TForm1.mnuHowToClick(Sender: TObject);
 begin
-  ShowMessage('Steps:'#10+
-    '1. Open an image file'#10+
-    '2. Position the red ''Source'' quadrilateral'#10+
-    '3. Click the ''Start Transform'' button'#10+
-    '4. Position the blue ''Destination'' quadrilateral'#10+
-    '    and possibly reposition the ''Source'' quadrilateral too'#10+
-    '5. Adjust the margins to include more or less of the image'#10+
+  ShowMessage('Steps:'#10 +
+    '1. Open an image file'#10 +
+    '2. Position the red ''Source'' quadrilateral'#10 +
+    '3. Click the ''Start Transform'' button'#10 +
+    '4. Position the blue ''Destination'' quadrilateral'#10 +
+    '    and possibly reposition the ''Source'' quadrilateral too'#10 +
+    '5. Adjust the margins to include more or less of the image'#10 +
     '6. Save the transformed image.');
 end;
 //------------------------------------------------------------------------------

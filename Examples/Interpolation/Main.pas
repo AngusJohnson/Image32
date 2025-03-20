@@ -119,7 +119,7 @@ begin
   DrawText(ImagePanel.Image, dstRec.Left, dstRec.Top - DpiAware(20),
     'SmoothPath function - using different tensions', arial16);
 
-  scale := Min(dstRec.Width/spRec.Width, dstRec.Height/spRec.Height);
+  scale := Min(dstRec.Width / spRec.Width, dstRec.Height / spRec.Height);
   path := ScalePath(path, scale);
 
   dx := dstRec.Left - spRec.Left * scale;
@@ -172,8 +172,8 @@ begin
     path[i] := PointD(Random(maxX), Random(maxY));
   smoothedPath := SmoothPath(path, true, -0.5);
   srcRec := GetBounds(smoothedPath);
-  scaleX := maxX /srcRec.Width;
-  scaleY := maxY /srcRec.Height;
+  scaleX := maxX / srcRec.Width;
+  scaleY := maxY / srcRec.Height;
   path := ScalePath(path, scaleX, scaleY);
 
   // repeat smoothing now that the path has been properly scaled
@@ -211,7 +211,7 @@ begin
   begin
     SetLength(paths[i], ptCount);
     for j := 0 to High(paths[i]) do
-      paths[i][j] := PointD(rec.Left + j*dx, rec.Bottom - Random(rec.Height));
+      paths[i][j] := PointD(rec.Left + j * dx, rec.Bottom - Random(rec.Height));
   end;
   for i := 0 to High(smoothedPaths) do
     smoothedPaths[i] := SmoothPath(paths[i], false, 0);
@@ -219,7 +219,7 @@ begin
   for i := 0 to High(smoothedPaths) do
   begin
     DrawLine(ImagePanel.Image, smoothedPaths[i], DpiAware(3),
-      RainbowColor(i/pathCount), esSquare);
+      RainbowColor(i / pathCount), esSquare);
     for j := 0 to High(paths[i]) do
        DrawPoint(ImagePanel.Image, paths[i][j], DpiAware(2.5), clRed32);
   end;

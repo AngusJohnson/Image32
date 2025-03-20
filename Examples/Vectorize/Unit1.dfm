@@ -37,8 +37,6 @@ object Form1: TForm1
       end>
     ParentFont = True
     UseSystemFont = False
-    ExplicitTop = 817
-    ExplicitWidth = 1124
   end
   object pnlSmooth: TPanel
     Left = 1024
@@ -54,8 +52,6 @@ object Form1: TForm1
     TabOrder = 1
     OnEnter = pnlSmoothEnter
     OnExit = pnlSmoothExit
-    ExplicitLeft = 1010
-    ExplicitHeight = 817
     object lblSmooth: TLabel
       Left = 12
       Top = 412

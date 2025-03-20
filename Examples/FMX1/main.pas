@@ -67,7 +67,7 @@ var
   fontReader : TFontReader;
 begin
   margin := DPIAware(14);
-  Layout1.Scale.Point := PointF(1/DpiAwareOne, 1/DpiAwareOne);
+  Layout1.Scale.Point := PointF(1 / DpiAwareOne, 1 / DpiAwareOne);
 
   bkColor  := $FFF8F8BB; //yellow
   penColor := clMaroon32;
@@ -148,7 +148,7 @@ begin
   textRec := Img32.Vector.GetBounds(bigTextGlyphs);
   //scale and position bigTextGlyphs so it fits
   //comfortably into the ImageViewer
-  scale := (rec.Width - margin*2) / textRec.Width;
+  scale := (rec.Width - margin * 2) / textRec.Width;
   mainGlyphs := Img32.Vector.ScalePath(bigTextGlyphs, scale);
   textRec := Img32.Vector.GetBounds(mainGlyphs);
   mainGlyphs := TranslatePath(mainGlyphs, -textRec.left, -textRec.top);
@@ -156,8 +156,8 @@ begin
   //reposition copyright text
   tmpRec := Img32.Vector.GetBounds(copyrightGlyphs);
   copyrightGlyphs := TranslatePath(copyrightGlyphs,
-    rec.Right -tmpRec.Right -margin,
-    rec.Bottom -tmpRec.Top -margin *2);
+    rec.Right - tmpRec.Right - margin,
+    rec.Bottom - tmpRec.Top - margin * 2);
 
   //add the bottom-most layer
   with layeredImg32.AddLayer(TVectorLayer32) as TVectorLayer32 do
@@ -191,7 +191,7 @@ begin
       PositionCenteredAt(layeredImg32.MidPoint);
       DrawPolygon(Image, mainGlyphs, frNonZero, txtColor);
       DrawLine(Image, mainGlyphs, 1.5, clBlack32, esPolygon);
-      Draw3D(Image, mainGlyphs, frNonZero, Round(textRec.Height/30), 3);
+      Draw3D(Image, mainGlyphs, frNonZero, Round(textRec.Height / 30), 3);
       mainGlyphs := ScalePath(mainGlyphs, 0.9, 0.9);
       textRec := Img32.Vector.GetBounds(mainGlyphs);
     end;
@@ -273,7 +273,7 @@ begin
   btnClose.Position.Y := ClientHeight - btnClose.Height - margin * 1.75;
 
   btnRefresh.Position.X := btnClose.Position.X;
-  btnRefresh.Position.Y := btnClose.Position.Y - btnRefresh.Height - margin/2;
+  btnRefresh.Position.Y := btnClose.Position.Y - btnRefresh.Height - margin / 2;
 
   Timer1.Enabled := false;
   ReloadImage;

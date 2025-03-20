@@ -863,7 +863,7 @@ begin
   Result := false;
   if not OpenClipboard(0) then Exit;
   try
-    len := Length(text) *2 +2;
+    len := Length(text) * 2 + 2;
     DataHandle := GlobalAlloc(GMEM_MOVEABLE or GMEM_SHARE, len);
     dataPtr := GlobalLock(DataHandle);
     try
@@ -1008,9 +1008,9 @@ begin
   Result.flags := 0;
   len := Length(caption);
   i := Pos('&', caption);
-  if (i = 0) or (i = len) or (caption[i+1] = '&') then Exit;
+  if (i = 0) or (i = len) or (caption[i + 1] = '&') then Exit;
   Result.flags := $2000;
-  Result.chr := Upcase(caption[i+1]);
+  Result.chr := Upcase(caption[i + 1]);
 end;
 //------------------------------------------------------------------------------
 
@@ -1021,9 +1021,9 @@ begin
   Result := '';
   len := Length(aos);
   if len = 0 then Exit;
-  for i := 0 to Len -2 do
+  for i := 0 to Len - 2 do
     Result := Result + aos[i] + #10;
-  Result := Result + aos[len-1];
+  Result := Result + aos[len - 1];
 end;
 //------------------------------------------------------------------------------
 
@@ -1041,16 +1041,16 @@ begin
     begin
       if cnt = cap then
       begin
-        cap := cap *2;
+        cap := cap * 2;
         SetLength(Result, cap);
       end;
-      Result[cnt] := Copy(str, j, i -j);
-      j := i+1;
+      Result[cnt] := Copy(str, j, i - j);
+      j := i + 1;
       inc(cnt);
     end;
     if j <= len then
     begin
-      Result[cnt] := Copy(str, j, len -j +1);
+      Result[cnt] := Copy(str, j, len - j + 1);
       inc(cnt);
     end;
   SetLength(Result, cnt);
@@ -1083,7 +1083,7 @@ begin
   if not enabled then pressed := false;
 
   if pressed then
-    bevHeight := bevHeight * 5/4;
+    bevHeight := bevHeight * 5 / 4;
 
   if not enabled then textColor := clGray32;
 
@@ -1107,7 +1107,7 @@ begin
   if pressed then pp := TranslatePath(pp, bevHeight, bevHeight);
   pp := TranslatePath(pp, textOffX, textOffY);
 
-  dx := font.LineHeight/24;
+  dx := font.LineHeight / 24;
   pp := TranslatePath(pp, -dx, -dx);
   DrawPolygon(Image, pp, frNonZero, clWhite32);
   pp := TranslatePath(pp, dx, dx);
@@ -1129,7 +1129,7 @@ var
   p2 : TPathD;
   rec2  : TRectD;
 begin
-  radius := radius *2;
+  radius := radius * 2;
   with rec do
     rec2 := RectD(Left, Top, Left + radius, Top + radius);
   Result := MakePath([rec.Left, rec.Bottom]);
@@ -1161,11 +1161,11 @@ begin
   Result := nil;
   len := Length(captions);
   if (len = 0) or not assigned(font) then Exit;
-  padding := font.GetTextWidth(' ') *6;
-  SetLength(Result, len +1);
+  padding := font.GetTextWidth(' ') * 6;
+  SetLength(Result, len + 1);
   Result[0] := startingOffset;
   for i := 1 to len do
-    Result[i] := Result[i-1] +
+    Result[i] := Result[i - 1] +
       font.GetTextWidth(captions[i-1]) + padding;
 end;
 //------------------------------------------------------------------------------
@@ -1196,20 +1196,20 @@ begin
     lh := DPIAware(12);
 
   bh := bevHeight;
-  hbh := bh/2;
-  r := lh/3;
+  hbh := bh / 2;
+  r := lh / 3;
 
   totalW := offsets[len];
 
   if tabHeight <= 0 then
     tabHeight := Ceil(lh * 1.33);
 
-  img := TImage32.Create(Ceil(totalW +bh), Ceil(tabHeight +bh*2));
+  img := TImage32.Create(Ceil(totalW + bh), Ceil(tabHeight + bh * 2));
   try
     //draw tabs before selected tab
-    for i := 0 to selectedIdx-1 do
+    for i := 0 to selectedIdx - 1 do
     begin
-      rec := RectD(hbh + offsets[i], bh, hbh + offsets[i+1], bh + tabHeight);
+      rec := RectD(hbh + offsets[i], bh, hbh + offsets[i + 1], bh + tabHeight);
       p := GetTabOutLine(rec, r);
       DrawBtnInternal(img, p, captions[i], font,
         hbh, 0, false, true, color, textColor, 0, 0, false);
@@ -1219,9 +1219,9 @@ begin
     end;
 
     //draw tabs following selected tab
-    for i := len -1 downto selectedIdx+1 do
+    for i := len -1 downto selectedIdx + 1 do
     begin
-      rec := RectD(hbh + offsets[i], bh, hbh + offsets[i+1], bh + tabHeight);
+      rec := RectD(hbh + offsets[i], bh, hbh + offsets[i + 1], bh + tabHeight);
       p := GetTabOutLine(rec, r);
       DrawBtnInternal(img, p, captions[i], font,
         hbh, 0, false, true, color, textColor, 0, 0, false);
@@ -1231,8 +1231,8 @@ begin
     end;
 
     //draw selected tab
-    rec := RectD(hbh + offsets[selectedIdx], bh+4,
-      hbh + offsets[selectedIdx+1], bh + tabHeight);
+    rec := RectD(hbh + offsets[selectedIdx], bh + 4,
+      hbh + offsets[selectedIdx + 1], bh + tabHeight);
     img32.Vector.InflateRect(rec, 0, bh);
     p := GetTabOutLine(rec, r);
     DrawBtnInternal(img, p, captions[selectedIdx], font,
@@ -1245,7 +1245,7 @@ begin
     p := TranslatePath(p, 0, 1);
 
     recI.Left := Round(offsets[0]);
-    recI.Top := Round(bh)-1;
+    recI.Top := Round(bh) - 1;
     recI.Right := recI.Left + img.Width;
     recI.Bottom := recI.Top + img.Height;
     Image.CopyBlend(img, img.Bounds, recI, BlendToAlpha);
@@ -1274,10 +1274,10 @@ var
   rec2  : TRectD;
 begin
   if not enabled then triState := tsUnknown;
-  hbh := bevHeight/2;
+  hbh := bevHeight / 2;
   d := min(rec.Width, rec.Height) - bevHeight;
-  rec2.Left := rec.Left +hbh;
-  rec2.Top := rec.Top +hbh;
+  rec2.Left := rec.Left + hbh;
+  rec2.Top := rec.Top + hbh;
   rec2.Right := rec2.Left + d;
   rec2.Bottom := rec2.Top + d;
 
@@ -1289,7 +1289,7 @@ begin
     tsUnknown :
       begin
         w := RectWidth(rec);
-        pp := ScalePath(checkPaths, w * 0.6 /100);
+        pp := ScalePath(checkPaths, w * 0.6 / 100);
         pp := TranslatePath(pp, rec.Left + w * 0.2, rec.Top + w * 0.2);
         DrawPolygon(Image, pp, frEvenOdd, SetAlpha(clDefDark32, $88));
 //        d := Ceil(d/6);
@@ -1302,15 +1302,15 @@ begin
         if preferTick then
         begin
           w := RectWidth(rec);
-          p := ScalePath(tickPaths[0],  w * 0.8 /100);
-          p := TranslatePath(p, rec.Left + w *0.1, rec.Top + w *0.1);
+          p := ScalePath(tickPaths[0],  w * 0.8 / 100);
+          p := TranslatePath(p, rec.Left + w * 0.1, rec.Top + w * 0.1);
           DrawPolygon(Image, p, frEvenOdd, clDefDark32);
         end else
         begin
-          pw := d/5;
-          d := Ceil(d/4);
+          pw := d / 5;
+          d := Ceil(d / 4);
           Img32.Vector.InflateRect(rec2, -d, -d);
-          rec2.BottomRight := TranslatePoint(rec2.BottomRight, 1,1);
+          rec2.BottomRight := TranslatePoint(rec2.BottomRight, 1, 1);
           DrawLine(Image, rec2.TopLeft, rec2.BottomRight, pw, clDefDark32);
           DrawLine(Image, PointD(rec2.Left, rec2.Bottom),
             PointD(rec2.Right, rec2.Top), pw, clDefDark32);
@@ -1347,13 +1347,13 @@ begin
   case triState of
     tsUnknown :
       begin
-        pp := ScalePath(checkPaths, d * 0.7 /100);
+        pp := ScalePath(checkPaths, d * 0.7 / 100);
         pp := TranslatePath(pp, rec2.Left + d * 0.22, rec2.Top  + d * 0.22);
         DrawPolygon(Image, pp, frEvenOdd, SetAlpha(clDefDark32, $88));
       end;
     tsYes :
       begin
-        d := Ceil(d/5);
+        d := Ceil(d / 5);
         InflateRect(rec2, -d, -d);
         p := Img32.Vector.Ellipse(rec2);
         DrawPolygon(Image, p, frNonZero, SetAlpha(clDefDark32, $DD));
@@ -1926,7 +1926,7 @@ begin
   rec := Rect(InnerRect);
   TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   pp := fUsableFont.GetTextOutline(RectD(rec), caption, taCenter, tvaMiddle, ulIdx);
-  dx := fUsableFont.LineHeight/24;
+  dx := fUsableFont.LineHeight / 24;
   pp := TranslatePath(pp, -dx, -dx);
   DrawPolygon(Image, pp, frNonZero, clWhite32);
   pp := TranslatePath(pp, dx, dx);
@@ -1952,7 +1952,7 @@ var
 begin
   rec := newBounds;
   if GetUsableFont then
-    h := fUsableFont.LineHeight + fBevelHeight *3 else
+    h := fUsableFont.LineHeight + fBevelHeight * 3 else
     h := DPIAware(15);
   rec.Top := rec.Bottom - h;
   inherited SetInnerBounds(rec);
@@ -2013,7 +2013,7 @@ end;
 function TScrollingCtrl.InsertChild(layerClass: TLayer32Class;
   index: integer; const name: string = ''): TLayer32;
 begin
-  //non-scroll ctrls must always preceed scroll ctrls
+  //non-scroll ctrls must always precede scroll ctrls
   if layerClass.InheritsFrom(TScrollCtrl) then
   begin
     while (index < ChildCount) and not (Child[index] is TScrollCtrl) do inc(index);
@@ -2266,7 +2266,7 @@ begin
     Exit;
   end;
 
-  requestVis := Ceil((newBounds.Height - BevelHeight*2)/itemH);
+  requestVis := Ceil((newBounds.Height - BevelHeight * 2) / itemH);
   scrollCanShow := Assigned(ScrollV) and (ScrollV.Visible or ScrollV.fAutoHide);
 
   if not fAutoSize then
@@ -2294,7 +2294,7 @@ begin
 
   rec := newBounds;
   rec.Bottom := rec.Top +
-    (makeVis * itemH) + BevelHeight*2;
+    (makeVis * itemH) + BevelHeight * 2;
   inherited SetInnerBounds(rec);
 end;
 //------------------------------------------------------------------------------
@@ -2457,7 +2457,7 @@ end;
 procedure TListCtrl.DoScroll(dx, dy: double);
 begin
   fScrollOff := fScrollOff + dy;
-  fTopItem := Round(fScrollOff/GetItemHeight);
+  fTopItem := Round(fScrollOff / GetItemHeight);
   if fTopItem < 0 then fTopItem := 0
   else if fTopItem > ItemCount - fMaxVisible then
     fTopItem := ItemCount - fMaxVisible;
@@ -2521,19 +2521,19 @@ begin
   marg := Round(fInnerMargin);
   spaceW := Round(fUsableFont.GetSpaceWidth);
   bh := fBevelHeight;
-  hbh := Round(bh/2);
+  hbh := Round(bh / 2);
   om := Round(OuterMargin);
 
   scrollShowing := Assigned(ScrollV) and ScrollV.Visible;
 
-  vis := Math.Min(Trunc((recI.Height - fBevelHeight *2) / itemH), cnt);
+  vis := Math.Min(Trunc((recI.Height - fBevelHeight * 2) / itemH), cnt);
   if HasFocus and
     ((ItemIndex < fTopItem) or (ItemIndex >= fTopItem + fMaxVisible)) then
   begin
-    Types.InflateRect(recI, hbh*2, hbh*2);
+    Types.InflateRect(recI, hbh * 2, hbh * 2);
     if (om > 0) then DrawShadowRect(Image, recI, om);
     DrawLine(Image, Rectangle(recI), FocusLineWidth, clDefDark32, esPolygon);
-    Types.InflateRect(recI, -hbh*2, -hbh*2);
+    Types.InflateRect(recI, -hbh * 2, -hbh * 2);
   end;
 
   if Assigned(fImgList) then
@@ -2541,7 +2541,7 @@ begin
     img := nil;
   try
     with recI do
-      rec := RectD(Left + bh, Top + bh, Right -bh -1, Top + bh +itemH);
+      rec := RectD(Left + bh, Top + bh, Right - bh - 1, Top + bh + itemH);
     if scrollShowing then rec.Right := rec.Right - ScrollV.Width;
 
     if fTopItem < 0 then fTopItem := 0;
@@ -2567,14 +2567,14 @@ begin
         recI := Rect(rec);
         fImgList.GetImage(i, img);
         rec2I.Left := recI.Left + marg + spaceW;
-        rec2I.Top := recI.Top + Round((rec.Height - img.Height)/2);
+        rec2I.Top := recI.Top + Round((rec.Height - img.Height) / 2);
         rec2I.Right := rec2I.Left + img.Width;
         rec2I.Bottom := rec2I.Top + img.Height;
         Image.CopyBlend(img, img.Bounds, rec2I, BlendToAlpha);
       end;
 
       if Assigned(img) then
-        rec.Left := rec.Left + img.Width + spaceW*2;
+        rec.Left := rec.Left + img.Width + spaceW * 2;
 
       DrawText(Image, rec, fItems[i], fUsableFont, clWhite32, taLeft, tvaMiddle);
       TranslateRect(rec, hbh, hbh);
@@ -2582,7 +2582,7 @@ begin
       TranslateRect(rec, -hbh, itemH -hbh);
 
       if Assigned(img) then
-        rec.Left := rec.Left - img.Width - spaceW*2;
+        rec.Left := rec.Left - img.Width - spaceW * 2;
     end;
   finally
     FreeAndNil(img);
@@ -2647,7 +2647,7 @@ begin
   if not Assigned(ScrollV) or not ScrollV.Visible then Exit;
   itmHeight := GetItemHeight;
   if (fItemIndex < 0) or (itmHeight = 0) then Exit;
-  itemsInView := Trunc(Height/itmHeight);
+  itemsInView := Trunc(Height / itmHeight);
   if fTopItem > fItemIndex then
     fTopItem := fItemIndex
   else if fTopItem < fItemIndex - itemsInView then
@@ -2803,7 +2803,7 @@ begin
   end;
 
   rec := newBounds;
-  rec.Bottom := rec.Top + (ItemCount * itemH) + BevelHeight*2;
+  rec.Bottom := rec.Top + (ItemCount * itemH) + BevelHeight * 2;
   inherited SetInnerBounds(rec);
 end;
 //------------------------------------------------------------------------------
@@ -3071,7 +3071,7 @@ begin
   chunk := fChunkedText.Chunk[fCursorChunkPos.X];
   if not chunk.IsText then Exit;
   fSelStart := Types.Point(fCursorChunkPos.X, 0);
-  fSelEnd := Types.Point(fCursorChunkPos.X+1, 0);
+  fSelEnd := Types.Point(fCursorChunkPos.X + 1, 0);
   //fSelEnd := Types.Point(fCursorChunkPos.X, chunk.length);
   fCursorChunkPos := fSelEnd;
   Invalidate;
@@ -3190,7 +3190,7 @@ begin
       while (i > 0) and (chunkPos.X < startOfLineIdx[i -1]) do Dec(i)
     else
       while (i < fPageMetrics.totalLines -1) and
-        (chunkPos.X >= startOfLineIdx[i+1]) do Inc(i);
+        (chunkPos.X >= startOfLineIdx[i + 1]) do Inc(i);
 
   Result.Y := (i - fTopLine) * fPageMetrics.lineHeight + fTextMargin.Y;
 
@@ -3280,11 +3280,11 @@ begin
   if not Assigned(chunk) or (chunk.IsNewline) then Exit;
 
   if (chunk.IsBlankSpaces) and
-    (x2 - x > (chunk.width + spcW)/2) then inc(Result.X)
+    (x2 - x > (chunk.width + spcW) / 2) then inc(Result.X)
   else
     while (Result.Y < High(chunk.glyphOffsets) -1) and
-      (x + chunk.glyphOffsets[Result.Y] + (chunk.glyphOffsets[Result.Y+1] -
-        chunk.glyphOffsets[Result.Y]) *0.5 < x2) do
+      (x + chunk.glyphOffsets[Result.Y] + (chunk.glyphOffsets[Result.Y + 1] -
+        chunk.glyphOffsets[Result.Y]) * 0.5 < x2) do
           inc(Result.Y);
 end;
 //------------------------------------------------------------------------------
@@ -3462,11 +3462,11 @@ begin
 
   selStartTop := TranslatePoint(selStartTop, OuterMargin, OuterMargin);
   selStartBot := TranslatePoint(selStartBot, OuterMargin, OuterMargin);
-  DrawLine(Image, selStartTop, selStartBot, fPageMetrics.lineHeight/15, clMaroon32);
+  DrawLine(Image, selStartTop, selStartBot, fPageMetrics.lineHeight / 15, clMaroon32);
   with selStartTop do
-    DrawLine(Image, PointD(X-4,Y), PointD(X+4,Y), fPageMetrics.lineHeight/15, clMaroon32);
+    DrawLine(Image, PointD(X - 4, Y), PointD(X + 4, Y), fPageMetrics.lineHeight / 15, clMaroon32);
   with selStartBot do
-    DrawLine(Image, PointD(X-4,Y), PointD(X+4,Y), fPageMetrics.lineHeight/15, clMaroon32);
+    DrawLine(Image, PointD(X - 4, Y), PointD(X + 4, Y), fPageMetrics.lineHeight / 15, clMaroon32);
 
 //  fScrollV.Invalidate;
 end;
@@ -3834,7 +3834,7 @@ begin
   chunk := fChunkedText.Chunk[fCursorChunkPos.X];
   if not chunk.IsText then Exit;
   fSelStart := Types.Point(fCursorChunkPos.X, 0);
-  fSelEnd := Types.Point(fCursorChunkPos.X+1, 0);
+  fSelEnd := Types.Point(fCursorChunkPos.X + 1, 0);
   //fSelEnd := Types.Point(fCursorChunkPos.X, chunk.length);
   fCursorChunkPos := fSelEnd;
   Invalidate;
@@ -3913,7 +3913,7 @@ begin
   rec := newBounds;
   if GetUsableFont then
     rec.Bottom := rec.Top + fUsableFont.LineHeight * 1.1 +
-      (fBevelHeight + TextMargin.Y) *2;
+      (fBevelHeight + TextMargin.Y) * 2;
   inherited SetInnerBounds(rec);
 end;
 //------------------------------------------------------------------------------
@@ -3924,10 +3924,10 @@ var
   bh: double;
 begin
   om := Round(OuterMargin);
-  Result := RectD(om, om, om+Width, om+Height);
+  Result := RectD(om, om, om + Width, om + Height);
   bh := fBevelHeight;
   if stripMargins then
-    InflateRect(Result, -bh -TextMargin.X, -bh -TextMargin.Y) else
+    InflateRect(Result, -bh - TextMargin.X, -bh - TextMargin.Y) else
     InflateRect(Result, -bh, -bh);
 
   if assigned(ScrollV) and ScrollV.Visible then
@@ -4002,7 +4002,7 @@ begin
     while (Result.Y < len) and (d > glyphOffsets[Result.Y] + cwDiv2) do
     begin
       inc(Result.Y);
-      cwDiv2 := (glyphOffsets[Result.Y+1] - glyphOffsets[Result.Y]) * 0.5;
+      cwDiv2 := (glyphOffsets[Result.Y + 1] - glyphOffsets[Result.Y]) * 0.5;
     end;
   end;
 
@@ -4011,7 +4011,6 @@ begin
     inc(Result.X);
     Result.Y := 0;
   end;
-
 end;
 //------------------------------------------------------------------------------
 
@@ -4050,8 +4049,8 @@ begin
     begin
       rec.Left := ChunkIdxToPos(fSelStart).X;
       rec.Right := ChunkIdxToPos(fSelEnd).X;
-      lh := fLineHeight /5;
-      rec.Bottom := rec.Bottom- lh;
+      lh := fLineHeight / 5;
+      rec.Bottom := rec.Bottom - lh;
       rec.Top := rec.Top + lh;
       DrawPolygon(Image, Rectangle(rec), frNonZero, SetAlpha(clDefDark32, 32));
       DrawLine(Image, Rectangle(rec), 1, SetAlpha(clDefDark32, 196), esClosed);
@@ -4060,7 +4059,7 @@ begin
 
   if HasFocus then
   begin
-    lh := fLineHeight /20; // non-blinking cursor width
+    lh := fLineHeight / 20; // non-blinking cursor width
     cursorTop := ChunkIdxToPos(fCursorChunkPos);
     cursorBot := TranslatePoint(cursorTop, 0, fLineHeight);
     cursorTop.Y := cursorTop.Y + lh;
@@ -4171,7 +4170,7 @@ var
   txt: string;
 begin
   bh := fBevelHeight;
-  hbh := bh /2;
+  hbh := bh / 2;
   rec := InnerRect;
   TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
 
@@ -4204,7 +4203,7 @@ begin
   image.Clear;
   if not GetUsableFont then Exit;
   bh := fBevelHeight;
-  hbh := bh /2;
+  hbh := bh / 2;
   rec := InnerRect;
   TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   p := GetRoundedRectPath(rec);
@@ -4245,7 +4244,7 @@ var
   txt: string;
 begin
   bh := fBevelHeight;
-  hbh := bh /2;
+  hbh := bh / 2;
   rec := InnerRect;
   TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   image.Clear;
@@ -4340,13 +4339,13 @@ begin
         begin
           if assigned(ilImage) then
           begin
-            rec.Left := rec.Right -bh - ilImage.Width -pad +pDelta;
-            rec.Top := rec.Top +(Height -ilImage.Height)/2 +pDelta;
+            rec.Left := rec.Right -bh - ilImage.Width -pad + pDelta;
+            rec.Top := rec.Top +(Height -ilImage.Height) / 2 +pDelta;
             rec.Right := rec.Left + ilImage.Width + pDelta;
             rec.Bottom := rec.Top + ilImage.Height;
             Image.CopyBlend(ilImage, ilImage.Bounds, Rect(rec), BlendToAlpha);
             rec.Right := rec.Left - pad;
-            rec.Left := OuterMargin +pad +bh +pDelta *2;
+            rec.Left := OuterMargin + pad + bh + pDelta * 2;
           end else
           begin
             InflateRect(rec, -pad, -pad);
@@ -4358,13 +4357,13 @@ begin
         begin
           if assigned(ilImage) then
           begin
-            rec.Top := rec.Bottom -bh - ilImage.Height -pad +pDelta;
-            rec.Left := rec.Left +(Width -ilImage.Width)/2 +pDelta;
+            rec.Top := rec.Bottom -bh - ilImage.Height - pad + pDelta;
+            rec.Left := rec.Left + (Width - ilImage.Width) / 2 + pDelta;
             rec.Bottom := rec.Top + ilImage.Height + pDelta;
             rec.Right := rec.Left + ilImage.Width;
             Image.CopyBlend(ilImage, ilImage.Bounds, Rect(rec), BlendToAlpha);
             rec.Bottom := rec.Top - pad;
-            rec.Top := +OuterMargin +pad +pDelta*2;
+            rec.Top := +OuterMargin + pad + pDelta * 2;
           end else
           begin
             InflateRect(rec, -pad, -pad);
@@ -4378,14 +4377,14 @@ begin
           begin
             rec.Left := rec.Left +pad +pDelta;
             rec.Right := rec.Left +ilImage.Width;
-            rec.Top := rec.Top +(Height -ilImage.Height)/2 +pDelta;
+            rec.Top := rec.Top +(Height -ilImage.Height) / 2 + pDelta;
             rec.Bottom := rec.Top + ilImage.Height;
             Image.CopyBlend(ilImage, ilImage.Bounds, Rect(rec), BlendToAlpha);
-            rec.Left := rec.Right +pad +pDelta;
-            rec.Right := Image.Width - OuterMargin -pad -bh*2 +pDelta;
+            rec.Left := rec.Right + pad + pDelta;
+            rec.Right := Image.Width - OuterMargin - pad -bh * 2 + pDelta;
           end else
           begin
-            InflateRect(rec, -pad -bh, -pad -bh);
+            InflateRect(rec, -pad - bh, -pad - bh);
             TranslateRect(rec, pDelta, pDelta);
           end;
           DrawText(Image, rec, fCaption, fUsableFont, fFontColor, taRight, tvaMiddle);
@@ -4394,13 +4393,13 @@ begin
         begin
           if assigned(ilImage) then
           begin
-            rec.Top := rec.Top +pad +pDelta;
-            rec.Bottom := rec.Top +ilImage.Height;
-            rec.Left := rec.Left +(Width -ilImage.Width)/2 +pDelta;
+            rec.Top := rec.Top + pad + pDelta;
+            rec.Bottom := rec.Top + ilImage.Height;
+            rec.Left := rec.Left + (Width -ilImage.Width) / 2 + pDelta;
             rec.Right := rec.Left + ilImage.Width;
             Image.CopyBlend(ilImage, ilImage.Bounds, Rect(rec), BlendToAlpha);
-            rec.Top := rec.Bottom +pad +pDelta;
-            rec.Bottom := Image.Height - OuterMargin -pad +pDelta -bh*2;
+            rec.Top := rec.Bottom + pad + pDelta;
+            rec.Bottom := Image.Height - OuterMargin - pad + pDelta - bh * 2;
           end else
           begin
             InflateRect(rec, -pad, -pad);
@@ -4523,7 +4522,7 @@ begin
   rec := InnerRect;
   TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   rec.Bottom := rec.Top + j;
-  TranslateRect(rec, 0, (Height-j) /2);
+  TranslateRect(rec, 0, (Height - j) / 2);
   if fTextPos = tphRight then
     rec.Right := rec.Left + j else
     rec.Left := rec.Right - j;
@@ -4543,7 +4542,7 @@ begin
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
     pp := fUsableFont.GetTextOutline(rec, caption, taLeft, tvaMiddle);
-    dx := fUsableFont.LineHeight/24;
+    dx := fUsableFont.LineHeight / 24;
     pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
     pp := TranslatePath(pp, dx, dx);
@@ -4561,7 +4560,7 @@ begin
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
     pp := fUsableFont.GetTextOutline(rec, fCaption, taRight, tvaMiddle);
-    dx := fUsableFont.LineHeight/24;
+    dx := fUsableFont.LineHeight / 24;
     pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
     pp := TranslatePath(pp, dx, dx);
@@ -4596,7 +4595,7 @@ begin
   rec := InnerRect;
   TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   rec.Bottom := rec.Top + j;
-  TranslateRect(rec, 0, (Height-j) /2);
+  TranslateRect(rec, 0, (Height-j) / 2);
   if fTextPos = tphRight then
     rec.Right := rec.Left + j else
     rec.Left := rec.Right - j;
@@ -4617,7 +4616,7 @@ begin
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
     pp := fUsableFont.GetTextOutline(rec, fCaption, taLeft, tvaMiddle);
-    dx := fUsableFont.LineHeight/24;
+    dx := fUsableFont.LineHeight / 24;
     pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
     pp := TranslatePath(pp, dx, dx);
@@ -4634,7 +4633,7 @@ begin
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
     pp := fUsableFont.GetTextOutline(rec, fCaption, taRight, tvaMiddle);
-    dx := fUsableFont.LineHeight/24;
+    dx := fUsableFont.LineHeight / 24;
     pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
     pp := TranslatePath(pp, dx, dx);
@@ -4768,8 +4767,8 @@ begin
   if cnt > 0 then
   begin
     if index <> fActiveIdx then
-      Child[fActiveIdx*2 +1].Visible := false;
-    pagePnl := Child[index*2 +1] as TPagePnlCtrl;
+      Child[fActiveIdx * 2 + 1].Visible := false;
+    pagePnl := Child[index * 2 + 1] as TPagePnlCtrl;
     pagePnl.Visible := true;
 
     if Assigned(RootCtrl.FocusedCtrl) then
@@ -4792,7 +4791,7 @@ function TPageCtrl.GetPagePanel(index: integer): TPagePnlCtrl;
 begin
   if (index < 0) or (index >= ChildCount div 2) then
     Result := nil else
-    Result := TPagePnlCtrl(Child[index *2 +1]);
+    Result := TPagePnlCtrl(Child[index * 2 + 1]);
 end;
 //------------------------------------------------------------------------------
 
@@ -4810,14 +4809,14 @@ begin
   if (len = 0) or not GetUsableFont then Exit;
   SetLength(tabs, len);
   for i := 0 to len -1 do
-    tabs[i] := TCustomCtrl(Child[i*2]).Caption;
+    tabs[i] := TCustomCtrl(Child[i * 2]).Caption;
 
   rec := InnerRect;
   om := OuterMargin;
   TranslateRect(rec, om, om);
 
   bh := Round(BevelHeight);
-  hbh := Round(BevelHeight/2);
+  hbh := Round(BevelHeight / 2);
   if fTabHeight = 0 then
     h := Ceil(fUsableFont.LineHeight * 1.33) else
     h := Round(fTabHeight);
@@ -4829,13 +4828,13 @@ begin
   pt1.X := rec.Left + fTabOffsets[fActiveIdx];
   pt1.Y := rec.Top +h +bh;
 
-  pt2.X := rec.Left + fTabOffsets[fActiveIdx +1];
+  pt2.X := rec.Left + fTabOffsets[fActiveIdx + 1];
   pt2.Y := pt1.Y;
 
   DrawLine(Image, PointD(rec.Left +bh, pt1.Y),
     PointD(rec.Right-bh, pt1.Y), hbh, self.Color);
 
-  Image.Clear(Rect(RectD(bh, rec.Top+ h, rec.Right, rec.Bottom)), self.Color);
+  Image.Clear(Rect(RectD(bh, rec.Top + h, rec.Right, rec.Bottom)), self.Color);
 
   SetLength(p, 6);
   p[0] := pt2;
@@ -4845,9 +4844,9 @@ begin
   p[4] := PointD(rec.Left, pt1.Y);
   p[5] := pt1;
   DrawEdge(Image, p, clWhite32, clSilver32, bh, false);
-  DrawLine(Image, PointD(rec.Left +bh, rec.Bottom),
-    PointD(rec.Right-bh, rec.Bottom), 1, clGray32);
-  DrawLine(Image, PointD(rec.Right, rec.Top + h +1),
+  DrawLine(Image, PointD(rec.Left + bh, rec.Bottom),
+    PointD(rec.Right - bh, rec.Bottom), 1, clGray32);
+  DrawLine(Image, PointD(rec.Right, rec.Top + h + 1),
     PointD(rec.Right, rec.Bottom), 1, clGray32);
 end;
 //------------------------------------------------------------------------------
@@ -4862,7 +4861,7 @@ begin
   len := ChildCount div 2;
   SetLength(tabs, len);
   for i := 0 to len -1 do
-    tabs[i] := TCustomCtrl(Child[i*2]).Caption;
+    tabs[i] := TCustomCtrl(Child[i * 2]).Caption;
   if fTabHeight = 0 then
     h := Ceil(fUsableFont.LineHeight * 1.33) else
     h := fTabHeight;
@@ -4872,10 +4871,10 @@ begin
     fTabOffsets := GetVariableWidthTabOffsets(tabs, fUsableFont, BevelHeight);
 
   if StorageState = ssLoading then Exit;
-  for i := 0 to len -1 do
+  for i := 0 to len - 1 do
   begin
-    Child[i*2].SetInnerBounds(RectD(fTabOffsets[i], 0, fTabOffsets[i+1], h));
-    Child[i*2 +1].SetInnerBounds(RectD(bh, h+bh*2, width -bh, height -bh));
+    Child[i * 2].SetInnerBounds(RectD(fTabOffsets[i], 0, fTabOffsets[i + 1], h));
+    Child[i * 2 + 1].SetInnerBounds(RectD(bh, h + bh * 2, width - bh, height - bh));
   end;
 end;
 //------------------------------------------------------------------------------
@@ -4890,7 +4889,7 @@ begin
   if not GetUsableFont or (ChildCount = 0) then Exit;
   bhi := Round(fBevelHeight);
   om := Round(OuterMargin);
-  rec := Rect(0,0, Ceil(Width),Ceil(Height));
+  rec := Rect(0, 0, Ceil(Width),Ceil(Height));
   if (om > 0) then
     TranslateRect(rec, om, om);
   Img32.Vector.InflateRect(rec, -bhi, -bhi);
@@ -5128,7 +5127,7 @@ procedure TProgressCtrl.FontChanged;
 begin
   inherited;
   if not GetUsableFont then Exit;
-  fSize := Round(fUsableFont.LineHeight *1.1);
+  fSize := Round(fUsableFont.LineHeight * 1.1);
   SetInnerBounds(InnerBounds);
 end;
 //------------------------------------------------------------------------------
@@ -5149,12 +5148,12 @@ begin
   DrawEdge(Image, rec, clSilver32, clWhite32, fBevelHeight);
   //draw the progress
 
-  c := GradientColor(fStartColor, fEndColor, Position/fMax);
+  c := GradientColor(fStartColor, fEndColor, Position / fMax);
   case fOrientation of
     soHorizontal:
-      rec2.Right := rec2.Left + Round(Position/fMax * Width);
+      rec2.Right := rec2.Left + Round(Position / fMax * Width);
     soVertical:
-      rec2.Bottom := rec2.top + Round(Position/fMax * Height);
+      rec2.Bottom := rec2.top + Round(Position / fMax * Height);
   end;
   bh := Round(fBevelHeight);
   Types.InflateRect(rec2, -bh, -bh);
@@ -5210,12 +5209,12 @@ begin
   fOrientation  := soHorizontal;
   if GetUsableFont then
   begin
-    fSize     := fUsableFont.LineHeight *1.1;
+    fSize     := fUsableFont.LineHeight * 1.1;
     SetBtnSize;
   end else
   begin
     fSize     := DPIAware(15);
-    fBtnSize  := Round(fSize*2);
+    fBtnSize  := Round(fSize * 2);
   end;
   fMax          := 100;
   fScrollStep   := DPIAware(5);
@@ -5226,8 +5225,8 @@ function TSliderCtrl.GetDelta: double;
 begin
   //Delta = real step size for one unit of position change
   case fOrientation of
-    soHorizontal  : result := (Width - fBtnSize)/ (fMax-fMin);
-    soVertical    : result := (Height - fBtnSize)/ (fMax-fMin);
+    soHorizontal  : result := (Width - fBtnSize) / (fMax - fMin);
+    soVertical    : result := (Height - fBtnSize) / (fMax - fMin);
     else Result := 0; //otherwise compiler warning !???
   end;
 end;
@@ -5251,7 +5250,7 @@ begin
   inherited;
   if not GetUsableFont then Exit;
   SetBtnSize;
-  fSize := Round(fUsableFont.LineHeight *1.1);
+  fSize := Round(fUsableFont.LineHeight * 1.1);
   SetInnerBounds(InnerBounds);
 end;
 //------------------------------------------------------------------------------
@@ -5278,18 +5277,18 @@ begin
   case fOrientation of
     soHorizontal:
      begin
-      d2 := rec.Left + (fPosition -fMin) * d;
-      rec := RectD(d2, rec.Top, d2+fBtnSize, rec.Top + Height + BevelHeight);
+      d2 := rec.Left + (fPosition - fMin) * d;
+      rec := RectD(d2, rec.Top, d2 + fBtnSize, rec.Top + Height + BevelHeight);
      end;
     soVertical:
       begin
-        d2 := rec.Top + (fPosition -fMin) * d;
-        rec := RectD(rec.Left, d2, rec.Left + Width + BevelHeight, d2+fBtnSize);
+        d2 := rec.Top + (fPosition - fMin) * d;
+        rec := RectD(rec.Left, d2, rec.Left + Width + BevelHeight, d2 + fBtnSize);
       end;
   end;
   if HasFocus then DrawShadowRect(Image, Rect(rec), OuterMargin);
   Image.FillRect(Rect(rec), clPaleGray32);
-  DrawLine(Image, Rectangle(rec), dpiAware1+1, clWhite32, esPolygon);
+  DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
 
   Img32.Vector.InflateRect(rec, -dpiAwareOne, -dpiAwareOne);
   if fPressed then
@@ -5298,7 +5297,7 @@ begin
 
   if HasFocus then
   begin
-    hbh := Round(fBevelHeight /2);
+    hbh := Round(fBevelHeight / 2);
     recI := Rect(rec);
     Types.InflateRect(recI, hbh, hbh);
     DrawLine(Image, Rectangle(recI), FocusLineWidth, clDefDark32, esPolygon);
@@ -5414,31 +5413,31 @@ begin
       begin
         case fScrollState of
           scLeft      :
-            if pt2.X > d*(fPosition-fMin) then
+            if pt2.X > d * (fPosition - fMin) then
               fScrollState := scScrollBtn else
               Position := Round(fPosition - Step);
           scRight     :
-            if pt2.X < d*(fPosition-fMin) + fBtnSize then
+            if pt2.X < d * (fPosition - fMin) + fBtnSize then
               fScrollState := scScrollBtn else
               Position := Round(fPosition + Step);
         end;
         if fScrollState = scScrollBtn then
-          Position := Round((pt2.X-halfBtnSize)/d) + fMin;
+          Position := Round((pt2.X - halfBtnSize)  / d) + fMin;
       end;
     soVertical    :
       begin
         case fScrollState of
           scTop      :
-            if pt2.Y > d*(fPosition-fMin) then
+            if pt2.Y > d * (fPosition - fMin) then
               fScrollState := scScrollBtn else
               Position := Round(fPosition - Step);
           scBottom   :
-            if pt2.Y < d*(fPosition-fMin) + fBtnSize then
+            if pt2.Y < d * (fPosition - fMin) + fBtnSize then
               fScrollState := scScrollBtn else
               Position := Round(fPosition + Step);
         end;
         if fScrollState = scScrollBtn then
-          Position := Round((pt2.Y-halfBtnSize)/d) + fMin;
+          Position := Round((pt2.Y - halfBtnSize) / d) + fMin;
       end;
   end;
 end;
@@ -5738,7 +5737,7 @@ begin
           Exit;
         end;
         with fTargetCtrl do
-          maxTravel := Width - (bh + self.Height)*2;
+          maxTravel := Width - (bh + self.Height) * 2;
         k := fMax - fTargetCtrl.Width;
       end;
     soVertical:
@@ -5750,14 +5749,14 @@ begin
           Exit;
         end;
         with fTargetCtrl do
-          maxTravel := Height - (bh + self.Width)*2;
+          maxTravel := Height - (bh + self.Width) * 2;
         k := fMax - fTargetCtrl.Height;
       end;
 
     else Exit;
   end;
   if (maxTravel > 10) and (maxDelta > maxTravel) then
-    fDeltaScale := maxDelta/maxTravel else
+    fDeltaScale := maxDelta / maxTravel else
     fDeltaScale := 1;
   if fAutoHide then Visible := true;
   if (k > 0) and (Position > k) then Position := Round(k);
@@ -5792,7 +5791,7 @@ begin
     d := rec2.Width * 0.3;
     InflateRect(rec2, -d, -d);
     with rec2 do
-      p := MakePath([left-2, bottom, MidPoint.X, top+2, right+2, bottom]);
+      p := MakePath([left-2, bottom, MidPoint.X, top + 2, right + 2, bottom]);
     p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);
@@ -5802,7 +5801,7 @@ begin
     rec2.Top := rec2.Bottom - rec2.Width;
     InflateRect(rec2, -d, -d);
     with rec2 do
-      p := MakePath([left-2, top, MidPoint.X, bottom-2, right+2, top]);
+      p := MakePath([left - 2, top, MidPoint.X, bottom - 2, right + 2, top]);
     p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);
@@ -5818,19 +5817,19 @@ begin
       Exit;
     end;
     fBtnRec.Left := rec.Left;
-    fBtnRec.Top := Round(fPosition/fDeltaScale) + rec.Width;
+    fBtnRec.Top := Round(fPosition / fDeltaScale) + rec.Width;
     fBtnRec.Width := rec.Width;
     fBtnRec.Height := Math.Max(fMinBtnSize,
-      Self.Height - (rec.Width + bh) *2 - (fMax - fTargetCtrl.Height));
+      Self.Height - (rec.Width + bh) * 2 - (fMax - fTargetCtrl.Height));
 
     //position and draw the button
     Img32.Vector.InflateRect(rec, -1, -rec.Width);
-    rec.Top := rec.Top + fPosition/fDeltaScale;
+    rec.Top := rec.Top + fPosition / fDeltaScale;
     rec.Bottom := rec.Top + fBtnRec.Height;
 
     rec.Left := rec.Left + bhDiv2 +2;
     Image.FillRect(Rect(rec), clPaleGray32);
-    DrawLine(Image, Rectangle(rec), dpiAware1+1, clWhite32, esPolygon);
+    DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
     Img32.Vector.InflateRect(rec, -1, -1);
     DrawEdge(Image, rec, clWhite32, clBlack32, 1);
   end else
@@ -5840,7 +5839,7 @@ begin
     d := rec2.Height * 0.3;
     InflateRect(rec2, -d, -d);
     with rec2 do
-      p := MakePath([right, top, left +2, MidPoint.Y+1, right, bottom+2]);
+      p := MakePath([right, top, left + 2, MidPoint.Y + 1, right, bottom + 2]);
     p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);
@@ -5850,7 +5849,7 @@ begin
     rec2.Left := rec2.Right - rec2.Height;
     InflateRect(rec2, -d, -d);
     with rec2 do
-      p := MakePath([left, top, right -2, MidPoint.Y+1, left, bottom+2]);
+      p := MakePath([left, top, right -2, MidPoint.Y + 1, left, bottom + 2]);
     p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);
@@ -5866,19 +5865,19 @@ begin
       Exit;
     end;
     fBtnRec.Top := rec.Top;
-    fBtnRec.Left := Round(fPosition/fDeltaScale) + rec.Height;
+    fBtnRec.Left := Round(fPosition / fDeltaScale) + rec.Height;
     fBtnRec.Height := rec.Height;
     fBtnRec.Width := Math.Max(fMinBtnSize,
-      Self.Width - (rec.Height + bh) *2 - (fMax - fTargetCtrl.Width));
+      Self.Width - (rec.Height + bh) * 2 - (fMax - fTargetCtrl.Width));
 
     //position and draw the button
     Img32.Vector.InflateRect(rec, -rec.Height, -1);
-    rec.Left := rec.Left + fPosition/fDeltaScale;
+    rec.Left := rec.Left + fPosition / fDeltaScale;
     rec.Right := rec.Left + fBtnRec.Width;
 
-    rec.Top := rec.Top + bhDiv2 +2;
+    rec.Top := rec.Top + bhDiv2 + 2;
     Image.FillRect(Rect(rec), clPaleGray32);
-    DrawLine(Image, Rectangle(rec), dpiAware1+1, clWhite32, esPolygon);
+    DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
     Img32.Vector.InflateRect(rec, -1, -1);
     DrawEdge(Image, rec, clWhite32, clBlack32, 1);
   end;
@@ -6077,7 +6076,7 @@ end;
 procedure TCtrlStorageManager.SetDesignScale(value: double);
 begin
   if value <= 0 then Exit;
-  fFocusLineW := fFocusLineW * value/DesignScale;
+  fFocusLineW := fFocusLineW * value / DesignScale;
   inherited;
 end;
 //------------------------------------------------------------------------------

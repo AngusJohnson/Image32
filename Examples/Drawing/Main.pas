@@ -166,8 +166,8 @@ begin
         q := Max(Result.Width, Result.Height);
       end;
   end;
-  Result.Left := Result.Left + (Result.Width - q)/2;
-  Result.Top := Result.Top + (Result.Height - q)/2;
+  Result.Left := Result.Left + (Result.Width - q) / 2;
+  Result.Top := Result.Top + (Result.Height - q) / 2;
   Result.Right := Result.Left + q;
   Result.Bottom := Result.Top + q;
 end;
@@ -185,7 +185,7 @@ end;
 function IsCSplineCtrlPt(idx: integer): Boolean;
 begin
   // except for the first control pt, every other
-  // control pt preceeds an on-path point
+  // control pt precedes an on-path point
   Result := (idx = 1) or ((idx > 1) and not Odd(idx)); // 1,2,4,6,8,10 etc
 end;
 //------------------------------------------------------------------------------
@@ -325,7 +325,7 @@ end;
 //------------------------------------------------------------------------------
 
 (*
-// OffsetPath - this is a very simple ofsetting function
+// OffsetPath - this is a very simple offsetting function
 function OffsetPath(const path: TPathD; delta: double; isClosed: Boolean): TPathD;
 var
   i,j,k, len: integer;
@@ -525,7 +525,7 @@ begin
   try
     for i := 0 to High(toolIconNames) do
     begin
-      tmpImg.LoadFromResource(toolIconNames[i]+'2', 'SVG');
+      tmpImg.LoadFromResource(toolIconNames[i] + '2', 'SVG');
       hotX := Round(cursorSize.cx * hotXs[i]);
       hotY := Round(cursorSize.cy * hotYs[i]);
       Screen.Cursors[i +1] := Create32BitCursorFromImage(tmpImg, hotX, hotY);
@@ -587,16 +587,16 @@ begin
   // make sure control-points get preference over on-path points
   for i := highI div 2 downto 1 do
   begin
-    if (Abs(pt.X - path[i*2].X) < ctrlPtRadius) and
-      (Abs(pt.Y - path[i*2].Y) < ctrlPtRadius) then
+    if (Abs(pt.X - path[i * 2].X) < ctrlPtRadius) and
+      (Abs(pt.Y - path[i * 2].Y) < ctrlPtRadius) then
     begin
-      Result := i*2;
+      Result := i * 2;
       Exit;
     end;
-    if (Abs(pt.X - path[i*2+1].X) < ctrlPtRadius) and
-      (Abs(pt.Y - path[i*2+1].Y) < ctrlPtRadius) then
+    if (Abs(pt.X - path[i * 2 + 1].X) < ctrlPtRadius) and
+      (Abs(pt.Y - path[i * 2 + 1].Y) < ctrlPtRadius) then
     begin
-      Result := i*2+1;
+      Result := i * 2 + 1;
       Exit;
     end;
   end;
@@ -1111,7 +1111,7 @@ begin
             end;
             for i := 1 to highI div 2 do
             begin
-              p[0] := pp[0][i*2]; p[1] := pp[0][i*2 +1];
+              p[0] := pp[0][i * 2]; p[1] := pp[0][i * 2 + 1];
               DrawDashedLine(Image, p, [10,10], nil, 1, clRed32, esButt);
             end;
 

@@ -30,8 +30,6 @@ object MainForm: TMainForm
     Panels = <>
     SimplePanel = True
     SimpleText = '  Ctrl + MouseWheel --> to zoom in or out'
-    ExplicitTop = 734
-    ExplicitWidth = 1145
   end
   object TabControl1: TTabControl
     Left = 0
@@ -50,7 +48,5 @@ object MainForm: TMainForm
       '&3. Open Paths')
     TabIndex = 0
     OnChange = TabControl1Change
-    ExplicitWidth = 1145
-    ExplicitHeight = 734
   end
 end

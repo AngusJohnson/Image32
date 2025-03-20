@@ -25,7 +25,6 @@ object Form1: TForm1
     Margins.Top = 6
     Margins.Right = 6
     Margins.Bottom = 6
-    ExplicitHeight = 778
   end
   object StatusBar1: TStatusBar
     Left = 0

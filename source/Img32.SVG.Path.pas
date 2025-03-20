@@ -1865,7 +1865,7 @@ begin
     if (radii.Y < 0) then radii.Y := -radii.Y;
     if (radii.X = 0) or (radii.Y = 0) then Exit;
 
-    GetSinCos(phi_rads, s_phi, c_phi);;
+    GetSinCos(phi_rads, s_phi, c_phi);
     hd_x := (p1.X - p2.X) / 2.0; // half diff of x
     hd_y := (p1.Y - p2.Y) / 2.0; // half diff of y
     hs_x := (p1.X + p2.X) / 2.0; // half sum of x

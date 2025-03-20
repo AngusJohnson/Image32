@@ -142,7 +142,7 @@ begin
   ipSubMain.Image.SetSize(fSize, fSize);
   SetLength(fBytes, fSize);
   for i := 1 to fSize do
-    fBytes[i-1] := ClampByte(127 * (fSize - i)/fSize);
+    fBytes[i-1] := ClampByte(127 * (fSize - i) / fSize);
 
   fHsl.hue := 0;
   fHsl.sat := 255;
@@ -150,12 +150,12 @@ begin
   fHsl.alpha := 255;
   fARGB.Color := clRed32;
 
-  RectWidthHeight(ipMain.InnerClientRect, w,h);
+  RectWidthHeight(ipMain.InnerClientRect, w, h);
   tbMain.Max := w;
   SetLength(fRainbow, w);
   for i := 0 to w -1 do
   begin
-    fHsl.hue := Round(255 * i/w);
+    fHsl.hue := Round(255 * i / w);
     fRainbow[i] := HslToRgb(fHsl);
   end;
   fHsl.hue := 0;
@@ -224,9 +224,9 @@ begin
       pt.Y := pt.Y + (fSize - pt.Y) * (127 - fHsl.lum) / 127;
     end;
 
-    p := Ellipse(RectD(pt.X-r,pt.Y-r,pt.X+r,pt.Y+r));
+    p := Ellipse(RectD(pt.X - r, pt.Y - r, pt.X + r, pt.Y + r));
 
-    if (pt.X * 255/fSize) - (pt.Y * 255/fSize) <= 0.0 then
+    if (pt.X * 255 / fSize) - (pt.Y * 255 / fSize) <= 0.0 then
       DrawLine(ipSubMain.Image, p, dpi2, clWhite32, esPolygon) else
       DrawLine(ipSubMain.Image, p, dpi2, clBlack32, esPolygon);
 
@@ -276,7 +276,7 @@ var
   val: int64;
 begin
   if fBlockUpd then Exit;
-  val := StrToInt64Def('$'+ eHexColor.Text, -1);
+  val := StrToInt64Def('$' + eHexColor.Text, -1);
   if (val < 0) or (Length(eHexColor.Text) <> 8) then Exit;
   SetColor(TColor32(val));
 end;
@@ -364,8 +364,8 @@ begin
   fMouseDn := true;
   pt := ipSubMain.ClientToImage(Point(X,Y));
   ClampRange(pt.X, 0, fSize); ClampRange(pt.Y, 0, fSize);
-  fHsl.sat := ClampByte(127 * (fSize-pt.X) /fSize + 127 * (fSize-pt.Y) /fSize);
-  fHsl.lum := ClampByte(127 * pt.X/fSize + 127 * (fSize-pt.Y) /fSize);
+  fHsl.sat := ClampByte(127 * (fSize - pt.X) / fSize + 127 * (fSize - pt.Y) / fSize);
+  fHsl.lum := ClampByte(127 * pt.X / fSize + 127 * (fSize - pt.Y) / fSize);
   fARGB.Color := HslToRgb(fHsl);
   UpdateCtrls(nil);
 end;
@@ -377,10 +377,10 @@ var
   pt: TPoint;
 begin
   if not fMouseDn then Exit;
-  pt := ipSubMain.ClientToImage(Point(X,Y));
+  pt := ipSubMain.ClientToImage(Point(X, Y));
   ClampRange(pt.X, 0, fSize); ClampRange(pt.Y, 0, fSize);
-  fHsl.sat := ClampByte(127 * (fSize-pt.X) /fSize + 127 * (fSize-pt.Y) /fSize);
-  fHsl.lum := ClampByte(127 * pt.X/fSize + 127 * (fSize-pt.Y) /fSize);
+  fHsl.sat := ClampByte(127 * (fSize-pt.X) / fSize + 127 * (fSize - pt.Y) / fSize);
+  fHsl.lum := ClampByte(127 * pt.X / fSize + 127 * (fSize - pt.Y) / fSize);
   fARGB.Color := HslToRgb(fHsl);
   UpdateCtrls(nil);
 end;

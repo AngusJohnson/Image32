@@ -84,9 +84,9 @@ begin
   for i := 0 to high(path) do
     result := result + PointToStr(path[i]);
   len := Length(Result);
-  SetLength(Result, len+2);
-  Result[len-1] := #13; Result[len]   := #10;
-  Result[len+1] := #13; Result[len+2] := #10;
+  SetLength(Result, len + 2);
+  Result[len - 1] := #13; Result[len]   := #10;
+  Result[len + 1] := #13; Result[len + 2] := #10;
 end;
 //------------------------------------------------------------------------------
 
@@ -171,7 +171,7 @@ begin
   begin
     workImg.Assign(masterImg); //shows the raw image only
     with GetDisplaySize do
-      workImg.ScaleToFit(cx-margin*2, cy-margin*2);
+      workImg.ScaleToFit(cx-margin * 2, cy-margin * 2);
 //    // otherwise, show as a monochrome image
 //    tmpColors := GetColorMask(workImg, clBlack32, CompareRGB, $32);
 //    Move(tmpColors[0], workImg.Pixels[0], Length(tmpColors) * SizeOf(TColor32));
@@ -200,8 +200,8 @@ begin
     margin -vectorBounds.Left, margin -vectorBounds.Top);
 
   scale := Min(
-    (workImg.Width - Margin*2) / RectWidth(vectorBounds),
-    (workImg.Height - Margin*2) / RectHeight(vectorBounds));
+    (workImg.Width - Margin * 2) / RectWidth(vectorBounds),
+    (workImg.Height - Margin * 2) / RectHeight(vectorBounds));
   rawPaths := ScalePath(rawPaths, scale);
 
   if mnuShowRawPoly.Checked then
@@ -212,7 +212,7 @@ begin
   end else
   begin
 
-    smoothedPaths := SmoothPaths(rawPaths, true, (10-TrackBar1.Position)/10, 0.25);
+    smoothedPaths := SmoothPaths(rawPaths, true, (10-TrackBar1.Position) / 10, 0.25);
 
     lblSmooth.Caption :=
       Format('Smooth'#10'Amount'#10'(%d)',[TrackBar1.Position]);

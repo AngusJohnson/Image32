@@ -258,21 +258,21 @@ begin
     DrawPolygon(Image, p, frNonZero, clBtnFace32);
     //and draw a pale 3D gray frame
     p := MakeEllipse(Rect(rec));
-    DrawEdge(Image, p, clWhite32, $FFCCCCCC, dpiAwareOne*2);
+    DrawEdge(Image, p, clWhite32, $FFCCCCCC, dpiAwareOne * 2);
     img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
     p := MakeEllipse(Rect(rec));
     DrawPolygon(Image, p, frNonZero, BrushColor);
-    DrawEdge(Image, Ellipse(rec), $FFCCCCCC, clWhite32, dpiAwareOne*2);
+    DrawEdge(Image, Ellipse(rec), $FFCCCCCC, clWhite32, dpiAwareOne * 2);
   end
   else //name = 'star'
   begin
     p := MakeStar(rec);
     DrawShadow(Image, p, frNonZero, OuterMargin, angle45, $33000000);
     DrawPolygon(Image, p, frNonZero, clBtnFace32);
-    DrawEdge(Image, MakeStar(rec), clWhite32, $FFCCCCCC, dpiAwareOne*2);
+    DrawEdge(Image, MakeStar(rec), clWhite32, $FFCCCCCC, dpiAwareOne * 2);
     img32.Vector.InflateRect(rec, -FrameWidth, -FrameWidth);
     DrawPolygon(Image, MakeStar(rec), frNonZero, BrushColor);
-    DrawEdge(Image, MakeStar(rec), $FFCCCCCC, clWhite32, dpiAwareOne*2);
+    DrawEdge(Image, MakeStar(rec), $FFCCCCCC, clWhite32, dpiAwareOne * 2);
   end;
   //draw the text
   pp := TranslatePath(textPath,
