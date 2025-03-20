@@ -82,7 +82,7 @@ type
   // single chunk is too wide for the supplied rect.) That value is the negated
   // character offset of that chunk. When consecutive negative values are
   // encountered, the referenced text chunk will be the first non-negative
-  // value that preceeds the negative values. If the very first startOfLineIdx
+  // value that precedes the negative values. If the very first startOfLineIdx
   // value is negative, the referenced text chunk is indicated by startPos.X.
 
   // TChunkedText: A font formatted list of text 'chunks' (usually space
@@ -1029,7 +1029,7 @@ begin
   if chnk.index > startPos.X then
     chunkPos.Y := 0 else
     chunkPos.Y := startPos.Y;
-  while x2 >= chnk.glyphOffsets[chunkPos.Y+1] do Inc(chunkPos.Y);
+  while x2 >= chnk.glyphOffsets[chunkPos.Y + 1] do Inc(chunkPos.Y);
 
   if (chunkPos.X < EndPos.X) or
     ((chunkPos.X = EndPos.X) and (chunkPos.Y < EndPos.Y)) then
@@ -1052,7 +1052,7 @@ begin
 
   i := 0;
   while i < ptm.visibleLines - 1 do
-    if chunkIdx < ptm.startOfLineIdx[i+1] then Break
+    if chunkIdx < ptm.startOfLineIdx[i + 1] then Break
     else inc(i);
   pos := GetRealChunkPosFromLineIdx(ptm, i);
   chnk := Chunk[pos.X];
@@ -1126,7 +1126,7 @@ begin
   chrOff := currPos.Y;
 
   case textAlignV of
-    tvaMiddle: y := top + (RecHeight - totalHeight) /2 -1;
+    tvaMiddle: y := top + (RecHeight - totalHeight) / 2 - 1;
     tvaBottom: y := rec.bottom - totalHeight + chnk.ascent;
     else y := top;
   end;
@@ -1136,12 +1136,12 @@ begin
   currPos := GetRealChunkPosFromLineIdx(Result, 0);
 
   // for each visible line
-  highI := Result.visibleLines -1;
+  highI := Result.visibleLines - 1;
   for i := 0 to highI do
   begin
     if i = highI then
       endPos := Result.nextStartPos else
-      endPos := GetRealChunkPosFromLineIdx(Result, i +1);
+      endPos := GetRealChunkPosFromLineIdx(Result, i + 1);
 
     if textAlign = taJustify then
       spcDx := Result.justifyDeltas[i] else
