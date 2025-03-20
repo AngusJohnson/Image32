@@ -566,7 +566,7 @@ begin
       begin
         hash := GetHashedNameCaseSens(slNames[i]);
         sl.Add(Format('  %-28s= $%8.8x;    // %s',
-          [TidyName(slNames[i])+'_', hash, slNames[i]]));
+          [TidyName(slNames[i]) + '_', hash, slNames[i]]));
       end else
       begin
         hash := GetHashedName(slNames[i]);

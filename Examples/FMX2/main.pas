@@ -139,7 +139,7 @@ begin
   essay := TextResourceToString('ESSAY', RT_RCDATA, TEncoding.Unicode);
   essay := StringReplace(essay, '\n', #10, [rfReplaceAll]);
 
-  Layout1.Scale.Point := PointF(1/DpiAwareOne,1/DpiAwareOne);
+  Layout1.Scale.Point := PointF(1 / DpiAwareOne, 1 / DpiAwareOne);
   TabControl1Change(nil);
 end;
 //------------------------------------------------------------------------------
@@ -166,8 +166,8 @@ begin
   Timer1.Enabled := false;
 
   outerRec := Img32.Vector.Rect(0, 0,
-    DPIAware(ClientWidth) - margin*2,
-    Round(DPIAware(ClientHeight - TabControl1.TabHeight)) -margin*2);
+    DPIAware(ClientWidth) - margin * 2,
+    Round(DPIAware(ClientHeight - TabControl1.TabHeight)) - margin * 2);
   imgMain.SetSize(outerRec.Width, outerRec.Height, clWhite32);
 
   innermargin := margin div 2;
@@ -266,21 +266,21 @@ begin
     lineWidth6 := DPIAware(6);
     if imgClockface.Width > imgClockface.Height then // landscape
     begin
-      recD := RectD(0, imgClockface.Height /4,
+      recD := RectD(0, imgClockface.Height / 4,
         imgClockface.Width, imgClockface.Height * 0.75);
       path := Rectangle(recD);
       DrawPolygon(imgClockface, path, frEvenOdd, ir);
-      path2 := Copy(path, 0,2);
-      path3 := Copy(path, 2,2);
+      path2 := Copy(path, 0, 2);
+      path3 := Copy(path, 2, 2);
       DrawLine(imgClockface, path2, lineWidth6, clDarkMaroon32, esPolygon);
       DrawLine(imgClockface, path3, lineWidth6, clDarkMaroon32, esPolygon);
     end else
     begin                                            // portrait
-      recD := RectD(imgClockface.Width /4, 0,
+      recD := RectD(imgClockface.Width / 4, 0,
         imgClockface.Width * 0.75, imgClockface.Height);
       path := Rectangle(recD);
       DrawPolygon(imgClockface, path, frEvenOdd, ir);
-      path2 := Copy(path, 1,2);
+      path2 := Copy(path, 1, 2);
       SetLength(path3, 2); path3[0] := path[3]; path3[1] := path[0];
       DrawLine(imgClockface, path2, lineWidth6, clDarkMaroon32, esPolygon);
       DrawLine(imgClockface, path3, lineWidth6, clDarkMaroon32, esPolygon);
@@ -293,12 +293,12 @@ begin
   //DRAW THE WATCH FRAME
   /////////////////////////////////////////////////////////////
 
-  clockRadius := min(imgClockface.Width, imgClockface.Height) *2 div 5;
+  clockRadius := min(imgClockface.Width, imgClockface.Height) * 2 div 5;
   x := imgClockface.Width / 2; y := imgClockface.Height / 2;
-  recD := RectD(x-clockRadius, y-clockRadius, x+clockRadius, y+clockRadius);
-  frameWidth := clockRadius /6;
+  recD := RectD(x-clockRadius, y - clockRadius, x + clockRadius, y + clockRadius);
+  frameWidth := clockRadius / 6;
 
-  handWidth := clockRadius /14;
+  handWidth := clockRadius / 14;
   secHandLen   := clockRadius * 0.70;
   minHandLen   := clockRadius * 0.69;
   hrHandLen    := clockRadius * 0.52;
@@ -307,9 +307,9 @@ begin
 
   path := Img32.Vector.Ellipse(recD);
   rec2 := recD;
-  InflateRect(rec2, frameWidth/2, frameWidth/2);
+  InflateRect(rec2, frameWidth / 2, frameWidth / 2);
   path2 := Img32.Vector.Ellipse(rec2);
-  DrawShadow(imgClockface, path2, frEvenOdd, frameWidth/4, angle315);
+  DrawShadow(imgClockface, path2, frEvenOdd, frameWidth / 4, angle315);
 
   lgr := TLinearGradientRenderer.Create;
   try
@@ -318,7 +318,7 @@ begin
         PointD(Right,Top), PointD(Left,Bottom),
         clNearWhite32, clLightGray32, gfsClamp);
     DrawLine(imgClockface, path, frameWidth, lgr, esPolygon);
-    inflateRect(recD, frameWidth/2, frameWidth/2);
+    inflateRect(recD, frameWidth / 2, frameWidth / 2);
     path2 := Ellipse(recD);
     DrawLine(imgClockface, path2, 1.0, clGray32, esPolygon);
 
@@ -330,7 +330,7 @@ begin
       lgr.SetParameters(
         PointD(Left, Bottom), PointD(Right, Top),
         clNearWhite32, clDarkGray32, gfsClamp);
-    DrawLine(imgClockface, path2, frameWidth/3, lgr, esPolygon);
+    DrawLine(imgClockface, path2, frameWidth / 3, lgr, esPolygon);
   finally
     lgr.Free;
   end;
@@ -339,7 +339,7 @@ begin
   //DRAW THE WATCH FACE
   /////////////////////////////////////////////////////////////
 
-  inflateRect(recD, -frameWidth/8, -frameWidth/8);
+  inflateRect(recD, -frameWidth / 8, -frameWidth / 8);
   path2 := Img32.Vector.Ellipse(recD);
   DrawLine(imgClockface, path2, 1.0, clSilver32, esPolygon);
   DrawPolygon(imgClockface, path2, frEvenOdd, clWhite32);
@@ -375,16 +375,16 @@ begin
       rec3 := GetBoundsD(numGlyphs[j]);
       mp3 := MidPoint(rec3);
 
-      RotatePoint(pt, mp, PI/6);
+      RotatePoint(pt, mp, PI / 6);
       numGlyphs[j] := TranslatePath(numGlyphs[j], pt.X -mp3.X, pt.Y -mp3.y);
       DrawPolygon(imgClockface, numGlyphs[j], frEvenOdd, clBlack32);
-    end else if ((i-1) mod 5 <> 0) and ((i+1) mod 5 <> 0) then
+    end else if ((i-1) mod 5 <> 0) and ((i + 1) mod 5 <> 0) then
     begin
       //DRAW MINUTE MARKS ...
       path[0] := PointD(mp.X, mp.Y - clockRadius * 0.80);
       path[1] := PointD(mp.X, mp.Y - clockRadius * 0.75);
-      path := RotatePath(path, mp, i *PI/30);
-      DrawLine(imgClockface, path, clockRadius/150, clDarkGray32, esButt);
+      path := RotatePath(path, mp, i * PI / 30);
+      DrawLine(imgClockface, path, clockRadius / 150, clDarkGray32, esButt);
     end;
   end;
   imgMain.Assign(imgClockface);
@@ -401,7 +401,7 @@ procedure TMainForm.Timer1Timer(Sender: TObject);
   const
     widthDelta = 1.5; //to enlarge the tip of eacb hand a little
   begin
-    handWidth := handWidth /2;
+    handWidth := handWidth / 2;
     setLength(Result, 5);
     //base
     Result[0].X := origin.X - handWidth;
@@ -409,18 +409,18 @@ procedure TMainForm.Timer1Timer(Sender: TObject);
     Result[1].X := origin.X + handWidth;
     Result[1].Y := origin.Y;
     //tip
-    handWidth := handWidth *widthDelta;
+    handWidth := handWidth * widthDelta;
     Result[2].X := origin.X  + handWidth;
-    Result[2].Y := origin.Y - handLength *arrowOffset;
+    Result[2].Y := origin.Y - handLength * arrowOffset;
     Result[3].X := origin.X;
     Result[3].Y := origin.Y - handLength;
     Result[4].X := origin.X  - handWidth;
-    Result[4].Y := origin.Y - handLength *arrowOffset;
+    Result[4].Y := origin.Y - handLength * arrowOffset;
   end;
 
   procedure DrawShadow(path: TPathD; handwidth: double);
   begin
-    path := TranslatePath(path, handWidth/4, handWidth/3);
+    path := TranslatePath(path, handWidth / 4, handWidth /  3);
     DrawPolygon(imgMain, path, frNonZero, $30000000);
   end;
 
@@ -433,7 +433,7 @@ procedure TMainForm.Timer1Timer(Sender: TObject);
     path1 := RotatePath(path1, origin, angle);
     DrawShadow(path1, handWidth);
     DrawPolygon(imgMain, path1, frNonZero, clMidGreen32);
-    DrawLine(imgMain, path1, handWidth/8, clBlack32, esPolygon);
+    DrawLine(imgMain, path1, handWidth / 8, clBlack32, esPolygon);
   end;
 
   procedure DrawSecHand(const origin: TPointD;
@@ -444,15 +444,15 @@ procedure TMainForm.Timer1Timer(Sender: TObject);
     pt: TPointD;
   begin
     pt.X := origin.X;
-    pt.Y := origin.Y + handLength/5;
-    path1 := MakeHandPath(pt, handLength*1.2, handWidth, 0.97);
+    pt.Y := origin.Y + handLength / 5;
+    path1 := MakeHandPath(pt, handLength * 1.2, handWidth, 0.97);
     path1 := RotatePath(path1, origin, angle);
-    handWidth := handWidth *3;
+    handWidth := handWidth * 3;
     rec := RectD(origin.X - handWidth, origin.Y - handWidth,
       origin.X + handWidth, origin.Y + handWidth);
     path2 := Ellipse(rec);
     DrawShadow(path1, handWidth);
-    DrawLine(imgMain, path2, handWidth/5, clBlack32, esPolygon);
+    DrawLine(imgMain, path2, handWidth / 5, clBlack32, esPolygon);
     DrawPolygon(imgMain, path1, frNonZero, clDarkRed32);
     DrawPolygon(imgMain, path2, frNonZero, clDarkRed32);
   end;
@@ -462,28 +462,28 @@ var
   mp: TPointD;
   angle, tnow: double;
 const
-  secsPerDay = 24*60*60;
+  secsPerDay = 24 * 60 * 60;
 begin
   t := time * secsPerDay;
   //round 't' so that 'tnow' isn't caught between secs.
-  tnow := Round(t)/secsPerDay;
-  Timer1.Interval := Round(1000*(1 - abs(t - Round(t))));
+  tnow := Round(t) / secsPerDay;
+  Timer1.Interval := Round(1000 * (1 - abs(t - Round(t))));
 
   //UPDATE CLOCK HANDS
   imgMain.Assign(imgClockface);
-  mp := PointD(imgMain.Width/2, imgMain.Height/2);
+  mp := PointD(imgMain.Width / 2, imgMain.Height / 2);
 
   //draw hour hand
-  angle := Frac(tnow *2) *PI*2;//fraction of 12hrs elapsed
+  angle := Frac(tnow * 2) * PI * 2;//fraction of 12hrs elapsed
   DrawHourMinHand(mp, hrHandLen, handWidth, angle);
 
   //draw minute hand
-  angle := Frac(tnow *24) *PI*2; //fraction of 1hr elapsed
+  angle := Frac(tnow * 24) * PI * 2; //fraction of 1hr elapsed
   DrawHourMinHand(mp, minHandLen, handWidth, angle);
 
   //draw second hand
-  angle := Frac(tnow * 24 *60) *PI*2;
-  DrawSecHand(mp, secHandLen, handWidth/3, angle);
+  angle := Frac(tnow * 24 * 60) * PI * 2;
+  DrawSecHand(mp, secHandLen, handWidth / 3, angle);
 
   Layout1.Repaint;
 end;
@@ -499,8 +499,8 @@ procedure TMainForm.Layout1Paint(Sender: TObject; Canvas: TCanvas; const ARect: 
 var
   srcRec, dstRec: TRectF;
 begin
-  srcRec := RectF(0,0,imgMain.Width,imgMain.Height);
-  dstRec := TranslateRectF(srcRec, (layout1.Width - imgMain.Width)/2, margin);
+  srcRec := RectF(0, 0, imgMain.Width, imgMain.Height);
+  dstRec := TranslateRectF(srcRec, (layout1.Width - imgMain.Width) / 2, margin);
   CopyImage32ToFmxCanvas(imgMain, Canvas, dstRec);
 end;
 //------------------------------------------------------------------------------

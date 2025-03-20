@@ -45,8 +45,8 @@ var
   mp: TPointD;
   radius: double;
 begin
-  mp.X := rec.Width /2;
-  mp.Y := rec.Height /2;
+  mp.X := rec.Width / 2;
+  mp.Y := rec.Height / 2;
   radius := Distance(PointD(rec.Left, rec.Top), mp);
   Result.Left := Ceil(mp.X - radius);
   Result.Right := Ceil(mp.X + radius);
@@ -113,7 +113,7 @@ var
   mpForm: TPointD;
 begin
   with ClientRect do
-    mpForm := PointD(width /2, Height /2);
+    mpForm := PointD(width / 2, Height / 2);
   img.LoadFromResource(format('RAZZ_%2.2d',[imgIndex]), 'PNG');
   x := Round(mpForm.X - img.MidPoint.X);
   y  := Round(mpForm.Y - img.MidPoint.Y);

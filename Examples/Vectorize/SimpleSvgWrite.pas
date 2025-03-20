@@ -67,12 +67,12 @@ const
     '"http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">'#10#10 +
     '<svg width="%dpx" height="%dpx" viewBox="0 0 %0:d %1:d" ' +
     'version="1.1" xmlns="http://www.w3.org/2000/svg">';
-  svg_path_format: string = '%s"'#10+
-    leftSpacesMul2+'style="fill:%s;' +
-    ' fill-opacity:%1.2f; fill-rule:%s;'#10 +leftSpacesMul2+
+  svg_path_format: string = '%s"'#10 +
+    leftSpacesMul2 + 'style="fill:%s;' +
+    ' fill-opacity:%1.2f; fill-rule:%s;'#10 + leftSpacesMul2 +
     'stroke:%s; stroke-opacity:%1.2f; stroke-width:%1.2f;"/>';
-  svg_path_format2: string = '%s"'#10+
-    leftSpacesMul2+'style="fill:none; stroke:%s; '+
+  svg_path_format2: string = '%s"'#10 +
+    leftSpacesMul2 + 'style="fill:none; stroke:%s; ' +
     'stroke-opacity:%1.2f; stroke-width:%1.2f;"/>';
 
 function ColorToHtml(color: Cardinal): string;

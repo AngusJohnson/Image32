@@ -31,8 +31,8 @@ var
 begin
   rec := Img32.Vector.GetBoundsD(defaultArrowBtns);
   Self.Paths := TranslatePath(defaultArrowBtns,
-    centerPt.X - rec.Left - rec.Width/2,
-    centerPt.Y -rec.Top - rec.Height/2);
+    centerPt.X - rec.Left - rec.Width / 2,
+    centerPt.Y -rec.Top - rec.Height / 2);
 end;
 //------------------------------------------------------------------------------
 
@@ -58,7 +58,7 @@ function AlmostParallel(const pt1, pt2, pt3: TPointD): boolean;
 var
   a: double;
 const
-  angle5 = angle1 *5;
+  angle5 = angle1 * 5;
   angle175 = angle180 - angle5;
 begin
   //precondition: angle <= 180 degrees
@@ -71,7 +71,7 @@ function AlmostPerpendicular(const pt1, pt2, pt3: TPointD): boolean;
 var
   a: double;
 const
-  angle5 = angle1 *5;
+  angle5 = angle1 * 5;
   angle85 = angle90 - angle5;
 begin
   //precondition: angle <= 90 degrees

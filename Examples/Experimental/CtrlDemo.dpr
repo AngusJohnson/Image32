@@ -150,7 +150,7 @@ begin
   GetClientRect(hdl, clientRec);
   dx := winrec.Width - clientRec.Width;
   dy := winrec.Height - clientRec.Height;
-  SetWindowPos(hdl, 0,0,0, width+dx,height+dy, SWP_NOZORDER or SWP_NOMOVE);
+  SetWindowPos(hdl, 0,0,0, width + dx, height + dy, SWP_NOZORDER or SWP_NOMOVE);
 end;
 //------------------------------------------------------------------------------
 
@@ -159,14 +159,14 @@ var
   DesktopRec, WindowRec: TRect;
   l,t: integer;
 begin
-  result := SystemParametersInfo(SPI_GETWORKAREA,0,@DesktopRec,0);
+  result := SystemParametersInfo(SPI_GETWORKAREA, 0, @DesktopRec, 0);
   if not result or (windowHdl = 0) then exit;
   GetWindowRect(windowHdl,WindowRec);
-  l := ((DesktopRec.Right-DesktopRec.Left)-(WindowRec.Right-WindowRec.Left)) div 2;
-  t := ((DesktopRec.Bottom-DesktopRec.Top)-(WindowRec.Bottom-WindowRec.Top)) div 2;
+  l := ((DesktopRec.Right - DesktopRec.Left) - (WindowRec.Right - WindowRec.Left)) div 2;
+  t := ((DesktopRec.Bottom - DesktopRec.Top) - (WindowRec.Bottom - WindowRec.Top)) div 2;
   if l < 0 then l := 0;
   if t < 0 then t := 0;
-  result := SetWindowPos(windowHdl,0,l,t,0,0,SWP_NOACTIVATE or SWP_NOSIZE or SWP_NOZORDER);
+  result := SetWindowPos(windowHdl, 0, l, t, 0, 0, SWP_NOACTIVATE or SWP_NOSIZE or SWP_NOZORDER);
 end;
 //------------------------------------------------------------------------------
 
@@ -218,7 +218,7 @@ var
   designScale : double;
   ImgSz       : integer;
 begin
-  scaleDelta := newScale/currentScale;
+  scaleDelta := newScale / currentScale;
   if ValueAlmostOne(scaleDelta) then Exit;
   currentScale := newScale;
 
@@ -606,7 +606,7 @@ begin
       begin
         //nb: Manifest DPI Awareness must be set to
         //at least 'Per Monitor' to receive this notification.
-        DpiAwareOne := LoWord(wParam)/96;
+        DpiAwareOne := LoWord(wParam) / 96;
         DpiAware1 := Round(DpiAwareOne);
         Result := 0;
       end;
@@ -631,14 +631,14 @@ begin
   Result := '';
   rs := TResourceStream.Create(hInstance, resName, resType);
   try
-    len := rs.Size div 2 -1;
+    len := rs.Size div 2 - 1;
     //nb: skipping unicode BOM
     if len < 1 then Exit;
     rs.Read(bom, 2);
     if bom <> $FEFF then Exit;
     //rs.Position := 2;
     SetLength(Result, len);
-    rs.ReadBuffer(Result[1], len *2);
+    rs.ReadBuffer(Result[1], len * 2);
   finally
     rs.Free;
   end;
@@ -866,8 +866,8 @@ begin
 
   //prepare for button positioning
   pad := DPIAware(4);
-  w := bevelSize*2 + pad*2 + imageSize64; //top row button width (bevel, padding & image)
-  h := imageSize64 + pad*3 +bevelSize*2 +epHandler.arial14.LineHeight;  //button height
+  w := bevelSize * 2 + pad * 2 + imageSize64; //top row button width (bevel, padding & image)
+  h := imageSize64 + pad * 3 + bevelSize * 2 + epHandler.arial14.LineHeight;  //button height
   j := DPIAware(40);    //initial button X offset
   k := DPIAware(80);    //initial button Y offset
 
@@ -875,18 +875,18 @@ begin
     with layeredImg32.AddLayer(TImageBtnCtrl, pagePnl) as TImageBtnCtrl do
     begin
       //Font := arial;
-      Caption := 'Btn' + Format('%d', [i+1]);
+      Caption := 'Btn' + Format('%d', [i + 1]);
       Padding := pad;
       BevelHeight := bevelSize;
       SetInnerBounds(RectD(j, k, j + w, k + h));
       if i mod 8 = 7 then
       begin
-        j := DPIAware(40*currentScale);
-        k := k + h +OuterMargin;
+        j := DPIAware(40 * currentScale);
+        k := k + h + OuterMargin;
         //change button width and height for second row
         w := epHandler.arial14.GetTextWidth('Btn13')
-          +16 + bevelSize*2 + pad*3 + imageSize64;
-        h := imageSize64 + pad*2 +bevelSize*2;
+          +16 + bevelSize * 2 + pad * 3 + imageSize64;
+        h := imageSize64 + pad * 2 +bevelSize * 2;
       end else
         j := j + w +OuterMargin;
 

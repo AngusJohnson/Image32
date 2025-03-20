@@ -12,7 +12,7 @@ uses
 
 begin
 {$IFDEF REPORTMEMORYLEAKS}
-  ReportMemoryLeaksOnShutdown := true;
+  ReportMemoryLeaksOnShutdown := True;
 {$ENDIF}
   Application.Initialize;
 {$IFDEF MAINFORMONTASKBAR}

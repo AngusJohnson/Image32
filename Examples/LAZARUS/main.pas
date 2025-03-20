@@ -124,7 +124,7 @@ begin
   DrawPolygon(img, copyTxtPaths, frNonZero, clBlack32);
 
   // finally draw 'img' onto the Image1 component ...
-  Image1.Picture.Bitmap.PixelFormat:= pf32bit;
+  Image1.Picture.Bitmap.PixelFormat := pf32bit;
   Image1.Picture.Bitmap.SetSize(img.Width, img.Height);
   img.CopyToDc(Image1.Picture.Bitmap.Canvas.Handle);
 end;

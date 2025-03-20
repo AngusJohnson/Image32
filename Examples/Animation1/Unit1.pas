@@ -51,7 +51,7 @@ var
   ballRec: TRect;
 begin
   ballsize := DPIAware(100);
-  SpaceAbove := ballsize *2;
+  SpaceAbove := ballsize * 2;
   drawRec := Rect(0, 0, ballsize, ballsize + SpaceAbove);
 
   layeredImage := TLayeredImage32.Create;
@@ -59,7 +59,7 @@ begin
   layeredImage.BackgroundColor := Color32(clBtnFace);
 
   //path: for drawing a black line at the bottom of the image
-  path := MakePath([0, ballsize*3-8, ballsize, ballsize*3 -8]);
+  path := MakePath([0, ballsize * 3 - 8, ballsize, ballsize * 3 - 8]);
   with layeredImage.AddLayer(TLayer32) do
   begin
     SetInnerBounds(RectD(drawRec));
@@ -68,7 +68,7 @@ begin
 
   ballRec := Rect(0,0,ballsize,ballsize);
 
-  Windows.InflateRect(ballRec, -15,-15);
+  Windows.InflateRect(ballRec, -15, -15);
   path := Ellipse(ballRec);
 
   //31 images (25 + 6) will be added to masterImageList. Each will be viewed
@@ -87,7 +87,7 @@ begin
       with layeredImage.AddLayer(TLayer32) do
       begin
         SetInnerBounds(RectD(drawRec));
-        j := Round(power(SpaceAbove, i/25));
+        j := Round(power(SpaceAbove, i / 25));
         ballRec := Rect(0, j, ballsize, j + ballsize);
         Image.CopyBlend(img, img.Bounds, ballRec);
         Visible := false;
@@ -101,7 +101,7 @@ begin
       begin
         SetInnerBounds(RectD(drawRec));
         ballRec := Rect(0,
-          SpaceAbove +maxSquishSize -Round(power(maxSquishSize, (6-i)/6)),
+          SpaceAbove +maxSquishSize -Round(power(maxSquishSize, (6 - i) / 6)),
           ballsize, SpaceAbove + ballsize);
         Image.CopyBlend(img, img.Bounds, ballRec);
         Visible := false;
@@ -189,7 +189,7 @@ end;
 procedure TForm1.PnlMainDblClick(Sender: TObject);
 begin
   //halve speed of bouncing ball
-  timer.Interval := timer.Interval *2;
+  timer.Interval := timer.Interval * 2;
 end;
 //------------------------------------------------------------------------------
 

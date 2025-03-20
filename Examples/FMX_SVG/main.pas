@@ -52,7 +52,7 @@ uses
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
   margin := DPIAware(14);
-  Layout1.Scale.Point := PointF(1/DpiAwareOne, 1/DpiAwareOne);
+  Layout1.Scale.Point := PointF(1 / DpiAwareOne, 1 / DpiAwareOne);
 
   // Image32's SVG reader uses FontManager and, to display any
   // SVG text, it will require at least one font to be loaded

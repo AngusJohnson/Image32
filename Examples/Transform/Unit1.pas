@@ -193,7 +193,7 @@ begin
   end;
   //and center transformlayer
   mp := transformLayer.MidPoint;
-  transformlayer.PositionCenteredAt(PointD(w/2,h/2));
+  transformlayer.PositionCenteredAt(PointD(w / 2, h / 2));
 
   //and offset everything else
   with transformLayer.MidPoint do
@@ -374,7 +374,7 @@ begin
         begin
           transformLayer.Angle := UpdateRotatingButtonGroup(rotateGroup);
           StatusBar1.SimpleText := Format(' ROTATE TRANSFORM - angle:%1.0n',
-            [transformLayer.Angle *180/PI]);
+            [transformLayer.Angle * 180 / PI]);
         end;
       ttProjective:
         begin
@@ -628,7 +628,7 @@ begin
   transformLayer.ImageBak.Assign(transformLayer.Image);
   transformLayer.UpdateHitTestMask;
   transformLayer.AutoPivot := true;
-  transformlayer.PositionCenteredAt(PointD(ClientWidth/2, ClientHeight/2));
+  transformlayer.PositionCenteredAt(PointD(ClientWidth / 2, ClientHeight / 2));
   mnuVerticalSplineClick(mnuVertSkew);
 end;
 //------------------------------------------------------------------------------

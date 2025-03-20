@@ -74,7 +74,7 @@ begin
   begin
     if not started then Exit;
     QueryPerformanceCounter(endTime);
-    cumulativeTime := cumulativeTime + (endTime - startTime)/freq;
+    cumulativeTime := cumulativeTime + (endTime - startTime) / freq;
     started := false;
   end;
 end;
@@ -106,7 +106,7 @@ end;
 {$R images.res}
 
 const
-  boxDownSamplingUrl = 'https://angusj.com/image32/Docs/Units/'+
+  boxDownSamplingUrl = 'https://angusj.com/image32/Docs/Units/' +
     'Img32.Resamplers/Routines/BoxDownSampling.htm';
   boxDownSamplingText = 'See - BoxDownSampling';
 
@@ -185,7 +185,7 @@ begin
     margin + displaySize, margin + displaySize + topOffset);
 
   rec := GetRotatedRectBounds(displayRect, angle);
-  preRotatedSize := Round(displaySize * displaySize/rec.Width);
+  preRotatedSize := Round(displaySize * displaySize / rec.Width);
 
   ImagePanel.Image.Clear;
 
@@ -194,13 +194,13 @@ begin
 
   DrawText(ImagePanel.Image, margin,
     topOffset - dpi8, 'rNearestResampler', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + displaySize*2,
+  DrawText(ImagePanel.Image, margin * 5 + displaySize * 2,
     topOffset - dpi8, 'rBilinearResampler', fontCache12);
   DrawText(ImagePanel.Image, margin,
-    topOffset - dpi8 + displaySize + margin*6,
+    topOffset - dpi8 + displaySize + margin * 6,
     'rWeightedBilinear', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + displaySize*2,
-    topOffset - dpi8 + displaySize + margin*6,
+  DrawText(ImagePanel.Image, margin * 5 + displaySize * 2,
+    topOffset - dpi8 + displaySize + margin * 6,
     'rBicubicResampler', fontCache12);
 
   img := TImage32.Create;
@@ -222,7 +222,7 @@ begin
     img.Resize(preRotatedSize, preRotatedSize);
     img.Rotate(angle);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
-    TranslateRect(displayRect, displaySize + margin*3, 0);
+    TranslateRect(displayRect, displaySize + margin * 3, 0);
 
     // rBilinearResampler
 
@@ -241,7 +241,7 @@ begin
     img.Rotate(angle);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect,
-      -displayRect.Left + margin, displaySize + margin*6);
+      -displayRect.Left + margin, displaySize + margin * 6);
 
     // rWeightedBilinear
 
@@ -259,7 +259,7 @@ begin
     img.Resize(preRotatedSize, preRotatedSize);
     img.Rotate(angle);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
-    TranslateRect(displayRect, displaySize + margin*3, 0);
+    TranslateRect(displayRect, displaySize + margin * 3, 0);
 
     // rBicubicResampler
 
@@ -324,7 +324,7 @@ begin
   try
     img.LoadFromResource('BEETLE', 'PNG');
     rec := GetRotatedRectBounds(img.Bounds, angle);
-    scale := (imgDisplaySize/rec.Width);
+    scale := (imgDisplaySize / rec.Width);
     mat := IdentityMatrix;
     MatrixScale(mat, scale);
     MatrixRotate(mat, NullPointD, angle);
@@ -348,7 +348,7 @@ begin
     displayRect.Right := displayRect.Left + img.Width;
     displayRect.Bottom := displayRect.Top + img.Height;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
-    TranslateRect(displayRect, imgDisplaySize + margin*3, 0);
+    TranslateRect(displayRect, imgDisplaySize + margin * 3, 0);
 
     img.Resampler := rBilinearResampler;
     ResetTimer(tr, false);
@@ -385,7 +385,7 @@ begin
     end;
     times[2] := StopTimer(tr) / loopCnt;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
-    TranslateRect(displayRect, imgDisplaySize + margin*5, 0);
+    TranslateRect(displayRect, imgDisplaySize + margin * 5, 0);
 
     img.Resampler := rBicubicResampler;
     ResetTimer(tr, false);
@@ -403,7 +403,7 @@ begin
     end;
     times[3] := StopTimer(tr) / loopCnt;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
-    TranslateRect(displayRect, imgDisplaySize + margin*5, 0);
+    TranslateRect(displayRect, imgDisplaySize + margin * 5, 0);
     //img.SaveToFile('c:\temp\resampling_bc.png');
 
   finally
@@ -417,15 +417,15 @@ begin
     topOffset + dpi5, 'Fast, but also pixelated', fontCache12);
   DrawText(ImagePanel.Image, margin,
     topOffset + dpi18,
-    Format('%1.2n msec',[times[0]*1e3]), fontCache12);
+    Format('%1.2n msec',[times[0] * 1e3]), fontCache12);
 
-  DrawText(ImagePanel.Image, margin*5 + imgDisplaySize,
+  DrawText(ImagePanel.Image, margin * 5 + imgDisplaySize,
     topOffset - dpi8, 'rBilinearResampler', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + imgDisplaySize,
+  DrawText(ImagePanel.Image, margin * 5 + imgDisplaySize,
     topOffset + dpi5, 'Note blurring', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + imgDisplaySize,
+  DrawText(ImagePanel.Image, margin * 5 + imgDisplaySize,
     topOffset + dpi18,
-    Format('%1.2n msec',[times[1]*1e3]), fontCache12);
+    Format('%1.2n msec',[times[1] * 1e3]), fontCache12);
 
   DrawText(ImagePanel.Image, margin,
     topOffset - dpi8 + imgDisplaySize,
@@ -435,17 +435,17 @@ begin
     'Very mildly pixelated and blurred', fontCache12);
   DrawText(ImagePanel.Image, margin,
     topOffset + dpi18 + imgDisplaySize,
-    Format('%1.2n msec',[times[2]*1e3]), fontCache12);
+    Format('%1.2n msec',[times[2] * 1e3]), fontCache12);
 
-  DrawText(ImagePanel.Image, margin*5 + imgDisplaySize,
+  DrawText(ImagePanel.Image, margin * 5 + imgDisplaySize,
     topOffset - dpi8 + imgDisplaySize,
     'rBicubicResampler', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + imgDisplaySize,
+  DrawText(ImagePanel.Image, margin * 5 + imgDisplaySize,
     topOffset + dpi5 + imgDisplaySize,
     'Slow, but no pixelation or blurring', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + imgDisplaySize,
+  DrawText(ImagePanel.Image, margin * 5 + imgDisplaySize,
     topOffset + dpi18 + imgDisplaySize,
-    Format('%1.2n msec',[times[3]*1e3]), fontCache12);
+    Format('%1.2n msec',[times[3] * 1e3]), fontCache12);
 end;
 //------------------------------------------------------------------------------
 
@@ -472,10 +472,10 @@ begin
     margin + displaySize, margin + topOffset + displaySize);
 
   rec := GetRotatedRectBounds(displayRect, angle);
-  preRotatedSize := Round(displaySize * displaySize/rec.Width);
+  preRotatedSize := Round(displaySize * displaySize / rec.Width);
   mat := IdentityMatrix;
   // initial image will be 100 wide and 1 high
-  MatrixScale(mat, preRotatedSize/100, preRotatedSize);
+  MatrixScale(mat, preRotatedSize / 100, preRotatedSize);
   MatrixRotate(mat, NullPointD, angle);
 
   ImagePanel.Image.Clear;
@@ -486,13 +486,13 @@ begin
 
   DrawText(ImagePanel.Image, margin,
     topOffset - dpi8, 'rNearestResampler', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + displaySize*2,
+  DrawText(ImagePanel.Image, margin * 5 + displaySize * 2,
     topOffset - dpi8, 'rBilinearResampler', fontCache12);
   DrawText(ImagePanel.Image, margin,
-    topOffset - dpi8 + displaySize + margin*6,
+    topOffset - dpi8 + displaySize + margin * 6,
     'rWeightedBilinear', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + displaySize*2,
-    topOffset - dpi8 + displaySize + margin*6,
+  DrawText(ImagePanel.Image, margin * 5 + displaySize * 2,
+    topOffset - dpi8 + displaySize + margin * 6,
     'rBicubicResampler', fontCache12);
 
   img := TImage32.Create;
@@ -502,7 +502,7 @@ begin
 
     img.SetSize(100,1);
     for i := 0 to 99 do
-      img.Pixels[i] := RainbowColor(i/100);
+      img.Pixels[i] := RainbowColor(i / 100);
     img.Resampler := rNearestResampler;
     img.Resize(displaySize,displaySize);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
@@ -510,7 +510,7 @@ begin
 
     img.SetSize(100,1);
     for i := 0 to 99 do
-      img.Pixels[i] := RainbowColor(i/100);
+      img.Pixels[i] := RainbowColor(i / 100);
     if useMatrix then
       AffineTransformImage(img, mat, true)
     else
@@ -519,13 +519,13 @@ begin
       img.Rotate(angle);
     end;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
-    TranslateRect(displayRect, displaySize + margin*3, 0);
+    TranslateRect(displayRect, displaySize + margin * 3, 0);
 
     // rBilinearResampler
 
     img.SetSize(100,1);
     for i := 0 to 99 do
-      img.Pixels[i] := RainbowColor(i/100);
+      img.Pixels[i] := RainbowColor(i / 100);
     img.Resampler := rBilinearResampler;
     img.Resize(displaySize,displaySize);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
@@ -533,7 +533,7 @@ begin
 
     img.SetSize(100,1);
     for i := 0 to 99 do
-      img.Pixels[i] := RainbowColor(i/100);
+      img.Pixels[i] := RainbowColor(i / 100);
     if useMatrix then
       AffineTransformImage(img, mat, true)
     else
@@ -543,13 +543,13 @@ begin
     end;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect,
-      -displayRect.Left + margin, displaySize + margin*6);
+      -displayRect.Left + margin, displaySize + margin * 6);
 
     // rWeightedBilinear
 
     img.SetSize(100,1);
     for i := 0 to 99 do
-      img.Pixels[i] := RainbowColor(i/100);
+      img.Pixels[i] := RainbowColor(i / 100);
     img.Resampler := rWeightedBilinear;
     img.Resize(displaySize,displaySize);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
@@ -557,7 +557,7 @@ begin
 
     img.SetSize(100,1);
     for i := 0 to 99 do
-      img.Pixels[i] := RainbowColor(i/100);
+      img.Pixels[i] := RainbowColor(i / 100);
     if useMatrix then
       AffineTransformImage(img, mat, true)
     else
@@ -566,13 +566,13 @@ begin
       img.Rotate(angle);
     end;
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
-    TranslateRect(displayRect, displaySize + margin*3, 0);
+    TranslateRect(displayRect, displaySize + margin * 3, 0);
 
     // rBicubicResampler
 
     img.SetSize(100,1);
     for i := 0 to 99 do
-      img.Pixels[i] := RainbowColor(i/100);
+      img.Pixels[i] := RainbowColor(i / 100);
     img.Resampler := rBicubicResampler;
     img.Resize(displaySize,displaySize);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
@@ -580,7 +580,7 @@ begin
 
     img.SetSize(100,1);
     for i := 0 to 99 do
-      img.Pixels[i] := RainbowColor(i/100);
+      img.Pixels[i] := RainbowColor(i / 100);
     if useMatrix then
       AffineTransformImage(img, mat, true)
     else
@@ -616,7 +616,7 @@ begin
     margin + displaySize, margin + displaySize + topOffset);
 
   rec := GetRotatedRectBounds(displayRect, angle);
-  preRotatedSize := Round(displaySize * displaySize/rec.Width);
+  preRotatedSize := Round(displaySize * displaySize / rec.Width);
 
   ImagePanel.Image.Clear;
 
@@ -625,13 +625,13 @@ begin
 
   DrawText(ImagePanel.Image, margin,
     topOffset - dpi8, 'rNearestResampler', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + displaySize*2,
+  DrawText(ImagePanel.Image, margin * 5 + displaySize * 2,
     topOffset - dpi8, 'rBilinearResampler', fontCache12);
   DrawText(ImagePanel.Image, margin,
-    topOffset - dpi8 + displaySize + margin*6,
+    topOffset - dpi8 + displaySize + margin * 6,
     'rWeightedBilinear', fontCache12);
-  DrawText(ImagePanel.Image, margin*5 + displaySize*2,
-    topOffset - dpi8 + displaySize + margin*6,
+  DrawText(ImagePanel.Image, margin * 5 + displaySize * 2,
+    topOffset - dpi8 + displaySize + margin * 6,
     'rBicubicResampler', fontCache12);
 
   img := TImage32.Create;
@@ -655,7 +655,7 @@ begin
     img.Resize(preRotatedSize, preRotatedSize);
     img.Rotate(angle);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
-    TranslateRect(displayRect, displaySize + margin*3, 0);
+    TranslateRect(displayRect, displaySize + margin * 3, 0);
 
     // rBilinearResampler
 
@@ -676,7 +676,7 @@ begin
     img.Rotate(angle);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect,
-      -displayRect.Left + margin, displaySize + margin*6);
+      -displayRect.Left + margin, displaySize + margin * 6);
 
     // rWeightedBilinear
 
@@ -696,7 +696,7 @@ begin
     img.Resize(preRotatedSize, preRotatedSize);
     img.Rotate(angle);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
-    TranslateRect(displayRect, displaySize + margin*3, 0);
+    TranslateRect(displayRect, displaySize + margin * 3, 0);
 
     // rBicubicResampler
 
@@ -762,7 +762,7 @@ begin
 
 
     pt.X := dstRect.Right + margin;
-    pt.Y := dstRect.Bottom - lineHt *2;
+    pt.Y := dstRect.Bottom - lineHt * 2;
 
     boxDownsamplingLinkRect.Left := pt.X;
     boxDownsamplingLinkRect.Bottom := pt.Y;

@@ -110,7 +110,7 @@ var
   txtEditor: string;
 begin
   txtEditor := GetDefaultTextEditor;
-  ShellExecute(0, 'open', PChar(txtEditor), PChar('"'+filename+'"'), nil, SW_SHOWNORMAL);
+  ShellExecute(0, 'open', PChar(txtEditor), PChar('"' + filename + '"'), nil, SW_SHOWNORMAL);
 end;
 //------------------------------------------------------------------------------
 
@@ -132,7 +132,7 @@ begin
   ImagePanel := TImage32Panel.create(self);
   ImagePanel.parent := self;
   ImagePanel.Align := alClient;
-  ImagePanel.OnResize:= ImagePanelResize;
+  ImagePanel.OnResize := ImagePanelResize;
   ImagePanel.BkgType := pbtChessBoard;
   {$IFNDEF FPC}
   DragAcceptFiles(Handle, True);
@@ -254,7 +254,7 @@ var
 begin
   if ListBox1.ItemIndex < 0 then Exit;
   fn := AppendSlash(folder) + ListBox1.Items[ListBox1.ItemIndex];
-  ShellExecute(0, nil, 'explorer.exe', PChar('/select,'+fn), nil, SW_SHOWNORMAL);
+  ShellExecute(0, nil, 'explorer.exe', PChar('/select,' + fn), nil, SW_SHOWNORMAL);
 end;
 //------------------------------------------------------------------------------
 
@@ -267,10 +267,10 @@ var
 begin
   {$IFnDEF FPC}
   Msg.Result := 0;
-  hDrop:= Msg.wParam;
+  hDrop := Msg.wParam;
   filenameLen := DragQueryFile(hDrop, 0, nil, 0);
   SetLength(filename, filenameLen);
-  DragQueryFile(hDrop, 0, Pointer(filename), filenameLen+1);
+  DragQueryFile(hDrop, 0, Pointer(filename), filenameLen + 1);
   DragFinish(hDrop);
   OpenFile(fileName);
   {$ENDIF}

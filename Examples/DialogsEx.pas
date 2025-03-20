@@ -224,7 +224,7 @@ var
 begin
   i := Length(btnCaps);
   if i > 3 then Exit;
-  SetLength(btnCaps, i+1);
+  SetLength(btnCaps, i + 1);
   btnCaps[i] := caption;
 end;
 //------------------------------------------------------------------------------
@@ -369,7 +369,7 @@ begin
 
   dpi7 := DPI(7); dpi11 := DPI(11); dpi20 := DPI(20);
   dpi26 := DPI(26); dpi75 := DPI(75);
-  dialogMargin := dpi7 *2;
+  dialogMargin := dpi7 * 2;
   tmpClientWidth := DPI(400);
 
   fForm.Font.Name := 'Segoe UI';
@@ -504,7 +504,7 @@ begin
       begin
         fEdit.Visible := false;
         fCombo.Visible := false;
-        fHorzLineYPos := fSmallTextRect.Bottom + dpi11 *2;
+        fHorzLineYPos := fSmallTextRect.Bottom + dpi11 * 2;
       end;
     dtEdit:
       begin
@@ -564,7 +564,7 @@ begin
     MB_OKCANCEL:
       begin
         fButtons[1].Caption := rsOK;
-        fButtons[1].ModalResult := mrOK;
+        fButtons[1].ModalResult := mrOk;
         fButtons[1].Visible := true;
         fButtons[0].Caption := rsCancel;
         fButtons[0].ModalResult := mrCancel;
@@ -667,9 +667,9 @@ begin
   clientWidth := Max(clientWidth, Max(padding * 19,
     Max(fBigTextRect.Right, fSmallTextRect.Right) + dialogMargin));
 
-  fEdit.Width := clientWidth - dialogMargin *2;
-  fCombo.Width := clientWidth - dialogMargin *2;
-  fCheckbox.Width := clientWidth - dialogMargin *2;
+  fEdit.Width := clientWidth - dialogMargin * 2;
+  fCombo.Width := clientWidth - dialogMargin * 2;
+  fCheckbox.Width := clientWidth - dialogMargin * 2;
 
   fForm.ClientWidth := clientWidth;
   fForm.ClientHeight := fButtons[0].Top + fButtons[0].Height + dpi11;
@@ -720,7 +720,7 @@ begin
     fEdit.CharCase := options.charCase;
     fEdit.OnChange := ValidateStrInput;
     ValidateStrInput(nil);
-    result := fForm.ShowModal = mrOK;
+    result := fForm.ShowModal = mrOk;
     if result then Value := fEdit.Text;
   finally
     fForm.Free;
@@ -746,7 +746,7 @@ begin
       fCombo.Items.Add(options.comboItems[i]);
     fCombo.ItemIndex := index;
     fButtons[1].Enabled := fCombo.Items.Count > 0;
-    result := fForm.ShowModal = mrOK;
+    result := fForm.ShowModal = mrOk;
     if result then index := fCombo.ItemIndex;
   finally
     fForm.Free;
@@ -807,7 +807,7 @@ procedure TCustomDialog.ValidateStrInput(Sender: TObject);
           CharInSet(S[i], ['A'..'Z','a'..'z']) then Exit;
 {$ELSE}
         if (aoLetters in fAllowOnlyOptions) and not
-          (S[i] in['A'..'Z','a'..'z']) then Exit;
+          (S[i] in ['A'..'Z','a'..'z']) then Exit;
 {$ENDIF}
 
       end;
@@ -904,7 +904,7 @@ begin
     fEdit.OnChange := ValidateStrInput;
     fEdit.MaxLength := 1;
     ValidateStrInput(nil);
-    result := fForm.ShowModal = mrOK;
+    result := fForm.ShowModal = mrOk;
     if result then Value := fEdit.Text[1];
   finally
     fForm.Free;
@@ -929,7 +929,7 @@ begin
     fEdit.Text := FloatToStr(Value);
     fEdit.OnChange := ValidateRealInput;
     ValidateRealInput(nil);
-    result := fForm.ShowModal = mrOK;
+    result := fForm.ShowModal = mrOk;
     if result then Value := StrToFloat(fEdit.Text);
   finally
     fForm.Free;
@@ -985,7 +985,7 @@ begin
     fEdit.Text := IntToStr(value);
     fEdit.OnChange := ValidateIntInput;
     ValidateIntInput(nil);
-    result := fForm.ShowModal = mrOK;
+    result := fForm.ShowModal = mrOk;
     if result then Value := StrToInt(fEdit.Text);
   finally
     fForm.Free;
@@ -1011,7 +1011,7 @@ begin
     fEdit.Text := hex;
     fEdit.OnChange := ValidateHexInput;
     ValidateHexInput(nil);
-    result := fForm.ShowModal = mrOK;
+    result := fForm.ShowModal = mrOk;
     if result then hex := fEdit.Text;
   finally
     fForm.Free;

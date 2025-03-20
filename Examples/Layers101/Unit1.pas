@@ -130,7 +130,7 @@ var
   r: TARGB absolute Result;
 begin
   percent := Max(0, Min(100, percent));
-  pcFrac := percent/100;
+  pcFrac := percent / 100;
   Result := color;
   r.R := r.R - Round(r.R * pcFrac);
   r.G := r.G - Round(r.G * pcFrac);
@@ -297,8 +297,8 @@ begin
   rec := Img32.Vector.GetBoundsD(tmp);
   with popupPoint do
     tmp := TranslatePath(tmp,
-      X - rec.Left - rec.Width/2,
-      Y -rec.Top - rec.Height/2);
+      X - rec.Left - rec.Width / 2,
+      Y - rec.Top - rec.Height / 2);
 
   newLayer := layeredImg32.AddLayer(TMyVectorLayer32);
   with newLayer as TMyVectorLayer32 do

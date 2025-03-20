@@ -37,7 +37,7 @@ begin
   //it's important to presize 'img' here so the
   //SVG loader and renderer knows the required
   //precision when rendering curved paths.
-  size := Round(Layout1.Width *0.5);
+  size := Round(Layout1.Width * 0.5);
   rec := RectF(0, 0, size, size);
   img := TImage32.Create(size, size);
 
@@ -75,14 +75,14 @@ begin
     Canvas.Flush;
 
     rec2 := rec;
-    OffsetRect(rec2, 0, BMP.Height*2);
+    OffsetRect(rec2, 0, BMP.Height * 2);
     img.LoadFromResource('DUCK', '10');
     AssignImage32ToFmxBitmap(img, bmp);
     Canvas.DrawBitmap(bmp, rec, rec2, 1.0);
     Canvas.Flush;
 
     rec2 := rec;
-    OffsetRect(rec2, bmp.Width, BMP.Height*2);
+    OffsetRect(rec2, bmp.Width, BMP.Height * 2);
     img.LoadFromResource('PREVIEW', '10');
     AssignImage32ToFmxBitmap(img, bmp);
     Canvas.DrawBitmap(bmp, rec, rec2, 1.0);
