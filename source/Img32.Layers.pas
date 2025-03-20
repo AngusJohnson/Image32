@@ -712,8 +712,8 @@ begin
 {$IFDEF USE_FILE_STORAGE}
   if (StorageState = ssLoading) then Exit;
 {$ENDIF}
-  fWidth := Image.Width -fOuterMargin *2;
-  fHeight := Image.Height -fOuterMargin *2;
+  fWidth := Image.Width -fOuterMargin * 2;
+  fHeight := Image.Height -fOuterMargin * 2;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -726,8 +726,8 @@ begin
   if StorageState = ssDestroying then Exit;
 {$ENDIF}
   fWidth := width; fHeight := height;
-  w := Ceil(fWidth + fOuterMargin *2);
-  h := Ceil(fHeight + fOuterMargin *2);
+  w := Ceil(fWidth + fOuterMargin * 2);
+  h := Ceil(fHeight + fOuterMargin * 2);
   Image.SetSize(w, h);
 end;
 //------------------------------------------------------------------------------
@@ -737,8 +737,8 @@ begin
   fWidth := newBounds.Width;
   fHeight := newBounds.Height;
   Image.BlockNotify;
-  Image.SetSize(Ceil(fWidth + fOuterMargin *2),
-    Ceil(fHeight + fOuterMargin *2));
+  Image.SetSize(Ceil(fWidth + fOuterMargin * 2),
+    Ceil(fHeight + fOuterMargin * 2));
   Image.UnBlockNotify;
   PositionAt(newBounds.Left, newBounds.Top);
   Invalidate;
@@ -852,8 +852,8 @@ begin
   if fOuterMargin = value then Exit;
   fOuterMargin := value;
   Image.BlockNotify;
-  Image.SetSize(Ceil(fWidth + fOuterMargin *2),
-    Ceil(fHeight + fOuterMargin *2));
+  Image.SetSize(Ceil(fWidth + fOuterMargin * 2),
+    Ceil(fHeight + fOuterMargin * 2));
   Image.UnBlockNotify;
 end;
 //------------------------------------------------------------------------------
@@ -1281,8 +1281,8 @@ begin
   //if 'pt2' is outside the clip mask then don't continue
   if Assigned(fClipImage) then
     if TARGB(fClipImage.Pixel[
-      Round(pt2.X+ fOuterMargin),
-      Round(pt2.Y+ fOuterMargin)]).A < 128 then Exit;
+      Round(pt2.X + fOuterMargin),
+      Round(pt2.Y + fOuterMargin)]).A < 128 then Exit;
 
   for i := ChildCount -1 downto 0 do
   begin
@@ -1610,7 +1610,7 @@ begin
     mat := IdentityMatrix;
     rec := Img32.Vector.GetBounds(fPaths);
     MatrixTranslate(mat, -rec.Left, -rec.Top);
-    MatrixScale(mat, w/Width, h/Height);
+    MatrixScale(mat, w / Width, h / Height);
     MatrixTranslate(mat, newBounds.Left, newBounds.Top);
     MatrixApply(mat, fPaths);
     if fAutoPivot then fPivotPt := InvalidPointD;
@@ -1626,9 +1626,9 @@ end;
 procedure TVectorLayer32.Offset(dx,dy: double);
 begin
   inherited;
-  fPaths := TranslatePath(fPaths, dx,dy);
+  fPaths := TranslatePath(fPaths, dx, dy);
   if fAutoPivot and not PointsEqual(fPivotPt, InvalidPointD) then
-    fPivotPt := TranslatePoint(fPivotPt, dx,dy);
+    fPivotPt := TranslatePoint(fPivotPt, dx, dy);
 end;
 //------------------------------------------------------------------------------
 
@@ -1849,12 +1849,12 @@ begin
         fScaleY := newBounds.Width / MasterImage.Height;
       end else
       begin
-        tanA := sinA/cosA;
+        tanA := sinA / cosA;
         // adjust for rotational cropping
         rx := newBounds.Width + fCropMargins.X * 2;
         ry := newBounds.Height + fCropMargins.Y * 2;
-        x := (rx /cosA - tanA * ry / cosA) / (1 - tanA*tanA);
-        y := (ry - sinA * x) /cosA;
+        x := (rx / cosA - tanA * ry / cosA) / (1 - tanA * tanA);
+        y := (ry - sinA * x) / cosA;
 
         if (x <= 0) or (y <= 0) then
         begin
@@ -2577,8 +2577,8 @@ begin
         with group do
           for i := 0 to 3 do
           begin
-            Child[i*2].PositionCenteredAt(corners[i]);
-            Child[i*2 +1].PositionCenteredAt(edges[i]);
+            Child[i * 2].PositionCenteredAt(corners[i]);
+            Child[i * 2 + 1].PositionCenteredAt(edges[i]);
           end;
       end;
   end;
@@ -2719,12 +2719,12 @@ end;
 procedure InitDashes;
 begin
   setLength(dashes, 2);
-  dashes[0] := dpiAware1 *2; dashes[1] := dpiAware1 *4;
+  dashes[0] := dpiAware1 * 2; dashes[1] := dpiAware1 * 4;
 end;
 
 initialization
   InitDashes;
-  DefaultButtonSize := dpiAware1*10;
+  DefaultButtonSize := dpiAware1 * 10;
 
 {$IFDEF USE_FILE_STORAGE}
   RegisterStorageClass(TLayeredImage32);

@@ -458,14 +458,14 @@ end;
 function TSvgPathSeg.DescaleAndOffset(const pt: TPointD): TPointD;
 begin
   Result := TranslatePoint(pt, -parent.PathOffset.X, -parent.PathOffset.Y);
-  Result := ScalePoint(Result, 1/Owner.Scale);
+  Result := ScalePoint(Result, 1 / Owner.Scale);
 end;
 //------------------------------------------------------------------------------
 
 function TSvgPathSeg.DescaleAndOffset(const p: TPathD): TPathD;
 begin
   Result := TranslatePath(p, -parent.PathOffset.X, -parent.PathOffset.Y);
-  Result := ScalePath(Result, 1/Owner.Scale);
+  Result := ScalePath(Result, 1 / Owner.Scale);
 end;
 //------------------------------------------------------------------------------
 
@@ -779,9 +779,9 @@ begin
     if relative then Result := 'a ' else Result := 'A ';
 
     Result := Result +
-      AsFloatStr(rec.Width *0.5 /Owner.Scale, decimalPrec) + ',';
+      AsFloatStr(rec.Width * 0.5 / Owner.Scale, decimalPrec) + ',';
     Result := Result +
-      AsFloatStr(rec.Height *0.5 /Owner.Scale, decimalPrec) + ' ';
+      AsFloatStr(rec.Height * 0.5 / Owner.Scale, decimalPrec) + ' ';
     //angle as degrees
     Result := Result + AsIntStr(RadToDeg(rectAngle));
 
@@ -830,7 +830,7 @@ begin
   len := Length(fCtrlPts) div 3;
   NewPointDArray(Result, len, True);
   for i := 0 to High(Result) do
-    Result[i] := fCtrlPts[i*3 +2];
+    Result[i] := fCtrlPts[i * 3 + 2];
 end;
 //------------------------------------------------------------------------------
 
@@ -856,7 +856,7 @@ begin
   relPt := DescaleAndOffset(fFirstPt);
   for i := 0 to High(fCtrlPts) do
   begin
-    pt:= DescaleAndOffset(fCtrlPts[i]);
+    pt := DescaleAndOffset(fCtrlPts[i]);
     Result := Result + AsCoordStr(pt, relPt, relative, decimalPrec);
     if relative and (i mod 3 = 2) then relPt := pt;
   end;
@@ -923,7 +923,7 @@ begin
   relPt := DescaleAndOffset(fFirstPt);
   for i := 0 to High(fCtrlPts) do
   begin
-    pt:= DescaleAndOffset(fCtrlPts[i]);
+    pt := DescaleAndOffset(fCtrlPts[i]);
     Result := Result + AsCoordStr(pt, relPt, relative, decimalPrec);
     relPt := pt;
   end;
@@ -949,7 +949,7 @@ begin
   len := Length(fCtrlPts) div 2;
   NewPointDArray(Result, len, True);
   for i := 0 to High(Result) do
-    Result[i] := fCtrlPts[i*2+1];
+    Result[i] := fCtrlPts[i * 2 + 1];
 end;
 //------------------------------------------------------------------------------
 
@@ -1014,7 +1014,7 @@ begin
   len := Length(fCtrlPts) div 2;
   NewPointDArray(Result, len, True);
   for i := 0 to High(Result) do
-    Result[i] := fCtrlPts[i*2+1];
+    Result[i] := fCtrlPts[i * 2 + 1];
 end;
 //------------------------------------------------------------------------------
 
@@ -1333,8 +1333,8 @@ begin
 
   with fParent do
   begin
-    pt.X := (fSegs[0].fFirstPt.X - self.PathOffset.X - Offset.X)/fPathScale;
-    pt.Y := (fSegs[0].fFirstPt.Y - self.PathOffset.Y - Offset.Y)/fPathScale;
+    pt.X := (fSegs[0].fFirstPt.X - self.PathOffset.X - Offset.X) / fPathScale;
+    pt.Y := (fSegs[0].fFirstPt.Y - self.PathOffset.Y - Offset.Y) / fPathScale;
   end;
   Result := 'M ' + AsCoordStr(pt, NullPointD, false, decimalPrec);
 end;
@@ -1841,9 +1841,9 @@ begin
     begin
       fSubPaths[i].Free;
       if i < len -1 then
-        Move(fSubPaths[i+1], fSubPaths[i],
+        Move(fSubPaths[i + 1], fSubPaths[i],
           (len - i -1) * SizeOf(Pointer));
-      SetLength(fSubPaths, len -1);
+      SetLength(fSubPaths, len - 1);
       break;
     end;
 end;
