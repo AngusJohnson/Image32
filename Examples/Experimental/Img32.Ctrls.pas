@@ -3,7 +3,7 @@ unit Img32.Ctrls;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  0.0 (Experimental)                                              *
-* Date      :  18 March 2025                                                   *
+* Date      :  20 March 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -2648,10 +2648,10 @@ begin
   itmHeight := GetItemHeight;
   if (fItemIndex < 0) or (itmHeight = 0) then Exit;
   itemsInView := Trunc(Height / itmHeight);
-  if fItemIndex < fTopItem then
+  if fTopItem > fItemIndex then
     fTopItem := fItemIndex
-  else if fItemIndex > fTopItem + itemsInView - 1 then
-    fTopItem := Math.Max(0, fItemIndex - itemsInView + 1)
+  else if fTopItem < fItemIndex - itemsInView then
+    fTopItem := Math.Max(0, fItemIndex - itemsInView)
   else
     Exit;
 
@@ -2961,6 +2961,7 @@ procedure TMemoCtrl.ScrollCaretIntoView;
 var
   visLines: integer;
 begin
+  if fPageMetrics.bounds.IsEmpty then Exit;
   visLines := GetVisibleLines;
   if fCursorChunkPos.X < fPageMetrics.startOfLineIdx[fTopLine] then
   begin

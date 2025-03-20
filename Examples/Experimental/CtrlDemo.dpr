@@ -212,14 +212,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DoScale(newScale: double);
+procedure Rescale(newScale: double; postLoad: Boolean);
 var
   scaleDelta  : double;
   designScale : double;
   ImgSz       : integer;
 begin
-  scaleDelta := newScale / currentScale;
-  if ValueAlmostOne(scaleDelta) then Exit;
+  if postLoad then
+  begin
+    currentScale := storageMngr.DesignScale;
+    scaleDelta := newScale / currentScale;
+  end else
+  begin
+    scaleDelta := newScale / currentScale;
+    if ValueAlmostOne(scaleDelta) then Exit;
+  end;
   currentScale := newScale;
 
   // StorageMngr.DesignScale and storageMngr.DesignResolution are
@@ -266,13 +273,9 @@ begin
   storageMngr.LoadFromFile(filename);
   // LoadFromFile() will delete all controls contained by
   // RootCtrl prior to loading the new ones.
-
   pageCtrl := rootCtrl.FindChildByClass(TPageCtrl) as TPageCtrl;
   statusCtrl := rootCtrl.FindChildByClass(TStatusbarCtrl) as TStatusbarCtrl;
-
-  // storageMngr.DesignScale may have changed so ...
-  currentScale := storageMngr.DesignScale;
-  DoScale(currentScale);
+  Rescale(storageMngr.DesignScale, true);
 
   ResizeMainWindow(mainHdl, layeredImg32.Width, layeredImg32.Height);
 end;
@@ -297,7 +300,7 @@ begin
 
   senderPos := (Sender as TSliderCtrl).Position;
   scale := (100 + senderPos) * 0.01;
-  DoScale(scale);
+  Rescale(scale, false);
 end;
 //------------------------------------------------------------------------------
 
@@ -1011,8 +1014,7 @@ begin
     statusCtrl := rootCtrl.FindChildByClass(TStatusbarCtrl) as TStatusbarCtrl;
 
     // storageMngr.DesignScale may have changed so ...
-    currentScale := storageMngr.DesignScale;
-    DoScale(currentScale);
+    Rescale(currentScale, true);
     ResizeMainWindow(mainHdl, layeredImg32.Width, layeredImg32.Height);
   end else
   begin
