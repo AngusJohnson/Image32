@@ -3,7 +3,7 @@ unit Img32.TextChunks;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  11 March 2025                                                   *
+* Date      :  20 March 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  Manages navigating, formatting and displaying text.             *
@@ -40,8 +40,6 @@ type
     owner         : TChunkedText;
     index         : integer;
     length        : integer;        // text length
-//    left          : double;
-//    top           : double;
     width         : double;         // pixel width
     height        : double;         // pixel height
     backColor     : TColor32;
@@ -878,7 +876,10 @@ begin
   if (EndChunkPos.X >= Count) then EndChunkPos := Types.Point(Count, 0);
   if (startingChunkPos.X < 0) then startingChunkPos := NullPoint;
   if (Count = 0) or not IsCorrectPosOrder(startingChunkPos, EndChunkPos) then
+  begin
+    SetResultLength(1);
     Exit;
+  end;
 
   Result.visibleLines := -1;
   lh := lineHeightOverride;

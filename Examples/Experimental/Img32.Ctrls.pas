@@ -1,9 +1,9 @@
-unit Img32.Ctrl;
+unit Img32.Ctrls;
 
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  0.0 (Experimental)                                              *
-* Date      :  11 March 2025                                                   *
+* Date      :  18 March 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -49,6 +49,15 @@ type
   end;
   TArrayOfNameAndAddress = array of TNameAndAddress;
 
+  TLoadRec = record
+    loadObj   : TStorage;
+    propName  : string;
+    targetId  : integer;
+  end;
+  TLoadRecArray = array of TLoadRec;
+
+
+
   TEventPropertyHandler = class(TStorage)
   private
     fNotifyEvents : TArrayOfNameAndAddress;
@@ -62,7 +71,8 @@ type
   public
     constructor Create(parent:  TStorage = nil; const name: string = ''); override;
     destructor Destroy; override;
-    procedure RefreshPropertyEvents;
+    procedure RegisterProperties;
+    procedure DeRegisterProperties;
     function  GetEventName(event: TNotifyEvent): string;
     function  GetPropName(prop: TObject): string;
     property  EventCount: integer read GetEventCount;
@@ -73,29 +83,35 @@ type
   end;
 
   TCustomCtrl = class;
+  TRootCtrl  = class;
   TCustomCtrlClass = class of TCustomCtrl;
 
+  // TCtrlStorageManager - in its constructor creates
+  //   1. a TLayeredImage32 object that also creates a TGroupLayer32 'root'.
+  //   2. a TRootCtrl 'RootCtrl' object that's owned by the 'root'.
+  //   Any custom controls added will be owned directly or indirectly by 'RootCtrl'.
   TCtrlStorageManager = class(TStorageManager)
   private
     fLayeredImg   : TLayeredImage32;
-    fRootCtrl     : TCustomCtrl;
+    fRootCtrl     : TRootCtrl;
     fLastClicked  : TCustomCtrl;
     fCurrCursor   : integer;
     fShortcutList : TList;
     fEventHandler : TEventPropertyHandler;
     fFocusLineW   : double;
+    fDelayedLinks : TLoadRecArray;
     function GetRepaintReq: Boolean;
     function GetFocusedCtrl: TCustomCtrl;
-    function GetEventProp(const str: string; out success: Boolean): TNotifyEvent;
+    procedure SetFocusedCtrl(ctrl: TCustomCtrl);
+    function FindChildByLoadId(parent: TStorage; id: integer): TStorage;
+    procedure AddDelayedLink(const delayedLink: TLoadRec);
   protected
-    procedure DoBeforeLoad; override;
-    procedure DoAfterLoad; override;
-    procedure DoBeforeWrite; override;
-    function GetEventName(event: TNotifyEvent): string; override;
-    function GetExternPropName(prop: TObject): string; override;
+    procedure SetDesignScale(value: double); override;
+    procedure BeginRead; override;
     function GetExternalProp(const str: string; out success: Boolean): TObject;
-    procedure WriteCustomProperties; override;
-    function ReadInfoProperty(const propName, propVal: string): Boolean; override;
+    procedure LoadStoredObjects(const utf8: UTF8String); override;
+    function  GetExternalPropName(obj: TObject): string; override;
+    function GetExternalEvent(const method: TMethod; out textId: string): Boolean; override;
   public
     constructor Create(parent: TStorage = nil; const name: string = ''); override;
     destructor Destroy; override;
@@ -109,16 +125,15 @@ type
     procedure KeyPress(var Key: Char);
     procedure Resize(width, height: Cardinal);
     procedure FindAllShortcutOwners;
-    procedure DeleteShortcutOwner(ctrl: TCustomCtrl);
+    procedure RemoveShortcutOwner(ctrl: TCustomCtrl);
     procedure AddShortcutOwner(ctrl: TCustomCtrl);
     function  FindShortcutOwner(const aShortcut: TShortcut): TCustomCtrl;
     property CurrentCursor: integer read fCurrCursor;
-    property EventAndPropertyHandler : TEventPropertyHandler
-      read fEventHandler write fEventHandler;
-    property FocusedCtrl: TCustomCtrl read GetFocusedCtrl;
+    property EventAndPropertyHandler : TEventPropertyHandler read fEventHandler;
+    property FocusedCtrl: TCustomCtrl read GetFocusedCtrl write SetFocusedCtrl;
     property FocusedLineWidth: double read fFocusLineW write fFocusLineW;
     property LayeredImage: TLayeredImage32 read fLayeredImg write fLayeredImg;
-    property RootCtrl: TCustomCtrl read fRootCtrl write fRootCtrl;
+    property RootCtrl: TRootCtrl read fRootCtrl;
     property LastClicked: TCustomCtrl read fLastClicked;
     property RepaintRequired: Boolean read GetRepaintReq;
   end;
@@ -129,16 +144,16 @@ type
     fShortcut     : TShortcut;
     fUsableFont   : TFontCache;
     fBevelHeight  : double;
-    fFocusedCtrl  : TCustomCtrl;
     fEnabled      : Boolean;
-    fRootCtrl     : TCustomCtrl;
     fColor        : TColor32;
     fFontColor    : TColor32;
     fCanFocus     : Boolean;
     fAutoPosition : TAutoPosition;
-    fText         : string;
+    fCaption      : string;
     fOnClick      : TNotifyEvent;
     fAfterPaint   : TNotifyEvent;
+    fDelayedLinks : TLoadRecArray;
+    procedure AddDelayedLink(const propName: string; targetId: integer);
     function  GetManager: TCtrlStorageManager;
     procedure SetBevHeight(value: double);
     procedure SetColor(color: TColor32);
@@ -151,10 +166,13 @@ type
     function  GetFocusLineWidth: double; {$IFDEF INLINE} inline; {$ENDIF}
     function  GetHalfFocusWidth: double; {$IFDEF INLINE} inline; {$ENDIF}
     function  GetFocusedCtrl: TCustomCtrl;
+    function  GetRootCtrl: TRootCtrl;
   protected
+    function  ReadProperty(const propName, propVal: string): Boolean; override;
+    function  WriteProperty(propInfo: PPropInfo): Boolean; override;
     procedure Clicked; virtual;
     function  GetUsableFont: Boolean;
-    procedure SetText(const text: string); virtual;
+    procedure SetCaption(const caption: string); virtual;
     function  GetCanFocus: Boolean; virtual;
     procedure SetFont(font: TFontCache); virtual;
     procedure CheckScaleBounds(var value: double); virtual;
@@ -173,8 +191,6 @@ type
     procedure DoKeyPress(var Key: Char); virtual;
     procedure FontChanged; virtual;
     procedure DoBeforeMerge; override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
@@ -184,25 +200,25 @@ type
     procedure SetFocus; virtual;
     procedure KillFocus; virtual;
     function GetCtrlWithFocus: TCustomCtrl; virtual;
-
+    property FocusedCtrl: TCustomCtrl read GetFocusedCtrl;
+    property HasFocus   : Boolean read GetHasFocus;
+    property RootCtrl   : TRootCtrl read GetRootCtrl;
+    property StorageManager: TCtrlStorageManager read GetManager;
+    property FocusLineWidth: double read GetFocusLineWidth;
+    property HalfFocusWidth: double read GetHalfFocusWidth;
+  published
     property AutoPosition : TAutoPosition
       read fAutoPosition write SetAutoPosition;
     property BevelHeight: double read fBevelHeight write SetBevHeight;
     property CanFocus   : Boolean read GetCanFocus write SetCanFocus;
+    property Caption    : string read fCaption write SetCaption;
     property Color      : TColor32 read fColor write SetColor;
     property Enabled    : Boolean read fEnabled write SetEnabled;
-    property FocusedCtrl: TCustomCtrl read GetFocusedCtrl;
     property Font       : TFontCache read GetFont write SetFont;
     property FontColor  : TColor32 read fFontColor write fFontColor;
-    property HasFocus   : Boolean read GetHasFocus;
-    property RootCtrl   : TCustomCtrl read fRootCtrl;
     property Shortcut   : TShortcut read fShortcut write SetShortcut;
-    property Text       : string read fText write SetText;
     property OnClick    : TNotifyEvent read fOnClick write fOnClick;
     property OnPainted  : TNotifyEvent read fAfterPaint write fAfterPaint;
-    property StorageManager: TCtrlStorageManager read GetManager;
-    property FocusLineWidth: double read GetFocusLineWidth;
-    property HalfFocusWidth: double read GetHalfFocusWidth;
   end;
 
   TAutoSizedCtrl = class(TCustomCtrl)
@@ -215,12 +231,13 @@ type
     fTargetCtrl: TCustomCtrl;
   protected
     procedure Clicked; override;
-    procedure SetText(const text: string); override;
+    procedure SetCaption(const caption: string); override;
     procedure Repaint; override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
+  published
+    // TargetCtrl - control to receive focus when an ampersanded
+    // char in the label's caption is ALT key triggered.
     property TargetCtrl: TCustomCtrl read fTargetCtrl write fTargetCtrl;
   end;
 
@@ -232,9 +249,9 @@ type
     procedure SetInnerBounds(const newBounds: TRectD); override;
   end;
 
-  TScrollCtrl = class;                  //scrollbar
+  TScrollCtrl = class;                  //scrollbar (vertical or horizontal)
 
-  TScrollingCtrl = class(TCustomCtrl)   //scrollbar user
+  TScrollingCtrl = class(TCustomCtrl)   //class that can own and use a scrollbar
   private
     fScrollV      : TScrollCtrl;
     fScrollH      : TScrollCtrl;
@@ -252,8 +269,6 @@ type
     procedure DoScroll(dx, dy: double); virtual;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
     procedure Repaint; override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
@@ -261,6 +276,7 @@ type
       index: integer; const name: string = ''): TLayer32; override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
     procedure Scale(value: double); override;
+  published
     property Margin   : double read fInnerMargin write fInnerMargin;
     property ScrollH  : TScrollCtrl read fScrollH write SetScrollH;
     property ScrollV  : TScrollCtrl read fScrollV write SetScrollV;
@@ -279,38 +295,42 @@ type
     fAutoSize   : Boolean;
     fImgList    : TSvgImageList32;
     fOnClick    : TNotifyEvent;
-    procedure SetItemIndex(index: integer);
+    procedure SetItemIndex(index: integer); // sets selected item
     function  GetItemCount: integer;
     function  GetItemHeight: double;
     function  GetItem(index: integer): string;
     procedure SetImgList(svgImageList: TSvgImageList32);
     procedure SetVisibleItms(value: integer);
     procedure UpdateScrollV;
+    procedure TextToItems(const text: string);
+    function  ItemsToText: string;
   protected
+    procedure EndRead; override;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
     procedure DoMouseDown(button: TMouseButton;
       shift: TShiftState; const pt: TPoint); override;
     procedure DoScroll(dx, dy: double); override;
-    procedure SetText(const text: string); override;
+    procedure SetCaption(const text: string); override;
     procedure SetScrollV(scrollVert: TScrollCtrl); override;
     procedure Repaint; override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
     procedure ReceiveNotification(Sender: TObject; notify: TImg32Notification); override;
     procedure ScrollItemIndexIntoView;
-    procedure AddItem(const text: string);
+    procedure SetItems(const items: TArrayOfString); virtual;
+    procedure AddItem(const text: string); virtual;
     procedure InsertItem(index: integer; const itemStr: string);
     procedure DeleteItem(index: integer);
+    property Item[index: integer]: string read GetItem; default;
+    property ItemCount: integer read GetItemCount;
+  published
     property AutoSize : Boolean read fAutoSize write fAutoSize;
     property ImageList: TSvgImageList32 read fImgList write SetImgList;
-    property Item[index: integer]: string read GetItem; default;
     property ItemIndex: integer read fItemIndex write SetItemIndex;
-    property ItemCount: integer read GetItemCount;
     property MaxVisibleItems: integer read fMaxVisible write SetVisibleItms;
+    property Text     : string read ItemsToText write TextToItems;
     property OnClick: TNotifyEvent read fOnClick write fOnClick;
   end;
 
@@ -328,27 +348,21 @@ type
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
     procedure DoMouseDown(button: TMouseButton;
       shift: TShiftState; const pt: TPoint); override;
-    procedure SetText(const text: string); override;
+    procedure SetCaption(const text: string); override;
     procedure Repaint; override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
     procedure ReceiveNotification(Sender: TObject; notify: TImg32Notification); override;
     procedure AddItem(const text: string);
-    procedure InsertItem(index: integer; const itemStr: string);
     procedure DeleteItem(index: integer);
-    property ImageList: TSvgImageList32 read fImgList write SetImgList;
     property ItemIndex: integer read fItemIndex write SetItemIndex;
     property ItemCount: integer read GetItemCount;
-    property OnClick: TNotifyEvent read fOnClick write fOnClick;
-  end;
-
-  TInsertionPtCtrl = class(TCustomCtrl)
   public
-    constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
+    procedure InsertItem(index: integer; const itemStr: string);
+    property ImageList: TSvgImageList32 read fImgList write SetImgList;
+    property OnClick: TNotifyEvent read fOnClick write fOnClick;
   end;
 
   TMemoCtrl = class(TScrollingCtrl)
@@ -369,6 +383,8 @@ type
     procedure ScrollCaretIntoView;
     procedure ResetSelPos;
   protected
+    function GetText: string;
+    procedure SetText(const txt: string);
     procedure SetFont(font: TFontCache); override;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
     procedure DoDblClick; override;
@@ -381,19 +397,18 @@ type
     function DoMouseWheel(Shift: TShiftState;
       WheelDelta: Integer; MousePos: TPoint): Boolean; override;
     procedure SetScrollV(scrollVert: TScrollCtrl); override;
-    procedure SetText(const text: string); override;
     procedure DoScroll(dx, dy: double); override;
     procedure FontChanged; override;
     procedure Repaint; override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
     procedure Scale(value: double); override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
-    function WordIdxToPos(const wordIdx: TPoint): TPointD;
+    function ChunkPosToPos(const chunkPos: TPoint): TPointD;
     function PosToChunkIdx(const relPos: TPointD): TPoint;
+  published
+    property Text       : string read GetText write SetText;
     property TextMargin : TPointD read fTextMargin write SetTextMargin;
   end;
 
@@ -423,18 +438,18 @@ type
       Shift: TShiftState; const pt: TPoint); override;
     procedure DoMouseUp(Button: TMouseButton;
       Shift: TShiftState; const pt: TPoint); override;
-    procedure SetText(const text: string); override;
+    procedure SetCaption(const text: string); override;
     procedure FontChanged; override;
     procedure Repaint; override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
     function GetText: string;
+    procedure SetText(const txt: string);
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
     function ChunkIdxToPos(const chunkIdx: TPoint): TPointD;
     function PosToChunkIdx(const relPos: TPointD): TPoint;
+  published
     property TextMargin: TPointD read fTextMargin write SetTextMargin;
     property Text       : string read GetText write SetText;
   end;
@@ -446,7 +461,7 @@ type
     procedure SetPadding(value: double);
   protected
     procedure Clicked; override;
-    procedure SetText(const text: string); override;
+    procedure SetCaption(const text: string); override;
     procedure SetPressed(value: Boolean); virtual;
     procedure Repaint; override;
     procedure DoMouseDown(Button: TMouseButton;
@@ -455,18 +470,23 @@ type
       shift: TShiftState; const pt: TPoint); override;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
     procedure DoKeyUp(var Key: Word; Shift: TShiftState); override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     procedure Scale(value: double); override;
-    property Padding: double read fPadding write SetPadding;
     property Pressed: Boolean read fPressed write SetPressed;
+  published
+    property Padding: double read fPadding write SetPadding;
   end;
 
   TRoundedBtnCtrl = class(TButtonCtrl)
+  private
+    fRadius: TPointD; //////////////////////debugging only :_
   protected
     procedure Repaint; override;
+
+  published
+    property Radius: TPointD read fRadius write fRadius;
+
   end;
 
   TEllipseBtnCtrl = class(TButtonCtrl)
@@ -483,12 +503,11 @@ type
     procedure SetImgList(svgImageList: TSvgImageList32);
     procedure SetImgIdx(index: integer);
   protected
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
     procedure Repaint; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
+  published
     property TextPosition: TTextPosition read fTextPos write SetTextPos;
     property ImageList: TSvgImageList32 read fImgList write SetImgList;
     property ImageListIdx: integer read fImgIdx write SetImgIdx;
@@ -509,12 +528,11 @@ type
       Shift: TShiftState; const pt: TPoint); override;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
     procedure DoKeyUp(var Key: Word; Shift: TShiftState); override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
+  published
     property AutoState: Boolean read fAutoState write fAutoState;
-    property TriState: TTriState read fTriState write SetTriState;
+    property State: TTriState read fTriState write SetTriState;
     property TextPosition: TTextPositionH read fTextPos write SetTextPos;
     property PreferCross: Boolean read fUseCross write fUseCross;
   end;
@@ -534,6 +552,13 @@ type
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
     procedure Scale(value: double); override;
+  end;
+
+  TRootCtrl = class(TPanelCtrl)
+  private
+    fFocusedCtrl : TCustomCtrl;
+  public
+    property FocusedCtrl : TCustomCtrl read fFocusedCtrl write fFocusedCtrl;
   end;
 
   TPageTabCtrl = class(TAutoSizedCtrl)
@@ -572,9 +597,7 @@ type
   protected
     procedure Repaint; override;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
     procedure EndRead; override;
-    procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
@@ -583,10 +606,11 @@ type
     procedure AddTab(const caption: string);
     procedure AddTabs(const captions: TArrayOfString);
     property  Panel[index: integer]: TPagePnlCtrl read GetPagePanel;
-    property  TabWidth: double read fTabWidth write SetTabWidth;
-    property  TabHeight: double read fTabHeight write SetTabHeight;
+  published
     property  ActiveIndex: integer read fActiveIdx write SetActiveIndex;
     property  ShadowSize: double read fShadowSize write fShadowSize;
+    property  TabWidth: double read fTabWidth write SetTabWidth;
+    property  TabHeight: double read fTabHeight write SetTabHeight;
     property  OnPaint  : TNotifyEvent read fOnPaint write fOnPaint;
   end;
 
@@ -604,11 +628,10 @@ type
   protected
     procedure FontChanged; override;
     procedure Repaint; override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
+  published
     property Max        : integer read fMax write SetMax;
     property Position   : double read fPosition write SetPosition;
     property Orientation: TScrollOrientation read fOrientation write SetOrientation;
@@ -646,15 +669,14 @@ type
     procedure DoMouseMove(button: TMouseButton; shift: TShiftState; const pt: TPoint); override;
     procedure DoMouseUp(button: TMouseButton; shift: TShiftState; const pt: TPoint); override;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
-    property Min        : double read fMax write SetMin;
+    property Pressed    : Boolean read fPressed write SetPressed;
+  published
+    property Min        : double read fMin write SetMin;
     property Max        : double read fMax write SetMax;
     property Position   : double read fPosition write SetPosition;
-    property Pressed    : Boolean read fPressed write SetPressed;
     property Step       : integer read fScrollStep write fScrollStep;
     property Orientation: TScrollOrientation read fOrientation write SetOrientation;
     property OnSlider   : TNotifyEvent read fOnSlider write fOnSlider;
@@ -689,21 +711,24 @@ type
     procedure DoMouseDown(button: TMouseButton; shift: TShiftState; const pt: TPoint); override;
     procedure DoMouseMove(button: TMouseButton; shift: TShiftState; const pt: TPoint); override;
     procedure DoMouseUp(button: TMouseButton; shift: TShiftState; const pt: TPoint); override;
-    function  ReadProperty(const propName, propVal: string): Boolean; override;
-    procedure WriteProperties; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
     procedure Scale(value: double); override;
     procedure SetFocus; override;
-    property AutoHide   : Boolean read fAutoHide write SetAutoHide;
     property TargetCtrl : TScrollingCtrl read fTargetCtrl;
+  published
+    property AutoHide   : Boolean read fAutoHide write SetAutoHide;
     property Size       : double read fSize write SetScrollSize;
     property Min        : double read fMin write SetMin;
     property Max        : double read fMax write SetMax;
     property Position   : double read fPosition write SetPosition;
     property Step       : integer read fScrollStep write fScrollStep;
   end;
+
+{$IFDEF MSWINDOWS}
+  function GetScreenResolution: double;
+{$ENDIF}
 
 const
   ssShift = $8000;
@@ -727,10 +752,11 @@ var
 implementation
 
 uses
-  RTTI, Img32.Extra, Img32.Draw, Img32.SVG.Core;
+  RTTI, StrUtils, Img32.Extra, Img32.Draw, Img32.SVG.Core;
 
 resourcestring
-  rsListCtrlError = 'TListCtrl error: index out of range.';
+  rsClassNotRegistered  = 'Error: %s is not a registered TStorage class';
+  rsListCtrlError       = 'TListCtrl error: index out of range.';
 
 const
   VK_BACK   = $8;
@@ -744,12 +770,36 @@ const
   VK_DOWN   = 40;
   VK_DELETE = 46;
 
+{$IFNDEF NO_STORAGE}
+const
+  squote  = '''';
+  dquote  = '"';
+  space   = #32;
+  lt      = '<';
+  gt      = '>';
+  amp     = '&';
+  tab     = #9;
+{$ENDIF}
+
 //------------------------------------------------------------------------------
 // Miscellaneous functions
 //------------------------------------------------------------------------------
 
 
 {$IFDEF MSWINDOWS}
+function GetScreenResolution: double;
+var
+  dc: HDC;
+begin
+  dc := GetDC(0);
+  try
+    Result := GetDeviceCaps(dc, LOGPIXELSX) / 96;
+  finally
+    ReleaseDC(0, dc);
+  end;
+end;
+//------------------------------------------------------------------------------
+
 function LoadAnsiTextFromClipboard: AnsiString;
 var
    len : integer;
@@ -874,6 +924,7 @@ end;
 function ShortcutToString(shortcut: TShortcut): string;
 begin
   Result := '';
+  if shortcut.chr = #0 then Exit;
   case (shortcut.flags and $3F) of
     0:  Result := shortcut.chr;
     8:  Result := 'BkSp';
@@ -1300,7 +1351,7 @@ begin
         pp := TranslatePath(pp, rec2.Left + d * 0.22, rec2.Top  + d * 0.22);
         DrawPolygon(Image, pp, frEvenOdd, SetAlpha(clDefDark32, $88));
       end;
-    tsYes     :
+    tsYes :
       begin
         d := Ceil(d/5);
         InflateRect(rec2, -d, -d);
@@ -1318,12 +1369,14 @@ end;
 constructor TCustomCtrl.Create(parent: TLayer32; const name: string);
 begin
   inherited;
-  if Assigned(StorageManager) then
-    with StorageManager do
-    begin
-      if not Assigned(fRootCtrl) then fRootCtrl := self;
-      self.fRootCtrl := fRootCtrl;
-    end;
+  if not Assigned(StorageManager) then
+    Raise Exception.Create('oops!');
+  if (self is TRootCtrl) then
+  begin
+    if Assigned(StorageManager.fRootCtrl) then
+      raise Exception.Create('oops');
+    StorageManager.fRootCtrl := TRootCtrl(self);
+  end;
   fColor        := clBtnFace32;
   fFontColor    := clBlack32;
   fEnabled      := true;
@@ -1335,9 +1388,8 @@ end;
 
 destructor TCustomCtrl.Destroy;
 begin
-  if IsShortcut(fShortcut) and
-    Assigned(StorageManager) then
-      StorageManager.DeleteShortcutOwner(self);
+  if IsShortcut(fShortcut) then
+      StorageManager.RemoveShortcutOwner(self);
 
   //notify INotifySenders
   if Assigned(fFont) then fFont.DeleteRecipient(self);
@@ -1375,9 +1427,10 @@ var
   i: integer;
   rec: TRectD;
 begin
+  // provide sensible limits to scaling
+  CheckScaleBounds(value);
   if AutoPosition <> apClient then
   begin
-    CheckScaleBounds(value);
     rec := GetInnerBounds;
     rec := ScaleRect(rec, value);
     SetInnerBounds(rec);
@@ -1392,10 +1445,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TCustomCtrl.SetText(const text: string);
+procedure TCustomCtrl.SetCaption(const caption: string);
 begin
-  if fText = text then Exit;
-  fText := text;
+  if fCaption = caption then Exit;
+  fCaption := caption;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -1435,11 +1488,87 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function  TCustomCtrl.GetRootCtrl: TRootCtrl;
+begin
+  Result := StorageManager.fRootCtrl;
+end;
+//------------------------------------------------------------------------------
+
 function TCustomCtrl.GetFocusedCtrl: TCustomCtrl;
 begin
-  if Assigned(fRootCtrl) then
-    Result := fRootCtrl.fFocusedCtrl else
-    Result := nil;
+  Result := RootCtrl.FocusedCtrl;
+end;
+//------------------------------------------------------------------------------
+
+function TCustomCtrl.WriteProperty(propInfo: PPropInfo): Boolean;
+var
+  s, propName: string;
+  //parentPropInfo: PPropInfo;
+begin
+   Result := False; // ie proceed with the default storage writing
+
+   // NOTE: individual properties could (and ideally should)
+   // be checked in descendant classes that actually contain
+   // the named properties.
+
+   if not Assigned(parent) then Exit;
+   propName := string(propInfo.Name);
+   //parentPropInfo := GetPropInfo(Parent.ClassInfo, propName);
+
+   if (propName = 'AutoPosition') then
+   begin
+     // only write an AutoPosition property if it isn't apNone
+     Result := GetEnumProp(self, 'AutoPosition') = 'apNone';
+   end
+   else if (propName = 'CanFocus') then
+   begin
+     // only write a CanFocus property if it isn't TRUE
+     Result := GetEnumProp(self, 'CanFocus') = 'True';
+   end
+   else if (propName = 'Color') then
+   begin
+     Result := GetOrdProp(self, 'Color') = clNone32;
+   end
+   else if (propName = 'CursorId') then
+   begin
+     Result := GetOrdProp(self, 'CursorId') = 0;
+   end
+   else if (propName = 'Enabled') then
+   begin
+     Result := GetEnumProp(self, 'Enabled') = 'True';
+   end
+   else if (propName = 'Font') then
+   begin
+     // only write a Font property if it differs from its parent's Font
+     if not HasPublishedProperty(parent.Classname, propName) then Exit;
+     Result := GetObjectProp(self, propName) = GetObjectProp(Parent, propName);
+   end
+   else if (propName = 'FontColor') then
+   begin
+     Result := Cardinal(GetOrdProp(self, 'FontColor')) = clBlack32;
+   end
+   else if (propName = 'Opacity') then
+   begin
+     Result := GetOrdProp(self, 'Opacity') = 255;
+   end
+   else if (propName = 'Shortcut') then
+   begin
+     s := ShortcutToString(Shortcut);
+     if s <> '' then WriteStrProp(propName, s);
+     Result := true; // ie write process handled
+   end
+   else if (propName = 'TabWidth') then
+   begin
+     Result := GetOrdProp(self, 'TabWidth') <= 0;
+   end
+   else if (propName = 'TabHeight') then
+   begin
+     Result := GetOrdProp(self, 'TabHeight') <= 0;
+   end
+   else if (propName = 'Visible') then
+   begin
+     Result := GetEnumProp(self, 'Visible') = 'True';
+   end
 end;
 //------------------------------------------------------------------------------
 
@@ -1511,10 +1640,9 @@ var
 begin
   hadShortcut := IsShortcut(fShortcut);
   fShortcut := value;
-  if (hadShortcut = IsShortcut(fShortcut)) or
-    not Assigned(StorageManager) then Exit;
+  if (hadShortcut = IsShortcut(fShortcut)) then Exit;
   if hadShortcut then
-    StorageManager.DeleteShortcutOwner(self) else
+    StorageManager.RemoveShortcutOwner(self) else
     StorageManager.AddShortcutOwner(self);
 end;
 //------------------------------------------------------------------------------
@@ -1531,7 +1659,7 @@ end;
 
 function TCustomCtrl.GetHasFocus: Boolean;
 begin
-  Result := fRootCtrl.fFocusedCtrl = self;
+  Result := (RootCtrl.FocusedCtrl = self);
 end;
 //------------------------------------------------------------------------------
 
@@ -1550,18 +1678,18 @@ begin
     Exit;
   end;
 
-  if (self = fRootCtrl.fFocusedCtrl) then Exit;
-  if Assigned(fRootCtrl.fFocusedCtrl) then
-    fRootCtrl.fFocusedCtrl.KillFocus;
-  fRootCtrl.fFocusedCtrl := Self;
+  if (self = RootCtrl.FocusedCtrl) then Exit;
+  if Assigned(RootCtrl.FocusedCtrl) then
+    RootCtrl.FocusedCtrl.KillFocus;
+  RootCtrl.FocusedCtrl := Self;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TCustomCtrl.KillFocus;
 begin
-  if self <> fRootCtrl.fFocusedCtrl then Exit;
-  fRootCtrl.fFocusedCtrl := nil;
+  if self <> RootCtrl.FocusedCtrl then Exit;
+  RootCtrl.FocusedCtrl := nil;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -1574,7 +1702,7 @@ end;
 
 function TCustomCtrl.GetCtrlWithFocus: TCustomCtrl;
 begin
-  Result := fRootCtrl.fFocusedCtrl;
+  Result := RootCtrl.FocusedCtrl;
 end;
 //------------------------------------------------------------------------------
 
@@ -1673,45 +1801,74 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TCustomCtrl.ReadProperty(const propName, propVal: string): Boolean;
+function IsIntValue(const txt: string; out val: integer): Boolean;
 begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit;
-  if propName = 'AutoPosition' then
-    AutoPosition := TAutoPosition(GetIntProp(propVal, Result))
-  else if propName = 'BevelHeight' then
-    BevelHeight := GetDoubleProp(propVal, Result)
-  else if propName = 'CanFocus' then
-    CanFocus := GetBoolProp(propVal, Result)
-  else if propName = 'Color' then
-    Color := GetColorProp(propVal, Result)
-  else if propName = 'Enabled' then
-    Enabled := GetBoolProp(propVal, Result)
-  else if propName = '?Font' then
-    Font := StorageManager. GetExternalProp(
-      propVal, Result) as TFontCache
-  else if propName = 'Shortcut' then
-    fShortcut := StringToShortcut(GetStringProp(propVal, Result))
-  else if propName = 'Text' then
-    Text := GetStringProp(propVal, Result)
-  else if propName = '?OnClick' then
-    self.fOnClick := StorageManager.GetEventProp(propVal, Result);
+  val := strToIntDef(txt, -1);
+  Result := val > 0;
 end;
 //------------------------------------------------------------------------------
 
-procedure TCustomCtrl.WriteProperties;
+procedure TCustomCtrl.AddDelayedLink(const propName: string; targetId: integer);
+var
+  len: integer;
 begin
-  inherited;
-  WriteIntProp('AutoPosition', Ord(AutoPosition));
-  WriteDoubleProp('BevelHeight', BevelHeight);
-  WriteBoolProp('CanFocus', CanFocus);
-  WriteColorProp('Color', Color);
-  if not fEnabled then WriteBoolProp('Enabled', Enabled);
-  WriteExternalProp('Font', fFont);
-  if (fShortcut.chr > #0) or (fShortcut.flags > 0) then
-    WriteStrProp('Shortcut', ShortcutToString(fShortcut));
-  if Text <> '' then WriteStrProp('Text', Text);
-  if Assigned(fOnClick) then WriteEventProp('OnClick', fOnClick);
+  len := Length(fDelayedLinks);
+  SetLength(fDelayedLinks, len +1);
+  fDelayedLinks[len].loadObj := self;
+  fDelayedLinks[len].propName := propName;
+  fDelayedLinks[len].targetId := targetId;
+end;
+//------------------------------------------------------------------------------
+
+function TCustomCtrl.ReadProperty(const propName, propVal: string): Boolean;
+var
+  pi      : PPropInfo;
+  obj     : TObject;
+  method  : TMethod;
+  val     : integer;
+begin
+  Result := False;
+  if IsPublishedProp(self, propName) then
+  try
+    pi := GetPropInfo(self.ClassType, propName);
+    case pi.PropType^.Kind of
+      tkEnumeration: SetEnumProp(self, propName, propVal);
+      tkInteger: TypInfo.SetOrdProp(self, pi, Cardinal(strToIntDef(propVal, 0)));
+      tkFloat: SetFloatProp(self, propName, strToFloatDef(propVal, 0.0));
+      tkUString: SetPropValue(self, propName, SimpleXmlDecode(propVal));
+      tkMethod:
+      begin
+        method := TMethod(storageManager.EventAndPropertyHandler.Event[propVal]);
+        SetMethodProp(self, propName, method);
+      end;
+      tkClass:
+      begin
+        // TCustomCtrl properties are stored using their numeric Ids,
+        // as opposed to 'external' property names
+        if IsIntValue(propVal, val) then
+        begin
+          obj := storageManager.FindChildByLoadId(RootCtrl, val);
+          if not Assigned(obj) then
+          begin
+            // the target object hasn't been constructed yet so
+            // we'll need to fix these up later
+            AddDelayedLink(propName, val);
+            Exit;
+          end
+          else if not (obj is TCustomCtrl) then Exit;
+        end
+        else
+          obj := storageManager.GetExternalProp(propVal, Result);
+
+        SetObjectProp(self, propName, obj);
+      end;
+
+      else Exit; // eg record types not handled
+    end;
+    Result := true;
+  except
+    Result := False;
+  end;
 end;
 
 //------------------------------------------------------------------------------
@@ -1744,10 +1901,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TLabelCtrl.SetText(const text: string);
+procedure TLabelCtrl.SetCaption(const caption: string);
 begin
   inherited;
-  fShortcut := GetShortcutFromCaption(text);
+  fShortcut := GetShortcutFromCaption(caption);
 end;
 //------------------------------------------------------------------------------
 
@@ -1762,7 +1919,7 @@ begin
   Image.Clear(Color);
   if not GetUsableFont then Exit;
 
-  caption := fText;
+  caption := fCaption;
   ulIdx := Pos('&', caption);
   if ulIdx > 0 then Delete(caption, ulIdx, 1);
 
@@ -1774,28 +1931,6 @@ begin
   DrawPolygon(Image, pp, frNonZero, clWhite32);
   pp := TranslatePath(pp, dx, dx);
   DrawPolygon(Image, pp, frNonZero, clBlack32);
-end;
-//------------------------------------------------------------------------------
-
-function TLabelCtrl.ReadProperty(const propName, propVal: string): Boolean;
-var
-  p: TCustomCtrl;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit
-  else if propName = 'TargetCtrl' then
-  begin
-    p := GetStorageProp(propVal, Result) as TCustomCtrl;
-    if Assigned(p) and (p is TCustomCtrl) then
-      TargetCtrl := TCustomCtrl(p);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TLabelCtrl.WriteProperties;
-begin
-  inherited;
-  WriteLocalStorageProp('TargetCtrl', fTargetCtrl);
 end;
 
 //------------------------------------------------------------------------------
@@ -1838,7 +1973,7 @@ begin
   Img32.Vector.InflateRect(rec, -DPIAware(10), -Round(bh));
   if GetUsableFont then
     DrawText(Image, rec.Left, rec.Top + fUsableFont.Ascent ,
-      fText, fUsableFont, fFontColor);
+      fCaption, fUsableFont, fFontColor);
 end;
 
 //------------------------------------------------------------------------------
@@ -1849,7 +1984,6 @@ constructor TScrollingCtrl.Create(parent: TLayer32; const name: string);
 begin
   inherited;
   fBevelHeight := dpiAware(2);
-  //OuterMargin := DpiAwareOne*5;
   fInnerMargin := 0;
 end;
 //------------------------------------------------------------------------------
@@ -1901,29 +2035,30 @@ end;
 
 procedure TScrollingCtrl.DoChildAutoPositioning;
 var
-  i           : integer;
-  w,h         : double;
-  rec         : TRectD;
-  clientRect  : TRectD;
-  clientCtrl  : TCustomCtrl;
-  scrollHsize : double;
-  scrollVsize : double;
+  i   : integer;
+  w,h : double;
+  rec : TRectD;
+  clientArea      : TRectD;
+  clientAreaCtrl  : TCustomCtrl;
+  scrollHsize     : double;
+  scrollVsize     : double;
 const
   scrollScale = 0.75;
 begin
   if (StorageState = ssLoading) or (Width = 0) or (Height = 0) or
     not GetUsableFont then Exit;
 
-  clientRect := InnerRect;
+  clientArea := InnerRect;
   //exclude regions non-usable for all childs
 
   //reposition horz and vert scrollbars
   if Assigned(fScrollH) and fScrollH.Visible then
   begin
+    // todo - unlink scrollStepSize from font lineheight
     if fScrollH.fSize = 0 then
       scrollHsize := fUsableFont.LineHeight * scrollScale else
       scrollHsize := fScrollH.fSize;
-    rec := clientRect;
+    rec := clientArea;
     if Assigned(fScrollV) and fScrollV.Visible then
     begin
       if fScrollV.fSize = 0 then
@@ -1933,62 +2068,62 @@ begin
     end;
     rec.Top := Rec.Bottom - scrollHsize;
     fScrollH.SetInnerBounds(rec);
-    clientRect.Bottom := clientRect.Bottom - scrollHsize;
+    clientArea.Bottom := clientArea.Bottom - scrollHsize;
   end;
   if Assigned(fScrollV) and (fScrollV.Visible or fScrollV.fAutoHide) then
   begin
     if fScrollV.fSize = 0 then
       scrollVsize := fUsableFont.LineHeight * scrollScale else
       scrollVsize := fScrollV.fSize;
-    rec := clientRect;
+    rec := clientArea;
     rec.Left := Rec.Right - scrollVsize;
     fScrollV.SetInnerBounds(rec);
-    clientRect.Right := clientRect.Right - scrollVsize;
+    clientArea.Right := clientArea.Right - scrollVsize;
   end;
 
   //now exclude the region that's non-usable for 'inner' childs
   if fInnerMargin > 0 then
-    InflateRect(clientRect, -fInnerMargin, -fInnerMargin);
+    InflateRect(clientArea, -fInnerMargin, -fInnerMargin);
 
-  clientCtrl  := nil;
+  clientAreaCtrl  := nil;
   for i := 0 to ChildCount -1 do
     if (Child[i] is TCustomCtrl) and
     not (Child[i] is TScrollCtrl) and
       (TCustomCtrl(Child[i]).fAutoPosition > apCustom) then
   begin
-    rec := clientRect;
+    rec := clientArea;
     w := rec.Width; h := rec.Height;
     case TCustomCtrl(Child[i]).fAutoPosition of
       apClient  :
-        clientCtrl := TCustomCtrl(Child[i]);
+        clientAreaCtrl := TCustomCtrl(Child[i]);
       apLeft    :
         begin
           rec.Right := rec.Left + Min(w, Child[i].Width);
           Child[i].SetInnerBounds(rec);
-          clientRect.Left := Child[i].Left + Child[i].Width;
+          clientArea.Left := Child[i].Left + Child[i].Width;
         end;
       apTop     :
         begin
           rec.Bottom := rec.Top + Min(h, Child[i].Height);
           Child[i].SetInnerBounds(rec);
-          clientRect.Top := Child[i].Top + Child[i].Height;
+          clientArea.Top := Child[i].Top + Child[i].Height;
         end;
       apRight   :
         begin
           rec.Left := rec.Right - Min(w, Child[i].Width);
           Child[i].SetInnerBounds(rec);
-          clientRect.Right := Child[i].Left;
+          clientArea.Right := Child[i].Left;
         end;
       apBottom  :
         begin
           rec.Top := rec.Bottom - Min(h, Child[i].Height);
           Child[i].SetInnerBounds(rec);
-          clientRect.Bottom := Child[i].Top;
+          clientArea.Bottom := Child[i].Top;
         end;
     end;
   end;
-  if Assigned(clientCtrl) then
-    clientCtrl.SetInnerBounds(clientRect);
+  if Assigned(clientAreaCtrl) then
+    clientAreaCtrl.SetInnerBounds(clientArea);
 
   UpdateHorzScrollbarPos;
   UpdateVertScrollbarPos;
@@ -2018,42 +2153,7 @@ procedure TScrollingCtrl.Scale(value: double);
 begin
   inherited;
   fInnerMargin := fInnerMargin * value;
-end;
-//------------------------------------------------------------------------------
-
-function TScrollingCtrl.ReadProperty(const propName, propVal: string): Boolean;
-var
-  p: TStorage;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-
-  if Result then Exit
-  else if propName = 'ShadowSize' then
-    ShadowSize := GetDoubleProp(propVal, Result)
-  else if propName = 'Margin' then
-    Margin := GetDoubleProp(propVal, Result)
-  else if propName = 'ScrollH' then
-  begin
-    p := GetStorageProp(propVal, Result) as TScrollCtrl;
-    if Assigned(p) and (p is TScrollCtrl) then
-      ScrollH := TScrollCtrl(p);
-  end
-  else if propName = 'ScrollV' then
-  begin
-    p := GetStorageProp(propVal, Result) as TScrollCtrl;
-    if Assigned(p) and (p is TScrollCtrl) then
-      ScrollV := TScrollCtrl(p);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TScrollingCtrl.WriteProperties;
-begin
-  inherited;
-  WriteDoubleProp('Margin', fInnerMargin);
-  if ShadowSize > 0 then WriteDoubleProp('ShadowSize', fShadowSize);
-  WriteLocalStorageProp('ScrollH', ScrollH);
-  WriteLocalStorageProp('ScrollV', ScrollV);
+  fShadowSize := fShadowSize * value;
 end;
 //------------------------------------------------------------------------------
 
@@ -2066,6 +2166,7 @@ begin
   begin
     RegisterTargetCtrl(self);
     fOrientation := soHorizontal;
+    // make sure it's on top of every other child control
     Move(self, MaxInt);
     AutoPosition := apBottom;
   end;
@@ -2083,6 +2184,7 @@ begin
   begin
     RegisterTargetCtrl(self);
     fOrientation := soVertical;
+    // make sure it's on top of every other child control
     Move(self, MaxInt);
     AutoPosition := apRight;
   end;
@@ -2216,6 +2318,56 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function SplitString(const str, delims: string): TArrayOfString;
+var
+  i,j,k, len: integer;
+  delimOffsets: TArrayOfInteger;
+begin
+  Result := nil;
+  len := Length(str);
+  if len = 0 then Exit;
+  SetLength(delimOffsets, len);
+  k := 0;
+  for i := 1 to len do
+    for j := 1 to length(delims) do
+      if str[i] = delims[j] then
+      begin
+        delimOffsets[k] := i;
+        inc(k);
+        break;
+      end;
+  SetLength(delimOffsets, k);
+  SetLength(Result, k +1);
+  j := 1; k := 0;
+  for i := 0 to High(delimOffsets) do
+  begin
+    Result[k] :=  SimpleXmlDecode(Trim(Copy(str, j, delimOffsets[i] - j)));
+    inc(k);
+    j := delimOffsets[i] +1;
+  end;
+  Result[k] := SimpleXmlDecode(Trim(Copy(str, j, MaxInt)));
+end;
+//------------------------------------------------------------------------------
+
+procedure TListCtrl.TextToItems(const text: string);
+begin
+  fItems := SplitString(text, ';');
+end;
+//------------------------------------------------------------------------------
+
+function TListCtrl.ItemsToText: string;
+var
+  i,len: integer;
+begin
+  Result := '';
+  len := Length(fItems);
+  if len = 0 then Exit;
+  Result := fItems[0];
+  for i := 1 to len -1 do
+    Result := Result + ';' + SimpleXmlEncode(fItems[i]);
+end;
+//------------------------------------------------------------------------------
+
 function TListCtrl.GetItem(index: integer): string;
 begin
   if (index < 0) or (index >= ItemCount) then
@@ -2226,7 +2378,9 @@ end;
 
 procedure TListCtrl.SetItemIndex(index: integer);
 begin
-  if (index < 0) or (index >= GetItemCount) then index := -1;
+  if Assigned(StorageManager) and
+    (StorageManager.StorageState <> ssLoading) and
+      ((index < 0) or (index >= GetItemCount)) then index := -1;
   if index = fItemIndex then Exit;
   fItemIndex := index;
   Invalidate;
@@ -2245,6 +2399,14 @@ begin
     Result := fImgList.DefaultHeight
   else
     Result := 0;
+end;
+//------------------------------------------------------------------------------
+
+procedure TListCtrl.EndRead;
+begin
+  inherited;
+  if fItemIndex > 0 then
+    ScrollItemIndexIntoView;
 end;
 //------------------------------------------------------------------------------
 
@@ -2324,7 +2486,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TListCtrl.SetText(const text: string);
+procedure TListCtrl.SetCaption(const text: string);
 begin
   inherited;
   fItems := StringToArrayOfString(Text);
@@ -2365,15 +2527,13 @@ begin
   scrollShowing := Assigned(ScrollV) and ScrollV.Visible;
 
   vis := Math.Min(Trunc((recI.Height - fBevelHeight *2) / itemH), cnt);
-  if HasFocus then
+  if HasFocus and
+    ((ItemIndex < fTopItem) or (ItemIndex >= fTopItem + fMaxVisible)) then
   begin
+    Types.InflateRect(recI, hbh*2, hbh*2);
     if (om > 0) then DrawShadowRect(Image, recI, om);
-    if (ItemIndex < 0) then
-    begin
-      Types.InflateRect(recI, hbh*2, hbh*2);
-      DrawLine(Image, Rectangle(recI), FocusLineWidth, clDefDark32, esPolygon);
-      Types.InflateRect(recI, -hbh*2, -hbh*2);
-    end;
+    DrawLine(Image, Rectangle(recI), FocusLineWidth, clDefDark32, esPolygon);
+    Types.InflateRect(recI, -hbh*2, -hbh*2);
   end;
 
   if Assigned(fImgList) then
@@ -2393,11 +2553,10 @@ begin
         DrawLine(Image, Rectangle(rec),
           DpiAwareOne, clGray32, esPolygon);
         if HasFocus then
-          Image.FillRect(Rect(rec2), clLiteBtn32) else
+          Image.FillRect(Rect(rec2), clLiteBtn32)
+        else
           Image.FillRect(Rect(rec2), clBtnFace32);
         Img32.Vector.InflateRect(rec2, -hbh, -hbh);
-        DrawEdge(Image, rec2, clWhite32, clLiteGray32,
-          DpiAwareOne * StorageManager.DesignFormScale);
         if HasFocus then
           DrawLine(Image, Rectangle(rec2),
             FocusLineWidth, clDefDark32, esPolygon);
@@ -2431,6 +2590,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TListCtrl.SetItems(const items: TArrayOfString);
+begin
+  fItems := items;
+  SetInnerBounds(GetInnerBounds);
+  UpdateScrollV;
+  fItemIndex := -1;
+end;
+//------------------------------------------------------------------------------
+
 procedure TListCtrl.AddItem(const text: string);
 begin
   InsertItem(MaxInt, text);
@@ -2445,7 +2613,7 @@ begin
   if (index < 0) then index := 0
   else if (index > len) then index := len;
   Insert(itemStr, fItems, index);
-  Text := ArrayOfStringToString(fItems);
+  //Caption := ArrayOfStringToString(fItems);
 end;
 //------------------------------------------------------------------------------
 
@@ -2453,7 +2621,7 @@ procedure TListCtrl.DeleteItem(index: integer);
 begin
   if (index < 0) or (index >= GetItemCount) then Exit;
   Delete(fItems, index, 1);
-  Text := ArrayOfStringToString(fItems);
+  Caption := ArrayOfStringToString(fItems);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -2500,35 +2668,6 @@ begin
   fMaxVisible := value;
   Invalidate;
   SetInnerBounds(GetInnerBounds);
-end;
-//------------------------------------------------------------------------------
-
-function TListCtrl.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit
-  else if propName = 'AutoSize' then
-    fAutoSize := GetBoolProp(propVal, Result)
-  else if propName = '?ImageList' then
-    ImageList := StorageManager.GetExternalProp(propVal,
-      Result) as TSvgImageList32
-  else if propName = 'ItemIndex' then
-    fItemIndex := GetIntProp(propVal, Result)
-  else if propName = 'MaxVisibleItems' then
-  begin
-    fMaxVisible := 0;
-    MaxVisibleItems := GetIntProp(propVal, Result)
-  end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TListCtrl.WriteProperties;
-begin
-  inherited;
-  WriteBoolProp('AutoSize', fAutoSize);
-  WriteExternalProp('ImageList', ImageList);
-  WriteIntProp('ItemIndex', fItemIndex);
-  WriteIntProp('MaxVisibleItems', fMaxVisible);
 end;
 
 //------------------------------------------------------------------------------
@@ -2620,7 +2759,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPopMenuCtrl.SetText(const text: string);
+procedure TPopMenuCtrl.SetCaption(const text: string);
 begin
   inherited;
   fItems := StringToArrayOfString(Text);
@@ -2632,26 +2771,6 @@ end;
 procedure TPopMenuCtrl.Repaint;
 begin
 
-end;
-//------------------------------------------------------------------------------
-
-function  TPopMenuCtrl.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit
-  else if propName = '?ImageList' then
-    ImageList := StorageManager.GetExternalProp(propVal,
-      Result) as TSvgImageList32
-  else if propName = 'ItemIndex' then
-    fItemIndex := GetIntProp(propVal, Result);
-end;
-//------------------------------------------------------------------------------
-
-procedure TPopMenuCtrl.WriteProperties;
-begin
-  inherited;
-  WriteExternalProp('ImageList', ImageList);
-  WriteIntProp('ItemIndex', fItemIndex);
 end;
 //------------------------------------------------------------------------------
 
@@ -2716,7 +2835,7 @@ begin
   if (index < 0) then index := 0
   else if (index > len) then index := len;
   Insert(itemStr, fItems, index);
-  Text := ArrayOfStringToString(fItems);
+  Caption := ArrayOfStringToString(fItems);
 end;
 //------------------------------------------------------------------------------
 
@@ -2724,19 +2843,8 @@ procedure TPopMenuCtrl.DeleteItem(index: integer);
 begin
   if (index < 0) or (index >= GetItemCount) then Exit;
   Delete(fItems, index, 1);
-  Text := ArrayOfStringToString(fItems);
+  Caption := ArrayOfStringToString(fItems);
   Invalidate;
-end;
-
-//------------------------------------------------------------------------------
-// TInsertionPtCtrl
-//------------------------------------------------------------------------------
-
-constructor TInsertionPtCtrl.Create(parent: TLayer32; const name: string);
-begin
-  inherited;
-  CanFocus := false;
-  Color := clNone32;
 end;
 
 //------------------------------------------------------------------------------
@@ -2768,10 +2876,7 @@ end;
 procedure TMemoCtrl.Scale(value: double);
 begin
   inherited;
-  fTopLine  := 0;
-  fSelStart := NullPoint;
-  fSelEnd   := NullPoint;
-  ScrollV.Position := 0;
+  ScrollCaretIntoView;
 end;
 //------------------------------------------------------------------------------
 
@@ -2826,7 +2931,6 @@ begin
     with fPageMetrics do
     begin
       ScrollV.Max := Round(lineHeight * totalLines);
-      //ScrollV.Visible := true; ////////////
       ScrollV.Step := Round(lineHeight);
     end;
     ScrollV.Invalidate;
@@ -2840,7 +2944,7 @@ begin
   if not Assigned(fUsableFont) then Exit;
   fPageMetrics.bounds := NullRect; // force a fPageMetrics refresh
   fPageMetrics.lineHeight := fUsableFont.LineHeight;
-  if fText <> '' then
+  if fCaption <> '' then
     fChunkedText.ApplyNewFont(fUsableFont);
   Invalidate;
 end;
@@ -2869,7 +2973,7 @@ begin
     (fCursorChunkPos.X >= fPageMetrics.startOfLineIdx[fTopLine + visLines]) then
   begin
     while (fTopLine + visLines < fPageMetrics.totalLines) and
-      (fCursorChunkPos.X >= fPageMetrics.startOfLineIdx[fTopLine + visLines]) do
+      (fCursorChunkPos.X >= fPageMetrics.startOfLineIdx[fTopLine + visLines -1]) do
         inc(fTopLine);
     ScrollV.Position := fTopLine * fPageMetrics.lineHeight;
     Invalidate;
@@ -2925,7 +3029,7 @@ begin
       end;
     VK_UP:
       begin
-        pos := WordIdxToPos(fCursorChunkPos);
+        pos := ChunkPosToPos(fCursorChunkPos);
         pos.Y := pos.Y - fPageMetrics.lineHeight;
         fCursorChunkPos := PosToChunkIdx(pos);
         if HasShiftKey(shift) then
@@ -2936,7 +3040,7 @@ begin
       end;
     VK_DOWN:
       begin
-        pos := WordIdxToPos(fCursorChunkPos);
+        pos := ChunkPosToPos(fCursorChunkPos);
         pos.Y := pos.Y + fPageMetrics.lineHeight;
         fCursorChunkPos := PosToChunkIdx(pos);
         if HasShiftKey(shift) then
@@ -3039,12 +3143,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMemoCtrl.SetText(const text: string);
+function TMemoCtrl.GetText: string;
 begin
-  inherited;
+  Result := fChunkedText.Text;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMemoCtrl.SetText(const txt: string);
+begin
   if not GetUsableFont then Exit;
   fPageMetrics.bounds := NullRect; // force a fPageMetrics refresh
-  fChunkedText.SetText(text, fUsableFont);
+  fChunkedText.SetText(txt, fUsableFont, fontColor, fColor);
   fTopLine := 0;
   Invalidate;
 end;
@@ -3064,7 +3173,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TMemoCtrl.WordIdxToPos(const wordIdx: TPoint): TPointD;
+function TMemoCtrl.ChunkPosToPos(const chunkPos: TPoint): TPointD;
 var
   i       : integer;
   x, spcW : double;
@@ -3073,21 +3182,24 @@ begin
   Result := NullPointD;
   if not GetUsableFont then Exit;
 
-  //get WordIdx's start of line index
-  i := 0;
-  while (i < fPageMetrics.totalLines -1) and
-    (wordIdx.X >= fPageMetrics.startOfLineIdx[i+1]) do inc(i);
+  // get chunkPos' start of line index
+  i := fTopLine;
+  with fPageMetrics do
+    if chunkPos.X < startOfLineIdx[i] then
+      while (i > 0) and (chunkPos.X < startOfLineIdx[i -1]) do Dec(i)
+    else
+      while (i < fPageMetrics.totalLines -1) and
+        (chunkPos.X >= startOfLineIdx[i+1]) do Inc(i);
 
-  //with the line index we now have Y pos
-  Result.Y := (i - fTopLine) * fPageMetrics.lineHeight;
+  Result.Y := (i - fTopLine) * fPageMetrics.lineHeight + fTextMargin.Y;
 
-  //and get the justify offset for spaces
+  // get the justify offset for spaces
   spcW := fPageMetrics.justifyDeltas[i];
 
-  //get the start of the word
+  // get the start of the word
   i := fPageMetrics.startOfLineIdx[i];
   x := 0;
-  while (i < wordIdx.X) do
+  while (i < chunkPos.X) do
     with fChunkedText[i] do
     begin
       if IsBlankSpaces then
@@ -3096,21 +3208,20 @@ begin
       inc(i);
     end;
 
-  if wordIdx.X >= fChunkedText.Count then
+  if chunkPos.X >= fChunkedText.Count then
   begin
     with fPageMetrics do
       Result.X := lineWidths[High(lineWidths)];
   end else
   begin
-    chunk := fChunkedText[wordIdx.X];
-    if wordIdx.Y >= chunk.length then
+    chunk := fChunkedText[chunkPos.X];
+    if chunkPos.Y >= chunk.length then
       x := x + chunk.glyphOffsets[chunk.length -1] else
-      x := x + chunk.glyphOffsets[wordIdx.Y];
+      x := x + chunk.glyphOffsets[chunkPos.Y];
     Result.X := x +1;
   end;
 
   Result.X := Result.X + fTextMargin.X;
-  Result.Y := Result.Y + fTextMargin.Y;
 end;
 //------------------------------------------------------------------------------
 
@@ -3253,12 +3364,12 @@ begin
   begin
     if IsCorrectPosOrder(fSelStart, fSelEnd) then
     begin
-      selStartTop := WordIdxToPos(fSelStart);
-      selEndTop := WordIdxToPos(fSelEnd);
+      selStartTop := ChunkPosToPos(fSelStart);
+      selEndTop := ChunkPosToPos(fSelEnd);
     end else
     begin
-      selStartTop := WordIdxToPos(fSelEnd);
-      selEndTop := WordIdxToPos(fSelStart);
+      selStartTop := ChunkPosToPos(fSelEnd);
+      selEndTop := ChunkPosToPos(fSelStart);
     end;
 
     // it looks better if we offset the selection by a small amount
@@ -3342,7 +3453,7 @@ begin
   // FINALLY DRAW THE INSERTION POINT CURSOR
 
   i := Ceil(fPageMetrics.lineHeight * 0.1);
-  selStartTop := WordIdxToPos(fCursorChunkPos);
+  selStartTop := ChunkPosToPos(fCursorChunkPos);
   selStartBot := PointD(selStartTop.X, selStartTop.Y + fPageMetrics.lineHeight);
 
   selStartTop.Y := selStartTop.Y + i;
@@ -3357,23 +3468,6 @@ begin
     DrawLine(Image, PointD(X-4,Y), PointD(X+4,Y), fPageMetrics.lineHeight/15, clMaroon32);
 
 //  fScrollV.Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-function  TMemoCtrl.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit
-  else if propName = 'TextMargin' then
-    TextMargin := GetPointDProp(propVal, Result)
-  else Result := false;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMemoCtrl.WriteProperties;
-begin
-  inherited;
-  WritePointDProp('TextMargin', fTextMargin);
 end;
 
 //------------------------------------------------------------------------------
@@ -3404,6 +3498,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TEditCtrl.SetText(const txt: string);
+begin
+  GetUsableFont;
+  fChunkedText.SetText(txt, fUsableFont, fontColor, fColor);
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+
 procedure TEditCtrl.SetFont(font: TFontCache);
 begin
   inherited;
@@ -3420,6 +3522,7 @@ var
   endPos    : TPoint;
   txt       : UnicodeString;
   tmpCT     : TChunkedText;
+  ctrl      : TCustomCtrl;
 begin
   if not GetUsableFont or not IsValid(fCursorChunkPos) then
   begin
@@ -3483,7 +3586,11 @@ begin
           if IsCorrectPosOrder(fSelStart, fSelEnd) then
             txt := fChunkedText.GetSubText(fSelStart, fSelEnd) else
             txt := fChunkedText.GetSubText(fSelEnd, fSelStart);
-          SaveTextToClipboard(txt);
+          if SaveTextToClipboard(txt) then
+          begin
+            ctrl := RootCtrl.FindChildByClass(TStatusbarCtrl) as TCustomCtrl;
+            ctrl.Caption := 'Text copied to clipboard.';
+          end;
           key := 0;
         end else
           inherited;
@@ -3495,7 +3602,11 @@ begin
           if IsCorrectPosOrder(fSelStart, fSelEnd) then
             txt := fChunkedText.GetSubText(fSelStart, fSelEnd) else
             txt := fChunkedText.GetSubText(fSelEnd, fSelStart);
-          SaveTextToClipboard(txt);
+            if SaveTextToClipboard(txt) then
+            begin
+              ctrl := RootCtrl.FindChildByClass(TStatusbarCtrl) as TCustomCtrl;
+              ctrl.Caption := 'Text cut to clipboard.';
+            end;
           fCursorChunkPos := fChunkedText.Delete(fSelStart, fSelEnd);
           ResetSelPos;
           key := 0;
@@ -3510,11 +3621,6 @@ begin
           if txt = '' then UnicodeString(LoadUnicodeTextFromClipboard);
           if txt <> '' then
           begin
-//            if not PointsEqual(fSelStart, fSelEnd) then
-//            begin
-//              fCursorChunkPos := fChunkedText.Delete(fSelStart, fSelEnd);
-//              ResetSelPos;
-//            end;
             tmpCT := TChunkedText.Create(txt, Font, FontColor);
             try
               for i := 0 to tmpCT.Count -1 do
@@ -3522,6 +3628,9 @@ begin
             finally
               tmpCT.Free;
             end;
+
+            ctrl := RootCtrl.FindChildByClass(TStatusbarCtrl) as TCustomCtrl;
+            ctrl.Caption := 'Text pasted from clipboard.';
           end;
           key := 0;
         end else
@@ -3586,210 +3695,130 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-(* nb: InsertChunkAtCursor as a non-method would require the following params:
-  fChunkedText, fUsableFont, var fCursorChunkPos, fselStart & fselEnd *)
 procedure TEditCtrl.InsertChunkAtCursor(const chunkTxt: UnicodeString);
 
-  procedure InsertSpaceInsideText(spaces: UnicodeString);
+  function PrependText(chunk: TTextChunk): TTextChunk;
   var
-    chunk: TTextChunk;
-    text1, text2: UnicodeString;
+    i: integer;
+    newTxt: UnicodeString;
   begin
-    chunk := fChunkedText[fCursorChunkPos.X];
-    text1 := Copy(chunk.text, 1, fCursorChunkPos.Y);
-    text2 := Copy(chunk.text, fCursorChunkPos.Y +1, MaxInt);
-    fChunkedText.DeleteChunk(fCursorChunkPos.X);
-    if text2 <> '' then
-      fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkPos.X, text2);
-    chunk := fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkPos.X, spaces);
-    if text1 <> '' then
-      fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkPos.X, text1);
-    fCursorChunkPos := Types.Point(chunk.index, chunk.length);
+    newTxt := chunkTxt + chunk.Text;
+    i := chunk.index;
+    fChunkedText.DeleteChunk(i);
+    Result := fChunkedText.InsertTextChunk(fUsableFont, i, newTxt);
   end;
 
-  procedure AddAppendSpaceChunk(spaces: UnicodeString);
+  function AppendText(chunk: TTextChunk): TTextChunk;
   var
-    chunk, lastChunk: TTextChunk;
-    newSpaces: UnicodeString;
+    i: integer;
+    newTxt: UnicodeString;
   begin
-    lastChunk := fChunkedText.LastChunk;
-    if (fChunkedText.Count = 0) or
-      ((fCursorChunkPos.X = 0) and (fCursorChunkPos.Y = 0) and
-      not fChunkedText.FirstChunk.IsBlankSpaces) then
+    newTxt := chunk.Text + chunkTxt;
+    i := chunk.index;
+    fChunkedText.DeleteChunk(i);
+    Result := fChunkedText.InsertTextChunk(fUsableFont, i, newTxt);
+  end;
+
+  function InsertText(chunk: TTextChunk; out pos: TPoint): TTextChunk;
+  var
+    i               : integer;
+    insertingSpaces : Boolean;
+    txtBefore       : UnicodeString;
+    txtAfter        : UnicodeString;
+    newTxt          : UnicodeString;
+  begin
+    insertingSpaces := chunkTxt[1] = #32;
+    if chunk.IsBlankSpaces = insertingSpaces then
     begin
-      // adding spaces to the very beginning
-      chunk := fChunkedText.InsertTextChunk(fUsableFont, 0, spaces);
-      fCursorChunkPos := Types.Point(0, chunk.length);
-    end
-    else if not LastChunk.IsBlankSpaces and
-      ((fCursorChunkPos.X = fChunkedText.Count) or
-      ((fCursorChunkPos.X = fChunkedText.Count -1) and
-      (fCursorChunkPos.Y = LastChunk.length))) then
-    begin
-      // adding spaces to the very end where the last chunk is text
-      fChunkedText.InsertTextChunk(fUsableFont, fChunkedText.Count, spaces);
-      fCursorChunkPos := Types.Point(fChunkedText.Count, 0);
-    end
-    else if (fCursorChunkPos.X = fChunkedText.Count) then
-    begin
-      // adding space to the very end where the last chunk is also space
-      newSpaces := lastChunk.text + spaces;
-      fChunkedText.DeleteChunk(lastChunk.index);
-      fChunkedText.InsertTextChunk(fUsableFont, fChunkedText.Count, newSpaces);
-      fCursorChunkPos := Types.Point(fChunkedText.Count, 0);
+      newTxt := chunk.Text;
+      System.Insert(chunkTxt, newTxt, fCursorChunkPos.Y +1);
+      i := chunk.index;
+      fChunkedText.DeleteChunk(i);
+      Result := fChunkedText.InsertTextChunk(fUsableFont, i, newTxt);
+      pos := Types.Point(i, fCursorChunkPos.Y + Length(chunkTxt));
     end else
     begin
-      // adding spaces somewhere that's adjacent to or inside a space chunk
-      chunk := fChunkedText[fCursorChunkPos.X];
-      if chunk.IsBlankSpaces then
-      begin
-        // merge inside the current space chunk
-        newSpaces := chunk.text + spaces;
-        fChunkedText.DeleteChunk(chunk.index);
-        fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkPos.X, newSpaces);
-        Inc(fCursorChunkPos.Y, Length(spaces));
-      end
-      else if fCursorChunkPos.Y = 0 then
-      begin
-        // merge with the preceding space chunk
-        chunk := chunk.Prev;
-        Dec(fCursorChunkPos.X);
-        newSpaces := chunk.text + spaces;
-        fChunkedText.DeleteChunk(chunk.index);
-        fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkPos.X, newSpaces);
-        fCursorChunkPos := Types.Point(fCursorChunkPos.X +1, 0);
-      end else
-      begin
-        // merge with the trailing space chunk
-        chunk := chunk.Next;
-        Inc(fCursorChunkPos.X);
-        newSpaces := spaces + chunk.text;
-        fChunkedText.DeleteChunk(chunk.index);
-        fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkPos.X, newSpaces);
-        fCursorChunkPos := Types.Point(fCursorChunkPos.X, Length(spaces));
-      end;
-    end;
-  end;
-
-  procedure InsertTextInsideSpaces(text: UnicodeString);
-  var
-    chunk: TTextChunk;
-    space1, space2: UnicodeString;
-  begin
-    chunk := fChunkedText[fCursorChunkPos.X];
-    space1 := Copy(chunk.text, 1, fCursorChunkPos.Y);
-    space2 := Copy(chunk.text, fCursorChunkPos.Y +1, MaxInt);
-    fChunkedText.DeleteChunk(fCursorChunkPos.X);
-    fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkPos.X, space2);
-    fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkPos.X, text);
-    chunk := fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkPos.X, space1);
-    fCursorChunkPos := Types.Point(chunk.index, chunk.length);
-  end;
-
-  // AddAppendTextChunk - add text inside other text or before or after spaces
-  procedure AddAppendTextChunk(text: UnicodeString);
-  var
-    chunk, lastChunk: TTextChunk;
-    newText: UnicodeString;
-  begin
-    lastChunk := fChunkedText.LastChunk;
-    if (fChunkedText.Count = 0) or
-      ((fCursorChunkPos.X = 0) and
-      not fChunkedText.FirstChunk.IsText) then
-    begin
-      // adding text to the very beginning
-      fChunkedText.InsertTextChunk(fUsableFont, 0, text);
-      fCursorChunkPos := Types.Point(0,Length(text));
-    end
-    else if not LastChunk.IsText and
-      ((fCursorChunkPos.X = fChunkedText.Count) or
-      ((fCursorChunkPos.X = LastChunk.index) and
-      (fCursorChunkPos.Y = LastChunk.length))) then
-    begin
-      // adding text to the very end where the last chunk is spaces
-      fChunkedText.InsertTextChunk(fUsableFont, fChunkedText.Count, text);
-      fCursorChunkPos := Types.Point(fChunkedText.Count, 0);
-    end
-    else if (fCursorChunkPos.X = fChunkedText.Count) then
-    begin
-      // adding text to the very end where the last chunk is also text
-      newText := lastChunk.text + text;
-      fChunkedText.DeleteChunk(lastChunk.index);
-      fChunkedText.InsertTextChunk(fUsableFont, fChunkedText.Count, newText);
-      fCursorChunkPos := Types.Point(fChunkedText.Count, 0);
-    end else
-    begin
-      // adding text somewhere that's adjacent to or inside a text chunk
-      chunk := fChunkedText[fCursorChunkPos.X];
-      if chunk.IsText then
-      begin
-        // merge inside the current text chunk
-        newText := chunk.text;
-        Inc(fCursorChunkPos.Y);
-        Insert(text, newText, fCursorChunkPos.Y);
-        fChunkedText.DeleteChunk(chunk.index);
-        fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkPos.X, newText);
-        Inc(fCursorChunkPos.Y, Length(text));
-      end
-      else if fCursorChunkPos.Y = 0 then
-      begin
-        // merge with the preceding text chunk
-        chunk := chunk.Prev;
-        Dec(fCursorChunkPos.X);
-        newText := chunk.text + text;
-        fChunkedText.DeleteChunk(chunk.index);
-        chunk :=
-          fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkPos.X, newText);
-        fCursorChunkPos.Y := chunk.length;
-      end else
-      begin
-        // merge with the trailing text chunk
-        chunk := chunk.Next;
-        Inc(fCursorChunkPos.X);
-        fCursorChunkPos.Y := Length(text);
-        newText := text + chunk.text;
-        fChunkedText.DeleteChunk(chunk.index);
-        fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkPos.X, newText);
-      end;
+      newTxt := chunk.Text;
+      txtBefore := System.Copy(newTxt, 1, fCursorChunkPos.Y);
+      txtAfter := System.Copy(newTxt, fCursorChunkPos.Y +1, MaxInt);
+      i := chunk.index;
+      fChunkedText.DeleteChunk(i);
+      fChunkedText.InsertTextChunk(fUsableFont, i, txtAfter);
+      Result := fChunkedText.InsertTextChunk(fUsableFont, i, chunkTxt);
+      fChunkedText.InsertTextChunk(fUsableFont, i, txtBefore);
+      pos := Types.Point(Result.index +1, 0);
     end;
   end;
 
 var
   chunk: TTextChunk;
+  insertingSpaces: Boolean;
 begin
   if (chunkTxt = '') or (chunkTxt[1] < #32) then Exit;
 
-  // first delete a selection range
+  // delete any text selections
   if not PointsEqual(fSelStart, fSelEnd) then
     fCursorChunkPos := fChunkedText.Delete(fSelStart, fSelEnd);
 
-  if chunkTxt[1] = #32 then
+  // 'normalize' fCursorChunkPos.Y so it's never at the end of a chunk
+  if (fCursorChunkPos.Y > 0) and
+    (fCursorChunkPos.X < fChunkedText.Count) then
   begin
-    if (fCursorChunkPos.X = fChunkedText.Count) then
-      AddAppendSpaceChunk(chunkTxt)
-    else
+    chunk := fChunkedText[fCursorChunkPos.X];
+    if fCursorChunkPos.Y = chunk.length then
     begin
-      chunk := fChunkedText[fCursorChunkPos.X];
-      if not chunk.IsBlankSpaces and (fCursorChunkPos.Y > 0) and
-        (fCursorChunkPos.Y < chunk.length) then
-          InsertSpaceInsideText(chunkTxt) else
-          AddAppendSpaceChunk(chunkTxt);
+      Inc(fCursorChunkPos.X);
+      fCursorChunkPos.Y := 0;
     end;
-    ResetSelPos;
+  end;
+
+  insertingSpaces := chunkTxt[1] = #32;
+  if (fCursorChunkPos.X = 0) and (fCursorChunkPos.Y = 0) then
+  begin
+    chunk := fChunkedText.FirstChunk;
+    if not Assigned(chunk) or (insertingSpaces = chunk.IsText) then
+    begin
+      fChunkedText.InsertTextChunk(fUsableFont, 0, chunkTxt);
+      fCursorChunkPos := Types.Point(1, 0);
+    end else
+    begin
+      PrependText(chunk);
+      fCursorChunkPos := Types.Point(0, Length(chunkTxt));
+    end;
+  end
+  else if (fCursorChunkPos.X = fChunkedText.Count) then
+  begin
+    chunk := fChunkedText.LastChunk;
+    if not Assigned(chunk) or (insertingSpaces = chunk.IsText) then
+    begin
+      fChunkedText.InsertTextChunk(fUsableFont, fCursorChunkPos.X, chunkTxt);
+      inc(fCursorChunkPos.X);
+    end else
+    begin
+      chunk := AppendText(chunk);
+      fCursorChunkPos := Types.Point(chunk.index +1, 0);
+    end;
+  end
+  else if (fCursorChunkPos.Y = 0) then
+  begin
+    chunk := fChunkedText[fCursorChunkPos.X];
+    if (insertingSpaces = chunk.IsBlankSpaces) then
+    begin
+      chunk := PrependText(chunk);
+      fCursorChunkPos := Types.Point(chunk.index, Length(chunkTxt));
+    end else
+    begin
+      chunk := chunk.Prev;
+      chunk := AppendText(chunk);
+      fCursorChunkPos := Types.Point(chunk.index +1, 0);
+    end
   end else
   begin
-    if (fCursorChunkPos.X = fChunkedText.Count) then
-      AddAppendTextChunk(chunkTxt)
-    else
-    begin
-      chunk := fChunkedText[fCursorChunkPos.X];
-      if not chunk.IsText and (fCursorChunkPos.Y > 0) and
-        (fCursorChunkPos.Y < chunk.length) then
-          InsertTextInsideSpaces(chunkTxt) else
-          AddAppendTextChunk(chunkTxt);
-    end;
-    ResetSelPos;
+    // inserting chunkTxt somewhere inside another chunk
+    chunk := fChunkedText[fCursorChunkPos.X];
+    InsertText(chunk, fCursorChunkPos);
   end;
+  ResetSelPos;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -3858,7 +3887,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TEditCtrl.SetText(const text: string);
+procedure TEditCtrl.SetCaption(const text: string);
 begin
   inherited;
   if not GetUsableFont then Exit;
@@ -4039,23 +4068,6 @@ begin
 
   fPageMetrics := fChunkedText.DrawText(Image, Rect(textRecD), taLeft, tvaMiddle);
 end;
-//------------------------------------------------------------------------------
-
-function  TEditCtrl.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit
-  else if propName = 'TextMargin' then
-    TextMargin := GetPointDProp(propVal, Result)
-  else Result := false;
-end;
-//------------------------------------------------------------------------------
-
-procedure TEditCtrl.WriteProperties;
-begin
-  inherited;
-  WritePointDProp('TextMargin', fTextMargin);
-end;
 
 //------------------------------------------------------------------------------
 // TButtonCtrl
@@ -4076,7 +4088,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TButtonCtrl.SetText(const text: string);
+procedure TButtonCtrl.SetCaption(const text: string);
 begin
   inherited;
   fShortcut := GetShortcutFromCaption(text);
@@ -4162,7 +4174,7 @@ begin
   rec := InnerRect;
   TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
 
-  if GetUsableFont then txt := fText else txt := '';
+  if GetUsableFont then txt := fCaption else txt := '';
   Image.Clear;
   Img32.Vector.InflateRect(rec, -hbh, -hbh);
   p := Rectangle(rec);
@@ -4175,22 +4187,6 @@ begin
   end else
     DrawBtnInternal(Image, p, txt, fUsableFont,
       bh, fPadding, fPressed, fEnabled, Color);
-end;
-//------------------------------------------------------------------------------
-
-function TButtonCtrl.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit
-  else if propName = 'Padding' then
-    Padding := GetDoubleProp(propVal, Result);
-end;
-//------------------------------------------------------------------------------
-
-procedure TButtonCtrl.WriteProperties;
-begin
-  inherited;
-  WriteDoubleProp('Padding', Padding);
 end;
 
 //------------------------------------------------------------------------------
@@ -4213,7 +4209,7 @@ begin
   p := GetRoundedRectPath(rec);
 
 
-  if GetUsableFont then txt := fText else txt := '';
+  if GetUsableFont then txt := fCaption else txt := '';
   Image.Clear;
   Img32.Vector.InflateRect(rec, -hbh, -hbh);
   if HasFocus then
@@ -4254,7 +4250,7 @@ begin
   image.Clear;
   InflateRect(rec, -hbh, -hbh);
   ellip := Ellipse(rec);
-  if GetUsableFont then txt := fText else txt := '';
+  if GetUsableFont then txt := fCaption else txt := '';
   if HasFocus then
   begin
     DrawShadow(Image, ellip,
@@ -4291,29 +4287,6 @@ destructor TImageBtnCtrl.Destroy;
 begin
   SetImgList(nil);
   inherited;
-end;
-//------------------------------------------------------------------------------
-
-function TImageBtnCtrl.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit
-  else if propName = 'TextPosition' then
-    TextPosition := TTextPosition(GetIntProp(propVal, Result))
-  else if propName = 'ImageListIdx' then
-    ImageListIdx := GetIntProp(propVal, Result)
-  else if propName = '?ImageList' then
-    ImageList := StorageManager.GetExternalProp(propVal,
-      Result) as TSvgImageList32;
-end;
-//------------------------------------------------------------------------------
-
-procedure TImageBtnCtrl.WriteProperties;
-begin
-  inherited;
-  WriteIntProp('TextPosition', Ord(TextPosition));
-  WriteIntProp('ImageListIdx', ImageListIdx);
-  WriteExternalProp('ImageList', ImageList);
 end;
 //------------------------------------------------------------------------------
 
@@ -4378,7 +4351,7 @@ begin
             InflateRect(rec, -pad, -pad);
             TranslateRect(rec, pDelta, pDelta);
           end;
-          DrawText(Image, rec, fText, fUsableFont, fFontColor, taLeft, tvaMiddle);
+          DrawText(Image, rec, fCaption, fUsableFont, fFontColor, taLeft, tvaMiddle);
         end;
       tpTop:
         begin
@@ -4396,7 +4369,7 @@ begin
             InflateRect(rec, -pad, -pad);
             TranslateRect(rec, pDelta, pDelta);
           end;
-          DrawText(Image, rec, fText, fUsableFont, fFontColor, taCenter, tvaTop);
+          DrawText(Image, rec, fCaption, fUsableFont, fFontColor, taCenter, tvaTop);
         end;
       tpRight:
         begin
@@ -4414,7 +4387,7 @@ begin
             InflateRect(rec, -pad -bh, -pad -bh);
             TranslateRect(rec, pDelta, pDelta);
           end;
-          DrawText(Image, rec, fText, fUsableFont, fFontColor, taRight, tvaMiddle);
+          DrawText(Image, rec, fCaption, fUsableFont, fFontColor, taRight, tvaMiddle);
         end;
       tpBottom:
         begin
@@ -4432,7 +4405,7 @@ begin
             InflateRect(rec, -pad, -pad);
             TranslateRect(rec, pDelta, pDelta);
           end;
-          DrawText(Image, rec, fText, fUsableFont, fFontColor, taCenter, tvaBottom);
+          DrawText(Image, rec, fCaption, fUsableFont, fFontColor, taCenter, tvaBottom);
         end;
     end;
   finally
@@ -4475,6 +4448,7 @@ begin
   fTextPos    := tphRight;
   fAutoState  := true;
   Color       := clNone32;
+  fTriState   := tsUnknown;
 end;
 //------------------------------------------------------------------------------
 
@@ -4491,10 +4465,10 @@ begin
   if (Key = VK_SPACE) and CanFocus then
   begin
     Key := 0;
-    case TriState of
-      tsUnknown : TriState := tsNo;
-      tsYes     : TriState := tsNo;
-      tsNo      : TriState := tsYes;
+    case State of
+      tsUnknown : State := tsNo;
+      tsYes     : State := tsNo;
+      tsNo      : State := tsYes;
     end;
   end
   else inherited;
@@ -4519,8 +4493,8 @@ begin
   if fAutoState then
   begin
     if fTriState = tsNo then
-      TriState := tsYes else
-      TriState := tsNo;
+      State := tsYes else
+      State := tsNo;
     Invalidate;
   end;
   inherited;
@@ -4539,7 +4513,7 @@ begin
   image.Clear(Color);
   if not GetUsableFont then Exit;
 
-  caption := fText;
+  caption := fCaption;
   i := Pos('&', caption);
   if i > 0 then Delete(caption, i, 1);
 
@@ -4585,7 +4559,7 @@ begin
     rec.Right := rec.Right - j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
-    pp := fUsableFont.GetTextOutline(rec, fText, taRight, tvaMiddle);
+    pp := fUsableFont.GetTextOutline(rec, fCaption, taRight, tvaMiddle);
     dx := fUsableFont.LineHeight/24;
     pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
@@ -4600,30 +4574,6 @@ begin
   if value = fTextPos then Exit;
   fTextPos := value;
   Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-function  TCheckboxCtrl.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit
-  else if propName = 'TextPosition' then
-    TextPosition := TTextPositionH(GetIntProp(propVal, Result))
-  else if propName = 'TriState' then
-    TriState := TTriState(GetIntProp(propVal, Result))
-  else if propName = 'PreferCross' then
-    PreferCross := GetBoolProp(propVal, Result)
-  else Result := false;
-end;
-//------------------------------------------------------------------------------
-
-procedure TCheckboxCtrl.WriteProperties;
-begin
-  inherited;
-  WriteIntProp('TextPosition', Ord(TextPosition));
-  WriteIntProp('TriState', Ord(TriState));
-  if PreferCross then
-    WriteBoolProp('PreferCross', PreferCross);
 end;
 
 //------------------------------------------------------------------------------
@@ -4665,7 +4615,7 @@ begin
     rec.Left := rec.Left + j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
-    pp := fUsableFont.GetTextOutline(rec, fText, taLeft, tvaMiddle);
+    pp := fUsableFont.GetTextOutline(rec, fCaption, taLeft, tvaMiddle);
     dx := fUsableFont.LineHeight/24;
     pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
@@ -4682,7 +4632,7 @@ begin
     rec.Right := rec.Right - j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
-    pp := fUsableFont.GetTextOutline(rec, fText, taRight, tvaMiddle);
+    pp := fUsableFont.GetTextOutline(rec, fCaption, taRight, tvaMiddle);
     dx := fUsableFont.LineHeight/24;
     pp := TranslatePath(pp, -dx, -dx);
     DrawPolygon(Image, pp, frNonZero, clWhite32);
@@ -4821,8 +4771,8 @@ begin
     pagePnl := Child[index*2 +1] as TPagePnlCtrl;
     pagePnl.Visible := true;
 
-    if Assigned(fRootCtrl.fFocusedCtrl) then
-      fRootCtrl.fFocusedCtrl.KillFocus;
+    if Assigned(RootCtrl.FocusedCtrl) then
+      RootCtrl.FocusedCtrl.KillFocus;
 
     for i := 0 to pagePnl.ChildCount -1 do
       if (pagePnl[i] is TCustomCtrl) and
@@ -4859,7 +4809,7 @@ begin
   if (len = 0) or not GetUsableFont then Exit;
   SetLength(tabs, len);
   for i := 0 to len -1 do
-    tabs[i] := TCustomCtrl(Child[i*2]).text;
+    tabs[i] := TCustomCtrl(Child[i*2]).Caption;
 
   rec := InnerRect;
   om := OuterMargin;
@@ -4911,7 +4861,7 @@ begin
   len := ChildCount div 2;
   SetLength(tabs, len);
   for i := 0 to len -1 do
-    tabs[i] := TCustomCtrl(Child[i*2]).text;
+    tabs[i] := TCustomCtrl(Child[i*2]).Caption;
   if fTabHeight = 0 then
     h := Ceil(fUsableFont.LineHeight * 1.33) else
     h := fTabHeight;
@@ -4943,14 +4893,9 @@ begin
   if (om > 0) then
     TranslateRect(rec, om, om);
   Img32.Vector.InflateRect(rec, -bhi, -bhi);
-  //rec.Top := fMetrics.bounds.Bottom + om;
   if Assigned(fOnPaint) then fOnPaint(Self);
   DrawTabs;
 
-//  if ShadowSize > 0 then
-//    DrawShadowRect(Image,
-//      Rect(om+bhi, fMetrics.bounds.Bottom,
-//      rec.Width+om+bhi*2, rec.Height+om+bhi), ShadowSize);
   UpdateHitTestMask;
 end;
 //------------------------------------------------------------------------------
@@ -4972,7 +4917,7 @@ begin
   for i := 0 to len -1 do
   begin
     with TPageTabCtrl(AddChild(TPageTabCtrl, '')) do
-      Text := captions[i];
+      Caption := captions[i];
     with AddChild(TPagePnlCtrl, '') as TPagePnlCtrl do
     begin
       Shortcut := GetShortcutFromCaption(captions[i]);
@@ -5019,22 +4964,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TPageCtrl.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit
-  else if propName = 'ActiveIndex' then
-    ActiveIndex := GetIntProp(propVal, Result)
-  else if propName = 'ShadowSize' then
-    ShadowSize := GetDoubleProp(propVal, Result)
-  else if propName = 'TabWidth' then
-    TabWidth := GetDoubleProp(propVal, Result)
-  else if propName = 'TabHeight' then
-    TabHeight := GetDoubleProp(propVal, Result)
-  else Result := false;
-end;
-//------------------------------------------------------------------------------
-
 procedure TPageCtrl.EndRead;
 var
   i: integer;
@@ -5049,16 +4978,7 @@ begin
     end;
   if (ChildCount > 1) and (ActiveIndex < 0) then
     ActiveIndex := 0;
-end;
-//------------------------------------------------------------------------------
-
-procedure TPageCtrl.WriteProperties;
-begin
-  inherited;
-  WriteIntProp('ActiveIndex', ActiveIndex);
-  WriteDoubleProp('ShadowSize', fShadowSize);
-  WriteDoubleProp('TabWidth', TabWidth);
-  WriteDoubleProp('TabHeight', TabHeight);
+  ResizeTabs;
 end;
 
 //------------------------------------------------------------------------------
@@ -5093,8 +5013,8 @@ begin
   begin
     if HasShiftKey(shift) then
     begin
-      if Assigned(fRootCtrl.fFocusedCtrl) then
-        idx := fRootCtrl.fFocusedCtrl.Index else
+      if Assigned(RootCtrl.FocusedCtrl) then
+        idx := RootCtrl.FocusedCtrl.Index else
         idx := 0;
 
       for i := idx-1 downto 0 do
@@ -5117,8 +5037,8 @@ begin
             end;
     end else
     begin
-      if Assigned(fRootCtrl.fFocusedCtrl) then
-        idx := fRootCtrl.fFocusedCtrl.Index else
+      if Assigned(RootCtrl.FocusedCtrl) then
+        idx := RootCtrl.FocusedCtrl.Index else
         idx := ChildCount -1;
 
       for i := idx +1 to ChildCount -1 do
@@ -5245,35 +5165,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function  TProgressCtrl.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit
-  else if propName = 'Max' then
-    Max := GetIntProp(propVal, Result)
-  else if propName = 'Position' then
-    Position := GetDoubleProp(propVal, Result)
-  else if propName = 'Orientation' then
-    Orientation := TScrollOrientation(GetIntProp(propVal, Result))
-  else if propName = 'StartColor' then
-    StartColor := GetColorProp(propVal, Result)
-  else if propName = 'EndColor' then
-    EndColor := GetColorProp(propVal, Result)
-  else Result := false;
-end;
-//------------------------------------------------------------------------------
-
-procedure TProgressCtrl.WriteProperties;
-begin
-  inherited;
-  WriteIntProp('Max', fMax);
-  WriteDoubleProp('Position', fPosition);
-  WriteIntProp('Orientation', Ord(fOrientation));
-  WriteColorProp('StartColor', fStartColor);
-  WriteColorProp('EndColor', fEndColor);
-end;
-//------------------------------------------------------------------------------
-
 procedure TProgressCtrl.SetInnerBounds(const newBounds: TRectD);
 var
   rec : TRectD;
@@ -5326,7 +5217,7 @@ begin
     fBtnSize  := Round(fSize*2);
   end;
   fMax          := 100;
-  fScrollStep   := 5;
+  fScrollStep   := DPIAware(5);
 end;
 //------------------------------------------------------------------------------
 
@@ -5599,40 +5490,6 @@ begin
   SetBtnSize;
   Invalidate;
 end;
-//------------------------------------------------------------------------------
-
-function TSliderCtrl.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit
-  else if propName = 'Min' then
-    Min := GetDoubleProp(propVal, Result)
-  else if propName = 'Max' then
-    Max := GetDoubleProp(propVal, Result)
-  else if propName = 'Position' then
-    Position := GetDoubleProp(propVal, Result)
-  else if propName = 'Orientation' then
-    Orientation := TScrollOrientation(GetIntProp(propVal, Result))
-  else if propName = 'Step' then
-    Step := GetIntProp(propVal, Result)
-  else if propName = '?OnSlider' then
-    fOnSlider := StorageManager.GetEventProp(propVal, Result);
-end;
-//------------------------------------------------------------------------------
-
-procedure TSliderCtrl.WriteProperties;
-begin
-  inherited;
-  //nb: write Min and Max before Position so they'll also be loaded first.
-  //This way the Position property won't be restricted to the default range
-  WriteDoubleProp('Min', fMin);
-  WriteDoubleProp('Max', fMax);
-  WriteIntProp('Orientation', Ord(Orientation));
-  WriteDoubleProp('Position', fPosition);
-  WriteIntProp('Step', Step);
-  if Assigned(fOnSlider) then
-    WriteEventProp('OnSlider', fOnSlider);
-end;
 
 //------------------------------------------------------------------------------
 // TScrollCtrl
@@ -5864,7 +5721,9 @@ procedure TScrollCtrl.CalcScale;
 var
   maxDelta, maxTravel, k, bh: double;
 begin
-  if (StorageState = ssLoading) or (fMax = 0) or not Assigned(fTargetCtrl) or
+  if (StorageState = ssLoading) or
+    (fMax = 0) or
+    not Assigned(fTargetCtrl) or
     fTargetCtrl.Image.IsEmpty then Exit;
 
   bh := fBevelHeight;
@@ -6023,38 +5882,6 @@ begin
     DrawEdge(Image, rec, clWhite32, clBlack32, 1);
   end;
 end;
-//------------------------------------------------------------------------------
-
-function TScrollCtrl.ReadProperty(const propName, propVal: string): Boolean;
-begin
-  Result := inherited ReadProperty(propName, propVal);
-  if Result then Exit
-  else if propName = 'Min' then
-    Min := GetDoubleProp(propVal, Result)
-  else if propName = 'Max' then
-    Max := GetDoubleProp(propVal, Result)
-  else if propName = 'Position' then
-    Position := GetDoubleProp(propVal, Result)
-  else if propName = 'Size' then
-    Size := GetDoubleProp(propVal, Result)
-  else if propName = 'Step' then
-    Step := GetIntProp(propVal, Result)
-  else if propName = 'AutoHide' then
-    AutoHide := GetBoolProp(propVal, Result)
-  else Result := false;
-end;
-//------------------------------------------------------------------------------
-
-procedure TScrollCtrl.WriteProperties;
-begin
-  inherited;
-  WriteDoubleProp('Min', fMin);
-  WriteDoubleProp('Max', fMax);
-  WriteDoubleProp('Position', fPosition);
-  WriteDoubleProp('Size', fSize);
-  WriteIntProp('Step', Step);
-  WriteBoolProp('AutoHide', AutoHide);
-end;
 
 //------------------------------------------------------------------------------
 // TEventPropertyHandler
@@ -6069,12 +5896,9 @@ end;
 //------------------------------------------------------------------------------
 
 destructor TEventPropertyHandler.Destroy;
-var
-  i: integer;
 begin
   if fAutoFree then
-    for i := 0 to High(fObjectProps) do
-      FreeAndNil(TObject(fObjectProps[i].address));
+    DeRegisterProperties;
   Inherited;
 end;
 //------------------------------------------------------------------------------
@@ -6107,7 +5931,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TEventPropertyHandler.RefreshPropertyEvents;
+procedure TEventPropertyHandler.RegisterProperties;
 var
   context: TRttiContext;
   aType: TRttiType;
@@ -6126,6 +5950,16 @@ begin
     inc(j);
   end;
   SetLength(fObjectProps, j);
+end;
+//------------------------------------------------------------------------------
+
+procedure TEventPropertyHandler.DeRegisterProperties;
+var
+  i: integer;
+begin
+  for i := 0 to High(fObjectProps) do
+    FreeAndNil(TObject(fObjectProps[i].address));
+  fObjectProps := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -6191,7 +6025,7 @@ var
   i: integer;
 begin
   for i := 0 to High(fObjectProps) do
-    if prop = fObjectProps[i].address then
+    if Pointer(prop) = fObjectProps[i].address then
     begin
       Result := fObjectProps[i].name;
       Exit;
@@ -6207,7 +6041,15 @@ constructor TCtrlStorageManager.Create(parent: TStorage; const name: string);
 begin
   inherited;
   fShortcutList := TList.Create;
-  fFocusLineW := DPIAware(1);
+  fFocusLineW := DPIAware(1.25);
+  fLayeredImg := TLayeredImage32.Create(self, 'TLayeredImage32');
+  fLayeredImg.backgroundColor := clBtnFace32;
+  fRootCtrl   := fLayeredImg.InsertChild(0 , TRootCtrl) as TRootCtrl;
+  fRootCtrl.CanFocus := false;
+{$IFDEF MSWINDOWS}
+  DesignResolution := GetScreenResolution;
+{$ENDIF}
+
 end;
 //------------------------------------------------------------------------------
 
@@ -6220,28 +6062,22 @@ end;
 
 function TCtrlStorageManager.InsertChild(index: integer; storeClass: TStorageClass): TStorage;
 begin
-  Result := inherited InsertChild(index, storeClass);
-  if storeClass.InheritsFrom(TLayeredImage32) then
-    fLayeredImg := Result as TLayeredImage32
-  else if storeClass.InheritsFrom(TCustomCtrl) and
-    not assigned(fRootCtrl) then
-      fRootCtrl := Result as TCustomCtrl;
+  if storeClass.InheritsFrom(TEventPropertyHandler) then
+  begin
+    if (Child[0] is TEventPropertyHandler) then
+      Result := Child[0] else
+      Result := inherited InsertChild(0, storeClass);
+    fEventHandler := TEventPropertyHandler(Result);
+  end else
+    Raise Exception.Create('TCtrlStorageManager error');
 end;
 //------------------------------------------------------------------------------
 
-function TCtrlStorageManager.GetEventName(event: TNotifyEvent): string;
+procedure TCtrlStorageManager.SetDesignScale(value: double);
 begin
-  if Assigned(fEventHandler) then
-    Result := fEventHandler.GetEventName(event) else
-    Result := '';
-end;
-//------------------------------------------------------------------------------
-
-function TCtrlStorageManager.GetExternPropName(prop: TObject): string;
-begin
-  if Assigned(fEventHandler) then
-    Result := fEventHandler.GetPropName(prop) else
-    Result := '';
+  if value <= 0 then Exit;
+  fFocusLineW := fFocusLineW * value/DesignScale;
+  inherited;
 end;
 //------------------------------------------------------------------------------
 
@@ -6254,65 +6090,362 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TCtrlStorageManager.WriteCustomProperties;
+function SkipBlanks(var c: PUTF8Char; endC: PUTF8Char): Boolean;
 begin
-  inherited;
-  if Assigned(fEventHandler) then
-    WriteStrProp('EventAndPropertyHandler', fEventHandler.ClassName);
+  while (c < endC) and (c^ <= space) do inc(c);
+  Result := (c < endC);
 end;
 //------------------------------------------------------------------------------
 
-function TCtrlStorageManager.ReadInfoProperty(const propName, propVal: string): Boolean;
+function MakeUTF8String(var c: PUTF8Char; endC: PUTF8Char): UTF8String;
+var
+  len: integer;
 begin
-  Result := inherited ReadInfoProperty(propName, propVal);
-  if Result then Exit;
-  if (propName = 'EventAndPropertyHandler') then
+  len := endC - c;
+  SetLength(Result, len);
+  if len = 0 then Exit;
+  Move(c^, Result[1], len * SizeOf(UTF8Char));
+  c := endC;
+end;
+//------------------------------------------------------------------------------
+
+function CheckChar(c: PUTF8Char; endC: PUTF8Char;
+  offset: integer; matchChr: Utf8Char): Boolean;
+begin
+  inc(c, offset);
+  Result := (c < endC) and (c^ = matchChr);
+end;
+//------------------------------------------------------------------------------
+
+function GetWord(var c: PUTF8Char; endC: PUTF8Char; out word: Utf8String): Boolean;
+var
+  len: integer;
+  c2: PUTF8Char;
+begin
+  c2 := c;
+  inc(c);
+  while (c < endC) and (c^ > space) do inc(c);
+  len := c-c2;
+  SetLength(word, len);
+  Result := len > 0;
+  if Result then Move(c2^, word[1], len * SizeOf(UTF8Char));
+end;
+//------------------------------------------------------------------------------
+
+function GetName(var c: PUTF8Char; endC: PUTF8Char): string;
+var
+  c2: PUTF8Char;
+begin
+  c2 := c;
+  if (c < endC) and
+    (((c^ >= 'A') and (c^ <= 'Z')) or
+    ((c^ >= 'a') and (c^ <= 'z'))) then
   begin
-    Result := true;
-    //now make sure it's the right event handler!
-    if Assigned(fEventHandler) and
-      not SameText(fEventHandler.ClassName, propVal) then
-        fEventHandler := nil;
+    inc(c);
+    while (c < endC) and
+      (((c^ >= 'A') and (c^ <= 'Z')) or
+      ((c^ >= 'a') and (c^ <= 'z')) or
+      ((c^ >= '0') and (c^ <= '9'))) do inc(c);
+    Result := string(MakeUTF8String(c2, c));
+  end else
+    Result := '';
+end;
+//------------------------------------------------------------------------------
+
+//function GetAttribName(var c: PUTF8Char; endC: PUTF8Char): Utf8String;
+//begin
+//  Result := '';
+//  if not SkipBlanks(c, endC) then Exit;
+//  Result := GetName(c, endC);
+//end;
+//------------------------------------------------------------------------------
+
+function GetNextChar(var c: PUTF8Char; endC: PUTF8Char): UTF8Char;
+begin
+  Result := #0;
+  if not SkipBlanks(c, endC) then Exit;
+  Result := c^;
+  inc(c);
+end;
+//------------------------------------------------------------------------------
+
+function GetQuote(var c: PUTF8Char; endC: PUTF8Char): UTF8Char;
+begin
+  if SkipBlanks(c, endC) and (c^ in [squote, dquote]) then
+  begin
+    Result := c^;
+    inc(c);
+  end else
+    Result := #0;
+end;
+//------------------------------------------------------------------------------
+
+function GetAttribValue(var c: PUTF8Char; endC: PUTF8Char): Utf8String;
+var
+  quoteChar : UTF8Char;
+  c2: PUTF8Char;
+begin
+  Result := '';
+  if GetNextChar(c, endC) <> '=' then Exit;
+  quoteChar := GetQuote(c, endC);
+  if quoteChar = #0 then Exit;
+  c2 := c;
+  while (c < endC) and (c^ <> quoteChar) do inc(c);
+  Result := MakeUTF8String(c2, c);
+  inc(c); //skip end quote
+end;
+//------------------------------------------------------------------------------
+
+function IsCommentStart(c, endC: PUTF8Char): Boolean;
+begin
+  Result := False;
+  if (c^ <> '<') or (endC - c < 7) then Exit;
+  inc(c);
+  if (c^ <> '!') then Exit;
+  inc(c);
+  if (c^ <> '-') then Exit;
+  inc(c);
+  if (c^ <> '-') then Exit;
+end;
+//------------------------------------------------------------------------------
+
+function SkipComment(var c: PUTF8Char; endC: PUTF8Char): Boolean;
+var
+  str: Utf8String;
+begin
+  inc(c, 4);
+  while SkipBlanks(c, endC) and
+    GetWord(c, endC, str) and (str <> '-->') do;
+  Result := (str = '-->');
+end;
+//------------------------------------------------------------------------------
+
+function CheckSkipComment(var xmlCurr, xmlEnd: PUTF8Char): Boolean;
+begin
+  Result := IsCommentStart(xmlCurr, xmlEnd);
+  if not Result then Exit;
+  if not SkipComment(xmlCurr, xmlEnd) then xmlCurr := xmlEnd;
+  SkipBlanks(xmlCurr, xmlEnd);
+end;
+//------------------------------------------------------------------------------
+
+procedure TCtrlStorageManager.AddDelayedLink(const delayedLink: TLoadRec);
+var
+  len: integer;
+begin
+  len := Length(fDelayedLinks);
+  SetLength(fDelayedLinks, len +1);
+  Move(delayedLink.loadObj, fDelayedLinks[len].loadObj, SizeOf(TLoadRec));
+end;
+//------------------------------------------------------------------------------
+
+
+type
+  TGetProtectedStorage = class(TStorage);
+
+procedure TCtrlStorageManager.LoadStoredObjects(const utf8: UTF8String);
+
+  function ParseStorageElement(stgObj: TStorage;
+    var xmlCurr: PUTF8Char; xmlEnd: PUTF8Char): Boolean;
+  var
+    i         : integer;
+    attName   : string;
+    attVal    : string;
+    clssName  : string;
+    stgClass  : TStorageClass;
+    child     : TStorage;
+    target    : TStorage;
+  begin
+    Result := False; // assume error
+    stgObj.StorageState := ssLoading;
+    try
+      // get ATTRIBUTES
+      while SkipBlanks(xmlCurr, xmlEnd) do
+      begin
+        if CheckSkipComment(xmlCurr, xmlEnd) then Continue;
+        if (xmlCurr^ < 'A') then Break;
+        attName := string(GetName(xmlCurr, xmlEnd));
+        if (attName = '') then Break;
+        attVal := string(GetAttribValue(xmlCurr, xmlEnd));
+        if Assigned(stgObj) then
+          TGetProtectedStorage(stgObj).ReadProperty(attName, attVal);
+      end;
+      if (xmlCurr^ <> '>') then Exit; // error
+      inc(xmlCurr);
+
+      // get obj CONTENT, either a child element or the element's closure
+      while (xmlCurr <= xmlEnd) do
+      begin
+        if not SkipBlanks(xmlCurr, xmlEnd) or (xmlCurr^ <> '<') then Exit;
+        if CheckSkipComment(xmlCurr, xmlEnd) then Continue;
+        inc(xmlCurr); // '<'
+
+        if (xmlCurr^ = '/') then // element closure
+        begin
+          inc(xmlCurr);
+          SkipBlanks(xmlCurr, xmlEnd);
+          clssName := GetName(xmlCurr, xmlEnd);
+          if Assigned(stgObj) and not SameText(stgObj.ClassName, clssName) or
+            not SkipBlanks(xmlCurr, xmlEnd) or (xmlCurr^ <> '>') then Exit;
+          inc(xmlCurr); // '>'
+          Break; //
+        end;
+
+        // get next child
+        clssName := GetName(xmlCurr, xmlEnd);
+        stgClass := GetStorageClass(clssName);
+
+        if (clssName = 'TEventPropHandler') then
+        begin
+          if not Assigned(EventAndPropertyHandler) then Exit;
+          child := EventAndPropertyHandler
+        end else if (clssName = 'TLayeredImage32') then
+          child := fLayeredImg
+        else if (clssName = 'TGroupLayer32') and (fLayeredImg.ChildCount < 2) then
+          child := fLayeredImg.Root
+        else if (clssName = 'TRootCtrl') and (fLayeredImg.ChildCount < 3) then
+          child := RootCtrl
+        else if Assigned(stgClass) then
+        begin
+          child := stgObj.AddChild(stgClass);
+        end
+        else
+          Exit; // error
+
+        if not ParseStorageElement(child, xmlCurr, xmlEnd) then Exit;
+      end;
+
+      // join up parent-child controls (often TScrollCtrl)
+      // while postponing other linkages until all controls have been loaded
+      if (stgObj is TCustomCtrl) then
+        with TCustomCtrl(stgObj) do
+        begin
+          for i := 0 to High(fDelayedLinks) do
+            with fDelayedLinks[i] do
+            begin
+              target := FindChildByLoadId(self, targetId);
+              if Assigned(target) then
+                SetObjectProp(loadObj, propName, target)
+              else
+                self.AddDelayedLink(fDelayedLinks[i]);
+            end;
+          fDelayedLinks := nil;
+        end;
+
+      // finally process EndRead
+      TGetProtectedStorage(stgObj).EndRead;
+    finally
+      stgObj.StorageState := ssNormal;
+    end;
+    Result := True;
+  end;
+
+var
+  i: integer;
+  xmlCurr, xmlEnd : PUTF8Char;
+  savedDecSep     : Char;
+  target          : TStorage;
+begin
+  if (utf8 = '') then Exit;
+  savedDecSep := {$IFDEF FORMATSETTINGS}FormatSettings.{$ENDIF}DecimalSeparator;
+  try
+    {$IFDEF FORMATSETTINGS}FormatSettings.{$ENDIF}DecimalSeparator := '.';
+    xmlCurr := PUTF8Char(utf8);
+    xmlEnd := xmlCurr;
+    inc(xmlEnd, Length(utf8));
+
+    StorageState := ssLoading;
+    try
+      //get top storage element
+      if not SkipBlanks(xmlCurr, xmlEnd) or
+        (xmlCurr^ <> '<') then Exit;
+
+      Inc(xmlCurr);
+      if (GetName(xmlCurr, xmlEnd) <> self.ClassName) then Exit;
+      ParseStorageElement(self, xmlCurr, xmlEnd);
+    finally
+      StorageState := ssNormal;
+    end;
+
+    // join up remaining unresolved linkages
+    for i := 0 to High(fDelayedLinks) do
+      with fDelayedLinks[i] do
+      begin
+        target := FindChildByLoadId(fRootCtrl, targetId);
+        if Assigned(target) then
+          SetObjectProp(self, propName, target);
+      end;
+    fDelayedLinks := nil;
+
+  finally
+    fDelayedLinks := nil;
+    {$IFDEF FORMATSETTINGS}FormatSettings.{$ENDIF}DecimalSeparator := savedDecSep;
   end;
 end;
 //------------------------------------------------------------------------------
 
-function TCtrlStorageManager.GetEventProp(const str: string; out success: Boolean): TNotifyEvent;
-begin
-  if Assigned(fEventHandler) then
-    Result := fEventHandler.GetNotify(str) else
-    Result := nil;
-  success := Assigned(Result);
-end;
-//------------------------------------------------------------------------------
+function TCtrlStorageManager.FindChildByLoadId(parent: TStorage; id: integer): TStorage;
 
-procedure TCtrlStorageManager.DoBeforeLoad;
-begin
-  inherited;
-  if Assigned(fEventHandler) then
-    fEventHandler.RefreshPropertyEvents;
-end;
-//------------------------------------------------------------------------------
-
-procedure TCtrlStorageManager.DoAfterLoad;
-begin
-  inherited;
-  fLayeredImg := FindObjectByClass(TLayeredImage32) as TLayeredImage32;
-  if Assigned(fLayeredImg) then
+  function FindChild(so: TStorage): TStorage;
+  var
+    i: integer;
   begin
-    fRootCtrl := FindObjectByClass(TCustomCtrl, fLayeredImg) as TCustomCtrl;
-    FindAllShortcutOwners;
-  end
-  else
-    fRootCtrl := nil;
+    // unfortunately we have to do this the slow way because
+    // TScrollCtrl objects can change their order during construction.
+    if id = so.Id then
+    begin
+      Result := so;
+    end else
+    begin
+      Result := nil;
+      for i := so.ChildCount -1 downto 0 do
+      begin
+        Result := FindChild(so.Child[i]);
+        if Assigned(Result) then Break
+      end;
+    end;
+  end;
+
+begin
+  Result := FindChild(parent);
 end;
 //------------------------------------------------------------------------------
 
-procedure TCtrlStorageManager.DoBeforeWrite;
+procedure TCtrlStorageManager.BeginRead;
 begin
-  inherited;
+  if Assigned(RootCtrl) then
+  begin
+    RootCtrl.ClearChildren;
+    RootCtrl.FocusedCtrl := nil;
+    RootCtrl.fScrollOffset := NullPointD;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TCtrlStorageManager.GetExternalPropName(obj: TObject): string;
+begin
   if Assigned(fEventHandler) then
-    fEventHandler.RefreshPropertyEvents;
+    Result := fEventHandler.GetPropName(obj) else
+    Result := '';
+end;
+//------------------------------------------------------------------------------
+
+function TCtrlStorageManager.GetExternalEvent(const method: TMethod; out textId: string): Boolean;
+var
+  i: integer;
+begin
+  if Assigned(fEventHandler) then
+    with fEventHandler do
+    begin
+      for i := 0 to High(fNotifyEvents) do
+        if method.Code = fNotifyEvents[i].address then
+        begin
+          textId := fNotifyEvents[i].name;
+          Result := True;
+          Exit;
+        end;
+    end;
+  Result := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -6350,7 +6483,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TCtrlStorageManager.DeleteShortcutOwner(ctrl: TCustomCtrl);
+procedure TCtrlStorageManager.RemoveShortcutOwner(ctrl: TCustomCtrl);
 var
   i: integer;
 begin
@@ -6381,9 +6514,17 @@ end;
 
 function TCtrlStorageManager.GetFocusedCtrl: TCustomCtrl;
 begin
-  if Assigned(fRootCtrl) then
-    Result := fRootCtrl.fFocusedCtrl else
-    Result := nil;
+  Result := fRootCtrl.fFocusedCtrl;
+end;
+//------------------------------------------------------------------------------
+
+procedure TCtrlStorageManager.SetFocusedCtrl(ctrl: TCustomCtrl);
+begin
+  if Assigned(fRootCtrl.fFocusedCtrl) then
+    fRootCtrl.fFocusedCtrl.KillFocus;
+  if Assigned(ctrl) and ctrl.CanFocus then
+    fRootCtrl.fFocusedCtrl := ctrl else
+    fRootCtrl.fFocusedCtrl := nil;
 end;
 //------------------------------------------------------------------------------
 
@@ -6449,7 +6590,9 @@ var
   ctrl: TStorage;
   shortcut: TShortcut;
 begin
-  if HasAltOrCtrlKey(shift) {and (Key > 47)} then
+  if not Assigned(fRootCtrl) then Exit;
+
+  if HasAltOrCtrlKey(shift) then
   begin
     shortcut := MakeShortcut(key, shift);
     if shortcut.flags > 0 then
@@ -6473,14 +6616,14 @@ end;
 
 procedure TCtrlStorageManager.KeyUp(var Key: Word; shift: TShiftState);
 begin
-  if Assigned(fRootCtrl.fFocusedCtrl) then
+  if Assigned(fRootCtrl) and Assigned(fRootCtrl.fFocusedCtrl) then
     fRootCtrl.fFocusedCtrl.DoKeyUp(Key, shift);
 end;
 //------------------------------------------------------------------------------
 
 procedure TCtrlStorageManager.KeyPress(var Key: Char);
 begin
-  if Assigned(fRootCtrl.fFocusedCtrl) then
+  if Assigned(fRootCtrl) and Assigned(fRootCtrl.fFocusedCtrl) then
     fRootCtrl.fFocusedCtrl.DoKeyPress(Key);
 end;
 //------------------------------------------------------------------------------
@@ -6526,6 +6669,7 @@ end;
 
 procedure RegisterClasses;
 begin
+  RegisterStorageClass(TRootCtrl);
   RegisterStorageClass(TButtonCtrl);
   RegisterStorageClass(TCheckboxCtrl);
   RegisterStorageClass(TCustomCtrl);
