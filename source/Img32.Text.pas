@@ -2601,11 +2601,11 @@ begin
     if cnt < 2 then Exit;
     dx := (rightX - leftX) / cnt;
     SetLength(wavyPath, cnt + 2);
-    wavyPath[0] := PointD(leftX, y + defaultSW/2);
-    wavyPath[1] := PointD(leftX + dx/2, y - (defaultSW * 2));
+    wavyPath[0] := PointD(leftX, y + defaultSW / 2);
+    wavyPath[1] := PointD(leftX + dx / 2, y - (defaultSW * 2));
 
     for i := 1 to cnt do
-      wavyPath[i+1] := PointD(leftX + dx * i, y + defaultSW / 2);
+      wavyPath[i + 1] := PointD(leftX + dx * i, y + defaultSW / 2);
     Result := FlattenQSpline(wavyPath);
     wavyPath := ReversePath(Result);
     wavyPath := TranslatePath(wavyPath, 0, strokeWidth * 1.5);

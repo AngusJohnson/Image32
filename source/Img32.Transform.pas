@@ -713,7 +713,7 @@ begin
     xx := xx / zz;
     if xx > Q then x := MaxInt
     else if xx < -Q then x := -MaxInt
-    else x := Round(xx *256);
+    else x := Round(xx * 256);
 
     yy := yy / zz;
     if yy > Q then y := MaxInt
@@ -863,7 +863,7 @@ begin
     dydx := (pt2.Y - pt1.Y) / (pt2.X - pt1.X);
     xo := x1 - pt1.X;
     NewPointDArray(Result, x2 - x1, True);
-    for i:= 0 to x2 - x1 - 1 do
+    for i := 0 to x2 - x1 - 1 do
     begin
       Result[i].X := x1 + i;
       Result[i].Y := pt1.Y + dydx * (xo + i);
@@ -876,7 +876,7 @@ begin
     dydx := (pt2.Y - pt1.Y) / (pt2.X - pt1.X);
     xo := x1 -pt1.X;
     NewPointDArray(Result, x1 - x2, True);
-    for i:= 0 to x1 - x2 - 1 do
+    for i := 0 to x1 - x2 - 1 do
     begin
       Result[i].X := x1 - i;
       Result[i].Y := pt1.Y + dydx * (xo - i);
@@ -899,7 +899,7 @@ begin
     dxdy := (pt2.X - pt1.X) / (pt2.Y - pt1.Y);
     yo := y1 -pt1.Y;
     NewPointDArray(Result, y2 - y1, True);
-    for i:= 0 to y2 - y1 - 1 do
+    for i := 0 to y2 - y1 - 1 do
     begin
       Result[i].Y := y1 + i;
       Result[i].X := pt1.X + dxdy * (yo + i);
@@ -912,8 +912,8 @@ begin
     dxdy := (pt2.X - pt1.X) / (pt2.Y - pt1.Y);
     yo := y1 - pt1.Y;
     NewPointDArray(Result, y1 - y2, True);
-    for i:= 0 to y1 - y2 - 1 do
-    begin
+    for i := 0 to y1 - y2 - 1 do
+    begin 
       Result[i].Y := y1 - i;
       Result[i].X := pt1.X + dxdy * (yo - i);
     end;
@@ -1091,7 +1091,7 @@ begin
   backColor :=   backColor and $00FFFFFF;
 
   distances := GetCumulativeDistances(leftPath);
-  q := img.Height / distances[High(distances)];;
+  q := img.Height / distances[High(distances)];
   xLimLo := -0.5;
   xLimHi := img.Width + 0.5;
 

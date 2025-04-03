@@ -417,11 +417,11 @@ begin
   bb := 3 * c.G -3 * b.G -2 * m0 - m1;
   Res.G := ClampByte(aa * t3 + bb * t2 + m0 * t1 + b.G);
 
-  m0 := (c.B - a.B) /2;
-  m1 := (d.B - b.B) /2;
+  m0 := (c.B - a.B) / 2;
+  m1 := (d.B - b.B) / 2;
   aa := 2 * b.B - 2 * c.B + m0 + m1;
   bb := 3 * c.B - 3 * b.B - 2 * m0 - m1;
-  Res.B := ClampByte(aa *t3 + bb * t2 + m0 * t1 + b.B);
+  Res.B := ClampByte(aa * t3 + bb * t2 + m0 * t1 + b.B);
 end;
 //------------------------------------------------------------------------------
 
@@ -440,7 +440,7 @@ begin
   begin
     if x < -0.5 then
     begin
-      xFrac := Round((1 + x) *255);
+      xFrac := Round((1 + x) * 255);
       bceX := eaPreStart;
     end
     else if (x < 0) or
@@ -824,7 +824,7 @@ var
   mat: TMatrixD;
 begin
   mat := IdentityMatrix;
-  MatrixScale(mat, newWidth/Image.Width, newHeight/Image.Height);
+  MatrixScale(mat, newWidth / Image.Width, newHeight / Image.Height);
   AffineTransformImage(Image, TargetImage, mat);
 end;
 
@@ -843,10 +843,10 @@ begin
   for i := 0 to 255 do
   begin
     byteFrac[i]  := i * inv255;
-    byteFracSq[i]  := i * i *inv255sqrd;
+    byteFracSq[i]  := i * i * inv255sqrd;
     byteFracCubed[i] := i * i * i * inv255cubed;
 
-    sinWeighted[i] := Round((Sin(i * piDiv256 - Pi / 2) + 1) /2 * 255);
+    sinWeighted[i] := Round((Sin(i * piDiv256 - Pi / 2) + 1) / 2 * 255);
   end;
 end;
 //------------------------------------------------------------------------------

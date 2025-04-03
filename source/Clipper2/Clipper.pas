@@ -204,8 +204,8 @@ begin
   SetLength(Result, len);
   for i := 0 to len -1 do
   begin
-    Result[i].X := ints[i*2];
-    Result[i].Y := ints[i*2 +1];
+    Result[i].X := ints[i * 2];
+    Result[i].Y := ints[i * s2 +1];
   end;
 end;
 //------------------------------------------------------------------------------

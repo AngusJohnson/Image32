@@ -3003,10 +3003,10 @@ begin
   FHorzSegList.Sort(HorzSegListSort);
 
   // find overlaps
-  for i := 0 to FHorzSegList.Count -2 do
+  for i := 0 to FHorzSegList.Count - 2 do
   begin
     hs1 := FHorzSegList.UnsafeGet(i);
-    for j := i+1 to FHorzSegList.Count -1 do
+    for j := i + 1 to FHorzSegList.Count - 1 do
     begin
       hs2 := FHorzSegList.UnsafeGet(j);
 

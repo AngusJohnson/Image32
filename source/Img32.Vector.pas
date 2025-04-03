@@ -2209,7 +2209,7 @@ begin
     m1 := (ln1B.Y - ln1A.Y) / (ln1B.X - ln1A.X);
     b1 := ln1A.Y - m1 * ln1A.X;
     Result.X := ln2A.X;
-    Result.Y := m1*ln2A.X + b1;
+    Result.Y := m1 * ln2A.X + b1;
   end else
   begin
     m1 := (ln1B.Y - ln1A.Y) / (ln1B.X - ln1A.X);
@@ -2463,7 +2463,7 @@ begin
 
   if miterLim <= 0 then miterLim := DefaultMiterLimit
   else if miterLim < 2 then miterLim := 2;
-  miterLim := 2 /(sqr(miterLim));
+  miterLim := 2 / (sqr(miterLim));
 
   resCnt := 0;
   resCap := 0;
@@ -3787,8 +3787,8 @@ begin
   if t > 1 then t := 1
   else if t < 0 then t := 0;
   omt := 1 - t;
-  Result.X := a.X * omt * omt + b.X * 2 * omt*t + c.X * t * t;
-  Result.Y := a.Y * omt * omt + b.Y * 2 * omt*t + c.Y * t * t;
+  Result.X := a.X * omt * omt + b.X * 2 * omt * t + c.X * t * t;
+  Result.Y := a.Y * omt * omt + b.Y * 2 * omt * t + c.Y * t * t;
 end;
 //------------------------------------------------------------------------------
 
@@ -3914,7 +3914,7 @@ begin
   Result[0] := path[0];
   for i := 0 to (len div 3) - 1 do
   begin
-    if PointsEqual(path[i *3 ], path[i * 3 + 1]) and
+    if PointsEqual(path[i * 3 ], path[i * 3 + 1]) and
       PointsEqual(path[i * 3 + 2], path[i * 3 + 3]) then
     begin
       AppendPoint(Result, path[i * 3]);

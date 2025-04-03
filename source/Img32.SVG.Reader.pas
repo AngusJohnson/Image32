@@ -1470,8 +1470,8 @@ begin
         begin
           with viewboxWH do
           begin
-            dx := -Left/Width * self.elRectWH.width.rawVal;
-            dy := -Top/Height * self.elRectWH.height.rawVal;
+            dx := -Left / Width * self.elRectWH.width.rawVal;
+            dy := -Top / Height * self.elRectWH.height.rawVal;
 
             //scale <symbol> proportionally to fill the <use> element
             scale2.X := self.elRectWH.width.rawVal / Width;
@@ -1578,8 +1578,8 @@ begin
   //If two stops are equal the last stop controls the color from that point.
   len := Length(stops);
   if (len > 0) and (stops[len-1].offset > offset) then
-    offset := stops[len-1].offset;
-  setLength(stops, len+1);
+    offset := stops[len - 1].offset;
+  setLength(stops, len + 1);
   stops[len].offset := Min(1,Max(0, offset));
   stops[len].color := color;
 end;
@@ -3758,7 +3758,7 @@ begin
   else if (dd.FontInfo.textLength > 0) then
   begin
     textWidth := fSvgReader.fFontCache.GetTextWidth(unicodeText);
-    spacing := (dd.FontInfo.textLength/scale) - textWidth;
+    spacing := (dd.FontInfo.textLength / scale) - textWidth;
     spacing := spacing / (len - 1);
   end;
 
@@ -3766,7 +3766,7 @@ begin
   begin
     mat := fDrawData.matrix;
     MatrixScale(mat, 1 / scale);
-    for i := 0 to fSvgPaths.Count -1 do
+    for i := 0 to fSvgPaths.Count - 1 do
     begin
       Flatten(i, scale, tmpPath, isClosed);
       //'path' is temporarily scaled to accommodate fReader.fFontCache's
