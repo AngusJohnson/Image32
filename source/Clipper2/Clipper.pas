@@ -805,7 +805,7 @@ begin
   scale := power(10, precision);
   p := ScalePath(path, scale);
   p := TrimCollinear(p, isOpenPath);
-  Result := ScalePathD(p, 1/scale);
+  Result := ScalePathD(p, 1 / scale);
 end;
 //------------------------------------------------------------------------------
 
