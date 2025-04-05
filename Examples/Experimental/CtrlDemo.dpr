@@ -21,10 +21,9 @@ uses
 
 (*
   NOTES:
-  1. THIS APP USES IMAGE32 FOR **ALL** GUI CONTROLS
-  IN OTHER WORDS - IT DOESN'T USE DELPHI'S VCL OR FMX FRAMEWORKS!
-  2. THIS APP CONTINUES TO BE EXPERIMENTAL, MOSTLY BECAUSE
-  THE GUI CONTROLS ARE VERY INCOMPLETE.
+  1. THIS APP USES IMAGE32 FOR **ALL** GUI CONTROLS ... IN OTHER WORDS -
+  IT DOESN'T USE DELPHI'S VCL OR FMX FRAMEWORKS!
+  2. THIS APP IS EXPERIMENTAL BECAUSE THE GUI CONTROLS ARE QUITE INCOMPLETE.
 *)
 
 {$R Lorem.res}
@@ -306,11 +305,14 @@ begin
   bevelSize := DPIAware(2);
 
   // rootCtrl is the container for all other controls
-  // that's automatically created by storageMngr.
+  // and it was created automatically by storageMngr.
   rootCtrl.Margin := DPIAware(10);
   rootCtrl.Font := epHandler.unscaledFont;
   rootCtrl.Isthemed := true;
   rootCtrl.theme := lightTheme;
+
+  // note: when objects are created, if they have events
+  // then these are assigned here too.
 
   // add main menus
   mainMenu := rootCtrl.InsertChild(0, TMainMenuCtrl) as TMainMenuCtrl;
@@ -651,7 +653,7 @@ end;
 
 procedure TEventPropHandler.DesigningClick(Sender: TObject);
 begin
-  designing := not designing;
+  designing := TMenuItemCtrl(Sender).Checked;
   if not designing then SetDesignTarget(nil);
 end;
 //------------------------------------------------------------------------------
@@ -715,7 +717,7 @@ begin
         clickPt := Img32.vector.Point(
           SmallInt(LoWord(lParam)),
           SmallInt(HiWord(lParam)));
-        if designing and not Assigned(rootCtrl.CaptureCtrl) then
+        if designing then
         begin
           clickLayer := layeredImg32.GetLayerAt(clickPt);
           if IsOwnedBy(clickLayer, TPagePnlCtrl) then
@@ -729,11 +731,9 @@ begin
           begin
             SetCursor(sizeCursor);
             Exit;
-          end else
-          begin
-            SetDesignTarget(nil);
-            clickLayer := nil;
-          end;
+          end
+          else if not (clickLayer is TBaseMenuCtrl) then
+            Exit;
         end;
         // not designing so get storageMngr to process
         storageMngr.MouseDown(mbLeft, WParamToShiftState(wParam), clickPt);
@@ -749,7 +749,7 @@ begin
           SmallInt(HiWord(lParam)));
         dx := pt.X - clickPt.X; dy := pt.Y - clickPt.Y;
 
-        if designing and not Assigned(rootCtrl.CaptureCtrl) then
+        if designing and PtInRect(pageCtrl.InnerBounds, PointD(pt)) then
         begin
           if not assigned(clickLayer) then
           begin
@@ -806,8 +806,7 @@ begin
       end;
     WM_MOUSEWHEEL:
       begin
-        if designing and not Assigned(rootCtrl.CaptureCtrl) then
-          clickLayer := nil;
+        if designing then clickLayer := nil;
         pt := Img32.vector.Point(
           SmallInt(LoWord(lParam)),
           SmallInt(HiWord(lParam)));
@@ -836,8 +835,7 @@ begin
         key := Word(wParam);
         shift := LParamToShiftState(lParam);
 
-        if designing and not Assigned(rootCtrl.CaptureCtrl) and
-          Assigned(designTarget) then
+        if designing and Assigned(designTarget) then
         begin
           case Key of
             VK_DELETE:
@@ -1000,6 +998,9 @@ begin
   imageSize64 := DpiAware(64.0);
   imageSize24 := DpiAware(24.0);
 
+  // Assign the event and property handler's properties here
+  // The events will be assigned when the relevant control objects
+  // are created.
   with epHandler do
   begin
 

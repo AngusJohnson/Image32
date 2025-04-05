@@ -365,7 +365,6 @@ type
     fIsChecked  : Boolean;
     procedure UpdateItem;
   protected
-    procedure Clicked; override;
     procedure SetCaption(const caption: string); override;
     procedure SetFont(font: TFontCache); override;
     // procedure Paint; override; // painting done by parent control :)
@@ -2816,19 +2815,6 @@ constructor TMenuItemCtrl.Create(parent: TLayer32 = nil; const name: string = ''
 begin
   inherited Create(parent, name);
   Caption := name;
-end;
-//------------------------------------------------------------------------------
-
-procedure TMenuItemCtrl.Clicked;
-begin
-//  if Assigned(OnClick) then
-//    inherited Clicked
-//  else
-  with TBaseMenuCtrl(Parent) do
-  begin
-    ItemIndex := Self.index;
-    Clicked;
-  end;
 end;
 //------------------------------------------------------------------------------
 
