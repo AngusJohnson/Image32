@@ -3,7 +3,7 @@ unit Img32.TextChunks;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  20 March 2025                                                   *
+* Date      :  4 April 2025                                                    *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  Manages navigating, formatting and displaying text.             *
@@ -158,12 +158,18 @@ type
       read fDrawChunkEvent write fDrawChunkEvent;
   end;
 
+function GetLineIndexFromChunkIdx(const pageMetrics: TPageTextMetrics;
+  chunkIdx: integer): integer;
+function GetChunkIdxAtStartOfLine(const pageMetrics: TPageTextMetrics;
+  lineIdx: integer): integer;
+
 implementation
 
 resourcestring
   rsInvalidChunk            = 'TChunkedText: invalid chunk';
   rsChunkedTextRangeError   = 'TChunkedText: range error.';
   rsChunkedTextFontError    = 'TChunkedText: invalid font error.';
+  rsPageTextMetricsError    = 'TPageTextMetrics: range error';
 
 const
   SPACE   = #32;
@@ -173,6 +179,25 @@ type
   TFontCacheHack = class(TFontCache);
 
 //------------------------------------------------------------------------------
+
+function GetLineIndexFromChunkIdx(const pageMetrics: TPageTextMetrics;
+  chunkIdx: integer): integer;
+begin
+  Result := pageMetrics.totalLines -1;
+  while (Result > 0) and (chunkIdx < pageMetrics.startOfLineIdx[Result]) do
+    Dec(Result);
+end;
+//------------------------------------------------------------------------------
+
+function GetChunkIdxAtStartOfLine(const pageMetrics: TPageTextMetrics;
+  lineIdx: integer): integer;
+begin
+  if (lineIdx < 0) or (lineIdx >= pageMetrics.totalLines) then
+    Raise Exception.Create(rsPageTextMetricsError);
+  Result := pageMetrics.startOfLineIdx[lineIdx];
+end;
+//------------------------------------------------------------------------------
+
 function IsCorrectPosOrder(const pt1, pt2: TPoint): Boolean;
 begin
   if pt1.X <> pt2.X then
@@ -894,7 +919,7 @@ begin
   begin
     chnk := Chunk[currentPos.X];
     if currentPos.Y >= chnk.length then
-      raise Exception.Create('oops!');
+      currentPos.Y := chnk.length;
     priorSplitWidth := chnk.glyphOffsets[startingChunkPos.Y];
     // start by finishing a partial text chunk
     AddPartChunk;
@@ -930,9 +955,6 @@ begin
         while chnk.IsBlankSpaces and (chnk.index < EndChunkPos.X) do
           chnk := chnk.Next;
         currentPos.X := chnk.index;
-//        while (currentPos.X < EndChunkPos.X) and
-//          self.chunk[currentPos.X].IsBlankSpaces do
-//            inc(currentPos.X);
         chunkIdxAtStartOfLine  := currentPos.X;
         pseudoIdxAtStartOfLine := currentPos.X;
       end;

@@ -24,7 +24,7 @@ uses
   1. THIS APP USES IMAGE32 FOR **ALL** GUI CONTROLS
   IN OTHER WORDS - IT DOESN'T USE DELPHI'S VCL OR FMX FRAMEWORKS!
   2. THIS APP CONTINUES TO BE EXPERIMENTAL, MOSTLY BECAUSE
-  THE GUI CONTROLS REMAIN VERY INCOMPLETE
+  THE GUI CONTROLS ARE VERY INCOMPLETE.
 *)
 
 {$R Lorem.res}
@@ -35,27 +35,29 @@ uses
 
 type
 
-  // TEventPropHandler - contains properties and NotifyEvents
-  // used by TCtrlStorageManager
+  // TEventPropHandler - events & properties used by TCtrlStorageManager
   TEventPropHandler = class(TEventPropertyHandler)
   private
-    fArial14      : TFontCache;
-    fUnscaledFont : TFontCache;
+    fScaledFnt      : TFontCache;
+    fUnscaledFnt : TFontCache;
     fSvgList      : TSvgImageList32;
     fSvgList2     : TSvgImageList32;
   public
     // events
     procedure LoadClick(Sender: TObject);
     procedure SaveClick(Sender: TObject);
-    procedure SliderClick(Sender: TObject);
+    procedure ExitClick(Sender: TObject);
+    procedure ScaleSliderClick(Sender: TObject);
     procedure Slider2Click(Sender: TObject);
     procedure ClickMe(Sender: TObject);
     procedure ClickBtn(Sender: TObject);
     procedure CheckboxClick(Sender: TObject);
-    procedure DesignModeClick(Sender: TObject);
-    // public properties (these don't need to be published)
-    property Arial14: TFontCache read fArial14 write fArial14;
-    property UnscaledFont: TFontCache read fUnscaledFont write fUnscaledFont;
+    procedure DesigningClick(Sender: TObject);
+    procedure DarkModeClick(Sender: TObject);
+    procedure TabClicked(Sender: TObject);
+    // properties
+    property scaledFont: TFontCache read fScaledFnt write fScaledFnt;
+    property unscaledFont: TFontCache read fUnscaledFnt write fUnscaledFnt;
     property svgList   : TSvgImageList32 read fSvgList write fSvgList;
     property svgList2  : TSvgImageList32 read fSvgList2 write fSvgList2;
   end;
@@ -64,8 +66,6 @@ var
   WinClass: TWndClass;
   Inst, mainHdl: THandle;
   Msg: TMsg;
-
-  fontReader  : TFontReader;
 
   // storageMngr runs the show together with its event handler
   storageMngr : TCtrlStorageManager;
@@ -76,7 +76,8 @@ var
   // and exposed as properties of storageMngr and it's just
   // conveneint to expose these as global variables.
   layeredImg32: TLayeredImage32;
-  rootCtrl    : TPanelCtrl;
+  rootCtrl    : TRootCtrl;
+  mainMenu    : TMainMenuCtrl;
 
   // these objects are created by the Setup procedure below
   // (or loaded from the stored XML file). It's also
@@ -101,7 +102,7 @@ var
   arrowCursor : HIcon;
 
 const
-  DoLoadFromStorage = false; //true; //
+  DoLoadFromStorage = false; // true;//
 
 //------------------------------------------------------------------------------
 //Miscellaneous functions
@@ -243,8 +244,8 @@ begin
   // scale font and SVG image sizes
   with epHandler do
   begin
-    UnscaledFont.FontHeight := DpiAware(14) * designScale;
-    arial14.FontHeight := DpiAware(14) * designScale * newScale;
+    unscaledFont.FontHeight := DpiAware(14) * designScale;
+    scaledFont.FontHeight := DpiAware(14) * designScale * newScale;
 
     ImgSz := Round(imageSize64 * designScale * newScale);
     svgList.DefaultWidth := ImgSz;
@@ -257,371 +258,8 @@ begin
 
   // finally, update just pageCtrl and its contents
   // (because we don't scale everything)
-  pageCtrl.Scale(scaleDelta);
-end;
-
-//------------------------------------------------------------------------------
-// TEventPropertyHandler1 events
-//------------------------------------------------------------------------------
-
-procedure TEventPropHandler.LoadClick(Sender: TObject);
-var
-  filename: string;
-begin
-  filename := '.\*.xml';
-  if not OpenSaveXmlDialog(filename, false) then Exit;
-  storageMngr.LoadFromFile(filename);
-  // LoadFromFile() will delete all controls contained by
-  // RootCtrl prior to loading the new ones.
-  pageCtrl := rootCtrl.FindChildByClass(TPageCtrl) as TPageCtrl;
-  statusCtrl := rootCtrl.FindChildByClass(TStatusbarCtrl) as TStatusbarCtrl;
-  Rescale(storageMngr.DesignScale, true);
-
-  ResizeMainWindow(mainHdl, layeredImg32.Width, layeredImg32.Height);
-end;
-//------------------------------------------------------------------------------
-
-procedure TEventPropHandler.SaveClick(Sender: TObject);
-var
-  filename: string;
-begin
-  filename := '.\*.xml';
-  if not OpenSaveXmlDialog(filename, true) then Exit;
-  storageMngr.SaveToFile(filename, StorageMngr.DesignScale);
-  statusCtrl.Caption := 'Controls saved';
-end;
-//------------------------------------------------------------------------------
-
-procedure TEventPropHandler.SliderClick(Sender: TObject);
-var
-  senderPos, scale: double;
-begin
-  if not Assigned(sender) or not (Sender is TSliderCtrl) then Exit;
-
-  senderPos := (Sender as TSliderCtrl).Position;
-  scale := (100 + senderPos) * 0.01;
-  Rescale(scale, false);
-end;
-//------------------------------------------------------------------------------
-
-procedure TEventPropHandler.Slider2Click(Sender: TObject);
-var
-  senderPos: double;
-begin
-  senderPos := (Sender as TSliderCtrl).Position;
-  with pageCtrl.FindChildByClass(TProgressCtrl) as TProgressCtrl do
-    Position := senderPos;
-end;
-//------------------------------------------------------------------------------
-
-procedure TEventPropHandler.ClickMe(Sender: TObject);
-begin
-  windows.MessageBox(0, '''Click Me'' button clicked!', 'CtrlDemo', 0);
-end;
-//------------------------------------------------------------------------------
-
-procedure TEventPropHandler.ClickBtn(Sender: TObject);
-begin
-  statusCtrl.Caption := TButtonCtrl(Sender).Caption + ' clicked';
-end;
-//------------------------------------------------------------------------------
-
-procedure TEventPropHandler.CheckboxClick(Sender: TObject);
-begin
-  with (Sender as TCheckboxCtrl) do
-    case State of
-      tsUnknown : State := tsNo;
-      tsYes     : State := tsUnknown;
-      tsNo      : State := tsYes;
-    end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TEventPropHandler.DesignModeClick(Sender: TObject);
-begin
-  designing := TCheckboxCtrl(Sender).State = tsYes;
-  if not designing then SetDesignTarget(nil);
-end;
-
-//------------------------------------------------------------------------------
-// Windows message handler - that passes keyboard and
-// mouse messages to storageMngr for processing
-//------------------------------------------------------------------------------
-
-function WindowProc(hWnd, uMsg,	wParam: WPARAM; lParam: LPARAM): Integer; stdcall;
-
-  procedure UpdateTargetPosDisplay;
-  begin
-    if Assigned(designTarget) then
-      with designTarget do
-        statusCtrl.Caption := Format('  %1.0n, %1.0n',[Left, Top]);
-  end;
-
-  procedure UpdateFocusedCtrlDisplay;
-  begin
-    if Assigned(storageMngr.RootCtrl.FocusedCtrl) then
-      with storageMngr.RootCtrl.FocusedCtrl do
-        if Caption = '' then
-          statusCtrl.Caption := Name else
-          statusCtrl.Caption := StringReplace(Caption, '&', '', []);
-  end;
-
-var
-  key     : Word;
-  chr     : Char;
-  w,h     : integer;
-  pt      : TPoint;
-  ps      : TPAINTSTRUCT;
-  dc      : HDC;
-  img     : TImage32;
-  dx,dy   : integer;
-  rec     : TRectD;
-  shift   : TShiftState;
-  layer   : TLayer32;
-begin
-  case uMsg of
-    WM_LBUTTONDOWN:
-      begin
-        Result := 0;
-        clickPt := Img32.vector.Point(
-          SmallInt(LoWord(lParam)),
-          SmallInt(HiWord(lParam)));
-        if designing then
-        begin
-          clickLayer := layeredImg32.GetLayerAt(clickPt);
-          if IsOwnedBy(clickLayer, TPagePnlCtrl) then
-          begin
-            SetDesignTarget(clickLayer as TCustomCtrl);
-            SetCursor(handCursor);
-            UpdateTargetPosDisplay;
-            Exit;
-          end
-          else if (clickLayer is TButtonDesignerLayer32) then
-          begin
-            SetCursor(sizeCursor);
-            Exit;
-          end else
-          begin
-            SetDesignTarget(nil);
-            clickLayer := nil;
-          end;
-        end;
-        // not designing so get storageMngr to process
-        storageMngr.MouseDown(mbLeft, WParamToShiftState(wParam), clickPt);
-        //UpdateFocusedCtrlDisplay;
-        if storageMngr.RepaintRequired then
-          InvalidateRect(hWnd, nil, false);
-      end;
-    WM_MOUSEMOVE:
-      begin
-        Result := 0;
-        pt := Img32.vector.Point(
-          SmallInt(LoWord(lParam)), SmallInt(HiWord(lParam)));
-        dx := pt.X - clickPt.X; dy := pt.Y - clickPt.Y;
-
-        if designing then
-        begin
-          if not assigned(clickLayer) then
-          begin
-            layer := layeredImg32.GetLayerAt(pt);
-            if Assigned(layer) then
-            begin
-              if (layer is TButtonDesignerLayer32) then
-                SetCursor(sizeCursor)
-              else if layer = designTarget then
-                SetCursor(handCursor)
-              else
-                SetCursor(arrowCursor);
-            end;
-            Exit;
-          end;
-
-          if (clickLayer = designTarget) then
-          begin
-            SetCursor(handCursor);
-            designTarget.Offset(dx,dy);
-            sizingGroup.Offset(dx,dy);
-            clickPt := pt;
-            UpdateTargetPosDisplay;
-            InvalidateRect(hWnd, nil, false);
-          end else if (clickLayer is TButtonDesignerLayer32) then
-          begin
-            SetCursor(sizeCursor);
-            clickLayer.Offset(dx, dy);
-            rec := RectD(UpdateSizingButtonGroup(clickLayer));
-            rec := designTarget.Parent.MakeRelative(rec);
-            designTarget.SetInnerBounds(rec);
-            clickPt := pt;
-            InvalidateRect(hWnd, nil, false);
-          end;
-        end else
-        begin
-          // not designing so get storageMngr to process
-          storageMngr.MouseMove(mbLeft, WParamToShiftState(wParam), pt);
-          if storageMngr.RepaintRequired then
-            InvalidateRect(hWnd, nil, false);
-        end;
-      end;
-    WM_LBUTTONUP:
-      begin
-        pt := Img32.vector.Point(
-          SmallInt(LoWord(lParam)),
-          SmallInt(HiWord(lParam)));
-        storageMngr.MouseUp(mbLeft, WParamToShiftState(wParam), pt);
-        if storageMngr.RepaintRequired then
-          InvalidateRect(hWnd, nil, false);
-        clickLayer := nil;
-        Result := 0;
-      end;
-    WM_MOUSEWHEEL:
-      begin
-        if designing then clickLayer := nil;
-        pt := Img32.vector.Point(
-          SmallInt(LoWord(lParam)),
-          SmallInt(HiWord(lParam)));
-        if storageMngr.MouseWheel(WParamToShiftState(wParam),
-          SmallInt(HiWord(wParam)), pt) and storageMngr.RepaintRequired then
-            InvalidateRect(hWnd, nil, false);
-        Result := 0;
-      end;
-    WM_SYSCOMMAND:
-      if wParam = SC_KEYMENU then
-        Result := 0 else //stops beeps with Alt key combos
-        Result := DefWindowProc(hWnd, uMsg, wParam, lParam);
-    WM_CHAR:
-      begin
-        if not designing then
-        begin
-          chr := Char(wParam);
-          storageMngr.KeyPress(chr);
-          if storageMngr.RepaintRequired then
-            InvalidateRect(hWnd, nil, false);
-        end;
-        Result := 0;
-      end;
-    WM_KEYDOWN:
-      begin
-        key := Word(wParam);
-        shift := LParamToShiftState(lParam);
-
-        if (key = VK_ESCAPE) then
-        begin
-          PostQuitMessage(0);
-        end
-
-        else if designing and Assigned(designTarget) then
-        begin
-          case Key of
-            VK_DELETE:
-              begin
-                FreeAndNil(sizingGroup);
-                FreeAndNil(designTarget);
-                InvalidateRect(hWnd, nil, false);
-              end;
-            VK_DOWN:
-              begin
-                if Shift and ssCtrl <> 0 then w := 5 else w := 1;
-                designTarget.Offset(0,w);
-                sizingGroup.Offset(0,w);
-                UpdateTargetPosDisplay;
-                InvalidateRect(hWnd, nil, false);
-              end;
-            VK_UP:
-              begin
-                if Shift and ssCtrl <> 0 then w := 5 else w := 1;
-                designTarget.Offset(0,-w);
-                sizingGroup.Offset(0,-w);
-                UpdateTargetPosDisplay;
-                InvalidateRect(hWnd, nil, false);
-              end;
-            VK_RIGHT:
-              begin
-                if Shift and ssCtrl <> 0 then w := 5 else w := 1;
-                designTarget.Offset(w,0);
-                sizingGroup.Offset(w,0);
-                UpdateTargetPosDisplay;
-                InvalidateRect(hWnd, nil, false);
-              end;
-            VK_LEFT:
-              begin
-                if Shift and ssCtrl <> 0 then w := 5 else w := 1;
-                designTarget.Offset(-w,0);
-                sizingGroup.Offset(-w,0);
-                UpdateTargetPosDisplay;
-                InvalidateRect(hWnd, nil, false);
-              end;
-          end;
-        end
-        else
-        begin
-
-          if (key = VK_TAB) then
-            statusCtrl.Caption := 'TAB key pressed';
-
-          storageMngr.KeyDown(key, shift);
-          if storageMngr.RepaintRequired then
-            InvalidateRect(hWnd, nil, false);
-        end;
-        Result := 0;
-      end;
-    WM_SYSKEYDOWN:
-      begin
-        // eg alt keys
-        key := Word(wParam);
-        shift := LParamToShiftState(lParam);
-        storageMngr.KeyDown(key, shift);
-        if storageMngr.RepaintRequired then
-          InvalidateRect(hWnd, nil, false);
-        Result := 0;
-      end;
-    WM_SYSKEYUP:
-      begin
-        Result := 0;
-      end;
-    WM_KEYUP:
-      begin
-        key := Word(wParam);
-        shift := LParamToShiftState(lParam);
-        storageMngr.KeyUp(key, shift);
-        if storageMngr.RepaintRequired then
-          InvalidateRect(hWnd, nil, false);
-        Result := 0;
-      end;
-    WM_SIZE:
-      begin
-        w := LoWord(lParam);
-        h := HIWord(lParam);
-        storageMngr.Resize(w,h);
-        InvalidateRect(hWnd,nil,true);
-        Result := 0;
-      end;
-    WM_PAINT:
-      begin
-        Result := 0;
-        img := layeredImg32.GetMergedImage(false, updateRect);
-        dc := BeginPaint(hWnd, &ps);
-        img.CopyToDc(updateRect, dc, updateRect.Left, updateRect.Top, false);
-        EndPaint(hWnd, &ps);
-      end;
-    WM_ERASEBKGND: Result := 1;
-    WM_GETDLGCODE: Result := DLGC_WANTALLKEYS;
-    WM_DPICHANGED:
-      begin
-        //nb: Manifest DPI Awareness must be set to
-        //at least 'Per Monitor' to receive this notification.
-        DpiAwareOne := LoWord(wParam) / 96;
-        DpiAware1 := Round(DpiAwareOne);
-        Result := 0;
-      end;
-    WM_DESTROY:
-      begin
-        PostQuitMessage(0);
-        result := 0;
-        exit;
-      end;
-    else
-      Result := DefWindowProc(hWnd, uMsg, wParam, lParam);
-  end;
+  if Assigned(pageCtrl) then
+    pageCtrl.Scale(scaleDelta);
 end;
 //------------------------------------------------------------------------------
 
@@ -655,103 +293,110 @@ end;
 
 procedure SetupCtrls;
 var
-  i, pad    : integer;
-  j,k,h,w   : double;
-  bevelSize  : double;
+  i, pad      : integer;
+  j,k,h,w     : double;
+  bevelSize   : double;
   pagePnl     : TPagePnlCtrl;
   topPnlCtrl  : TPanelCtrl;
   sliderCtrl  : TSliderCtrl;
 begin
+  rootCtrl.ClearChildren;
+
   currentScale := 1;
   bevelSize := DPIAware(2);
 
   // rootCtrl is the container for all other controls
   // that's automatically created by storageMngr.
   rootCtrl.Margin := DPIAware(10);
-  rootCtrl.Font := epHandler.UnscaledFont;
-  rootCtrl.Color := clBtnFace32; //$FFFFFFD0;//
+  rootCtrl.Font := epHandler.unscaledFont;
+  rootCtrl.Isthemed := true;
+  rootCtrl.theme := lightTheme;
 
+  // add main menus
+  mainMenu := rootCtrl.InsertChild(0, TMainMenuCtrl) as TMainMenuCtrl;
+  with mainMenu.AddChild(TMenuItemCtrl, '&File') as TMenuItemCtrl do
+  begin
+    with AddChild(TPopMenuCtrl, 'File Popup') as TPopMenuCtrl do
+    begin
+      with AddChild(TMenuItemCtrl, '&Load ...') as TMenuItemCtrl do
+        OnClick := epHandler.LoadClick;
+      with AddChild(TMenuItemCtrl, '&Save ...') as TMenuItemCtrl do
+        OnClick := epHandler.SaveClick;
+      AddChild(TMenuItemCtrl, '-');
+      with AddChild(TMenuItemCtrl, 'E&xit') as TMenuItemCtrl do
+        OnClick := epHandler.ExitClick;
+    end;
+  end;
+  with mainMenu.AddChild(TMenuItemCtrl, '&Options') as TMenuItemCtrl do
+  begin
+    with AddChild(TPopMenuCtrl, 'Options Popup') as TPopMenuCtrl do
+    begin
+      with AddChild(TMenuItemCtrl, '&Designing') as TMenuItemCtrl do
+      begin
+        MenuItemType := TMenuItemType.mitCheckbox;
+        OnClick := epHandler.DesigningClick;
+      end;
+      with AddChild(TMenuItemCtrl, 'Dar&k Mode') as TMenuItemCtrl do
+      begin
+        MenuItemType := TMenuItemType.mitCheckbox;
+        OnClick := epHandler.DarkModeClick;
+      end;
+    end;
+  end;
+  mainMenu.AddChild(TMenuItemCtrl, '&Help');
+
+  // add a status bar at the bottom
   statusCtrl := layeredImg32.AddLayer(TStatusbarCtrl, rootCtrl) as TStatusbarCtrl;
   with statusCtrl do
   begin
     BevelHeight := DPIAware(1.5);
     Color := clNone32;
     AutoPosition := apBottom;
-    Caption := 'This GUI app doesn''t use either VCL or FMX, just Image32 !';
+    Caption := 'This demo doesn''t use either VCL or FMX frameworks, just Image32 !';
   end;
 
+  // add the top scale slider panel
   topPnlCtrl := layeredImg32.AddLayer(TPanelCtrl, rootCtrl) as TPanelCtrl;
-  topPnlCtrl.AutoPosition := apTop;
-  topPnlCtrl.Height := DPIAware(40);
-  topPnlCtrl.Color := clNone32;
-  topPnlCtrl.BevelHeight := 0;
-  topPnlCtrl.ShadowSize := DPIAware(10);
-
-  //filler panel
-  with layeredImg32.AddLayer(TPanelCtrl, rootCtrl) as TPanelCtrl do
+  with topPnlCtrl do
   begin
     AutoPosition := apTop;
-    Height := DPIAware(20);
+    Height := DPIAware(46);
     Color := clNone32;
     BevelHeight := 0;
+    ShadowSize := DPIAware(10);
+
+    sliderCtrl := AddChild(TSliderCtrl) as TSliderCtrl;
+    with sliderCtrl do
+    begin
+      Orientation := soHorizontal;
+      SetInnerBounds(DPIAware(RectD(70, 5, 560, 20)));
+      BevelHeight := DPIAware(2);
+      Min := -50;
+      Max := 100;
+      Position := 0;
+      OnSlider := epHandler.ScaleSliderClick;
+    end;
+
+    with AddChild(TLabelCtrl) as TLabelCtrl do
+    begin
+      Caption := '&Scale:';
+      SetInnerBounds(DPIAware(RectD(20, 7, 60, 27)));
+      TargetCtrl := sliderCtrl;
+    end;
   end;
 
-  sliderCtrl := layeredImg32.AddLayer(TSliderCtrl, topPnlCtrl) as TSliderCtrl;
-  with sliderCtrl do
-  begin
-    Orientation := soHorizontal;
-    SetInnerBounds(DPIAware(RectD(70, 5, 345, 20)));
-    BevelHeight := DPIAware(2);
-    Min := -50;
-    Max := 100;
-    Position := 0;
-    OnSlider := epHandler.SliderClick;
-  end;
-
-  with layeredImg32.AddLayer(TLabelCtrl, topPnlCtrl,'') as TLabelCtrl do
-  begin
-    Caption := '&Scale:';
-    SetInnerBounds(DPIAware(RectD(20, 5, 70, 25)));
-    TargetCtrl := sliderCtrl;
-  end;
-
-  with layeredImg32.AddLayer(TButtonCtrl, topPnlCtrl,'') as TButtonCtrl do
-  begin
-    Caption := '&Load ...';
-    SetInnerBounds(DPIAware(RectD(365, 2, 435, 32)));
-    BevelHeight := bevelSize;
-    OnClick := epHandler.LoadClick;
-  end;
-
-  with layeredImg32.AddLayer(TButtonCtrl, topPnlCtrl,'') as TButtonCtrl do
-  begin
-    Caption := 'S&ave ...';
-    SetInnerBounds(DPIAware(RectD(440, 2, 510, 32)));
-    BevelHeight := bevelSize;
-    OnClick := epHandler.SaveClick;
-  end;
-
-  with layeredImg32.AddLayer(TCheckboxCtrl, topPnlCtrl,'') as TCheckboxCtrl do
-  begin
-    Caption := '&Design Mode';
-    SetInnerBounds(DPIAware(RectD(530, 2, 660, 32)));
-    BevelHeight := bevelSize;
-    State := tsNo;
-    OnClick := epHandler.DesignModeClick;
-  end;
-
-  //add a page control with 3 tabs
+  // add a page control with 3 tabs
   pageCtrl := layeredImg32.AddLayer(TPageCtrl, rootCtrl) as TPageCtrl;
   pageCtrl.AutoPosition := apClient;
   pageCtrl.BevelHeight := DPIAware(3);
-  pageCtrl.AddTabs(['Page &1', 'Page &2', 'Page &Three']);
-  pageCtrl.Font := epHandler.arial14;
+  pageCtrl.Font := epHandler.scaledFont;
+  pageCtrl.AddTabs(['Page &1', 'Page &2', 'Page &3']);
+  pageCtrl.OnClick := epHandler.TabClicked;
 
-  //now add a number of ctrls to each page
+  // add a variety of ctrls to each page
 
   // PAGE 1 ///////////////////////////////////////////////////////
   pagePnl := pageCtrl.Panel[0];
-  //pagePnl.Color := $20FFFF00; //try it :)
   pagePnl.ScrollH := pagePnl.AddChild(TScrollCtrl) as TScrollCtrl;
   pagePnl.ScrollV := pagePnl.AddChild(TScrollCtrl) as TScrollCtrl;
 
@@ -767,8 +412,9 @@ begin
   with layeredImg32.AddLayer(TRoundedBtnCtrl, pagePnl) as TButtonCtrl do
   begin
     Caption := 'Transparent';
+    Isthemed := false;
+    Color := clNone32;
     SetInnerBounds(DPIAware(RectD(40, 100, 150, 135)));
-    //Color := clBtnFace32;
     BevelHeight := bevelSize;
     Onclick := epHandler.ClickBtn;
   end;
@@ -777,7 +423,6 @@ begin
   begin
     Caption := 'Opaque';
     SetInnerBounds(DPIAware(RectD(40, 150, 150, 190)));
-    Color := clBtnFace32;
     BevelHeight := bevelSize;
     Onclick := epHandler.ClickBtn;
   end;
@@ -835,24 +480,19 @@ begin
     BevelHeight := bevelSize;
   end;
 
-  with layeredImg32.AddLayer(TListCtrl, pagePnl) as TListCtrl do
+  with pagePnl.AddChild(TListCtrl, 'ListCtrl') as TListCtrl do
   begin
-    SetInnerBounds(DPIAware(RectD(430, 50, 560, 160)));
-    SetItems(['List Item 1','List Item 2','List Item 3','List Item 4',
-      'List Item 5','List Item 6','List Item 7','List Item 8']);
+    SetInnerBounds(DPIAware(RectD(430, 50, 560, 178)));
+    for i := 1 to 8 do
+      AddChild(TListItem, 'List item ' + IntToStr(i));
     BevelHeight := bevelSize;
-    MaxVisibleItems := 6;
-    Margin := 0;//2;
     ImageList := epHandler.svgList2;
-    ScrollV := AddChild(TScrollCtrl) as TScrollCtrl;
-    ScrollV.Name := 'ListScroll';
+    ScrollV := AddChild(TScrollCtrl, 'ListScroll') as TScrollCtrl;
   end;
 
   // PAGE 2 ///////////////////////////////////////////////////////
 
   pagePnl := pageCtrl.Panel[1];
-  //pagePnl.Color := $20FF00FF;
-  //pagePnl.Margin := DPIAware(50); //margin only works for autopositioned ctrls
   //add vertical and horizontal scrollbars
   pagePnl.ScrollH := pagePnl.AddChild(TScrollCtrl) as TScrollCtrl;
   pagePnl.ScrollV := pagePnl.AddChild(TScrollCtrl) as TScrollCtrl;
@@ -868,16 +508,15 @@ begin
   //so we'll do this in a loop
 
   //prepare for button positioning
-  pad := DPIAware(4);
+  pad := DPIAware(2);
   w := bevelSize * 2 + pad * 2 + imageSize64; //top row button width (bevel, padding & image)
-  h := imageSize64 + pad * 3 + bevelSize * 2 + epHandler.arial14.LineHeight;  //button height
+  h := imageSize64 + pad * 3 + bevelSize * 2 + epHandler.scaledFont.LineHeight;  //button height
   j := DPIAware(40);    //initial button X offset
   k := DPIAware(80);    //initial button Y offset
 
   for i := 0 to epHandler.svgList.Count -1 do
     with layeredImg32.AddLayer(TImageBtnCtrl, pagePnl) as TImageBtnCtrl do
     begin
-      //Font := arial;
       Caption := 'Btn' + Format('%d', [i + 1]);
       Padding := pad;
       BevelHeight := bevelSize;
@@ -885,9 +524,9 @@ begin
       if i mod 8 = 7 then
       begin
         j := DPIAware(40 * currentScale);
-        k := k + h + OuterMargin;
+        k := k + h + OuterMargin * 2;
         //change button width and height for second row
-        w := epHandler.arial14.GetTextWidth('Btn13')
+        w := epHandler.scaledFont.GetTextWidth('Btn13')
           +16 + bevelSize * 2 + pad * 3 + imageSize64;
         h := imageSize64 + pad * 2 +bevelSize * 2;
       end else
@@ -906,25 +545,410 @@ begin
           TextPosition := tpTop;
       end;
       ImageList := epHandler.svgList;
-      ImageListIdx := i;
+      ImageIdx := i;
       Onclick := epHandler.ClickBtn;
-      //Color := clBtnFace32;
+      Color := clNone32;
     end;
 
   // PAGE 3 ///////////////////////////////////////////////////////
   pagePnl := pageCtrl.Panel[2];
-  //pagePnl.Color := $2000FFFF;
   pagePnl.Margin := DpiAware(10);
   pageCtrl.ActiveIndex := 0;
 
   with layeredImg32.AddLayer(TMemoCtrl, pagePnl) as TMemoCtrl do
   begin
+    OuterMargin := 40;
     Text := GetUnicodeTextResource('LOREM', 'TEXT');
     BevelHeight := bevelSize;
     AutoPosition := apClient;
-    ScrollV := AddChild(TScrollCtrl) as TScrollCtrl;
-    ScrollV.Name := 'MemoScroll';
-    OuterMargin := 40;
+    ScrollV := AddChild(TScrollCtrl, 'MemoScroll') as TScrollCtrl;
+  end;
+end;
+
+//------------------------------------------------------------------------------
+// TEventPropertyHandler1 handles all custom (ie user defined) events
+//------------------------------------------------------------------------------
+
+procedure TEventPropHandler.LoadClick(Sender: TObject);
+var
+  filename: string;
+begin
+  filename := '.\*.xml';
+  if not OpenSaveXmlDialog(filename, false) then Exit;
+  storageMngr.LoadFromFile(filename);
+
+  // LoadFromFile() will delete all controls contained by
+  // RootCtrl prior to loading the new ones.
+  pageCtrl := rootCtrl.FindChildByClass(TPageCtrl) as TPageCtrl;
+  statusCtrl := rootCtrl.FindChildByClass(TStatusbarCtrl) as TStatusbarCtrl;
+  Rescale(storageMngr.DesignScale, true);
+
+  ResizeMainWindow(mainHdl, layeredImg32.Width, layeredImg32.Height);
+end;
+//------------------------------------------------------------------------------
+
+procedure TEventPropHandler.SaveClick(Sender: TObject);
+var
+  filename: string;
+begin
+  filename := '.\*.xml';
+  if not OpenSaveXmlDialog(filename, true) then Exit;
+  storageMngr.SaveToFile(filename, StorageMngr.DesignScale);
+  statusCtrl.Caption := 'Controls saved';
+end;
+//------------------------------------------------------------------------------
+
+procedure TEventPropHandler.ExitClick(Sender: TObject);
+begin
+  storageMngr.Quit;
+end;
+//------------------------------------------------------------------------------
+
+procedure TEventPropHandler.ScaleSliderClick(Sender: TObject);
+var
+  senderPos, scale: double;
+begin
+  if not Assigned(sender) or not (Sender is TSliderCtrl) then Exit;
+
+  senderPos := (Sender as TSliderCtrl).Position;
+  scale := (100 + senderPos) * 0.01;
+  Rescale(scale, false);
+end;
+//------------------------------------------------------------------------------
+
+procedure TEventPropHandler.Slider2Click(Sender: TObject);
+var
+  senderPos: double;
+begin
+  senderPos := (Sender as TSliderCtrl).Position;
+  with pageCtrl.FindChildByClass(TProgressCtrl) as TProgressCtrl do
+    Position := senderPos;
+end;
+//------------------------------------------------------------------------------
+
+procedure TEventPropHandler.ClickMe(Sender: TObject);
+begin
+  windows.MessageBox(0, '''Click Me'' button clicked!', 'CtrlDemo', 0);
+end;
+//------------------------------------------------------------------------------
+
+procedure TEventPropHandler.ClickBtn(Sender: TObject);
+begin
+  statusCtrl.Caption := TButtonCtrl(Sender).Caption + ' clicked';
+end;
+//------------------------------------------------------------------------------
+
+procedure TEventPropHandler.CheckboxClick(Sender: TObject);
+begin
+  with (Sender as TCheckboxCtrl) do
+    case State of
+      tsUnknown : State := tsNo;
+      tsYes     : State := tsUnknown;
+      tsNo      : State := tsYes;
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TEventPropHandler.DesigningClick(Sender: TObject);
+begin
+  designing := not designing;
+  if not designing then SetDesignTarget(nil);
+end;
+//------------------------------------------------------------------------------
+
+procedure TEventPropHandler.DarkModeClick(Sender: TObject);
+begin
+  if rootCtrl.Theme.Color = darkTheme.Color then
+    rootCtrl.Theme := lightTheme else
+    rootCtrl.Theme := darkTheme;
+  InvalidateRect(mainHdl, nil, true);
+end;
+//------------------------------------------------------------------------------
+
+procedure TEventPropHandler.TabClicked(Sender: TObject);
+begin
+  if Assigned(statusCtrl) then
+    statusCtrl.Caption := '';
+end;
+
+//------------------------------------------------------------------------------
+// Windows message handler - that passes keyboard and
+// mouse messages to storageMngr for processing
+//------------------------------------------------------------------------------
+
+function WindowProc(hWnd, uMsg,	wParam: WPARAM; lParam: LPARAM): Integer; stdcall;
+
+  procedure UpdateTargetPosDisplay;
+  begin
+    if Assigned(designTarget) then
+      with designTarget do
+        statusCtrl.Caption := Format('  %1.0n, %1.0n',[Left, Top]);
+  end;
+
+  procedure UpdateFocusedCtrlDisplay;
+  begin
+    if Assigned(storageMngr.RootCtrl.FocusedCtrl) then
+      with storageMngr.RootCtrl.FocusedCtrl do
+        if Caption = '' then
+          statusCtrl.Caption := Name else
+          statusCtrl.Caption := StringReplace(Caption, '&', '', []);
+  end;
+
+var
+  key     : Word;
+  chr     : Char;
+  w,h     : integer;
+  pt      : TPoint;
+  ps      : TPAINTSTRUCT;
+  dc      : HDC;
+  img     : TImage32;
+  dx,dy   : integer;
+  rec     : TRectD;
+  shift   : TShiftState;
+  layer   : TLayer32;
+begin
+  case uMsg of
+    WM_LBUTTONDOWN:
+      begin
+        Result := 0;
+        SetCapture(hWnd);
+        clickPt := Img32.vector.Point(
+          SmallInt(LoWord(lParam)),
+          SmallInt(HiWord(lParam)));
+        if designing and not Assigned(rootCtrl.CaptureCtrl) then
+        begin
+          clickLayer := layeredImg32.GetLayerAt(clickPt);
+          if IsOwnedBy(clickLayer, TPagePnlCtrl) then
+          begin
+            SetDesignTarget(clickLayer as TCustomCtrl);
+            SetCursor(handCursor);
+            UpdateTargetPosDisplay;
+            Exit;
+          end
+          else if (clickLayer is TButtonDesignerLayer32) then
+          begin
+            SetCursor(sizeCursor);
+            Exit;
+          end else
+          begin
+            SetDesignTarget(nil);
+            clickLayer := nil;
+          end;
+        end;
+        // not designing so get storageMngr to process
+        storageMngr.MouseDown(mbLeft, WParamToShiftState(wParam), clickPt);
+        //UpdateFocusedCtrlDisplay;
+        if storageMngr.RepaintRequired then
+          InvalidateRect(hWnd, nil, false);
+      end;
+    WM_MOUSEMOVE:
+      begin
+        Result := 0;
+        pt := Img32.vector.Point(
+          SmallInt(LoWord(lParam)),
+          SmallInt(HiWord(lParam)));
+        dx := pt.X - clickPt.X; dy := pt.Y - clickPt.Y;
+
+        if designing and not Assigned(rootCtrl.CaptureCtrl) then
+        begin
+          if not assigned(clickLayer) then
+          begin
+            layer := layeredImg32.GetLayerAt(pt);
+            if Assigned(layer) then
+            begin
+              if (layer is TButtonDesignerLayer32) then
+                SetCursor(sizeCursor)
+              else if layer = designTarget then
+                SetCursor(handCursor)
+              else
+                SetCursor(arrowCursor);
+            end;
+            Exit;
+          end;
+
+          if (clickLayer = designTarget) then
+          begin
+            SetCursor(handCursor);
+            designTarget.Offset(dx,dy);
+            sizingGroup.Offset(dx,dy);
+            clickPt := pt;
+            UpdateTargetPosDisplay;
+            InvalidateRect(hWnd, nil, false);
+          end else if (clickLayer is TButtonDesignerLayer32) then
+          begin
+            SetCursor(sizeCursor);
+            clickLayer.Offset(dx, dy);
+            rec := RectD(UpdateSizingButtonGroup(clickLayer));
+            rec := designTarget.Parent.MakeRelative(rec);
+            designTarget.SetInnerBounds(rec);
+            clickPt := pt;
+            InvalidateRect(hWnd, nil, false);
+          end;
+        end else
+        begin
+          // not designing so get storageMngr to process
+          storageMngr.MouseMove(WParamToShiftState(wParam), pt);
+          if storageMngr.RepaintRequired then
+            InvalidateRect(hWnd, nil, false);
+        end;
+      end;
+    WM_LBUTTONUP:
+      begin
+        ReleaseCapture;
+        pt := Img32.vector.Point(
+          SmallInt(LoWord(lParam)),
+          SmallInt(HiWord(lParam)));
+        storageMngr.MouseUp(mbLeft, WParamToShiftState(wParam), pt);
+        if storageMngr.RepaintRequired then
+          InvalidateRect(hWnd, nil, false);
+        clickLayer := nil;
+        Result := 0;
+      end;
+    WM_MOUSEWHEEL:
+      begin
+        if designing and not Assigned(rootCtrl.CaptureCtrl) then
+          clickLayer := nil;
+        pt := Img32.vector.Point(
+          SmallInt(LoWord(lParam)),
+          SmallInt(HiWord(lParam)));
+        if storageMngr.MouseWheel(WParamToShiftState(wParam),
+          SmallInt(HiWord(wParam)), pt) and storageMngr.RepaintRequired then
+            InvalidateRect(hWnd, nil, false);
+        Result := 0;
+      end;
+    WM_SYSCOMMAND:
+      if wParam = SC_KEYMENU then
+        Result := 0 else //stops beeps with Alt key combos
+        Result := DefWindowProc(hWnd, uMsg, wParam, lParam);
+    WM_CHAR:
+      begin
+        if not designing then
+        begin
+          chr := Char(wParam);
+          storageMngr.KeyPress(chr);
+          if storageMngr.RepaintRequired then
+            InvalidateRect(hWnd, nil, false);
+        end;
+        Result := 0;
+      end;
+    WM_KEYDOWN:
+      begin
+        key := Word(wParam);
+        shift := LParamToShiftState(lParam);
+
+        if designing and not Assigned(rootCtrl.CaptureCtrl) and
+          Assigned(designTarget) then
+        begin
+          case Key of
+            VK_DELETE:
+              begin
+                FreeAndNil(sizingGroup);
+                FreeAndNil(designTarget);
+                InvalidateRect(hWnd, nil, false);
+              end;
+            VK_DOWN:
+              begin
+                if Shift and ssCtrl <> 0 then w := 5 else w := 1;
+                designTarget.Offset(0,w);
+                sizingGroup.Offset(0,w);
+                UpdateTargetPosDisplay;
+                InvalidateRect(hWnd, nil, false);
+              end;
+            VK_UP:
+              begin
+                if Shift and ssCtrl <> 0 then w := 5 else w := 1;
+                designTarget.Offset(0,-w);
+                sizingGroup.Offset(0,-w);
+                UpdateTargetPosDisplay;
+                InvalidateRect(hWnd, nil, false);
+              end;
+            VK_RIGHT:
+              begin
+                if Shift and ssCtrl <> 0 then w := 5 else w := 1;
+                designTarget.Offset(w,0);
+                sizingGroup.Offset(w,0);
+                UpdateTargetPosDisplay;
+                InvalidateRect(hWnd, nil, false);
+              end;
+            VK_LEFT:
+              begin
+                if Shift and ssCtrl <> 0 then w := 5 else w := 1;
+                designTarget.Offset(-w,0);
+                sizingGroup.Offset(-w,0);
+                UpdateTargetPosDisplay;
+                InvalidateRect(hWnd, nil, false);
+              end;
+          end;
+        end
+        else
+        begin
+          if (key = VK_TAB) then
+            statusCtrl.Caption := 'TAB key pressed';
+
+          storageMngr.KeyDown(key, shift);
+          if storageMngr.RepaintRequired then
+            InvalidateRect(hWnd, nil, false);
+        end;
+        Result := 0;
+      end;
+    WM_SYSKEYDOWN:
+      begin
+        // eg alt keys
+        key := Word(wParam);
+        shift := LParamToShiftState(lParam);
+        storageMngr.KeyDown(key, shift);
+        if storageMngr.RepaintRequired then
+          InvalidateRect(hWnd, nil, false);
+        Result := 0;
+      end;
+    WM_SYSKEYUP:
+      begin
+        Result := 0;
+      end;
+    WM_KEYUP:
+      begin
+        key := Word(wParam);
+        shift := LParamToShiftState(lParam);
+        storageMngr.KeyUp(key, shift);
+        if storageMngr.RepaintRequired then
+          InvalidateRect(hWnd, nil, false);
+        Result := 0;
+      end;
+    WM_SIZE:
+      begin
+        w := LoWord(lParam);
+        h := HIWord(lParam);
+        storageMngr.Resize(w,h);
+        InvalidateRect(hWnd,nil,true);
+        Result := 0;
+      end;
+    WM_PAINT:
+      begin
+        Result := 0;
+        img := layeredImg32.GetMergedImage(false, updateRect);
+        //img.SaveToFile('c:\temp\test.bmp');
+        dc := BeginPaint(hWnd, &ps);
+        img.CopyToDc(updateRect, dc, updateRect.Left, updateRect.Top, false);
+        EndPaint(hWnd, &ps);
+      end;
+    WM_ERASEBKGND: Result := 1;
+    WM_GETDLGCODE: Result := DLGC_WANTALLKEYS;
+    WM_DPICHANGED:
+      begin
+        //nb: Manifest DPI Awareness must be set to
+        //at least 'Per Monitor' to receive this notification.
+        DpiAwareOne := LoWord(wParam) / 96;
+        DpiAware1 := Round(DpiAwareOne);
+        Result := 0;
+      end;
+    WM_DESTROY:
+      begin
+        PostQuitMessage(0);
+        result := 0;
+        exit;
+      end;
+    else
+      Result := DefWindowProc(hWnd, uMsg, wParam, lParam);
   end;
 end;
 
@@ -933,9 +957,11 @@ end;
 //------------------------------------------------------------------------------
 
 const
-  mainWindowWidth   = 720;
+  mainWindowWidth   = 620;
   mainWindowHeight  = 480;
 
+var
+  tmpFontReader: TFontReader;
 begin
 
   // Setup and register the TWndClass record needed to create the main window
@@ -960,26 +986,29 @@ begin
 
   CenterWindow(mainHdl);
 
-  imageSize64 := DpiAware(64.0);
-  imageSize24 := DpiAware(24.0);
-
-  // fontReader - construction and destruction managed by FontManager
-  fontReader  := FontManager.LoadFontReader('Arial');
-
-  // instantiate handles to 'shared' cursors.
-  // nb: these won't need destroying
+  // instantiate handles to 'shared' cursors (that won't need destroying)
   sizeCursor  := LoadCursor(0, IDC_SIZEALL);
   handCursor  := LoadCursor(0, IDC_HAND);
   arrowCursor := LoadCursor(0, IDC_ARROW);
 
-  storageMngr := TCtrlStorageManager.Create;
+  // initialize Storage Manager that controls almost everything
+  storageMngr := TCtrlStorageManager.Create(mainHdl);
+  // create Storage Manager's event handler (that's owned by Storage Manager)
   epHandler := storageMngr.InsertChild(0, TEventPropHandler) as TEventPropHandler;
+
+  // image sizes used by svgList & svgList2
+  imageSize64 := DpiAware(64.0);
+  imageSize24 := DpiAware(24.0);
 
   with epHandler do
   begin
-    arial14 := TFontCache.Create(fontReader, DPIAware(14));
-    UnscaledFont := TFontCache.Create(fontReader, DPIAware(14));
-    //arial18 := TFontCache.Create(fontReader, DPIAware(18));
+
+    tmpFontReader  := FontManager.LoadFontReader('Arial');
+    // tmpFontReader is needed to create a couple of font caches
+    // here to be used by Storage Manager event handler.
+    // (It will be destroyed by FontManager later.)
+    scaledFont := TFontCache.Create(tmpFontReader, DPIAware(14));
+    unscaledFont := TFontCache.Create(tmpFontReader, DPIAware(14));
 
     svgList  := TSvgImageList32.Create;
     svgList.ResourceName := 'SVG';  //automatically loads resource
@@ -1007,19 +1036,17 @@ begin
   if DoLoadFromStorage then
   begin
     storageMngr.LoadFromFile('.\CtrlDemo.xml');
-    // LoadFromFile() will delete the existing controls
-    // contained by RootCtrl before loading all the new ones.
-
+    // assign a couple of useful control variables
     pageCtrl := rootCtrl.FindChildByClass(TPageCtrl) as TPageCtrl;
     statusCtrl := rootCtrl.FindChildByClass(TStatusbarCtrl) as TStatusbarCtrl;
-
+    // LoadFromFile() will delete the existing controls
+    // contained by RootCtrl before loading all the new ones.
     // storageMngr.DesignScale may have changed so ...
-    Rescale(currentScale, true);
+    Rescale(1, true);
     ResizeMainWindow(mainHdl, layeredImg32.Width, layeredImg32.Height);
   end else
   begin
     SetupCtrls;
-    storageMngr.FindAllShortcutOwners;
   end;
 
   ShowWindow(mainHdl, cmdShow);
@@ -1031,6 +1058,8 @@ begin
       DispatchMessage(msg);
     end;
 
+  if storageMngr.MainHdl > 0 then
+    DestroyWindow(mainHdl);
   storageMngr.free;
 
 end.

@@ -3,7 +3,7 @@ unit Img32.Layers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  20 March 2025                                                   *
+* Date      :  4 April 2025                                                    *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  Layered images support                                          *
@@ -61,24 +61,24 @@ type
     fTop            : double;
     fWidth          : double;
     fHeight         : double;
-    fOuterMargin    : double;
+    fOuterMargin    : double;   // the drawing margin around a layer
     fImage          : TImage32;
-    fMergeImage     : TImage32; //contains a merge of child images
-    fClipImage      : TImage32; //used to restrict child drawing inside a layer
+    fMergeImage     : TImage32; // contains a merge of child images
+    fClipImage      : TImage32; // used to restrict child drawing inside a layer
     fVisible        : Boolean;
     fOpacity        : Byte;
     fCursorId       : integer;
     fUserData       : TObject;
-    fBlendFunc      : TBlendFunction; //defaults to BlendToAlpha
+    fBlendFunc      : TBlendFunction;   // defaults to BlendToAlpha
     fLayeredImage   : TLayeredImage32;
-    fClipPath       : TPathsD;  //used in conjunction with fClipImage
+    fClipPath       : TPathsD;          // used in conjunction with fClipImage
+    fNonLayerChilds : Boolean;
 {$IFDEF USE_FILE_STORAGE}
     fStreamingRec   : TRectWH;
     procedure SetLeft(value: double);
     procedure SetTop(value: double);
 {$ENDIF}
     function  GetMidPoint: TPointD;
-    procedure SetVisible(value: Boolean);
     procedure SetHeight(value: double);
     procedure SetWidth(value: double);
     procedure SetBlendFunc(func: TBlendFunction);
@@ -94,17 +94,26 @@ type
   protected
     fIsDesignLayer  : Boolean;
     fUpdateInfo     : TUpdateInfo;
+    // children may not always be TLayer32 objects
+    function  GetStorageChild(index: integer): TStorage;
+    function  AddStorageChild(storeClass: TStorageClass): TStorage;
+    function  InsertStorageChild(idx: integer; storeClass: TStorageClass): TStorage;
+    function  ChildNotTLayer32(childIdx: integer): Boolean;
+    procedure SetVisible(value: Boolean); virtual;
     procedure SetDesignerLayer(value: Boolean);
     procedure SetOuterMargin(value: double); virtual;
     function  GetUpdateNeeded: Boolean;
     procedure DoBeforeMerge; virtual;
+    procedure DoAfterMerge; virtual;
     procedure PreMerge(hideDesigners: Boolean); virtual;
+    procedure MergeChild(child: TLayer32;
+      dstImg: TImage32; hideDesigners: Boolean; const updateRect: TRect);
     procedure Merge(hideDesigners: Boolean; updateRect: TRect);
     function  GetLayerAt(const pt: TPointD; ignoreDesigners: Boolean): TLayer32;
     function  RemoveChildFromList(index: integer): TStorage; override;
-    function  GetInnerRectD: TRectD;
-    function  GetInnerBounds: TRectD;
-    function  GetOuterBounds: TRectD;
+    function  GetInnerRectD: TRectD;   // in client (ie layer) coordinates
+    function  GetInnerBounds: TRectD;  // in fLayeredImage coordinates
+    function  GetOuterBounds: TRectD;  // margin inflated GetInnerBounds
 {$IFDEF USE_FILE_STORAGE}
     procedure BeginRead; override;
     procedure EndRead; override;
@@ -113,10 +122,13 @@ type
     procedure ImageChanged(Sender: TImage32); virtual;
     procedure UpdateLayeredImage(newLayeredImage: TLayeredImage32);
     property  UpdateInfo: TUpdateInfo read fUpdateInfo;
-    property  UpdateNeeded : Boolean read GetUpdateNeeded;
+    property  UpdateNeeded  : Boolean read GetUpdateNeeded;
+    property  MergeImage    : TImage32 read fMergeImage; // a merge of child images
   public
-    constructor Create(parent: TStorage = nil; const name: string = ''); overload; override;
-    constructor Create(parent: TLayer32; const name: string = ''); reintroduce; overload; virtual;
+    constructor Create(parent: TStorage = nil;
+      const name: string = ''); overload; override;
+    constructor Create(parent: TLayer32;
+      const name: string = ''); reintroduce; overload; virtual;
     destructor Destroy; override;
     function   BringForwardOne: Boolean;
     function   SendBackOne: Boolean;
@@ -144,9 +156,10 @@ type
 
     function   AddChild(layerClass: TLayer32Class;
       const name: string = ''): TLayer32; reintroduce; virtual;
-    function   InsertChild(layerClass: TLayer32Class;
-      index: integer; const name: string = ''): TLayer32; reintroduce; overload; virtual;
-    function   InsertChild(index: integer; storeClass: TStorageClass): TStorage;  overload; override;
+    function   InsertChild(index: integer; layerClass: TLayer32Class;
+      const name: string = ''): TLayer32; reintroduce; overload; virtual;
+    function   InsertChild(index: integer;
+      storeClass: TStorageClass): TStorage;  overload; override;
     procedure  ClearChildren; override;
 
     property   Child[index: integer]: TLayer32 read GetChild; default;
@@ -154,7 +167,8 @@ type
     //Portions of child layers residing outside this region  will be clipped.
     property   ClipPath: TPathsD read fClipPath write SetClipPath;
     procedure  Offset(dx, dy: double); overload; virtual;
-    property   IsDesignerLayer: Boolean read fIsDesignLayer write SetDesignerLayer;
+    property   IsDesignerLayer: Boolean
+      read fIsDesignLayer write SetDesignerLayer;
     property   InnerBounds: TRectD read GetInnerBounds;
     property   InnerRect: TRectD read GetInnerRectD;
     property   OuterBounds: TRectD read GetOuterBounds;
@@ -395,7 +409,8 @@ type
     procedure SetSize(width, height: integer);
     procedure Clear;
     procedure Invalidate;
-    function  InsertChild(index: integer; storeClass: TStorageClass): TStorage; override;
+    function  InsertChild(index: integer;
+      storeClass: TLayer32Class): TLayer32; reintroduce; overload; virtual;
     function  AddLayer(layerClass: TLayer32Class = nil;
       parent: TLayer32 = nil; const name: string = ''): TLayer32;
     function  InsertLayer(layerClass: TLayer32Class; parent: TLayer32;
@@ -404,7 +419,7 @@ type
     procedure DeleteLayer(layerIndex: integer;
       parent: TLayer32 = nil); overload;
     function  FindLayerNamed(const name: string): TLayer32;
-    function   GetLayerAt(const pt: TPoint; ignoreDesigners: Boolean = false): TLayer32; overload;
+    function  GetLayerAt(const pt: TPoint; ignoreDesigners: Boolean = false): TLayer32; overload;
     function  GetLayerAt(const pt: TPointD; ignoreDesigners: Boolean = false): TLayer32; overload;
     function  GetMergedImage(hideDesigners: Boolean = false): TImage32; overload;
     function  GetMergedImage(hideDesigners: Boolean;
@@ -484,7 +499,7 @@ resourcestring
   rsCreateButtonGroupError = 'CreateButtonGroup - invalid target layer';
   rsUpdateRotateGroupError = 'UpdateRotateGroup - invalid group';
   rsLayeredImage32Error    = 'TLayeredImage32: ''root'' must be a TGroupLayer32';
-  rsLayer32Error           = 'TLayer32 - children must also be TLayer32';
+  rsLayer32Error           = 'TLayer32 child expected';
   rsVectorLayer32Error     = 'TVectorLayer32 - updating Paths during draw events will cause recursion.';
 
 //------------------------------------------------------------------------------
@@ -662,15 +677,15 @@ end;
 
 procedure TLayer32.SetLayer32Parent(parent: TLayer32);
 begin
-  if inherited parent = parent then Exit;
-  inherited SetParent(parent);
+  if inherited Parent = parent then Exit;
+  SetParent(parent);
   if Visible then Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 function TLayer32.GetUpdateNeeded: Boolean;
 begin
-     Result := (fUpdateInfo.updateMethod <> umNone);
+  Result := (fUpdateInfo.updateMethod <> umNone);
 end;
 //------------------------------------------------------------------------------
 
@@ -912,8 +927,7 @@ end;
 
 function TLayer32.BringToFront: Boolean;
 begin
-  Result := assigned(Parent) and
-    (index < Parent.ChildCount -1);
+  Result := assigned(Parent) and (index < Parent.ChildCount -1);
   if not Result then Exit;
   Parent.Childs.Move(index, Parent.ChildCount -1);
   Parent.ReindexChilds(index);
@@ -995,6 +1009,8 @@ begin
   if not assigned(Parent) or not assigned(newParent) then
     Exit;
 
+  Invalidate; // at old location
+
   //make sure we don't create circular parenting
   layer := newParent;
   while Assigned(layer) and (layer is TLayer32) do
@@ -1019,7 +1035,8 @@ begin
     Parent.Childs.Move(Index, idx);
     Parent.ReindexChilds(idx);
   end;
-  Invalidate;
+  fUpdateInfo.updateMethod := umNone;
+  Invalidate; // at new position :)
   Result := true;
 end;
 //------------------------------------------------------------------------------
@@ -1039,6 +1056,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TLayer32.GetStorageChild(index: integer): TStorage;
+begin
+  Result := inherited GetChild(index);
+end;
+//------------------------------------------------------------------------------
+
 procedure TLayer32.ClearChildren;
 begin
   inherited;
@@ -1050,25 +1073,48 @@ end;
 function TLayer32.AddChild(layerClass: TLayer32Class;
   const name: string = ''): TLayer32;
 begin
-  Result := InsertChild(layerClass, MaxInt, name);
+  Result := InsertChild(MaxInt, layerClass, name);
 end;
 //------------------------------------------------------------------------------
 
-function TLayer32.InsertChild(layerClass: TLayer32Class;
-  index: integer; const name: string = ''): TLayer32;
+function TLayer32.AddStorageChild(storeClass: TStorageClass): TStorage;
 begin
-  Result := inherited InsertChild(index, layerClass) as TLayer32;
-  if name = '' then
-    Result.Name := Result.ClassName else
-    Result.Name := name;
+  Result := InsertStorageChild(MaxInt, storeClass);
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.InsertStorageChild(idx: integer;
+  storeClass: TStorageClass): TStorage;
+begin
+  Result := inherited InsertChild(idx, storeClass);
+  if not (Result is TLayer32) then fNonLayerChilds := true;
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.ChildNotTLayer32(childIdx: integer): Boolean;
+begin
+  Result := not (GetStorageChild(childIdx) is TLayer32);
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.InsertChild(index: integer; layerClass: TLayer32Class;
+  const name: string = ''): TLayer32;
+begin
+  Result := layerClass.Create(self, name) as TLayer32;
+  if index < ChildCount -1 then
+  begin
+    Childs.Move(Result.Index, index);
+    ReindexChilds(index);
+  end;
 end;
 //------------------------------------------------------------------------------
 
 function TLayer32.InsertChild(index: integer; storeClass: TStorageClass): TStorage;
 begin
+  // must use explicit InsertStorageChild() for non-TLayer32 children
   if not storeClass.InheritsFrom(TLayer32) then
     raise Exception.Create(rsLayer32Error);
-  Result := InsertChild(TLayer32Class(storeClass), index, '');
+  Result := InsertChild(index, TLayer32Class(storeClass), '');
 end;
 //------------------------------------------------------------------------------
 
@@ -1111,6 +1157,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TLayer32.DoAfterMerge;
+begin
+end;
+//------------------------------------------------------------------------------
+
 procedure TLayer32.PreMerge(hideDesigners: Boolean);
 var
   i: integer;
@@ -1120,6 +1171,8 @@ begin
   //this method is recursive and updates each group's fInvalidRect
   for i := 0 to ChildCount -1 do
   begin
+    if fNonLayerChilds and ChildNotTLayer32(i) then Continue;
+
     childLayer := Child[i];
     with childLayer do
     begin
@@ -1133,13 +1186,15 @@ begin
         rec := Parent.MakeAbsolute(fUpdateInfo.priorPosition);
         with fLayeredImage do
           fInvalidRect := UnionRect(fInvalidRect, rec);
+
+        // and repeat with updated fUpdateInfo.priorPosition
         fUpdateInfo.priorPosition := OuterBounds;
         rec := Parent.MakeAbsolute(fUpdateInfo.priorPosition);
         with fLayeredImage do
           fInvalidRect := UnionRect(fInvalidRect, rec);
       end;
 
-      // premerge children
+      // premerge children - updates each visible child's fInvalidRect
       DoBeforeMerge;
       PreMerge(hideDesigners);
     end;
@@ -1147,44 +1202,18 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TLayer32.Merge(hideDesigners: Boolean; updateRect: TRect);
+procedure TLayer32.MergeChild(child: TLayer32;
+  dstImg: TImage32; hideDesigners: Boolean; const updateRect: TRect);
 var
-  i: integer;
-  childLayer: TLayer32;
-  img, childImg, childImg2: TImage32;
-  rec, rec2, dstRect, srcRect: TRect;
+  childImg  : TImage32;
+  childImg2 : TImage32;
+  srcRect   : TRect;
+  dstRect   : TRect;
+  rec, rec2 : TRect;
 begin
-  //layers with children will merge to fMergeImage to preserve its own image.
-  //that fMergeImage will then merge with its parent fMergeImage until root.
-
-  if not (self is TGroupLayer32) then
-    TranslateRect(updateRect, -Floor(fLeft), -Floor(fTop));
-
-  if (self is TGroupLayer32) or (ChildCount = 0) then
-  begin
-    //safe to merge any child images onto self.Image
-    img := fImage;
-  end else
-  begin
-    if not Assigned(fMergeImage) then
-      fMergeImage := TImage32.Create;
-    fMergeImage.Assign(fImage);
-    img := fMergeImage;
-  end;
-
-  {$IF not defined(FPC) and (CompilerVersion <= 26.0)}
-  // Delphi 7-XE5 have a problem with "continue" and the
-  // code analysis, marking "childImg" as "not initialized"
-  childImg := nil;
-  {$IFEND}
-  //merge redraw all children
-  for i := 0 to ChildCount -1 do
-  begin
-    childLayer := Child[i];
-    with childLayer do
+    with child do
     begin
-      if not visible or (hideDesigners and IsDesignerLayer) then
-         Continue;
+      if not visible or (hideDesigners and IsDesignerLayer) then Exit;
 
       //recursive merge
       if (fUpdateInfo.updateMethod <> umNone) then
@@ -1209,7 +1238,7 @@ begin
         Types.IntersectRect(dstRect, dstRect, self.Image.Bounds);
       end;
 
-      if IsEmptyRect(dstRect) then Continue;
+      if IsEmptyRect(dstRect) then Exit;
 
       //get srcRect (offset to childLayer coords)
       //and further adjust dstRect to accommodate OuterMargin
@@ -1228,33 +1257,67 @@ begin
     //DRAW THE CHILD  ONTO THE PARENT'S IMAGE
 
     childImg2 := nil;
-    img.BlockNotify;
     try
-      if (childLayer.Opacity < 254) or Assigned(fClipPath) then
+      if (child.Opacity < 254) or Assigned(fClipPath) then
       begin
         childImg2 := TImage32.Create(childImg);
-        childImg2.ReduceOpacity(childLayer.Opacity);
+        childImg2.ReduceOpacity(child.Opacity);
         if Assigned(fClipImage) then
         begin
           //use the clipping mask to 'trim' childLayer's image
           rec := fClipImage.Bounds;
           rec2 := rec;
           TranslateRect(rec2,
-            Floor(childLayer.fOuterMargin -childLayer.Left -fOuterMargin),
-            Floor(childLayer.fOuterMargin -childLayer.Top -fOuterMargin));
+            Floor(child.fOuterMargin -child.Left -fOuterMargin),
+            Floor(child.fOuterMargin -child.Top -fOuterMargin));
           childImg2.CopyBlend(fClipImage, rec, rec2, BlendMaskLine);
         end;
       end else
         childImg2 := childImg;
 
-      if Assigned(childLayer.BlendFunc) then
-        img.CopyBlend(childImg2, srcRect, dstRect, childLayer.BlendFunc) else
-        img.Copy(childImg2, srcRect, dstRect);
+      if Assigned(child.BlendFunc) then
+        dstImg.CopyBlend(childImg2, srcRect, dstRect, child.BlendFunc) else
+        dstImg.Copy(childImg2, srcRect, dstRect);
     finally
       if childImg2 <> childImg then
         childImg2.Free;
-      img.UnblockNotify;
     end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TLayer32.Merge(hideDesigners: Boolean; updateRect: TRect);
+var
+  i: integer;
+  img: TImage32;
+begin
+  //layers with children will merge to fMergeImage to preserve its own image.
+  //that fMergeImage will then merge with its parent fMergeImage until root.
+  if not (self is TGroupLayer32) then
+    TranslateRect(updateRect, -Floor(fLeft), -Floor(fTop));
+
+  if (self is TGroupLayer32) or (ChildCount = 0) then
+  begin
+    //safe to merge any child images onto self.Image
+    img := fImage;
+  end else
+  begin
+    if not Assigned(fMergeImage) then
+      fMergeImage := TImage32.Create;
+    fMergeImage.Assign(fImage);
+    img := fMergeImage;
+  end;
+
+  img.BlockNotify;
+  try
+    //merge redraw all children
+    for i := 0 to ChildCount -1 do
+    begin
+      if fNonLayerChilds and ChildNotTLayer32(i) then Continue;
+      MergeChild(child[i], img, hideDesigners, updateRect);
+    end;
+  finally
+    DoAfterMerge;
+    img.UnblockNotify;
   end;
 
   with fUpdateInfo do
@@ -1286,6 +1349,7 @@ begin
 
   for i := ChildCount -1 downto 0 do
   begin
+    if fNonLayerChilds and ChildNotTLayer32(i) then Continue;
     childLayer := Child[i];
     with childLayer do
       if not Visible or not PtInRect(InnerBounds, pt2) or
@@ -1331,15 +1395,9 @@ begin
   Result := nil;
   for i := 0 to ChildCount -1 do
   begin
-    if Child[i] is TLayer32 then
-    begin
-      Result := Child[i].FindLayerNamed(name);
-      if assigned(Result) then Break;
-    end else if SameText(self.Name, name) then
-    begin
-      Result := Child[i];
-      Break;
-    end;
+    if fNonLayerChilds and ChildNotTLayer32(i) then Continue;
+    Result := Child[i].FindLayerNamed(name);
+    if assigned(Result) then Break;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1350,7 +1408,9 @@ var
 begin
   fLayeredImage := newLayeredImage;
   for i := 0 to ChildCount -1 do
-    Child[i].UpdateLayeredImage(newLayeredImage);
+    if fNonLayerChilds and ChildNotTLayer32(i) then
+      Continue else
+      Child[i].UpdateLayeredImage(newLayeredImage);
 end;
 
 //------------------------------------------------------------------------------
@@ -1372,7 +1432,9 @@ begin
   rec := nullRectD;
   fOuterMargin := 0;
   for i := 0 to ChildCount -1 do
-    rec := UnionRect(rec, Child[i].OuterBounds);
+    if fNonLayerChilds and ChildNotTLayer32(i) then
+      Continue else
+      rec := UnionRect(rec, Child[i].OuterBounds);
   Image.BlockNotify;
   SetInnerBounds(rec);
   Image.UnblockNotify;
@@ -1413,7 +1475,9 @@ begin
   Invalidate;
   PositionAt(fLeft + dx, fTop + dy);
   for i := 0 to ChildCount -1 do
-    Child[i].Offset(dx, dy);
+    if fNonLayerChilds and ChildNotTLayer32(i) then
+      Continue else
+      Child[i].Offset(dx, dy);
 end;
 
 //------------------------------------------------------------------------------
@@ -2077,7 +2141,7 @@ end;
 function TButtonGroupLayer32.InsertButton(const pt: TPointD;
   btnIdx: integer): TButtonDesignerLayer32;
 begin
-  result := TButtonDesignerLayer32(InsertChild(fBtnLayerClass, btnIdx));
+  result := TButtonDesignerLayer32(InsertChild(btnIdx, fBtnLayerClass));
   with result do
   begin
     SetButtonAttributes(fBtnShape, FBtnSize, fBtnColor);
@@ -2232,10 +2296,22 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TLayeredImage32.Invalidate;
+
+  procedure InvalidateAll(layer: TLayer32);
+  var
+    i: integer;
+  begin
+    layer.Invalidate;
+    for i := 0 to layer.ChildCount -1 do
+      if layer.fNonLayerChilds and layer.ChildNotTLayer32(i) then Continue
+      else InvalidateAll(layer[i]);
+  end;
+
 begin
   if not Assigned(fRoot) then Exit;
   fInvalidRect := RectD(fBounds);
   fLastUpdateType := utUndefined;
+  InvalidateAll(fRoot);
 end;
 //------------------------------------------------------------------------------
 
@@ -2317,11 +2393,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TLayeredImage32.InsertChild(index: integer; storeClass: TStorageClass): TStorage;
+function TLayeredImage32.InsertChild(index: integer; storeClass: TLayer32Class): TLayer32;
 begin
   if ChildCount = 0 then
   begin
-    Result := inherited InsertChild(index, storeClass);
+    Result := inherited InsertChild(index, storeClass) as TLayer32;
 {$IFDEF USE_FILE_STORAGE}
     if (StorageState = ssLoading) then
     begin
@@ -2333,7 +2409,7 @@ begin
     end;
 {$ENDIF}
   end else
-    Result := fRoot.InsertChild(index, storeClass);
+    Result := fRoot.InsertChild(index, storeClass) as TLayer32;
 end;
 //------------------------------------------------------------------------------
 
@@ -2354,7 +2430,7 @@ begin
     Exit;
   end;
   if not Assigned(parent) then parent := fRoot;
-  Result := parent.InsertChild(layerClass, index, name);
+  Result := parent.InsertChild(index, layerClass, name);
 end;
 //------------------------------------------------------------------------------
 
