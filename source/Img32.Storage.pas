@@ -307,7 +307,7 @@ begin
     begin
       if Data[i] <> ';' then Continue;
       inSpecial := false;
-      case Data[j+1] of
+      case Data[j + 1] of
         'g': result := result + '>';
         'l': result := result + '<';
         'q': result := result + '"';
@@ -317,7 +317,7 @@ begin
             'p' : result := result + '''';
           end;
         '#': result := result +
-          Chr(StrToIntDef(Copy(Data, j+2, i-j-2), 32));
+          Chr(StrToIntDef(Copy(Data, j + 2, i - j - 2), 32));
       end;
     end
     else if Data[i] = '&' then
@@ -386,7 +386,7 @@ begin
     inc(cnt);
     if cnt = buffSize then
     begin
-      buffSize := buffSize*2;
+      buffSize := buffSize * 2;
       SetLength(Result, buffSize);
     end;
     while (i < len) and (str[i] = space) do inc(i);
@@ -416,7 +416,7 @@ begin
   if isNeg then inc(startIdx);
   Result := (startIdx <= len) and
     (str[startIdx] >= '0') and (str[startIdx] <= '9');
-  if not Result then Exit;; //error
+  if not Result then Exit; //error
   for i := startIdx to len do
   begin
     j := Ord(str[startIdx]) - 48;
@@ -447,7 +447,7 @@ begin
     inc(cnt);
     if cnt = buffSize then
     begin
-      buffSize := buffSize*2;
+      buffSize := buffSize * 2;
       SetLength(Result, buffSize);
     end;
     while (i < len) and (str[i] = space) do inc(i);
@@ -640,11 +640,11 @@ var
   i, len: integer;
 begin
   len := Length(path);
-  SetLength(Result, len*2);
-  for i := 0 to len -1 do
+  SetLength(Result, len * 2);
+  for i := 0 to len - 1 do
   begin
-    Result[i*2]     := path[i].X;
-    Result[i*2 +1]  := path[i].Y;
+    Result[i * 2]     := path[i].X;
+    Result[i * 2 + 1] := path[i].Y;
   end;
 end;
 //------------------------------------------------------------------------------

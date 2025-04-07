@@ -889,7 +889,7 @@ function ClampByte(val: integer): Byte;
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
   if val < 0 then Result := 0
-  else if val >= 255 then Result:= 255
+  else if val >= 255 then Result := 255
   else Result := val;
 end;
 //------------------------------------------------------------------------------

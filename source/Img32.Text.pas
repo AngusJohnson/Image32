@@ -885,13 +885,13 @@ function GetUtf8String(stream: TStream; len: integer): Utf8String;
 var
   i: integer;
 begin
-  setLength(Result, len+1);
-  Result[len+1] := #0;
+  setLength(Result, len + 1);
+  Result[len + 1] := #0;
   stream.Read(Result[1], len);
   for i := 1 to length(Result) do
     if Result[i] = #0 then
     begin
-      SetLength(Result, i -1);
+      SetLength(Result, i - 1);
       break;
     end;
 end;
@@ -995,7 +995,7 @@ var
   len: integer;
 begin
   len := Length(fRecipientList);
-  SetLength(fRecipientList, len+1);
+  SetLength(fRecipientList, len + 1);
   fRecipientList[len] := Recipient;
 end;
 //------------------------------------------------------------------------------
@@ -1009,7 +1009,7 @@ begin
   while (i >= 0) and (fRecipientList[i] <> Recipient) do dec(i);
   if i < 0 then Exit;
   if i < highI then
-    Move(fRecipientList[i+1], fRecipientList[i],
+    Move(fRecipientList[i + 1], fRecipientList[i],
       (highI - i) * SizeOf(INotifyRecipient));
   SetLength(fRecipientList, highI);
 end;
@@ -1656,7 +1656,7 @@ begin
   while (j < len) and (fKernTable[j].left = glyphIdx) do inc(j);
   SetLength(Result, j - i);
   for j := 0 to High(Result) do
-    with fKernTable[i+j] do
+    with fKernTable[i + j] do
   begin
     Result[j].rightGlyphIdx := right;
     Result[j].kernValue := value;
@@ -1673,12 +1673,12 @@ begin
   result := nil;
   if fTbl_head.indexToLocFmt = 0 then
   begin
-    offset := fTbl_loca2[glyphIdx] *2;
-    if offset = fTbl_loca2[glyphIdx+1] *2 then Exit;  // no contours
+    offset := fTbl_loca2[glyphIdx] * 2;
+    if offset = fTbl_loca2[glyphIdx + 1] * 2 then Exit;  // no contours
   end else
   begin
     offset := fTbl_loca4[glyphIdx];
-    if offset = fTbl_loca4[glyphIdx+1] then Exit;     // no contours
+    if offset = fTbl_loca4[glyphIdx + 1] then Exit;     // no contours
   end;
   glyfTbl := fTables[fTblIdxes[tblGlyf]];
   if offset >= glyfTbl.length then Exit;
@@ -1831,7 +1831,7 @@ begin
   SetLength(Result, Length(pathsEx));
   for i := 0 to High(pathsEx) do
   begin
-    SetLength(Result[i], Length(pathsEx[i]) *2);
+    SetLength(Result[i], Length(pathsEx[i]) * 2);
     Result[i][0] := pathsEx[i][0]; k := 1;
     prevOnCurve := true;
     for j := 1 to High(pathsEx[i]) do
@@ -1861,7 +1861,7 @@ begin
   len1 := length(paths);
   setLength(paths, len1 + len2);
   for i := 0 to len2 -1 do
-    paths[len1+i] := Copy(extra[i], 0, length(extra[i]));
+    paths[len1 + i] := Copy(extra[i], 0, length(extra[i]));
 end;
 //------------------------------------------------------------------------------
 
@@ -2022,8 +2022,8 @@ begin
       begin
         if j = High(pathsEx[i]) then
           pt2 := pathsEx[i][0] else
-          pt2 := pathsEx[i][j+1];
-        bez := FlattenQBezier(pathsEx[i][j-1].pt, pathsEx[i][j].pt, pt2.pt);
+          pt2 := pathsEx[i][j + 1];
+        bez := FlattenQBezier(pathsEx[i][j - 1].pt, pathsEx[i][j].pt, pt2.pt);
         ConcatPaths(Result[i], bez);
       end;
     end;
@@ -2120,7 +2120,7 @@ begin
   GetGlyphInfo(Ord('G'),dummy, gm);
   rec := GetBoundsD(gm.paths);
   gm.paths := Img32.Vector.TranslatePath(gm.paths, -rec.Left, -rec.Top);
-  gm.paths := Img32.Vector.ScalePath(gm.paths, imgSize/rec.Width, imgSize/rec.Height);
+  gm.paths := Img32.Vector.ScalePath(gm.paths, imgSize / rec.Width, imgSize / rec.Height);
   img := TImage32.Create(imgSize,imgSize);
   try
     DrawPolygon(img, gm.paths, frEvenOdd, clBlack32);
@@ -2242,7 +2242,7 @@ var
   len: integer;
 begin
   len := Length(fRecipientList);
-  SetLength(fRecipientList, len+1);
+  SetLength(fRecipientList, len + 1);
   fRecipientList[len] := Recipient;
 end;
 //------------------------------------------------------------------------------
@@ -2256,7 +2256,7 @@ begin
   while (i >= 0) and (fRecipientList[i] <> Recipient) do dec(i);
   if i < 0 then Exit;
   if i < highI then
-    Move(fRecipientList[i+i], fRecipientList[i],
+    Move(fRecipientList[i + i], fRecipientList[i],
       (highI - i) * SizeOf(INotifyRecipient));
   SetLength(fRecipientList, highI);
 end;
@@ -2485,11 +2485,11 @@ begin
     begin
       j := FindInKernList(glyphInfo.glyphIdx, prevGlyphKernList);
       if (j >= 0) then
-        thisX := thisX + prevGlyphKernList[j].kernValue*fScale;
+        thisX := thisX + prevGlyphKernList[j].kernValue * fScale;
     end;
     Result[i] := thisX;
-    thisX := thisX + glyphInfo.hmtx.advanceWidth*fScale +interCharSpace;
-    prevGlyphKernList := glyphInfo.kernList;
+    thisX := thisX + glyphInfo.hmtx.advanceWidth * fScale + interCharSpace;
+    prevGlyphKernList := glyphInfo.kernList;       
   end;
   Result[len] := thisX - interCharSpace;
 end;
@@ -2515,7 +2515,7 @@ begin
   if not IsValidFont then Exit;
   offsets := GetGlyphOffsets(text);
   Result := Length(offsets);
-  while offsets[Result -1] > maxWidth do
+  while offsets[Result - 1] > maxWidth do
     Dec(Result);
 end;
 //------------------------------------------------------------------------------
@@ -2564,12 +2564,12 @@ begin
   rec2 := GetBoundsD(arrayOfGlyphs);
   case ta of
     taRight: dx := rec.Right - rec2.Width;
-    taCenter: dx := rec.Left + (rec.Width - rec2.Width)/ 2;
+    taCenter: dx := rec.Left + (rec.Width - rec2.Width) / 2;
     else dx := rec.Left;
   end;
 
   case tav of
-    tvaMiddle: dy := rec.Top - rec2.Top + (rec.Height - rec2.Height)/ 2;
+    tvaMiddle: dy := rec.Top - rec2.Top + (rec.Height - rec2.Height) / 2;
     tvaBottom: dy := rec.Bottom - Descent;
     else dy := rec.Top + Ascent;
   end;
@@ -2597,18 +2597,18 @@ begin
   if wavy then
   begin
     Result := nil;
-    cnt := Ceil((rightX - leftX) / (defaultSW *4));
+    cnt := Ceil((rightX - leftX) / (defaultSW * 4));
     if cnt < 2 then Exit;
-    dx := (rightX - leftX)/ cnt;
-    SetLength(wavyPath, cnt +2);
-    wavyPath[0] := PointD(leftX, y + defaultSW/2);
-    wavyPath[1] := PointD(leftX + dx/2, y-(defaultSW *2));
+    dx := (rightX - leftX) / cnt;
+    SetLength(wavyPath, cnt + 2);
+    wavyPath[0] := PointD(leftX, y + defaultSW / 2);
+    wavyPath[1] := PointD(leftX + dx / 2, y - (defaultSW * 2));
 
     for i := 1 to cnt do
-      wavyPath[i+1] := PointD(leftX + dx * i, y + defaultSW/2);
+      wavyPath[i + 1] := PointD(leftX + dx * i, y + defaultSW / 2);
     Result := FlattenQSpline(wavyPath);
     wavyPath := ReversePath(Result);
-    wavyPath := TranslatePath(wavyPath, 0, strokeWidth *1.5);
+    wavyPath := TranslatePath(wavyPath, 0, strokeWidth * 1.5);
     ConcatPaths(Result, wavyPath);
   end else
     Result := Rectangle(leftX, y, rightX, y + strokeWidth);
@@ -2885,7 +2885,7 @@ end;
 
 procedure FontHeightToFontSize(var logFontHeight: integer);
 const
-  _72Div96 = 72/96;
+  _72Div96 = 72 / 96;
 begin
   if logFontHeight < 0 then
     logFontHeight := -Round(logFontHeight * _72Div96 / dpiAware1);
@@ -2894,7 +2894,7 @@ end;
 
 procedure FontSizeToFontHeight(var logFontHeight: integer);
 const
-  _96Div72 = 96/72;
+  _96Div72 = 96 / 72;
 begin
   if logFontHeight > 0 then
     logFontHeight := -Round(DpiAware(logFontHeight * _96Div72));
@@ -2903,7 +2903,7 @@ end;
 
 function GetFontPixelHeight(logFontHeight: integer): double;
 const
-  _96Div72 = 96/72;
+  _96Div72 = 96 / 72;
 begin
   if logFontHeight > 0 then
     Result := DPIAware(logFontHeight * _96Div72) else
@@ -3146,9 +3146,9 @@ begin
   setLength(cummDists, pathLen +1);
   cummDists[0] := 0;
   dist := 0;
-  for i:= 1 to pathLen -1 do
+  for i := 1 to pathLen - 1 do
   begin
-    dist := dist + Distance(path[i-1], path[i]);
+    dist := dist + Distance(path[i - 1], path[i]);
     cummDists[i] := dist;
   end;
 
@@ -3241,7 +3241,7 @@ begin
 {$IFDEF XPLAT_GENERICS}
     fFontList := TList<TFontReader>.Create;
 {$ELSE}
-    fFontList:= TList.Create;
+    fFontList := TList.Create;
 {$ENDIF}
 end;
 //------------------------------------------------------------------------------

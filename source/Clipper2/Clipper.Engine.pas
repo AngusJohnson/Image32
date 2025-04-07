@@ -690,7 +690,7 @@ function TopX(e: PActive; const currentY: Int64): Int64; overload;
 begin
   if (currentY = e.top.Y) or (e.top.X = e.bot.X) then Result := e.top.X
   else if (currentY = e.bot.Y) then Result := e.bot.X
-  else Result := e.bot.X + Round(e.dx*(currentY - e.bot.Y));
+  else Result := e.bot.X + Round(e.dx * (currentY - e.bot.Y));
 end;
 //------------------------------------------------------------------------------
 
@@ -3003,10 +3003,10 @@ begin
   FHorzSegList.Sort(HorzSegListSort);
 
   // find overlaps
-  for i := 0 to FHorzSegList.Count -2 do
+  for i := 0 to FHorzSegList.Count - 2 do
   begin
     hs1 := FHorzSegList.UnsafeGet(i);
-    for j := i+1 to FHorzSegList.Count -1 do
+    for j := i + 1 to FHorzSegList.Count - 1 do
     begin
       hs2 := FHorzSegList.UnsafeGet(j);
 

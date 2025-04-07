@@ -342,7 +342,7 @@ var
   hsl: THsl;
 begin
   hsl := RgbToHsl(Color32(color));
-  hsl.lum := ClampByte(hsl.lum - (percent/100 * hsl.lum));
+  hsl.lum := ClampByte(hsl.lum - (percent / 100 * hsl.lum));
   Result := HslToRgb(hsl) and $FFFFFF;
 end;
 

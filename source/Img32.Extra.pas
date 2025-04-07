@@ -472,7 +472,7 @@ begin
       l := rec.Right; t := rec.Top;
       if ss.X < 0 then dec(l, sX);
       if ss.Y < 0 then dec(t, sY);
-      img.Copy(tmpImg, tmpRec, Rect(l, t, l+ sX, t+ sY));
+      img.Copy(tmpImg, tmpRec, Rect(l, t, l + sX, t + sY));
     end;
     // b-l corner
     if (ss.X < 0) or (ss.Y > 0) then
@@ -506,7 +506,7 @@ begin
     // t-edge
     if (ss.Y < 0) then
     begin
-      l := rec.Left+sX; r := rec.Right - 1; t := rec.Top;
+      l := rec.Left + sX; r := rec.Right - 1; t := rec.Top;
       if ss.X < 0 then begin dec(l, sX); dec(r, sX); end;
       for i := 1 to sY do
       begin
@@ -2115,9 +2115,9 @@ begin
     end;
 
     if i = 0 then
-      Result[len * 3-1] := TranslatePoint(path[0], -vec.X * d1, -vec.Y * d1)
+      Result[len * 3 - 1] := TranslatePoint(path[0], -vec.X * d1, -vec.Y * d1)
     else
-      Result[i * 3-1] := TranslatePoint(path[i], -vec.X * d1, -vec.Y * d1);
+      Result[i * 3 - 1] := TranslatePoint(path[i], -vec.X * d1, -vec.Y * d1);
     Result[i * 3] := path[i];
     Result[i * 3 + 1] := TranslatePoint(path[i], vec.X * d2, vec.Y * d2);
   end;
@@ -2126,7 +2126,7 @@ begin
   if pathIsClosed then Exit;
   Result[1] := Result[0];
   dec(len);
-  Result[len*3-1] := Result[len * 3];
+  Result[len * 3 - 1] := Result[len * 3];
   SetLength(Result, Len * 3 + 1);
 end;
 //------------------------------------------------------------------------------
@@ -2292,20 +2292,20 @@ begin
   begin
     for i := 0 to highI -1 do
     begin
-      cnt := Ceil(dists[i]/maxInterval);
+      cnt := Ceil(dists[i] / maxInterval);
       Append(Result, path[i]);
       for j := 1 to cnt -1 do
       begin
         pt.X := CubicInterpolate(
-          path[Clamp(i-1, len)].X,
+          path[Clamp(i - 1, len)].X,
           path[Clamp(i, len)].X,
-          path[Clamp(i+1, len)].X,
-          path[Clamp(i+2, len)].X, j/cnt, tension);
+          path[Clamp(i + 1, len)].X,
+          path[Clamp(i + 2, len)].X, j / cnt, tension);
         pt.Y := CubicInterpolate(
-          path[Clamp(i-1, len)].Y,
+          path[Clamp(i - 1, len)].Y,
           path[Clamp(i, len)].Y,
-          path[Clamp(i+1, len)].Y,
-          path[Clamp(i+2, len)].Y, j/cnt, tension);
+          path[Clamp(i + 1, len)].Y,
+          path[Clamp(i + 2, len)].Y, j / cnt, tension);
         Append(Result, pt);
       end;
     end;
@@ -2322,7 +2322,7 @@ var
 begin
   len := Length(paths);
   SetLength(Result, len);
-  for i := 0 to len -1 do
+  for i := 0 to len - 1 do
     Result[i] := SmoothPath(paths[i], isClosedPath, tension, shapeTolerance);
 end;
 
