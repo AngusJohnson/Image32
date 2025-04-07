@@ -3,7 +3,7 @@ unit Img32.Ctrls;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  0.0 (Experimental)                                              *
-* Date      :  20 March 2025                                                   *
+* Date      :  4 April 2025                                                    *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -39,8 +39,9 @@ type
   TShiftState         = Cardinal;
 
   TShortcut = record
-    chr   : Char;
-    flags : TShiftState;
+    chr     : Char;
+    flags   : TShiftState;
+    chrIdx  : integer;
   end;
 
   TNameAndAddress = Record
@@ -56,7 +57,13 @@ type
   end;
   TLoadRecArray = array of TLoadRec;
 
-
+  TCtrlTheme = record
+    Color: TColor32;
+    AltColor: TColor32;
+    FocusColor: TColor32;
+    FontColor: TColor32;
+    SoftHighlight: TColor32;
+  end;
 
   TEventPropertyHandler = class(TStorage)
   private
@@ -94,12 +101,13 @@ type
   private
     fLayeredImg   : TLayeredImage32;
     fRootCtrl     : TRootCtrl;
-    fLastClicked  : TCustomCtrl;
+    fLastCtrl     : TCustomCtrl;
+    fMseDownCtrl  : TCustomCtrl;
     fCurrCursor   : integer;
     fShortcutList : TList;
     fEventHandler : TEventPropertyHandler;
-    fFocusLineW   : double;
     fDelayedLinks : TLoadRecArray;
+    fMainHdl      : THandle;
     function GetRepaintReq: Boolean;
     function GetFocusedCtrl: TCustomCtrl;
     procedure SetFocusedCtrl(ctrl: TCustomCtrl);
@@ -112,29 +120,29 @@ type
     procedure LoadStoredObjects(const utf8: UTF8String); override;
     function  GetExternalPropName(obj: TObject): string; override;
     function GetExternalEvent(const method: TMethod; out textId: string): Boolean; override;
+    procedure RemoveShortcutOwner(ctrl: TCustomCtrl);
+    property ShortcutList: TList read fShortcutList;
   public
-    constructor Create(parent: TStorage = nil; const name: string = ''); override;
+    constructor Create(mainHdl: THandle); reintroduce; overload; virtual;
+    constructor Create(parent: TStorage = nil; const name: string = ''); overload; override;
     destructor Destroy; override;
+    procedure Quit;
     function  InsertChild(index: integer; storeClass: TStorageClass): TStorage; override;
     procedure MouseDown(mouseButton: TMouseButton; shift: TShiftState; const pt: TPoint);
-    procedure MouseMove(mouseButton: TMouseButton; shift: TShiftState; const pt: TPoint);
+    procedure MouseMove(shift: TShiftState; const pt: TPoint);
     procedure MouseUp(mouseButton: TMouseButton; shift: TShiftState; const pt: TPoint);
-    function MouseWheel(shift: TShiftState; wheelDelta: Integer; mousePos: TPoint): Boolean;
+    function  MouseWheel(shift: TShiftState; wheelDelta: Integer; mousePos: TPoint): Boolean;
     procedure KeyDown(var Key: Word; shift: TShiftState);
     procedure KeyUp(var Key: Word; shift: TShiftState);
     procedure KeyPress(var Key: Char);
     procedure Resize(width, height: Cardinal);
-    procedure FindAllShortcutOwners;
-    procedure RemoveShortcutOwner(ctrl: TCustomCtrl);
-    procedure AddShortcutOwner(ctrl: TCustomCtrl);
     function  FindShortcutOwner(const aShortcut: TShortcut): TCustomCtrl;
     property CurrentCursor: integer read fCurrCursor;
     property EventAndPropertyHandler : TEventPropertyHandler read fEventHandler;
     property FocusedCtrl: TCustomCtrl read GetFocusedCtrl write SetFocusedCtrl;
-    property FocusedLineWidth: double read fFocusLineW write fFocusLineW;
     property LayeredImage: TLayeredImage32 read fLayeredImg write fLayeredImg;
+    property MainHdl     : THandle read fMainHdl write fMainHdl;
     property RootCtrl: TRootCtrl read fRootCtrl;
-    property LastClicked: TCustomCtrl read fLastClicked;
     property RepaintRequired: Boolean read GetRepaintReq;
   end;
 
@@ -153,36 +161,47 @@ type
     fOnClick      : TNotifyEvent;
     fAfterPaint   : TNotifyEvent;
     fDelayedLinks : TLoadRecArray;
+    fIsthemed     : Boolean;
     procedure AddDelayedLink(const propName: string; targetId: integer);
     function  GetManager: TCtrlStorageManager;
     procedure SetBevHeight(value: double);
     procedure SetColor(color: TColor32);
     function  GetFont: TFontCache;
     function  GetHasFocus: Boolean;
+    function  IsEmpty: Boolean;
+    // theme colors
+    function  GetColor: TColor32;
+    function  GetAltColor: TColor32;
+    function  GetFocusColor: TColor32;
+    function  GetFontColor: TColor32;
     procedure SetCanFocus(value: Boolean);
     procedure SetEnabled(value: Boolean);
     procedure SetShortcut(value: TShortcut);
     procedure SetAutoPosition(ap: TAutoPosition);
     function  GetFocusLineWidth: double; {$IFDEF INLINE} inline; {$ENDIF}
-    function  GetHalfFocusWidth: double; {$IFDEF INLINE} inline; {$ENDIF}
-    function  GetFocusedCtrl: TCustomCtrl;
     function  GetRootCtrl: TRootCtrl;
   protected
+    function  GetClientHeight: double; virtual;
+    function  GetClientWidth: double; virtual;
+    function  GetClientRect: TRectD; virtual;
+    procedure SetVisible(value: Boolean); override;
     function  ReadProperty(const propName, propVal: string): Boolean; override;
-    function  WriteProperty(propInfo: PPropInfo): Boolean; override;
+    function  CheckSkipWriteProperty(propInfo: PPropInfo): Boolean; override;
     procedure Clicked; virtual;
     function  GetUsableFont: Boolean;
     procedure SetCaption(const caption: string); virtual;
     function  GetCanFocus: Boolean; virtual;
     procedure SetFont(font: TFontCache); virtual;
     procedure CheckScaleBounds(var value: double); virtual;
-    procedure Repaint; virtual;
+    function  HasShortcut: Boolean;
+    procedure Paint; virtual;
     procedure DoMouseDown(button: TMouseButton;
       shift: TShiftState; const pt: TPoint); virtual;
-    procedure DoMouseMove(button: TMouseButton;
-      shift: TShiftState; const pt: TPoint); virtual;
+    procedure DoMouseMove(shift: TShiftState; const pt: TPoint); virtual;
     procedure DoMouseUp(button: TMouseButton;
       shift: TShiftState; const pt: TPoint); virtual;
+    procedure DoMouseEnter; virtual;
+    procedure DoMouseLeave(newCtrl: TStorage); virtual;
     function DoMouseWheel(Shift: TShiftState;
       WheelDelta: Integer; MousePos: TPoint): Boolean; virtual;
     procedure DoDblClick; virtual;
@@ -193,19 +212,22 @@ type
     procedure DoBeforeMerge; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
-    destructor Destroy; override;
-    procedure SetInnerBounds(const newBounds: TRectD); override;
+    destructor  Destroy; override;
     procedure ReceiveNotification(Sender: TObject; notify: TImg32Notification); virtual;
     procedure Scale(value: double); virtual;
     procedure SetFocus; virtual;
     procedure KillFocus; virtual;
-    function GetCtrlWithFocus: TCustomCtrl; virtual;
-    property FocusedCtrl: TCustomCtrl read GetFocusedCtrl;
+    function  GetCtrlWithFocus: TCustomCtrl; virtual;
+    function  IsVisibleToCtrlRoot: Boolean;
+    function  IsEnabledToCtrlRoot: Boolean;
+    property ClientHeight: double read GetClientHeight;
+    property ClientWidth: double read GetClientWidth;
+    property ClientRect: TRectD read GetClientRect;
     property HasFocus   : Boolean read GetHasFocus;
     property RootCtrl   : TRootCtrl read GetRootCtrl;
     property StorageManager: TCtrlStorageManager read GetManager;
     property FocusLineWidth: double read GetFocusLineWidth;
-    property HalfFocusWidth: double read GetHalfFocusWidth;
+    property Shortcut   : TShortcut read fShortcut write SetShortcut;
   published
     property AutoPosition : TAutoPosition
       read fAutoPosition write SetAutoPosition;
@@ -216,7 +238,7 @@ type
     property Enabled    : Boolean read fEnabled write SetEnabled;
     property Font       : TFontCache read GetFont write SetFont;
     property FontColor  : TColor32 read fFontColor write fFontColor;
-    property Shortcut   : TShortcut read fShortcut write SetShortcut;
+    property IsThemed   : Boolean read fIsthemed write fIsthemed;
     property OnClick    : TNotifyEvent read fOnClick write fOnClick;
     property OnPainted  : TNotifyEvent read fAfterPaint write fAfterPaint;
   end;
@@ -231,8 +253,7 @@ type
     fTargetCtrl: TCustomCtrl;
   protected
     procedure Clicked; override;
-    procedure SetCaption(const caption: string); override;
-    procedure Repaint; override;
+    procedure Paint; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
   published
@@ -243,7 +264,7 @@ type
 
   TStatusbarCtrl = class(TAutoSizedCtrl)
   protected
-    procedure Repaint; override;
+    procedure Paint; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
@@ -258,22 +279,27 @@ type
     fInnerMargin  : double;
     fShadowSize   : double;
     fShadowAngle  : double;
+    fScrollOffset : TPointD;
     fOnPaint      : TNotifyEvent;
     fOnChange     : TNotifyEvent;
-    procedure UpdateHorzScrollbarPos;
-    procedure UpdateVertScrollbarPos;
   protected
+    function GetClientHeight: double; override;
+    function GetClientWidth: double; override;
+    function GetClientRect: TRectD; override;
     procedure DoChildAutoPositioning;
     procedure SetScrollH(scrollHorz: TScrollCtrl); virtual;
     procedure SetScrollV(scrollVert: TScrollCtrl); virtual;
-    procedure DoScroll(dx, dy: double); virtual;
+    procedure DoScrollX(newPos: double); virtual;
+    procedure DoScrollY(newPos: double); virtual;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
-    procedure Repaint; override;
+    procedure DoAfterMerge; override;
+    procedure Paint; override;
+    property  ScrollOffset: TPointD read fScrollOffset write fScrollOffset;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
-    function   InsertChild(layerClass: TLayer32Class;
-      index: integer; const name: string = ''): TLayer32; override;
+    function   InsertChild(index: integer; layerClass: TLayer32Class;
+      const name: string = ''): TLayer32; override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
     procedure Scale(value: double); override;
   published
@@ -285,84 +311,122 @@ type
     property OnPaint  : TNotifyEvent read fOnPaint write fOnPaint;
   end;
 
+  TListItem = class(TStorage)
+  private
+    fText     : string;
+    fImageIdx : integer;
+  published
+    property Text     : string read fText write fText;
+    property ImageIdx: integer read fImageIdx write fImageIdx;
+  end;
+
   TListCtrl = class(TScrollingCtrl)
   private
-    fItems      : TArrayOfString;
     fTopItem    : integer;
-    fScrollOff  : double;
     fItemIndex  : integer;
-    fMaxVisible : integer;
     fAutoSize   : Boolean;
     fImgList    : TSvgImageList32;
-    fOnClick    : TNotifyEvent;
     procedure SetItemIndex(index: integer); // sets selected item
-    function  GetItemCount: integer;
     function  GetItemHeight: double;
-    function  GetItem(index: integer): string;
+    function  GetVisibleItems: integer;
+    function  GetItemCount: integer;
+    function  GetItem(index: integer): TListItem;
     procedure SetImgList(svgImageList: TSvgImageList32);
-    procedure SetVisibleItms(value: integer);
-    procedure UpdateScrollV;
-    procedure TextToItems(const text: string);
-    function  ItemsToText: string;
   protected
     procedure EndRead; override;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
     procedure DoMouseDown(button: TMouseButton;
       shift: TShiftState; const pt: TPoint); override;
-    procedure DoScroll(dx, dy: double); override;
-    procedure SetCaption(const text: string); override;
+    procedure DoScrollY(newPos: double); override;
     procedure SetScrollV(scrollVert: TScrollCtrl); override;
-    procedure Repaint; override;
+    procedure Paint; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
-    procedure SetInnerBounds(const newBounds: TRectD); override;
     procedure ReceiveNotification(Sender: TObject; notify: TImg32Notification); override;
     procedure ScrollItemIndexIntoView;
-    procedure SetItems(const items: TArrayOfString); virtual;
-    procedure AddItem(const text: string); virtual;
-    procedure InsertItem(index: integer; const itemStr: string);
-    procedure DeleteItem(index: integer);
-    property Item[index: integer]: string read GetItem; default;
-    property ItemCount: integer read GetItemCount;
+    function  AddChild(storeClass: TStorageClass; const text: string = ''): TStorage; reintroduce; overload; virtual;
+    function InsertChild(index: integer; storeClass: TStorageClass): TStorage;  override;
+    property Item[index: integer]: TListItem read GetItem; default;
+    property ItemCount: integer read GetItemCount; // differs from ChildCount!
   published
     property AutoSize : Boolean read fAutoSize write fAutoSize;
     property ImageList: TSvgImageList32 read fImgList write SetImgList;
     property ItemIndex: integer read fItemIndex write SetItemIndex;
-    property MaxVisibleItems: integer read fMaxVisible write SetVisibleItms;
-    property Text     : string read ItemsToText write TextToItems;
-    property OnClick: TNotifyEvent read fOnClick write fOnClick;
   end;
 
-  TPopMenuCtrl = class(TScrollingCtrl)
+  TMenuItemType = (mitNormal, mitCheckbox, mitRadioBtn);
+
+  TMenuItemCtrl = class(TCustomCtrl)
   private
-    fItems      : TArrayOfString;
+    fCapWidth : double;
+    fImgIdx   : integer;
+    fMenuType   : TMenuItemType;
+    fIsChecked  : Boolean;
+    procedure UpdateItem;
+  protected
+    procedure SetCaption(const caption: string); override;
+    procedure SetFont(font: TFontCache); override;
+    // procedure Paint; override; // painting done by parent control :)
+  public
+    constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
+    property CaptionWidth: double read fCapWidth;
+  published
+    property Checked: Boolean read fIsChecked write fIsChecked;
+    property ImageIdx: integer read fImgIdx write fImgIdx;
+    property MenuItemType: TMenuItemType read fMenuType write fMenuType;
+  end;
+
+  TBaseMenuCtrl = class(TCustomCtrl)
+  private
     fItemIndex  : integer;
+    fUsesIcons  : Boolean;
     fImgList    : TSvgImageList32;
-    fOnClick    : TNotifyEvent;
     procedure SetItemIndex(index: integer);
-    function  GetItemCount: integer;
-    function  GetItemHeight: double;
     procedure SetImgList(svgImageList: TSvgImageList32);
   protected
+    function GetMenuItemRect(idx: integer): TRectD; virtual; abstract;
+    function GetItemWidths: TArrayOfDouble;
+    function  GetItemHeight: double; virtual;
+    procedure Clicked; override;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
-    procedure DoMouseDown(button: TMouseButton;
-      shift: TShiftState; const pt: TPoint); override;
-    procedure SetCaption(const text: string); override;
-    procedure Repaint; override;
+    property UsesIcons: Boolean read fUsesIcons;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
-    procedure SetInnerBounds(const newBounds: TRectD); override;
     procedure ReceiveNotification(Sender: TObject; notify: TImg32Notification); override;
-    procedure AddItem(const text: string);
-    procedure DeleteItem(index: integer);
     property ItemIndex: integer read fItemIndex write SetItemIndex;
-    property ItemCount: integer read GetItemCount;
-  public
-    procedure InsertItem(index: integer; const itemStr: string);
+  published
     property ImageList: TSvgImageList32 read fImgList write SetImgList;
-    property OnClick: TNotifyEvent read fOnClick write fOnClick;
+  end;
+
+  TPopMenuCtrl = class(TBaseMenuCtrl)
+  private
+    fItemsSize  : TSizeD;
+    fRealParent : TMenuItemCtrl;
+  protected
+    procedure GetItemsSize;
+    procedure SetVisible(value: Boolean); override;
+    procedure UpdateLayout; virtual;
+    procedure DoMouseMove(shift: TShiftState; const pt: TPoint); override;
+    procedure DoMouseLeave(newCtrl: TStorage); override;
+    procedure DoKeyPress(var Key: Char); override;
+    procedure Paint; override;
+  public
+    constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
+    function  GetMenuItemRect(idx: integer): TRectD; override;
+  end;
+
+  TMainMenuCtrl = class(TBaseMenuCtrl)
+  protected
+    function  GetItemHeight: double; override;
+    procedure DoMouseMove(shift: TShiftState; const pt: TPoint); override;
+    procedure DoMouseLeave(newCtrl: TStorage); override;
+    procedure Paint; override;
+  public
+    constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
+    function  GetMenuItemRect(idx: integer): TRectD; override;
+    procedure SetInnerBounds(const newBounds: TRectD); override;
   end;
 
   TMemoCtrl = class(TScrollingCtrl)
@@ -375,7 +439,7 @@ type
     fSelStart       : TPoint;
     fSelEnd         : TPoint;
     fBuffer         : TImage32;
-    fTextRect       : TRect;
+    fTextRect       : TRectD;
     fMouseLeftDown  : Boolean;
     procedure CheckPageMetrics;
     function  GetVisibleLines: integer;
@@ -390,21 +454,20 @@ type
     procedure DoDblClick; override;
     procedure DoMouseDown(Button: TMouseButton;
       Shift: TShiftState; const pt: TPoint); override;
-    procedure DoMouseMove(Button: TMouseButton;
-      Shift: TShiftState; const pt: TPoint); override;
+    procedure DoMouseMove(Shift: TShiftState; const pt: TPoint); override;
     procedure DoMouseUp(Button: TMouseButton;
       Shift: TShiftState; const pt: TPoint); override;
     function DoMouseWheel(Shift: TShiftState;
       WheelDelta: Integer; MousePos: TPoint): Boolean; override;
     procedure SetScrollV(scrollVert: TScrollCtrl); override;
-    procedure DoScroll(dx, dy: double); override;
+    procedure DoScrollY(newPos: double); override;
     procedure FontChanged; override;
-    procedure Repaint; override;
+    procedure Paint; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
-    procedure Scale(value: double); override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
+    procedure Scale(value: double); override;
     function ChunkPosToPos(const chunkPos: TPoint): TPointD;
     function PosToChunkIdx(const relPos: TPointD): TPoint;
   published
@@ -434,13 +497,11 @@ type
     procedure DoDblClick; override;
     procedure DoMouseDown(Button: TMouseButton;
       Shift: TShiftState; const pt: TPoint); override;
-    procedure DoMouseMove(Button: TMouseButton;
-      Shift: TShiftState; const pt: TPoint); override;
+    procedure DoMouseMove(Shift: TShiftState; const pt: TPoint); override;
     procedure DoMouseUp(Button: TMouseButton;
       Shift: TShiftState; const pt: TPoint); override;
-    procedure SetCaption(const text: string); override;
     procedure FontChanged; override;
-    procedure Repaint; override;
+    procedure Paint; override;
     function GetText: string;
     procedure SetText(const txt: string);
   public
@@ -463,7 +524,7 @@ type
     procedure Clicked; override;
     procedure SetCaption(const text: string); override;
     procedure SetPressed(value: Boolean); virtual;
-    procedure Repaint; override;
+    procedure Paint; override;
     procedure DoMouseDown(Button: TMouseButton;
       Shift: TShiftState; const pt: TPoint); override;
     procedure DoMouseUp(Button: TMouseButton;
@@ -479,19 +540,13 @@ type
   end;
 
   TRoundedBtnCtrl = class(TButtonCtrl)
-  private
-    fRadius: TPointD; //////////////////////debugging only :_
   protected
-    procedure Repaint; override;
-
-  published
-    property Radius: TPointD read fRadius write fRadius;
-
+    procedure Paint; override;
   end;
 
   TEllipseBtnCtrl = class(TButtonCtrl)
   protected
-    procedure Repaint; override;
+    procedure Paint; override;
   end;
 
   TImageBtnCtrl = class(TButtonCtrl)
@@ -503,14 +558,14 @@ type
     procedure SetImgList(svgImageList: TSvgImageList32);
     procedure SetImgIdx(index: integer);
   protected
-    procedure Repaint; override;
+    procedure Paint; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
   published
     property TextPosition: TTextPosition read fTextPos write SetTextPos;
     property ImageList: TSvgImageList32 read fImgList write SetImgList;
-    property ImageListIdx: integer read fImgIdx write SetImgIdx;
+    property ImageIdx: integer read fImgIdx write SetImgIdx;
   end;
 
   TCheckboxCtrl = class(TButtonCtrl)
@@ -518,12 +573,11 @@ type
     fAutoState  : Boolean;
     fTriState   : TTriState;
     fTextPos    : TTextPositionH;
-    fUseCross   : Boolean;
     procedure SetTriState(state: TTriState);
     procedure SetTextPos(value: TTextPositionH);
   protected
     procedure Clicked; override;
-    procedure Repaint; override;
+    procedure Paint; override;
     procedure DoMouseDown(Button: TMouseButton;
       Shift: TShiftState; const pt: TPoint); override;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
@@ -534,35 +588,44 @@ type
     property AutoState: Boolean read fAutoState write fAutoState;
     property State: TTriState read fTriState write SetTriState;
     property TextPosition: TTextPositionH read fTextPos write SetTextPos;
-    property PreferCross: Boolean read fUseCross write fUseCross;
   end;
 
   TRadioBtnCtrl = class(TCheckboxCtrl)
   protected
-    procedure Repaint; override;
+    procedure Paint; override;
   end;
 
   TPanelCtrl = class(TScrollingCtrl)
-  private
-    fScrollOffset: TPointD;
   protected
-    procedure CheckScrollMax; virtual;
-    procedure DoScroll(dx, dy: double); override;
+    procedure RecalcScrollMax; virtual;
+    procedure CheckScrollOffset(const newBounds: TRectD);
+    procedure DoScrollX(newPos: double); override;
+    procedure DoScrollY(newPos: double); override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
-    procedure Scale(value: double); override;
   end;
 
   TRootCtrl = class(TPanelCtrl)
   private
-    fFocusedCtrl : TCustomCtrl;
+    fFocusedCtrl  : TCustomCtrl;
+    fCaptureCtrl  : TCustomCtrl;
+    fPopMenuCtrl  : TPopMenuCtrl;
+    fTheme        : TCtrlTheme;
+    procedure SetTheme(const theme: TCtrlTheme);
   public
-    property FocusedCtrl : TCustomCtrl read fFocusedCtrl write fFocusedCtrl;
+    function SetFocus(ctrl: TCustomCtrl): Boolean; reintroduce; overload;
+    function SetCapture(ctrl: TCustomCtrl; hdl: HWnd): Boolean;
+    function ReleaseCapture: Boolean;
+    property CaptureCtrl : TCustomCtrl read fCaptureCtrl;
+    property FocusedCtrl : TCustomCtrl read fFocusedCtrl;
+    property PopMenuCtrl : TPopMenuCtrl read fPopMenuCtrl write fPopMenuCtrl;
+    property Theme       : TCtrlTheme read fTheme write SetTheme;
   end;
 
   TPageTabCtrl = class(TAutoSizedCtrl)
   protected
+    procedure Clicked; override;
     procedure DoMouseDown(Button: TMouseButton;
       Shift: TShiftState; const pt: TPoint); override;
   public
@@ -595,7 +658,7 @@ type
     procedure DrawTabs;
     procedure ResizeTabs;
   protected
-    procedure Repaint; override;
+    procedure Paint; override;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
     procedure EndRead; override;
   public
@@ -605,6 +668,7 @@ type
     procedure ClearTabs;
     procedure AddTab(const caption: string);
     procedure AddTabs(const captions: TArrayOfString);
+    function  ActivePage: TPagePnlCtrl;
     property  Panel[index: integer]: TPagePnlCtrl read GetPagePanel;
   published
     property  ActiveIndex: integer read fActiveIdx write SetActiveIndex;
@@ -627,7 +691,7 @@ type
     procedure SetOrientation(newOrient: TScrollOrientation);
   protected
     procedure FontChanged; override;
-    procedure Repaint; override;
+    procedure Paint; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
@@ -663,10 +727,10 @@ type
     procedure SetOrientation(newOrient: TScrollOrientation);
   protected
     procedure FontChanged; override;
-    procedure Repaint; override;
+    procedure Paint; override;
     procedure DoMouseDown(button: TMouseButton;
       shift: TShiftState; const pt: TPoint); override;
-    procedure DoMouseMove(button: TMouseButton; shift: TShiftState; const pt: TPoint); override;
+    procedure DoMouseMove(shift: TShiftState; const pt: TPoint); override;
     procedure DoMouseUp(button: TMouseButton; shift: TShiftState; const pt: TPoint); override;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
   public
@@ -686,31 +750,40 @@ type
   private
     fAutoHide     : Boolean;
     fSize         : double;
-    fScrollStep   : integer;
+    fScrollRatio  : double;
+    fHiddenSize   : double;
+    fBtnSize      : double;
+    fScrollStep   : double;   // double to facilitate scaling (streamed a int.)
     fOrientation  : TScrollOrientation;
-    fPosition     : double;
+    fPos          : double;
     fMax          : double;
-    fMin          : double;
-    fBtnRec       : TRectWH;
-    fMinBtnSize   : integer;
-    fDeltaScale   : double;
-    fMouseDownPos : TPointD;
+    fMinBtnSize   : double;   // double to facilitate scaling (streamed a int.)
+    fMousePos     : TPointD;
     fScrollState  : TScrollState;
     fTargetCtrl   : TScrollingCtrl;
     procedure UnregisterTargetCtrl;
-    procedure SetMin(newMin: double);
     procedure SetMax(newMax: double);
     procedure SetScrollSize(newSize: double);
     procedure SetPosition(newPos: double);
     procedure SetAutoHide(value: Boolean);
+    procedure SetMinBtnSize(value: integer);
+    function  GetMinBtnSize: integer;
+    procedure SetScrollStep(value: integer);
+    function  GetScrollStep: integer;
   protected
     procedure RegisterTargetCtrl(target: TScrollingCtrl);
-    procedure CalcScale;
+    procedure SetDefaultSize;
+    function GetChevronSize: Double;
+    procedure CheckAutoVisible(firstPass: Boolean);
+    procedure CheckCtrlPos;
+    procedure GetScrollBtnInfo; overload;
+    procedure GetScrollBtnInfo(out btnStart, btnEnd: double); overload;
     function CanScroll: Boolean;
-    procedure Repaint; override;
+    procedure Paint; override;
     procedure DoMouseDown(button: TMouseButton; shift: TShiftState; const pt: TPoint); override;
-    procedure DoMouseMove(button: TMouseButton; shift: TShiftState; const pt: TPoint); override;
+    procedure DoMouseMove(shift: TShiftState; const pt: TPoint); override;
     procedure DoMouseUp(button: TMouseButton; shift: TShiftState; const pt: TPoint); override;
+    property  MinBtnSize        : integer read GetMinBtnSize write SetMinBtnSize;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     destructor Destroy; override;
@@ -720,10 +793,9 @@ type
   published
     property AutoHide   : Boolean read fAutoHide write SetAutoHide;
     property Size       : double read fSize write SetScrollSize;
-    property Min        : double read fMin write SetMin;
     property Max        : double read fMax write SetMax;
-    property Position   : double read fPosition write SetPosition;
-    property Step       : integer read fScrollStep write fScrollStep;
+    property Position   : double read fPos write SetPosition; // relative to pixels
+    property Step       : integer read GetScrollStep write SetScrollStep;
   end;
 
 {$IFDEF MSWINDOWS}
@@ -735,9 +807,14 @@ const
   ssCtrl  = $4000;
   ssAlt   = $2000;
 
+  lightTheme: TCtrlTheme = (color: clBtnFace32;
+    altColor: $FFE0E0E0; focusColor: clGreen32; fontColor: clBlack32);
+  darkTheme : TCtrlTheme = (color: clDarkGray32;
+    altColor: $FF6A6A6A; focusColor: clLime32; fontColor: clWhite32);
+
 var
   clDefDark32 :   TColor32 = $FF008000;
-  clDefMid32  :   TColor32 = $FF33FF33;
+  clDefMid32  :   TColor32 = $FF33CC33;
   clDefLite32 :   TColor32 = $FFDDEEDD;
 
 {$IFDEF MSWINDOWS}
@@ -747,7 +824,7 @@ var
 {$ENDIF}
 
   tickPaths     :   TPathsD;
-  checkPaths    :   TPathsD;
+  queryPaths    :   TPathsD;
 
 implementation
 
@@ -879,80 +956,17 @@ end;
 //------------------------------------------------------------------------------
 {$ENDIF}
 
-const
-  shortcutStrings1: array[0..2] of string =
-    ('Shift+', 'Ctrl+', 'Alt+');
-  shortcutStrings2: array[0..13] of string =
-    ('BkSp', 'Tab', 'Enter', 'Esc', 'Space', 'PgUp', 'PgDn',
-    'End', 'Left', 'Up', 'Right', 'Down', 'Ins', 'Del');
-  shortcutVirtKeys: array[0..13] of cardinal =
-    (8, 9, 13, 27, 32, 33, 34, 35, 37, 38, 39, 40, 45, 46);
-
-function StringToShortcut(str: string): TShortcut;
-var
-  i,j: integer;
-begin
-  Result.chr := #0;
-  Result.flags := 0;
-  if str = '' then Exit;
-
-  for i := 0 to 2 do
-  begin
-    j := Pos(shortcutStrings1[i], str);
-    if j = 0 then Continue;
-    Delete(str, j, 6 - i);
-    Result.flags := Result.flags or ($8000 shr i);
-  end;
-
-  if str = '' then //ie bare shift keys
-  begin
-    Result.flags := 0;
-    Exit;
-  end;
-
-  if length(str) > 1 then
-    for i := 0 to High(shortcutStrings2) do
-    begin
-      if Pos(shortcutStrings2[i], str) = 0 then Continue;
-      Result.flags := Result.flags or shortcutVirtKeys[i];
-      Exit;
-    end;
-  Result.chr := UpCase(str[1]);
-end;
-//------------------------------------------------------------------------------
-
-function ShortcutToString(shortcut: TShortcut): string;
-begin
-  Result := '';
-  if shortcut.chr = #0 then Exit;
-  case (shortcut.flags and $3F) of
-    0:  Result := shortcut.chr;
-    8:  Result := 'BkSp';
-    9:  Result := 'Tab';
-    13: Result := 'Enter';
-    27: Result := 'Esc';
-    32: Result := 'Space';
-    33: Result := 'PgUp';
-    34: Result := 'PgDn';
-    35: Result := 'End';
-    37: Result := 'Left';
-    38: Result := 'Up';
-    39: Result := 'Right';
-    40: Result := 'Down';
-    45: Result := 'Ins';
-    46: Result := 'Del';
-    else Exit;
-  end;
-  if shortcut.flags and ssShift <> 0 then Result := 'Shift+' + Result;
-  if shortcut.flags and ssCtrl <> 0 then Result := 'Ctrl+' + Result;
-  if shortcut.flags and ssAlt <> 0 then Result := 'Alt+' + Result;
-end;
-//------------------------------------------------------------------------------
-
 function IsShortcut(const shortcut: TShortcut): Boolean;
   {$IFDEF INLINE} inline; {$ENDIF}
 begin
-  Result := (shortcut.chr <> #0);
+  Result := (shortcut.chrIdx > 0);
+end;
+//------------------------------------------------------------------------------
+
+function DeleteChar(const caption: string; idx: integer): string;
+begin
+  Result := caption;
+  Delete(Result, idx, 1);
 end;
 //------------------------------------------------------------------------------
 
@@ -988,10 +1002,10 @@ function MakeShortcut(key: Word; shift: TShiftState): TShortcut;
 begin
   Result.flags := 0;
   Result.chr := #0;
+  Result.chrIdx := 0;
 
   case (key) of
-    8,9,13,27,32,33,34,35,37,38,39,40,45,46:
-      Result.chr := Char(key);
+    8,9,13,27,32,33,34,35,37,38,39,40,45,46: Result.chr := Char(key);
     else if key < 48 then Exit
     else Result.chr := Char(key);
   end;
@@ -1000,17 +1014,49 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetShortcutFromCaption(const caption: string): TShortcut;
+function GetShortcutFromCaption(const caption: string;
+  out shortcut: TShortcut): Boolean; overload;
 var
   i, len: integer;
 begin
-  Result.chr := #0;
-  Result.flags := 0;
+  shortcut.chr := #0;
+  shortcut.flags := 0;
+  shortcut.chrIdx := 0;
   len := Length(caption);
   i := Pos('&', caption);
-  if (i = 0) or (i = len) or (caption[i + 1] = '&') then Exit;
-  Result.flags := $2000;
-  Result.chr := Upcase(caption[i + 1]);
+  Result := (i > 0) and (i < len);
+  while Result and (caption[i + 1] = '&') do
+  begin
+    i := StrUtils.PosEx('&', caption, i + 2);
+    Result := (i > 0) and (i < len);
+  end;
+  if not Result then Exit;
+  shortcut.chrIdx := i;
+  shortcut.flags := $2000;
+  shortcut.chr := Upcase(caption[i + 1]);
+
+end;
+//------------------------------------------------------------------------------
+
+function GetShortcutFromCaption(const caption: string): TShortcut; overload;
+begin
+  GetShortcutFromCaption(caption, Result);
+end;
+//------------------------------------------------------------------------------
+
+function TriStateToBool(ts: TTriState): Boolean;
+begin
+  if ts = tsYes then
+    Result := true else
+    Result := false;
+end;
+//------------------------------------------------------------------------------
+
+function BoolToTriState(val: Boolean): TTriState;
+begin
+  if val then
+    Result := tsYes else
+    Result := tsNo;
 end;
 //------------------------------------------------------------------------------
 
@@ -1022,7 +1068,7 @@ begin
   len := Length(aos);
   if len = 0 then Exit;
   for i := 0 to Len - 2 do
-    Result := Result + aos[i] + #10;
+    Result := Result + aos[i] + #9;
   Result := Result + aos[len - 1];
 end;
 //------------------------------------------------------------------------------
@@ -1037,7 +1083,7 @@ begin
   SetLength(Result, cap);
   j := 1;
   for i := 1 to  len do
-    if str[i] = #10 then
+    if str[i] = #9 then
     begin
       if cnt = cap then
       begin
@@ -1069,6 +1115,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function GetMaxWidth(ad: TArrayOfDouble): Double;
+var
+  i: integer;
+begin
+  Result := 0;
+  for i := 0 to High(ad) do
+     if ad[i] > Result then Result := ad[i];
+end;
+//------------------------------------------------------------------------------
+
 procedure DrawBtnInternal(Image: TImage32; const p: TPathD;
   caption: string; font: TFontCache; bevHeight, padding: double;
   pressed: Boolean; enabled: Boolean; color: TColor32 = clNone32;
@@ -1078,14 +1134,9 @@ var
   dx    : double;
   pp    : TPathsD;
   rec2  : TRectD;
-  ulIdx : integer;
+  sc    : TShortcut;
 begin
   if not enabled then pressed := false;
-
-  if pressed then
-    bevHeight := bevHeight * 5 / 4;
-
-  if not enabled then textColor := clGray32;
 
   if GetAlpha(color) > 2 then
     DrawPolygon(Image, p, frNonZero, color);
@@ -1096,22 +1147,34 @@ begin
 
   if not Assigned(font) then Exit;
 
-  ulIdx := Pos('&', caption);
-  if ulIdx > 0 then Delete(caption, ulIdx, 1);
+  sc := GetShortcutFromCaption(caption);
+  if sc.chrIdx > 0 then
+    caption := DeleteChar(caption, sc.chrIdx);
 
   rec2 := GetBoundsD(p);
   if padding > 0 then
     Img32.Vector.InflateRect(rec2, -Round(padding), -Round(padding));
   if (GetAlpha(textColor) < 3) or (Trim(caption) = '') then Exit;
-  pp := font.GetTextOutline(rec2, caption, taCenter, tvaMiddle, ulIdx);
-  if pressed then pp := TranslatePath(pp, bevHeight, bevHeight);
-  pp := TranslatePath(pp, textOffX, textOffY);
-
   dx := font.LineHeight / 24;
-  pp := TranslatePath(pp, -dx, -dx);
-  DrawPolygon(Image, pp, frNonZero, clWhite32);
-  pp := TranslatePath(pp, dx, dx);
-  DrawPolygon(Image, pp, frNonZero, textColor);
+  pp := font.GetTextOutline(rec2, caption, taCenter, tvaMiddle, sc.chrIdx);
+  if pressed then
+    pp := TranslatePath(pp, bevHeight + textOffX - dx, bevHeight + textOffY - dx) else
+    pp := TranslatePath(pp, textOffX - dx, textOffY - dx);
+  if GetLuminance(textColor) < 160 then
+  begin
+    DrawPolygon(Image, pp, frNonZero, clWhite32);
+    if not enabled then
+      textColor := MakeLighter(textColor, 40);
+    pp := TranslatePath(pp, dx, dx);
+    DrawPolygon(Image, pp, frNonZero, textColor);
+  end else
+  begin
+    DrawPolygon(Image, pp, frNonZero, clBlack32);
+    pp := TranslatePath(pp, dx, dx);
+    if not enabled then
+      textColor := MakeDarker(textColor, 30);
+    DrawPolygon(Image, pp, frNonZero, textColor);
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1264,11 +1327,11 @@ end;
 //------------------------------------------------------------------------------
 
 procedure DrawCheckboxCtrl(Image: TImage32; const rec: TRect;
-  bevHeight: double; triState: TTriState = tsNo; preferTick: Boolean = false;
+  bevHeight: double; triState: TTriState = tsNo; lineWidth: double = 1.0;
   color: TColor32 = clWhite32; enabled: Boolean = true);
 var
   d,w   : double;
-  hbh,pw: double;
+  hbh   : double;
   p     : TPathD;
   pp    : TPathsD;
   rec2  : TRectD;
@@ -1281,7 +1344,7 @@ begin
   rec2.Right := rec2.Left + d;
   rec2.Bottom := rec2.Top + d;
 
-  Image.FillRect(Rect(rec2), color);
+  Image.FillRect(Rect(rec2), clWhite32);
   if bevHeight > 0 then
     DrawEdge(Image, rec2, clSilver32, clWhite32, bevHeight);
 
@@ -1289,40 +1352,26 @@ begin
     tsUnknown :
       begin
         w := RectWidth(rec);
-        pp := ScalePath(checkPaths, w * 0.6 / 100);
+        pp := ScalePath(queryPaths, w * 0.6 / 100);
         pp := TranslatePath(pp, rec.Left + w * 0.2, rec.Top + w * 0.2);
-        DrawPolygon(Image, pp, frEvenOdd, SetAlpha(clDefDark32, $88));
-//        d := Ceil(d/6);
-//        Img32.Vector.InflateRect(rec2, -d, -d);
-//        rec2.BottomRight := TranslatePoint(rec2.BottomRight, 1,1);
-//        DrawPolygon(Image, Rectangle(rec2), frNonZero, clLiteGray32);
+        DrawPolygon(Image, pp, frEvenOdd, SetAlpha(color, 80));
+        DrawLine(Image, pp, lineWidth, clBlack32, esPolygon);
       end;
     tsYes :
       begin
-        if preferTick then
-        begin
-          w := RectWidth(rec);
-          p := ScalePath(tickPaths[0],  w * 0.8 / 100);
-          p := TranslatePath(p, rec.Left + w * 0.1, rec.Top + w * 0.1);
-          DrawPolygon(Image, p, frEvenOdd, clDefDark32);
-        end else
-        begin
-          pw := d / 5;
-          d := Ceil(d / 4);
-          Img32.Vector.InflateRect(rec2, -d, -d);
-          rec2.BottomRight := TranslatePoint(rec2.BottomRight, 1, 1);
-          DrawLine(Image, rec2.TopLeft, rec2.BottomRight, pw, clDefDark32);
-          DrawLine(Image, PointD(rec2.Left, rec2.Bottom),
-            PointD(rec2.Right, rec2.Top), pw, clDefDark32);
-        end;
+        w := RectWidth(rec);
+        p := ScalePath(tickPaths[0],  w * 0.7 / 100);
+        p := TranslatePath(p, rec.Left + w * 0.15, rec.Top + w * 0.15);
+        DrawPolygon(Image, p, frEvenOdd, color);
+        DrawLine(Image, p, lineWidth, clBlack32, esPolygon);
       end;
   end;
 end;
 //------------------------------------------------------------------------------
 
 procedure DrawRadioCtrl(Image: TImage32; const ellipse: TPathD;
-  bevHeight: double; enabled: Boolean; triState: TTriState = tsNo;
-  color: TColor32 = clWhite32);
+  color: TColor32; bevHeight: double; enabled: Boolean;
+  triState: TTriState = tsNo; lineWidth: double = 1.0);
 var
   d     : double;
   rec2  : TRectD;
@@ -1338,7 +1387,7 @@ begin
     triState := tsUnknown;
     bc := clBtnFace32;
   end else
-    bc := color;
+    bc := clWhite32;
 
   DrawPolygon(Image, ellipse, frNonZero, bc);
   if bevHeight > 0 then
@@ -1347,16 +1396,18 @@ begin
   case triState of
     tsUnknown :
       begin
-        pp := ScalePath(checkPaths, d * 0.7 / 100);
+        pp := ScalePath(queryPaths, d * 0.7 / 100);
         pp := TranslatePath(pp, rec2.Left + d * 0.22, rec2.Top  + d * 0.22);
-        DrawPolygon(Image, pp, frEvenOdd, SetAlpha(clDefDark32, $88));
+        DrawPolygon(Image, pp, frEvenOdd, SetAlpha(color, 80));
+        DrawLine(Image, pp, lineWidth, clBlack32, esPolygon);
       end;
     tsYes :
       begin
         d := Ceil(d / 5);
         InflateRect(rec2, -d, -d);
         p := Img32.Vector.Ellipse(rec2);
-        DrawPolygon(Image, p, frNonZero, SetAlpha(clDefDark32, $DD));
+        DrawPolygon(Image, p, frNonZero, color);
+        DrawLine(Image, p, lineWidth, clBlack32, esPolygon);
       end
     else Exit;
   end;
@@ -1370,37 +1421,42 @@ constructor TCustomCtrl.Create(parent: TLayer32; const name: string);
 begin
   inherited;
   if not Assigned(StorageManager) then
-    Raise Exception.Create('oops!');
+    Raise Exception.Create('oops - we there must be a storage manager');
   if (self is TRootCtrl) then
   begin
     if Assigned(StorageManager.fRootCtrl) then
-      raise Exception.Create('oops');
+      raise Exception.Create('oops - only one RootCtrl allowed :)');
     StorageManager.fRootCtrl := TRootCtrl(self);
   end;
-  fColor        := clBtnFace32;
-  fFontColor    := clBlack32;
+  if Assigned(parent) and (parent is TCustomCtrl) then
+  begin
+    with TCustomCtrl(parent) do
+    begin
+      Self.Color        := Color;
+      Self.FontColor    := FontColor;
+      Self.Isthemed     := Isthemed;
+    end;
+  end else
+  begin
+    Color             := clBtnFace32;
+    FontColor         := clBlack32;
+    fIsthemed         := false;
+  end;
+  fBevelHeight      := dpiAware(2);
+  OuterMargin       := DPIAware(5);
   fEnabled      := true;
   fCanFocus     := true;
-  fBevelHeight  := dpiAware(2);
-  OuterMargin   := DPIAware(5);
 end;
 //------------------------------------------------------------------------------
 
 destructor TCustomCtrl.Destroy;
 begin
-  if IsShortcut(fShortcut) then
-      StorageManager.RemoveShortcutOwner(self);
+  if HasShortcut then
+    StorageManager.RemoveShortcutOwner(self);
 
   //notify INotifySenders
   if Assigned(fFont) then fFont.DeleteRecipient(self);
   inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TCustomCtrl.SetInnerBounds(const newBounds: TRectD);
-begin
-  inherited SetInnerBounds(newBounds);
-  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -1449,6 +1505,7 @@ procedure TCustomCtrl.SetCaption(const caption: string);
 begin
   if fCaption = caption then Exit;
   fCaption := caption;
+  Shortcut := GetShortcutFromCaption(caption);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -1458,6 +1515,46 @@ begin
   if color = fColor then Exit;
   fColor := color;
   Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+function TCustomCtrl.GetColor: TColor32;
+begin
+  if Isthemed then
+  begin
+    if Assigned(RootCtrl) then Result := RootCtrl.Theme.Color
+    else if self is TRootCtrl then Result := TRootCtrl(self).Theme.Color
+    else Result := fColor;
+  end else
+    Result := fColor;
+end;
+//------------------------------------------------------------------------------
+
+function TCustomCtrl.GetAltColor: TColor32;
+begin
+  if Isthemed then
+  begin
+    if Assigned(RootCtrl) then Result := RootCtrl.Theme.AltColor
+    else if self is TRootCtrl then Result := TRootCtrl(self).Theme.AltColor
+    else Result := MakeDarker(fColor, 20);
+  end else
+    Result := MakeDarker(fColor, 20);
+end;
+//------------------------------------------------------------------------------
+
+function TCustomCtrl.GetFocusColor: TColor32;
+begin
+  if Isthemed and Assigned(RootCtrl) then
+    Result := RootCtrl.Theme.FocusColor else
+    Result := clDefDark32;
+end;
+//------------------------------------------------------------------------------
+
+function  TCustomCtrl.GetFontColor: TColor32;
+begin
+    if Assigned(RootCtrl) then Result := RootCtrl.Theme.FontColor
+    else if self is TRootCtrl then Result := TRootCtrl(self).Theme.FontColor
+    else Result := fFontColor;
 end;
 //------------------------------------------------------------------------------
 
@@ -1478,13 +1575,7 @@ end;
 
 function  TCustomCtrl.GetFocusLineWidth: double;
 begin
-  Result := StorageManager.fFocusLineW;
-end;
-//------------------------------------------------------------------------------
-
-function  TCustomCtrl.GetHalfFocusWidth: double;
-begin
-  Result := StorageManager.fFocusLineW * 0.5;
+  Result := StorageManager.DesignScale * DpiAware(1.25);
 end;
 //------------------------------------------------------------------------------
 
@@ -1494,20 +1585,14 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TCustomCtrl.GetFocusedCtrl: TCustomCtrl;
-begin
-  Result := RootCtrl.FocusedCtrl;
-end;
-//------------------------------------------------------------------------------
-
-function TCustomCtrl.WriteProperty(propInfo: PPropInfo): Boolean;
+function TCustomCtrl.CheckSkipWriteProperty(propInfo: PPropInfo): Boolean;
 var
-  s, propName: string;
+  propName: string;
   //parentPropInfo: PPropInfo;
 begin
-   Result := False; // ie proceed with the default storage writing
+   Result := False; // ie don't skip writing to storage
 
-   // NOTE: individual properties could (and ideally should)
+   // NOTE: individual properties could, and ideally should
    // be checked in descendant classes that actually contain
    // the named properties.
 
@@ -1518,44 +1603,50 @@ begin
    if (propName = 'AutoPosition') then
    begin
      // only write an AutoPosition property if it isn't apNone
-     Result := GetEnumProp(self, 'AutoPosition') = 'apNone';
+     Result := AutoPosition = apNone;
    end
    else if (propName = 'CanFocus') then
    begin
      // only write a CanFocus property if it isn't TRUE
-     Result := GetEnumProp(self, 'CanFocus') = 'True';
+     Result := CanFocus = True;
    end
    else if (propName = 'Color') then
    begin
-     Result := GetOrdProp(self, 'Color') = clNone32;
+     Result := Isthemed;
    end
    else if (propName = 'CursorId') then
    begin
-     Result := GetOrdProp(self, 'CursorId') = 0;
+     Result := CursorId = 0;
    end
    else if (propName = 'Enabled') then
    begin
-     Result := GetEnumProp(self, 'Enabled') = 'True';
+     Result := Enabled = True;
    end
    else if (propName = 'Font') then
    begin
      // only write a Font property if it differs from its parent's Font
      if not HasPublishedProperty(parent.Classname, propName) then Exit;
-     Result := GetObjectProp(self, propName) = GetObjectProp(Parent, propName);
+     Result := Font = GetObjectProp(Parent, propName);
    end
    else if (propName = 'FontColor') then
    begin
-     Result := Cardinal(GetOrdProp(self, 'FontColor')) = clBlack32;
+     Result := FontColor = clBlack32;
+   end
+   else if (propName = 'IsThemed') then
+   begin
+     Result := IsThemed = True;
    end
    else if (propName = 'Opacity') then
    begin
-     Result := GetOrdProp(self, 'Opacity') = 255;
+     Result := Opacity = 255;
+   end
+   else if (propName = 'ShadowSize') then
+   begin
+     Result := GetFloatProp(self, 'ShadowSize') = 0;
    end
    else if (propName = 'Shortcut') then
    begin
-     s := ShortcutToString(Shortcut);
-     if s <> '' then WriteStrProp(propName, s);
-     Result := true; // ie write process handled
+     Result := Shortcut.chr = #0;
    end
    else if (propName = 'TabWidth') then
    begin
@@ -1567,7 +1658,7 @@ begin
    end
    else if (propName = 'Visible') then
    begin
-     Result := GetEnumProp(self, 'Visible') = 'True';
+     Result := Visible = True;
    end
 end;
 //------------------------------------------------------------------------------
@@ -1621,8 +1712,15 @@ begin
 
   Invalidate;
   for i := 0 to ChildCount -1 do
-    if not Assigned(TCustomCtrl(Child[i]).fFont) then
-      TCustomCtrl(Child[i]).FontChanged; //child inherits the parent's font
+    if (Child[i] is TCustomCtrl) and
+      not Assigned(TCustomCtrl(Child[i]).fFont) then
+        TCustomCtrl(Child[i]).FontChanged; //child inherits the parent's font
+end;
+//------------------------------------------------------------------------------
+
+function TCustomCtrl.IsEmpty: Boolean;
+begin
+  Result := (Width = 0) or (Height = 0);
 end;
 //------------------------------------------------------------------------------
 
@@ -1638,12 +1736,12 @@ procedure TCustomCtrl.SetShortcut(value: TShortcut);
 var
   hadShortcut: Boolean;
 begin
-  hadShortcut := IsShortcut(fShortcut);
+  hadShortcut := HasShortcut;
   fShortcut := value;
-  if (hadShortcut = IsShortcut(fShortcut)) then Exit;
+  if (hadShortcut = IsShortcut(value)) then Exit;
   if hadShortcut then
     StorageManager.RemoveShortcutOwner(self) else
-    StorageManager.AddShortcutOwner(self);
+    StorageManager.ShortcutList.Add(self);
 end;
 //------------------------------------------------------------------------------
 
@@ -1652,8 +1750,9 @@ begin
   if ap = fAutoPosition then Exit;
   fAutoPosition := ap;
   Invalidate;
-  if Assigned(Parent) and (Parent is TScrollingCtrl) then
-    TScrollingCtrl(Parent).DoChildAutoPositioning;
+  if IsVisibleToCtrlRoot and
+    (Parent is TScrollingCtrl) then
+      TScrollingCtrl(Parent).DoChildAutoPositioning;
 end;
 //------------------------------------------------------------------------------
 
@@ -1677,26 +1776,20 @@ begin
       TCustomCtrl(parent).SetFocus;
     Exit;
   end;
-
-  if (self = RootCtrl.FocusedCtrl) then Exit;
-  if Assigned(RootCtrl.FocusedCtrl) then
-    RootCtrl.FocusedCtrl.KillFocus;
-  RootCtrl.FocusedCtrl := Self;
-  Invalidate;
+  RootCtrl.SetFocus(Self);
 end;
 //------------------------------------------------------------------------------
 
 procedure TCustomCtrl.KillFocus;
 begin
-  if self <> RootCtrl.FocusedCtrl then Exit;
-  RootCtrl.FocusedCtrl := nil;
-  Invalidate;
+  if self = RootCtrl.FocusedCtrl then
+    RootCtrl.SetFocus(nil);
 end;
 //------------------------------------------------------------------------------
 
 function TCustomCtrl.GetCanFocus: Boolean;
 begin
-  Result := fCanFocus and fEnabled and Visible;
+  Result := fCanFocus and fEnabled and IsVisibleToCtrlRoot;
 end;
 //------------------------------------------------------------------------------
 
@@ -1714,8 +1807,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TCustomCtrl.DoMouseMove(button: TMouseButton;
-  shift: TShiftState; const pt: TPoint);
+procedure TCustomCtrl.DoMouseMove(shift: TShiftState; const pt: TPoint);
+begin
+end;
+//------------------------------------------------------------------------------
+
+procedure TCustomCtrl.DoMouseEnter;
+begin
+end;
+//------------------------------------------------------------------------------
+
+procedure TCustomCtrl.DoMouseLeave(newCtrl: TStorage);
 begin
 end;
 //------------------------------------------------------------------------------
@@ -1779,13 +1881,95 @@ end;
 
 procedure TCustomCtrl.Clicked;
 begin
-  if Visible and fEnabled and Assigned(fOnClick) then
-    fOnClick(Self);
+  if Visible and fEnabled and Assigned(fOnClick) then fOnClick(Self);
 end;
 //------------------------------------------------------------------------------
 
-procedure TCustomCtrl.Repaint;
+function TCustomCtrl.HasShortcut: Boolean;
 begin
+  Result := IsShortcut(fShortcut);
+end;
+//------------------------------------------------------------------------------
+
+procedure TCustomCtrl.Paint;
+begin
+end;
+//------------------------------------------------------------------------------
+
+function TCustomCtrl.GetClientHeight: double;
+begin
+  Result := Height - fBevelHeight * 2;
+end;
+//------------------------------------------------------------------------------
+
+function TCustomCtrl.GetClientWidth: double;
+begin
+  Result := Width - fBevelHeight * 2;
+end;
+//------------------------------------------------------------------------------
+
+function TCustomCtrl.GetClientRect: TRectD;
+begin
+  Result.Left := fBevelHeight;
+  Result.Top := fBevelHeight;
+  Result.Right := Width - fBevelHeight;
+  Result.Bottom := Height - fBevelHeight;
+end;
+//------------------------------------------------------------------------------
+
+procedure TCustomCtrl.SetVisible(value: Boolean);
+
+  procedure RecursiveNotifyVisibleChildren(obj: TLayer32);
+  var
+    i: integer;
+  begin
+    if (obj is TScrollingCtrl) then
+      TScrollingCtrl(obj).DoChildAutoPositioning;
+    for i := 0 to obj.ChildCount -1 do
+      if obj[i].Visible then
+        RecursiveNotifyVisibleChildren(obj[i]);
+  end;
+
+begin
+  if Visible = value then Exit;
+  inherited;
+  if IsVisibleToCtrlRoot then
+    RecursiveNotifyVisibleChildren(self)
+  else
+  begin
+    if (RootCtrl.CaptureCtrl = self) then
+      RootCtrl.ReleaseCapture;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TCustomCtrl.IsVisibleToCtrlRoot: Boolean;
+var
+  obj: TLayer32;
+begin
+  Result := Visible;
+  obj := Self;
+  while Result and not (obj is TRootCtrl) do
+  begin
+    obj := obj.Parent;
+    Result := obj.Visible;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TCustomCtrl.IsEnabledToCtrlRoot: Boolean;
+var
+  obj: TLayer32;
+begin
+  Result := True;
+  obj := Self;
+  while Result and not (obj is TRootCtrl) do
+  begin
+    if obj is TCustomCtrl then
+      Result := TCustomCtrl(obj).Enabled and obj.Visible else
+      Result := Visible;
+    obj := obj.Parent;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1794,7 +1978,7 @@ begin
   if UpdateInfo.updateMethod = umNone then Exit;
   Image.BlockNotify;
   try
-    Repaint;
+    Paint;
   finally
     Image.UnblockNotify;
   end;
@@ -1872,6 +2056,59 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+// TRootCtrl
+//------------------------------------------------------------------------------
+
+function TRootCtrl.SetFocus(ctrl: TCustomCtrl): Boolean;
+begin
+  if not Assigned(ctrl) then
+  begin
+    Result := true;
+    if not Assigned(fFocusedCtrl) then Exit;
+    FocusedCtrl.Invalidate;
+    fFocusedCtrl := nil;
+  end else
+  begin
+    Result := (ctrl <> Self) and ctrl.CanFocus and (ctrl <> FocusedCtrl);
+    if not Result then Exit;
+    if Assigned(fFocusedCtrl) then FocusedCtrl.Invalidate;
+    fFocusedCtrl := ctrl;
+    ctrl.Invalidate;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+function TRootCtrl.SetCapture(ctrl: TCustomCtrl; hdl: HWnd): Boolean;
+begin
+  if Assigned(fCaptureCtrl) then ReleaseCapture;
+  Result := Assigned(ctrl) and (hdl > 0);
+  if Result then
+  begin
+    ctrl.SetFocus;
+    Windows.SetCapture(hdl);
+    fCaptureCtrl := ctrl;
+  end else
+    fCaptureCtrl := nil;
+end;
+//------------------------------------------------------------------------------
+
+function TRootCtrl.ReleaseCapture: Boolean;
+begin
+  if Assigned(fCaptureCtrl) then
+    Result := Windows.ReleaseCapture else
+    Result := True;
+  fCaptureCtrl := nil;
+end;
+//------------------------------------------------------------------------------
+
+procedure TRootCtrl.SetTheme(const theme: TCtrlTheme);
+begin
+  fTheme := theme;
+  StorageManager.LayeredImage.Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
 // TAutoSizedCtrl
 //------------------------------------------------------------------------------
 
@@ -1901,36 +2138,32 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TLabelCtrl.SetCaption(const caption: string);
-begin
-  inherited;
-  fShortcut := GetShortcutFromCaption(caption);
-end;
-//------------------------------------------------------------------------------
-
-procedure TLabelCtrl.Repaint;
+procedure TLabelCtrl.Paint;
 var
-  ulIdx: integer;
   caption: string;
   pp: TPathsD;
   dx: double;
-  rec: TRect;
+  rec: TRectD;
+  sc: TShortcut;
 begin
-  Image.Clear(Color);
+  Image.Clear(GetColor);
   if not GetUsableFont then Exit;
 
   caption := fCaption;
-  ulIdx := Pos('&', caption);
-  if ulIdx > 0 then Delete(caption, ulIdx, 1);
+  if GetShortcutFromCaption(caption, sc) then
+    Delete(caption, sc.chrIdx, 1);
 
-  rec := Rect(InnerRect);
-  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
-  pp := fUsableFont.GetTextOutline(RectD(rec), caption, taCenter, tvaMiddle, ulIdx);
+  rec := InnerRect;
+  TranslateRect(rec, OuterMargin, OuterMargin);
+  pp := fUsableFont.GetTextOutline(rec, caption, taCenter, tvaMiddle, sc.chrIdx);
   dx := fUsableFont.LineHeight / 24;
   pp := TranslatePath(pp, -dx, -dx);
-  DrawPolygon(Image, pp, frNonZero, clWhite32);
+
+  if GetLuminance(GetFontColor) < 160 then
+    DrawPolygon(Image, pp, frNonZero, clWhite32) else
+    DrawPolygon(Image, pp, frNonZero, clBlack32);
   pp := TranslatePath(pp, dx, dx);
-  DrawPolygon(Image, pp, frNonZero, clBlack32);
+  DrawPolygon(Image, pp, frNonZero, GetFontColor);
 end;
 
 //------------------------------------------------------------------------------
@@ -1959,13 +2192,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TStatusbarCtrl.Repaint;
+procedure TStatusbarCtrl.Paint;
 var
   rec: TRect;
   bh: double;
 begin
   if not (Parent is TPanelCtrl) then Exit;
-  Image.Clear(Color);
+  Image.Clear(GetColor);
   rec := Rect(InnerRect);
   TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
   bh := fBevelHeight;
@@ -1973,7 +2206,7 @@ begin
   Img32.Vector.InflateRect(rec, -DPIAware(10), -Round(bh));
   if GetUsableFont then
     DrawText(Image, rec.Left, rec.Top + fUsableFont.Ascent ,
-      fCaption, fUsableFont, fFontColor);
+      fCaption, fUsableFont, GetFontColor);
 end;
 
 //------------------------------------------------------------------------------
@@ -1996,22 +2229,37 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TScrollingCtrl.UpdateHorzScrollbarPos;
+function TScrollingCtrl.GetClientHeight: double;
 begin
-  if not Assigned(fScrollH) or Image.IsEmpty then Exit;
-  fScrollH.CalcScale;
+  Result := Height - fBevelHeight * 2;
+  if Assigned(ScrollH) and ScrollH.visible then
+    Result := Result - ScrollH.Height;
 end;
 //------------------------------------------------------------------------------
 
-procedure TScrollingCtrl.UpdateVertScrollbarPos;
+function TScrollingCtrl.GetClientWidth: double;
 begin
-  if not Assigned(fScrollV) or Image.IsEmpty then Exit;
-  fScrollV.CalcScale;
+  Result := Width - fBevelHeight * 2;
+  if Assigned(ScrollV) and ScrollV.visible then
+    Result := Result - ScrollV.Width;
 end;
 //------------------------------------------------------------------------------
 
-function TScrollingCtrl.InsertChild(layerClass: TLayer32Class;
-  index: integer; const name: string = ''): TLayer32;
+function TScrollingCtrl.GetClientRect: TRectD;
+begin
+  Result.Left := fBevelHeight;
+  Result.Top := fBevelHeight;
+  Result.Right := Width - fBevelHeight;
+  if Assigned(ScrollV) and ScrollV.visible then
+    Result.Right := Result.Right - ScrollV.Width;
+  Result.Bottom := Height - fBevelHeight;
+  if Assigned(ScrollH) and ScrollH.visible then
+    Result.Bottom := Result.Bottom - ScrollH.Height;
+end;
+//------------------------------------------------------------------------------
+
+function TScrollingCtrl.InsertChild(index: integer; layerClass: TLayer32Class;
+  const name: string = ''): TLayer32;
 begin
   //non-scroll ctrls must always precede scroll ctrls
   if layerClass.InheritsFrom(TScrollCtrl) then
@@ -2022,127 +2270,120 @@ begin
     if index > ChildCount then index := ChildCount;
     while (index > 0) and (Child[index -1] is TScrollCtrl) do dec(index);
   end;
-  Result := inherited InsertChild(layerClass, index, name);
+  Result := inherited InsertChild(index, layerClass, name);
 end;
 //------------------------------------------------------------------------------
 
 procedure TScrollingCtrl.SetInnerBounds(const newBounds: TRectD);
 begin
   inherited;
-  DoChildAutoPositioning;
+  if IsVisibleToCtrlRoot then
+    DoChildAutoPositioning;
 end;
 //------------------------------------------------------------------------------
 
 procedure TScrollingCtrl.DoChildAutoPositioning;
 var
   i   : integer;
-  w,h : double;
   rec : TRectD;
-  clientArea      : TRectD;
-  clientAreaCtrl  : TCustomCtrl;
-  scrollHsize     : double;
-  scrollVsize     : double;
-const
-  scrollScale = 0.75;
+  recWidth    : double;
+  recHeight   : double;
+  clientArea  : TRectD;
+  clientAligningCtrl  : TCustomCtrl;
 begin
-  if (StorageState = ssLoading) or (Width = 0) or (Height = 0) or
+  // this method can be relatively slow, so this method will
+  // anly be called when the ctrl and all its parents are visible
+
+  if (StorageState = ssLoading) or IsEmpty or
     not GetUsableFont then Exit;
 
-  clientArea := InnerRect;
-  //exclude regions non-usable for all childs
-
+  if Assigned(fScrollH) then fScrollH.CheckAutoVisible(true);
+  if Assigned(fScrollV) then fScrollV.CheckAutoVisible(false);
+//
   //reposition horz and vert scrollbars
   if Assigned(fScrollH) and fScrollH.Visible then
   begin
-    // todo - unlink scrollStepSize from font lineheight
-    if fScrollH.fSize = 0 then
-      scrollHsize := fUsableFont.LineHeight * scrollScale else
-      scrollHsize := fScrollH.fSize;
-    rec := clientArea;
-    if Assigned(fScrollV) and fScrollV.Visible then
-    begin
-      if fScrollV.fSize = 0 then
-        scrollVsize := fUsableFont.LineHeight * scrollScale else
-        scrollVsize := fScrollV.fSize;
-      rec.Right := rec.Right - scrollVsize;
-    end;
-    rec.Top := Rec.Bottom - scrollHsize;
-    fScrollH.SetInnerBounds(rec);
-    clientArea.Bottom := clientArea.Bottom - scrollHsize;
+    fScrollH.CheckCtrlPos;
+    fScrollH.GetScrollBtnInfo;
   end;
-  if Assigned(fScrollV) and (fScrollV.Visible or fScrollV.fAutoHide) then
+  if Assigned(fScrollV) and fScrollV.Visible then
   begin
-    if fScrollV.fSize = 0 then
-      scrollVsize := fUsableFont.LineHeight * scrollScale else
-      scrollVsize := fScrollV.fSize;
-    rec := clientArea;
-    rec.Left := Rec.Right - scrollVsize;
-    fScrollV.SetInnerBounds(rec);
-    clientArea.Right := clientArea.Right - scrollVsize;
+    fScrollV.CheckCtrlPos;
+    fScrollV.GetScrollBtnInfo;
   end;
 
-  //now exclude the region that's non-usable for 'inner' childs
-  if fInnerMargin > 0 then
-    InflateRect(clientArea, -fInnerMargin, -fInnerMargin);
+  clientArea := GetClientRect; // get client area now scrollbars sorted
+  // clientAligningCtrl: a ctrl with align == apClient
+  clientAligningCtrl  := nil;
 
-  clientAreaCtrl  := nil;
+  // Note: TScrollCtrl.AutoPosition = apCustom
   for i := 0 to ChildCount -1 do
     if (Child[i] is TCustomCtrl) and
     not (Child[i] is TScrollCtrl) and
       (TCustomCtrl(Child[i]).fAutoPosition > apCustom) then
   begin
     rec := clientArea;
-    w := rec.Width; h := rec.Height;
+    recWidth := rec.Width; recHeight := rec.Height;
     case TCustomCtrl(Child[i]).fAutoPosition of
       apClient  :
-        clientAreaCtrl := TCustomCtrl(Child[i]);
+        clientAligningCtrl := TCustomCtrl(Child[i]); // postpone setting bounds
       apLeft    :
         begin
-          rec.Right := rec.Left + Min(w, Child[i].Width);
+          rec.Right := rec.Left + Min(recWidth, Child[i].Width);
           Child[i].SetInnerBounds(rec);
           clientArea.Left := Child[i].Left + Child[i].Width;
         end;
       apTop     :
         begin
-          rec.Bottom := rec.Top + Min(h, Child[i].Height);
+          rec.Bottom := rec.Top + Min(recHeight, Child[i].Height);
           Child[i].SetInnerBounds(rec);
           clientArea.Top := Child[i].Top + Child[i].Height;
         end;
       apRight   :
         begin
-          rec.Left := rec.Right - Min(w, Child[i].Width);
+          rec.Left := rec.Right - Min(recWidth, Child[i].Width);
           Child[i].SetInnerBounds(rec);
           clientArea.Right := Child[i].Left;
         end;
       apBottom  :
         begin
-          rec.Top := rec.Bottom - Min(h, Child[i].Height);
+          rec.Top := rec.Bottom - Min(recHeight, Child[i].Height);
           Child[i].SetInnerBounds(rec);
           clientArea.Bottom := Child[i].Top;
         end;
     end;
   end;
-  if Assigned(clientAreaCtrl) then
-    clientAreaCtrl.SetInnerBounds(clientArea);
-
-  UpdateHorzScrollbarPos;
-  UpdateVertScrollbarPos;
+  if Assigned(clientAligningCtrl) then
+    clientAligningCtrl.SetInnerBounds(clientArea);
 end;
 //------------------------------------------------------------------------------
 
-procedure TScrollingCtrl.Repaint;
+procedure TScrollingCtrl.DoAfterMerge;
+var
+  rec: TRectD;
+begin
+  // when both scrollbars are visible, fill in the bottom-right corner
+  if not Assigned(MergeImage) or
+    not Assigned(ScrollH) or not ScrollH.Visible or
+    not Assigned(ScrollV) or not ScrollV.Visible then Exit;
+
+  rec := GetInnerRectD;
+  rec.Top := rec.Bottom - ScrollH.Height;
+  rec.Left := rec.Right - ScrollV.Width;
+  MergeImage.FillRect(Rect(rec), clBtnFace32);
+end;
+//------------------------------------------------------------------------------
+
+procedure TScrollingCtrl.Paint;
 var
   rec : TRectD;
   bh  : double;
 begin
-  image.Clear;
-
-  image.Clear;
+  image.Clear(clNone32);
   bh := fBevelHeight;
-
   rec := InnerRect;
   TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
-  image.FillRect(Rect(rec), color);
+  image.FillRect(Rect(rec), GetColor);
   DrawEdge(Image, rec, clSilver32, clWhite32, bh);
 
   if Assigned(fOnPaint) then fOnPaint(Self);
@@ -2151,13 +2392,16 @@ end;
 
 procedure TScrollingCtrl.Scale(value: double);
 begin
-  inherited;
   fInnerMargin := fInnerMargin * value;
+  fScrollOffset := ScalePoint(fScrollOffset, value, value);
   fShadowSize := fShadowSize * value;
+  inherited;
 end;
 //------------------------------------------------------------------------------
 
 procedure TScrollingCtrl.SetScrollH(scrollHorz: TScrollCtrl);
+var
+  rec: TRectD;
 begin
   if Assigned(fScrollH) then fScrollH.UnregisterTargetCtrl;
   fScrollH := scrollHorz;
@@ -2170,12 +2414,18 @@ begin
     Move(self, MaxInt);
     AutoPosition := apBottom;
   end;
-  if (StorageState = ssNormal) then
-    DoChildAutoPositioning;
+
+  if (StorageState <> ssNormal) then Exit;
+  rec := ClientRect;
+  if (fScrollH.Size = 0) then fScrollH.SetDefaultSize;
+  rec.Top := rec.Bottom - fScrollH.Size;
+  fScrollH.SetInnerBounds(rec);
 end;
 //------------------------------------------------------------------------------
 
 procedure TScrollingCtrl.SetScrollV(scrollVert: TScrollCtrl);
+var
+  rec: TRectD;
 begin
   if Assigned(fScrollV) then fScrollV.UnregisterTargetCtrl;
   fScrollV := scrollVert;
@@ -2188,8 +2438,12 @@ begin
     Move(self, MaxInt);
     AutoPosition := apRight;
   end;
-  if (StorageState = ssNormal) then
-    DoChildAutoPositioning;
+
+  if (StorageState <> ssNormal) or IsEmpty then Exit;
+  rec := ClientRect;
+  if (fScrollV.Size = 0) then fScrollV.SetDefaultSize;
+  rec.Left := rec.Right - ScrollV.Size;
+  fScrollV.SetInnerBounds(rec);
 end;
 //------------------------------------------------------------------------------
 
@@ -2225,7 +2479,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TScrollingCtrl.DoScroll(dx, dy: double);
+procedure TScrollingCtrl.DoScrollX(newPos: double);
+begin
+end;
+//------------------------------------------------------------------------------
+
+procedure TScrollingCtrl.DoScrollY(newPos: double);
 begin
 end;
 
@@ -2236,9 +2495,10 @@ end;
 constructor TListCtrl.Create(parent: TLayer32; const name: string);
 begin
   inherited;
+  fItemIndex := -1;
   fCanFocus := true;
-  fColor := clWhite32;
-  fMaxVisible := 6;
+  Color := clWhite32;
+  fFontColor := clBlack32;
   fAutoSize := true;
 end;
 //------------------------------------------------------------------------------
@@ -2250,52 +2510,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TListCtrl.SetInnerBounds(const newBounds: TRectD);
-var
-  rec: TRectD;
-  makeVis, requestVis: integer;
-  itemH: double;
-  scrollCanShow: Boolean;
+function TListCtrl.GetItemCount: integer;
 begin
-  itemH := GetItemHeight;
-  if (itemH = 0) then
-    Exit
-  else if (StorageState = ssLoading) or not GetUsableFont then
-  begin
-    inherited SetInnerBounds(newBounds);
-    Exit;
-  end;
-
-  requestVis := Ceil((newBounds.Height - BevelHeight * 2) / itemH);
-  scrollCanShow := Assigned(ScrollV) and (ScrollV.Visible or ScrollV.fAutoHide);
-
-  if not fAutoSize then
-  begin
-    if fMaxVisible = 0 then
-      makeVis := requestVis else
-      makeVis := Min(requestVis, fMaxVisible)
-  end
-  else if (fMaxVisible > 0) then
-  begin
-    makeVis := Max(1, Min(fMaxVisible, ItemCount));
-  end
-  else if requestVis > 8 then
-  begin
-    makeVis := 8;
-    ScrollV.Visible := true;
-  end else
-  begin
-    ScrollV.Visible := false;
-    makeVis := requestVis;
-  end;
-
-  if scrollCanShow and ScrollV.fAutoHide then
-    ScrollV.Visible := makeVis < GetItemCount;
-
-  rec := newBounds;
-  rec.Bottom := rec.Top +
-    (makeVis * itemH) + BevelHeight * 2;
-  inherited SetInnerBounds(rec);
+  // TListItem objects always preceed TLayer32 objects
+  Result := ChildCount;
+  while (Result > 0) and (GetStorageChild(Result - 1) is TLayer32) do
+    Dec(Result);
 end;
 //------------------------------------------------------------------------------
 
@@ -2312,67 +2532,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TListCtrl.GetItemCount: integer;
+function TListCtrl.GetItem(index: integer): TListItem;
 begin
-  Result := Length(fItems);
-end;
-//------------------------------------------------------------------------------
-
-function SplitString(const str, delims: string): TArrayOfString;
-var
-  i,j,k, len: integer;
-  delimOffsets: TArrayOfInteger;
-begin
-  Result := nil;
-  len := Length(str);
-  if len = 0 then Exit;
-  SetLength(delimOffsets, len);
-  k := 0;
-  for i := 1 to len do
-    for j := 1 to length(delims) do
-      if str[i] = delims[j] then
-      begin
-        delimOffsets[k] := i;
-        inc(k);
-        break;
-      end;
-  SetLength(delimOffsets, k);
-  SetLength(Result, k +1);
-  j := 1; k := 0;
-  for i := 0 to High(delimOffsets) do
-  begin
-    Result[k] :=  SimpleXmlDecode(Trim(Copy(str, j, delimOffsets[i] - j)));
-    inc(k);
-    j := delimOffsets[i] +1;
-  end;
-  Result[k] := SimpleXmlDecode(Trim(Copy(str, j, MaxInt)));
-end;
-//------------------------------------------------------------------------------
-
-procedure TListCtrl.TextToItems(const text: string);
-begin
-  fItems := SplitString(text, ';');
-end;
-//------------------------------------------------------------------------------
-
-function TListCtrl.ItemsToText: string;
-var
-  i,len: integer;
-begin
-  Result := '';
-  len := Length(fItems);
-  if len = 0 then Exit;
-  Result := fItems[0];
-  for i := 1 to len -1 do
-    Result := Result + ';' + SimpleXmlEncode(fItems[i]);
-end;
-//------------------------------------------------------------------------------
-
-function TListCtrl.GetItem(index: integer): string;
-begin
-  if (index < 0) or (index >= ItemCount) then
+  if (index < 0) or (index >= GetItemCount) then
     raise Exception.Create(rsListCtrlError);
-  result := fItems[index];
+  result := GetStorageChild(index) as TListItem;
 end;
 //------------------------------------------------------------------------------
 
@@ -2380,9 +2544,10 @@ procedure TListCtrl.SetItemIndex(index: integer);
 begin
   if Assigned(StorageManager) and
     (StorageManager.StorageState <> ssLoading) and
-      ((index < 0) or (index >= GetItemCount)) then index := -1;
+      ((index < 0) or (index >= ItemCount)) then index := -1;
   if index = fItemIndex then Exit;
   fItemIndex := index;
+  ScrollItemIndexIntoView;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -2399,6 +2564,17 @@ begin
     Result := fImgList.DefaultHeight
   else
     Result := 0;
+end;
+//------------------------------------------------------------------------------
+
+function TListCtrl.GetVisibleItems: integer;
+var
+  itmHeight, onetenth: double;
+begin
+  itmHeight := GetItemHeight;
+  onetenth := itmHeight * 0.1;
+  if itmHeight = 0 then Result := 1
+  else Result := Max(1, Trunc((ClientHeight + onetenth) / itmHeight));
 end;
 //------------------------------------------------------------------------------
 
@@ -2454,22 +2630,19 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TListCtrl.DoScroll(dx, dy: double);
+procedure TListCtrl.DoScrollY(newPos: double);
 begin
-  fScrollOff := fScrollOff + dy;
-  fTopItem := Round(fScrollOff / GetItemHeight);
-  if fTopItem < 0 then fTopItem := 0
-  else if fTopItem > ItemCount - fMaxVisible then
-    fTopItem := ItemCount - fMaxVisible;
+  fTopItem := Min(Round(newPos / GetItemHeight), ItemCount - GetVisibleItems);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
 
-procedure TListCtrl.UpdateScrollV;
+procedure TListCtrl.SetScrollV(scrollVert: TScrollCtrl);
 var
   itmHeight: double;
 begin
-  if Assigned(ScrollV) then
+  inherited;
+  if Assigned(ScrollV) and (StorageState = ssNormal) then
   begin
     itmHeight := GetItemHeight;
     ScrollV.Max := ItemCount * itmHeight;
@@ -2478,151 +2651,126 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TListCtrl.SetScrollV(scrollVert: TScrollCtrl);
-begin
-  inherited;
-  if (StorageState = ssNormal) then
-    UpdateScrollV;
-end;
-//------------------------------------------------------------------------------
-
-procedure TListCtrl.SetCaption(const text: string);
-begin
-  inherited;
-  fItems := StringToArrayOfString(Text);
-  SetInnerBounds(GetInnerBounds);
-  UpdateScrollV;
-  fItemIndex := -1;
-end;
-//------------------------------------------------------------------------------
-
-procedure TListCtrl.Repaint;
+procedure TListCtrl.Paint;
 var
-  i,cnt, spaceW, marg, om, hbh, vis: integer;
+  i,cnt, spaceW, vis: integer;
   itemH, bh: double;
   rec, rec2: TRectD;
-  recI, rec2I: TRect;
   img: TImage32;
   scrollShowing: Boolean;
+  listItm: TListItem;
 const
   drawShad = true;
 begin
-
   Image.Clear;
-  recI := Rect(InnerRect);
-  TranslateRect(recI, Round(OuterMargin), Round(OuterMargin));
-  Image.Clear(recI, color);
-  DrawEdge(Image, recI, clSilver32, clWhite32, fBevelHeight);
+  rec := InnerRect;
+  TranslateRect(rec, OuterMargin, OuterMargin);
+  Image.Clear(Rect(rec), color);
+  DrawEdge(Image, rec, clSilver32, clWhite32, fBevelHeight);
 
   cnt := ItemCount;
   if (cnt = 0) or not GetUsableFont then Exit;
 
   itemH := GetItemHeight;
-  marg := Round(fInnerMargin);
   spaceW := Round(fUsableFont.GetSpaceWidth);
   bh := fBevelHeight;
-  hbh := Round(bh / 2);
-  om := Round(OuterMargin);
 
   scrollShowing := Assigned(ScrollV) and ScrollV.Visible;
 
-  vis := Math.Min(Trunc((recI.Height - fBevelHeight * 2) / itemH), cnt);
-  if HasFocus and
-    ((ItemIndex < fTopItem) or (ItemIndex >= fTopItem + fMaxVisible)) then
+  vis := GetVisibleItems;
+  if HasFocus and ((ItemIndex < fTopItem) or (ItemIndex >= fTopItem + vis)) then
   begin
-    Types.InflateRect(recI, hbh * 2, hbh * 2);
-    if (om > 0) then DrawShadowRect(Image, recI, om);
-    DrawLine(Image, Rectangle(recI), FocusLineWidth, clDefDark32, esPolygon);
-    Types.InflateRect(recI, -hbh * 2, -hbh * 2);
+    InflateRect(rec, bh, bh);
+    if (OuterMargin > 0) then
+      DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, clDarkGray32);
+    DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esPolygon);
+    InflateRect(rec, -bh, -bh);
   end;
 
   if Assigned(fImgList) then
     img := TImage32.Create(fImgList.DefaultWidth, fImgList.DefaultHeight) else
     img := nil;
   try
-    with recI do
-      rec := RectD(Left + bh, Top + bh, Right - bh - 1, Top + bh + itemH);
+    InflateRect(rec, -bh, -bh);
+    rec.Right := rec.Right - DPIAware(2);
+    rec.Bottom := rec.Top + itemH;
     if scrollShowing then rec.Right := rec.Right - ScrollV.Width;
 
-    if fTopItem < 0 then fTopItem := 0;
+    if fTopItem < 0 then fTopItem := 0
+    else if fTopItem > (ItemCount - vis) then
+      fTopItem := ItemCount - vis;
+
     for i := fTopItem to fTopItem + vis -1 do
     begin
+
+      rec2 := rec;
       if i = fItemIndex then
       begin
-        rec2 := rec;
         DrawLine(Image, Rectangle(rec),
           DpiAwareOne, clGray32, esPolygon);
         if HasFocus then
           Image.FillRect(Rect(rec2), clLiteBtn32)
         else
           Image.FillRect(Rect(rec2), clBtnFace32);
-        Img32.Vector.InflateRect(rec2, -hbh, -hbh);
+        Img32.Vector.InflateRect(rec2, - bh / 2, -bh / 2);
         if HasFocus then
           DrawLine(Image, Rectangle(rec2),
-            FocusLineWidth, clDefDark32, esPolygon);
+            FocusLineWidth, GetFocusColor, esPolygon);
       end;
 
-      if Assigned(img) and (i < fImgList.Count) then
+      if Assigned(img) then
       begin
-        recI := Rect(rec);
-        fImgList.GetImage(i, img);
-        rec2I.Left := recI.Left + marg + spaceW;
-        rec2I.Top := recI.Top + Round((rec.Height - img.Height) / 2);
-        rec2I.Right := rec2I.Left + img.Width;
-        rec2I.Bottom := rec2I.Top + img.Height;
-        Image.CopyBlend(img, img.Bounds, rec2I, BlendToAlpha);
-      end;
-
-      if Assigned(img) then
+        if (i < fImgList.Count) then
+        begin
+          fImgList.GetImage(i, img);
+          rec2.Left := rec2.Left + spaceW;
+          rec2.Right := rec2.Left + img.Width;
+          rec2.Bottom := rec2.Top + img.Height;
+          Image.CopyBlend(img, img.Bounds, Rect(rec2), BlendToAlpha);
+        end;
         rec.Left := rec.Left + img.Width + spaceW * 2;
-
-      DrawText(Image, rec, fItems[i], fUsableFont, clWhite32, taLeft, tvaMiddle);
-      TranslateRect(rec, hbh, hbh);
-      DrawText(Image, rec, fItems[i], fUsableFont, clBlack32, taLeft, tvaMiddle);
-      TranslateRect(rec, -hbh, itemH -hbh);
-
-      if Assigned(img) then
+        if not (GetStorageChild(i) is TListItem) then Break;
+        listItm := TListItem(GetStorageChild(i));
+        DrawText(Image, rec, listItm.Text, fUsableFont, fFontColor, taLeft, tvaMiddle);
         rec.Left := rec.Left - img.Width - spaceW * 2;
-    end;
+      end else
+      begin
+        if not (GetStorageChild(i) is TListItem) then Break;
+        listItm := TListItem(GetStorageChild(i));
+        DrawText(Image, rec, listItm.Text, fUsableFont, fFontColor, taLeft, tvaMiddle);
+      end;
+      TranslateRect(rec, 0, itemH);
+    end; // for each item loop
+
   finally
     FreeAndNil(img);
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TListCtrl.SetItems(const items: TArrayOfString);
+function TListCtrl.AddChild(storeClass: TStorageClass; const text: string = ''): TStorage;
 begin
-  fItems := items;
-  SetInnerBounds(GetInnerBounds);
-  UpdateScrollV;
-  fItemIndex := -1;
+  if storeClass.InheritsFrom(TListItem) then
+  begin
+    Result := InsertStorageChild(GetItemCount, storeClass);
+    TListItem(Result).Text := text;
+  end else if storeClass.InheritsFrom(TLayer32) then
+    Result := InsertStorageChild(ChildCount, storeClass)
+  else
+    Raise Exception.Create('oops');
+  Result.Name := text;
 end;
 //------------------------------------------------------------------------------
 
-procedure TListCtrl.AddItem(const text: string);
+function TListCtrl.InsertChild(index: integer; storeClass: TStorageClass): TStorage;
 begin
-  InsertItem(MaxInt, text);
-end;
-//------------------------------------------------------------------------------
-
-procedure TListCtrl.InsertItem(index: integer; const itemStr: string);
-var
-  len: integer;
-begin
-  len := GetItemCount;
-  if (index < 0) then index := 0
-  else if (index > len) then index := len;
-  Insert(itemStr, fItems, index);
-  //Caption := ArrayOfStringToString(fItems);
-end;
-//------------------------------------------------------------------------------
-
-procedure TListCtrl.DeleteItem(index: integer);
-begin
-  if (index < 0) or (index >= GetItemCount) then Exit;
-  Delete(fItems, index, 1);
-  Caption := ArrayOfStringToString(fItems);
-  Invalidate;
+  if storeClass.InheritsFrom(TListItem) then
+  begin
+    Result := InsertStorageChild(Math.Min(GetItemCount, index), storeClass);
+  end else if storeClass.InheritsFrom(TLayer32) then
+    Result := InsertStorageChild(Math.Max(GetItemCount, index), storeClass)
+  else
+    Raise Exception.Create('oops');
 end;
 //------------------------------------------------------------------------------
 
@@ -2647,168 +2795,77 @@ begin
   if not Assigned(ScrollV) or not ScrollV.Visible then Exit;
   itmHeight := GetItemHeight;
   if (fItemIndex < 0) or (itmHeight = 0) then Exit;
-  itemsInView := Trunc(Height / itmHeight);
+  itemsInView := GetVisibleItems;
   if fTopItem > fItemIndex then
     fTopItem := fItemIndex
-  else if fTopItem < fItemIndex - itemsInView then
-    fTopItem := Math.Max(0, fItemIndex - itemsInView)
+  else if fItemIndex >= fTopItem + itemsInView then
+    fTopItem := Math.Max(0, fItemIndex - itemsInView +1)
   else
     Exit;
 
-  ScrollV.Position :=
-    Min(fTopItem * itmHeight, ScrollV.fMax - Height);
+  ScrollV.Position := fTopItem * itmHeight;
   Invalidate;
 end;
+
+//------------------------------------------------------------------------------
+// TMenuItemCtrl
 //------------------------------------------------------------------------------
 
-procedure TListCtrl.SetVisibleItms(value: integer);
+constructor TMenuItemCtrl.Create(parent: TLayer32 = nil; const name: string = '');
 begin
-  if (value < 0) then value := 0;
-  if fMaxVisible = value then Exit;
-  fMaxVisible := value;
-  Invalidate;
-  SetInnerBounds(GetInnerBounds);
-end;
-
-//------------------------------------------------------------------------------
-// TPopMenuCtrl
-//------------------------------------------------------------------------------
-
-procedure TPopMenuCtrl.SetItemIndex(index: integer);
-begin
-  if (index < 0) or (index >= GetItemCount) then index := -1;
-  if index = fItemIndex then Exit;
-  fItemIndex := index;
-  Invalidate;
+  inherited Create(parent, name);
+  Caption := name;
 end;
 //------------------------------------------------------------------------------
 
-function  TPopMenuCtrl.GetItemCount: integer;
+procedure TMenuItemCtrl.SetCaption(const caption: string);
 begin
-  Result := Length(fItems);
+  inherited;
+  UpdateItem;
 end;
 //------------------------------------------------------------------------------
 
-function  TPopMenuCtrl.GetItemHeight: double;
+procedure TMenuItemCtrl.SetFont(font: TFontCache);
 begin
-  if GetUsableFont then
-  begin
-    Result := fUsableFont.LineHeight * 1.1;
-    if Assigned(fImgList) then
-      Result := Math.Max(Result, fImgList.DefaultHeight);
-  end
-  else if Assigned(fImgList) then
-    Result := fImgList.DefaultHeight
+  inherited;
+  UpdateItem;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMenuItemCtrl.UpdateItem;
+begin
+  if (Caption = '') or not GetUsableFont or
+    not (Parent is TBaseMenuCtrl) then
+      fCapWidth := 0
   else
-    Result := 0;
-end;
-//------------------------------------------------------------------------------
-
-procedure TPopMenuCtrl.SetImgList(svgImageList: TSvgImageList32);
-begin
-  if svgImageList = fImgList then Exit;
-  if Assigned(fImgList) then
-    fImgList.DeleteRecipient(self as INotifyRecipient);
-  fImgList := svgImageList;
-  if Assigned(fImgList) then
-    fImgList.AddRecipient(self as INotifyRecipient);
-  SetInnerBounds(InnerBounds);
-  Invalidate;
-end;
-//------------------------------------------------------------------------------
-
-procedure TPopMenuCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
-begin
-  if (ItemCount > 0) and GetUsableFont then
   begin
-    case key of
-      VK_UP:
-        if ItemIndex > 0 then
-        begin
-          ItemIndex := ItemIndex -1;
-          Key := 0;
-          Invalidate;
-          Exit;
-        end;
-      VK_DOWN:
-        if ItemIndex < ItemCount -1 then
-        begin
-          ItemIndex := ItemIndex +1;
-          Key := 0;
-          Invalidate;
-          Exit;
-        end;
-    end;
+    fCapWidth := font.GetTextWidth(caption);
+    if Parent is TPopMenuCtrl then
+      TPopMenuCtrl(Parent).UpdateLayout;
   end;
-  inherited;
 end;
+
+//------------------------------------------------------------------------------
+// TBaseMenuCtrl
 //------------------------------------------------------------------------------
 
-procedure TPopMenuCtrl.DoMouseDown(button: TMouseButton;
-  shift: TShiftState; const pt: TPoint);
-var
-  pt2: TPointD;
-begin
-  if (ItemCount > 0) and GetUsableFont then
-  begin
-    pt2 := MakeRelative(PointD(pt.X, pt.Y - fBevelHeight));
-    ItemIndex := Trunc(pt2.Y / GetItemHeight);
-    Invalidate;
-  end;
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TPopMenuCtrl.SetCaption(const text: string);
+constructor TBaseMenuCtrl.Create(parent: TLayer32 = nil; const name: string = '');
 begin
   inherited;
-  fItems := StringToArrayOfString(Text);
-  SetInnerBounds(GetInnerBounds);
+  fCanFocus := true;
+  fColor := clBtnFace32;
   fItemIndex := -1;
 end;
 //------------------------------------------------------------------------------
 
-procedure TPopMenuCtrl.Repaint;
-begin
-
-end;
-//------------------------------------------------------------------------------
-
-constructor TPopMenuCtrl.Create(parent: TLayer32 = nil; const name: string = '');
-begin
-  inherited;
-  fCanFocus := true;
-  fColor := clWhite32;
-end;
-//------------------------------------------------------------------------------
-
-destructor TPopMenuCtrl.Destroy;
+destructor TBaseMenuCtrl.Destroy;
 begin
   SetImgList(nil);
   inherited;
 end;
 //------------------------------------------------------------------------------
 
-procedure TPopMenuCtrl.SetInnerBounds(const newBounds: TRectD);
-var
-  rec: TRectD;
-  itemH: double;
-begin
-  itemH := GetItemHeight;
-  if (itemH = 0) then Exit
-  else if (StorageState = ssLoading) or not GetUsableFont then
-  begin
-    inherited SetInnerBounds(newBounds);
-    Exit;
-  end;
-
-  rec := newBounds;
-  rec.Bottom := rec.Top + (ItemCount * itemH) + BevelHeight * 2;
-  inherited SetInnerBounds(rec);
-end;
-//------------------------------------------------------------------------------
-
-procedure TPopMenuCtrl.ReceiveNotification(Sender: TObject; notify: TImg32Notification);
+procedure TBaseMenuCtrl.ReceiveNotification(Sender: TObject; notify: TImg32Notification);
 begin
   if Sender is TSvgImageList32 then
   begin
@@ -2821,30 +2878,489 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPopMenuCtrl.AddItem(const text: string);
-begin
-  InsertItem(MaxInt, text);
-end;
-//------------------------------------------------------------------------------
-
-procedure TPopMenuCtrl.InsertItem(index: integer; const itemStr: string);
+function TBaseMenuCtrl.GetItemWidths: TArrayOfDouble;
 var
-  len: integer;
+  i, cnt: integer;
 begin
-  len := GetItemCount;
-  if (index < 0) then index := 0
-  else if (index > len) then index := len;
-  Insert(itemStr, fItems, index);
-  Caption := ArrayOfStringToString(fItems);
+  Result := nil;
+  fUsesIcons := false;
+  cnt := ChildCount;
+  SetLength(Result, cnt);
+  for i := 0 to cnt -1 do
+    if Child[i] is TMenuItemCtrl then
+      with TMenuItemCtrl(Child[i]) do
+      begin
+        Result[i] := fCapWidth;
+        if MenuItemType <> mitNormal then fUsesIcons := true;
+      end else
+        Result[i] := 0;
 end;
 //------------------------------------------------------------------------------
 
-procedure TPopMenuCtrl.DeleteItem(index: integer);
+procedure TBaseMenuCtrl.Clicked;
+var
+  mnuItem: TMenuItemCtrl;
+  pt: TPointD;
 begin
-  if (index < 0) or (index >= GetItemCount) then Exit;
-  Delete(fItems, index, 1);
-  Caption := ArrayOfStringToString(fItems);
+  if (ItemIndex < 0) then
+  begin
+    if Self is TPopMenuCtrl then
+      Visible := false;
+    Exit;
+  end;
+
+  mnuItem := Child[ItemIndex] as TMenuItemCtrl;
+  if mnuItem.ChildCount = 0 then
+  begin
+    if Self is TPopMenuCtrl then Visible := false;
+    if mnuItem.fMenuType <> mitNormal then
+    begin
+      mnuItem.Checked := not mnuItem.Checked;
+      Invalidate;
+    end;
+    if Assigned(mnuItem.OnClick) then mnuItem.OnClick(mnuItem);
+  end
+  else if mnuItem[0] is TPopMenuCtrl then
+  begin
+    if Assigned(RootCtrl.PopMenuCtrl) then
+      RootCtrl.PopMenuCtrl.Visible := false;
+    if not GetUsableFont then Exit;
+    pt.X := GetMenuItemRect(ItemIndex).Left + fUsableFont.GetSpaceWidth *2;
+    pt.Y := Height - fUsableFont.FontHeight * 0.2;
+    pt := MakeAbsolute(pt);
+    RootCtrl.PopMenuCtrl := TPopMenuCtrl(mnuItem[0]);
+    with RootCtrl.PopMenuCtrl do
+    begin
+      fRealParent := mnuItem;
+      Visible := true;
+      Move(RootCtrl, MaxInt);
+      PositionAt(pt);
+      SetFocus;
+      if (ChildCount > 0) and (Child[0] is TMenuItemCtrl) and
+        TMenuItemCtrl(Child[0]).Enabled then ItemIndex := 0;
+    end;
+//    if StorageManager.MainHdl > 0 then
+//      rootCtrl.SetCapture(RootCtrl.PopMenuCtrl, StorageManager.MainHdl);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TBaseMenuCtrl.SetItemIndex(index: integer);
+begin
+  if (index < 0) or (index >= ChildCount) then index := -1;
+  if index = fItemIndex then Exit;
+  fItemIndex := index;
   Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+function  TBaseMenuCtrl.GetItemHeight: double;
+begin
+  if GetUsableFont then
+    Result := fUsableFont.LineHeight * 1.1 else
+    Result := 0;
+end;
+//------------------------------------------------------------------------------
+
+procedure TBaseMenuCtrl.SetImgList(svgImageList: TSvgImageList32);
+begin
+  if svgImageList = fImgList then Exit;
+  if Assigned(fImgList) then
+    fImgList.DeleteRecipient(self as INotifyRecipient);
+  fImgList := svgImageList;
+  if Assigned(fImgList) then
+    fImgList.AddRecipient(self as INotifyRecipient);
+  SetInnerBounds(InnerBounds);
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TBaseMenuCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
+begin
+  if (ChildCount = 0) or not GetUsableFont then Exit;
+  case key of
+    VK_LEFT:
+      if (Self is TMainMenuCtrl) then
+      begin
+        if ItemIndex = -1 then
+          ItemIndex := ChildCount -1 else
+          ItemIndex := ItemIndex -1;
+        Invalidate;
+      end;
+    VK_RIGHT:
+      if (Self is TMainMenuCtrl) then
+      begin
+        if ItemIndex = ChildCount -1 then
+          ItemIndex := -1 else
+          ItemIndex := ItemIndex +1;
+        Invalidate;
+      end;
+    VK_UP:
+      if (Self is TPopMenuCtrl) then
+      begin
+        if ItemIndex = -1 then
+          ItemIndex := ChildCount -1 else
+          ItemIndex := ItemIndex -1;
+        Invalidate;
+      end;
+    VK_DOWN:
+      if (Self is TPopMenuCtrl) then
+      begin
+        if ItemIndex = ChildCount -1 then
+          ItemIndex := -1 else
+          ItemIndex := ItemIndex +1;
+        Invalidate;
+      end;
+  end;
+  Key := 0;
+end;
+
+//------------------------------------------------------------------------------
+// TPopMenuCtrl
+//------------------------------------------------------------------------------
+
+constructor TPopMenuCtrl.Create(parent: TLayer32 = nil; const name: string = '');
+begin
+  inherited;
+  inherited Visible := false;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPopMenuCtrl.SetVisible(value: Boolean);
+begin
+  if (value = inherited Visible) then Exit;
+  if Value = False then
+  begin
+    RootCtrl.Invalidate;
+    RootCtrl.PopMenuCtrl := nil;
+    if not Assigned(fRealParent) then Exit;
+    Move(fRealParent, 0);
+    fRealParent := nil;
+  end;
+  inherited;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPopMenuCtrl.GetItemsSize;
+var
+  i, cnt: integer;
+  dy: double;
+begin
+  fItemsSize.cx := 0;
+  fItemsSize.cy := 0;
+  fUsesIcons := false;
+  cnt := ChildCount;
+  dy := GetItemHeight;
+  for i := 0 to cnt -1 do
+    if Child[i] is TMenuItemCtrl then
+      with TMenuItemCtrl(Child[i]) do
+      begin
+        fItemsSize.cx := Math.Max(fItemsSize.cx, fCapWidth);
+        if Caption = '-' then
+          fItemsSize.cy := fItemsSize.cy + dy * 0.5 else
+          fItemsSize.cy := fItemsSize.cy + dy;
+        if MenuItemType <> mitNormal then fUsesIcons := true;
+      end;
+end;
+//------------------------------------------------------------------------------
+
+
+procedure TPopMenuCtrl.UpdateLayout;
+var
+  h, bh2, w, spaceWidth: double;
+begin
+  if not GetUsableFont then Exit;
+  GetItemsSize;
+  bh2 := fBevelHeight * 2;
+  spaceWidth := fUsableFont.GetSpaceWidth;
+  w := fItemsSize.cx + spaceWidth * 2;
+  if UsesIcons then
+    w := w + fUsableFont.LineHeight + spaceWidth;
+  h := fItemsSize.cy;
+  SetInnerBounds(RectD(bh2, bh2, w + bh2 * 2, h + bh2 * 3));
+end;
+//------------------------------------------------------------------------------
+
+function TPopMenuCtrl.GetMenuItemRect(idx: integer): TRectD;
+var
+  i: integer;
+  y, dy, itmH: double;
+begin
+  GetUsableFont;
+  y := 0;
+  itmH := GetItemHeight;
+  for i := 0 to idx -1 do
+    if TCustomCtrl(Child[i]).Caption = '-' then
+      y := y + itmH * 0.5 else
+      y := y + itmH;
+  if TCustomCtrl(Child[idx]).Caption = '-' then
+    dy := itmH * 0.5 else
+    dy := itmH;
+
+  Result := ClientRect;
+  Result.Top := y;
+  Result.Bottom := Result.Top + dy;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPopMenuCtrl.DoMouseMove(shift: TShiftState; const pt: TPoint);
+var
+  idx, i, cnt: integer;
+  pt2: TPointD;
+  y, dy: double;
+begin
+  cnt := ChildCount;
+  if (cnt = 0) or not GetUsableFont then Exit;
+  pt2 := MakeRelative(PointD(pt.X, pt.Y));
+  y := BevelHeight * 2;
+  dy := GetItemHeight;
+  if not PtInRect(InnerBounds, PointD(pt)) then
+  begin
+    Visible := false;
+    Exit;
+  end;
+
+  idx := -1;
+  for i := 0 to cnt -1 do
+  begin
+    if TCustomCtrl(Child[i]).Caption = '-' then
+      y := y + dy * 0.5 else
+      y := y + dy;
+    if pt2.Y < y then
+    begin
+      idx := i;
+      Break;
+    end;
+  end;
+
+  if idx = ItemIndex then Exit;
+  ItemIndex := idx;
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPopMenuCtrl.DoMouseLeave(newCtrl: TStorage);
+begin
+  Visible := false;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPopMenuCtrl.DoKeyPress(var Key: Char);
+begin
+  case Key of
+    #10, #13, #32: Clicked;
+    #27: Visible := False;
+  end;
+  Key := #0;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPopMenuCtrl.Paint;
+var
+  i, cnt: integer;
+  x, x2, y, padding, bh: double;
+  dummy, iconSize, itmHeight: double;
+  rec, rec2: TRectD;
+  pp: TPathsD;
+  cap: string;
+begin
+  Image.Clear(GetColor);
+  rec := InnerRect;
+  TranslateRect(rec, OuterMargin, OuterMargin);
+
+  DrawEdge(Image, rec, clWhite32, clSilver32, fBevelHeight);
+
+  cnt := ChildCount;
+  if (cnt = 0) or not GetUsableFont then Exit;
+  padding := fUsableFont.GetSpaceWidth;
+  bh := BevelHeight;
+  if UsesIcons then
+    iconSize := fUsableFont.LineHeight - bh else
+    iconSize := 0;
+
+  y := rec.Top;
+  itmHeight := GetItemHeight;
+  for i := 0 to cnt -1 do
+  begin
+    if not (Child[i] is TMenuItemCtrl) then Break;
+    with TMenuItemCtrl(Child[i]) do
+    begin
+      rec := GetMenuItemRect(i);
+      TranslateRect(rec, OuterMargin, OuterMargin);
+
+      if fCaption = '-' then
+      begin
+        x := rec.Left + padding;
+        x2 := rec.Right - padding;
+        y := y + itmHeight * 0.25;
+        DrawLine(Self.Image, PointD(x, y), PointD(x2, y), FocusLineWidth, clSilver32);
+        y := y + itmHeight * 0.25;
+      end else
+      begin
+
+        if (i = fItemIndex) then
+          Self.Image.FillRect(Rect(rec), GetAltColor);
+
+        if (fMenuType <> mitNormal) then
+        begin
+          rec2 := RectD(rec.Left, rec.Top + bh,
+            rec.Left + iconsize, rec.Top + iconsize);
+          DrawCheckboxCtrl(Self.Image, Rect(rec2), bh,
+            BoolToTriState(checked), 1, GetFocusColor);
+        end;
+
+        if UsesIcons then TranslateRect(rec, iconSize + padding, 0);
+        x := rec.Left + padding;
+        if HasShortcut then
+          cap := DeleteChar(fCaption, Shortcut.chrIdx) else
+          cap := fCaption;
+        pp := fUsableFont.GetTextOutline(x,
+          y + fUsableFont.Ascent, cap, dummy, Shortcut.chrIdx);
+        DrawPolygon(Self.Image, pp, frEvenOdd, GetFontColor);
+        y := y + itmHeight;
+      end;
+    end;
+  end;
+end;
+
+//------------------------------------------------------------------------------
+// TMainMenuCtrl
+//------------------------------------------------------------------------------
+
+constructor TMainMenuCtrl.Create(parent: TLayer32 = nil; const name: string = '');
+begin
+  inherited;
+  AutoPosition := apTop;
+  Height := dpiAware(10);
+  Visible := true;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainMenuCtrl.SetInnerBounds(const newBounds: TRectD);
+var
+  rec: TRectD;
+begin
+  if not GetUsableFont then Exit;
+  rec := newBounds;
+  rec.Bottom := rec.Top + GetItemHeight + BevelHeight * 2;
+  inherited SetInnerBounds(rec);
+end;
+//------------------------------------------------------------------------------
+
+function TMainMenuCtrl.GetItemHeight: double;
+begin
+  if GetUsableFont then
+    Result := fUsableFont.LineHeight * 1.25 else
+    Result := 0;
+end;
+//------------------------------------------------------------------------------
+
+function TMainMenuCtrl.GetMenuItemRect(idx: integer): TRectD;
+var
+  i: integer;
+  padding: double;
+  widths: TArrayOfDouble;
+begin
+  GetUsableFont;
+  widths := GetItemWidths;
+  padding := fUsableFont.GetSpaceWidth * 2;
+  Result := ClientRect;
+  Result.Bottom := Result.Bottom - BevelHeight;
+  for i := 0 to idx -1 do
+    Result.Left := Result.Left + widths[i] + padding * 2;
+  Result.Right := Result.Left + widths[idx] + padding * 2;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainMenuCtrl.DoMouseMove(shift: TShiftState; const pt: TPoint);
+var
+  idx, i, cnt: integer;
+  pt2: TPointD;
+  widths: TArrayOfDouble;
+  x, padding: double;
+begin
+  cnt := ChildCount;
+  if (cnt = 0) or not GetUsableFont then Exit;
+  widths := GetItemWidths;
+  padding := fUsableFont.GetSpaceWidth * 2;
+  pt2 := MakeRelative(PointD(pt.X, pt.Y));
+  x := BevelHeight;
+
+  idx := -1;
+  for i := 0 to cnt -1 do
+  begin
+    x := x + widths[i] + padding * 2;
+    if pt2.X < x then
+    begin
+      idx := i;
+      Break;
+    end;
+  end;
+
+  if idx = ItemIndex then Exit;
+  fItemIndex := idx;
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainMenuCtrl.DoMouseLeave(newCtrl: TStorage);
+begin
+  ItemIndex := -1;
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMainMenuCtrl.Paint;
+var
+  i,cnt   : integer;
+  bh, y   : double;
+  dummy   : double;
+  padding : double;
+  itemWs  : TArrayOfDouble;
+  rec     : TRectD;
+  mnuItem : TMenuItemCtrl;
+  caption : string;
+  pp      : TPathsD;
+const
+  drawShad = true;
+begin
+  Image.Clear;
+  rec := Self.GetInnerBounds;
+  TranslateRect(rec, OuterMargin, OuterMargin);
+  Image.Clear(GetColor);
+  bh := fBevelHeight;
+  InflateRect(rec, -bh , -bh);
+
+  // draw a very faint line under the main menu
+  rec.Left := rec.Left + bh;
+  rec.Right := rec.Right - bh;
+  DrawLine(Image, PointD(rec.Left, rec.Bottom),
+    rec.BottomRight, 1, GetAltColor);
+
+  cnt := ChildCount;
+  if (cnt = 0) or not GetUsableFont then Exit;
+  itemWs := GetItemWidths;
+  padding := fUsableFont.GetSpaceWidth * 2;
+  y := rec.Top + fUsableFont.Ascent;
+
+  for i := 0 to cnt -1 do
+  begin
+    if not (Child[i] is TMenuItemCtrl) then Break;
+    mnuItem := TMenuItemCtrl(Child[i]);
+    rec := GetMenuItemRect(i);
+    TranslateRect(rec, OuterMargin, OuterMargin);
+
+    if i = fItemIndex then
+      Image.FillRect(Rect(rec), GetAltColor);
+
+    if mnuItem.HasShortcut then
+      caption := DeleteChar(mnuItem.caption, mnuItem.Shortcut.chrIdx) else
+      caption := mnuItem.Caption;
+
+    pp := fUsableFont.GetTextOutline(rec.Left + padding, y,
+      caption, dummy, mnuItem.Shortcut.chrIdx);
+    DrawPolygon(Image, pp, frNonZero, GetFontColor);
+  end; // for loop
 end;
 
 //------------------------------------------------------------------------------
@@ -2858,9 +3374,10 @@ begin
   fBuffer.BlockNotify;
   fChunkedText := TChunkedText.Create;
   Color := clWhite32;
+  FontColor := clBlack32;
   BlendFunc  := nil; //assumes edit controls will always be fully opaque.
   fTextMargin := PointD(20, 5);
-  fCursorChunkPos := InvalidPoint;
+  fCursorChunkPos := NullPoint;
 end;
 //------------------------------------------------------------------------------
 
@@ -2870,6 +3387,16 @@ begin
   fChunkedText.Free;
   fBuffer.Free;
   inherited;
+end;
+//------------------------------------------------------------------------------
+
+procedure TMemoCtrl.SetInnerBounds(const newBounds: TRectD);
+begin
+  inherited SetInnerBounds(newBounds);
+  CheckPageMetrics;
+  if fTopLine > fPageMetrics.totalLines - fPageMetrics.visibleLines then
+    fTopLine := fPageMetrics.totalLines - fPageMetrics.visibleLines;
+  ScrollCaretIntoView;
 end;
 //------------------------------------------------------------------------------
 
@@ -2884,56 +3411,43 @@ procedure TMemoCtrl.CheckPageMetrics;
 var
   ScrollVAutoHide     : Boolean;
   scrollShowing       : Boolean;
-  rec                 : TRect;
-  om                  : integer;
+  rec                 : TRectD;
 begin
-  if not GetUsableFont or
+  if not GetUsableFont or IsEmpty or (StorageState <> ssNormal) or
     // and exit if page metrics already measured
    (RectWidth(fPageMetrics.bounds) > 0) and
    (rec.Width = fTextRect.Width) and (rec.Height = fTextRect.Height) then Exit;
 
-  om := Round(OuterMargin);
-  rec  := Rect(InnerRect);
-  TranslateRect(rec, om, om);
+  rec  := InnerRect;
+  TranslateRect(rec, OuterMargin, OuterMargin);
   if HasFocus then
-    InflateRect(rec, Round(-TextMargin.X - fBevelHeight),
-      Round(-TextMargin.Y - fBevelHeight))
+    InflateRect(rec, -TextMargin.X - fBevelHeight, -TextMargin.Y - fBevelHeight)
   else
-    InflateRect(rec, Round(-TextMargin.X), Round(-TextMargin.Y));
+    InflateRect(rec, -TextMargin.X, -TextMargin.Y);
 
+  if RectsEqual(Rect(fTextRect), Rect(rec)) then Exit;
+
+  fTextRect := rec;
   //start by assuming ScrollV is NOT required
+  fPageMetrics := fChunkedText.GetPageMetrics(Rect(fTextRect), fUsableFont.LineHeight);
+
   ScrollVAutoHide := assigned(ScrollV) and ScrollV.AutoHide;
   scrollShowing := Assigned(ScrollV) and ScrollV.Visible;
-  if not ScrollVAutoHide and scrollShowing then
-    rec.Right := rec.Right - Round(ScrollV.Width);
 
-  if not RectsEqual(fTextRect, rec) then
+  if RectHeight(fPageMetrics.bounds) < fTextRect.Height then
   begin
-    fTextRect := rec;
+    if scrollShowing and ScrollVAutoHide then ScrollV.Visible := false;
+  end
+  else if ScrollVAutoHide and Assigned(ScrollV) then
+  begin
+    if not scrollShowing then ScrollV.Visible := true;
+    if ScrollV.Size = 0 then ScrollV.SetDefaultSize;
+    fTextRect.Right := fTextRect.Right - Round(ScrollV.Size);
     fPageMetrics :=
-      fChunkedText.GetPageMetrics(fTextRect, fUsableFont.LineHeight);
+      fChunkedText.GetPageMetrics(Rect(fTextRect), fUsableFont.LineHeight);
 
-    if RectHeight(fPageMetrics.bounds) < fTextRect.Height then
-    begin
-      if scrollShowing and ScrollVAutoHide then ScrollV.Visible := false;
-    end
-    else if ScrollVAutoHide and Assigned(ScrollV) then
-    begin
-      if not scrollShowing then ScrollV.Visible := true;
-      fTextRect.Right := fTextRect.Right - Round(ScrollV.Width);
-      fPageMetrics :=
-        fChunkedText.GetPageMetrics(fTextRect, fUsableFont.LineHeight);
-    end;
-  end;
-
-  if Assigned(ScrollV) and ScrollV.Visible then
-  begin
-    with fPageMetrics do
-    begin
-      ScrollV.Max := Round(lineHeight * totalLines);
-      ScrollV.Step := Round(lineHeight);
-    end;
-    ScrollV.Invalidate;
+    ScrollV.Max := fPageMetrics.lineHeight * (fPageMetrics.totalLines + 0.5);
+    ScrollV.Step := Round(fPageMetrics.lineHeight);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -2944,6 +3458,7 @@ begin
   if not Assigned(fUsableFont) then Exit;
   fPageMetrics.bounds := NullRect; // force a fPageMetrics refresh
   fPageMetrics.lineHeight := fUsableFont.LineHeight;
+  CheckPageMetrics;
   if fCaption <> '' then
     fChunkedText.ApplyNewFont(fUsableFont);
   Invalidate;
@@ -2965,10 +3480,7 @@ begin
   visLines := GetVisibleLines;
   if fCursorChunkPos.X < fPageMetrics.startOfLineIdx[fTopLine] then
   begin
-    while fCursorChunkPos.X < fPageMetrics.startOfLineIdx[fTopLine] do
-      dec(fTopLine);
-    ScrollV.Position := fTopLine * fPageMetrics.lineHeight;
-    Invalidate;
+    while fCursorChunkPos.X < fPageMetrics.startOfLineIdx[fTopLine] do dec(fTopLine);
   end
   else if (fTopLine + visLines < fPageMetrics.totalLines) and
     (fCursorChunkPos.X >= fPageMetrics.startOfLineIdx[fTopLine + visLines]) then
@@ -2976,9 +3488,12 @@ begin
     while (fTopLine + visLines < fPageMetrics.totalLines) and
       (fCursorChunkPos.X >= fPageMetrics.startOfLineIdx[fTopLine + visLines -1]) do
         inc(fTopLine);
-    ScrollV.Position := fTopLine * fPageMetrics.lineHeight;
-    Invalidate;
-  end;
+  end
+  else Exit;
+
+  with fPageMetrics do
+    ScrollV.Position := fTopLine / (totalLines - visibleLines) * ScrollV.fMax;
+  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -2999,6 +3514,7 @@ procedure TMemoCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
   end;
 
 var
+  x, y: integer;
   pos: TPointD;
   ctrlDown: Boolean;
 begin
@@ -3050,6 +3566,45 @@ begin
         ScrollCaretIntoView;
         Key := 0;
       end;
+    VK_HOME:
+      begin
+        key := 0;
+        if ctrlDown then
+          x := 0
+        else
+        begin
+          x := GetLineIndexFromChunkIdx(fPageMetrics, fCursorChunkPos.X);
+          x := fPageMetrics.startOfLineIdx[x];
+        end;
+        if (x = fCursorChunkPos.X) and (fCursorChunkPos.Y = 0) then Exit;
+        fCursorChunkPos := Types.Point(x, 0);
+        if HasShiftKey(shift) then
+          fSelEnd := fCursorChunkPos else
+          ResetSelPos;
+        ScrollCaretIntoView;
+      end;
+    VK_END:
+      begin
+        key := 0;
+        if ctrlDown then
+          x := fChunkedText.Count
+        else
+        begin
+          x := GetLineIndexFromChunkIdx(fPageMetrics, fCursorChunkPos.X);
+          if x = fPageMetrics.totalLines - 1 then
+            x := fChunkedText.Count else
+            x := fPageMetrics.startOfLineIdx[x + 1] -1;
+        end;
+        if x = fChunkedText.Count then
+          y := 0 else
+          y := fChunkedText[x].length;
+        if (x = fCursorChunkPos.X) and (fCursorChunkPos.Y = y) then Exit;
+        fCursorChunkPos := Types.Point(x, y);
+        if HasShiftKey(shift) then
+          fSelEnd := fCursorChunkPos else
+          ResetSelPos;
+        ScrollCaretIntoView;
+      end;
     else
     begin
       inherited;
@@ -3065,14 +3620,13 @@ procedure TMemoCtrl.DoDblClick;
 var
   chunk: TTextChunk;
 begin
-  if not IsValid(fCursorChunkPos) or
-    (fCursorChunkPos.X < 0) or (fCursorChunkPos.X >= fChunkedText.Count) then
-      Exit;
+  if (fCursorChunkPos.X < 0) or
+    (fCursorChunkPos.X >= fChunkedText.Count) then Exit;
+
   chunk := fChunkedText.Chunk[fCursorChunkPos.X];
   if not chunk.IsText then Exit;
   fSelStart := Types.Point(fCursorChunkPos.X, 0);
   fSelEnd := Types.Point(fCursorChunkPos.X + 1, 0);
-  //fSelEnd := Types.Point(fCursorChunkPos.X, chunk.length);
   fCursorChunkPos := fSelEnd;
   Invalidate;
 end;
@@ -3102,12 +3656,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMemoCtrl.DoMouseMove(Button: TMouseButton;
-  Shift: TShiftState; const pt: TPoint);
+procedure TMemoCtrl.DoMouseMove(Shift: TShiftState; const pt: TPoint);
 var
   relPos: TPointD;
 begin
-  inherited;
   if not fMouseLeftDown then Exit;
 
   relPos := MakeRelative(PointD(pt));
@@ -3139,8 +3691,11 @@ end;
 procedure TMemoCtrl.SetScrollV(scrollVert: TScrollCtrl);
 begin
   inherited;
-  if Assigned(ScrollV) then
+  if Assigned(ScrollV) and (StorageState = ssNormal) then
+  begin
     ScrollV.Step := Round(fPageMetrics.lineHeight);
+    CheckPageMetrics;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -3155,6 +3710,7 @@ begin
   if not GetUsableFont then Exit;
   fPageMetrics.bounds := NullRect; // force a fPageMetrics refresh
   fChunkedText.SetText(txt, fUsableFont, fontColor, fColor);
+  CheckPageMetrics;
   fTopLine := 0;
   Invalidate;
 end;
@@ -3168,12 +3724,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMemoCtrl.SetInnerBounds(const newBounds: TRectD);
-begin
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
 function TMemoCtrl.ChunkPosToPos(const chunkPos: TPoint): TPointD;
 var
   i       : integer;
@@ -3181,7 +3731,7 @@ var
   chunk   : TTextChunk;
 begin
   Result := NullPointD;
-  if not GetUsableFont then Exit;
+  if not GetUsableFont or not IsValid(chunkPos) then Exit;
 
   // get chunkPos' start of line index
   i := fTopLine;
@@ -3298,14 +3848,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMemoCtrl.DoScroll(dx, dy: double);
-var
-  visibleLines: integer;
+procedure TMemoCtrl.DoScrollY(newPos: double);
 begin
-  fTopLine := Trunc(ScrollV.Position / fPageMetrics.lineHeight);
-  visibleLines := GetVisibleLines;
-  if fTopLine > fPageMetrics.totalLines - visibleLines then
-    fTopLine := fPageMetrics.totalLines - visibleLines;
+  fTopLine := Round(newPos / fPageMetrics.lineHeight);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -3339,24 +3884,22 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMemoCtrl.Repaint;
+procedure TMemoCtrl.Paint;
 var
   i: integer;
   w: integer;
-  bh: double;
   p   : TPathD;
   rec: TRectD;
   selStartTop, selStartBot, selEndTop, selEndBot: TPointD;
 begin
+  rec := InnerRect;
+  TranslateRect(rec, OuterMargin, OuterMargin);
+  InflateRect(rec, -fBevelHeight, -fBevelHeight);
+  Image.Clear(Rect(rec), color);
+  DrawEdge(Image, Rect(rec), clSilver32, clWhite32, fBevelHeight);
+
   if not GetUsableFont then Exit;
-  bh  := fBevelHeight;
-
-  rec  := InnerRect;
-  TranslateRect(rec, outerMargin, outerMargin);
-
-  image.Clear;
-  image.FillRect(Rect(rec), color);
-  CheckPageMetrics;
+  if fPageMetrics.bounds.IsEmpty then CheckPageMetrics;
 
   // HIGHLIGHT TEXT SELECTION (even before drawing background)
 
@@ -3389,8 +3932,8 @@ begin
         selStartTop.X, selStartTop.Y + fPageMetrics.lineHeight]);
       p := TranslatePath(p, OuterMargin, OuterMargin);
       p := ClipPathTopAndBot(rec, p);
-      DrawPolygon(Image, p, frNonZero, SetAlpha(clDefDark32, 32));
-      DrawLine(Image, p, 1, SetAlpha(clDefDark32, 128), esClosed);
+      DrawPolygon(Image, p, frNonZero, clDefLite32);
+      DrawLine(Image, p, 1, GetFocusColor, esClosed);
     end else
     begin
       //multi-line selection - we'll assume (pro tempore) that pt2 is below pt
@@ -3398,14 +3941,14 @@ begin
       p := Rectangle(selStartTop.X, selStartTop.Y, fTextMargin.X + w, selStartBot.Y);
       p := TranslatePath(p, OuterMargin, OuterMargin);
       p := ClipPathTopAndBot(rec, p);
-      DrawPolygon(Image, p, frNonZero, SetAlpha(clDefDark32, 32));
+      DrawPolygon(Image, p, frNonZero, clDefLite32);
       // draw selection outline
       p := MakePath([fTextMargin.X-3, selStartBot.Y,
         selStartTop.X, selStartBot.Y, selStartTop.X, selStartTop.Y,
         fTextMargin.X + w, selStartTop.Y, fTextMargin.X + w, selStartBot.Y]);
       p := TranslatePath(p, OuterMargin, OuterMargin);
       p := ClipPathTopAndBot(rec, p);
-      DrawLine(Image, p, 1, SetAlpha(clDefDark32, 128), esButt);
+      DrawLine(Image, p, 1, GetFocusColor, esButt);
       while (selStartBot.Y + 1 < selEndTop.Y) do
       begin
         selStartTop.Y := selStartBot.Y;
@@ -3413,36 +3956,34 @@ begin
         p := Rectangle(fTextMargin.X, selStartTop.Y, fTextMargin.X + w, selStartBot.Y);
         p := TranslatePath(p, OuterMargin, OuterMargin);
         p := ClipPathTopAndBot(rec, p);
-        DrawPolygon(Image, p, frNonZero, SetAlpha(clDefDark32, 32));
+        DrawPolygon(Image, p, frNonZero, clDefLite32);
         // draw selection outline
         p := MakePath([fTextMargin.X-3, selStartTop.Y, fTextMargin.X-3, selStartBot.Y]);
         p := TranslatePath(p, OuterMargin, OuterMargin);
-        DrawLine(Image, p, 1, SetAlpha(clDefDark32, 128), esButt);
+        DrawLine(Image, p, 1, GetFocusColor, esButt);
         p := MakePath([fTextMargin.X + w, selStartTop.Y, fTextMargin.X +w, selStartBot.Y]);
         p := TranslatePath(p, OuterMargin, OuterMargin);
-        DrawLine(Image, p, 1, SetAlpha(clDefDark32, 128), esButt);
+        DrawLine(Image, p, 1, GetFocusColor, esButt);
       end;
       p := Rectangle(fTextMargin.X, selStartBot.Y,
         selEndTop.X, selStartBot.Y + fPageMetrics.lineHeight);
       p := TranslatePath(p, OuterMargin, OuterMargin);
       p := ClipPathTopAndBot(rec, p);
-      DrawPolygon(Image, p, frNonZero, SetAlpha(clDefDark32, 32));
+      DrawPolygon(Image, p, frNonZero, clDefLite32);
       // finish drawing selection outline
       p := MakePath([fTextMargin.X-3, selEndTop.Y, fTextMargin.X-3, selEndBot.Y,
         selEndBot.X, selEndBot.Y, selEndTop.X, selEndTop.Y,
         fTextMargin.X + w, selEndTop.Y]);
       p := TranslatePath(p, OuterMargin, OuterMargin);
       p := ClipPathTopAndBot(rec, p);
-      DrawLine(Image, p, 1, SetAlpha(clDefDark32, 128), esButt);
+      DrawLine(Image, p, 1, GetFocusColor, esButt);
     end;
   end;
 
-  DrawEdge(Image, rec, clSilver32, clWhite32, bh);
+  Img32.Vector.InflateRect(rec, -fBevelHeight * 0.5, -fBevelHeight * 0.5);
   if HasFocus then
-  begin
-    Img32.Vector.InflateRect(rec, bh, bh);
-    DrawLine(Image, Rectangle(rec),fBevelHeight,clDefDark32,esPolygon);
-  end;
+    DrawLine(Image, Rectangle(rec), fBevelHeight, GetFocusColor, esPolygon) else
+    DrawEdge(Image, rec, clSilver32, clWhite32, fBevelHeight);
 
   // DRAW THE (VISIBLE) TEXT
 
@@ -3467,8 +4008,6 @@ begin
     DrawLine(Image, PointD(X - 4, Y), PointD(X + 4, Y), fPageMetrics.lineHeight / 15, clMaroon32);
   with selStartBot do
     DrawLine(Image, PointD(X - 4, Y), PointD(X + 4, Y), fPageMetrics.lineHeight / 15, clMaroon32);
-
-//  fScrollV.Invalidate;
 end;
 
 //------------------------------------------------------------------------------
@@ -3478,8 +4017,9 @@ end;
 constructor TEditCtrl.Create(parent: TLayer32; const name: string);
 begin
   inherited;
-  fChunkedText := TChunkedText.Create;
   Color := clWhite32;
+  FontColor := clBlack32;
+  fChunkedText := TChunkedText.Create;
   BlendFunc  := nil; //assumes edit controls will always be fully opaque.
   fTextMargin := DPIAware(PointD(5, 1));
   fCursorChunkPos := NullPoint;
@@ -3517,6 +4057,21 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TEditCtrl.DoKeyDown(var key: Word; Shift: TShiftState);
+
+  function GetPrev(var curr: TPoint; ctrlDown: Boolean): Boolean;
+  begin
+    if ctrlDown then
+      Result := fChunkedText.GetPrevWord(curr) else
+      Result := fChunkedText.GetPrevChar(curr);
+  end;
+
+  function GetNext(var curr: TPoint; ctrlDown: Boolean): Boolean;
+  begin
+    if ctrlDown then
+      Result := fChunkedText.GetNextWord(curr) else
+      Result := fChunkedText.GetNextChar(curr);
+  end;
+
 var
   i         : integer;
   ctrlDown  : Boolean;
@@ -3535,9 +4090,7 @@ begin
   case key of
     VK_UP, VK_LEFT:
       begin
-        if ctrlDown then
-          fChunkedText.GetPrevWord(fCursorChunkPos) else
-          fChunkedText.GetPrevChar(fCursorChunkPos);
+        GetPrev(fCursorChunkPos, ctrlDown);
         if HasShiftKey(shift) then
           fSelEnd := fCursorChunkPos else
           ResetSelPos;
@@ -3546,9 +4099,7 @@ begin
       end;
     VK_DOWN, VK_RIGHT:
       begin
-        if ctrlDown then
-          fChunkedText.GetNextWord(fCursorChunkPos) else
-          fChunkedText.GetNextChar(fCursorChunkPos);
+        GetNext(fCursorChunkPos, ctrlDown);
         if HasShiftKey(shift) then
           fSelEnd := fCursorChunkPos else
           ResetSelPos;
@@ -3835,7 +4386,6 @@ begin
   if not chunk.IsText then Exit;
   fSelStart := Types.Point(fCursorChunkPos.X, 0);
   fSelEnd := Types.Point(fCursorChunkPos.X + 1, 0);
-  //fSelEnd := Types.Point(fCursorChunkPos.X, chunk.length);
   fCursorChunkPos := fSelEnd;
   Invalidate;
 end;
@@ -3866,12 +4416,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TEditCtrl.DoMouseMove(Button: TMouseButton;
-  Shift: TShiftState; const pt: TPoint);
+procedure TEditCtrl.DoMouseMove(Shift: TShiftState; const pt: TPoint);
 var
   relPos: TPointD;
 begin
-  inherited;
   if not fMouseLeftDown then Exit;
   relPos := MakeRelative(PointD(pt));
   fCursorChunkPos := PosToChunkIdx(relPos);
@@ -3885,16 +4433,6 @@ procedure TEditCtrl.DoMouseUp(Button: TMouseButton;
 begin
   fMouseLeftDown := false;
   inherited;
-end;
-//------------------------------------------------------------------------------
-
-procedure TEditCtrl.SetCaption(const text: string);
-begin
-  inherited;
-  if not GetUsableFont then Exit;
-  fChunkedText.SetText(text, fUsableFont, fFontColor);
-  fPageMetrics.bounds := NullRect; // force a fPageMetrics refresh
-  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
@@ -4024,25 +4562,25 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TEditCtrl.Repaint;
+procedure TEditCtrl.Paint;
 var
-  om: integer;
   textRecD, rec: TRectD;
   lh: Double;
   cursorTop, cursorBot: TPointD;
 begin
-  inherited;
+  rec := InnerRect;
+  TranslateRect(rec, OuterMargin, OuterMargin);
+  InflateRect(rec, -fBevelHeight, -fBevelHeight);
+  Image.Clear(Rect(rec), color);
+  DrawEdge(Image, Rect(rec), clSilver32, clWhite32, fBevelHeight);
+
   if not GetUsableFont then Exit;
   fLineHeight := fUsableFont.LineHeight;
-  textRecD := GetTextRect(true);
 
   if HasFocus then
   begin
-    rec := InnerRect;
-    om := Round(OuterMargin);
-    TranslateRect(rec, om, om);
-    DrawShadowRect(Image, Rect(rec), OuterMargin);
-    DrawLine(Image, Rectangle(rec), FocusLineWidth, clDefDark32, esPolygon);
+    DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, clDarkGray32);
+    DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esPolygon);
 
     // draw selection rect ...
     if not PointsEqual(fSelStart, fSelEnd) then
@@ -4052,20 +4590,17 @@ begin
       lh := fLineHeight / 5;
       rec.Bottom := rec.Bottom - lh;
       rec.Top := rec.Top + lh;
-      DrawPolygon(Image, Rectangle(rec), frNonZero, SetAlpha(clDefDark32, 32));
-      DrawLine(Image, Rectangle(rec), 1, SetAlpha(clDefDark32, 196), esClosed);
+      DrawPolygon(Image, Rectangle(rec), frNonZero, clDefLite32);
+      DrawLine(Image, Rectangle(rec), 1, GetFocusColor, esClosed);
     end;
-  end;
 
-  if HasFocus then
-  begin
     lh := fLineHeight / 20; // non-blinking cursor width
     cursorTop := ChunkIdxToPos(fCursorChunkPos);
     cursorBot := TranslatePoint(cursorTop, 0, fLineHeight);
     cursorTop.Y := cursorTop.Y + lh;
     DrawLine(Image, cursorTop, cursorBot, lh, $88AA0000);
   end;
-
+  textRecD := GetTextRect(true);
   fPageMetrics := fChunkedText.DrawText(Image, Rect(textRecD), taLeft, tvaMiddle);
 end;
 
@@ -4091,7 +4626,7 @@ end;
 procedure TButtonCtrl.SetCaption(const text: string);
 begin
   inherited;
-  fShortcut := GetShortcutFromCaption(text);
+  Shortcut := GetShortcutFromCaption(text);
 end;
 //------------------------------------------------------------------------------
 
@@ -4162,7 +4697,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TButtonCtrl.Repaint;
+procedure TButtonCtrl.Paint;
 var
   bh, hbh: double;
   rec: TRectD;
@@ -4172,7 +4707,9 @@ begin
   bh := fBevelHeight;
   hbh := bh / 2;
   rec := InnerRect;
-  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
+  if Pressed then
+    TranslateRect(rec, OuterMargin + bh, OuterMargin + bh) else
+    TranslateRect(rec, OuterMargin, OuterMargin);
 
   if GetUsableFont then txt := fCaption else txt := '';
   Image.Clear;
@@ -4180,20 +4717,20 @@ begin
   p := Rectangle(rec);
   if HasFocus then
   begin
-    DrawShadowRect(Image, Rect(rec), OuterMargin);
+    DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, clDarkGray32);
     DrawBtnInternal(Image, p, txt, fUsableFont,
-      bh, fPadding, fPressed, fEnabled, Color);
-    DrawLine(Image, Rectangle(rec), FocusLineWidth, clDefDark32, esPolygon);
+      bh, fPadding, fPressed, fEnabled, GetColor, GetFontColor);
+    DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esPolygon);
   end else
-    DrawBtnInternal(Image, p, txt, fUsableFont,
-      bh, fPadding, fPressed, fEnabled, Color);
+    DrawBtnInternal(Image, Rectangle(rec), txt, fUsableFont,
+      bh, fPadding, fPressed, fEnabled, GetColor, GetFontColor);
 end;
 
 //------------------------------------------------------------------------------
 // TRoundedBtnCtrl
 //------------------------------------------------------------------------------
 
-procedure TRoundedBtnCtrl.Repaint;
+procedure TRoundedBtnCtrl.Paint;
 var
   bh, hbh: double;
   rec: TRectD;
@@ -4205,7 +4742,9 @@ begin
   bh := fBevelHeight;
   hbh := bh / 2;
   rec := InnerRect;
-  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
+  if Pressed then
+    TranslateRect(rec, OuterMargin + bh, OuterMargin + bh) else
+    TranslateRect(rec, OuterMargin, OuterMargin);
   p := GetRoundedRectPath(rec);
 
 
@@ -4215,15 +4754,15 @@ begin
   if HasFocus then
   begin
     DrawShadow(Image, p,
-      frNonZero, OuterMargin, Angle45, $80000000, true);
+      frNonZero, OuterMargin, Angle45, clDarkGray32, true);
     DrawBtnInternal(Image, p, txt, fUsableFont,
-      bh, fPadding, fPressed, fEnabled, Color);
-    DrawLine(Image, p, FocusLineWidth, clDefDark32, esPolygon);
+      bh, fPadding, fPressed, fEnabled, GetColor, GetFontColor);
+    DrawLine(Image, p, FocusLineWidth, GetFocusColor, esPolygon);
   end else
     DrawBtnInternal(Image, p, txt, fUsableFont,
-      bh, fPadding, fPressed, fEnabled, Color);
+      bh, fPadding, fPressed, fEnabled, GetColor, GetFontColor);
 
-  if GetAlpha(Color) < 128 then
+  if GetAlpha(GetColor) < 128 then
   begin
     HitTest.htImage.SetSize(Image.Width, Image.Height);
     DrawBtnInternal(HitTest.htImage, p, '',
@@ -4236,7 +4775,7 @@ end;
 // TEllipseBtnCtrl
 //------------------------------------------------------------------------------
 
-procedure TEllipseBtnCtrl.Repaint;
+procedure TEllipseBtnCtrl.Paint;
 var
   bh, hbh: double;
   rec: TRectD;
@@ -4246,7 +4785,10 @@ begin
   bh := fBevelHeight;
   hbh := bh / 2;
   rec := InnerRect;
-  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
+  if Pressed then
+    TranslateRect(rec, OuterMargin + bh, OuterMargin + bh) else
+    TranslateRect(rec, OuterMargin, OuterMargin);
+
   image.Clear;
   InflateRect(rec, -hbh, -hbh);
   ellip := Ellipse(rec);
@@ -4254,15 +4796,15 @@ begin
   if HasFocus then
   begin
     DrawShadow(Image, ellip,
-      frNonZero, OuterMargin, Angle45, $80000000, true);
+      frNonZero, OuterMargin, Angle45, clDarkGray32, true);
     DrawBtnInternal(Image, ellip, txt, fUsableFont,
-      bh, fPadding, fPressed, fEnabled, Color);
-    DrawLine(Image, ellip, FocusLineWidth, clDefDark32, esPolygon);
+      bh, fPadding, fPressed, fEnabled, GetColor, GetFontColor);
+    DrawLine(Image, ellip, FocusLineWidth, GetFocusColor, esPolygon);
   end else
     DrawBtnInternal(Image, ellip, txt, fUsableFont,
-      bh, fPadding, fPressed, fEnabled, Color);
+      bh, fPadding, fPressed, fEnabled, GetColor, GetFontColor);
 
-  if GetAlpha(Color) < 128 then
+  if GetAlpha(GetColor) < 128 then
   begin
     HitTest.htImage.SetSize(Image.Width, Image.Height);
     DrawBtnInternal(HitTest.htImage, ellip, '', nil, 0, 0, false, enabled, clWhite32)
@@ -4290,16 +4832,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImageBtnCtrl.Repaint;
+procedure TImageBtnCtrl.Paint;
 var
-  p       : TPathD;
   rec     : TRectD;
   bh      : double;
   pDelta  : double;
   ilImage : TImage32;
   pad     : integer;
 begin
-  Image.Clear(Color);
+  Image.Clear;
   bh := fBevelHeight;
   if pressed and (bh = 0) then
     bh := DPIAware(1.5);
@@ -4307,25 +4848,21 @@ begin
   pad := Round(fPadding);
   rec := InnerRect;
   TranslateRect(rec, OuterMargin, OuterMargin);
-  p := Rectangle(rec);
 
   //if HasFocus and not fPressed then
   if HasFocus then
   begin
-    DrawShadowRect(Image, Rect(rec), OuterMargin);
-    if ( bh > 0) then
-      DrawBtnInternal(Image, p, '', nil,
-        bh, fPadding, fPressed, enabled, color, clNone32);
-    //p2 := Grow(p, nil, -FocusLineWidth/2, jsAuto, 0);
-    DrawLine(Image, p, FocusLineWidth, clDefDark32, esPolygon);
+    DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, clDarkGray32);
+    if (bh > 0) then
+      DrawBtnInternal(Image, Rectangle(rec), '', nil,
+        bh, fPadding, fPressed, enabled, GetColor, clNone32);
+    DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esPolygon);
   end
   else if ( bh > 0) then
-    DrawBtnInternal(Image, p, '', nil,
-      bh, fPadding, fPressed, enabled, color, clNone32);
-
+    DrawBtnInternal(Image, Rectangle(rec), '', nil,
+      bh, fPadding, fPressed, enabled, GetColor, clNone32);
 
   if not GetUsableFont then Exit;
-
   if fPressed then pDelta := bh else pDelta := 0;
 
 
@@ -4351,7 +4888,7 @@ begin
             InflateRect(rec, -pad, -pad);
             TranslateRect(rec, pDelta, pDelta);
           end;
-          DrawText(Image, rec, fCaption, fUsableFont, fFontColor, taLeft, tvaMiddle);
+          DrawText(Image, rec, fCaption, fUsableFont, GetFontColor, taLeft, tvaMiddle);
         end;
       tpTop:
         begin
@@ -4369,7 +4906,7 @@ begin
             InflateRect(rec, -pad, -pad);
             TranslateRect(rec, pDelta, pDelta);
           end;
-          DrawText(Image, rec, fCaption, fUsableFont, fFontColor, taCenter, tvaTop);
+          DrawText(Image, rec, fCaption, fUsableFont, GetFontColor, taCenter, tvaTop);
         end;
       tpRight:
         begin
@@ -4387,7 +4924,7 @@ begin
             InflateRect(rec, -pad - bh, -pad - bh);
             TranslateRect(rec, pDelta, pDelta);
           end;
-          DrawText(Image, rec, fCaption, fUsableFont, fFontColor, taRight, tvaMiddle);
+          DrawText(Image, rec, fCaption, fUsableFont, GetFontColor, taRight, tvaMiddle);
         end;
       tpBottom:
         begin
@@ -4399,13 +4936,13 @@ begin
             rec.Right := rec.Left + ilImage.Width;
             Image.CopyBlend(ilImage, ilImage.Bounds, Rect(rec), BlendToAlpha);
             rec.Top := rec.Bottom + pad + pDelta;
-            rec.Bottom := Image.Height - OuterMargin - pad + pDelta - bh * 2;
+            rec.Bottom := Image.Height - OuterMargin - pad + pDelta - bh * 3;
           end else
           begin
             InflateRect(rec, -pad, -pad);
             TranslateRect(rec, pDelta, pDelta);
           end;
-          DrawText(Image, rec, fCaption, fUsableFont, fFontColor, taCenter, tvaBottom);
+          DrawText(Image, rec, fCaption, fUsableFont, GetFontColor, taCenter, tvaBottom);
         end;
     end;
   finally
@@ -4501,7 +5038,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TCheckboxCtrl.Repaint;
+procedure TCheckboxCtrl.Paint;
 var
   i       : integer;
   j       : double;
@@ -4510,7 +5047,7 @@ var
   pp      : TPathsD;
   caption : string;
 begin
-  image.Clear(Color);
+  image.Clear(GetColor);
   if not GetUsableFont then Exit;
 
   caption := fCaption;
@@ -4520,7 +5057,7 @@ begin
   bh := fBevelHeight;
   j := fUsableFont.LineHeight - bh;
   rec := InnerRect;
-  TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
+  TranslateRect(rec, OuterMargin, OuterMargin);
   rec.Bottom := rec.Top + j;
   TranslateRect(rec, 0, (Height - j) / 2);
   if fTextPos = tphRight then
@@ -4528,14 +5065,14 @@ begin
     rec.Left := rec.Right - j;
 
   if HasFocus then
-    DrawShadowRect(Image, Rect(rec), OuterMargin);
+    DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, clDarkGray32);
 
   if fTextPos = tphRight then
   begin
     DrawCheckboxCtrl(Image, Rect(rec),
-      bh, fTriState, not fUseCross, clWhite32, enabled);
+      bh, fTriState, StorageManager.DesignScale, GetFocusColor, enabled);
     if HasFocus then
-      DrawLine(Image, Rectangle(rec), FocusLineWidth, clDefDark32, esPolygon);
+      DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esPolygon);
     rec := InnerRect;
     TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
     rec.Left := rec.Left + j;
@@ -4544,15 +5081,17 @@ begin
     pp := fUsableFont.GetTextOutline(rec, caption, taLeft, tvaMiddle);
     dx := fUsableFont.LineHeight / 24;
     pp := TranslatePath(pp, -dx, -dx);
-    DrawPolygon(Image, pp, frNonZero, clWhite32);
+    if GetLuminance(GetFontColor) < 160 then
+      DrawPolygon(Image, pp, frNonZero, clWhite32) else
+      DrawPolygon(Image, pp, frNonZero, clBlack32);
     pp := TranslatePath(pp, dx, dx);
-    DrawPolygon(Image, pp, frNonZero, clBlack32);
+    DrawPolygon(Image, pp, frNonZero, GetFontColor);
   end else
   begin
     DrawCheckboxCtrl(Image, Rect(rec),
-      bh, fTriState, not fUseCross, clWhite32, enabled);
+      bh, fTriState, StorageManager.DesignScale, GetFocusColor, enabled);
     if HasFocus then
-      DrawLine(Image, Rectangle(rec), FocusLineWidth, clDefDark32, esPolygon);
+      DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esPolygon);
 
     rec := InnerRect;
     TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
@@ -4562,9 +5101,12 @@ begin
     pp := fUsableFont.GetTextOutline(rec, fCaption, taRight, tvaMiddle);
     dx := fUsableFont.LineHeight / 24;
     pp := TranslatePath(pp, -dx, -dx);
-    DrawPolygon(Image, pp, frNonZero, clWhite32);
+
+    if GetLuminance(GetFontColor) < 160 then
+      DrawPolygon(Image, pp, frNonZero, clWhite32) else
+      DrawPolygon(Image, pp, frNonZero, clBlack32);
     pp := TranslatePath(pp, dx, dx);
-    DrawPolygon(Image, pp, frNonZero, clBlack32);
+    DrawPolygon(Image, pp, frNonZero, GetFontColor);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -4580,14 +5122,14 @@ end;
 // TRadioBtnCtrl
 //------------------------------------------------------------------------------
 
-procedure TRadioBtnCtrl.Repaint;
+procedure TRadioBtnCtrl.Paint;
 var
   j,bh,dx   : double;
   rec       : TRectD;
   p         : TPathD;
   pp        : TPathsD;
 begin
-  image.Clear(Color);
+  image.Clear(GetColor);
   if not GetUsableFont then Exit;
 
   bh := fBevelHeight;
@@ -4602,43 +5144,40 @@ begin
   p := Ellipse(rec);
 
   if HasFocus then
-    DrawShadow(Image, p,
-      frNonZero, OuterMargin, Angle45, $80000000, true);
+    DrawShadow(Image, p, frNonZero, OuterMargin, Angle45, clDarkGray32, true);
 
   if fTextPos = tphRight then
   begin
-    DrawRadioCtrl(Image, p, bh, enabled, fTriState, clWhite32);
+    DrawRadioCtrl(Image, p, GetFocusColor, bh, enabled, fTriState,
+      StorageManager.DesignScale);
     if HasFocus then
-      DrawLine(Image, p, FocusLineWidth, clDefDark32, esPolygon);
+      DrawLine(Image, p, FocusLineWidth, GetFocusColor, esPolygon);
     rec := InnerRect;
     TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
     rec.Left := rec.Left + j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
-
     pp := fUsableFont.GetTextOutline(rec, fCaption, taLeft, tvaMiddle);
-    dx := fUsableFont.LineHeight / 24;
-    pp := TranslatePath(pp, -dx, -dx);
-    DrawPolygon(Image, pp, frNonZero, clWhite32);
-    pp := TranslatePath(pp, dx, dx);
-    DrawPolygon(Image, pp, frNonZero, clBlack32);
   end else
   begin
     //rec.Left := rec.Right - j;
-    DrawRadioCtrl(Image, p, bh, enabled, fTriState, clWhite32);
+    DrawRadioCtrl(Image, p, GetFocusColor, bh, enabled, fTriState,
+      StorageManager.DesignScale);
     if HasFocus then
-      DrawLine(Image, p, FocusLineWidth, clDefDark32, esPolygon);
+      DrawLine(Image, p, FocusLineWidth, GetFocusColor, esPolygon);
     rec := InnerRect;
     TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
     rec.Right := rec.Right - j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
-
     pp := fUsableFont.GetTextOutline(rec, fCaption, taRight, tvaMiddle);
-    dx := fUsableFont.LineHeight / 24;
-    pp := TranslatePath(pp, -dx, -dx);
-    DrawPolygon(Image, pp, frNonZero, clWhite32);
-    pp := TranslatePath(pp, dx, dx);
-    DrawPolygon(Image, pp, frNonZero, clBlack32);
   end;
+
+  dx := fUsableFont.LineHeight / 24;
+  pp := TranslatePath(pp, -dx, -dx);
+  if GetLuminance(GetFontColor) < 160 then
+    DrawPolygon(Image, pp, frNonZero, clWhite32) else
+    DrawPolygon(Image, pp, frNonZero, clBlack32);
+  pp := TranslatePath(pp, dx, dx);
+  DrawPolygon(Image, pp, frNonZero, GetFontColor);
 end;
 
 //------------------------------------------------------------------------------
@@ -4648,64 +5187,103 @@ end;
 constructor TPanelCtrl.Create(parent: TLayer32 = nil; const name: string = '');
 begin
   inherited;
-  //fBevHeight := 0;
+  fBevelHeight := 0;
   fInnerMargin := dpiAware(10);
   fShadowAngle := angle45;
 end;
 //------------------------------------------------------------------------------
 
-procedure TPanelCtrl.CheckScrollMax;
+procedure TPanelCtrl.RecalcScrollMax;
 var
-  i: integer;
-  x,y: double;
+  i     : integer;
+  x,y   : double;
 begin
-  if not Assigned(ScrollH) and
-    not Assigned(ScrollV) then
-      Exit;
+  if not Assigned(ScrollH) and not Assigned(ScrollV) then
+    Exit;
 
+  // todo - consider control visability test
   x := 0; y := 0;
   for i := 0 to ChildCount -1 do
     if (Child[i] is TCustomCtrl) then
       with TCustomCtrl(Child[i]) do
-      begin
-        if AutoPosition <> apNone then Continue;
-        if Left + Width > x then x := Left + Width;
-        if Top + Height > y then y := Top + Height;
-      end;
+        if AutoPosition = apNone then
+        begin
+          if Left + Width > x then x := Left + Width;
+          if Top + Height > y then y := Top + Height;
+        end;
+
   if Assigned(ScrollH) then
-  begin
-    ScrollH.Max := fScrollOffset.X + Round(x + Margin);
-  end;
+    ScrollH.Max := ScrollOffset.X + x + {Right} Margin;
   if Assigned(ScrollV) then
-  begin
-    ScrollV.Max := fScrollOffset.Y + Round(y + Margin);
-  end;
+    ScrollV.Max := ScrollOffset.Y + y + {Bottom} Margin;
 end;
 //------------------------------------------------------------------------------
 
 procedure TPanelCtrl.SetInnerBounds(const newBounds: TRectD);
 begin
+  CheckScrollOffset(newBounds);
   inherited;
-  CheckScrollMax;
+  RecalcScrollMax;
 end;
 //------------------------------------------------------------------------------
 
-procedure TPanelCtrl.Scale(value: double);
-begin
-  inherited;
-  fScrollOffset := ScalePoint(fScrollOffset, value, value);
-  if fAutoPosition <> apNone then CheckScrollMax;
-end;
-//------------------------------------------------------------------------------
-
-procedure TPanelCtrl.DoScroll(dx, dy: double);
+procedure TPanelCtrl.CheckScrollOffset(const newBounds: TRectD);
 var
   i: integer;
+  dx, dy: double;
+  oldBounds: TRectD;
 begin
-  fScrollOffset := TranslatePoint(fScrollOffset, dx, dy);
+  if (fScrollOffset.X > 0) or (fScrollOffset.Y > 0) then
+  begin
+    oldBounds := GetInnerBounds;
+    if (fScrollOffset.X > 0) and (newBounds.Width > oldBounds.Width) then
+      dx := Min(fScrollOffset.X, newBounds.Width - oldBounds.Width) else
+      dx := 0;
+    if (fScrollOffset.Y > 0) and (newBounds.Height > oldBounds.Height) then
+      dy := Min(fScrollOffset.Y, newBounds.Height - oldBounds.Height) else
+      dy := 0;
+    if (dx > 0) or (dy > 0) then
+    begin
+      fScrollOffset.X := fScrollOffset.X - dx;
+      if fScrollOffset.X = 0 then ScrollH.fPos := 0;
+      fScrollOffset.Y := fScrollOffset.Y - dy;
+      if fScrollOffset.Y = 0 then ScrollV.fPos := 0;
+
+      for i := 0 to ChildCount -1 do
+        if (Child[i] is TCustomCtrl) and
+          (TCustomCtrl(Child[i]).AutoPosition = apNone) then
+            Child[i].Offset(dx, dy);
+    end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPanelCtrl.DoScrollX(newPos: double);
+var
+  i: integer;
+  dx: double;
+begin
+  dx := newPos - ScrollOffset.X;
+  ScrollOffset := PointD(newPos, ScrollOffset.Y);
   for i := 0 to ChildCount -1 do
-    if not (Child[i] is TScrollCtrl) then
-      Child[i].Offset(-dx, -dy);
+    if (Child[i] is TCustomCtrl) and
+      (TCustomCtrl(Child[i]).fAutoPosition = apNone) then
+        Child[i].Offset(-dx, 0);
+  Invalidate;
+end;
+//------------------------------------------------------------------------------
+
+procedure TPanelCtrl.DoScrollY(newPos: double);
+var
+  i: integer;
+  dy: double;
+begin
+  dy := newPos - ScrollOffset.Y;
+  ScrollOffset := PointD(ScrollOffset.X, newPos);
+  for i := 0 to ChildCount -1 do
+    if (Child[i] is TCustomCtrl) and
+      (TCustomCtrl(Child[i]).fAutoPosition = apNone) then
+        Child[i].Offset(0, -dy);
   Invalidate;
 end;
 
@@ -4783,6 +5361,8 @@ begin
       end;
   end;
   fActiveIdx := index;
+  if Assigned(OnClick) then OnClick(self);
+
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -4795,10 +5375,15 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function TPageCtrl.ActivePage: TPagePnlCtrl;
+begin
+  Result := GetPagePanel(fActiveIdx);
+end;
+//------------------------------------------------------------------------------
+
 procedure TPageCtrl.DrawTabs;
 var
   i,h,len : integer;
-  om    : double;
   bh,hbh: integer;
   tabs  : TArrayOfString;
   rec   : TRectD;
@@ -4808,12 +5393,14 @@ begin
   len := ChildCount div 2;
   if (len = 0) or not GetUsableFont then Exit;
   SetLength(tabs, len);
+  if Length(fTabOffsets) = 0 then
+    ResizeTabs;
+
   for i := 0 to len -1 do
     tabs[i] := TCustomCtrl(Child[i * 2]).Caption;
 
   rec := InnerRect;
-  om := OuterMargin;
-  TranslateRect(rec, om, om);
+  TranslateRect(rec, OuterMargin, OuterMargin);
 
   bh := Round(BevelHeight);
   hbh := Round(BevelHeight / 2);
@@ -4823,7 +5410,7 @@ begin
 
   DrawTabCtrl(Image, tabs, fTabOffsets, fUsableFont,
     BevelHeight, fActiveIdx, fTabWidth, h,
-    clLiteBtn32,clDarkGray32, self.Color, clBlack32);
+    clLiteBtn32,clDarkGray32, GetColor, GetFontColor);
 
   pt1.X := rec.Left + fTabOffsets[fActiveIdx];
   pt1.Y := rec.Top +h +bh;
@@ -4832,9 +5419,9 @@ begin
   pt2.Y := pt1.Y;
 
   DrawLine(Image, PointD(rec.Left +bh, pt1.Y),
-    PointD(rec.Right-bh, pt1.Y), hbh, self.Color);
+    PointD(rec.Right-bh, pt1.Y), hbh, GetColor);
 
-  Image.Clear(Rect(RectD(bh, rec.Top + h, rec.Right, rec.Bottom)), self.Color);
+  Image.Clear(Rect(RectD(bh, rec.Top + h, rec.Right, rec.Bottom)), GetColor);
 
   SetLength(p, 6);
   p[0] := pt2;
@@ -4857,9 +5444,9 @@ var
   h,bh      : double;
   tabs      : TArrayOfString;
 begin
-  if (Width = 0) or (Height = 0) or not GetUsableFont then Exit;
   len := ChildCount div 2;
   SetLength(tabs, len);
+  if (len = 0) or not GetUsableFont then Exit;
   for i := 0 to len -1 do
     tabs[i] := TCustomCtrl(Child[i * 2]).Caption;
   if fTabHeight = 0 then
@@ -4870,7 +5457,6 @@ begin
     fTabOffsets := MakeCumulativeArray(BevelHeight, fTabWidth, len) else
     fTabOffsets := GetVariableWidthTabOffsets(tabs, fUsableFont, BevelHeight);
 
-  if StorageState = ssLoading then Exit;
   for i := 0 to len - 1 do
   begin
     Child[i * 2].SetInnerBounds(RectD(fTabOffsets[i], 0, fTabOffsets[i + 1], h));
@@ -4879,7 +5465,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPageCtrl.Repaint;
+procedure TPageCtrl.Paint;
 var
   rec: TRect;
   bhi: integer;
@@ -5000,7 +5586,8 @@ end;
 procedure TPagePnlCtrl.Clicked;
 begin
   //ie from a shortcut
-  TPageCtrl(Parent).SetActiveIndex(Index div 2);
+  if Parent is TPageCtrl then
+    TPageCtrl(Parent).SetActiveIndex(Index div 2);
   inherited;
 end;
 //------------------------------------------------------------------------------
@@ -5079,16 +5666,24 @@ begin
   if Assigned(RootCtrl) and Assigned(RootCtrl.fFocusedCtrl) and
     RootCtrl.fFocusedCtrl.IsOwnedBy(TCustomCtrl(Parent)) then Exit;
   for i := 0 to ChildCount -1 do
-    with TCustomCtrl(Child[i]) do
-    if CanFocus then
-    begin
-      SetFocus;
-      Break;
-    end;
+    if (Child[i] is TCustomCtrl) then
+      with TCustomCtrl(Child[i]) do
+      if CanFocus then
+      begin
+        SetFocus;
+        Break;
+      end;
 end;
 
 //------------------------------------------------------------------------------
 // TPageTabCtrl
+//------------------------------------------------------------------------------
+
+constructor TPageTabCtrl.Create(parent: TLayer32; const name: string);
+begin
+  inherited;
+  fCanFocus := false;
+end;
 //------------------------------------------------------------------------------
 
 procedure TPageTabCtrl.DoMouseDown(button: TMouseButton;
@@ -5099,10 +5694,10 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-constructor TPageTabCtrl.Create(parent: TLayer32; const name: string);
+procedure TPageTabCtrl.Clicked;
 begin
+  TPageCtrl(parent).SetActiveIndex(Index div 2);
   inherited;
-  fCanFocus := false;
 end;
 
 //------------------------------------------------------------------------------
@@ -5112,6 +5707,7 @@ end;
 constructor TProgressCtrl.Create(parent: TLayer32; const name: string);
 begin
   inherited;
+  fFontColor := clBlack32;
   fOrientation  := soHorizontal;
   if GetUsableFont then
     fSize   := Round(fUsableFont.LineHeight * 1.1) else
@@ -5132,7 +5728,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TProgressCtrl.Repaint;
+procedure TProgressCtrl.Paint;
 var
   bh : integer;
   c   : TColor32;
@@ -5255,7 +5851,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSliderCtrl.Repaint;
+procedure TSliderCtrl.Paint;
 var
   hbh    : integer;
   d     : double;
@@ -5286,8 +5882,9 @@ begin
         rec := RectD(rec.Left, d2, rec.Left + Width + BevelHeight, d2 + fBtnSize);
       end;
   end;
-  if HasFocus then DrawShadowRect(Image, Rect(rec), OuterMargin);
-  Image.FillRect(Rect(rec), clPaleGray32);
+  if HasFocus then
+    DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, clDarkGray32);
+  Image.FillRect(Rect(rec), GetColor);
   DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
 
   Img32.Vector.InflateRect(rec, -dpiAwareOne, -dpiAwareOne);
@@ -5300,7 +5897,7 @@ begin
     hbh := Round(fBevelHeight / 2);
     recI := Rect(rec);
     Types.InflateRect(recI, hbh, hbh);
-    DrawLine(Image, Rectangle(recI), FocusLineWidth, clDefDark32, esPolygon);
+    DrawLine(Image, Rectangle(recI), FocusLineWidth * 1.5, GetFocusColor, esPolygon);
   end;
 
 
@@ -5308,7 +5905,7 @@ begin
   if fPressed then
     TranslateRect(rec, DPIAwareOne, DPIAwareOne);
   DrawText(Image, rec, Floattostr(fPosition),
-    fUsableFont, fFontColor, taCenter, tvaMiddle);
+    fUsableFont, GetFontColor, taCenter, tvaMiddle);
 end;
 //------------------------------------------------------------------------------
 
@@ -5396,8 +5993,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TSliderCtrl.DoMouseMove(button: TMouseButton;
-  shift: TShiftState; const pt: TPoint);
+procedure TSliderCtrl.DoMouseMove(shift: TShiftState; const pt: TPoint);
 var
   pt2: TPointD;
   d, halfBtnSize: double;
@@ -5409,14 +6005,14 @@ begin
   if d = 0 then Exit;
 
   case fOrientation of
-    soHorizontal  :
+    soHorizontal:
       begin
         case fScrollState of
-          scLeft      :
+          scLeft:
             if pt2.X > d * (fPosition - fMin) then
               fScrollState := scScrollBtn else
               Position := Round(fPosition - Step);
-          scRight     :
+          scRight:
             if pt2.X < d * (fPosition - fMin) + fBtnSize then
               fScrollState := scScrollBtn else
               Position := Round(fPosition + Step);
@@ -5424,14 +6020,14 @@ begin
         if fScrollState = scScrollBtn then
           Position := Round((pt2.X - halfBtnSize)  / d) + fMin;
       end;
-    soVertical    :
+    soVertical:
       begin
         case fScrollState of
-          scTop      :
+          scTop:
             if pt2.Y > d * (fPosition - fMin) then
               fScrollState := scScrollBtn else
               Position := Round(fPosition - Step);
-          scBottom   :
+          scBottom:
             if pt2.Y < d * (fPosition - fMin) + fBtnSize then
               fScrollState := scScrollBtn else
               Position := Round(fPosition + Step);
@@ -5502,9 +6098,11 @@ begin
   fSize         := 0;
   fOrientation  := soVertical;
   fMax          := 100;
+  fHiddenSize   := 0;
   fMinBtnSize   := DPIAware(10);
   fAutoHide     := True;
   fScrollStep   := dpiAware(5);
+  fScrollRatio  := 1;
   OuterMargin   := 0;
 end;
 //------------------------------------------------------------------------------
@@ -5543,70 +6141,150 @@ begin
   end;
   fTargetCtrl := nil;
   SetSize(0,0);
-  fBtnRec.Width := 0;
-  fBtnRec.Height := 0;
-end;
-//------------------------------------------------------------------------------
-
-procedure TScrollCtrl.SetMin(newMin: double);
-begin
-  if newMin = fMin then Exit;
-  fMin := newMin;
-  Invalidate;
 end;
 //------------------------------------------------------------------------------
 
 procedure TScrollCtrl.SetMax(newMax: double);
 begin
-  if newMax = fMax then Exit;
+  if (newMax < 0) then newMax := 0;
   fMax := newMax;
-  CalcScale;
+  if Visible then CheckCtrlPos;
+  GetScrollBtnInfo;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
 
-procedure TScrollCtrl.SetScrollSize(newSize: double);
+procedure TScrollCtrl.SetDefaultSize;
+begin
+  if GetUsableFont then
+    fSize := fUsableFont.LineHeight * 0.8 else
+    fSize := 0;
+  if fOrientation = soVertical then
+    Width := fSize else
+    Height := fSize;
+end;
+//------------------------------------------------------------------------------
+
+function TScrollCtrl.GetChevronSize: Double;
+begin
+  if (fSize = 0) then SetDefaultSize;
+  Result := fSize;
+end;
+//------------------------------------------------------------------------------
+
+procedure TScrollCtrl.CheckAutoVisible(firstPass: Boolean);
+begin
+  if not Assigned(fTargetCtrl) or not AutoHide then Exit;
+  if fOrientation = soVertical then
+  begin
+    if firstPass and Assigned(fTargetCtrl.fScrollH) then
+      fTargetCtrl.fScrollH.CheckAutoVisible(false);
+    Visible := fMax > fTargetCtrl.ClientHeight;
+  end else
+  begin
+    if firstPass and Assigned(fTargetCtrl.fScrollV) then
+      fTargetCtrl.fScrollV.CheckAutoVisible(false);
+    Visible := fMax > fTargetCtrl.ClientWidth;
+  end;
+  if Visible and (fSize = 0) then SetDefaultSize;
+end;
+//------------------------------------------------------------------------------
+
+procedure TScrollCtrl.CheckCtrlPos;
 var
-  i: double;
   rec: TRectD;
 begin
-  if fSize = newSize then Exit;
-  fSize := newSize;
-  if (fSize > 0) or not GetUsableFont then
-    i := fSize else
-    i := fUsableFont.LineHeight;
-  rec := InnerBounds;
-  case fOrientation of
-    soHorizontal: rec.top := rec.Bottom - i;
-    soVertical: rec.Left := rec.Right -i;
+  if not Visible or
+    not Assigned(fTargetCtrl) or fTargetCtrl.IsEmpty then Exit;
+
+  with fTargetCtrl do
+  begin
+    rec := InnerRect; // ie relative to parent not its absolute position
+    InflateRect(rec, -BevelHeight * 2, -BevelHeight * 2);
   end;
-  SetInnerBounds(rec);
+
+  if (fSize = 0) then SetDefaultSize;
+  if (fOrientation = soVertical) then
+  begin
+    rec.Left := Rec.Right - fSize - dpiAware1;
+  end else
+  begin
+    rec.Top := Rec.Bottom - fSize - dpiAware1;
+  end;
+
+  if not RectsEqual(Rect(rec), Rect(InnerBounds)) then
+    SetInnerBounds(rec);
+end;
+//------------------------------------------------------------------------------
+
+procedure TScrollCtrl.GetScrollBtnInfo;
+var
+  dummy1, dummy2: double;
+begin
+  GetScrollBtnInfo(dummy1, dummy2);
+end;
+//------------------------------------------------------------------------------
+
+procedure TScrollCtrl.GetScrollBtnInfo(out btnStart, btnEnd: double);
+var
+  trackSize, chevSize: double;
+begin
+  btnStart := 0; btnEnd := 0; fBtnSize := 0; // error values
+  if not Assigned(fTargetCtrl) or (fMax = 0) then Exit;
+
+  try
+    chevSize := GetChevronSize;
+    if fOrientation = soVertical then
+    begin
+      fHiddenSize := fMax - fTargetCtrl.ClientHeight;
+      trackSize := Self.ClientHeight - chevSize * 2;
+    end else
+    begin
+      fHiddenSize := fMax - fTargetCtrl.ClientWidth;
+      trackSize := Self.ClientWidth - chevSize * 2;
+    end;
+
+    if (fHiddenSize <= 0) or
+      (trackSize + DPIAware(10) < fMinBtnSize) then
+        Exit;
+
+    fBtnSize := Math.Max(fMinBtnSize, trackSize - fHiddenSize);
+    fScrollRatio := fHiddenSize / (trackSize - fBtnSize);
+    // nb: fScrollRatio = 1.0 UNLESS fBtnSize = fMinBtnSize
+
+    if fPos > fHiddenSize then fPos := fHiddenSize;
+
+    btnStart := chevSize + fPos / fScrollRatio;
+    btnEnd := btnStart + fBtnSize;
+  finally
+    if AutoHide then Visible := (fBtnSize > 0);
+    if not Visible then fPos := 0;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TScrollCtrl.SetScrollSize(newSize: double);
+begin
+  if (fSize <> newSize) then
+  begin
+    fSize := newSize;
+    if fOrientation = soVertical then
+      Width := fSize else
+      Height := fSize;
+  end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TScrollCtrl.SetPosition(newPos: double);
-var
-  delta: double;
 begin
-  if not CanScroll then Exit;
-  case fOrientation of
-    soHorizontal  :
-      if newPos > fMax - fTargetCtrl.Width then
-        newPos := fMax - fTargetCtrl.Width;
-    soVertical    :
-      if newPos > fMax - fTargetCtrl.Height then
-        newPos := fMax - fTargetCtrl.Height;
-  end;
-  if newPos < 0 then newPos := 0;
-
-  delta := newPos - fPosition;
-  if delta = 0 then Exit;
-  fPosition := fPosition + delta;
-  if not Assigned(fTargetCtrl) then Exit;
-  case fOrientation of
-    soHorizontal  : fTargetCtrl.DoScroll(delta, 0);
-    soVertical    : fTargetCtrl.DoScroll(0, delta);
-  end;
+  if not Assigned(fTargetCtrl) or not CanScroll then Exit;
+  if newPos > fHiddenSize then newPos := fHiddenSize
+  else if newPos < 0 then newPos := 0;
+  if (newPos = fPos) then Exit;
+  fPos := newPos;
+  if fOrientation = soHorizontal then
+    fTargetCtrl.DoScrollX(fPos) else
+    fTargetCtrl.DoScrollY(fPos);
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -5619,25 +6297,53 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TScrollCtrl.SetScrollStep(value: integer);
+begin
+  fScrollStep := value;
+end;
+//------------------------------------------------------------------------------
+
+function TScrollCtrl.GetScrollStep: integer;
+begin
+  Result := Round(fScrollStep);
+end;
+//------------------------------------------------------------------------------
+
+
+procedure TScrollCtrl.SetMinBtnSize(value: integer);
+begin
+  fMinBtnSize := value;
+end;
+//------------------------------------------------------------------------------
+
+function TScrollCtrl.GetMinBtnSize: integer;
+begin
+  Result := Round(fMinBtnSize);
+end;
+//------------------------------------------------------------------------------
+
 function TScrollCtrl.CanScroll: Boolean;
 begin
-  Result := Visible and (fBtnRec.Width > 0) and (fBtnRec.Height > 0)
+  Result := Visible and (fMax > 0);
 end;
 //------------------------------------------------------------------------------
 
 procedure TScrollCtrl.DoMouseDown(button: TMouseButton;
   shift: TShiftState; const pt: TPoint);
+var
+  ss, se: double;
 begin
-  fMouseDownPos := MakeRelative(PointD(pt));
+  fMousePos := MakeRelative(PointD(pt));
+  GetScrollBtnInfo(ss, se);
   case fOrientation of
     soHorizontal:
       begin
-        if fMouseDownPos.X < fBtnRec.Left then
+        if fMousePos.X < ss then
         begin
           Position := Position - Step;
           fScrollState := scLeft;
         end
-        else if fMouseDownPos.X > fBtnRec.Left + fBtnRec.Width then
+        else if fMousePos.X > se then
         begin
           Position := Position + Step;
           fScrollState := scRight;
@@ -5648,12 +6354,12 @@ begin
       end;
     soVertical:
       begin
-        if fMouseDownPos.Y < fBtnRec.Top then
+        if fMousePos.Y < ss then
         begin
           Position := Position - Step;
           fScrollState := scTop;
         end
-        else if fMouseDownPos.Y > fBtnRec.Top + fBtnRec.Height then
+        else if fMousePos.Y > se then
         begin
           Position := Position + Step;
           fScrollState := scBottom;
@@ -5667,35 +6373,47 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TScrollCtrl.DoMouseMove(button: TMouseButton;
-  shift: TShiftState; const pt: TPoint);
+procedure TScrollCtrl.DoMouseMove(shift: TShiftState; const pt: TPoint);
 var
+  ss, se: double;
   pt2: TPointD;
+
+  function CheckRange(newPos: double): double;
+  begin
+    if newPos > fHiddenSize then Result := fHiddenSize { + minor adjust??}
+    else if newPos < 0 then Result := 0
+    else Result := newPos;
+  end;
+
 begin
   if (fScrollState = scNormal) or not Assigned(fTargetCtrl) then Exit;
+  GetScrollBtnInfo(ss, se);
   pt2 := MakeRelative(PointD(pt));
 
-  if (fScrollState <> scScrollBtn) and
-    PtInRect(fBtnRec.RectD, pt2) then
-      fScrollState := scScrollBtn;
-
-  case fOrientation of
-    soHorizontal  :
-      case fScrollState of
-        scScrollBtn : Position := fPosition +
-          Round((pt2.X - fMouseDownPos.X) * fDeltaScale);
-        scLeft      : Position := Position - Step;
-        scRight     : Position := Position + Step;
-      end;
-    soVertical    :
-      case fScrollState of
-        scScrollBtn : Position := fPosition +
-          Round((pt2.Y - fMouseDownPos.Y) * fDeltaScale);
-        scTop       : Position := Position - Step;
-        scBottom    : Position := Position + Step;
-      end;
+  if fOrientation = soHorizontal then
+  begin
+    if (fScrollState <> scScrollBtn) and
+      PtInRect(RectD(ss, 0, se, Height), pt2) then
+        fScrollState := scScrollBtn;
+    case fScrollState of
+      scScrollBtn : Position :=
+        CheckRange(fPos + ((pt2.X - fMousePos.X) * fScrollRatio));
+      scLeft      : Position := CheckRange(fPos - Step);
+      scRight     : Position := CheckRange(fPos + Step);
+    end;
+  end else
+  begin
+    if (fScrollState <> scScrollBtn) and
+      PtInRect(RectD(0, ss, Width, se), pt2) then
+        fScrollState := scScrollBtn;
+    case fScrollState of
+      scScrollBtn : Position :=
+        CheckRange(fPos + ((pt2.Y - fMousePos.Y) * fScrollRatio));
+      scTop       : Position := CheckRange(fPos - Step);
+      scBottom    : Position := CheckRange(fPos + Step);
+    end;
   end;
-  fMouseDownPos := pt2;
+  fMousePos := pt2;
 end;
 //------------------------------------------------------------------------------
 
@@ -5703,104 +6421,63 @@ procedure TScrollCtrl.DoMouseUp(Button: TMouseButton;
   shift: TShiftState; const pt: TPoint);
 begin
   fScrollState := scNormal;
+  inherited;
 end;
 //------------------------------------------------------------------------------
 
 procedure TScrollCtrl.Scale(value: double);
 begin
-  inherited;
-  fSize := fSize * value;
-  fMax  := fMax * value;
-  fMin  := fMin * value;
-  fPosition  := fPosition * value;
-  SetInnerBounds(InnerBounds);
+  fSize       := fSize * value;
+  if fOrientation = soVertical then
+    Width := fSize else
+    Height := fSize;
+  fMax        := fMax * value;
+  fMinBtnSize := fMinBtnSize * value;
 end;
 //------------------------------------------------------------------------------
 
-procedure TScrollCtrl.CalcScale;
-var
-  maxDelta, maxTravel, k, bh: double;
-begin
-  if (StorageState = ssLoading) or
-    (fMax = 0) or
-    not Assigned(fTargetCtrl) or
-    fTargetCtrl.Image.IsEmpty then Exit;
-
-  bh := fBevelHeight;
-  case fOrientation of
-    soHorizontal:
-      begin
-        maxDelta := fMax - fTargetCtrl.Width;
-        if maxDelta <= 0 then
-        begin
-          if fAutoHide then Visible := false;
-          Exit;
-        end;
-        with fTargetCtrl do
-          maxTravel := Width - (bh + self.Height) * 2;
-        k := fMax - fTargetCtrl.Width;
-      end;
-    soVertical:
-      begin
-        maxDelta := fMax - fTargetCtrl.Height;
-        if maxDelta <= 0 then
-        begin
-          if fAutoHide then Visible := false;
-          Exit;
-        end;
-        with fTargetCtrl do
-          maxTravel := Height - (bh + self.Width) * 2;
-        k := fMax - fTargetCtrl.Height;
-      end;
-
-    else Exit;
-  end;
-  if (maxTravel > 10) and (maxDelta > maxTravel) then
-    fDeltaScale := maxDelta / maxTravel else
-    fDeltaScale := 1;
-  if fAutoHide then Visible := true;
-  if (k > 0) and (Position > k) then Position := Round(k);
-end;
-//------------------------------------------------------------------------------
-
-procedure TScrollCtrl.Repaint;
+procedure TScrollCtrl.Paint;
 var
   bhi     : integer;
   d, bh   : double;
+  ss, se  : double;
   bhDiv2  : double;
   rec     : TRectD;
-  rec2    : TRectD;
-  recI    : TRect;
+  tmpRec  : TRectD;
   p,p2    : TPathD;
+  drawBtn : Boolean;
 begin
   bh := fBevelHeight;
   bhi := Round(bh);
   bhDiv2 := bhi / 2;
-  if fDeltaScale = 0 then fDeltaScale := 1;
+
+  drawBtn := Assigned(fTargetCtrl) and (fMax > fTargetCtrl.ClientHeight);
+  if drawBtn then GetScrollBtnInfo(ss, se);
 
   rec := InnerRect;
   TranslateRect(rec, OuterMargin, OuterMargin);
-  recI := Rect(rec);
-  Hatch(Image, recI, clWhite32, clBtnFace32, DPIAware(3));
+  Hatch(Image, Rect(rec), clWhite32, clBtnFace32, DPIAware(3));
 
-  rec2 := rec;
+  tmpRec := rec;
   if fOrientation = soVertical then
   begin
     //draw the top chevron
-    rec2.Bottom := rec2.Top + rec2.Width;
-    d := rec2.Width * 0.3;
-    InflateRect(rec2, -d, -d);
-    with rec2 do
+    tmpRec.Bottom := tmpRec.Top + GetChevronSize;
+    Image.FillRect(Rect(tmpRec), clBtnFace32);
+    d := tmpRec.Width * 0.3;
+    InflateRect(tmpRec, -d, -d);
+    with tmpRec do
       p := MakePath([left-2, bottom, MidPoint.X, top + 2, right + 2, bottom]);
     p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);
 
     //draw the bottom chevron
-    rec2 := rec;
-    rec2.Top := rec2.Bottom - rec2.Width;
-    InflateRect(rec2, -d, -d);
-    with rec2 do
+    tmpRec := rec;
+    tmpRec.Top := tmpRec.Bottom - GetChevronSize;
+    Image.FillRect(Rect(tmpRec), clBtnFace32);
+    InflateRect(tmpRec, -d, -d);
+    with tmpRec do
       p := MakePath([left - 2, top, MidPoint.X, bottom - 2, right + 2, top]);
     p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
@@ -5809,46 +6486,38 @@ begin
     //draw the outer border
     DrawEdge(Image, rec, clSilver32, clWhite32, bh);
 
-    if not Assigned(fTargetCtrl) or
-      (fMax <= fTargetCtrl.Height) then
-    begin
-      fBtnRec.Width := 0;
-      fBtnRec.Height := 0;
-      Exit;
-    end;
-    fBtnRec.Left := rec.Left;
-    fBtnRec.Top := Round(fPosition / fDeltaScale) + rec.Width;
-    fBtnRec.Width := rec.Width;
-    fBtnRec.Height := Math.Max(fMinBtnSize,
-      Self.Height - (rec.Width + bh) * 2 - (fMax - fTargetCtrl.Height));
+    if not drawBtn then Exit;
 
     //position and draw the button
-    Img32.Vector.InflateRect(rec, -1, -rec.Width);
-    rec.Top := rec.Top + fPosition / fDeltaScale;
-    rec.Bottom := rec.Top + fBtnRec.Height;
-
-    rec.Left := rec.Left + bhDiv2 +2;
+    Img32.Vector.InflateRect(rec, -1, -1);
+    rec.Top := rec.Top + ss;
+    rec.Bottom := rec.Top + fBtnSize;
+    rec.Left := rec.Left + 1 + bhDiv2 +2;
+    rec.Right := rec.Right -1;
     Image.FillRect(Rect(rec), clPaleGray32);
+
     DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
     Img32.Vector.InflateRect(rec, -1, -1);
     DrawEdge(Image, rec, clWhite32, clBlack32, 1);
   end else
   begin
     //draw the left chevron
-    rec2.Right := rec2.Left + rec2.Height;
-    d := rec2.Height * 0.3;
-    InflateRect(rec2, -d, -d);
-    with rec2 do
+    tmpRec.Right := tmpRec.Left + GetChevronSize;
+    Image.FillRect(Rect(tmpRec), clBtnFace32);
+    d := tmpRec.Height * 0.3;
+    InflateRect(tmpRec, -d, -d);
+    with tmpRec do
       p := MakePath([right, top, left + 2, MidPoint.Y + 1, right, bottom + 2]);
     p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
     DrawLine(Image, p, bhi, clDarkGray32, esRound);
 
-    //draw the bottom chevron
-    rec2 := rec;
-    rec2.Left := rec2.Right - rec2.Height;
-    InflateRect(rec2, -d, -d);
-    with rec2 do
+    //draw the right chevron
+    tmpRec := rec;
+    tmpRec.Left := tmpRec.Right - GetChevronSize;
+    Image.FillRect(Rect(tmpRec), clBtnFace32);
+    InflateRect(tmpRec, -d, -d);
+    with tmpRec do
       p := MakePath([left, top, right -2, MidPoint.Y + 1, left, bottom + 2]);
     p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
     DrawLine(Image, p2, bhi, clWhite32, esRound);
@@ -5857,24 +6526,12 @@ begin
     //draw the outer border
     DrawEdge(Image, rec, clSilver32, clWhite32, bh);
 
-    if not Assigned(fTargetCtrl) or
-      (fMax <= fTargetCtrl.Height) then
-    begin
-      fBtnRec.Width := 0;
-      fBtnRec.Height := 0;
-      Exit;
-    end;
-    fBtnRec.Top := rec.Top;
-    fBtnRec.Left := Round(fPosition / fDeltaScale) + rec.Height;
-    fBtnRec.Height := rec.Height;
-    fBtnRec.Width := Math.Max(fMinBtnSize,
-      Self.Width - (rec.Height + bh) * 2 - (fMax - fTargetCtrl.Width));
+    if not drawBtn then Exit;
 
     //position and draw the button
-    Img32.Vector.InflateRect(rec, -rec.Height, -1);
-    rec.Left := rec.Left + fPosition / fDeltaScale;
-    rec.Right := rec.Left + fBtnRec.Width;
-
+    Img32.Vector.InflateRect(rec, -1, -1);
+    rec.Left := rec.Left + ss;
+    rec.Right := rec.Left + fBtnSize;
     rec.Top := rec.Top + bhDiv2 + 2;
     Image.FillRect(Rect(rec), clPaleGray32);
     DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
@@ -6041,15 +6698,20 @@ constructor TCtrlStorageManager.Create(parent: TStorage; const name: string);
 begin
   inherited;
   fShortcutList := TList.Create;
-  fFocusLineW := DPIAware(1.25);
   fLayeredImg := TLayeredImage32.Create(self, 'TLayeredImage32');
-  fLayeredImg.backgroundColor := clBtnFace32;
   fRootCtrl   := fLayeredImg.InsertChild(0 , TRootCtrl) as TRootCtrl;
   fRootCtrl.CanFocus := false;
+  RootCtrl.Theme := lightTheme;
 {$IFDEF MSWINDOWS}
   DesignResolution := GetScreenResolution;
 {$ENDIF}
+end;
+//------------------------------------------------------------------------------
 
+constructor TCtrlStorageManager.Create(mainHdl: THandle);
+begin
+  Create(nil, '');
+  Self.fMainHdl := mainHdl;
 end;
 //------------------------------------------------------------------------------
 
@@ -6057,6 +6719,16 @@ destructor TCtrlStorageManager.Destroy;
 begin
   fShortcutList.Free;
   inherited;
+end;
+//------------------------------------------------------------------------------
+
+procedure TCtrlStorageManager.Quit;
+begin
+  if fMainHdl > 0 then
+  begin
+    DestroyWindow(fMainHdl);
+    fMainHdl := 0;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -6076,7 +6748,6 @@ end;
 procedure TCtrlStorageManager.SetDesignScale(value: double);
 begin
   if value <= 0 then Exit;
-  fFocusLineW := fFocusLineW * value / DesignScale;
   inherited;
 end;
 //------------------------------------------------------------------------------
@@ -6257,8 +6928,6 @@ procedure TCtrlStorageManager.LoadStoredObjects(const utf8: UTF8String);
     target    : TStorage;
   begin
     Result := False; // assume error
-    stgObj.StorageState := ssLoading;
-    try
       // get ATTRIBUTES
       while SkipBlanks(xmlCurr, xmlEnd) do
       begin
@@ -6312,7 +6981,12 @@ procedure TCtrlStorageManager.LoadStoredObjects(const utf8: UTF8String);
         else
           Exit; // error
 
-        if not ParseStorageElement(child, xmlCurr, xmlEnd) then Exit;
+        child.StorageState := ssLoading;
+        try
+          if not ParseStorageElement(child, xmlCurr, xmlEnd) then Exit;
+        finally
+          child.StorageState := ssNormal;
+        end;
       end;
 
       // join up parent-child controls (often TScrollCtrl)
@@ -6334,9 +7008,6 @@ procedure TCtrlStorageManager.LoadStoredObjects(const utf8: UTF8String);
 
       // finally process EndRead
       TGetProtectedStorage(stgObj).EndRead;
-    finally
-      stgObj.StorageState := ssNormal;
-    end;
     Result := True;
   end;
 
@@ -6362,7 +7033,12 @@ begin
 
       Inc(xmlCurr);
       if (GetName(xmlCurr, xmlEnd) <> self.ClassName) then Exit;
-      ParseStorageElement(self, xmlCurr, xmlEnd);
+      StorageState := ssLoading;
+      try
+        ParseStorageElement(self, xmlCurr, xmlEnd);
+      finally
+        StorageState := ssNormal;
+      end;
     finally
       StorageState := ssNormal;
     end;
@@ -6376,7 +7052,6 @@ begin
           SetObjectProp(self, propName, target);
       end;
     fDelayedLinks := nil;
-
   finally
     fDelayedLinks := nil;
     {$IFDEF FORMATSETTINGS}FormatSettings.{$ENDIF}DecimalSeparator := savedDecSep;
@@ -6416,9 +7091,13 @@ begin
   if Assigned(RootCtrl) then
   begin
     RootCtrl.ClearChildren;
-    RootCtrl.FocusedCtrl := nil;
-    RootCtrl.fScrollOffset := NullPointD;
+    RootCtrl.fFocusedCtrl := nil;
   end;
+  fLastCtrl := nil;
+  fMseDownCtrl := nil;
+  fCurrCursor := 0;
+  fShortcutList.Clear;
+  SetDesignScale(1.0);
 end;
 //------------------------------------------------------------------------------
 
@@ -6449,34 +7128,17 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TCtrlStorageManager.FindAllShortcutOwners;
-
-  procedure FindAll(ctrl: TCustomCtrl);
-  var
-    i: integer;
-  begin
-    if HasAltOrCtrlKey(ctrl.Shortcut.flags) then
-      fShortcutList.Add(ctrl);
-    for i := 0 to ctrl.ChildCount -1 do
-      FindAll(ctrl[i] as TCustomCtrl);
-  end;
-
-begin
-  fShortcutList.Clear;
-  if Assigned(fRootCtrl) then
-    FindAll(fRootCtrl);
-end;
-//------------------------------------------------------------------------------
-
 function TCtrlStorageManager.FindShortcutOwner(const aShortcut: TShortcut): TCustomCtrl;
 var
   i: integer;
 begin
   for i := 0 to fShortcutList.Count -1 do
-    with TCustomCtrl(fShortcutList[i]).fShortcut do
+    with TCustomCtrl(fShortcutList[i]) do
     begin
-      if (flags <> aShortcut.flags) or (chr <> aShortcut.chr) then Continue;
+      if (fShortcut.flags <> aShortcut.flags) or
+        (fShortcut.chr <> aShortcut.chr) then Continue;
       Result := TCustomCtrl(fShortcutList[i]);
+      if not Result.IsEnabledToCtrlRoot then Continue;
       Exit;
     end;
   Result := nil;
@@ -6493,12 +7155,6 @@ begin
       fShortcutList.Delete(i);
       Break;
     end;
-end;
-//------------------------------------------------------------------------------
-
-procedure TCtrlStorageManager.AddShortcutOwner(ctrl: TCustomCtrl);
-begin
-  fShortcutList.Add(ctrl);
 end;
 //------------------------------------------------------------------------------
 
@@ -6532,40 +7188,77 @@ procedure TCtrlStorageManager.MouseDown(mouseButton: TMouseButton;
   shift: TShiftState; const pt: TPoint);
 begin
   if not Assigned(fLayeredImg) then Exit;
-  fLastClicked := fLayeredImg.GetLayerAt(pt) as TCustomCtrl;
-  if Assigned(fLastClicked) then
-    fLastClicked.DoMouseDown(mouseButton, shift, pt);
+  if Assigned(RootCtrl.fCaptureCtrl) then
+  begin
+    RootCtrl.fCaptureCtrl.DoMouseDown(mouseButton, shift, pt);
+  end else
+  begin
+    fMseDownCtrl := fLayeredImg.GetLayerAt(pt) as TCustomCtrl;
+    if not Assigned(fMseDownCtrl) then Exit;
+    fMseDownCtrl.DoMouseDown(mouseButton, shift, pt);
+    fLastCtrl := fMseDownCtrl;
+  end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TCtrlStorageManager.MouseMove(mouseButton: TMouseButton;
-  shift: TShiftState; const pt: TPoint);
+procedure TCtrlStorageManager.MouseMove(shift: TShiftState; const pt: TPoint);
 var
   ctrl: TLayer32;
 begin
   fCurrCursor := 0;
   if not Assigned(fRootCtrl) then Exit;
 
-  if mouseButton <> mbLeft then
+  if Assigned(RootCtrl.fCaptureCtrl) then
   begin
-    ctrl := fLayeredImg.GetLayerAt(pt);
-    while Assigned(ctrl) and (ctrl is TCustomCtrl) and
-      not TCustomCtrl(ctrl).Enabled do ctrl := ctrl.Parent;
+    RootCtrl.fCaptureCtrl.DoMouseMove(shift, pt);
+    if {still} Assigned(RootCtrl.fCaptureCtrl) and (shift = 0) and
+      not (RootCtrl.fCaptureCtrl is TPanelCtrl) then
+        fCurrCursor := RootCtrl.fCaptureCtrl.CursorId;
+    Exit;
+  end;
 
-    //not moving anything so just update the cursor
-    if Assigned(ctrl) and not (ctrl is TPanelCtrl) then
-      fCurrCursor := ctrl.CursorId;
-  end else if Assigned(fLastClicked) then
-    fLastClicked.DoMouseMove(mouseButton, shift, pt);
+  if Assigned(fMseDownCtrl) then
+  begin
+    fMseDownCtrl.DoMouseMove(shift, pt);
+    Exit;
+  end;
+
+  ctrl := fLayeredImg.GetLayerAt(pt);
+
+  if Assigned(fLastCtrl) and (fLastCtrl <> ctrl) then
+    fLastCtrl.DoMouseLeave(ctrl);
+
+  if not Assigned(ctrl) or not (ctrl is TCustomCtrl) then
+  begin
+    fLastCtrl := nil;
+    Exit;
+  end;
+
+  if (fLastCtrl <> ctrl) then
+  begin
+    TCustomCtrl(ctrl).DoMouseEnter;
+    fLastCtrl := TCustomCtrl(ctrl);
+  end;
+
+  TCustomCtrl(ctrl).DoMouseMove(shift, pt);
+  //not moving anything so just update the cursor
+  if (shift = 0) and not (ctrl is TPanelCtrl) then
+    fCurrCursor := ctrl.CursorId;
 end;
 //------------------------------------------------------------------------------
 
 procedure TCtrlStorageManager.MouseUp(mouseButton: TMouseButton;
   shift: TShiftState; const pt: TPoint);
 begin
-  if Assigned(fLastClicked) then
-    fLastClicked.DoMouseUp(mbLeft, shift, pt);
-  fLastClicked := nil;
+  if Assigned(RootCtrl.fCaptureCtrl) then
+  begin
+    RootCtrl.fCaptureCtrl.Clicked;
+  end else
+  begin
+    if not Assigned(fMseDownCtrl) then Exit;
+    fMseDownCtrl.DoMouseUp(mouseButton, shift, pt);
+    fMseDownCtrl := nil;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -6623,7 +7316,12 @@ end;
 
 procedure TCtrlStorageManager.KeyPress(var Key: Char);
 begin
-  if Assigned(fRootCtrl) and Assigned(fRootCtrl.fFocusedCtrl) then
+  if (Key = #27) then
+  begin
+    if Assigned(RootCtrl.fPopMenuCtrl) then
+      RootCtrl.fPopMenuCtrl.Visible := False;
+  end
+  else if Assigned(fRootCtrl) and Assigned(fRootCtrl.fFocusedCtrl) then
     fRootCtrl.fFocusedCtrl.DoKeyPress(Key);
 end;
 //------------------------------------------------------------------------------
@@ -6643,19 +7341,15 @@ end;
 
 procedure InitPaths;
 begin
-  // 100 x 100 vector icons
-  SetLength(checkPaths, 2);
-  checkPaths[0] := MakePath([
-    100,33.76, 94.18,49.56, 78.07,61.75, 58.32,66.42, 58.32,66,
-    31.14,66, 31.14,47.37, 58.32,47.37, 62.63,44.95, 70.12,40.08,
-    72.82,33.76, 70.12,27.43, 62.63,22.57, 52.09,20.25, 40.91,21.03,
-    31.61,24.72, 26.38,30.50, 0,25.61, 11.28,11.21, 31.27,1.95, 55.37,0,
-    78.07,5.76, 94.18,17.95 ]);
-  checkPaths[1] := MakePath([33,74.58, 65,74.58, 65,100, 33,100]);
+  // 100 x 100 vector icons for checkbox - question mark & tick symbols
+  SetLength(queryPaths, 2);
+  queryPaths[0] := MakePath([ 64,21, 52,18, 41,19, 32,22, 20,22, 15,12,
+    32,4, 55,2, 77,8, 93,19, 98,34, 93,48, 77,60, 59,64, 33,64, 33,49,
+    58,49, 59,49, 71,42, 72,41, 75,35, 75,33, 72,27, 71,26 ]);
+  queryPaths[1] := MakePath([35,82, 63,82, 63,98, 35,98]);
 
   SetLength(tickPaths, 1);
-  tickPaths[0] :=
-    MakePath([41.02, 60.75, 100, 0, 48.71, 100, 0, 65.82, 14.10, 37.97]);
+  tickPaths[0] := MakePath([41.02, 60.75, 100, 0, 48.71, 100, 0, 65.82, 14.10, 37.97]);
 end;
 //------------------------------------------------------------------------------
 
@@ -6673,6 +7367,7 @@ begin
   RegisterStorageClass(TButtonCtrl);
   RegisterStorageClass(TCheckboxCtrl);
   RegisterStorageClass(TCustomCtrl);
+  RegisterStorageClass(TListItem);
   RegisterStorageClass(TListCtrl);
   RegisterStorageClass(TEditCtrl);
   RegisterStorageClass(TMemoCtrl);
@@ -6689,6 +7384,9 @@ begin
   RegisterStorageClass(TScrollCtrl);
   RegisterStorageClass(TSliderCtrl);
   RegisterStorageClass(TStatusbarCtrl);
+  RegisterStorageClass(TMenuItemCtrl);
+  RegisterStorageClass(TPopMenuCtrl);
+  RegisterStorageClass(TMainMenuCtrl);
 end;
 
 initialization

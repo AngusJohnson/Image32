@@ -3,7 +3,7 @@ unit Img32.Storage;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  20 March 2025                                                   *
+* Date      :  4 April 2025                                                    *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  TLayer32 based object persistence                               *
@@ -56,7 +56,7 @@ type
     function  ReadProperty(const propName, propVal: string): Boolean; virtual;
     procedure EndRead; virtual;
     procedure WriteProperties; virtual;
-    function  WriteProperty(propInfo: PPropInfo): Boolean; virtual;
+    function  CheckSkipWriteProperty(propInfo: PPropInfo): Boolean; virtual;
     procedure WriteStorage;
     procedure WriteEnumProp(const propName, propVal: string);
     procedure WriteIntProp(const propName: string; propVal: integer);
@@ -77,7 +77,7 @@ type
     procedure ClearChildren; virtual;
     function  AddChild(storeClass: TStorageClass): TStorage; virtual;
     function  InsertChild(index: integer; storeClass: TStorageClass): TStorage; virtual;
-    procedure DeleteChild(index: integer);
+    procedure DeleteChild(index: integer); virtual;
     function  IsOwnedBy(obj: TStorage): Boolean; overload;
     function  IsOwnedBy(objClass: TStorageClass): Boolean; overload;
 {$IFDEF USE_FILE_STORAGE}
@@ -1036,7 +1036,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TStorage.WriteProperty(propInfo: PPropInfo): Boolean;
+function TStorage.CheckSkipWriteProperty(propInfo: PPropInfo): Boolean;
 begin
   // Return TRUE when writing of a specific published property
   // is handled in this method (in a descendant class)
@@ -1074,8 +1074,8 @@ begin
     for i := 0 to typeData.PropCount -1 do
       with propInfos^[i]^ do
       begin
-
-        if WriteProperty(propInfos^[i]) then Continue;
+        //
+        if CheckSkipWriteProperty(propInfos^[i]) then Continue;
 
         propName := string(name);
         case PropType^.Kind of
@@ -1476,17 +1476,19 @@ end;
 // Storage class registration
 //------------------------------------------------------------------------------
 
-procedure RegisterStorageClass(storageClass: TStorageClass);
-begin
-  classList.AddObject(storageClass.ClassName, Pointer(storageClass));
-end;
-//------------------------------------------------------------------------------
-
 procedure InitStorageClassRegister;
 begin
+  if Assigned(classList) then Exit;
   classList := TStringList.Create;
   classList.Duplicates := dupIgnore;
   classList.Sorted := true;
+end;
+//------------------------------------------------------------------------------
+
+procedure RegisterStorageClass(storageClass: TStorageClass);
+begin
+  if not Assigned(classList) then InitStorageClassRegister;
+  classList.AddObject(storageClass.ClassName, Pointer(storageClass));
 end;
 //------------------------------------------------------------------------------
 
