@@ -3,7 +3,7 @@ unit Img32.Storage;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  4 April 2025                                                    *
+* Date      :  7 April 2025                                                    *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  TLayer32 based object persistence                               *
@@ -762,21 +762,7 @@ constructor TStorage.Create(parent: TStorage; const name: string);
 begin
   fChilds := TList.Create;
   fName := name;
-  if Assigned(parent) then
-  begin
-    fIndex := parent.fChilds.Add(self);
-    fParent := parent;
-{$IFDEF USE_FILE_STORAGE}
-    if Assigned(parent.fManager) then
-    begin
-      fManager := parent.fManager;
-      fStgState := fManager.fStgState;
-    end;
-  end;
-  if fStgState = ssLoading then BeginRead;
-{$ELSE}
-  end;
-{$ENDIF}
+  Self.Parent := parent;
 end;
 //------------------------------------------------------------------------------
 
@@ -1182,8 +1168,17 @@ begin
   if Assigned(fParent) then
     fParent.RemoveChildFromList(fIndex);
   fParent := parent;
-  if Assigned(fParent) then
-    Self.fIndex := fParent.fChilds.Add(self);
+  if not Assigned(fParent) then Exit;
+  Self.fIndex := fParent.fChilds.Add(self);
+{$IFDEF USE_FILE_STORAGE}
+  if Assigned(Parent.fManager) then
+  begin
+    fManager := Parent.fManager;
+    fStgState := fManager.fStgState;
+  end;
+  if fStgState = ssLoading then BeginRead;
+{$ENDIF}
+
 end;
 //------------------------------------------------------------------------------
 

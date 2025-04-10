@@ -3,7 +3,7 @@ unit Img32.Layers;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  4 April 2025                                                    *
+* Date      :  9 April 2025                                                    *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  Layered images support                                          *
@@ -161,6 +161,7 @@ type
     function   InsertChild(index: integer;
       storeClass: TStorageClass): TStorage;  overload; override;
     procedure  ClearChildren; override;
+    function   Contains(layer: TLayer32): Boolean;
 
     property   Child[index: integer]: TLayer32 read GetChild; default;
     //ClipPath: defines a region that's inside the layer's rectangular region.
@@ -843,7 +844,6 @@ end;
 //------------------------------------------------------------------------------
 {$ENDIF}
 
-
 procedure TLayer32.SetHeight(value: double);
 begin
   SetSize(fWidth, value);
@@ -1059,6 +1059,14 @@ end;
 function TLayer32.GetStorageChild(index: integer): TStorage;
 begin
   Result := inherited GetChild(index);
+end;
+//------------------------------------------------------------------------------
+
+function TLayer32.Contains(layer: TLayer32): Boolean;
+begin
+  while Assigned(layer.Parent) and (layer.Parent <> self) do
+    layer := layer.Parent;
+  Result := Assigned(layer.Parent);
 end;
 //------------------------------------------------------------------------------
 

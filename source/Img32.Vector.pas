@@ -3,7 +3,7 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  21 February 2025                                                *
+* Date      :  10 April 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -70,10 +70,6 @@ type
   procedure InflateRect(var rec: TRectD; dx, dy: double); overload;
 
   function NormalizeRect(var rect: TRect): Boolean;
-
-  function PrePendPoint(const pt: TPointD; const p: TPathD): TPathD; overload;
-  procedure PrePendPoint(const pt: TPointD; const p: TPathD; var Result: TPathD); overload;
-  function PrePendPoints(const pt1, pt2: TPointD; const p: TPathD): TPathD;
 
   function Rectangle(const rec: TRect): TPathD; overload;
   function Rectangle(const rec: TRectD): TPathD; overload;
@@ -211,6 +207,8 @@ type
 
   function OpenPathToFlatPolygon(const path: TPathD): TPathD;
 
+  function PrePendPoint(const pt: TPointD; const p: TPathD): TPathD; overload;
+  function PrePendPoints(const pt1, pt2: TPointD; const p: TPathD): TPathD;
   procedure AppendPoint(var path: TPathD; const extra: TPointD);
 
   // AppendPath - adds TPathD & TPathsD objects to the end of
@@ -1905,6 +1903,29 @@ function ApplyNormal(const pt, norm: TPointD; delta: double): TPointD;
   {$IFDEF INLINE} inline; {$ENDIF}
 begin
   result := PointD(pt.X + norm.X * delta, pt.Y + norm.Y * delta);
+end;
+//------------------------------------------------------------------------------
+
+function PrePendPoint(const pt: TPointD; const p: TPathD): TPathD;
+var
+  len: integer;
+begin
+  len := Length(p);
+  SetLengthUninit(Result, len +1);
+  Result[0] := pt;
+  if len > 0 then Move(p[0], Result[1], len * SizeOf(TPointD));
+end;
+//------------------------------------------------------------------------------
+
+function PrePendPoints(const pt1, pt2: TPointD; const p: TPathD): TPathD;
+var
+  len: integer;
+begin
+  len := Length(p);
+  NewPointDArray(Result, len +2, True);
+  Result[0] := pt1;
+  Result[1] := pt2;
+  if len > 0 then Move(p[0], Result[2], len * SizeOf(TPointD));
 end;
 //------------------------------------------------------------------------------
 
@@ -3748,35 +3769,6 @@ var
 begin
   recD := GetBoundsD(paths);
   Result := Rect(recD);
-end;
-//------------------------------------------------------------------------------
-
-procedure PrePendPoint(const pt: TPointD; const p: TPathD; var Result: TPathD);
-var
-  len: integer;
-begin
-  len := Length(p);
-  SetLengthUninit(Result, len +1);
-  Result[0] := pt;
-  if len > 0 then Move(p[0], Result[1], len * SizeOf(TPointD));
-end;
-//------------------------------------------------------------------------------
-
-function PrePendPoint(const pt: TPointD; const p: TPathD): TPathD;
-begin
-  PrePendPoint(pt, p, Result);
-end;
-//------------------------------------------------------------------------------
-
-function PrePendPoints(const pt1, pt2: TPointD; const p: TPathD): TPathD;
-var
-  len: integer;
-begin
-  len := Length(p);
-  NewPointDArray(Result, len +2, True);
-  Result[0] := pt1;
-  Result[1] := pt2;
-  if len > 0 then Move(p[0], Result[2], len * SizeOf(TPointD));
 end;
 //------------------------------------------------------------------------------
 

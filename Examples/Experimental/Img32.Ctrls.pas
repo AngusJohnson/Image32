@@ -3,7 +3,7 @@ unit Img32.Ctrls;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  0.0 (Experimental)                                              *
-* Date      :  4 April 2025                                                    *
+* Date      :  10 April 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -31,7 +31,7 @@ uses
 type
   TTextPosition       = (tpLeft, tpTop, tpRight, tpBottom);
   TTextPositionH      = (tphLeft, tphRight);
-  TScrollOrientation  = (soHorizontal, soVertical);
+  TScrollOrientation  = (soUnknown, soHorizontal, soVertical);
   TAutoPosition       = (apNone, apCustom, apClient,
                           apLeft, apTop, apRight, apBottom);
 
@@ -80,6 +80,7 @@ type
     destructor Destroy; override;
     procedure RegisterProperties;
     procedure DeRegisterProperties;
+    procedure Resized; virtual;
     function  GetEventName(event: TNotifyEvent): string;
     function  GetPropName(prop: TObject): string;
     property  EventCount: integer read GetEventCount;
@@ -168,13 +169,13 @@ type
     procedure SetColor(color: TColor32);
     function  GetFont: TFontCache;
     function  GetHasFocus: Boolean;
+    function  CanSetFocus: Boolean;
     function  IsEmpty: Boolean;
     // theme colors
     function  GetColor: TColor32;
     function  GetAltColor: TColor32;
     function  GetFocusColor: TColor32;
     function  GetFontColor: TColor32;
-    procedure SetCanFocus(value: Boolean);
     procedure SetEnabled(value: Boolean);
     procedure SetShortcut(value: TShortcut);
     procedure SetAutoPosition(ap: TAutoPosition);
@@ -190,9 +191,7 @@ type
     procedure Clicked; virtual;
     function  GetUsableFont: Boolean;
     procedure SetCaption(const caption: string); virtual;
-    function  GetCanFocus: Boolean; virtual;
     procedure SetFont(font: TFontCache); virtual;
-    procedure CheckScaleBounds(var value: double); virtual;
     function  HasShortcut: Boolean;
     procedure Paint; virtual;
     procedure DoMouseDown(button: TMouseButton;
@@ -232,7 +231,8 @@ type
     property AutoPosition : TAutoPosition
       read fAutoPosition write SetAutoPosition;
     property BevelHeight: double read fBevelHeight write SetBevHeight;
-    property CanFocus   : Boolean read GetCanFocus write SetCanFocus;
+    // CanFocus - (local property) and not to be confused with CanSetFocus().
+    property CanFocus   : Boolean read fCanFocus write fCanFocus;
     property Caption    : string read fCaption write SetCaption;
     property Color      : TColor32 read fColor write SetColor;
     property Enabled    : Boolean read fEnabled write SetEnabled;
@@ -243,7 +243,7 @@ type
     property OnPainted  : TNotifyEvent read fAfterPaint write fAfterPaint;
   end;
 
-  TAutoSizedCtrl = class(TCustomCtrl)
+  TCustomPosCtrl = class(TCustomCtrl)
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
   end;
@@ -257,12 +257,12 @@ type
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
   published
-    // TargetCtrl - control to receive focus when an ampersanded
-    // char in the label's caption is ALT key triggered.
+    // TargetCtrl - control to receive focus when an
+    // ampersanded char in the label's caption is ALT key triggered.
     property TargetCtrl: TCustomCtrl read fTargetCtrl write fTargetCtrl;
   end;
 
-  TStatusbarCtrl = class(TAutoSizedCtrl)
+  TStatusbarCtrl = class(TCustomPosCtrl)
   protected
     procedure Paint; override;
   public
@@ -283,29 +283,28 @@ type
     fOnPaint      : TNotifyEvent;
     fOnChange     : TNotifyEvent;
   protected
-    function GetClientHeight: double; override;
-    function GetClientWidth: double; override;
-    function GetClientRect: TRectD; override;
+    function  GetClientHeight: double; override;
+    function  GetClientWidth: double; override;
+    function  GetClientRect: TRectD; override;
     procedure DoChildAutoPositioning;
-    procedure SetScrollH(scrollHorz: TScrollCtrl); virtual;
-    procedure SetScrollV(scrollVert: TScrollCtrl); virtual;
-    procedure DoScrollX(newPos: double); virtual;
-    procedure DoScrollY(newPos: double); virtual;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
     procedure DoAfterMerge; override;
     procedure Paint; override;
+    procedure SetScrollH(scrollCtrl: TScrollCtrl); virtual;
+    procedure SetScrollV(scrollCtrl: TScrollCtrl); virtual;
+    procedure DoScrollX(newPos: double); virtual;
+    procedure DoScrollY(newPos: double); virtual;
     property  ScrollOffset: TPointD read fScrollOffset write fScrollOffset;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
-    destructor Destroy; override;
     function   InsertChild(index: integer; layerClass: TLayer32Class;
       const name: string = ''): TLayer32; override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
     procedure Scale(value: double); override;
+    property ScrollH  : TScrollCtrl read fScrollH;
+    property ScrollV  : TScrollCtrl read fScrollV;
   published
     property Margin   : double read fInnerMargin write fInnerMargin;
-    property ScrollH  : TScrollCtrl read fScrollH write SetScrollH;
-    property ScrollV  : TScrollCtrl read fScrollV write SetScrollV;
     property ShadowSize: double read fShadowSize write fShadowSize;
     property OnChange : TNotifyEvent read fOnChange write fOnChange;
     property OnPaint  : TNotifyEvent read fOnPaint write fOnPaint;
@@ -338,7 +337,7 @@ type
     procedure DoMouseDown(button: TMouseButton;
       shift: TShiftState; const pt: TPoint); override;
     procedure DoScrollY(newPos: double); override;
-    procedure SetScrollV(scrollVert: TScrollCtrl); override;
+    procedure SetScrollV(scrollCtrl: TScrollCtrl); override;
     procedure Paint; override;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
@@ -365,6 +364,7 @@ type
     fIsChecked  : Boolean;
     procedure UpdateItem;
   protected
+    procedure Clicked; override;
     procedure SetCaption(const caption: string); override;
     procedure SetFont(font: TFontCache); override;
     // procedure Paint; override; // painting done by parent control :)
@@ -441,13 +441,14 @@ type
     fBuffer         : TImage32;
     fTextRect       : TRectD;
     fMouseLeftDown  : Boolean;
+    fSavedImage     : TArrayOfColor32;
     procedure CheckPageMetrics;
     function  GetVisibleLines: integer;
     procedure SetTextMargin(const margin: TPointD);
     procedure ScrollCaretIntoView;
     procedure ResetSelPos;
   protected
-    function GetText: string;
+    function  GetText: string;
     procedure SetText(const txt: string);
     procedure SetFont(font: TFontCache); override;
     procedure DoKeyDown(var Key: Word; Shift: TShiftState); override;
@@ -459,7 +460,7 @@ type
       Shift: TShiftState; const pt: TPoint); override;
     function DoMouseWheel(Shift: TShiftState;
       WheelDelta: Integer; MousePos: TPoint): Boolean; override;
-    procedure SetScrollV(scrollVert: TScrollCtrl); override;
+    procedure SetScrollV(scrollCtrl: TScrollCtrl); override;
     procedure DoScrollY(newPos: double); override;
     procedure FontChanged; override;
     procedure Paint; override;
@@ -623,7 +624,7 @@ type
     property Theme       : TCtrlTheme read fTheme write SetTheme;
   end;
 
-  TPageTabCtrl = class(TAutoSizedCtrl)
+  TPageTabCtrl = class(TCustomPosCtrl)
   protected
     procedure Clicked; override;
     procedure DoMouseDown(Button: TMouseButton;
@@ -655,6 +656,7 @@ type
     procedure SetTabHeight(height: double);
     procedure SetActiveIndex(index: integer);
     function  GetPagePanel(index: integer): TPagePnlCtrl;
+    procedure DrawTab(idx: integer);
     procedure DrawTabs;
     procedure ResizeTabs;
   protected
@@ -746,36 +748,36 @@ type
     property OnSlider   : TNotifyEvent read fOnSlider write fOnSlider;
   end;
 
-  TScrollCtrl = class(TAutoSizedCtrl)
+  TScrollCtrl = class(TCustomPosCtrl)
   private
     fAutoHide     : Boolean;
     fSize         : double;
     fScrollRatio  : double;
     fHiddenSize   : double;
     fBtnSize      : double;
-    fScrollStep   : double;   // double to facilitate scaling (streamed a int.)
+    fScrollStep   : double;   // double to facilitate scaling
     fOrientation  : TScrollOrientation;
     fPos          : double;
     fMax          : double;
-    fMinBtnSize   : double;   // double to facilitate scaling (streamed a int.)
+    fMinBtnSize   : double;   // double to facilitate scaling
     fMousePos     : TPointD;
     fScrollState  : TScrollState;
-    fTargetCtrl   : TScrollingCtrl;
-    procedure UnregisterTargetCtrl;
+    fTargetCtrl   : TScrollingCtrl; // Parent as TScrollingCtrl
     procedure SetMax(newMax: double);
     procedure SetScrollSize(newSize: double);
-    procedure SetPosition(newPos: double);
+    procedure SetBtnPos(newPos: double);
     procedure SetAutoHide(value: Boolean);
     procedure SetMinBtnSize(value: integer);
     function  GetMinBtnSize: integer;
     procedure SetScrollStep(value: integer);
     function  GetScrollStep: integer;
   protected
-    procedure RegisterTargetCtrl(target: TScrollingCtrl);
+    procedure SetParent(parent: TStorage); override;
+    procedure SetOrientation(orientation  : TScrollOrientation);
+    procedure DoAutoPosition; virtual;
     procedure SetDefaultSize;
     function GetChevronSize: Double;
     procedure CheckAutoVisible(firstPass: Boolean);
-    procedure CheckCtrlPos;
     procedure GetScrollBtnInfo; overload;
     procedure GetScrollBtnInfo(out btnStart, btnEnd: double); overload;
     function CanScroll: Boolean;
@@ -786,16 +788,17 @@ type
     property  MinBtnSize        : integer read GetMinBtnSize write SetMinBtnSize;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
-    destructor Destroy; override;
     procedure Scale(value: double); override;
     procedure SetFocus; override;
     property TargetCtrl : TScrollingCtrl read fTargetCtrl;
   published
-    property AutoHide   : Boolean read fAutoHide write SetAutoHide;
-    property Size       : double read fSize write SetScrollSize;
-    property Max        : double read fMax write SetMax;
-    property Position   : double read fPos write SetPosition; // relative to pixels
-    property Step       : integer read GetScrollStep write SetScrollStep;
+    property AutoHide     : Boolean read fAutoHide write SetAutoHide;
+    property Size         : double read fSize write SetScrollSize;
+    property Max          : double read fMax write SetMax;
+    property Orientation  : TScrollOrientation
+      read fOrientation write SetOrientation;
+    property Position     : double read fPos write SetBtnPos; // relative to pixels
+    property Step         : integer read GetScrollStep write SetScrollStep;
   end;
 
 {$IFDEF MSWINDOWS}
@@ -1163,8 +1166,7 @@ begin
   if GetLuminance(textColor) < 160 then
   begin
     DrawPolygon(Image, pp, frNonZero, clWhite32);
-    if not enabled then
-      textColor := MakeLighter(textColor, 40);
+    if not enabled then textColor := MakeLighter(textColor, 40);
     pp := TranslatePath(pp, dx, dx);
     DrawPolygon(Image, pp, frNonZero, textColor);
   end else
@@ -1189,17 +1191,17 @@ end;
 
 function GetTabOutLine(const rec: TRectD; radius: double): TPathD;
 var
-  p2 : TPathD;
+  diam  : double;
   rec2  : TRectD;
 begin
-  radius := radius * 2;
+  diam := radius * 2;
+  SetLength(Result, 1);
+  Result[0] := PointD(rec.Left, rec.Bottom);
   with rec do
-    rec2 := RectD(Left, Top, Left + radius, Top + radius);
-  Result := MakePath([rec.Left, rec.Bottom]);
+    rec2 := RectD(Left, Top, Left + diam, Top + diam);
   ConcatPaths(Result, arc(rec2, angle180, angle270));
-  TranslateRect(rec2, rec.Width - radius, 0);
-  p2 := arc(rec2, angle270, angle0);
-  ConcatPaths(Result, p2);
+  TranslateRect(rec2, rec.Width - diam, 0);
+  ConcatPaths(Result, arc(rec2, angle270, angle0));
   AppendPoint(Result, rec.BottomRight);
 end;
 //------------------------------------------------------------------------------
@@ -1230,91 +1232,6 @@ begin
   for i := 1 to len do
     Result[i] := Result[i - 1] +
       font.GetTextWidth(captions[i-1]) + padding;
-end;
-//------------------------------------------------------------------------------
-
-procedure DrawTabCtrl(Image: TImage32; const captions: array of string;
-  const offsets : TArrayOfDouble; font: TFontCache;
-  bevHeight: double; selectedIdx: integer;
-  tabWidth, tabHeight: double;
-  color: TColor32; textColor: TColor32;
-  selColor: TColor32; selTextColor: TColor32);
-var
-  i, len  : integer;
-  hbh,bh  : double;
-  totalW  : double;
-  lh, r   : double;
-  rec     : TRectD;
-  recI    : TRect;
-  img     : TImage32;
-  p       : TPathD;
-begin
-  len := Length(captions);
-  if (len = 0) or (len <> High(offsets)) then Exit;
-  if selectedIdx < 0 then selectedIdx := 0
-  else if selectedIdx >= len then selectedIdx := len-1;
-
-  if assigned(font) then
-    lh := font.LineHeight else
-    lh := DPIAware(12);
-
-  bh := bevHeight;
-  hbh := bh / 2;
-  r := lh / 3;
-
-  totalW := offsets[len];
-
-  if tabHeight <= 0 then
-    tabHeight := Ceil(lh * 1.33);
-
-  img := TImage32.Create(Ceil(totalW + bh), Ceil(tabHeight + bh * 2));
-  try
-    //draw tabs before selected tab
-    for i := 0 to selectedIdx - 1 do
-    begin
-      rec := RectD(hbh + offsets[i], bh, hbh + offsets[i + 1], bh + tabHeight);
-      p := GetTabOutLine(rec, r);
-      DrawBtnInternal(img, p, captions[i], font,
-        hbh, 0, false, true, color, textColor, 0, 0, false);
-      p := TranslatePath(p, -1, -1);
-      DrawLine(img, p, 1, clGray32, esPolygon);
-      p := TranslatePath(p, 1, 1);
-    end;
-
-    //draw tabs following selected tab
-    for i := len -1 downto selectedIdx + 1 do
-    begin
-      rec := RectD(hbh + offsets[i], bh, hbh + offsets[i + 1], bh + tabHeight);
-      p := GetTabOutLine(rec, r);
-      DrawBtnInternal(img, p, captions[i], font,
-        hbh, 0, false, true, color, textColor, 0, 0, false);
-      p := TranslatePath(p, 1, -1);
-      DrawLine(img, p, 1, clGray32, esPolygon);
-      p := TranslatePath(p, -1, 1);
-    end;
-
-    //draw selected tab
-    rec := RectD(hbh + offsets[selectedIdx], bh + 4,
-      hbh + offsets[selectedIdx + 1], bh + tabHeight);
-    img32.Vector.InflateRect(rec, 0, bh);
-    p := GetTabOutLine(rec, r);
-    DrawBtnInternal(img, p, captions[selectedIdx], font,
-      hbh, 0, false, true, selColor, selTextColor, -Round(hbh), 0, false);
-    p := Grow(p, nil, hbh, jsRound, 2);
-    DrawLine(img, p, DPIAware(1.2), clLiteGrey32, esSquare);
-
-    p := TranslatePath(p, 0, -1);
-    DrawLine(img, p, 1, clGray32, esPolygon);
-    p := TranslatePath(p, 0, 1);
-
-    recI.Left := Round(offsets[0]);
-    recI.Top := Round(bh) - 1;
-    recI.Right := recI.Left + img.Width;
-    recI.Bottom := recI.Top + img.Height;
-    Image.CopyBlend(img, img.Bounds, recI, BlendToAlpha);
-  finally
-    img.Free;
-  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -1360,8 +1277,9 @@ begin
     tsYes :
       begin
         w := RectWidth(rec);
-        p := ScalePath(tickPaths[0],  w * 0.7 / 100);
-        p := TranslatePath(p, rec.Left + w * 0.15, rec.Top + w * 0.15);
+        // scale tick to approx. 2/3 of width and offset tick approx 1/6
+        p := ScalePath(tickPaths[0],  w * 0.65 / 100);
+        p := TranslatePath(p, rec.Left + w * 0.18, rec.Top + w * 0.18);
         DrawPolygon(Image, p, frEvenOdd, color);
         DrawLine(Image, p, lineWidth, clBlack32, esPolygon);
       end;
@@ -1421,29 +1339,29 @@ constructor TCustomCtrl.Create(parent: TLayer32; const name: string);
 begin
   inherited;
   if not Assigned(StorageManager) then
-    Raise Exception.Create('oops - we there must be a storage manager');
+    Raise Exception.Create('Error - there must be a storage manager');
   if (self is TRootCtrl) then
   begin
     if Assigned(StorageManager.fRootCtrl) then
-      raise Exception.Create('oops - only one RootCtrl allowed :)');
+      raise Exception.Create('Error - only one RootCtrl allowed :)');
     StorageManager.fRootCtrl := TRootCtrl(self);
   end;
   if Assigned(parent) and (parent is TCustomCtrl) then
   begin
     with TCustomCtrl(parent) do
     begin
-      Self.Color        := Color;
-      Self.FontColor    := FontColor;
-      Self.Isthemed     := Isthemed;
+      Self.Color      := Color;
+      Self.FontColor  := FontColor;
+      Self.Isthemed   := Isthemed;
     end;
   end else
   begin
-    Color             := clBtnFace32;
-    FontColor         := clBlack32;
-    fIsthemed         := false;
+    Color       := clBtnFace32;
+    FontColor   := clBlack32;
+    fIsthemed   := false;
   end;
-  fBevelHeight      := dpiAware(2);
-  OuterMargin       := DPIAware(5);
+  fBevelHeight  := dpiAware(2);
+  OuterMargin   := DPIAware(5);
   fEnabled      := true;
   fCanFocus     := true;
 end;
@@ -1471,32 +1389,53 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TCustomCtrl.CheckScaleBounds(var value: double);
-begin
-  if value < 0.025 then value := 0.025
-  else if value > 50 then value := 50;
-end;
-//------------------------------------------------------------------------------
-
 procedure TCustomCtrl.Scale(value: double);
 var
   i: integer;
   rec: TRectD;
 begin
-  // provide sensible limits to scaling
-  CheckScaleBounds(value);
-  if AutoPosition <> apClient then
-  begin
-    rec := GetInnerBounds;
-    rec := ScaleRect(rec, value);
-    SetInnerBounds(rec);
-    fBevelHeight := fBevelHeight * value;
-    OuterMargin := OuterMargin * value;
-    Invalidate;
-  end;
+  fBevelHeight := fBevelHeight * value;
+  OuterMargin := OuterMargin * value;
 
+  case AutoPosition of
+    apNone:
+    begin
+      rec := InnerBounds;
+      rec := ScaleRect(rec, value);
+      SetInnerBounds(rec);
+      Invalidate;
+    end;
+    apLeft:
+    begin
+      rec := TCustomCtrl(Parent).ClientRect;
+      rec.Right := rec.Left + Width * value;
+      SetInnerBounds(rec);
+      Invalidate;
+    end;
+    apRight:
+    begin
+      rec := TCustomCtrl(Parent).ClientRect;
+      rec.Left := rec.Right - Width * value;
+      SetInnerBounds(rec);
+      Invalidate;
+    end;
+    apTop:
+    begin
+      rec := TCustomCtrl(Parent).ClientRect;
+      rec.Bottom := rec.Top + Height * value;
+      SetInnerBounds(rec);
+      Invalidate;
+    end;
+    apBottom:
+    begin
+      rec := TCustomCtrl(Parent).ClientRect;
+      rec.Top := rec.Bottom - Height * value;
+      SetInnerBounds(rec);
+      Invalidate;
+    end;
+  end;
   for i := 0 to ChildCount -1 do
-    if Child[i] is TCustomCtrl then
+    if (Child[i] is TCustomCtrl) then
       TCustomCtrl(Child[i]).Scale(value);
 end;
 //------------------------------------------------------------------------------
@@ -1762,20 +1701,8 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TCustomCtrl.SetCanFocus(value: Boolean);
-begin
-  fCanFocus := value;
-end;
-//------------------------------------------------------------------------------
-
 procedure TCustomCtrl.SetFocus;
 begin
-  if not CanFocus then
-  begin
-    if parent is TCustomCtrl then
-      TCustomCtrl(parent).SetFocus;
-    Exit;
-  end;
   RootCtrl.SetFocus(Self);
 end;
 //------------------------------------------------------------------------------
@@ -1787,9 +1714,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TCustomCtrl.GetCanFocus: Boolean;
+function TCustomCtrl.CanSetFocus: Boolean;
 begin
-  Result := fCanFocus and fEnabled and IsVisibleToCtrlRoot;
+  Result := fCanFocus and fEnabled and IsEnabledToCtrlRoot;
 end;
 //------------------------------------------------------------------------------
 
@@ -1803,7 +1730,7 @@ procedure TCustomCtrl.DoMouseDown(button: TMouseButton;
   shift: TShiftState; const pt: TPoint);
 begin
   if not Visible or not fEnabled then Exit;
-  if CanFocus and not HasFocus then SetFocus;
+  if CanSetFocus and not HasFocus then SetFocus;
 end;
 //------------------------------------------------------------------------------
 
@@ -1881,7 +1808,8 @@ end;
 
 procedure TCustomCtrl.Clicked;
 begin
-  if Visible and fEnabled and Assigned(fOnClick) then fOnClick(Self);
+  if not HasFocus and CanSetFocus then SetFocus;
+  if HasFocus and Assigned(fOnClick) then fOnClick(Self);
 end;
 //------------------------------------------------------------------------------
 
@@ -2061,16 +1989,21 @@ end;
 
 function TRootCtrl.SetFocus(ctrl: TCustomCtrl): Boolean;
 begin
+  Result := False;
   if not Assigned(ctrl) then
   begin
     Result := true;
     if not Assigned(fFocusedCtrl) then Exit;
     FocusedCtrl.Invalidate;
     fFocusedCtrl := nil;
-  end else
+  end else if (ctrl <> FocusedCtrl) then
   begin
-    Result := (ctrl <> Self) and ctrl.CanFocus and (ctrl <> FocusedCtrl);
-    if not Result then Exit;
+    while (ctrl <> Self) and not ctrl.CanSetFocus do
+    begin
+      if not (ctrl.Parent is TCustomCtrl) then Exit;
+      ctrl := TCustomCtrl(ctrl.Parent);
+    end;
+
     if Assigned(fFocusedCtrl) then FocusedCtrl.Invalidate;
     fFocusedCtrl := ctrl;
     ctrl.Invalidate;
@@ -2109,10 +2042,10 @@ end;
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
-// TAutoSizedCtrl
+// TCustomPosCtrl
 //------------------------------------------------------------------------------
 
-constructor TAutoSizedCtrl.Create(parent: TLayer32; const name: string);
+constructor TCustomPosCtrl.Create(parent: TLayer32; const name: string);
 begin
   fAutoPosition := apCustom;
   inherited;
@@ -2132,7 +2065,7 @@ end;
 
 procedure TLabelCtrl.Clicked;
 begin
-  if Assigned(fTargetCtrl) and fTargetCtrl.CanFocus then
+  if Assigned(fTargetCtrl) and fTargetCtrl.CanSetFocus then
     fTargetCtrl.SetFocus;
   inherited;
 end;
@@ -2180,14 +2113,17 @@ end;
 
 procedure TStatusbarCtrl.SetInnerBounds(const newBounds: TRectD);
 var
+  h: double;
   rec : TRectD;
-  h   : double;
 begin
   rec := newBounds;
-  if GetUsableFont then
-    h := fUsableFont.LineHeight + fBevelHeight * 3 else
-    h := DPIAware(15);
-  rec.Top := rec.Bottom - h;
+  if newBounds.Height = 0 then
+  begin
+    if GetUsableFont then
+      h := fUsableFont.LineHeight + fBevelHeight * 3 else
+      h := DPIAware(15);
+    rec.Top := rec.Bottom - h;
+  end;
   inherited SetInnerBounds(rec);
 end;
 //------------------------------------------------------------------------------
@@ -2205,7 +2141,7 @@ begin
   DrawEdge(Image, rec, clWhite32, clSilver32, bh);
   Img32.Vector.InflateRect(rec, -DPIAware(10), -Round(bh));
   if GetUsableFont then
-    DrawText(Image, rec.Left, rec.Top + fUsableFont.Ascent ,
+    DrawText(Image, rec.Left, rec.Top + BevelHeight + fUsableFont.Ascent,
       fCaption, fUsableFont, GetFontColor);
 end;
 
@@ -2221,40 +2157,52 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-destructor TScrollingCtrl.Destroy;
-begin
-  if Assigned(fScrollH) then fScrollH.UnregisterTargetCtrl;
-  if Assigned(fScrollV) then fScrollV.UnregisterTargetCtrl;
-  inherited;
-end;
-//------------------------------------------------------------------------------
-
 function TScrollingCtrl.GetClientHeight: double;
 begin
-  Result := Height - fBevelHeight * 2;
-  if Assigned(ScrollH) and ScrollH.visible then
-    Result := Result - ScrollH.Height;
+  if Assigned(ScrollV) and ScrollV.visible and
+    Assigned(ScrollH) and ScrollH.visible then
+      Result := Height - ScrollH.Size - BevelHeight * 4
+  else if Assigned(ScrollV) and ScrollV.visible then
+    Result := Height - BevelHeight * 4
+  else if Assigned(ScrollH) and ScrollH.visible then
+    Result := Height - ScrollH.Size - BevelHeight * 3
+  else
+    Result := Height - BevelHeight * 2;
 end;
 //------------------------------------------------------------------------------
 
 function TScrollingCtrl.GetClientWidth: double;
 begin
-  Result := Width - fBevelHeight * 2;
-  if Assigned(ScrollV) and ScrollV.visible then
-    Result := Result - ScrollV.Width;
+  if Assigned(ScrollV) and ScrollV.visible and
+    Assigned(ScrollH) and ScrollH.visible then
+      Result := Width - ScrollV.Size - BevelHeight * 4
+  else if Assigned(ScrollV) and ScrollV.visible then
+    Result := Width - ScrollV.Size - BevelHeight * 3
+  else if Assigned(ScrollH) and ScrollH.visible then
+    Result := Width - BevelHeight * 4
+  else
+    Result := Width - BevelHeight * 2;
 end;
 //------------------------------------------------------------------------------
 
 function TScrollingCtrl.GetClientRect: TRectD;
+var
+  bh2: double;
 begin
-  Result.Left := fBevelHeight;
-  Result.Top := fBevelHeight;
-  Result.Right := Width - fBevelHeight;
-  if Assigned(ScrollV) and ScrollV.visible then
-    Result.Right := Result.Right - ScrollV.Width;
-  Result.Bottom := Height - fBevelHeight;
-  if Assigned(ScrollH) and ScrollH.visible then
-    Result.Bottom := Result.Bottom - ScrollH.Height;
+  bh2 := BevelHeight * 2;
+  if Assigned(ScrollV) and ScrollV.visible and
+    Assigned(ScrollH) and ScrollH.visible then
+      Result := RectD(bh2, bh2,
+        Width - ScrollV.Size - bh2, Height - ScrollH.Size - bh2)
+  else if Assigned(ScrollV) and ScrollV.visible then
+    Result := RectD(BevelHeight, bh2,
+      Width - ScrollV.Size - bh2, Height - bh2)
+  else if Assigned(ScrollH) and ScrollH.visible then
+    Result := RectD(bh2, BevelHeight,
+      Width - bh2, Height - ScrollH.Size - bh2)
+  else
+    Result := RectD(BevelHeight, BevelHeight,
+      Width - BevelHeight, Height - BevelHeight);
 end;
 //------------------------------------------------------------------------------
 
@@ -2286,8 +2234,6 @@ procedure TScrollingCtrl.DoChildAutoPositioning;
 var
   i   : integer;
   rec : TRectD;
-  recWidth    : double;
-  recHeight   : double;
   clientArea  : TRectD;
   clientAligningCtrl  : TCustomCtrl;
 begin
@@ -2303,12 +2249,12 @@ begin
   //reposition horz and vert scrollbars
   if Assigned(fScrollH) and fScrollH.Visible then
   begin
-    fScrollH.CheckCtrlPos;
+    fScrollH.DoAutoPosition;
     fScrollH.GetScrollBtnInfo;
   end;
   if Assigned(fScrollV) and fScrollV.Visible then
   begin
-    fScrollV.CheckCtrlPos;
+    fScrollV.DoAutoPosition;
     fScrollV.GetScrollBtnInfo;
   end;
 
@@ -2322,32 +2268,34 @@ begin
     not (Child[i] is TScrollCtrl) and
       (TCustomCtrl(Child[i]).fAutoPosition > apCustom) then
   begin
-    rec := clientArea;
-    recWidth := rec.Width; recHeight := rec.Height;
     case TCustomCtrl(Child[i]).fAutoPosition of
       apClient  :
         clientAligningCtrl := TCustomCtrl(Child[i]); // postpone setting bounds
       apLeft    :
         begin
-          rec.Right := rec.Left + Min(recWidth, Child[i].Width);
+          rec := clientArea;
+          rec.Right := rec.Left + Min(rec.Width, Child[i].Width);
           Child[i].SetInnerBounds(rec);
           clientArea.Left := Child[i].Left + Child[i].Width;
         end;
       apTop     :
         begin
-          rec.Bottom := rec.Top + Min(recHeight, Child[i].Height);
+          rec := clientArea;
+          rec.Bottom := rec.Top + Min(rec.Height, Child[i].Height);
           Child[i].SetInnerBounds(rec);
           clientArea.Top := Child[i].Top + Child[i].Height;
         end;
       apRight   :
         begin
-          rec.Left := rec.Right - Min(recWidth, Child[i].Width);
+          rec := clientArea;
+          rec.Left := rec.Right - Min(rec.Width, Child[i].Width);
           Child[i].SetInnerBounds(rec);
           clientArea.Right := Child[i].Left;
         end;
       apBottom  :
         begin
-          rec.Top := rec.Bottom - Min(recHeight, Child[i].Height);
+          rec := clientArea;
+          rec.Top := rec.Bottom - Min(rec.Height, Child[i].Height);
           Child[i].SetInnerBounds(rec);
           clientArea.Bottom := Child[i].Top;
         end;
@@ -2399,51 +2347,21 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TScrollingCtrl.SetScrollH(scrollHorz: TScrollCtrl);
-var
-  rec: TRectD;
+procedure TScrollingCtrl.SetScrollH(scrollCtrl: TScrollCtrl);
 begin
-  if Assigned(fScrollH) then fScrollH.UnregisterTargetCtrl;
-  fScrollH := scrollHorz;
-  if not Assigned(scrollHorz) then Exit;
-  with scrollHorz do
-  begin
-    RegisterTargetCtrl(self);
-    fOrientation := soHorizontal;
-    // make sure it's on top of every other child control
-    Move(self, MaxInt);
-    AutoPosition := apBottom;
-  end;
-
-  if (StorageState <> ssNormal) then Exit;
-  rec := ClientRect;
-  if (fScrollH.Size = 0) then fScrollH.SetDefaultSize;
-  rec.Top := rec.Bottom - fScrollH.Size;
-  fScrollH.SetInnerBounds(rec);
+  if Assigned(fScrollH) and Assigned(scrollCtrl) then
+    Raise Exception.Create('oops - horizontal scroll already assigned.');
+  fScrollH := scrollCtrl;
+  scrollCtrl.fTargetCtrl := Self;
 end;
 //------------------------------------------------------------------------------
 
-procedure TScrollingCtrl.SetScrollV(scrollVert: TScrollCtrl);
-var
-  rec: TRectD;
+procedure TScrollingCtrl.SetScrollV(scrollCtrl: TScrollCtrl);
 begin
-  if Assigned(fScrollV) then fScrollV.UnregisterTargetCtrl;
-  fScrollV := scrollVert;
-  if not Assigned(scrollVert) then Exit;
-  with scrollVert do
-  begin
-    RegisterTargetCtrl(self);
-    fOrientation := soVertical;
-    // make sure it's on top of every other child control
-    Move(self, MaxInt);
-    AutoPosition := apRight;
-  end;
-
-  if (StorageState <> ssNormal) or IsEmpty then Exit;
-  rec := ClientRect;
-  if (fScrollV.Size = 0) then fScrollV.SetDefaultSize;
-  rec.Left := rec.Right - ScrollV.Size;
-  fScrollV.SetInnerBounds(rec);
+  if Assigned(fScrollV) and Assigned(scrollCtrl) then
+    Raise Exception.Create('oops - vertical scroll already assigned.');
+  fScrollV := scrollCtrl;
+  scrollCtrl.fTargetCtrl := Self;
 end;
 //------------------------------------------------------------------------------
 
@@ -2637,17 +2555,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TListCtrl.SetScrollV(scrollVert: TScrollCtrl);
+procedure TListCtrl.SetScrollV(scrollCtrl: TScrollCtrl);
 var
   itmHeight: double;
 begin
   inherited;
-  if Assigned(ScrollV) and (StorageState = ssNormal) then
-  begin
-    itmHeight := GetItemHeight;
-    ScrollV.Max := ItemCount * itmHeight;
-    ScrollV.Step := Round(itmHeight);
-  end;
+  if (StorageState <> ssNormal) or not Assigned(ScrollV) or
+    not GetUsableFont then Exit;
+  itmHeight := GetItemHeight;
+  ScrollV.Max := ItemCount * itmHeight;
+  ScrollV.Step := Round(itmHeight);
 end;
 //------------------------------------------------------------------------------
 
@@ -2825,6 +2742,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TMenuItemCtrl.Clicked;
+begin
+  if (Parent is TBaseMenuCtrl) then
+  begin
+    TBaseMenuCtrl(Parent).fItemIndex := Index;
+    TBaseMenuCtrl(Parent).Clicked;
+  end;
+end;
+//------------------------------------------------------------------------------
+
 procedure TMenuItemCtrl.SetFont(font: TFontCache);
 begin
   inherited;
@@ -2901,6 +2828,7 @@ procedure TBaseMenuCtrl.Clicked;
 var
   mnuItem: TMenuItemCtrl;
   pt: TPointD;
+  layer: TLayer32;
 begin
   if (ItemIndex < 0) then
   begin
@@ -2918,7 +2846,22 @@ begin
       mnuItem.Checked := not mnuItem.Checked;
       Invalidate;
     end;
-    if Assigned(mnuItem.OnClick) then mnuItem.OnClick(mnuItem);
+    if Assigned(mnuItem.OnClick) then
+    begin
+      mnuItem.OnClick(mnuItem);
+      layer := Parent;
+      while layer <> RootCtrl do
+      begin
+        if layer is TPopMenuCtrl then
+          layer.Visible := false
+        else if layer is TMainMenuCtrl then
+        begin
+          TMainMenuCtrl(layer).fItemIndex := -1;
+          Break;
+        end;
+        layer := layer.Parent;
+      end;
+    end;
   end
   else if mnuItem[0] is TPopMenuCtrl then
   begin
@@ -2939,8 +2882,6 @@ begin
       if (ChildCount > 0) and (Child[0] is TMenuItemCtrl) and
         TMenuItemCtrl(Child[0]).Enabled then ItemIndex := 0;
     end;
-//    if StorageManager.MainHdl > 0 then
-//      rootCtrl.SetCapture(RootCtrl.PopMenuCtrl, StorageManager.MainHdl);
   end;
 end;
 //------------------------------------------------------------------------------
@@ -3077,7 +3018,7 @@ begin
   if UsesIcons then
     w := w + fUsableFont.LineHeight + spaceWidth;
   h := fItemsSize.cy;
-  SetInnerBounds(RectD(bh2, bh2, w + bh2 * 2, h + bh2 * 3));
+  SetInnerBounds(RectD(bh2, bh2, w + bh2 * 2, h + bh2 * 2));
 end;
 //------------------------------------------------------------------------------
 
@@ -3373,6 +3314,7 @@ begin
   fBuffer := TImage32.Create;
   fBuffer.BlockNotify;
   fChunkedText := TChunkedText.Create;
+  fInnerMargin := BevelHeight;
   Color := clWhite32;
   FontColor := clBlack32;
   BlendFunc  := nil; //assumes edit controls will always be fully opaque.
@@ -3418,6 +3360,7 @@ begin
    (RectWidth(fPageMetrics.bounds) > 0) and
    (rec.Width = fTextRect.Width) and (rec.Height = fTextRect.Height) then Exit;
 
+  fSavedImage := nil;
   rec  := InnerRect;
   TranslateRect(rec, OuterMargin, OuterMargin);
   if HasFocus then
@@ -3467,6 +3410,8 @@ end;
 
 procedure TMemoCtrl.ResetSelPos;
 begin
+  if not PointsEqual(fSelStart, fSelEnd) then
+    fSavedImage := nil;
   fSelStart := fCursorChunkPos;
   fSelEnd := fCursorChunkPos;
 end;
@@ -3491,6 +3436,7 @@ begin
   end
   else Exit;
 
+  fSavedImage := nil;
   with fPageMetrics do
     ScrollV.Position := fTopLine / (totalLines - visibleLines) * ScrollV.fMax;
   Invalidate;
@@ -3563,7 +3509,7 @@ begin
         if HasShiftKey(shift) then
           fSelEnd := fCursorChunkPos else
           ResetSelPos;
-        ScrollCaretIntoView;
+         ScrollCaretIntoView;
         Key := 0;
       end;
     VK_HOME:
@@ -3688,17 +3634,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TMemoCtrl.SetScrollV(scrollVert: TScrollCtrl);
-begin
-  inherited;
-  if Assigned(ScrollV) and (StorageState = ssNormal) then
-  begin
-    ScrollV.Step := Round(fPageMetrics.lineHeight);
-    CheckPageMetrics;
-  end;
-end;
-//------------------------------------------------------------------------------
-
 function TMemoCtrl.GetText: string;
 begin
   Result := fChunkedText.Text;
@@ -3789,7 +3724,7 @@ begin
   x2 := relPos.X - fTextMargin.X;
   y2 := relPos.Y - fTextMargin.Y;
 
-  i := Floor(y2 / fPageMetrics.lineHeight);
+  i := Round(y2 / fPageMetrics.lineHeight);
   inc(i, fTopLIne);
   if i >= fPageMetrics.totalLines then
   begin
@@ -3848,9 +3783,20 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+procedure TMemoCtrl.SetScrollV(scrollCtrl: TScrollCtrl);
+begin
+  inherited;
+  if (StorageState <> ssNormal) or not Assigned(ScrollV) or
+    not GetUsableFont or IsEmpty then Exit;
+  CheckPageMetrics;
+  ScrollV.Step := Round(fPageMetrics.lineHeight);
+end;
+//------------------------------------------------------------------------------
+
 procedure TMemoCtrl.DoScrollY(newPos: double);
 begin
   fTopLine := Round(newPos / fPageMetrics.lineHeight);
+  fSavedImage := nil;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -3889,106 +3835,127 @@ var
   i: integer;
   w: integer;
   p   : TPathD;
-  rec: TRectD;
   selStartTop, selStartBot, selEndTop, selEndBot: TPointD;
+var
+  rec: TRectD;
 begin
   rec := InnerRect;
   TranslateRect(rec, OuterMargin, OuterMargin);
   InflateRect(rec, -fBevelHeight, -fBevelHeight);
-  Image.Clear(Rect(rec), color);
+  Image.Clear(Rect(rec), clWhite32);
   DrawEdge(Image, Rect(rec), clSilver32, clWhite32, fBevelHeight);
 
-  if not GetUsableFont then Exit;
-  if fPageMetrics.bounds.IsEmpty then CheckPageMetrics;
-
-  // HIGHLIGHT TEXT SELECTION (even before drawing background)
-
-  if IsValid(fSelStart) and IsValid(fSelEnd)  and
-    not PointsEqual(fSelStart, fSelEnd) then
+  if not GetUsableFont then
   begin
-    if IsCorrectPosOrder(fSelStart, fSelEnd) then
-    begin
-      selStartTop := ChunkPosToPos(fSelStart);
-      selEndTop := ChunkPosToPos(fSelEnd);
-    end else
-    begin
-      selStartTop := ChunkPosToPos(fSelEnd);
-      selEndTop := ChunkPosToPos(fSelStart);
-    end;
+    Image.Clear(Rect(rec), clWhite32);
+    DrawEdge(Image, Rect(rec), clSilver32, clWhite32, fBevelHeight);
+    Exit;
+  end;
+  if fPageMetrics.bounds.IsEmpty then
+    CheckPageMetrics;
 
-    // it looks better if we offset the selection by a small amount
-    selStartTop.Y := selStartTop.Y + fPageMetrics.lineHeight / 10;
-    selEndTop.Y := selEndTop.Y + fPageMetrics.lineHeight / 10;
+  if Assigned(fSavedImage) and PointsEqual(fSelStart, fSelEnd) then
+  begin
+    System.Move(fSavedImage[0], Image.Pixels[0],
+      Length(fSavedImage) * SizeOf(TColor32));
+  end else
+  begin
 
-    selStartBot := PointD(selStartTop.X, selStartTop.Y + fPageMetrics.lineHeight);
-    selEndBot := PointD(selEndTop.X, selEndTop.Y + fPageMetrics.lineHeight);
-
-    if ValueAlmostZero(selEndTop.Y - selStartTop.Y, 0.01)  then
+    // DRAW TEXT SELECTION HIGHLIGHT
+    if IsValid(fSelStart) and IsValid(fSelEnd)  and
+      not PointsEqual(fSelStart, fSelEnd) then
     begin
-      //single line selection
-      p := MakePath([selStartTop.X, selStartTop.Y,
-        selEndTop.X, selEndTop.Y,
-        selEndTop.X, selEndTop.Y + fPageMetrics.lineHeight,
-        selStartTop.X, selStartTop.Y + fPageMetrics.lineHeight]);
-      p := TranslatePath(p, OuterMargin, OuterMargin);
-      p := ClipPathTopAndBot(rec, p);
-      DrawPolygon(Image, p, frNonZero, clDefLite32);
-      DrawLine(Image, p, 1, GetFocusColor, esClosed);
-    end else
-    begin
-      //multi-line selection - we'll assume (pro tempore) that pt2 is below pt
-      w := RectWidth(fPageMetrics.bounds) +7;
-      p := Rectangle(selStartTop.X, selStartTop.Y, fTextMargin.X + w, selStartBot.Y);
-      p := TranslatePath(p, OuterMargin, OuterMargin);
-      p := ClipPathTopAndBot(rec, p);
-      DrawPolygon(Image, p, frNonZero, clDefLite32);
-      // draw selection outline
-      p := MakePath([fTextMargin.X-3, selStartBot.Y,
-        selStartTop.X, selStartBot.Y, selStartTop.X, selStartTop.Y,
-        fTextMargin.X + w, selStartTop.Y, fTextMargin.X + w, selStartBot.Y]);
-      p := TranslatePath(p, OuterMargin, OuterMargin);
-      p := ClipPathTopAndBot(rec, p);
-      DrawLine(Image, p, 1, GetFocusColor, esButt);
-      while (selStartBot.Y + 1 < selEndTop.Y) do
+      if IsCorrectPosOrder(fSelStart, fSelEnd) then
       begin
-        selStartTop.Y := selStartBot.Y;
-        selStartBot.Y := selStartBot.Y + fPageMetrics.lineHeight;
-        p := Rectangle(fTextMargin.X, selStartTop.Y, fTextMargin.X + w, selStartBot.Y);
+        selStartTop := ChunkPosToPos(fSelStart);
+        selEndTop := ChunkPosToPos(fSelEnd);
+      end else
+      begin
+        selStartTop := ChunkPosToPos(fSelEnd);
+        selEndTop := ChunkPosToPos(fSelStart);
+      end;
+
+      // it looks better if we offset the selection by a small amount
+      selStartTop.Y := selStartTop.Y + fPageMetrics.lineHeight / 10;
+      selEndTop.Y := selEndTop.Y + fPageMetrics.lineHeight / 10;
+
+      selStartBot := PointD(selStartTop.X, selStartTop.Y + fPageMetrics.lineHeight);
+      selEndBot := PointD(selEndTop.X, selEndTop.Y + fPageMetrics.lineHeight);
+
+      if ValueAlmostZero(selEndTop.Y - selStartTop.Y, 0.01)  then
+      begin
+        //single line selection
+        p := MakePath([selStartTop.X, selStartTop.Y,
+          selEndTop.X, selEndTop.Y,
+          selEndTop.X, selEndTop.Y + fPageMetrics.lineHeight,
+          selStartTop.X, selStartTop.Y + fPageMetrics.lineHeight]);
+        p := TranslatePath(p, OuterMargin, OuterMargin);
+        p := ClipPathTopAndBot(rec, p);
+        DrawPolygon(Image, p, frNonZero, clDefLite32);
+        DrawLine(Image, p, 1, GetFocusColor, esClosed);
+      end else
+      begin
+        //multi-line selection - we'll assume (pro tempore) that pt2 is below pt
+        w := RectWidth(fPageMetrics.bounds) +7;
+        p := Rectangle(selStartTop.X, selStartTop.Y, fTextMargin.X + w, selStartBot.Y);
         p := TranslatePath(p, OuterMargin, OuterMargin);
         p := ClipPathTopAndBot(rec, p);
         DrawPolygon(Image, p, frNonZero, clDefLite32);
         // draw selection outline
-        p := MakePath([fTextMargin.X-3, selStartTop.Y, fTextMargin.X-3, selStartBot.Y]);
+        p := MakePath([fTextMargin.X-3, selStartBot.Y,
+          selStartTop.X, selStartBot.Y, selStartTop.X, selStartTop.Y,
+          fTextMargin.X + w, selStartTop.Y, fTextMargin.X + w, selStartBot.Y]);
         p := TranslatePath(p, OuterMargin, OuterMargin);
+        p := ClipPathTopAndBot(rec, p);
         DrawLine(Image, p, 1, GetFocusColor, esButt);
-        p := MakePath([fTextMargin.X + w, selStartTop.Y, fTextMargin.X +w, selStartBot.Y]);
+        while (selStartBot.Y + 1 < selEndTop.Y) do
+        begin
+          selStartTop.Y := selStartBot.Y;
+          selStartBot.Y := selStartBot.Y + fPageMetrics.lineHeight;
+          p := Rectangle(fTextMargin.X, selStartTop.Y, fTextMargin.X + w, selStartBot.Y);
+          p := TranslatePath(p, OuterMargin, OuterMargin);
+          p := ClipPathTopAndBot(rec, p);
+          DrawPolygon(Image, p, frNonZero, clDefLite32);
+          // draw selection outline
+          p := MakePath([fTextMargin.X-3, selStartTop.Y, fTextMargin.X-3, selStartBot.Y]);
+          p := TranslatePath(p, OuterMargin, OuterMargin);
+          DrawLine(Image, p, 1, GetFocusColor, esButt);
+          p := MakePath([fTextMargin.X + w, selStartTop.Y, fTextMargin.X +w, selStartBot.Y]);
+          p := TranslatePath(p, OuterMargin, OuterMargin);
+          DrawLine(Image, p, 1, GetFocusColor, esButt);
+        end;
+        p := Rectangle(fTextMargin.X, selStartBot.Y,
+          selEndTop.X, selStartBot.Y + fPageMetrics.lineHeight);
         p := TranslatePath(p, OuterMargin, OuterMargin);
+        p := ClipPathTopAndBot(rec, p);
+        DrawPolygon(Image, p, frNonZero, clDefLite32);
+        // finish drawing selection outline
+        p := MakePath([fTextMargin.X-3, selEndTop.Y, fTextMargin.X-3, selEndBot.Y,
+          selEndBot.X, selEndBot.Y, selEndTop.X, selEndTop.Y,
+          fTextMargin.X + w, selEndTop.Y]);
+        p := TranslatePath(p, OuterMargin, OuterMargin);
+        p := ClipPathTopAndBot(rec, p);
         DrawLine(Image, p, 1, GetFocusColor, esButt);
       end;
-      p := Rectangle(fTextMargin.X, selStartBot.Y,
-        selEndTop.X, selStartBot.Y + fPageMetrics.lineHeight);
-      p := TranslatePath(p, OuterMargin, OuterMargin);
-      p := ClipPathTopAndBot(rec, p);
-      DrawPolygon(Image, p, frNonZero, clDefLite32);
-      // finish drawing selection outline
-      p := MakePath([fTextMargin.X-3, selEndTop.Y, fTextMargin.X-3, selEndBot.Y,
-        selEndBot.X, selEndBot.Y, selEndTop.X, selEndTop.Y,
-        fTextMargin.X + w, selEndTop.Y]);
-      p := TranslatePath(p, OuterMargin, OuterMargin);
-      p := ClipPathTopAndBot(rec, p);
-      DrawLine(Image, p, 1, GetFocusColor, esButt);
     end;
+
+    // DRAW THE (VISIBLE) TEXT
+
+    fChunkedText.DrawText(Image, fPageMetrics.bounds,
+      taJustify, tvaTop, Types.Point(fPageMetrics.startOfLineIdx[fTopLine], 0));
+
+    // backup the image to facilitate much faster redraws
+    SetLength(fSavedImage, Image.Width * Image.Height);
+    System.Move(Image.Pixels[0], fSavedImage[0],
+      Image.Width * Image.Height * SizeOf(TColor32));
   end;
 
-  Img32.Vector.InflateRect(rec, -fBevelHeight * 0.5, -fBevelHeight * 0.5);
   if HasFocus then
-    DrawLine(Image, Rectangle(rec), fBevelHeight, GetFocusColor, esPolygon) else
-    DrawEdge(Image, rec, clSilver32, clWhite32, fBevelHeight);
+  begin
+    Img32.Vector.InflateRect(rec, -fBevelHeight * 0.5, -fBevelHeight * 0.5);
+    DrawLine(Image, Rectangle(rec), fBevelHeight, GetFocusColor, esPolygon);
+  end;
 
-  // DRAW THE (VISIBLE) TEXT
-
-  fChunkedText.DrawText(Image, fPageMetrics.bounds,
-    taJustify, tvaTop, Types.Point(fPageMetrics.startOfLineIdx[fTopLine], 0));
 
   if not IsValid(fCursorChunkPos) then Exit;
 
@@ -4618,7 +4585,7 @@ end;
 
 procedure TButtonCtrl.Clicked;
 begin
-  if CanFocus then SetFocus;
+  if CanSetFocus then SetFocus;
   inherited;
 end;
 //------------------------------------------------------------------------------
@@ -4642,7 +4609,7 @@ end;
 procedure TButtonCtrl.DoMouseDown(button: TMouseButton;
   shift: TShiftState; const pt: TPoint);
 begin
-  if Enabled and CanFocus then
+  if Enabled and CanSetFocus then
   begin
     SetFocus;
     fPressed := true;
@@ -4992,14 +4959,14 @@ end;
 procedure TCheckboxCtrl.DoMouseDown(button: TMouseButton;
   shift: TShiftState; const pt: TPoint);
 begin
-  if CanFocus then SetFocus;
+  if CanSetFocus then SetFocus;
   inherited;
 end;
 //------------------------------------------------------------------------------
 
 procedure TCheckboxCtrl.DoKeyDown(var Key: Word; Shift: TShiftState);
 begin
-  if (Key = VK_SPACE) and CanFocus then
+  if (Key = VK_SPACE) and CanSetFocus then
   begin
     Key := 0;
     case State of
@@ -5078,7 +5045,8 @@ begin
     rec.Left := rec.Left + j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
-    pp := fUsableFont.GetTextOutline(rec, caption, taLeft, tvaMiddle);
+    pp := fUsableFont.GetTextOutline(rec, caption,
+      taLeft, tvaMiddle, Shortcut.chrIdx);
     dx := fUsableFont.LineHeight / 24;
     pp := TranslatePath(pp, -dx, -dx);
     if GetLuminance(GetFontColor) < 160 then
@@ -5098,7 +5066,9 @@ begin
     rec.Right := rec.Right - j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
 
-    pp := fUsableFont.GetTextOutline(rec, fCaption, taRight, tvaMiddle);
+    pp := fUsableFont.GetTextOutline(rec, fCaption, taRight,
+      tvaMiddle, Shortcut.chrIdx);
+
     dx := fUsableFont.LineHeight / 24;
     pp := TranslatePath(pp, -dx, -dx);
 
@@ -5124,13 +5094,19 @@ end;
 
 procedure TRadioBtnCtrl.Paint;
 var
+  i         : integer;
   j,bh,dx   : double;
   rec       : TRectD;
   p         : TPathD;
   pp        : TPathsD;
+  caption   : string;
 begin
   image.Clear(GetColor);
   if not GetUsableFont then Exit;
+
+  caption := fCaption;
+  i := Pos('&', caption);
+  if i > 0 then Delete(caption, i, 1);
 
   bh := fBevelHeight;
   j := fUsableFont.LineHeight - bh;
@@ -5156,7 +5132,8 @@ begin
     TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
     rec.Left := rec.Left + j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
-    pp := fUsableFont.GetTextOutline(rec, fCaption, taLeft, tvaMiddle);
+    pp := fUsableFont.GetTextOutline(rec, caption, taLeft,
+      tvaMiddle, Shortcut.chrIdx);
   end else
   begin
     //rec.Left := rec.Right - j;
@@ -5168,7 +5145,8 @@ begin
     TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
     rec.Right := rec.Right - j;
     Img32.Vector.InflateRect(rec, -fPadding, -fPadding);
-    pp := fUsableFont.GetTextOutline(rec, fCaption, taRight, tvaMiddle);
+    pp := fUsableFont.GetTextOutline(rec, caption, taRight,
+      tvaMiddle, Shortcut.chrIdx);
   end;
 
   dx := fUsableFont.LineHeight / 24;
@@ -5354,7 +5332,7 @@ begin
 
     for i := 0 to pagePnl.ChildCount -1 do
       if (pagePnl[i] is TCustomCtrl) and
-        TCustomCtrl(pagePnl[i]).CanFocus then
+        TCustomCtrl(pagePnl[i]).CanSetFocus then
       begin
         TCustomCtrl(pagePnl[i]).SetFocus;
         Break;
@@ -5381,60 +5359,101 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TPageCtrl.DrawTabs;
+procedure TPageCtrl.DrawTab(idx: integer);
 var
-  i,h,len : integer;
-  bh,hbh: integer;
-  tabs  : TArrayOfString;
-  rec   : TRectD;
-  p     : TPathD;
-  pt1,pt2 : TPointD;
+  h       : integer;
+  lh, dx  : double;
+  cap     : string;
+  rec     : TRectD;
+  rec2    : TRectD;
+  p       : TPathD;
+  p2      : TPathD;
+  pp      : TPathsD;
+  sc      : TShortcut;
+  bkClr   : TColor32;
+  txtClr  : TColor32;
 begin
-  len := ChildCount div 2;
-  if (len = 0) or not GetUsableFont then Exit;
-  SetLength(tabs, len);
-  if Length(fTabOffsets) = 0 then
-    ResizeTabs;
-
-  for i := 0 to len -1 do
-    tabs[i] := TCustomCtrl(Child[i * 2]).Caption;
-
-  rec := InnerRect;
-  TranslateRect(rec, OuterMargin, OuterMargin);
-
-  bh := Round(BevelHeight);
-  hbh := Round(BevelHeight / 2);
+  lh := font.LineHeight;
   if fTabHeight = 0 then
     h := Ceil(fUsableFont.LineHeight * 1.33) else
     h := Round(fTabHeight);
 
-  DrawTabCtrl(Image, tabs, fTabOffsets, fUsableFont,
-    BevelHeight, fActiveIdx, fTabWidth, h,
-    clLiteBtn32,clDarkGray32, GetColor, GetFontColor);
+  if idx = fActiveIdx then
+  begin
+    bkClr := GetColor;
+    txtClr := GetFontColor;
+    rec.Top := OuterMargin + 1;
+    rec.Bottom := rec.Top + h + BevelHeight - 1;
+  end else
+  begin
+    bkClr := clLiteBtn32;
+    txtClr := clDarkGray32;
+    rec.Top := BevelHeight + OuterMargin;
+    rec.Bottom := rec.Top + h;
+  end;
+  rec.Left := BevelHeight + OuterMargin + fTabOffsets[idx];
+  rec.Right := BevelHeight + OuterMargin + fTabOffsets[idx + 1];
 
-  pt1.X := rec.Left + fTabOffsets[fActiveIdx];
-  pt1.Y := rec.Top +h +bh;
+  p := GetTabOutLine(rec, lh / 3);
+  DrawPolygon(Image, p, frNonZero, bkClr);
+  DrawEdge(Image, p, clWhite32, clSilver32, BevelHeight, false);
 
-  pt2.X := rec.Left + fTabOffsets[fActiveIdx + 1];
-  pt2.Y := pt1.Y;
+  if idx < fActiveIdx then
+    p := TranslatePath(p, -1, -1)
+  else if idx > fActiveIdx then
+    p := TranslatePath(p, 1, -1)
+  else
+  begin
+    p := TranslatePath(p, 0, -1);
+    rec.Top := rec.Top - BevelHeight; // offsets caption
+  end;
+  DrawLine(Image, p, 1.0, clGray32, esButt);
 
-  DrawLine(Image, PointD(rec.Left +bh, pt1.Y),
-    PointD(rec.Right-bh, pt1.Y), hbh, GetColor);
+  cap := TCustomCtrl(Child[idx * 2]).Caption;
+  sc := GetShortcutFromCaption(cap);
+  if sc.chrIdx > 0 then
+    cap := DeleteChar(cap, sc.chrIdx);
+  if sc.chrIdx > 0 then
+    caption := DeleteChar(caption, sc.chrIdx);
+  pp := font.GetTextOutline(rec, cap, taCenter, tvaMiddle, sc.chrIdx);
+  dx := font.LineHeight / 24;
+  if GetLuminance(txtClr) < 160 then
+  begin
+    DrawPolygon(Image, pp, frNonZero, clWhite32);
+    pp := TranslatePath(pp, dx, dx);
+    DrawPolygon(Image, pp, frNonZero, txtClr);
+  end else
+  begin
+    DrawPolygon(Image, pp, frNonZero, clBlack32);
+    pp := TranslatePath(pp, dx, dx);
+    DrawPolygon(Image, pp, frNonZero, txtClr);
+  end;
 
-  Image.Clear(Rect(RectD(bh, rec.Top + h, rec.Right, rec.Bottom)), GetColor);
+  if idx <> fActiveIdx then Exit;
+  rec2 := GetClientRect;
+  TranslateRect(rec2, OuterMargin, OuterMargin);
+  rec2.Top := rec2.Top + h;
+  Image.Clear(Rect(rec2), bkClr);
+  with rec2 do
+    p2 := MakePath([p[High(p)].X, p[High(p)].Y, Right, Top, Right, Bottom,
+      Left, Bottom, Left, Top, p[0].X, p[0].Y]);
+  DrawEdge(Image, p2, clWhite32, clSilver32, BevelHeight, false);
+end;
+//------------------------------------------------------------------------------
 
-  SetLength(p, 6);
-  p[0] := pt2;
-  p[1] := PointD(rec.Right, pt1.Y);
-  p[2] := PointD(rec.Right, rec.Bottom);
-  p[3] := PointD(rec.Left, rec.Bottom);
-  p[4] := PointD(rec.Left, pt1.Y);
-  p[5] := pt1;
-  DrawEdge(Image, p, clWhite32, clSilver32, bh, false);
-  DrawLine(Image, PointD(rec.Left + bh, rec.Bottom),
-    PointD(rec.Right - bh, rec.Bottom), 1, clGray32);
-  DrawLine(Image, PointD(rec.Right, rec.Top + h + 1),
-    PointD(rec.Right, rec.Bottom), 1, clGray32);
+procedure TPageCtrl.DrawTabs;
+var
+  i, len : integer;
+begin
+  len := ChildCount div 2;
+  if (len = 0) or not GetUsableFont then Exit;
+  if Length(fTabOffsets) = 0 then
+    ResizeTabs;
+
+  Image.Clear(clNone32);
+  for i := 0 to fActiveIdx -1 do DrawTab(i);
+  for i := len -1 downto fActiveIdx +1 do DrawTab(i);
+  DrawTab(fActiveIdx);
 end;
 //------------------------------------------------------------------------------
 
@@ -5481,7 +5500,6 @@ begin
   Img32.Vector.InflateRect(rec, -bhi, -bhi);
   if Assigned(fOnPaint) then fOnPaint(Self);
   DrawTabs;
-
   UpdateHitTestMask;
 end;
 //------------------------------------------------------------------------------
@@ -5607,7 +5625,7 @@ begin
       for i := idx-1 downto 0 do
         if Child[i] is TCustomCtrl then
           with TCustomCtrl(Child[i]) do
-            if CanFocus then
+            if CanSetFocus then
             begin
               SetFocus;
               Key := 0;
@@ -5616,7 +5634,7 @@ begin
       for i := ChildCount -1 downto idx do
         if Child[i] is TCustomCtrl then
           with TCustomCtrl(Child[i]) do
-            if CanFocus then
+            if CanSetFocus then
             begin
               SetFocus;
               Key := 0;
@@ -5631,7 +5649,7 @@ begin
       for i := idx +1 to ChildCount -1 do
         if Child[i] is TCustomCtrl then
           with TCustomCtrl(Child[i]) do
-            if CanFocus then
+            if CanSetFocus then
             begin
               SetFocus;
               Key := 0;
@@ -5640,7 +5658,7 @@ begin
       for i := 0 to idx do
         if Child[i] is TCustomCtrl then
           with TCustomCtrl(Child[i]) do
-            if CanFocus then
+            if CanSetFocus then
             begin
               SetFocus;
               Key := 0;
@@ -5668,7 +5686,7 @@ begin
   for i := 0 to ChildCount -1 do
     if (Child[i] is TCustomCtrl) then
       with TCustomCtrl(Child[i]) do
-      if CanFocus then
+      if CanSetFocus then
       begin
         SetFocus;
         Break;
@@ -5746,6 +5764,7 @@ begin
 
   c := GradientColor(fStartColor, fEndColor, Position / fMax);
   case fOrientation of
+    soUnknown: Exit;
     soHorizontal:
       rec2.Right := rec2.Left + Round(Position / fMax * Width);
     soVertical:
@@ -5789,7 +5808,7 @@ end;
 
 procedure TProgressCtrl.SetOrientation(newOrient: TScrollOrientation);
 begin
-  if fOrientation = newOrient then Exit;
+  if (fOrientation = newOrient) or (newOrient = soUnknown) then Exit;
   fOrientation := newOrient;
   Image.SetSize(Round(Height), Round(Width));
   Invalidate;
@@ -5823,7 +5842,7 @@ begin
   case fOrientation of
     soHorizontal  : result := (Width - fBtnSize) / (fMax - fMin);
     soVertical    : result := (Height - fBtnSize) / (fMax - fMin);
-    else Result := 0; //otherwise compiler warning !???
+    else Result := 0;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -5871,6 +5890,7 @@ begin
   //draw the button
   d := GetDelta;
   case fOrientation of
+    soUnknown: Exit;
     soHorizontal:
      begin
       d2 := rec.Left + (fPosition - fMin) * d;
@@ -5911,7 +5931,7 @@ end;
 
 procedure TSliderCtrl.SetOrientation(newOrient: TScrollOrientation);
 begin
-  if fOrientation = newOrient then Exit;
+  if (fOrientation = newOrient) or (newOrient = soUnknown) then Exit;
   fOrientation := newOrient;
   SetInnerBounds(InnerBounds);
   Invalidate;
@@ -5947,12 +5967,13 @@ var
   d : double;
   pt2: TPointD;
 begin
-  if not CanFocus then Exit;
+  if not CanSetFocus then Exit;
   SetFocus;
 
   pt2 := MakeRelative(PointD(pt));
   d := GetDelta * (fPosition-fMin);
   case fOrientation of
+    soUnknown: Exit;
     soHorizontal:
       begin
         if pt2.X < d then
@@ -6005,6 +6026,7 @@ begin
   if d = 0 then Exit;
 
   case fOrientation of
+    soUnknown: Exit;
     soHorizontal:
       begin
         case fScrollState of
@@ -6107,40 +6129,62 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-destructor TScrollCtrl.Destroy;
+procedure TScrollCtrl.SetParent(parent: TStorage);
 begin
-  UnregisterTargetCtrl;
   inherited;
+  if Assigned(Parent) and (Parent is TScrollingCtrl) then
+    fTargetCtrl := TScrollingCtrl(Parent) else
+    fTargetCtrl := nil;
+end;
+//------------------------------------------------------------------------------
+
+procedure TScrollCtrl.SetOrientation(orientation  : TScrollOrientation);
+begin
+  fOrientation := orientation;
+  if not Assigned(fTargetCtrl) or (orientation = soUnknown) then Exit;
+  if orientation = soHorizontal then
+  begin
+    if Assigned(fTargetCtrl.fScrollH) then
+      Raise Exception.Create('oops - horizontal scroll already assigned.');
+    fTargetCtrl.SetScrollH(self);
+  end else
+  begin
+    if Assigned(fTargetCtrl.fScrollV) then
+      Raise Exception.Create('oops - vertical scroll already assigned.');
+    fTargetCtrl.SetScrollV(self);
+  end;
 end;
 //------------------------------------------------------------------------------
 
 procedure TScrollCtrl.SetFocus;
 begin
-  if CanFocus and Assigned(fTargetCtrl) and fTargetCtrl.CanFocus then
+  if Assigned(fTargetCtrl) and fTargetCtrl.CanSetFocus then
     fTargetCtrl.SetFocus;
 end;
 //------------------------------------------------------------------------------
 
-procedure TScrollCtrl.RegisterTargetCtrl(target: TScrollingCtrl);
+procedure TScrollCtrl.DoAutoPosition;
+var
+  rec: TRectD;
 begin
-  UnregisterTargetCtrl;
-  fTargetCtrl := target;
-end;
-//------------------------------------------------------------------------------
-
-procedure TScrollCtrl.UnregisterTargetCtrl;
-begin
-  if not Assigned(fTargetCtrl) then Exit;
-  case fOrientation of
-    soHorizontal:
-      if Self = fTargetCtrl.fScrollH then
-        fTargetCtrl.fScrollH := nil;
-    soVertical:
-      if Self = fTargetCtrl.fScrollV then
-        fTargetCtrl.fScrollV := nil;
+  if (StorageState <> ssNormal) or not Assigned(fTargetCtrl) or
+    fTargetCtrl.IsEmpty or (fOrientation = soUnknown) then Exit;
+  if (Size = 0) then SetDefaultSize;
+  rec := fTargetCtrl.ClientRect;
+  if fOrientation = soVertical then
+  begin
+    fAutoPosition := apRight;
+    if Visible then rec.Right := rec.Right + Size;
+    rec.Left := rec.Right - Size;
+  end else
+  begin
+    fAutoPosition := apBottom;
+    if Visible then rec.Bottom := rec.Bottom + Size;
+    rec.Top := rec.Bottom - Size;
   end;
-  fTargetCtrl := nil;
-  SetSize(0,0);
+  SetInnerBounds(rec);
+  if not RectsEqual(Rect(rec), Rect(InnerBounds)) then
+    SetInnerBounds(rec);
 end;
 //------------------------------------------------------------------------------
 
@@ -6148,7 +6192,7 @@ procedure TScrollCtrl.SetMax(newMax: double);
 begin
   if (newMax < 0) then newMax := 0;
   fMax := newMax;
-  if Visible then CheckCtrlPos;
+  DoAutoPosition;
   GetScrollBtnInfo;
   Invalidate;
 end;
@@ -6174,7 +6218,8 @@ end;
 
 procedure TScrollCtrl.CheckAutoVisible(firstPass: Boolean);
 begin
-  if not Assigned(fTargetCtrl) or not AutoHide then Exit;
+  if not Assigned(fTargetCtrl) or
+    not AutoHide or (fOrientation = soUnknown) then Exit;
   if fOrientation = soVertical then
   begin
     if firstPass and Assigned(fTargetCtrl.fScrollH) then
@@ -6190,33 +6235,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TScrollCtrl.CheckCtrlPos;
-var
-  rec: TRectD;
-begin
-  if not Visible or
-    not Assigned(fTargetCtrl) or fTargetCtrl.IsEmpty then Exit;
-
-  with fTargetCtrl do
-  begin
-    rec := InnerRect; // ie relative to parent not its absolute position
-    InflateRect(rec, -BevelHeight * 2, -BevelHeight * 2);
-  end;
-
-  if (fSize = 0) then SetDefaultSize;
-  if (fOrientation = soVertical) then
-  begin
-    rec.Left := Rec.Right - fSize - dpiAware1;
-  end else
-  begin
-    rec.Top := Rec.Bottom - fSize - dpiAware1;
-  end;
-
-  if not RectsEqual(Rect(rec), Rect(InnerBounds)) then
-    SetInnerBounds(rec);
-end;
-//------------------------------------------------------------------------------
-
 procedure TScrollCtrl.GetScrollBtnInfo;
 var
   dummy1, dummy2: double;
@@ -6229,24 +6247,28 @@ procedure TScrollCtrl.GetScrollBtnInfo(out btnStart, btnEnd: double);
 var
   trackSize, chevSize: double;
 begin
-  btnStart := 0; btnEnd := 0; fBtnSize := 0; // error values
+  btnStart := 0; btnEnd := 0; trackSize := 0;
+  fBtnSize := 0; // error value
   if not Assigned(fTargetCtrl) or (fMax = 0) then Exit;
 
   try
     chevSize := GetChevronSize;
-    if fOrientation = soVertical then
-    begin
-      fHiddenSize := fMax - fTargetCtrl.ClientHeight;
-      trackSize := Self.ClientHeight - chevSize * 2;
-    end else
-    begin
-      fHiddenSize := fMax - fTargetCtrl.ClientWidth;
-      trackSize := Self.ClientWidth - chevSize * 2;
+    case fOrientation of
+      soUnknown: Exit;
+      soHorizontal:
+        begin
+          fHiddenSize := fMax - fTargetCtrl.ClientWidth;
+          trackSize := ClientWidth - chevSize * 2;
+        end;
+      soVertical:
+        begin
+          fHiddenSize := fMax - fTargetCtrl.ClientHeight;
+          trackSize := ClientHeight - chevSize * 2;
+        end;
     end;
 
-    if (fHiddenSize <= 0) or
-      (trackSize + DPIAware(10) < fMinBtnSize) then
-        Exit;
+    if (fHiddenSize <= 0) or (trackSize + DPIAware(10) < fMinBtnSize) then
+      Exit;
 
     fBtnSize := Math.Max(fMinBtnSize, trackSize - fHiddenSize);
     fScrollRatio := fHiddenSize / (trackSize - fBtnSize);
@@ -6268,23 +6290,25 @@ begin
   if (fSize <> newSize) then
   begin
     fSize := newSize;
-    if fOrientation = soVertical then
-      Width := fSize else
-      Height := fSize;
+    case fOrientation of
+      soVertical: Width := fSize;
+      soHorizontal: Height := fSize;
+    end;
   end;
 end;
 //------------------------------------------------------------------------------
 
-procedure TScrollCtrl.SetPosition(newPos: double);
+procedure TScrollCtrl.SetBtnPos(newPos: double);
 begin
   if not Assigned(fTargetCtrl) or not CanScroll then Exit;
   if newPos > fHiddenSize then newPos := fHiddenSize
   else if newPos < 0 then newPos := 0;
   if (newPos = fPos) then Exit;
   fPos := newPos;
-  if fOrientation = soHorizontal then
-    fTargetCtrl.DoScrollX(fPos) else
-    fTargetCtrl.DoScrollY(fPos);
+  case fOrientation of
+    soVertical: fTargetCtrl.DoScrollY(fPos);
+    soHorizontal: fTargetCtrl.DoScrollX(fPos);
+  end;
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -6336,6 +6360,7 @@ begin
   fMousePos := MakeRelative(PointD(pt));
   GetScrollBtnInfo(ss, se);
   case fOrientation of
+    soUnknown: Exit;
     soHorizontal:
       begin
         if fMousePos.X < ss then
@@ -6390,27 +6415,31 @@ begin
   GetScrollBtnInfo(ss, se);
   pt2 := MakeRelative(PointD(pt));
 
-  if fOrientation = soHorizontal then
-  begin
-    if (fScrollState <> scScrollBtn) and
-      PtInRect(RectD(ss, 0, se, Height), pt2) then
-        fScrollState := scScrollBtn;
-    case fScrollState of
-      scScrollBtn : Position :=
-        CheckRange(fPos + ((pt2.X - fMousePos.X) * fScrollRatio));
-      scLeft      : Position := CheckRange(fPos - Step);
-      scRight     : Position := CheckRange(fPos + Step);
+  case fOrientation of
+    soUnknown: Exit;
+    soHorizontal:
+    begin
+      if (fScrollState <> scScrollBtn) and
+        PtInRect(RectD(ss, 0, se, Height), pt2) then
+          fScrollState := scScrollBtn;
+      case fScrollState of
+        scScrollBtn : Position :=
+          CheckRange(fPos + ((pt2.X - fMousePos.X) * fScrollRatio));
+        scLeft      : Position := CheckRange(fPos - Step);
+        scRight     : Position := CheckRange(fPos + Step);
+      end;
     end;
-  end else
-  begin
-    if (fScrollState <> scScrollBtn) and
-      PtInRect(RectD(0, ss, Width, se), pt2) then
-        fScrollState := scScrollBtn;
-    case fScrollState of
-      scScrollBtn : Position :=
-        CheckRange(fPos + ((pt2.Y - fMousePos.Y) * fScrollRatio));
-      scTop       : Position := CheckRange(fPos - Step);
-      scBottom    : Position := CheckRange(fPos + Step);
+    soVertical:
+    begin
+      if (fScrollState <> scScrollBtn) and
+        PtInRect(RectD(0, ss, Width, se), pt2) then
+          fScrollState := scScrollBtn;
+      case fScrollState of
+        scScrollBtn : Position :=
+          CheckRange(fPos + ((pt2.Y - fMousePos.Y) * fScrollRatio));
+        scTop       : Position := CheckRange(fPos - Step);
+        scBottom    : Position := CheckRange(fPos + Step);
+      end;
     end;
   end;
   fMousePos := pt2;
@@ -6428,10 +6457,12 @@ end;
 procedure TScrollCtrl.Scale(value: double);
 begin
   fSize       := fSize * value;
-  if fOrientation = soVertical then
-    Width := fSize else
-    Height := fSize;
-  fMax        := fMax * value;
+  case fOrientation of
+    soUnknown: Exit;
+    soVertical: Width := fSize;
+    soHorizontal: Height := fSize;
+  end;
+  Max := Max * value;
   fMinBtnSize := fMinBtnSize * value;
 end;
 //------------------------------------------------------------------------------
@@ -6459,84 +6490,88 @@ begin
   Hatch(Image, Rect(rec), clWhite32, clBtnFace32, DPIAware(3));
 
   tmpRec := rec;
-  if fOrientation = soVertical then
-  begin
-    //draw the top chevron
-    tmpRec.Bottom := tmpRec.Top + GetChevronSize;
-    Image.FillRect(Rect(tmpRec), clBtnFace32);
-    d := tmpRec.Width * 0.3;
-    InflateRect(tmpRec, -d, -d);
-    with tmpRec do
-      p := MakePath([left-2, bottom, MidPoint.X, top + 2, right + 2, bottom]);
-    p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
-    DrawLine(Image, p2, bhi, clWhite32, esRound);
-    DrawLine(Image, p, bhi, clDarkGray32, esRound);
+  case fOrientation of
+    soUnknown: Exit;
+    soVertical:
+    begin
+      //draw the top chevron
+      tmpRec.Bottom := tmpRec.Top + GetChevronSize;
+      Image.FillRect(Rect(tmpRec), clBtnFace32);
+      d := tmpRec.Width * 0.3;
+      InflateRect(tmpRec, -d, -d);
+      with tmpRec do
+        p := MakePath([left-2, bottom, MidPoint.X, top + 2, right + 2, bottom]);
+      p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
+      DrawLine(Image, p2, bhi, clWhite32, esRound);
+      DrawLine(Image, p, bhi, clDarkGray32, esRound);
 
-    //draw the bottom chevron
-    tmpRec := rec;
-    tmpRec.Top := tmpRec.Bottom - GetChevronSize;
-    Image.FillRect(Rect(tmpRec), clBtnFace32);
-    InflateRect(tmpRec, -d, -d);
-    with tmpRec do
-      p := MakePath([left - 2, top, MidPoint.X, bottom - 2, right + 2, top]);
-    p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
-    DrawLine(Image, p2, bhi, clWhite32, esRound);
-    DrawLine(Image, p, bhi, clDarkGray32, esRound);
+      //draw the bottom chevron
+      tmpRec := rec;
+      tmpRec.Top := tmpRec.Bottom - GetChevronSize;
+      Image.FillRect(Rect(tmpRec), clBtnFace32);
+      InflateRect(tmpRec, -d, -d);
+      with tmpRec do
+        p := MakePath([left - 2, top, MidPoint.X, bottom - 2, right + 2, top]);
+      p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
+      DrawLine(Image, p2, bhi, clWhite32, esRound);
+      DrawLine(Image, p, bhi, clDarkGray32, esRound);
 
-    //draw the outer border
-    DrawEdge(Image, rec, clSilver32, clWhite32, bh);
+      //draw the outer border
+      DrawEdge(Image, rec, clSilver32, clWhite32, bh);
 
-    if not drawBtn then Exit;
+      if not drawBtn then Exit;
 
-    //position and draw the button
-    Img32.Vector.InflateRect(rec, -1, -1);
-    rec.Top := rec.Top + ss;
-    rec.Bottom := rec.Top + fBtnSize;
-    rec.Left := rec.Left + 1 + bhDiv2 +2;
-    rec.Right := rec.Right -1;
-    Image.FillRect(Rect(rec), clPaleGray32);
+      //position and draw the button
+      Img32.Vector.InflateRect(rec, -1, -1);
+      rec.Top := rec.Top + ss;
+      rec.Bottom := rec.Top + fBtnSize;
+      rec.Left := rec.Left + 1 + bhDiv2 +2;
+      rec.Right := rec.Right -1;
+      Image.FillRect(Rect(rec), clPaleGray32);
 
-    DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
-    Img32.Vector.InflateRect(rec, -1, -1);
-    DrawEdge(Image, rec, clWhite32, clBlack32, 1);
-  end else
-  begin
-    //draw the left chevron
-    tmpRec.Right := tmpRec.Left + GetChevronSize;
-    Image.FillRect(Rect(tmpRec), clBtnFace32);
-    d := tmpRec.Height * 0.3;
-    InflateRect(tmpRec, -d, -d);
-    with tmpRec do
-      p := MakePath([right, top, left + 2, MidPoint.Y + 1, right, bottom + 2]);
-    p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
-    DrawLine(Image, p2, bhi, clWhite32, esRound);
-    DrawLine(Image, p, bhi, clDarkGray32, esRound);
+      DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
+      Img32.Vector.InflateRect(rec, -1, -1);
+      DrawEdge(Image, rec, clWhite32, clBlack32, 1);
+    end;
+    soHorizontal:
+    begin
+      //draw the left chevron
+      tmpRec.Right := tmpRec.Left + GetChevronSize;
+      Image.FillRect(Rect(tmpRec), clBtnFace32);
+      d := tmpRec.Height * 0.3;
+      InflateRect(tmpRec, -d, -d);
+      with tmpRec do
+        p := MakePath([right, top, left + 2, MidPoint.Y + 1, right, bottom + 2]);
+      p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
+      DrawLine(Image, p2, bhi, clWhite32, esRound);
+      DrawLine(Image, p, bhi, clDarkGray32, esRound);
 
-    //draw the right chevron
-    tmpRec := rec;
-    tmpRec.Left := tmpRec.Right - GetChevronSize;
-    Image.FillRect(Rect(tmpRec), clBtnFace32);
-    InflateRect(tmpRec, -d, -d);
-    with tmpRec do
-      p := MakePath([left, top, right -2, MidPoint.Y + 1, left, bottom + 2]);
-    p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
-    DrawLine(Image, p2, bhi, clWhite32, esRound);
-    DrawLine(Image, p, bhi, clDarkGray32, esRound);
+      //draw the right chevron
+      tmpRec := rec;
+      tmpRec.Left := tmpRec.Right - GetChevronSize;
+      Image.FillRect(Rect(tmpRec), clBtnFace32);
+      InflateRect(tmpRec, -d, -d);
+      with tmpRec do
+        p := MakePath([left, top, right -2, MidPoint.Y + 1, left, bottom + 2]);
+      p2 := TranslatePath(p, -bhDiv2, -bhDiv2);
+      DrawLine(Image, p2, bhi, clWhite32, esRound);
+      DrawLine(Image, p, bhi, clDarkGray32, esRound);
 
-    //draw the outer border
-    DrawEdge(Image, rec, clSilver32, clWhite32, bh);
+      //draw the outer border
+      DrawEdge(Image, rec, clSilver32, clWhite32, bh);
 
-    if not drawBtn then Exit;
+      if not drawBtn then Exit;
 
-    //position and draw the button
-    Img32.Vector.InflateRect(rec, -1, -1);
-    rec.Left := rec.Left + ss;
-    rec.Right := rec.Left + fBtnSize;
-    rec.Top := rec.Top + bhDiv2 + 2;
-    Image.FillRect(Rect(rec), clPaleGray32);
-    DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
-    Img32.Vector.InflateRect(rec, -1, -1);
-    DrawEdge(Image, rec, clWhite32, clBlack32, 1);
+      //position and draw the button
+      Img32.Vector.InflateRect(rec, -1, -1);
+      rec.Left := rec.Left + ss;
+      rec.Right := rec.Left + fBtnSize;
+      rec.Top := rec.Top + bhDiv2 + 2;
+      Image.FillRect(Rect(rec), clPaleGray32);
+      DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
+      Img32.Vector.InflateRect(rec, -1, -1);
+      DrawEdge(Image, rec, clWhite32, clBlack32, 1);
+    end;
   end;
 end;
 
@@ -6617,6 +6652,12 @@ begin
   for i := 0 to High(fObjectProps) do
     FreeAndNil(TObject(fObjectProps[i].address));
   fObjectProps := nil;
+end;
+//------------------------------------------------------------------------------
+
+procedure TEventPropertyHandler.Resized;
+begin
+  // override in descendant classes
 end;
 //------------------------------------------------------------------------------
 
@@ -7178,7 +7219,7 @@ procedure TCtrlStorageManager.SetFocusedCtrl(ctrl: TCustomCtrl);
 begin
   if Assigned(fRootCtrl.fFocusedCtrl) then
     fRootCtrl.fFocusedCtrl.KillFocus;
-  if Assigned(ctrl) and ctrl.CanFocus then
+  if Assigned(ctrl) and ctrl.CanSetFocus then
     fRootCtrl.fFocusedCtrl := ctrl else
     fRootCtrl.fFocusedCtrl := nil;
 end;
@@ -7332,6 +7373,8 @@ begin
   begin
     fLayeredImg.SetSize(width, height);
     fRootCtrl.SetInnerBounds(RectD(0, 0, width, height));
+    if Assigned(EventAndPropertyHandler) then
+        EventAndPropertyHandler.Resized;
   end;
 end;
 
@@ -7349,7 +7392,8 @@ begin
   queryPaths[1] := MakePath([35,82, 63,82, 63,98, 35,98]);
 
   SetLength(tickPaths, 1);
-  tickPaths[0] := MakePath([41.02, 60.75, 100, 0, 48.71, 100, 0, 65.82, 14.10, 37.97]);
+  tickPaths[0] := MakePath([
+      41.02, 60.75, 100, 0, 48.71, 100, 0, 65.82, 14.10, 37.97]);
 end;
 //------------------------------------------------------------------------------
 
