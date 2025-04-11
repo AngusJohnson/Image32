@@ -8,6 +8,7 @@ uses
   Types,
   Messages,
   TypInfo,
+  Math,
   Img32,
   Img32.Vector,
   Img32.Draw,
@@ -42,15 +43,16 @@ type
     fSvgList      : TSvgImageList32;
     fSvgList2     : TSvgImageList32;
   public
+    procedure Resized; override;
     // events
     procedure LoadClick(Sender: TObject);
     procedure SaveClick(Sender: TObject);
     procedure ExitClick(Sender: TObject);
-    procedure ScaleSliderClick(Sender: TObject);
     procedure Slider2Click(Sender: TObject);
     procedure ClickMe(Sender: TObject);
     procedure ClickBtn(Sender: TObject);
     procedure CheckboxClick(Sender: TObject);
+    procedure AutoSizeClick(Sender: TObject);
     procedure DesigningClick(Sender: TObject);
     procedure DarkModeClick(Sender: TObject);
     procedure TabClicked(Sender: TObject);
@@ -84,14 +86,19 @@ var
   pageCtrl    : TPageCtrl;
   statusCtrl  : TStatusbarCtrl;
 
-  currentScale  : double;
-  updateRect    : TRect;
-  imageSize64   : double;
-  imageSize24   : double;
+  autoSizing      : Boolean;
+  currentScale    : double;
+  baseClientRect  : TRect;
+  currClientRect  : TRect;
+
+  updateRect      : TRect;
+  imageSize64     : double;
+  imageSize24     : double;
 
   // designing globals
   designing     : Boolean;
   designTarget  : TCustomCtrl;
+
   clickLayer    : TLayer32;
   sizingGroup   : TSizingGroupLayer32;
   clickPt       : TPoint;
@@ -101,7 +108,7 @@ var
   arrowCursor : HIcon;
 
 const
-  DoLoadFromStorage = false; // true;//
+  DoLoadFromStorage = false; //true;//
 
 //------------------------------------------------------------------------------
 //Miscellaneous functions
@@ -212,26 +219,16 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure Rescale(newScale: double; postLoad: Boolean);
+procedure Rescale(scaleDelta: double);
 var
-  scaleDelta  : double;
   designScale : double;
   ImgSz       : integer;
 begin
-  if postLoad then
-  begin
-    currentScale := storageMngr.DesignScale;
-    scaleDelta := newScale / currentScale;
-  end else
-  begin
-    scaleDelta := newScale / currentScale;
-    if ValueAlmostOne(scaleDelta) then Exit;
-  end;
-  currentScale := newScale;
+  if ValueAlmostOne(scaleDelta) then Exit;
 
   // StorageMngr.DesignScale and storageMngr.DesignResolution are
   // used when streaming controls to and from XML
-  StorageMngr.DesignScale := newScale;
+  StorageMngr.DesignScale := StorageMngr.DesignScale * scaleDelta;
 
   if storageMngr.DesignResolution > 0 then
     designScale := storageMngr.DesignResolution / DpiAwareOne else
@@ -244,19 +241,21 @@ begin
   with epHandler do
   begin
     unscaledFont.FontHeight := DpiAware(14) * designScale;
-    scaledFont.FontHeight := DpiAware(14) * designScale * newScale;
+    scaledFont.FontHeight := DpiAware(14) * designScale * StorageMngr.DesignScale;
 
-    ImgSz := Round(imageSize64 * designScale * newScale);
+    ImgSz := Round(imageSize64 * designScale * StorageMngr.DesignScale);
     svgList.DefaultWidth := ImgSz;
     svgList.DefaultHeight := ImgSz;
 
-    ImgSz := Round(imageSize24 * designScale * newScale);
+    ImgSz := Round(imageSize24 * designScale * StorageMngr.DesignScale);
     svgList2.DefaultWidth := ImgSz;
     svgList2.DefaultHeight := ImgSz;
   end;
 
-  // finally, update just pageCtrl and its contents
-  // (because we don't scale everything)
+  // finally, scale statusCtrl & pageCtrl and their contents because
+  // we won't scale the menu
+  if Assigned(statusCtrl) then
+    statusCtrl.Scale(scaleDelta);
   if Assigned(pageCtrl) then
     pageCtrl.Scale(scaleDelta);
 end;
@@ -283,6 +282,12 @@ begin
     rs.Free;
   end;
 end;
+//------------------------------------------------------------------------------
+
+function BoolEnabledToString(isEnabled: Boolean): string;
+begin
+  if isEnabled then Result := ' enabled' else Result := ' disabled';
+end;
 
 //------------------------------------------------------------------------------
 // SetupCtrls - creates numerous GUI controls for the main Window.
@@ -296,12 +301,8 @@ var
   j,k,h,w     : double;
   bevelSize   : double;
   pagePnl     : TPagePnlCtrl;
-  topPnlCtrl  : TPanelCtrl;
-  sliderCtrl  : TSliderCtrl;
 begin
   rootCtrl.ClearChildren;
-
-  currentScale := 1;
   bevelSize := DPIAware(2);
 
   // rootCtrl is the container for all other controls
@@ -333,6 +334,11 @@ begin
   begin
     with AddChild(TPopMenuCtrl, 'Options Popup') as TPopMenuCtrl do
     begin
+      with AddChild(TMenuItemCtrl, '&AutoSizing') as TMenuItemCtrl do
+      begin
+        MenuItemType := TMenuItemType.mitCheckbox;
+        OnClick := epHandler.AutoSizeClick;
+      end;
       with AddChild(TMenuItemCtrl, '&Designing') as TMenuItemCtrl do
       begin
         MenuItemType := TMenuItemType.mitCheckbox;
@@ -354,37 +360,8 @@ begin
     BevelHeight := DPIAware(1.5);
     Color := clNone32;
     AutoPosition := apBottom;
+    Font := epHandler.scaledFont;
     Caption := 'This demo doesn''t use either VCL or FMX frameworks, just Image32 !';
-  end;
-
-  // add the top scale slider panel
-  topPnlCtrl := layeredImg32.AddLayer(TPanelCtrl, rootCtrl) as TPanelCtrl;
-  with topPnlCtrl do
-  begin
-    AutoPosition := apTop;
-    Height := DPIAware(46);
-    Color := clNone32;
-    BevelHeight := 0;
-    ShadowSize := DPIAware(10);
-
-    sliderCtrl := AddChild(TSliderCtrl) as TSliderCtrl;
-    with sliderCtrl do
-    begin
-      Orientation := soHorizontal;
-      SetInnerBounds(DPIAware(RectD(70, 5, 560, 20)));
-      BevelHeight := DPIAware(2);
-      Min := -50;
-      Max := 100;
-      Position := 0;
-      OnSlider := epHandler.ScaleSliderClick;
-    end;
-
-    with AddChild(TLabelCtrl) as TLabelCtrl do
-    begin
-      Caption := '&Scale:';
-      SetInnerBounds(DPIAware(RectD(20, 7, 60, 27)));
-      TargetCtrl := sliderCtrl;
-    end;
   end;
 
   // add a page control with 3 tabs
@@ -399,8 +376,10 @@ begin
 
   // PAGE 1 ///////////////////////////////////////////////////////
   pagePnl := pageCtrl.Panel[0];
-  pagePnl.ScrollH := pagePnl.AddChild(TScrollCtrl) as TScrollCtrl;
-  pagePnl.ScrollV := pagePnl.AddChild(TScrollCtrl) as TScrollCtrl;
+  with pagePnl.AddChild(TScrollCtrl) as TScrollCtrl do
+    Orientation := soHorizontal;
+  with pagePnl.AddChild(TScrollCtrl) as TScrollCtrl do
+    Orientation := soVertical;
 
   with layeredImg32.AddLayer(TButtonCtrl, pagePnl) as TButtonCtrl do
   begin
@@ -439,7 +418,7 @@ begin
 
   with layeredImg32.AddLayer(TCheckboxCtrl, pagePnl) as TCheckboxCtrl do
   begin
-    Caption := 'Tri-state checkbox';
+    Caption := 'Tri-state &checkbox';
     SetInnerBounds(DPIAware(RectD(180, 50, 380, 70)));
     BevelHeight := bevelSize;
     AutoState := false; // handle state changes manually in OnClick events
@@ -448,7 +427,7 @@ begin
 
   with layeredImg32.AddLayer(TRadioBtnCtrl, pagePnl) as TRadioBtnCtrl do
   begin
-    Caption := 'Tri-state radiobutton';
+    Caption := 'Tri-state &radiobutton';
     SetInnerBounds(DPIAware(RectD(180, 90, 380, 110)));
     BevelHeight := bevelSize;
   end;
@@ -457,7 +436,7 @@ begin
   begin
     Name := 'sliderCtrl2';
     Orientation := soHorizontal;
-    SetInnerBounds(DPIAware(RectD(180, 140, 400, 160)));
+    SetInnerBounds(DPIAware(RectD(180, 140, 490, 160)));
     Min := 0; Max := 100;
     Position := 10; //set position first otherwise the
     //OnSlider event will try to find progressCtrl which
@@ -469,7 +448,7 @@ begin
   with layeredImg32.AddLayer(TProgressCtrl, pagePnl) as TProgressCtrl do
   begin
     Orientation := soHorizontal;
-    SetInnerBounds(DPIAware(RectD(180, 180, 400, 200)));
+    SetInnerBounds(DPIAware(RectD(180, 180, 490, 200)));
     EndColor := clRed32;
     Position := 10;
     BevelHeight := bevelSize;
@@ -477,28 +456,30 @@ begin
 
   with layeredImg32.AddLayer(TEditCtrl, pagePnl) as TEditCtrl do
   begin
-    SetInnerBounds(DPIAware(RectD(180, 220, 400, 250)));
+    SetInnerBounds(DPIAware(RectD(180, 220, 650, 250)));
     Text := 'Try editing me :).';
     BevelHeight := bevelSize;
   end;
 
   with pagePnl.AddChild(TListCtrl, 'ListCtrl') as TListCtrl do
   begin
-    SetInnerBounds(DPIAware(RectD(430, 50, 560, 178)));
+    SetInnerBounds(DPIAware(RectD(520, 50, 650, 178)));
     for i := 1 to 8 do
       AddChild(TListItem, 'List item ' + IntToStr(i));
     BevelHeight := bevelSize;
     ImageList := epHandler.svgList2;
-    ScrollV := AddChild(TScrollCtrl, 'ListScroll') as TScrollCtrl;
+    with AddChild(TScrollCtrl, 'ListScroll') as TScrollCtrl do
+      Orientation := soVertical;
   end;
 
   // PAGE 2 ///////////////////////////////////////////////////////
 
   pagePnl := pageCtrl.Panel[1];
   //add vertical and horizontal scrollbars
-  pagePnl.ScrollH := pagePnl.AddChild(TScrollCtrl) as TScrollCtrl;
-  pagePnl.ScrollV := pagePnl.AddChild(TScrollCtrl) as TScrollCtrl;
-  //pagePnl.ScrollH.ScrollSize := DPIAware(16);
+  with pagePnl.AddChild(TScrollCtrl) as TScrollCtrl do
+    Orientation := soHorizontal;
+  with pagePnl.AddChild(TScrollCtrl) as TScrollCtrl do
+    Orientation := soVertical;
 
   with layeredImg32.AddLayer(TLabelCtrl, pagePnl,'') as TLabelCtrl do
   begin
@@ -525,7 +506,7 @@ begin
       SetInnerBounds(RectD(j, k, j + w, k + h));
       if i mod 8 = 7 then
       begin
-        j := DPIAware(40 * currentScale);
+        j := DPIAware(40 * StorageMngr.DesignScale);
         k := k + h + OuterMargin * 2;
         //change button width and height for second row
         w := epHandler.scaledFont.GetTextWidth('Btn13')
@@ -563,12 +544,46 @@ begin
     Text := GetUnicodeTextResource('LOREM', 'TEXT');
     BevelHeight := bevelSize;
     AutoPosition := apClient;
-    ScrollV := AddChild(TScrollCtrl, 'MemoScroll') as TScrollCtrl;
+    with AddChild(TScrollCtrl, 'MemoScroll') as TScrollCtrl do
+      Orientation := soVertical;
   end;
 end;
 
 //------------------------------------------------------------------------------
 // TEventPropertyHandler1 handles all custom (ie user defined) events
+//------------------------------------------------------------------------------
+
+procedure TEventPropHandler.Resized;
+var
+  newScale, w, h, refW, refH: double;
+begin
+  if IsEmptyRect(currClientRect) then
+  begin
+    currClientRect := baseClientRect;
+    currentScale := 1;
+    storageMngr.DesignScale := 1;
+  end else
+  begin
+    GetClientRect(mainHdl, currClientRect);
+    with currClientRect do
+    begin
+      w := Right - Left;
+      h := Bottom - Top;
+    end;
+    with baseClientRect do
+    begin
+      refW := Right - Left;
+      refH := Bottom - Top;
+    end;
+
+    if autoSizing then
+    begin
+      newScale := Math.Min(w / refW, h / refH);
+      Rescale(newScale/currentScale);
+      currentScale := newScale;
+    end;
+  end;
+end;
 //------------------------------------------------------------------------------
 
 procedure TEventPropHandler.LoadClick(Sender: TObject);
@@ -583,8 +598,8 @@ begin
   // RootCtrl prior to loading the new ones.
   pageCtrl := rootCtrl.FindChildByClass(TPageCtrl) as TPageCtrl;
   statusCtrl := rootCtrl.FindChildByClass(TStatusbarCtrl) as TStatusbarCtrl;
-  Rescale(storageMngr.DesignScale, true);
 
+//  Rescale(storageMngr.DesignScale, true);
   ResizeMainWindow(mainHdl, layeredImg32.Width, layeredImg32.Height);
 end;
 //------------------------------------------------------------------------------
@@ -603,18 +618,6 @@ end;
 procedure TEventPropHandler.ExitClick(Sender: TObject);
 begin
   storageMngr.Quit;
-end;
-//------------------------------------------------------------------------------
-
-procedure TEventPropHandler.ScaleSliderClick(Sender: TObject);
-var
-  senderPos, scale: double;
-begin
-  if not Assigned(sender) or not (Sender is TSliderCtrl) then Exit;
-
-  senderPos := (Sender as TSliderCtrl).Position;
-  scale := (100 + senderPos) * 0.01;
-  Rescale(scale, false);
 end;
 //------------------------------------------------------------------------------
 
@@ -655,6 +658,14 @@ procedure TEventPropHandler.DesigningClick(Sender: TObject);
 begin
   designing := TMenuItemCtrl(Sender).Checked;
   if not designing then SetDesignTarget(nil);
+  statusCtrl.Caption := 'Designing' + BoolEnabledToString(designing);
+end;
+//------------------------------------------------------------------------------
+
+procedure TEventPropHandler.AutoSizeClick(Sender: TObject);
+begin
+  autoSizing := TMenuItemCtrl(Sender).Checked;
+  statusCtrl.Caption := 'Auto-sizing' + BoolEnabledToString(autoSizing);
 end;
 //------------------------------------------------------------------------------
 
@@ -664,6 +675,7 @@ begin
     rootCtrl.Theme := lightTheme else
     rootCtrl.Theme := darkTheme;
   InvalidateRect(mainHdl, nil, true);
+  statusCtrl.Caption := '';
 end;
 //------------------------------------------------------------------------------
 
@@ -749,12 +761,12 @@ begin
           SmallInt(HiWord(lParam)));
         dx := pt.X - clickPt.X; dy := pt.Y - clickPt.Y;
 
-        if designing and PtInRect(pageCtrl.InnerBounds, PointD(pt)) then
+        if designing then
         begin
           if not assigned(clickLayer) then
           begin
             layer := layeredImg32.GetLayerAt(pt);
-            if Assigned(layer) then
+            if Assigned(layer) and pageCtrl.Contains(layer) then
             begin
               if (layer is TButtonDesignerLayer32) then
                 SetCursor(sizeCursor)
@@ -762,6 +774,12 @@ begin
                 SetCursor(handCursor)
               else
                 SetCursor(arrowCursor);
+            end else
+            begin
+              // ie don't try to design the menus
+              storageMngr.MouseMove(WParamToShiftState(wParam), pt);
+              if storageMngr.RepaintRequired then
+                InvalidateRect(hWnd, nil, false);
             end;
             Exit;
           end;
@@ -955,7 +973,7 @@ end;
 //------------------------------------------------------------------------------
 
 const
-  mainWindowWidth   = 620;
+  mainWindowWidth   = 720;
   mainWindowHeight  = 480;
 
 var
@@ -983,6 +1001,7 @@ begin
               DpiAware(mainWindowHeight), 0, 0, Inst, nil);
 
   CenterWindow(mainHdl);
+  GetClientRect(mainHdl, baseClientRect);
 
   // instantiate handles to 'shared' cursors (that won't need destroying)
   sizeCursor  := LoadCursor(0, IDC_SIZEALL);
@@ -1033,6 +1052,7 @@ begin
   // nb: storageMngr's 'rootCtrl' object is a TPanelCtrl that is
   // owned by layeredImg32's 'root' (TGroupLayer32) layer.
 
+  currClientRect := NullRect;
 
   if DoLoadFromStorage then
   begin
@@ -1043,7 +1063,7 @@ begin
     // LoadFromFile() will delete the existing controls
     // contained by RootCtrl before loading all the new ones.
     // storageMngr.DesignScale may have changed so ...
-    Rescale(1, true);
+    //Rescale(1, true);
     ResizeMainWindow(mainHdl, layeredImg32.Width, layeredImg32.Height);
   end else
   begin

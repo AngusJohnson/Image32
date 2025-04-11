@@ -3,7 +3,7 @@ unit Img32.SVG.Path;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.7                                                             *
-* Date      :  6 January 2025                                                  *
+* Date      :  10 April 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -544,7 +544,7 @@ end;
 
 procedure TSvgStraightSeg.GetFlattenedInternal;
 begin
-  PrePendPoint(fFirstPt, fCtrlPts, fFlatPath);
+  fFlatPath := PrePendPoint(fFirstPt, fCtrlPts);
 end;
 
 //------------------------------------------------------------------------------
