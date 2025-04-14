@@ -156,7 +156,6 @@ type
       const WindowCaption: string; const IconResourceName: string = '';
       Width: integer = 0; Height: integer = 0): THandle;
 {$ENDIF}
-    property AllowResize: Boolean read fAllowResize write fAllowResize;
     property CurrentCursor: integer read fCurrCursor;
     property Designing: Boolean read fDesigning write SetDesigning;
     property DesignTarget: TCustomCtrl read fDesignTarget write SetDesignTarget;
@@ -166,6 +165,8 @@ type
     property MainHdl     : THandle read fMainHdl;
     property RootCtrl: TRootCtrl read fRootCtrl;
     property RepaintRequired: Boolean read GetRepaintReq;
+  published
+    property AllowResize: Boolean read fAllowResize write fAllowResize;
   end;
 
   TCustomCtrl = class(THitTestLayer32, INotifyRecipient)
@@ -2160,8 +2161,8 @@ function TCustomCtrl.IsVisibleToCtrlRoot: Boolean;
 var
   obj: TLayer32;
 begin
-  Result := Visible;
   obj := Self;
+  Result := Visible;
   while Result and not (obj is TRootCtrl) do
   begin
     obj := obj.Parent;
@@ -2275,14 +2276,17 @@ end;
 constructor TRootCtrl.Create(parent: TLayer32 = nil; const name: string = ''); 
 begin
   inherited;
-  fAllowRTEdit := False;
 end;
 //------------------------------------------------------------------------------
 
 procedure TRootCtrl.Scale(value: double);
+var
+  i: integer;
 begin
-  if (value >= 0.01) and (value <= 100) and (value <> 1.0) then
-    inherited;
+  if (value < 0.01) or (value > 100) or (value = 1.0) then Exit;
+  for i := 0 to ChildCount -1 do
+    if (Child[i] is TCustomCtrl) then
+      TCustomCtrl(Child[i]).Scale(value);
 end;
 //------------------------------------------------------------------------------
 
@@ -3042,7 +3046,6 @@ constructor TMenuItemCtrl.Create(parent: TLayer32 = nil; const name: string = ''
 begin
   inherited Create(parent, name);
   Caption := name;
-  fAllowRTEdit := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -5592,7 +5595,6 @@ constructor TPageCtrl.Create(parent: TLayer32; const name: string);
 begin
   inherited;
   fActiveIdx := -1;
-  fAllowRTEdit := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -6835,7 +6837,7 @@ begin
       Img32.Vector.InflateRect(rec, -1, -1);
       rec.Top := rec.Top + ss;
       rec.Bottom := rec.Top + fBtnSize;
-      rec.Left := rec.Left + 1 + bhDiv2 +2;
+      rec.Left := rec.Left + 1 + bhDiv2;
       rec.Right := rec.Right -1;
       Image.FillRect(Rect(rec), clPaleGray32);
 
@@ -6876,7 +6878,7 @@ begin
       Img32.Vector.InflateRect(rec, -1, -1);
       rec.Left := rec.Left + ss;
       rec.Right := rec.Left + fBtnSize;
-      rec.Top := rec.Top + bhDiv2 + 2;
+      rec.Top := rec.Top + bhDiv2 + 1;
       Image.FillRect(Rect(rec), clPaleGray32);
       DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
       Img32.Vector.InflateRect(rec, -1, -1);
@@ -7095,37 +7097,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TCtrlStorageManager.SetDesignScale(value: double);
-var
-  delta: double;
-begin
-  if (StorageState = ssLoading)  then
-  begin
-    if Assigned(EventAndPropertyHandler) then
-    begin
-      EventAndPropertyHandler.Scale(RESET);
-      EventAndPropertyHandler.Scale(value);
-    end;
-    inherited SetDesignScale(value);  
-  end 
-  else if (value = RESET) then
-  begin
-    if Assigned(EventAndPropertyHandler) then
-      EventAndPropertyHandler.Scale(RESET);
-    inherited SetDesignScale(1);
-  end
-  else if (StorageState = ssNormal) and Assigned(RootCtrl) and 
-    AllowResize and (value >= 0.01) and (value <= 100)  then
-  begin
-    delta := value/DesignScale;
-    inherited SetDesignScale(value);
-    RootCtrl.Scale(delta);
-    if Assigned(EventAndPropertyHandler) then
-      EventAndPropertyHandler.Scale(delta);
-  end;  
-end;
-//------------------------------------------------------------------------------
-
 function TCtrlStorageManager.GetExternalProp(const str: string; out success: Boolean): TObject;
 begin
   if Assigned(fEventHandler) then
@@ -7268,7 +7239,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
 type
   TGetProtectedStorage = class(TStorage);
 
@@ -7375,8 +7345,6 @@ var
   xmlCurr, xmlEnd : PUTF8Char;
   savedDecSep     : Char;
   target          : TStorage;
-
-  debugRec  : TREct;
 begin
   if (utf8 = '') then Exit;
   savedDecSep := {$IFDEF FORMATSETTINGS}FormatSettings.{$ENDIF}DecimalSeparator;
@@ -7415,7 +7383,7 @@ begin
         if Assigned(target) then
           SetObjectProp(self, propName, target);
       end;
-    fDelayedLinks := nil;
+
   finally
     fDelayedLinks := nil;
     {$IFDEF FORMATSETTINGS}FormatSettings.{$ENDIF}DecimalSeparator := savedDecSep;
@@ -7456,12 +7424,14 @@ begin
   begin
     RootCtrl.ClearChildren;
     RootCtrl.fFocusedCtrl := nil;
+    RootCtrl.Theme := lightTheme;
   end;
   fLastCtrl := nil;
   fMseDownCtrl := nil;
   fCurrCursor := 0;
   fShortcutList.Clear;
   Designing := False;
+  fAllowResize := False;
 end;
 //------------------------------------------------------------------------------
 
@@ -7705,13 +7675,42 @@ begin
       newRec := fRootCtrl.InnerBounds;
       scale := Average(newRec.Width/oldRec.Width, newRec.Height/oldRec.Height);
       DesignScale := DesignScale * scale;
-      //EventAndPropertyHandler.Scale(scale); // scale fonts etc before ctrls
-      //fRootCtrl.Scale(scale);
     end else
     begin
       fLayeredImg.SetSize(width, height);
       fRootCtrl.SetInnerBounds(RectD(0, 0, width, height));
     end;
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TCtrlStorageManager.SetDesignScale(value: double);
+var
+  delta: double;
+begin
+  if (StorageState = ssLoading)  then
+  begin
+    if Assigned(EventAndPropertyHandler) then
+    begin
+      EventAndPropertyHandler.Scale(RESET);
+      EventAndPropertyHandler.Scale(value);
+    end;
+    inherited SetDesignScale(value);
+  end
+  else if (value = RESET) then
+  begin
+    if Assigned(EventAndPropertyHandler) then
+      EventAndPropertyHandler.Scale(RESET);
+    inherited SetDesignScale(1);
+  end
+  else if (StorageState = ssNormal) and Assigned(RootCtrl) and
+    AllowResize and (value >= 0.01) and (value <= 100)  then
+  begin
+    delta := value/DesignScale;
+    inherited SetDesignScale(value);
+    if Assigned(EventAndPropertyHandler) then // scale fonts etc before ctrls
+      EventAndPropertyHandler.Scale(delta);
+    RootCtrl.Scale(delta);
   end;
 end;
 //------------------------------------------------------------------------------

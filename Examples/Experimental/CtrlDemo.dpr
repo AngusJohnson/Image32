@@ -413,8 +413,6 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TMyEventPropHandler.Scale(delta: double);
-var
-  designScale : double;
 begin
   if ValueAlmostOne(delta) then Exit;
 
@@ -429,9 +427,6 @@ begin
     end;
   end else
   begin
-    if storageMngr.DesignResolution > 0 then
-      designScale := storageMngr.DesignResolution * storageMngr.DesignScale else
-      designScale := storageMngr.DesignScale;
     // scale the font and image sizes in my TEventPropertyHandler ...
     with mepHandler do
     begin
@@ -527,19 +522,17 @@ end;
 
 procedure TMyEventPropHandler.DarkModeClick(Sender: TObject);
 begin
-  if storageMngr.RootCtrl.Theme.Color = darkTheme.Color then
-    storageMngr.RootCtrl.Theme := lightTheme else
-    storageMngr.RootCtrl.Theme := darkTheme;
+  if TMenuItemCtrl(Sender).Checked then
+    storageMngr.RootCtrl.Theme := darkTheme else
+    storageMngr.RootCtrl.Theme := lightTheme;
   InvalidateRect(storageMngr.MainHdl, nil, true);
-  with storageMngr.RootCtrl.FindChildByClass(TStatusbarCtrl) as TStatusbarCtrl do
-    Caption := '';
 end;
 //------------------------------------------------------------------------------
 
 procedure TMyEventPropHandler.TabClicked(Sender: TObject);
 begin
   with storageMngr.RootCtrl.FindChildByClass(TStatusbarCtrl) as TStatusbarCtrl do
-    Caption := '';
+    Caption := 'Tab key clicked';
 end;
 
 //------------------------------------------------------------------------------
@@ -550,10 +543,10 @@ var
   Msg: TMsg;
   tmpFontReader: TFontReader;
 const
-  DoLoadFromStorage = false; //true;//
+  DoLoadFromStorage = false; //true; //
 begin
 
-  // CREATE **STORAGE MANAGER** THAT CONTROLS ALMOST EVERYTHING,
+  // CREATE **STORAGE MANAGER** THAT CONTROLS ALMOST EVERYTHING
   storageMngr := TCtrlStorageManager.Create;
   // AND ALSO CREATE THE CUSTOM EVENT AND PROPERTY HANDLER ...
   mepHandler := storageMngr.InsertChild(0, TMyEventPropHandler) as TMyEventPropHandler;
