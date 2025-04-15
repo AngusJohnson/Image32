@@ -1470,8 +1470,8 @@ begin
         begin
           with viewboxWH do
           begin
-            dx := -Left/Width * self.elRectWH.width.rawVal;
-            dy := -Top/Height * self.elRectWH.height.rawVal;
+            dx := -Left / Width * self.elRectWH.width.rawVal;
+            dy := -Top / Height * self.elRectWH.height.rawVal;
 
             //scale <symbol> proportionally to fill the <use> element
             scale2.X := self.elRectWH.width.rawVal / Width;
@@ -1578,8 +1578,8 @@ begin
   //If two stops are equal the last stop controls the color from that point.
   len := Length(stops);
   if (len > 0) and (stops[len-1].offset > offset) then
-    offset := stops[len-1].offset;
-  setLength(stops, len+1);
+    offset := stops[len - 1].offset;
+  setLength(stops, len + 1);
   stops[len].offset := Min(1,Max(0, offset));
   stops[len].color := color;
 end;
@@ -1721,7 +1721,7 @@ begin
   MatrixApply(fDrawData.matrix, cp);
   MatrixApply(drawDat.matrix, cp);
 
-  rec3 := RectD(cp.X-r.X, cp.Y-r.Y, cp.X+r.X, cp.Y+r.Y);
+  rec3 := RectD(cp.X - r.X, cp.Y - r.Y, cp.X + r.X, cp.Y + r.Y);
 
   if F.IsValid then
   begin
@@ -1966,8 +1966,8 @@ var
   len, w, h: integer;
 begin
   len := Length(fNames);
-  SetLength(fNames, len+1);
-  SetLength(fImages, len+1);
+  SetLength(fNames, len + 1);
+  SetLength(fImages, len + 1);
   RectWidthHeight(fFilterBounds, w, h);
   Result := TImage32.Create(w, h);
   fImages[len] := Result;
@@ -2180,7 +2180,7 @@ begin
     (ks[2] = InvalidD) or (ks[3] = InvalidD) then Exit;
 
   for i := 0 to 3 do
-    kk[i] := ClampByte(ks[i]*255);
+    kk[i] := ClampByte(ks[i] * 255);
 
   for i := 0 to h -1 do
   begin
@@ -2283,7 +2283,7 @@ var
 begin
   if not GetSrcAndDst or not Assigned(values) then Exit;
   for i := 0 to 19 do
-    colorMatrix[i] := ClampByte(Integer(Round(values[i]*255)));
+    colorMatrix[i] := ClampByte(Integer(Round(values[i] * 255)));
 
   dx1 := srcImg.Width - RectWidth(srcRec);
   dx2 := dstImg.Width - RectWidth(dstRec);
@@ -2338,28 +2338,28 @@ begin
             if Length(tableValues) = 0 then Continue;
             SetLength(bytes, 256);
             rangeSize := 256 div Length(tableValues);
-            for i:= 0 to High(tableValues) do
-              for j:= 0 to rangeSize -1 do
-                bytes[i*rangeSize + j] := ClampByte(tableValues[i] * 255);
+            for i := 0 to High(tableValues) do
+              for j := 0 to rangeSize - 1 do
+                bytes[i * rangeSize + j] := ClampByte(tableValues[i] * 255);
           end;
         ftTable:
           begin
             if Length(tableValues) < 2 then Continue;
             SetLength(bytes, 256);
-            rangeSize := 256 div (Length(tableValues) -1);
-            for i:= 0 to High(tableValues) -1 do
+            rangeSize := 256 div (Length(tableValues) - 1);
+            for i := 0 to High(tableValues) -1 do
             begin
               intercept := tableValues[i];
-              slope :=  (tableValues[i+1] - intercept) / rangeSize;
-              for j:= 0 to rangeSize -1 do
-                bytes[i*rangeSize + j] := ClampByte((j * slope + intercept) * 255);
+              slope :=  (tableValues[i + 1] - intercept) / rangeSize;
+              for j := 0 to rangeSize - 1 do
+                bytes[i * rangeSize + j] := ClampByte((j * slope + intercept) * 255);
             end;
           end;
         ftLinear:
           begin
             SetLength(bytes, 256);
             d := intercept * 255;
-            for i:= 0 to 255 do
+            for i := 0 to 255 do
               bytes[i] := ClampByte(i * slope + d);
           end;
       end;
@@ -2373,9 +2373,9 @@ begin
   dx2 := dstImg.Width - RectWidth(dstRec);
   p1 := @srcImg.Pixels[srcRec.Top * srcImg.Width + srcRec.Left];
   p2 := @dstImg.Pixels[dstRec.Top * dstImg.Width + dstRec.Left];
-  for i := srcRec.Top to srcRec.Bottom -1 do
+  for i := srcRec.Top to srcRec.Bottom - 1 do
   begin
-    for j := srcRec.Left to srcRec.Right -1 do
+    for j := srcRec.Left to srcRec.Right - 1 do
     begin
       p2.Color := p1^;
       if Assigned(childFuncs[0]) then p2.B := childFuncs[0].bytes[p2.B];
@@ -2438,7 +2438,7 @@ begin
     dstImg.ReduceOpacity(alpha);
   if stdDev > 0 then
     FastGaussianBlur(dstImg, dstRec,
-      Ceil(stdDev *0.75 * ParentFilterEl.fScale) , 1);
+      Ceil(stdDev * 0.75 * ParentFilterEl.fScale) , 1);
   dstImg.CopyBlend(dropShadImg, dropShadImg.Bounds, dstRec, BlendToAlphaLine);
 end;
 
@@ -2484,7 +2484,7 @@ begin
   //GaussianBlur(dstImg, dstRec, Round(stdDev * ParentFilterEl.fScale));
   // FastGaussianBlur is a very good approximation and also much faster.
   // However, empirically stdDev/2 more closely emulates other renderers.
-  FastGaussianBlur(dstImg, dstRec, Ceil(stdDev/2 * ParentFilterEl.fScale));
+  FastGaussianBlur(dstImg, dstRec, Ceil(stdDev / 2 * ParentFilterEl.fScale));
 end;
 
 //------------------------------------------------------------------------------
@@ -3742,7 +3742,7 @@ begin
     unicodeText := StripNewlines(unicodeText);
 
   //adjust glyph spacing when fFontInfo.textLength is assigned.
-  spacing := dd.FontInfo.spacing /scale;
+  spacing := dd.FontInfo.spacing / scale;
   len := Length(unicodeText);
   if (len < 2) then spacing := 0
   else if (dd.FontInfo.align = staJustify) and
@@ -3752,21 +3752,21 @@ begin
       Flatten(0, scale, tmpPath, isClosed);
       pathDist := GetPathDistance(tmpPath);
       textWidth := fSvgReader.fFontCache.GetTextWidth(unicodeText);
-      spacing := (pathDist/scale) - textWidth;
-      spacing := spacing / (len -1);
+      spacing := (pathDist / scale) - textWidth;
+      spacing := spacing / (len - 1);
     end
   else if (dd.FontInfo.textLength > 0) then
   begin
     textWidth := fSvgReader.fFontCache.GetTextWidth(unicodeText);
-    spacing := (dd.FontInfo.textLength/scale) - textWidth;
-    spacing := spacing / (len -1);
+    spacing := (dd.FontInfo.textLength / scale) - textWidth;
+    spacing := spacing / (len - 1);
   end;
 
   with pathEl do
   begin
     mat := fDrawData.matrix;
-    MatrixScale(mat, 1/scale);
-    for i := 0 to fSvgPaths.Count -1 do
+    MatrixScale(mat, 1 / scale);
+    for i := 0 to fSvgPaths.Count - 1 do
     begin
       Flatten(i, scale, tmpPath, isClosed);
       //'path' is temporarily scaled to accommodate fReader.fFontCache's
@@ -3808,7 +3808,7 @@ begin
   if not (el is TPathElement) then Exit;
   pathEl := TPathElement(el);
   fSvgReader.GetBestFont(dd.FontInfo);
-  scale := dd.FontInfo.size/fSvgReader.fFontCache.FontHeight;
+  scale := dd.FontInfo.size / fSvgReader.fFontCache.FontHeight;
 
   if offset.X.IsValid then
     textEl.currentPt.X := Max(0,
@@ -3819,7 +3819,7 @@ begin
       textEl.currentPt.Y + Round(offset.Y.rawVal / scale);
 
   // nb: recursive
-  for i := 0 to ChildCount -1 do
+  for i := 0 to ChildCount - 1 do
     GetPathsInternal(Child[i], drawDat);
 end;
 //------------------------------------------------------------------------------
@@ -3885,7 +3885,7 @@ begin
   lnHeight := fSvgReader.fFontCache.LineHeight;
 
   textRec := elRectWH.GetRectD(di.bounds.Width, di.bounds.Height, 1);
-  textRec := ScaleRect(textRec, 1/scale);
+  textRec := ScaleRect(textRec, 1 / scale);
   InflateRect(textRec, -margin, -margin);
 
   with TChunkedText.Create(s, fSvgReader.fFontCache) do
@@ -3929,7 +3929,7 @@ begin
     w := elRectWH.width.rawVal;
     h := elRectWH.height.rawVal;
     //currently assume preserve aspect ratio
-    scale := Min(w/markerBoxWH.Width, h/markerBoxWH.Height);
+    scale := Min(w / markerBoxWH.Width, h / markerBoxWH.Height);
     MatrixScale(mat, scale, scale);
   end;
 
@@ -3948,7 +3948,7 @@ begin
   a := angle;
   for i := 0 to len -2 do
   begin
-    a2 := GetAngle(fPoints[i], fPoints[i+1]);
+    a2 := GetAngle(fPoints[i], fPoints[i + 1]);
     angles[i] := Average(a, a2);
     a := a2;
   end;
@@ -4050,15 +4050,15 @@ begin
     //also scale if necessary
     if not pattBoxWH.IsEmpty then
     begin
-      sx := recWH.Width/pattBoxWH.Width;
-      sy := recWH.Height/pattBoxWH.Height;
+      sx := recWH.Width / pattBoxWH.Width;
+      sy := recWH.Height / pattBoxWH.Height;
     end;
 
   end
   else if not pattBoxWH.IsEmpty then
   begin
-    recWH.Width   := pattBoxWH.Width;
-    recWH.Height  := pattBoxWH.Width;
+    recWH.Width  := pattBoxWH.Width;
+    recWH.Height := pattBoxWH.Width;
   end else
     Exit;
 
@@ -4121,7 +4121,7 @@ begin
       MatrixExtractScale(dd.matrix, sx, sy);
       MatrixTranslate(dd.matrix,
         elRectWH.left.rawVal * sx,
-        elRectWH.top.rawVal *sy);
+        elRectWH.top.rawVal * sy);
     end;
     if not viewboxWH.IsEmpty then
     begin

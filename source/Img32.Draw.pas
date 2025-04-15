@@ -447,7 +447,7 @@ begin
   // Precondition: the background to text drawn onto 'img' must be transparent
 
   // 85 + (2 * 57) + (2 * 28) == 255
-  primeTbl := PByteArray(@MulTable[85 + centerWeighting *2]);
+  primeTbl := PByteArray(@MulTable[85 + centerWeighting * 2]);
   nearTbl  := PByteArray(@MulTable[57]);
   farTbl   := PByteArray(@MulTable[28 - centerWeighting]);
   SetLength(rowBuffer, img.Width + 4);
@@ -1911,7 +1911,7 @@ begin
     (fGradientColors[i].offset <= offsetFrac) do inc(i);
   SetLength(fGradientColors, len +1);
   Move(fGradientColors[i],
-    fGradientColors[i+1], (len -i) * SizeOf(TGradientColor));
+    fGradientColors[i + 1], (len - i) * SizeOf(TGradientColor));
   fGradientColors[i] := gradColor;
 end;
 
@@ -1973,7 +1973,7 @@ begin
     fIsVert := false;
     dx := (fEndPt.X - fStartPt.X);
     dy := (fEndPt.Y - fStartPt.Y);
-    dydx := dy /dx; //perpendicular slope
+    dydx := dy / dx; //perpendicular slope
 
     fColorsCnt := Ceil(dx + dydx * (fEndPt.Y - fStartPt.Y));
     MakeColorGradient(fGradientColors, fColorsCnt, fColors);

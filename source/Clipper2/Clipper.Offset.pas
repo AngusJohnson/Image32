@@ -765,7 +765,7 @@ begin
     m2 := (ln2B.Y - ln2A.Y) / (ln2B.X - ln2A.X);
     b2 := ln2A.Y - m2 * ln2A.X;
     Result.X := ln1A.X;
-    Result.Y := m2*ln1A.X + b2;
+    Result.Y := m2 * ln1A.X + b2;
   end
   else if (ln2B.X = ln2A.X) then
   begin

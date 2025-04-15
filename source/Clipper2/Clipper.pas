@@ -204,8 +204,8 @@ begin
   SetLength(Result, len);
   for i := 0 to len -1 do
   begin
-    Result[i].X := ints[i*2];
-    Result[i].Y := ints[i*2 +1];
+    Result[i].X := ints[i * 2];
+    Result[i].Y := ints[i * 2 + 1];
   end;
 end;
 //------------------------------------------------------------------------------
@@ -805,7 +805,7 @@ begin
   scale := power(10, precision);
   p := ScalePath(path, scale);
   p := TrimCollinear(p, isOpenPath);
-  Result := ScalePathD(p, 1/scale);
+  Result := ScalePathD(p, 1 / scale);
 end;
 //------------------------------------------------------------------------------
 
