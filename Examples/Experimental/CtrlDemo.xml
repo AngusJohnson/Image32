@@ -1,39 +1,43 @@
 <TCtrlStorageManager 
   Id="0"
   DesignResolution="2.00"
-  DesignScale="1.00">
-  <TEventPropHandler 
+  DesignScale="1.00"
+  AllowResize="False">
+  <TMyEventPropHandler 
     Id="1">
-  </TEventPropHandler>
+  </TMyEventPropHandler>
   <TLayeredImage32 
     Name="TLayeredImage32"
     Id="2"
     BackgroundColor="$00000000"
     Resampler="2"
-    Height="889"
-    Width="1414">
+    Height="740"
+    Width="1400">
     <TGroupLayer32 
       Name="root"
       Id="3"
       Left="0.00"
       Top="0.00"
       CursorId="0"
-      Height="889.00"
+      Height="740.00"
       Opacity="255"
       OuterMargin="0.00"
       Visible="True"
-      Width="1414.00">
+      Width="1400.00">
       <TRootCtrl 
         Name="TRootCtrl"
         Id="4"
         Left="0.00"
         Top="0.00"
-        Height="889.00"
+        Height="740.00"
         OuterMargin="10.00"
-        Width="1414.00"
+        Width="1400.00"
+        AllowRTEdit="True"
         BevelHeight="0.00"
         CanFocus="False"
+        Color="$FFF0F0F0"
         Font="unscaledFont"
+        IsThemed="True"
         Margin="20.00">
         <TMainMenuCtrl 
           Name="TMainMenuCtrl"
@@ -42,7 +46,8 @@
           Top="0.00"
           Height="56.89"
           OuterMargin="10.00"
-          Width="1414.00"
+          Width="1400.00"
+          AllowRTEdit="False"
           AutoPosition="apTop"
           BevelHeight="4.00">
           <TMenuItemCtrl 
@@ -198,43 +203,30 @@
               </TMenuItemCtrl>
             </TPopMenuCtrl>
           </TMenuItemCtrl>
-          <TMenuItemCtrl 
-            Name="&amp;Help"
-            Id="17"
-            Left="0.00"
-            Top="0.00"
-            Height="0.00"
-            OuterMargin="10.00"
-            Width="0.00"
-            BevelHeight="4.00"
-            Caption="&amp;Help"
-            Checked="False"
-            ImageIdx="0"
-            MenuItemType="mitNormal">
-          </TMenuItemCtrl>
         </TMainMenuCtrl>
         <TStatusbarCtrl 
           Name="TStatusbarCtrl"
-          Id="18"
+          Id="17"
           Left="0.00"
-          Top="840.88"
+          Top="691.88"
           Height="48.12"
           OuterMargin="10.00"
-          Width="1414.00"
+          Width="1400.00"
           AutoPosition="apBottom"
           BevelHeight="3.00"
           CanFocus="False"
-          Caption="This demo doesn&apos;t use either VCL or FMX frameworks, just Image32 !"
-          Font="scaledFont">
+          Color="$00000000"
+          Font="scaledFont"
+          FontColor="$FF000000">
         </TStatusbarCtrl>
         <TPageCtrl 
           Name="TPageCtrl"
-          Id="19"
+          Id="18"
           Left="0.00"
           Top="56.89"
-          Height="783.99"
+          Height="634.99"
           OuterMargin="10.00"
-          Width="1414.00"
+          Width="1400.00"
           AutoPosition="apClient"
           BevelHeight="6.00"
           Font="scaledFont"
@@ -242,7 +234,7 @@
           ActiveIndex="0">
           <TPageTabCtrl 
             Name="TPageTabCtrl"
-            Id="20"
+            Id="19"
             Left="6.00"
             Top="0.00"
             Height="53.00"
@@ -255,19 +247,21 @@
           </TPageTabCtrl>
           <TPagePnlCtrl 
             Name="TPagePnlCtrl"
-            Id="21"
+            Id="20"
             Left="6.00"
             Top="65.00"
-            Height="712.99"
+            Height="563.99"
             OuterMargin="0.00"
-            Width="1402.00"
+            Width="1388.00"
             AutoPosition="apClient"
             BevelHeight="0.00"
             CanFocus="False"
+            Color="$00000000"
+            FontColor="$FF000000"
             Margin="20.00">
             <TButtonCtrl 
               Name="TButtonCtrl"
-              Id="22"
+              Id="21"
               Left="80.00"
               Top="100.00"
               Height="70.00"
@@ -280,7 +274,7 @@
             </TButtonCtrl>
             <TRoundedBtnCtrl 
               Name="TRoundedBtnCtrl"
-              Id="23"
+              Id="22"
               Left="80.00"
               Top="200.00"
               Height="70.00"
@@ -288,14 +282,13 @@
               Width="220.00"
               BevelHeight="4.00"
               Caption="Transparent"
-              Color="$00000000"
               IsThemed="False"
               OnClick="ClickBtn"
               Padding="4.00">
             </TRoundedBtnCtrl>
             <TEllipseBtnCtrl 
               Name="TEllipseBtnCtrl"
-              Id="24"
+              Id="23"
               Left="80.00"
               Top="300.00"
               Height="80.00"
@@ -308,7 +301,7 @@
             </TEllipseBtnCtrl>
             <TButtonCtrl 
               Name="TButtonCtrl"
-              Id="25"
+              Id="24"
               Left="80.00"
               Top="410.00"
               Height="70.00"
@@ -321,7 +314,7 @@
             </TButtonCtrl>
             <TCheckboxCtrl 
               Name="TCheckboxCtrl"
-              Id="26"
+              Id="25"
               Left="360.00"
               Top="100.00"
               Height="40.00"
@@ -332,12 +325,12 @@
               OnClick="CheckboxClick"
               Padding="16.00"
               AutoState="False"
-              State="tsNo"
+              State="tsYes"
               TextPosition="tphRight">
             </TCheckboxCtrl>
             <TRadioBtnCtrl 
               Name="TRadioBtnCtrl"
-              Id="27"
+              Id="26"
               Left="360.00"
               Top="180.00"
               Height="40.00"
@@ -351,8 +344,8 @@
               TextPosition="tphRight">
             </TRadioBtnCtrl>
             <TSliderCtrl 
-              Name="sliderCtrl2"
-              Id="28"
+              Name="TSliderCtrl"
+              Id="27"
               Left="360.00"
               Top="280.00"
               Height="43.03"
@@ -361,14 +354,14 @@
               BevelHeight="4.00"
               Min="0.00"
               Max="100.00"
-              Position="41.00"
+              Position="33.00"
               Step="10"
               Orientation="soHorizontal"
-              OnSlider="Slider2Click">
+              OnSlide="SliderClick">
             </TSliderCtrl>
             <TProgressCtrl 
-              Name="TProgressCtrl"
-              Id="29"
+              Name="ProgressCtrl1"
+              Id="28"
               Left="360.00"
               Top="360.00"
               Height="43.00"
@@ -377,87 +370,91 @@
               BevelHeight="4.00"
               CanFocus="False"
               Max="100"
-              Position="41.00"
+              Position="33.00"
               Orientation="soHorizontal"
               StartColor="$FF33CC33"
               EndColor="$FFFF0000">
             </TProgressCtrl>
             <TEditCtrl 
               Name="TEditCtrl"
-              Id="30"
+              Id="29"
               Left="360.00"
               Top="440.00"
               Height="55.03"
               OuterMargin="10.00"
               Width="940.00"
               BevelHeight="4.00"
+              Color="$FFFFFFFF"
+              FontColor="$FF000000"
               Margin="0.00"
               Text="Try editing me :).">
             </TEditCtrl>
             <TListCtrl 
               Name="ListCtrl"
-              Id="31"
+              Id="30"
               Left="1040.00"
               Top="100.00"
               Height="256.00"
               OuterMargin="10.00"
               Width="260.00"
               BevelHeight="4.00"
+              Color="$FFFFFFFF"
+              FontColor="$FF000000"
               Margin="0.00"
               AutoSize="True"
-              ImageList="svgList2"
-              ItemIndex="4">
+              ImageList="svgList24"
+              ItemIndex="0">
               <TListItem 
                 Name="List item 1"
-                Id="32"
+                Id="31"
                 Text="List item 1"
                 ImageIdx="0">
               </TListItem>
               <TListItem 
                 Name="List item 2"
-                Id="33"
+                Id="32"
                 Text="List item 2"
                 ImageIdx="0">
               </TListItem>
               <TListItem 
                 Name="List item 3"
-                Id="34"
+                Id="33"
                 Text="List item 3"
                 ImageIdx="0">
               </TListItem>
               <TListItem 
                 Name="List item 4"
-                Id="35"
+                Id="34"
                 Text="List item 4"
                 ImageIdx="0">
               </TListItem>
               <TListItem 
                 Name="List item 5"
-                Id="36"
+                Id="35"
                 Text="List item 5"
                 ImageIdx="0">
               </TListItem>
               <TListItem 
                 Name="List item 6"
-                Id="37"
+                Id="36"
                 Text="List item 6"
                 ImageIdx="0">
               </TListItem>
               <TListItem 
                 Name="List item 7"
-                Id="38"
+                Id="37"
                 Text="List item 7"
                 ImageIdx="0">
               </TListItem>
               <TListItem 
                 Name="List item 8"
-                Id="39"
+                Id="38"
                 Text="List item 8"
                 ImageIdx="0">
               </TListItem>
               <TScrollCtrl 
                 Name="ListScroll"
-                Id="40"
+                Id="39"
                 Left="220.71"
                 Top="8.00"
                 Height="240.00"
@@ -476,13 +473,13 @@
             </TListCtrl>
             <TScrollCtrl 
               Name="TScrollCtrl"
-              Id="41"
+              Id="40"
               Left="0.00"
-              Top="681.70"
+              Top="532.70"
               Height="31.29"
               OuterMargin="0.00"
               Visible="False"
-              Width="1402.00"
+              Width="1388.00"
               AutoPosition="apBottom"
               BevelHeight="4.00"
               CanFocus="False"
@@ -495,10 +492,10 @@
             </TScrollCtrl>
             <TScrollCtrl 
               Name="TScrollCtrl"
-              Id="42"
-              Left="1370.71"
+              Id="41"
+              Left="1356.71"
               Top="0.00"
-              Height="712.99"
+              Height="563.99"
               OuterMargin="0.00"
               Visible="False"
               Width="31.29"
@@ -515,7 +512,7 @@
           </TPagePnlCtrl>
           <TPageTabCtrl 
             Name="TPageTabCtrl"
-            Id="43"
+            Id="42"
             Left="160.10"
             Top="0.00"
             Height="53.00"
@@ -528,20 +525,22 @@
           </TPageTabCtrl>
           <TPagePnlCtrl 
             Name="TPagePnlCtrl"
-            Id="44"
+            Id="43"
             Left="6.00"
             Top="65.00"
-            Height="712.99"
+            Height="563.99"
             OuterMargin="0.00"
             Visible="False"
-            Width="1402.00"
+            Width="1388.00"
             AutoPosition="apClient"
             BevelHeight="0.00"
             CanFocus="False"
+            Color="$00000000"
+            FontColor="$FF000000"
             Margin="20.00">
             <TLabelCtrl 
               Name="TLabelCtrl"
-              Id="45"
+              Id="44"
               Left="80.00"
               Top="80.00"
               Height="44.00"
@@ -553,7 +552,7 @@
             </TLabelCtrl>
             <TImageBtnCtrl 
               Name="TImageBtnCtrl"
-              Id="46"
+              Id="45"
               Left="80.00"
               Top="160.00"
               Height="187.12"
@@ -564,12 +563,12 @@
               OnClick="ClickBtn"
               Padding="4.00"
               TextPosition="tpTop"
-              ImageList="svgList"
+              ImageList="svgList64"
               ImageIdx="0">
             </TImageBtnCtrl>
             <TImageBtnCtrl 
               Name="TImageBtnCtrl"
-              Id="47"
+              Id="46"
               Left="234.00"
               Top="160.00"
               Height="187.12"
@@ -580,12 +579,12 @@
               OnClick="ClickBtn"
               Padding="4.00"
               TextPosition="tpBottom"
-              ImageList="svgList"
+              ImageList="svgList64"
               ImageIdx="1">
             </TImageBtnCtrl>
             <TImageBtnCtrl 
               Name="TImageBtnCtrl"
-              Id="48"
+              Id="47"
               Left="388.00"
               Top="160.00"
               Height="187.12"
@@ -596,12 +595,12 @@
               OnClick="ClickBtn"
               Padding="4.00"
               TextPosition="tpTop"
-              ImageList="svgList"
+              ImageList="svgList64"
               ImageIdx="2">
             </TImageBtnCtrl>
             <TImageBtnCtrl 
               Name="TImageBtnCtrl"
-              Id="49"
+              Id="48"
               Left="542.00"
               Top="160.00"
               Height="187.12"
@@ -612,12 +611,12 @@
               OnClick="ClickBtn"
               Padding="4.00"
               TextPosition="tpBottom"
-              ImageList="svgList"
+              ImageList="svgList64"
               ImageIdx="3">
             </TImageBtnCtrl>
             <TImageBtnCtrl 
               Name="TImageBtnCtrl"
-              Id="50"
+              Id="49"
               Left="696.00"
               Top="160.00"
               Height="187.12"
@@ -628,12 +627,12 @@
               OnClick="ClickBtn"
               Padding="4.00"
               TextPosition="tpTop"
-              ImageList="svgList"
+              ImageList="svgList64"
               ImageIdx="4">
             </TImageBtnCtrl>
             <TImageBtnCtrl 
               Name="TImageBtnCtrl"
-              Id="51"
+              Id="50"
               Left="850.00"
               Top="160.00"
               Height="187.12"
@@ -644,12 +643,12 @@
               OnClick="ClickBtn"
               Padding="4.00"
               TextPosition="tpBottom"
-              ImageList="svgList"
+              ImageList="svgList64"
               ImageIdx="5">
             </TImageBtnCtrl>
             <TImageBtnCtrl 
               Name="TImageBtnCtrl"
-              Id="52"
+              Id="51"
               Left="1004.00"
               Top="160.00"
               Height="187.12"
@@ -660,12 +659,12 @@
               OnClick="ClickBtn"
               Padding="4.00"
               TextPosition="tpTop"
-              ImageList="svgList"
+              ImageList="svgList64"
               ImageIdx="6">
             </TImageBtnCtrl>
             <TImageBtnCtrl 
               Name="TImageBtnCtrl"
-              Id="53"
+              Id="52"
               Left="1158.00"
               Top="160.00"
               Height="187.12"
@@ -676,12 +675,12 @@
               OnClick="ClickBtn"
               Padding="4.00"
               TextPosition="tpBottom"
-              ImageList="svgList"
+              ImageList="svgList64"
               ImageIdx="7">
             </TImageBtnCtrl>
             <TImageBtnCtrl 
               Name="TImageBtnCtrl"
-              Id="54"
+              Id="53"
               Left="80.00"
               Top="367.12"
               Height="144.00"
@@ -692,12 +691,12 @@
               OnClick="ClickBtn"
               Padding="4.00"
               TextPosition="tpLeft"
-              ImageList="svgList"
+              ImageList="svgList64"
               ImageIdx="8">
             </TImageBtnCtrl>
             <TImageBtnCtrl 
               Name="TImageBtnCtrl"
-              Id="55"
+              Id="54"
               Left="327.17"
               Top="367.12"
               Height="144.00"
@@ -708,12 +707,12 @@
               OnClick="ClickBtn"
               Padding="4.00"
               TextPosition="tpRight"
-              ImageList="svgList"
+              ImageList="svgList64"
               ImageIdx="9">
             </TImageBtnCtrl>
             <TImageBtnCtrl 
               Name="TImageBtnCtrl"
-              Id="56"
+              Id="55"
               Left="574.34"
               Top="367.12"
               Height="144.00"
@@ -724,12 +723,12 @@
               OnClick="ClickBtn"
               Padding="4.00"
               TextPosition="tpLeft"
-              ImageList="svgList"
+              ImageList="svgList64"
               ImageIdx="10">
             </TImageBtnCtrl>
             <TImageBtnCtrl 
               Name="TImageBtnCtrl"
-              Id="57"
+              Id="56"
               Left="821.52"
               Top="367.12"
               Height="144.00"
@@ -740,12 +739,12 @@
               OnClick="ClickBtn"
               Padding="4.00"
               TextPosition="tpRight"
-              ImageList="svgList"
+              ImageList="svgList64"
               ImageIdx="11">
             </TImageBtnCtrl>
             <TImageBtnCtrl 
               Name="TImageBtnCtrl"
-              Id="58"
+              Id="57"
               Left="1068.69"
               Top="367.12"
               Height="144.00"
@@ -756,18 +755,18 @@
               OnClick="ClickBtn"
               Padding="4.00"
               TextPosition="tpLeft"
-              ImageList="svgList"
+              ImageList="svgList64"
               ImageIdx="12">
             </TImageBtnCtrl>
             <TScrollCtrl 
               Name="TScrollCtrl"
-              Id="59"
+              Id="58"
               Left="0.00"
-              Top="681.70"
+              Top="532.70"
               Height="31.29"
               OuterMargin="0.00"
               Visible="False"
-              Width="1402.00"
+              Width="1388.00"
               AutoPosition="apBottom"
               BevelHeight="4.00"
               CanFocus="False"
@@ -780,10 +779,10 @@
             </TScrollCtrl>
             <TScrollCtrl 
               Name="TScrollCtrl"
-              Id="60"
-              Left="1370.71"
+              Id="59"
+              Left="1356.71"
               Top="0.00"
-              Height="712.99"
+              Height="563.99"
               OuterMargin="0.00"
               Visible="False"
               Width="31.29"
@@ -800,7 +799,7 @@
           </TPagePnlCtrl>
           <TPageTabCtrl 
             Name="TPageTabCtrl"
-            Id="61"
+            Id="60"
             Left="314.19"
             Top="0.00"
             Height="53.00"
@@ -813,20 +812,22 @@
           </TPageTabCtrl>
           <TPagePnlCtrl 
             Name="TPagePnlCtrl"
-            Id="62"
+            Id="61"
             Left="6.00"
             Top="65.00"
-            Height="712.99"
+            Height="563.99"
             OuterMargin="0.00"
             Visible="False"
-            Width="1402.00"
+            Width="1388.00"
             AutoPosition="apClient"
             BevelHeight="0.00"
             CanFocus="False"
+            Color="$00000000"
+            FontColor="$FF000000"
             Margin="20.00">
             <TMemoCtrl 
               Name="TMemoCtrl"
-              Id="63"
+              Id="62"
               Left="0.00"
               Top="0.00"
               Height="0.00"
@@ -834,21 +835,24 @@
               Width="0.00"
               AutoPosition="apClient"
               BevelHeight="4.00"
+              Color="$FFFFFFFF"
+              FontColor="$FF000000"
               Margin="4.00"
               Text="Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis condimentum metus quis enim pellentesque, nec auctor lectus sodales. Nunc nec ullamcorper magna. Vivamus ac semper dui, eu hendrerit orci. Aliquam fermentum at nisi ut tincidunt. Ut at risus at turpis tempus luctus. Nulla sit amet ex vulputate, congue odio et, rhoncus sem. Donec venenatis libero eros, nec cursus nibh pulvinar sit amet. Nulla et velit aliquam, venenatis enim non, egestas ex.&#10;&#10;Aliquam ac erat quis arcu tincidunt vestibulum. Nunc consequat eu dui tempus tincidunt. In eget tortor quis nisi lacinia lobortis a eu magna. Nunc ac ante sagittis diam aliquet congue. Nunc molestie felis sit amet ultricies suscipit. Suspendisse ut porta tortor. Duis magna tortor, egestas vel tincidunt a, posuere quis risus. Vestibulum elementum lorem eu nisi pharetra consequat.&#10;&#10;Sed malesuada mauris in felis molestie, ut laoreet diam rhoncus. Duis ullamcorper turpis ut aliquet interdum. In nec eleifend tellus. Phasellus viverra molestie turpis. Cras eu urna nunc. Donec sit amet enim vitae tortor auctor sollicitudin nec ac eros. Maecenas aliquam dignissim nulla, nec rutrum urna tristique at. Nulla fringilla, lacus et molestie cursus, ex libero condimentum neque, vitae placerat mauris mauris et ante.&#10;&#10;Donec magna sapien, lacinia vitae nulla ac, accumsan porta ipsum. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Curabitur ac augue magna. Aliquam ante nisl, iaculis a facilisis et, semper eget eros. In egestas ex tortor. Maecenas vestibulum sed ipsum eu mollis. Mauris porta, odio id volutpat pellentesque, ex nulla ultrices est, sit amet maximus felis tortor id elit. Duis condimentum eget diam vitae sollicitudin. Aenean quis ipsum nec orci pharetra bibendum et in enim.&#10;&#10;Mauris dapibus convallis massa, nec scelerisque magna sagittis laoreet. Aliquam tincidunt facilisis sem. Morbi aliquam hendrerit ante, nec semper augue tempus ut. Morbi vel neque quis ligula blandit dictum. In non lacus diam. Ut lorem quam, gravida vestibulum nibh non, volutpat ultrices enim. Sed id laoreet lectus.&#10;&#10;Sed non tortor accumsan, accumsan ex vitae, fringilla leo. Pellentesque in arcu sit amet ante dictum sodales. Etiam eu diam lectus. Maecenas nec porttitor orci. Mauris efficitur eros convallis pharetra pulvinar. Aenean venenatis, neque nec scelerisque consectetur, ante dui dictum libero, ut semper turpis nulla vitae ipsum. Donec quam massa, interdum non venenatis ac, rutrum eu tortor. In bibendum ex eu arcu commodo consectetur ut quis massa. Cras elementum nibh eu arcu eleifend feugiat. Sed nulla nulla, egestas id efficitur vel, semper non odio. Ut accumsan faucibus ullamcorper. Duis semper ultricies leo nec faucibus. Sed molestie mollis elit vel dictum.&#10;&#10;Vivamus aliquet, urna vel dignissim mattis, purus nisi condimentum tortor, quis rhoncus lacus ex at neque. Vivamus vel orci nisi. Nulla eget quam sed nunc sagittis elementum eget sit amet quam. Praesent vitae semper nibh. Pellentesque eleifend enim dolor, et condimentum sem porttitor ac. Nam condimentum mi nibh, eu sollicitudin neque iaculis at. Pellentesque id tellus aliquam ligula varius molestie. Suspendisse luctus, erat vel scelerisque accumsan, orci justo fringilla urna, at blandit odio mi eu sapien. Vestibulum convallis molestie sapien dictum scelerisque. Praesent vitae turpis lorem.&#10;&#10;Quisque posuere mi purus, ut auctor justo auctor eget. Nam lacinia dignissim ultricies. Cras luctus sem quis lacus ornare viverra. Maecenas gravida nulla at urna aliquam scelerisque. Suspendisse ut ligula aliquam, maximus metus non, faucibus purus. Vestibulum luctus libero turpis, vel luctus massa euismod eget. Maecenas vel bibendum velit. Nunc at purus sit amet nisl tempus molestie nec ac risus. Ut non scelerisque nibh. Integer ipsum ipsum, sagittis non venenatis sed, eleifend non justo. Nulla facilisi. Donec accumsan vulputate faucibus. Nam lacinia ornare condimentum.">
               <TScrollCtrl 
                 Name="MemoScroll"
-                Id="64"
+                Id="63"
                 Left="0.00"
                 Top="0.00"
                 Height="0.00"
                 OuterMargin="0.00"
-                Width="0.00"
+                Visible="False"
+                Width="31.29"
                 AutoPosition="apCustom"
                 BevelHeight="4.00"
                 CanFocus="False"
                 AutoHide="True"
-                Size="0.00"
+                Size="31.29"
                 Max="100.00"
                 Orientation="soVertical"
                 Position="0.00"

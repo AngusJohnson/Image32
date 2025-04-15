@@ -904,7 +904,7 @@ begin
     pi := GetPropInfo(self.ClassType, propName);
     case pi.PropType^.Kind of
       tkEnumeration: SetEnumProp(self, propName, propVal);
-      tkInteger: TypInfo.SetOrdProp(self, pi, Cardinal(strToIntDef(propVal, 0)));
+      tkInteger: SetOrdProp(self, pi, Cardinal(strToIntDef(propVal, 0)));
       tkFloat: SetFloatProp(self, propName, strToFloatDef(propVal, 0.0));
       tkUString: SetPropValue(self, propName, propVal);
       else Exit; // eg methods and classes aren't handled here
@@ -1226,6 +1226,7 @@ begin
   inherited Create(nil, name); // TStorageManager should never have a parent
   fManager := self;
   fDesignScale := 1;
+  fDesignScreenRes := 1;
 end;
 //------------------------------------------------------------------------------
 
@@ -1237,7 +1238,7 @@ end;
 
 procedure TStorageManager.SetDesignScale(value: double);
 begin
-  if value <= 0 then value := 1;
+  if value <= 0 then Exit;
   fDesignScale := value;
 end;
 //------------------------------------------------------------------------------

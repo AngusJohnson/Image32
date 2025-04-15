@@ -3,7 +3,7 @@ unit Img32.Ctrls;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  0.0 (Experimental)                                              *
-* Date      :  10 April 2025                                                   *
+* Date      :  12 April 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -23,7 +23,7 @@ interface
 
 uses
   SysUtils, Classes, Math, Types, TypInfo, Character,
-  {$IFDEF MSWINDOWS} Windows, {$ENDIF} // required for clipboard
+  {$IFDEF MSWINDOWS} Windows, Messages, {$ENDIF} // required for clipboard
   {$IFDEF XPLAT_GENERICS} Generics.Collections, Generics.Defaults,{$ENDIF}
   Img32, Img32.Storage, Img32.Vector, Img32.Text, Img32.TextChunks,
   Img32.Layers, Img32.Fmt.SVG;
@@ -80,7 +80,7 @@ type
     destructor Destroy; override;
     procedure RegisterProperties;
     procedure DeRegisterProperties;
-    procedure Resized; virtual;
+    procedure Scale(delta: double); virtual;
     function  GetEventName(event: TNotifyEvent): string;
     function  GetPropName(prop: TObject): string;
     property  EventCount: integer read GetEventCount;
@@ -94,10 +94,13 @@ type
   TRootCtrl  = class;
   TCustomCtrlClass = class of TCustomCtrl;
 
-  // TCtrlStorageManager - in its constructor creates
-  //   1. a TLayeredImage32 object that also creates a TGroupLayer32 'root'.
-  //   2. a TRootCtrl 'RootCtrl' object that's owned by the 'root'.
-  //   Any custom controls added will be owned directly or indirectly by 'RootCtrl'.
+  // TCtrlStorageManager - pretty much runs everything.
+  // TCtrlStorageManager contains ...
+  //   1. TEventPropertyHandler object
+  //   2. TLayeredImage32 object that contains
+  //         'root' layer that contains
+  //           'RootCtrl' layer object that contains all 'ctrl' objects
+
   TCtrlStorageManager = class(TStorageManager)
   private
     fLayeredImg   : TLayeredImage32;
@@ -109,11 +112,19 @@ type
     fEventHandler : TEventPropertyHandler;
     fDelayedLinks : TLoadRecArray;
     fMainHdl      : THandle;
+    fAllowResize  : Boolean;
+    fDesigning    : Boolean;
+    fDesignTarget : TCustomCtrl;
+    fClickLayer   : TLayer32;
+    fSizingGroup  : TSizingGroupLayer32;
+    fClickPt      : TPoint;
     function GetRepaintReq: Boolean;
     function GetFocusedCtrl: TCustomCtrl;
     procedure SetFocusedCtrl(ctrl: TCustomCtrl);
     function FindChildByLoadId(parent: TStorage; id: integer): TStorage;
     procedure AddDelayedLink(const delayedLink: TLoadRec);
+    procedure SetDesigning(value: Boolean);
+    procedure SetDesignTarget(ctrl: TCustomCtrl);
   protected
     procedure SetDesignScale(value: double); override;
     procedure BeginRead; override;
@@ -124,7 +135,9 @@ type
     procedure RemoveShortcutOwner(ctrl: TCustomCtrl);
     property ShortcutList: TList read fShortcutList;
   public
-    constructor Create(mainHdl: THandle); reintroduce; overload; virtual;
+    // Constructor also creates
+    //   1. a TLayeredImage32 object containing a 'root' TGroupLayer32, and
+    //   2. a TRootCtrl object 'RootCtrl' that's owned by the 'root'.
     constructor Create(parent: TStorage = nil; const name: string = ''); overload; override;
     destructor Destroy; override;
     procedure Quit;
@@ -138,13 +151,22 @@ type
     procedure KeyPress(var Key: Char);
     procedure Resize(width, height: Cardinal);
     function  FindShortcutOwner(const aShortcut: TShortcut): TCustomCtrl;
+{$IFDEF MSWINDOWS}
+    function CreateMainWindow(const UniqueClassName: string;
+      const WindowCaption: string; const IconResourceName: string = '';
+      Width: integer = 0; Height: integer = 0): THandle;
+{$ENDIF}
     property CurrentCursor: integer read fCurrCursor;
+    property Designing: Boolean read fDesigning write SetDesigning;
+    property DesignTarget: TCustomCtrl read fDesignTarget write SetDesignTarget;
     property EventAndPropertyHandler : TEventPropertyHandler read fEventHandler;
     property FocusedCtrl: TCustomCtrl read GetFocusedCtrl write SetFocusedCtrl;
     property LayeredImage: TLayeredImage32 read fLayeredImg write fLayeredImg;
-    property MainHdl     : THandle read fMainHdl write fMainHdl;
+    property MainHdl     : THandle read fMainHdl;
     property RootCtrl: TRootCtrl read fRootCtrl;
     property RepaintRequired: Boolean read GetRepaintReq;
+  published
+    property AllowResize: Boolean read fAllowResize write fAllowResize;
   end;
 
   TCustomCtrl = class(THitTestLayer32, INotifyRecipient)
@@ -162,6 +184,7 @@ type
     fOnClick      : TNotifyEvent;
     fAfterPaint   : TNotifyEvent;
     fDelayedLinks : TLoadRecArray;
+    fAllowRTEdit  : Boolean;        // run-time editing
     fIsthemed     : Boolean;
     procedure AddDelayedLink(const propName: string; targetId: integer);
     function  GetManager: TCtrlStorageManager;
@@ -228,6 +251,7 @@ type
     property FocusLineWidth: double read GetFocusLineWidth;
     property Shortcut   : TShortcut read fShortcut write SetShortcut;
   published
+    property AllowRTEdit  : Boolean read fAllowRTEdit write fAllowRTEdit;
     property AutoPosition : TAutoPosition
       read fAutoPosition write SetAutoPosition;
     property BevelHeight: double read fBevelHeight write SetBevHeight;
@@ -243,7 +267,7 @@ type
     property OnPainted  : TNotifyEvent read fAfterPaint write fAfterPaint;
   end;
 
-  TCustomPosCtrl = class(TCustomCtrl)
+  TCustomAutoPosCtrl = class(TCustomCtrl)
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
   end;
@@ -262,7 +286,7 @@ type
     property TargetCtrl: TCustomCtrl read fTargetCtrl write fTargetCtrl;
   end;
 
-  TStatusbarCtrl = class(TCustomPosCtrl)
+  TStatusbarCtrl = class(TCustomAutoPosCtrl)
   protected
     procedure Paint; override;
   public
@@ -615,16 +639,20 @@ type
     fTheme        : TCtrlTheme;
     procedure SetTheme(const theme: TCtrlTheme);
   public
+    constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
+    procedure Scale(value: double); override;
     function SetFocus(ctrl: TCustomCtrl): Boolean; reintroduce; overload;
+{$IFDEF MSWINDOWS}
     function SetCapture(ctrl: TCustomCtrl; hdl: HWnd): Boolean;
     function ReleaseCapture: Boolean;
     property CaptureCtrl : TCustomCtrl read fCaptureCtrl;
+{$ENDIF}
     property FocusedCtrl : TCustomCtrl read fFocusedCtrl;
     property PopMenuCtrl : TPopMenuCtrl read fPopMenuCtrl write fPopMenuCtrl;
     property Theme       : TCtrlTheme read fTheme write SetTheme;
   end;
 
-  TPageTabCtrl = class(TCustomPosCtrl)
+  TPageTabCtrl = class(TCustomAutoPosCtrl)
   protected
     procedure Clicked; override;
     procedure DoMouseDown(Button: TMouseButton;
@@ -719,7 +747,7 @@ type
     fMin          : double;
     fMax          : double;
     fScrollState  : TScrollState;
-    fOnSlider     : TNotifyEvent;
+    fOnSlide     : TNotifyEvent;
     function  GetDelta: double;
     procedure SetBtnSize;
     procedure SetPressed(value: Boolean);
@@ -745,10 +773,10 @@ type
     property Position   : double read fPosition write SetPosition;
     property Step       : integer read fScrollStep write fScrollStep;
     property Orientation: TScrollOrientation read fOrientation write SetOrientation;
-    property OnSlider   : TNotifyEvent read fOnSlider write fOnSlider;
+    property OnSlide    : TNotifyEvent read fOnSlide write fOnSlide;
   end;
 
-  TScrollCtrl = class(TCustomPosCtrl)
+  TScrollCtrl = class(TCustomAutoPosCtrl)
   private
     fAutoHide     : Boolean;
     fSize         : double;
@@ -767,8 +795,6 @@ type
     procedure SetScrollSize(newSize: double);
     procedure SetBtnPos(newPos: double);
     procedure SetAutoHide(value: Boolean);
-    procedure SetMinBtnSize(value: integer);
-    function  GetMinBtnSize: integer;
     procedure SetScrollStep(value: integer);
     function  GetScrollStep: integer;
   protected
@@ -785,7 +811,6 @@ type
     procedure DoMouseDown(button: TMouseButton; shift: TShiftState; const pt: TPoint); override;
     procedure DoMouseMove(shift: TShiftState; const pt: TPoint); override;
     procedure DoMouseUp(button: TMouseButton; shift: TShiftState; const pt: TPoint); override;
-    property  MinBtnSize        : integer read GetMinBtnSize write SetMinBtnSize;
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     procedure Scale(value: double); override;
@@ -801,11 +826,8 @@ type
     property Step         : integer read GetScrollStep write SetScrollStep;
   end;
 
-{$IFDEF MSWINDOWS}
-  function GetScreenResolution: double;
-{$ENDIF}
-
 const
+  RESET   = -1;
   ssShift = $8000;
   ssCtrl  = $4000;
   ssAlt   = $2000;
@@ -820,14 +842,23 @@ var
   clDefMid32  :   TColor32 = $FF33CC33;
   clDefLite32 :   TColor32 = $FFDDEEDD;
 
+  tickPaths     :   TPathsD;
+  queryPaths    :   TPathsD;
+
+  sizeCursor  : HIcon;
+  handCursor  : HIcon;
+  arrowCursor : HIcon;
+
 {$IFDEF MSWINDOWS}
   minDragDist   : integer;
   dblClickInt   : integer;
   lastClick     : integer;
-{$ENDIF}
 
-  tickPaths     :   TPathsD;
-  queryPaths    :   TPathsD;
+  function BasicWindowProc(hWnd, uMsg, wParam: WPARAM; lParam: LPARAM): Integer; stdcall;
+  function CenterWindow(windowHdl: THandle): boolean;
+  procedure ResizeMainWindow(hdl: HWnd; width, height: Cardinal);
+  function GetScreenResolution: double;
+{$ENDIF}
 
 implementation
 
@@ -861,12 +892,340 @@ const
   tab     = #9;
 {$ENDIF}
 
-//------------------------------------------------------------------------------
-// Miscellaneous functions
-//------------------------------------------------------------------------------
-
-
 {$IFDEF MSWINDOWS}
+
+//------------------------------------------------------------------------------
+// Miscellaneous Windows functions
+//------------------------------------------------------------------------------
+
+function CenterWindow(windowHdl: THandle): boolean;
+var
+  DesktopRec, WindowRec: TRect;
+  l,t: integer;
+begin
+  result := SystemParametersInfo(SPI_GETWORKAREA, 0, @DesktopRec, 0);
+  if not result or (windowHdl = 0) then exit;
+  GetWindowRect(windowHdl,WindowRec);
+  l := ((DesktopRec.Right - DesktopRec.Left) - (WindowRec.Right - WindowRec.Left)) div 2;
+  t := ((DesktopRec.Bottom - DesktopRec.Top) - (WindowRec.Bottom - WindowRec.Top)) div 2;
+  if l < 0 then l := 0;
+  if t < 0 then t := 0;
+  result := SetWindowPos(windowHdl, 0, l, t, 0, 0, SWP_NOACTIVATE or SWP_NOSIZE or SWP_NOZORDER);
+end;
+//------------------------------------------------------------------------------
+
+procedure ResizeMainWindow(hdl: HWnd; width, height: Cardinal);
+var
+  winRec, clientRec: TRect;
+  dx,dy: cardinal;
+begin
+  GetWindowRect(hdl, winRec);
+  GetClientRect(hdl, clientRec);
+  dx := winrec.Width - clientRec.Width;
+  dy := winrec.Height - clientRec.Height;
+  SetWindowPos(hdl, 0,0,0, width + dx, height + dy, SWP_NOZORDER or SWP_NOMOVE);
+end;
+//------------------------------------------------------------------------------
+
+function WParamToShiftState(wParam: Word): TShiftState;
+begin
+  Result := 0;
+  if wParam and MK_SHIFT <> 0 then Result := Result + ssShift;
+  if wParam and MK_CONTROL <> 0 then Result := Result + ssCtrl;
+  if GetKeyState(VK_MENU) < 0 then Result := Result + ssAlt;
+end;
+//------------------------------------------------------------------------------
+
+function LParamToShiftState(lParam: LPARAM): TShiftState;
+const
+  AltMask = $20000000;
+begin
+  Result := 0;
+  if GetKeyState(VK_SHIFT) < 0 then Result := Result + ssShift;
+  if GetKeyState(VK_CONTROL) < 0 then Result := Result + ssCtrl;
+  if lParam and AltMask <> 0 then Result := Result + ssAlt;
+end;
+//------------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+// Windows message handler - that passes keyboard and
+// mouse messages to storageMngr for processing
+//------------------------------------------------------------------------------
+
+function BasicWindowProc(hWnd, uMsg,	wParam: WPARAM; lParam: LPARAM): Integer; stdcall;
+var
+  key     : Word;
+  chr     : Char;
+  w,h     : integer;
+  pt      : TPoint;
+  ps      : TPAINTSTRUCT;
+  dc      : HDC;
+  img     : TImage32;
+  dx,dy   : integer;
+  rec     : TRectD;
+  shift   : TShiftState;
+  layer   : TLayer32;
+  updateRect    : TRect;
+  storageMngr   : TCtrlStorageManager;
+  layeredImg32  : TLayeredImage32;
+begin
+  storageMngr := Pointer(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+  case uMsg of
+    WM_LBUTTONDOWN:
+      begin
+        Result := 0;
+        SetCapture(hWnd);
+        storageMngr.fClickPt := Img32.vector.Point(
+          SmallInt(LoWord(lParam)),
+          SmallInt(HiWord(lParam)));
+        if storageMngr.Designing then
+        begin
+          layeredImg32 := storageMngr.fLayeredImg;
+          storageMngr.fClickLayer := layeredImg32.GetLayerAt(storageMngr.fClickPt);
+          if (storageMngr.fClickLayer is TCustomCtrl) and
+            TCustomCtrl(storageMngr.fClickLayer).AllowRTEdit then
+          begin
+            storageMngr.DesignTarget := TCustomCtrl(storageMngr.fClickLayer);
+            SetCursor(handCursor);
+            //UpdateTargetPosDisplay;
+            Exit;
+          end
+          else if (storageMngr.fClickLayer is TButtonDesignerLayer32) then
+          begin
+            SetCursor(sizeCursor);
+            Exit;
+          end
+          else if not (storageMngr.fClickLayer is TBaseMenuCtrl) then
+            Exit;
+        end;
+        // not designing so get storageMngr to process
+        storageMngr.MouseDown(mbLeft,
+          WParamToShiftState(wParam), storageMngr.fClickPt);
+        if storageMngr.RepaintRequired then
+          InvalidateRect(hWnd, nil, false);
+      end;
+    WM_MOUSEMOVE:
+      begin
+        Result := 0;
+        pt := Img32.vector.Point(
+          SmallInt(LoWord(lParam)),
+          SmallInt(HiWord(lParam)));
+        dx := pt.X - storageMngr.fClickPt.X;
+        dy := pt.Y - storageMngr.fClickPt.Y;
+
+        if storageMngr.Designing then
+        begin
+          if not assigned(storageMngr.fClickLayer) then
+          begin
+            layeredImg32 := storageMngr.fLayeredImg;
+            layer := layeredImg32.GetLayerAt(pt);
+            if Assigned(layer) and (layer is TCustomCtrl) and
+              TCustomCtrl(layer).AllowRTEdit then
+            begin
+              if (layer is TButtonDesignerLayer32) then
+                SetCursor(sizeCursor)
+              else if layer = storageMngr.DesignTarget then
+                SetCursor(handCursor)
+              else
+                SetCursor(arrowCursor);
+            end else
+            begin
+              // ie don't try to design the menus
+              storageMngr.MouseMove(WParamToShiftState(wParam), pt);
+              if storageMngr.RepaintRequired then
+                InvalidateRect(hWnd, nil, false);
+            end;
+            Exit;
+          end;
+
+          if (storageMngr.fClickLayer = storageMngr.DesignTarget) then
+          begin
+            SetCursor(handCursor);
+            storageMngr.DesignTarget.Offset(dx,dy);
+            storageMngr.fSizingGroup.Offset(dx,dy);
+            storageMngr.fClickPt := pt;
+            //UpdateTargetPosDisplay;
+            InvalidateRect(hWnd, nil, false);
+          end else if (storageMngr.fClickLayer is TButtonDesignerLayer32) then
+          begin
+            SetCursor(sizeCursor);
+            storageMngr.fClickLayer.Offset(dx, dy);
+            rec := RectD(UpdateSizingButtonGroup(storageMngr.fClickLayer));
+            rec := storageMngr.DesignTarget.Parent.MakeRelative(rec);
+            storageMngr.DesignTarget.SetInnerBounds(rec);
+            storageMngr.fClickPt := pt;
+            InvalidateRect(hWnd, nil, false);
+          end;
+        end else
+        begin
+          // not designing so get storageMngr to process
+          storageMngr.MouseMove(WParamToShiftState(wParam), pt);
+          if storageMngr.RepaintRequired then
+            InvalidateRect(hWnd, nil, false);
+        end;
+      end;
+    WM_LBUTTONUP:
+      begin
+        ReleaseCapture;
+        pt := Img32.vector.Point(
+          SmallInt(LoWord(lParam)),
+          SmallInt(HiWord(lParam)));
+        storageMngr.MouseUp(mbLeft, WParamToShiftState(wParam), pt);
+        if storageMngr.RepaintRequired then
+          InvalidateRect(hWnd, nil, false);
+        storageMngr.fClickLayer := nil;
+        Result := 0;
+      end;
+    WM_MOUSEWHEEL:
+      begin
+        if storageMngr.Designing then storageMngr.fClickLayer := nil;
+        pt := Img32.vector.Point(
+          SmallInt(LoWord(lParam)),
+          SmallInt(HiWord(lParam)));
+        if storageMngr.MouseWheel(WParamToShiftState(wParam),
+          SmallInt(HiWord(wParam)), pt) and storageMngr.RepaintRequired then
+            InvalidateRect(hWnd, nil, false);
+        Result := 0;
+      end;
+    WM_SYSCOMMAND:
+      if wParam = SC_KEYMENU then
+        Result := 0 else //stops beeps with Alt key combos
+        Result := DefWindowProc(hWnd, uMsg, wParam, lParam);
+    WM_CHAR:
+      begin
+        if not storageMngr.Designing then
+        begin
+          chr := Char(wParam);
+          storageMngr.KeyPress(chr);
+          if storageMngr.RepaintRequired then
+            InvalidateRect(hWnd, nil, false);
+        end;
+        Result := 0;
+      end;
+    WM_KEYDOWN:
+      begin
+        key := Word(wParam);
+        shift := LParamToShiftState(lParam);
+
+        if storageMngr.Designing and 
+          Assigned(storageMngr.DesignTarget) then
+        begin
+          case Key of
+            VK_DELETE:
+              begin
+                FreeAndNil(storageMngr.fSizingGroup);
+                FreeAndNil(storageMngr.DesignTarget);
+                InvalidateRect(hWnd, nil, false);
+              end;
+            VK_DOWN:
+              begin
+                if Shift and ssCtrl <> 0 then w := 5 else w := 1;
+                storageMngr.DesignTarget.Offset(0,w);
+                storageMngr.fSizingGroup.Offset(0,w);
+                //UpdateTargetPosDisplay;
+                InvalidateRect(hWnd, nil, false);
+              end;
+            VK_UP:
+              begin
+                if Shift and ssCtrl <> 0 then w := 5 else w := 1;
+                storageMngr.DesignTarget.Offset(0,-w);
+                storageMngr.fSizingGroup.Offset(0,-w);
+                //UpdateTargetPosDisplay;
+                InvalidateRect(hWnd, nil, false);
+              end;
+            VK_RIGHT:
+              begin
+                if Shift and ssCtrl <> 0 then w := 5 else w := 1;
+                storageMngr.DesignTarget.Offset(w,0);
+                storageMngr.fSizingGroup.Offset(w,0);
+                //UpdateTargetPosDisplay;
+                InvalidateRect(hWnd, nil, false);
+              end;
+            VK_LEFT:
+              begin
+                if Shift and ssCtrl <> 0 then w := 5 else w := 1;
+                storageMngr.DesignTarget.Offset(-w,0);
+                storageMngr.fSizingGroup.Offset(-w,0);
+                //UpdateTargetPosDisplay;
+                InvalidateRect(hWnd, nil, false);
+              end;
+          end;
+        end
+        else
+        begin
+          storageMngr.KeyDown(key, shift);
+          if storageMngr.RepaintRequired then
+            InvalidateRect(hWnd, nil, false);
+        end;
+        Result := 0;
+      end;
+    WM_SYSKEYDOWN:
+      begin
+        // eg alt keys
+        key := Word(wParam);
+        shift := LParamToShiftState(lParam);
+        storageMngr.KeyDown(key, shift);
+        if storageMngr.RepaintRequired then
+          InvalidateRect(hWnd, nil, false);
+        Result := 0;
+      end;
+    WM_SYSKEYUP:
+      begin
+        Result := 0;
+      end;
+    WM_KEYUP:
+      begin
+        key := Word(wParam);
+        shift := LParamToShiftState(lParam);
+        storageMngr.KeyUp(key, shift);
+        if storageMngr.RepaintRequired then
+          InvalidateRect(hWnd, nil, false);
+        Result := 0;
+      end;
+    WM_SIZE:
+      begin
+        w := LoWord(lParam);
+        h := HIWord(lParam);
+        storageMngr.Resize(w,h);
+        InvalidateRect(hWnd,nil,true);
+        Result := 0;
+      end;
+    WM_PAINT:
+      begin
+        Result := 0;
+        if not Assigned(storageMngr) then Exit;
+        layeredImg32 := storageMngr.LayeredImage;
+        img := layeredImg32.GetMergedImage(false, updateRect);
+        //img.SaveToFile('c:\temp\test.bmp');
+        dc := BeginPaint(hWnd, &ps);
+        img.CopyToDc(updateRect, dc, updateRect.Left, updateRect.Top, false);
+        EndPaint(hWnd, &ps);
+      end;
+    WM_ERASEBKGND: Result := 1;
+    WM_GETDLGCODE: Result := DLGC_WANTALLKEYS;
+    WM_DPICHANGED:
+      begin
+        //nb: Manifest DPI Awareness must be set to
+        //at least 'Per Monitor' to receive this notification.
+        DpiAwareOne := LoWord(wParam) / 96;
+        DpiAware1 := Round(DpiAwareOne);
+        Result := 0;
+      end;
+    WM_DESTROY:
+      begin
+        PostQuitMessage(0);
+        result := 0;
+        exit;
+      end;
+    else
+      Result := DefWindowProc(hWnd, uMsg, wParam, lParam);
+  end;
+end;
+
+//------------------------------------------------------------------------------
+// Miscellaneous Windows functions
+//------------------------------------------------------------------------------
+
 function GetScreenResolution: double;
 var
   dc: HDC;
@@ -876,33 +1235,6 @@ begin
     Result := GetDeviceCaps(dc, LOGPIXELSX) / 96;
   finally
     ReleaseDC(0, dc);
-  end;
-end;
-//------------------------------------------------------------------------------
-
-function LoadAnsiTextFromClipboard: AnsiString;
-var
-   len : integer;
-   DataHandle: THandle;
-   dataPtr: Pointer;
-begin
-  Result := '';
-  if not OpenClipboard(0) then Exit;
-  try
-    if not IsClipboardFormatAvailable(CF_TEXT) then Exit;
-    DataHandle := GetClipboardData(CF_TEXT);
-    if DataHandle = 0 then Exit;
-    len := GlobalSize(DataHandle) -1; // ignore trailing zero
-    if len < 1 then Exit;
-    SetLength(Result, len);
-    dataPtr := GlobalLock(DataHandle);
-    try
-      Move(dataPtr^, Result[1], len);
-    finally
-      GlobalUnlock(DataHandle)
-    end;
-  finally
-    CloseClipboard;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -956,8 +1288,11 @@ begin
     CloseClipboard;
   end;
 end;
-//------------------------------------------------------------------------------
 {$ENDIF}
+
+//------------------------------------------------------------------------------
+// Miscellaneous functions
+//------------------------------------------------------------------------------
 
 function IsShortcut(const shortcut: TShortcut): Boolean;
   {$IFDEF INLINE} inline; {$ENDIF}
@@ -1047,62 +1382,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TriStateToBool(ts: TTriState): Boolean;
-begin
-  if ts = tsYes then
-    Result := true else
-    Result := false;
-end;
-//------------------------------------------------------------------------------
-
 function BoolToTriState(val: Boolean): TTriState;
 begin
   if val then
     Result := tsYes else
     Result := tsNo;
-end;
-//------------------------------------------------------------------------------
-
-function ArrayOfStringToString(const aos: TArrayOfString): string;
-var
-  i, len: integer;
-begin
-  Result := '';
-  len := Length(aos);
-  if len = 0 then Exit;
-  for i := 0 to Len - 2 do
-    Result := Result + aos[i] + #9;
-  Result := Result + aos[len - 1];
-end;
-//------------------------------------------------------------------------------
-
-function StringToArrayOfString(const str: string): TArrayOfString;
-var
-  i,j, len, cnt, cap: integer;
-begin
-  len := Length(str);
-  cnt := 0;
-  cap := 8;
-  SetLength(Result, cap);
-  j := 1;
-  for i := 1 to  len do
-    if str[i] = #9 then
-    begin
-      if cnt = cap then
-      begin
-        cap := cap * 2;
-        SetLength(Result, cap);
-      end;
-      Result[cnt] := Copy(str, j, i - j);
-      j := i + 1;
-      inc(cnt);
-    end;
-    if j <= len then
-    begin
-      Result[cnt] := Copy(str, j, len - j + 1);
-      inc(cnt);
-    end;
-  SetLength(Result, cnt);
 end;
 //------------------------------------------------------------------------------
 
@@ -1115,16 +1399,6 @@ begin
   begin
     Result := pt1.Y <= pt2.Y;
   end;
-end;
-//------------------------------------------------------------------------------
-
-function GetMaxWidth(ad: TArrayOfDouble): Double;
-var
-  i: integer;
-begin
-  Result := 0;
-  for i := 0 to High(ad) do
-     if ad[i] > Result then Result := ad[i];
 end;
 //------------------------------------------------------------------------------
 
@@ -1235,14 +1509,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure DrawEditCtrl(Image: TImage32; const rect: TRect;
-  bevHeight: double;  color: TColor32 = clWhite32);
-begin
-  Image.FillRect(rect, color);
-  DrawEdge(Image, rect, clSilver32, clWhite32, bevHeight);
-end;
-//------------------------------------------------------------------------------
-
 procedure DrawCheckboxCtrl(Image: TImage32; const rec: TRect;
   bevHeight: double; triState: TTriState = tsNo; lineWidth: double = 1.0;
   color: TColor32 = clWhite32; enabled: Boolean = true);
@@ -1350,15 +1616,17 @@ begin
   begin
     with TCustomCtrl(parent) do
     begin
-      Self.Color      := Color;
-      Self.FontColor  := FontColor;
-      Self.Isthemed   := Isthemed;
+      Self.Color        := Color;
+      Self.FontColor    := FontColor;
+      Self.Isthemed     := Isthemed;
+      Self.AllowRTEdit  := AllowRTEdit;
     end;
   end else
   begin
     Color       := clBtnFace32;
     FontColor   := clBlack32;
-    fIsthemed   := false;
+    Isthemed    := True;
+    AllowRTEdit := true;
   end;
   fBevelHeight  := dpiAware(2);
   OuterMargin   := DPIAware(5);
@@ -1394,44 +1662,47 @@ var
   i: integer;
   rec: TRectD;
 begin
-  fBevelHeight := fBevelHeight * value;
-  OuterMargin := OuterMargin * value;
+  if AllowRTEdit then
+  begin
+    fBevelHeight := fBevelHeight * value;
+    OuterMargin := OuterMargin * value;
 
-  case AutoPosition of
-    apNone:
-    begin
-      rec := InnerBounds;
-      rec := ScaleRect(rec, value);
-      SetInnerBounds(rec);
-      Invalidate;
-    end;
-    apLeft:
-    begin
-      rec := TCustomCtrl(Parent).ClientRect;
-      rec.Right := rec.Left + Width * value;
-      SetInnerBounds(rec);
-      Invalidate;
-    end;
-    apRight:
-    begin
-      rec := TCustomCtrl(Parent).ClientRect;
-      rec.Left := rec.Right - Width * value;
-      SetInnerBounds(rec);
-      Invalidate;
-    end;
-    apTop:
-    begin
-      rec := TCustomCtrl(Parent).ClientRect;
-      rec.Bottom := rec.Top + Height * value;
-      SetInnerBounds(rec);
-      Invalidate;
-    end;
-    apBottom:
-    begin
-      rec := TCustomCtrl(Parent).ClientRect;
-      rec.Top := rec.Bottom - Height * value;
-      SetInnerBounds(rec);
-      Invalidate;
+    case AutoPosition of
+      apNone:
+      begin
+        rec := InnerBounds;
+        rec := ScaleRect(rec, value);
+        SetInnerBounds(rec);
+        Invalidate;
+      end;
+      apLeft:
+      begin
+        rec := TCustomCtrl(Parent).ClientRect;
+        rec.Right := rec.Left + Width * value;
+        SetInnerBounds(rec);
+        Invalidate;
+      end;
+      apRight:
+      begin
+        rec := TCustomCtrl(Parent).ClientRect;
+        rec.Left := rec.Right - Width * value;
+        SetInnerBounds(rec);
+        Invalidate;
+      end;
+      apTop:
+      begin
+        rec := TCustomCtrl(Parent).ClientRect;
+        rec.Bottom := rec.Top + Height * value;
+        SetInnerBounds(rec);
+        Invalidate;
+      end;
+      apBottom:
+      begin
+        rec := TCustomCtrl(Parent).ClientRect;
+        rec.Top := rec.Bottom - Height * value;
+        SetInnerBounds(rec);
+        Invalidate;
+      end;
     end;
   end;
   for i := 0 to ChildCount -1 do
@@ -1539,7 +1810,14 @@ begin
    propName := string(propInfo.Name);
    //parentPropInfo := GetPropInfo(Parent.ClassInfo, propName);
 
-   if (propName = 'AutoPosition') then
+   if (propName = 'AllowRTEdit') then
+   begin
+     // only write an AllowRTEdit property if it differs from its parent
+     if Parent is TCustomCtrl then
+       Result := TCustomCtrl(Parent).AllowRTEdit = AllowRTEdit else
+       Result := False;
+   end
+   else if (propName = 'AutoPosition') then
    begin
      // only write an AutoPosition property if it isn't apNone
      Result := AutoPosition = apNone;
@@ -1551,7 +1829,9 @@ begin
    end
    else if (propName = 'Color') then
    begin
-     Result := Isthemed;
+     if Parent is TCustomCtrl then
+       Result := TCustomCtrl(Parent).Color = Color else
+       Result := False;
    end
    else if (propName = 'CursorId') then
    begin
@@ -1569,11 +1849,15 @@ begin
    end
    else if (propName = 'FontColor') then
    begin
-     Result := FontColor = clBlack32;
+     if Parent is TCustomCtrl then
+       Result := TCustomCtrl(Parent).Color = Color else
+       Result := FontColor = clBlack32;
    end
    else if (propName = 'IsThemed') then
    begin
-     Result := IsThemed = True;
+     if Parent is TCustomCtrl then
+       Result := TCustomCtrl(Parent).IsThemed = IsThemed else
+       Result := False;
    end
    else if (propName = 'Opacity') then
    begin
@@ -1865,8 +2149,10 @@ begin
     RecursiveNotifyVisibleChildren(self)
   else
   begin
+{$IFDEF MSWINDOWS}
     if (RootCtrl.CaptureCtrl = self) then
       RootCtrl.ReleaseCapture;
+{$ENDIF}
   end;
 end;
 //------------------------------------------------------------------------------
@@ -1875,8 +2161,8 @@ function TCustomCtrl.IsVisibleToCtrlRoot: Boolean;
 var
   obj: TLayer32;
 begin
-  Result := Visible;
   obj := Self;
+  Result := Visible;
   while Result and not (obj is TRootCtrl) do
   begin
     obj := obj.Parent;
@@ -1987,6 +2273,23 @@ end;
 // TRootCtrl
 //------------------------------------------------------------------------------
 
+constructor TRootCtrl.Create(parent: TLayer32 = nil; const name: string = ''); 
+begin
+  inherited;
+end;
+//------------------------------------------------------------------------------
+
+procedure TRootCtrl.Scale(value: double);
+var
+  i: integer;
+begin
+  if (value < 0.01) or (value > 100) or (value = 1.0) then Exit;
+  for i := 0 to ChildCount -1 do
+    if (Child[i] is TCustomCtrl) then
+      TCustomCtrl(Child[i]).Scale(value);
+end;
+//------------------------------------------------------------------------------
+
 function TRootCtrl.SetFocus(ctrl: TCustomCtrl): Boolean;
 begin
   Result := False;
@@ -2011,6 +2314,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+{$IFDEF MSWINDOWS}
 function TRootCtrl.SetCapture(ctrl: TCustomCtrl; hdl: HWnd): Boolean;
 begin
   if Assigned(fCaptureCtrl) then ReleaseCapture;
@@ -2033,6 +2337,7 @@ begin
   fCaptureCtrl := nil;
 end;
 //------------------------------------------------------------------------------
+{$ENDIF}
 
 procedure TRootCtrl.SetTheme(const theme: TCtrlTheme);
 begin
@@ -2045,9 +2350,10 @@ end;
 // TCustomPosCtrl
 //------------------------------------------------------------------------------
 
-constructor TCustomPosCtrl.Create(parent: TLayer32; const name: string);
+constructor TCustomAutoPosCtrl.Create(parent: TLayer32; const name: string);
 begin
   fAutoPosition := apCustom;
+  fAllowRTEdit := false;
   inherited;
 end;
 
@@ -2117,13 +2423,17 @@ var
   rec : TRectD;
 begin
   rec := newBounds;
-  if newBounds.Height = 0 then
-  begin
-    if GetUsableFont then
-      h := fUsableFont.LineHeight + fBevelHeight * 3 else
-      h := DPIAware(15);
+  if GetUsableFont then
+    h := fUsableFont.LineHeight + fBevelHeight * 3 else
+    h := DPIAware(15);
     rec.Top := rec.Bottom - h;
-  end;
+//  if newBounds.Height = 0 then
+//  begin
+//    if GetUsableFont then
+//      h := fUsableFont.LineHeight + fBevelHeight * 3 else
+//      h := DPIAware(15);
+//    rec.Top := rec.Bottom - h;
+//  end;
   inherited SetInnerBounds(rec);
 end;
 //------------------------------------------------------------------------------
@@ -2340,9 +2650,12 @@ end;
 
 procedure TScrollingCtrl.Scale(value: double);
 begin
-  fInnerMargin := fInnerMargin * value;
-  fScrollOffset := ScalePoint(fScrollOffset, value, value);
-  fShadowSize := fShadowSize * value;
+  if AllowRTEdit then
+  begin
+    fInnerMargin := fInnerMargin * value;
+    fScrollOffset := ScalePoint(fScrollOffset, value, value);
+    fShadowSize := fShadowSize * value;
+  end;
   inherited;
 end;
 //------------------------------------------------------------------------------
@@ -2615,10 +2928,11 @@ begin
 
     if fTopItem < 0 then fTopItem := 0
     else if fTopItem > (ItemCount - vis) then
-      fTopItem := ItemCount - vis;
+      fTopItem := Math.Max(0, ItemCount - vis);
 
     for i := fTopItem to fTopItem + vis -1 do
     begin
+      if i >= ItemCount then Break;
 
       rec2 := rec;
       if i = fItemIndex then
@@ -2782,6 +3096,7 @@ begin
   fCanFocus := true;
   fColor := clBtnFace32;
   fItemIndex := -1;
+  fAllowRTEdit := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -2848,7 +3163,6 @@ begin
     end;
     if Assigned(mnuItem.OnClick) then
     begin
-      mnuItem.OnClick(mnuItem);
       layer := Parent;
       while layer <> RootCtrl do
       begin
@@ -2861,6 +3175,7 @@ begin
         end;
         layer := layer.Parent;
       end;
+      mnuItem.OnClick(mnuItem);
     end;
   end
   else if mnuItem[0] is TPopMenuCtrl then
@@ -2962,8 +3277,9 @@ end;
 
 constructor TPopMenuCtrl.Create(parent: TLayer32 = nil; const name: string = '');
 begin
-  inherited;
+  inherited Create(parent, name);
   inherited Visible := false;
+  fAllowRTEdit := false;
 end;
 //------------------------------------------------------------------------------
 
@@ -3471,6 +3787,7 @@ begin
   end;
 
   ctrlDown :=  HasCtrlKey(shift);
+{$IFDEF MSWINDOWS}
   case key of
     VK_LEFT:
       begin
@@ -3558,6 +3875,7 @@ begin
       Exit;
     end;
   end;
+{$ENDIF}
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -3597,6 +3915,7 @@ begin
   begin
     fSelStart := fCursorChunkPos;
     fSelEnd := fCursorChunkPos;
+    fSavedImage := nil;
   end;
   Invalidate;
 end;
@@ -3724,7 +4043,7 @@ begin
   x2 := relPos.X - fTextMargin.X;
   y2 := relPos.Y - fTextMargin.Y;
 
-  i := Round(y2 / fPageMetrics.lineHeight);
+  i := Trunc(y2 / fPageMetrics.lineHeight);
   inc(i, fTopLIne);
   if i >= fPageMetrics.totalLines then
   begin
@@ -4054,6 +4373,7 @@ begin
   end;
 
   ctrlDown := HasCtrlKey(shift);
+{$IFDEF MSWINDOWS}
   case key of
     VK_UP, VK_LEFT:
       begin
@@ -4196,6 +4516,7 @@ begin
       Exit;
     end;
   end;
+{$ENDIF}
   Invalidate;
 end;
 //------------------------------------------------------------------------------
@@ -4660,7 +4981,8 @@ end;
 procedure TButtonCtrl.Scale(value: double);
 begin
   inherited;
-  fPadding := fPadding * value;
+  if AllowRTEdit then
+    fPadding := fPadding * value;
 end;
 //------------------------------------------------------------------------------
 
@@ -5286,9 +5608,12 @@ end;
 procedure TPageCtrl.Scale(value: double);
 begin
   inherited;
-  fTabHeight := fTabHeight * value;
-  fTabWidth  := fTabWidth  * value;
-  ResizeTabs;
+  if AllowRTEdit then
+  begin
+    fTabHeight := fTabHeight * value;
+    fTabWidth  := fTabWidth  * value;
+    ResizeTabs;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -5942,7 +6267,7 @@ procedure TSliderCtrl.SetPosition(newPos: double);
 begin
   fPosition := Math.Min(fMax, Math.Max(fMin, newPos));
   Invalidate;
-  if Assigned(fOnSlider) then fOnSlider(Self);
+  if Assigned(fOnSlide) then fOnSlide(Self);
 end;
 //------------------------------------------------------------------------------
 
@@ -6333,19 +6658,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
-procedure TScrollCtrl.SetMinBtnSize(value: integer);
-begin
-  fMinBtnSize := value;
-end;
-//------------------------------------------------------------------------------
-
-function TScrollCtrl.GetMinBtnSize: integer;
-begin
-  Result := Round(fMinBtnSize);
-end;
-//------------------------------------------------------------------------------
-
 function TScrollCtrl.CanScroll: Boolean;
 begin
   Result := Visible and (fMax > 0);
@@ -6456,7 +6768,7 @@ end;
 
 procedure TScrollCtrl.Scale(value: double);
 begin
-  fSize       := fSize * value;
+  fSize := fSize * value;
   case fOrientation of
     soUnknown: Exit;
     soVertical: Width := fSize;
@@ -6525,7 +6837,7 @@ begin
       Img32.Vector.InflateRect(rec, -1, -1);
       rec.Top := rec.Top + ss;
       rec.Bottom := rec.Top + fBtnSize;
-      rec.Left := rec.Left + 1 + bhDiv2 +2;
+      rec.Left := rec.Left + 1 + bhDiv2;
       rec.Right := rec.Right -1;
       Image.FillRect(Rect(rec), clPaleGray32);
 
@@ -6566,7 +6878,7 @@ begin
       Img32.Vector.InflateRect(rec, -1, -1);
       rec.Left := rec.Left + ss;
       rec.Right := rec.Left + fBtnSize;
-      rec.Top := rec.Top + bhDiv2 + 2;
+      rec.Top := rec.Top + bhDiv2 + 1;
       Image.FillRect(Rect(rec), clPaleGray32);
       DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
       Img32.Vector.InflateRect(rec, -1, -1);
@@ -6630,13 +6942,16 @@ var
   i,j: integer;
   properties: TArray<TRttiProperty>;
 begin
+  // This gets both public and published properties
   aType := context.GetType(self.ClassType);
   properties := (aType as TRttiInstanceType).GetDeclaredProperties;
   SetLength(fObjectProps, Length(properties));
   j := 0;
   for i := 0 to High(properties) do
   begin
-    if (properties[i].PropertyType.TypeKind <> tkClass) then continue;
+    if (properties[i].PropertyType.TypeKind <> tkClass) or
+      not properties[i].IsReadable or
+      not properties[i].IsWritable then Continue;
     fObjectProps[j].name := properties[i].name;
     fObjectProps[j].address := properties[i].GetValue(self).AsObject;
     inc(j);
@@ -6655,7 +6970,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TEventPropertyHandler.Resized;
+procedure TEventPropertyHandler.Scale(delta: double);
 begin
   // override in descendant classes
 end;
@@ -6749,13 +7064,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-constructor TCtrlStorageManager.Create(mainHdl: THandle);
-begin
-  Create(nil, '');
-  Self.fMainHdl := mainHdl;
-end;
-//------------------------------------------------------------------------------
-
 destructor TCtrlStorageManager.Destroy;
 begin
   fShortcutList.Free;
@@ -6765,11 +7073,13 @@ end;
 
 procedure TCtrlStorageManager.Quit;
 begin
-  if fMainHdl > 0 then
+{$IFDEF MSWINDOWS}
+  if self.fMainHdl > 0 then
   begin
     DestroyWindow(fMainHdl);
     fMainHdl := 0;
   end;
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
@@ -6781,15 +7091,9 @@ begin
       Result := Child[0] else
       Result := inherited InsertChild(0, storeClass);
     fEventHandler := TEventPropertyHandler(Result);
+    RegisterStorageClass(storeClass);
   end else
     Raise Exception.Create('TCtrlStorageManager error');
-end;
-//------------------------------------------------------------------------------
-
-procedure TCtrlStorageManager.SetDesignScale(value: double);
-begin
-  if value <= 0 then Exit;
-  inherited;
 end;
 //------------------------------------------------------------------------------
 
@@ -6818,14 +7122,6 @@ begin
   if len = 0 then Exit;
   Move(c^, Result[1], len * SizeOf(UTF8Char));
   c := endC;
-end;
-//------------------------------------------------------------------------------
-
-function CheckChar(c: PUTF8Char; endC: PUTF8Char;
-  offset: integer; matchChr: Utf8Char): Boolean;
-begin
-  inc(c, offset);
-  Result := (c < endC) and (c^ = matchChr);
 end;
 //------------------------------------------------------------------------------
 
@@ -6862,14 +7158,6 @@ begin
   end else
     Result := '';
 end;
-//------------------------------------------------------------------------------
-
-//function GetAttribName(var c: PUTF8Char; endC: PUTF8Char): Utf8String;
-//begin
-//  Result := '';
-//  if not SkipBlanks(c, endC) then Exit;
-//  Result := GetName(c, endC);
-//end;
 //------------------------------------------------------------------------------
 
 function GetNextChar(var c: PUTF8Char; endC: PUTF8Char): UTF8Char;
@@ -6951,7 +7239,6 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-
 type
   TGetProtectedStorage = class(TStorage);
 
@@ -6969,86 +7256,87 @@ procedure TCtrlStorageManager.LoadStoredObjects(const utf8: UTF8String);
     target    : TStorage;
   begin
     Result := False; // assume error
-      // get ATTRIBUTES
-      while SkipBlanks(xmlCurr, xmlEnd) do
+    // get ATTRIBUTES
+    while SkipBlanks(xmlCurr, xmlEnd) do
+    begin
+      if CheckSkipComment(xmlCurr, xmlEnd) then Continue;
+      if (xmlCurr^ < 'A') then Break;
+      attName := string(GetName(xmlCurr, xmlEnd));
+      if (attName = '') then Break;
+      attVal := string(GetAttribValue(xmlCurr, xmlEnd));
+      if Assigned(stgObj) then
+        TGetProtectedStorage(stgObj).ReadProperty(attName, attVal);
+    end;
+    if (xmlCurr^ <> '>') then Exit; // error
+    inc(xmlCurr);
+
+    // get obj CONTENT, either a child element or the element's closure
+    while (xmlCurr <= xmlEnd) do
+    begin
+      if not SkipBlanks(xmlCurr, xmlEnd) or (xmlCurr^ <> '<') then Exit;
+      if CheckSkipComment(xmlCurr, xmlEnd) then Continue;
+      inc(xmlCurr); // '<'
+
+      if (xmlCurr^ = '/') then // element closure
       begin
-        if CheckSkipComment(xmlCurr, xmlEnd) then Continue;
-        if (xmlCurr^ < 'A') then Break;
-        attName := string(GetName(xmlCurr, xmlEnd));
-        if (attName = '') then Break;
-        attVal := string(GetAttribValue(xmlCurr, xmlEnd));
-        if Assigned(stgObj) then
-          TGetProtectedStorage(stgObj).ReadProperty(attName, attVal);
-      end;
-      if (xmlCurr^ <> '>') then Exit; // error
-      inc(xmlCurr);
-
-      // get obj CONTENT, either a child element or the element's closure
-      while (xmlCurr <= xmlEnd) do
-      begin
-        if not SkipBlanks(xmlCurr, xmlEnd) or (xmlCurr^ <> '<') then Exit;
-        if CheckSkipComment(xmlCurr, xmlEnd) then Continue;
-        inc(xmlCurr); // '<'
-
-        if (xmlCurr^ = '/') then // element closure
-        begin
-          inc(xmlCurr);
-          SkipBlanks(xmlCurr, xmlEnd);
-          clssName := GetName(xmlCurr, xmlEnd);
-          if Assigned(stgObj) and not SameText(stgObj.ClassName, clssName) or
-            not SkipBlanks(xmlCurr, xmlEnd) or (xmlCurr^ <> '>') then Exit;
-          inc(xmlCurr); // '>'
-          Break; //
-        end;
-
-        // get next child
+        inc(xmlCurr);
+        SkipBlanks(xmlCurr, xmlEnd);
         clssName := GetName(xmlCurr, xmlEnd);
-        stgClass := GetStorageClass(clssName);
+        if Assigned(stgObj) and not SameText(stgObj.ClassName, clssName) or
+          not SkipBlanks(xmlCurr, xmlEnd) or (xmlCurr^ <> '>') then Exit;
+        inc(xmlCurr); // '>'
+        Break; //
+      end;
 
-        if (clssName = 'TEventPropHandler') then
+      // get next child
+      clssName := GetName(xmlCurr, xmlEnd);
+      stgClass := GetStorageClass(clssName);
+
+      if (clssName = 'TLayeredImage32') then
+        child := fLayeredImg
+      else if (clssName = 'TGroupLayer32') and (fLayeredImg.ChildCount < 2) then
+        child := fLayeredImg.Root
+      else if (clssName = 'TRootCtrl') and (fLayeredImg.ChildCount < 3) then
+        child := RootCtrl
+      else if Assigned(stgClass) then
+      begin
+        if stgClass.InheritsFrom(TEventPropertyHandler) then
         begin
           if not Assigned(EventAndPropertyHandler) then Exit;
-          child := EventAndPropertyHandler
-        end else if (clssName = 'TLayeredImage32') then
-          child := fLayeredImg
-        else if (clssName = 'TGroupLayer32') and (fLayeredImg.ChildCount < 2) then
-          child := fLayeredImg.Root
-        else if (clssName = 'TRootCtrl') and (fLayeredImg.ChildCount < 3) then
-          child := RootCtrl
-        else if Assigned(stgClass) then
-        begin
+          child := EventAndPropertyHandler;
+        end else
           child := stgObj.AddChild(stgClass);
-        end
-        else
-          Exit; // error
+      end
+      else
+        Exit; // error
 
-        child.StorageState := ssLoading;
-        try
-          if not ParseStorageElement(child, xmlCurr, xmlEnd) then Exit;
-        finally
-          child.StorageState := ssNormal;
-        end;
+      child.StorageState := ssLoading;
+      try
+        if not ParseStorageElement(child, xmlCurr, xmlEnd) then Exit;
+      finally
+        child.StorageState := ssNormal;
+      end;
+    end;
+
+    // join up parent-child controls (often TScrollCtrl)
+    // while postponing other linkages until all controls have been loaded
+    if (stgObj is TCustomCtrl) then
+      with TCustomCtrl(stgObj) do
+      begin
+        for i := 0 to High(fDelayedLinks) do
+          with fDelayedLinks[i] do
+          begin
+            target := FindChildByLoadId(self, targetId);
+            if Assigned(target) then
+              SetObjectProp(loadObj, propName, target)
+            else
+              self.AddDelayedLink(fDelayedLinks[i]);
+          end;
+        fDelayedLinks := nil;
       end;
 
-      // join up parent-child controls (often TScrollCtrl)
-      // while postponing other linkages until all controls have been loaded
-      if (stgObj is TCustomCtrl) then
-        with TCustomCtrl(stgObj) do
-        begin
-          for i := 0 to High(fDelayedLinks) do
-            with fDelayedLinks[i] do
-            begin
-              target := FindChildByLoadId(self, targetId);
-              if Assigned(target) then
-                SetObjectProp(loadObj, propName, target)
-              else
-                self.AddDelayedLink(fDelayedLinks[i]);
-            end;
-          fDelayedLinks := nil;
-        end;
-
-      // finally process EndRead
-      TGetProtectedStorage(stgObj).EndRead;
+    // finally process EndRead
+    TGetProtectedStorage(stgObj).EndRead;
     Result := True;
   end;
 
@@ -7084,6 +7372,9 @@ begin
       StorageState := ssNormal;
     end;
 
+    if fMainHdl > 0 then 
+      ResizeMainWindow(mainHdl, fLayeredImg.Width, fLayeredImg.Height);
+
     // join up remaining unresolved linkages
     for i := 0 to High(fDelayedLinks) do
       with fDelayedLinks[i] do
@@ -7092,7 +7383,7 @@ begin
         if Assigned(target) then
           SetObjectProp(self, propName, target);
       end;
-    fDelayedLinks := nil;
+
   finally
     fDelayedLinks := nil;
     {$IFDEF FORMATSETTINGS}FormatSettings.{$ENDIF}DecimalSeparator := savedDecSep;
@@ -7133,12 +7424,14 @@ begin
   begin
     RootCtrl.ClearChildren;
     RootCtrl.fFocusedCtrl := nil;
+    RootCtrl.Theme := lightTheme;
   end;
   fLastCtrl := nil;
   fMseDownCtrl := nil;
   fCurrCursor := 0;
   fShortcutList.Clear;
-  SetDesignScale(1.0);
+  Designing := False;
+  fAllowResize := False;
 end;
 //------------------------------------------------------------------------------
 
@@ -7368,18 +7661,129 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TCtrlStorageManager.Resize(width, height: Cardinal);
+var
+  oldRec, newRec: TRectD;
+  scale: double;
 begin
   if Assigned(fRootCtrl) then
   begin
-    fLayeredImg.SetSize(width, height);
-    fRootCtrl.SetInnerBounds(RectD(0, 0, width, height));
-    if Assigned(EventAndPropertyHandler) then
-        EventAndPropertyHandler.Resized;
+    if fAllowResize and Assigned(EventAndPropertyHandler) then
+    begin
+      oldRec := fRootCtrl.InnerBounds;
+      fLayeredImg.SetSize(width, height);
+      fRootCtrl.SetInnerBounds(RectD(0, 0, width, height));
+      newRec := fRootCtrl.InnerBounds;
+      scale := Average(newRec.Width/oldRec.Width, newRec.Height/oldRec.Height);
+      DesignScale := DesignScale * scale;
+    end else
+    begin
+      fLayeredImg.SetSize(width, height);
+      fRootCtrl.SetInnerBounds(RectD(0, 0, width, height));
+    end;
   end;
 end;
+//------------------------------------------------------------------------------
+
+procedure TCtrlStorageManager.SetDesignScale(value: double);
+var
+  delta: double;
+begin
+  if (StorageState = ssLoading)  then
+  begin
+    if Assigned(EventAndPropertyHandler) then
+    begin
+      EventAndPropertyHandler.Scale(RESET);
+      EventAndPropertyHandler.Scale(value);
+    end;
+    inherited SetDesignScale(value);
+  end
+  else if (value = RESET) then
+  begin
+    if Assigned(EventAndPropertyHandler) then
+      EventAndPropertyHandler.Scale(RESET);
+    inherited SetDesignScale(1);
+  end
+  else if (StorageState = ssNormal) and Assigned(RootCtrl) and
+    AllowResize and (value >= 0.01) and (value <= 100)  then
+  begin
+    delta := value/DesignScale;
+    inherited SetDesignScale(value);
+    if Assigned(EventAndPropertyHandler) then // scale fonts etc before ctrls
+      EventAndPropertyHandler.Scale(delta);
+    RootCtrl.Scale(delta);
+  end;
+end;
+//------------------------------------------------------------------------------
+
+procedure TCtrlStorageManager.SetDesignTarget(ctrl: TCustomCtrl);
+begin
+  if ctrl = designTarget then Exit;
+  FreeAndNil(fSizingGroup);
+  fDesignTarget := ctrl;
+  if Assigned(fDesignTarget) then
+    fSizingGroup := CreateSizingButtonGroup(fDesignTarget, ssCorners,
+      bsRound, DefaultButtonSize, clLime32);
+  InvalidateRect(mainHdl, nil, false);
+end;
+//------------------------------------------------------------------------------
+
+procedure TCtrlStorageManager.SetDesigning(value: Boolean);
+begin
+  if value = fDesigning then Exit;
+  fDesigning := value;
+  DesignTarget := nil;
+end;
+//------------------------------------------------------------------------------
+
+{$IFDEF MSWINDOWS}
+function TCtrlStorageManager.CreateMainWindow(const UniqueClassName: string;
+  const WindowCaption: string; const IconResourceName: string;
+  Width: integer; Height: integer): THandle;
+var
+  Inst      : THandle;
+  WinClass  : TWndClass;
+const
+  defWindowWidth   = 720;
+  defWindowHeight  = 480;
+begin
+  Inst := hInstance;
+  if Width <= 0 then Width := DpiAware(defWindowWidth);
+  if Height <= 0 then Height := DpiAware(defWindowHeight);
+
+  FillChar(WinClass, SizeOf(WinClass), 0);
+  with WinClass do
+  begin
+    style              := CS_CLASSDC or CS_PARENTDC;
+    lpfnWndProc        := @BasicWindowProc;
+    hInstance          := Inst;
+    hbrBackground      := COLOR_BTNFACE + 1;
+    lpszClassname      := PChar(UniqueClassName);
+    if IconResourceName <> '' then
+      hIcon              := LoadIcon(hInstance, PChar(IconResourceName));
+    hCursor            := LoadCursor(0, IDC_ARROW);
+  end;
+  RegisterClass(WinClass);
+  fMainHdl := CreateWindow(PChar(UniqueClassName), PChar(WindowCaption),
+              WS_OVERLAPPEDWINDOW, 0, 0,
+              Width, Height, 0, 0, Inst, nil);
+  Result := fMainHdl;
+  if fMainHdl = 0 then Exit;
+  SetWindowLongPtr(fMainHdl, GWLP_USERDATA, NativeInt(Self));
+  CenterWindow(fMainHdl);
+end;
+{$ENDIF}
 
 //------------------------------------------------------------------------------
 // Initialization procedures
+//------------------------------------------------------------------------------
+
+procedure InitCursors;
+begin
+  // instantiate handles to 'shared' cursors (that won't need destroying)
+  sizeCursor  := LoadCursor(0, IDC_SIZEALL);
+  handCursor  := LoadCursor(0, IDC_HAND);
+  arrowCursor := LoadCursor(0, IDC_ARROW);
+end;
 //------------------------------------------------------------------------------
 
 procedure InitPaths;
@@ -7435,6 +7839,7 @@ end;
 
 initialization
   RegisterClasses;
+  InitCursors;
   InitPaths;
   InitWindowsVars;
 
