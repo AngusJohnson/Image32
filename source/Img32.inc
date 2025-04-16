@@ -4,7 +4,13 @@
 // use file storage (eg to compile the experimental 'CtrlDemo' in Examples).
 {.$DEFINE USE_FILE_STORAGE}   
 
-// default rotation direction is clockwise with positive angles
+// The library's default rotation direction is CLOCKWISE as angle values increase.
+// A point offset at an angle of 0 degrees from the origin will always be at 3 o'clock
+// relative to the origin. A point offset at 90 degrees from the origin will be at
+// 6 o'clock, and a point offset at 270 degrees will be at 12 o'clock.
+// However, when this compiler directive is enabled, as angles increase in value, their
+// offsets will now occur in an anti-clockwise direction so that a point offset at
+// 90 degrees from the origin will appear at 12 o'clock, instead of at 6 o'clock.
 {.$DEFINE CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
 
 // Image downsampling occurs when images are reduced in size, and the default downsampling

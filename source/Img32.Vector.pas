@@ -3,7 +3,7 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  10 April 2025                                                   *
+* Date      :  16 April 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -1760,6 +1760,9 @@ function GetPtOnEllipseFromAngle(const ellipseRect: TRectD;
 var
   sn, co: double;
 begin
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  angle := -angle;
+{$ENDIF}
   NormalizeAngle(angle);
   GetSinCos(angle, sn, co);
   Result.X := ellipseRect.MidPoint.X + ellipseRect.Width / 2 * co;
@@ -1772,12 +1775,19 @@ function GetEllipticalAngleFromPoint(const ellipseRect: TRectD;
 begin
   with ellipseRect do
     Result := ArcTan2(Width / Height * (pt.Y - MidPoint.Y), (pt.X - MidPoint.X));
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  Result := -Result;
+  NormalizeAngle(Result);
+{$ENDIF}
 end;
 //------------------------------------------------------------------------------
 
 function GetRotatedEllipticalAngleFromPoint(const ellipseRect: TRectD;
   ellipseRotAngle: double; pt: TPointD): double;
 begin
+{$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
+  ellipseRotAngle := -ellipseRotAngle;
+{$ENDIF}
   Result := 0;
   if ellipseRect.IsEmpty then Exit;
   RotatePoint(pt, ellipseRect.MidPoint, -ellipseRotAngle);
@@ -3277,8 +3287,9 @@ begin
   if scale <= 0 then scale := 4.0;
 
 {$IFDEF CLOCKWISE_ROTATION_WITH_NEGATIVE_ANGLES}
-  startAngle := -startAngle;
-  endAngle := -endAngle;
+  angle := -startAngle;
+  startAngle := -endAngle;
+  endAngle := angle;
 {$ENDIF}
 
   NormalizeAngle(startAngle, qtrDeg);
