@@ -2290,7 +2290,11 @@ function IsMidColor(const color: TARGB): Boolean;
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
   // not too dark and not too light :))
+  {$IFDEF FPC}
+  Result := Abs(longint(color.R + color.G + color.B - 383)) < 64;
+  {$ELSE}
   Result := Abs(color.R + color.G + color.B - 383) < 64;
+  {$ENDIF}
 end;
 // ------------------------------------------------------------------------------
 

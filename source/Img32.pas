@@ -836,7 +836,7 @@ end;
 
 procedure NewColor32Array(var a: TArrayOfColor32; count: nativeint; uninitialized: boolean);
 begin
-{$IF COMPILERVERSION < 16}
+{$IFDEF DELPHI_COMPILER_PRIOR_16}
   SetLength(a, count);
 {$ELSE}
   if a <> nil then
@@ -851,7 +851,7 @@ end;
 
 procedure NewIntegerArray(var a: TArrayOfInteger; count: nativeint; uninitialized: boolean);
 begin
-{$IF COMPILERVERSION < 16}
+{$IFDEF DELPHI_COMPILER_PRIOR_16}
   SetLength(a, count);
 {$ELSE}
   if a <> nil then
@@ -867,7 +867,7 @@ end;
 procedure NewDoubleArray(var a: TArrayOfDouble; count: nativeint;
   uninitialized: boolean = False);
 begin
-{$IF COMPILERVERSION < 16}
+{$IFDEF DELPHI_COMPILER_PRIOR_16}
   SetLength(a, count);
 {$ELSE}
   if a <> nil then
@@ -882,7 +882,7 @@ end;
 
 procedure NewByteArray(var a: TArrayOfByte; count: nativeint; uninitialized: boolean);
 begin
-{$IF COMPILERVERSION < 16}
+{$IFDEF DELPHI_COMPILER_PRIOR_16}
   SetLength(a, count);
 {$ELSE}
   if a <> nil then
@@ -897,7 +897,7 @@ end;
 
 procedure NewPointDArray(var a: TPathD; count: nativeint; uninitialized: boolean);
 begin
-{$IF COMPILERVERSION < 16}
+{$IFDEF DELPHI_COMPILER_PRIOR_16}
   SetLength(a, count);
 {$ELSE}
   if a <> nil then
@@ -920,7 +920,7 @@ end;
 
 procedure SetLengthUninit(var a: TArrayOfInteger; count: nativeint);
 begin
-{$IF COMPILERVERSION < 16}
+{$IFDEF DELPHI_COMPILER_PRIOR_16}
   SetLength(a, count);
 {$ELSE}
   Pointer(a) := InternSetSimpleDynArrayLengthUninit(Pointer(a), count, SizeOf(Integer));
@@ -930,7 +930,7 @@ end;
 
 procedure SetLengthUninit(var a: TArrayOfByte; count: nativeint);
 begin
-{$IF COMPILERVERSION < 16}
+{$IFDEF DELPHI_COMPILER_PRIOR_16}
   SetLength(a, count);
 {$ELSE}
   Pointer(a) := InternSetSimpleDynArrayLengthUninit(Pointer(a), count, SizeOf(Byte));
@@ -940,7 +940,7 @@ end;
 
 procedure SetLengthUninit(var a: TPathD; count: nativeint);
 begin
-{$IF COMPILERVERSION < 16}
+{$IFDEF DELPHI_COMPILER_PRIOR_16}
   SetLength(a, count);
 {$ELSE}
   Pointer(a) := InternSetSimpleDynArrayLengthUninit(Pointer(a), count, SizeOf(TPointD));

@@ -63,6 +63,9 @@
   {$IF COMPILERVERSION < 15}
     Your version of Delphi is not supported (Image32 requires Delphi version 7 or above)
   {$IFEND}
+  {$IF COMPILERVERSION <16}
+    {$DEFINE DELPHI_COMPILER_PRIOR_16}
+  {$IFEND}
   {$IF COMPILERVERSION < 23}
     {$DEFINE CPUX86}                            // CPUX86 was added in Delphi XE2 (added Win64 compiler)
   {$IFEND}
