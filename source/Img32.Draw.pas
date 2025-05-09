@@ -3,7 +3,7 @@ unit Img32.Draw;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  2 February 2025                                                 *
+* Date      :  16 April 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -2290,7 +2290,8 @@ function IsMidColor(const color: TARGB): Boolean;
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
   // not too dark and not too light :))
-  Result := Abs(color.R + color.G + color.B - 383) < 64;
+  // nb: longint() for FPC compatibility
+  Result := Abs(longint(color.R + color.G + color.B - 383)) < 64;
 end;
 // ------------------------------------------------------------------------------
 
@@ -2613,7 +2614,7 @@ begin
   for i := 0 to High(dashPattern) do
     if dashPattern[i] <= 0 then dashPattern[i] := 1;
 
-  lines := GetDashedPath(line, endStyle = esPolygon, dashPattern, patternOffset);
+  lines := GetDashedPath(line, endStyle = esClosed, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
 
   case joinStyle of
@@ -2670,7 +2671,7 @@ begin
   for i := 0 to High(dashPattern) do
     if dashPattern[i] <= 0 then dashPattern[i] := 1;
 
-  lines := GetDashedPath(line, endStyle = esPolygon, dashPattern, patternOffset);
+  lines := GetDashedPath(line, endStyle = esClosed, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
   lines := RoughOutline(lines, lineWidth, joinStyle, endStyle);
   Rasterize(img, lines, img.bounds, frNonZero, renderer);
@@ -2712,7 +2713,7 @@ begin
   for i := 0 to High(dashPattern) do
     if dashPattern[i] <= 0 then dashPattern[i] := 1;
 
-  lines := GetDashedPath(line, endStyle = esPolygon, dashPattern, patternOffset);
+  lines := GetDashedPath(line, endStyle = esClosed, dashPattern, patternOffset);
   if Length(lines) = 0 then Exit;
   lines := RoughOutline(lines, lineWidth, joinStyle, endStyle);
   renderer := TInverseRenderer.Create(bkgndImg);

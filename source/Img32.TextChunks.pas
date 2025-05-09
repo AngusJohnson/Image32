@@ -567,7 +567,14 @@ begin
 
   for i := startIdx to endIdx do
     TTextChunk(fList.Items[i]).Free;
+
+{$IFDEF FPC}
+  for i := endIdx-startIdx +1 downto startIdx do
+    fList.Delete(i);
+{$ELSE}
   fList.DeleteRange(startIdx, endIdx-startIdx +1);
+{$ENDIF}
+
   // reindex
   for i := startIdx to fList.Count -1 do
     TTextChunk(fList.Items[i]).index := i;
