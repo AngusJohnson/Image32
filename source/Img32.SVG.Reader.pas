@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  11 March 2025                                                   *
+* Date      :  10 May 2025                                                     *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -674,7 +674,7 @@ const
     fillRule: frNegative; fillEl: '';
     strokeColor: clInvalid; strokeOpacity: InvalidD;
     strokeWidth: (rawVal: InvalidD; unitType: utNumber);
-    strokeCap: esPolygon; strokeJoin: jsMiter; strokeMitLim: 0.0; strokeEl : '';
+    strokeCap: esClosed; strokeJoin: jsMiter; strokeMitLim: 0.0; strokeEl : '';
     dashArray: nil; dashOffset: 0;
     fontInfo: (family: tfUnknown; familyNames: nil; size: 0; spacing: 0.0;
     spacesInText: sitUndefined; textLength: 0; italic: sfsUndefined;
@@ -772,7 +772,7 @@ begin
       drawDat.strokeOpacity := strokeOpacity;
     if strokeWidth.IsValid then
       drawDat.strokeWidth := strokeWidth;
-    if strokeCap = esPolygon then
+    if strokeCap = esClosed then
       drawDat.strokeCap := strokeCap;
     if strokeJoin <> jsMiter then
       drawDat.strokeJoin := strokeJoin;
@@ -3021,13 +3021,13 @@ begin
         RoughOutline(strokePaths, sw, joinStyle, endStyle, miterLim, scale);
     end else
     begin
-      endStyle := esPolygon;
+      endStyle := esClosed;
       strokePaths :=
         RoughOutline(paths, sw, joinStyle, endStyle, miterLim, scale);
     end;
   end else
   begin
-    if fDrawData.strokeCap = esPolygon then
+    if fDrawData.strokeCap = esClosed then
       endStyle := esButt else
       endStyle := fDrawData.strokeCap;
     if Assigned(dashArray) then
@@ -3343,6 +3343,7 @@ end;
 procedure TRectElement.GetPaths(const drawDat: TDrawData);
 var
   radXY : TPointD;
+  scale : TPointD;
   bounds: TRectD;
   path  : TPathD;
 begin
@@ -3353,12 +3354,16 @@ begin
   if bounds.IsEmpty then Exit;
   pathsLoaded := true;
 
+  MatrixExtractScale(drawDat.matrix, scale.X, scale.Y);
   radXY := radius.GetPoint(bounds, GetRelFracLimit);
+  radXY := ScalePoint(radXY, scale.X, scale.Y);
   if (radXY.X > 0) or (radXY.Y > 0) then
   begin
     if (radXY.X <= 0) then radXY.X := radXY.Y
     else if (radXY.Y <= 0) then radXY.Y := radXY.X;
+    bounds := ScaleRect(bounds, scale.X, scale.Y);
     path := RoundRect(bounds, radXY);
+    path := ScalePath(path, 1/scale.X, 1/scale.Y)
   end else
     path := Rectangle(bounds);
   AppendPath(drawPathsC, path);
