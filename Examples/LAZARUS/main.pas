@@ -60,7 +60,7 @@ begin
   img := TImage32.create;
   Image1.Picture.Bitmap.PixelFormat := pf32bit;
 
-  copyright := UnicodeString('© 2023 Angus Johnson');
+  copyright := UnicodeString('© 2023-25 Angus Johnson');
   // Create a TFontReader object to access a truetype font stored as font
   // resource. This can be destroyed here, otherwise the FontManager
   // will automatically destroy it on close.
@@ -120,7 +120,7 @@ begin
   tmpPath := Img32.Vector.Rectangle(img.Bounds);
   DrawLine(img, tmpPath, 10, penColor, esPolygon);
   textRec := GetBounds(copyTxtPaths);
-  copyTxtPaths := OffsetPath(copyTxtPaths, 10- textRec.Left, 10 - textRec.Top);
+  copyTxtPaths := TranslatePath(copyTxtPaths, 10- textRec.Left, 10 - textRec.Top);
   DrawPolygon(img, copyTxtPaths, frNonZero, clBlack32);
 
   // finally draw 'img' onto the Image1 component ...

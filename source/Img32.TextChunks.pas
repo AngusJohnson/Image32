@@ -3,7 +3,7 @@ unit Img32.TextChunks;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  4 April 2025                                                    *
+* Date      :  9 May 2025                                                      *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  Manages navigating, formatting and displaying text.             *
@@ -272,7 +272,7 @@ end;
 
 function TTextChunk.IsBlankSpaces: Boolean;
 begin
-  Result := text[1] = SPACE;
+  Result := (text[1] = SPACE);
 end;
 //------------------------------------------------------------------------------
 
@@ -959,9 +959,12 @@ begin
         AddLine;
         // don't allow spaces to wrap to the front of the following line
 
-        while chnk.IsBlankSpaces and (chnk.index < EndChunkPos.X) do
-          chnk := chnk.Next;
-        currentPos.X := chnk.index;
+        while Assigned(chnk) and chnk.IsBlankSpaces and
+          (chnk.index < EndChunkPos.X) do
+            chnk := chnk.Next;
+        if not Assigned(chnk) then
+          currentPos.X := EndChunkPos.X else
+          currentPos.X := chnk.index;
         chunkIdxAtStartOfLine  := currentPos.X;
         pseudoIdxAtStartOfLine := currentPos.X;
       end;
