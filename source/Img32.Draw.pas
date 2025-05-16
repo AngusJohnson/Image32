@@ -811,10 +811,10 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure SplitEdgeIntoFragments(const pt1, pt2: TPointD;
-  const scanlines: TArrayOfScanline; fragments: PFragment; const clipRec: TRect);
+  const scanlines: TArrayOfScanline; fragments: PFragment; maxX, maxY: integer);
 var
   x,y, dx,dy, absDx, dydx, dxdy: double;
-  i, scanlineY, maxY, maxX: integer;
+  i, scanlineY, botY, topY: integer;
   psl: PScanLine;
   pFrag: PFragment;
   bot, top: TPointD;
@@ -832,9 +832,10 @@ begin
     if dy > -0.0001 then Exit;           //ignore near horizontals
     bot := pt2; top := pt1;
   end;
+  botY := Trunc(bot.Y);
+  topY := Trunc(top.Y);
   // exclude edges that are completely outside the top or bottom clip region
-  RectWidthHeight(clipRec, maxX, maxY);
-  if (top.Y >= maxY) or (bot.Y <= 0) then Exit;
+  if (topY >= maxY) or (bot.Y <= 0) then Exit;
 
   dx := pt2.X - pt1.X;
   absDx := abs(dx);
@@ -848,7 +849,7 @@ begin
     // but still update maxX for each scanline the edge passes
     if bot.X > maxX then
     begin
-      for i := Min(maxY, Trunc(bot.Y)) downto Max(0, Trunc(top.Y)) do
+      for i := Min(maxY, botY) downto Max(0, topY) do
         scanlines[i].maxX := maxX;
       Exit;
     end;
@@ -866,13 +867,13 @@ begin
   begin
     if top.X >= maxX then
     begin
-      for i := Min(maxY, Trunc(bot.Y)) downto Max(0, Trunc(top.Y)) do
+      for i := Min(maxY, botY) downto Max(0, topY) do
         scanlines[i].maxX := maxX;
       Exit;
     end;
     // here the edge must be oriented bottom-right to top-left
     y := bot.Y - (bot.X - maxX) * Abs(dydx);
-    for i := Min(maxY, Trunc(bot.Y)) downto Max(0, Trunc(y)) do
+    for i := Min(maxY, botY) downto Max(0, Trunc(y)) do
       scanlines[i].maxX := maxX;
     bot.Y := y;
     if bot.Y <= 0 then Exit;
@@ -882,7 +883,7 @@ begin
   begin
     // here the edge must be oriented bottom-left to top-right
     y := top.Y + (top.X - maxX) * Abs(dydx);
-    for i := Min(maxY, Trunc(y)) downto Max(0, Trunc(top.Y)) do
+    for i := Min(maxY, Trunc(y)) downto Max(0, topY) do
       scanlines[i].maxX := maxX;
     top.Y := y;
     if top.Y >= maxY then Exit;
@@ -955,12 +956,12 @@ end;
 // ------------------------------------------------------------------------------
 
 procedure InitializeScanlines(const polygons: TPathsD;
-  const scanlines: TArrayOfScanline; fragments: PFragment; const clipRec: TRect);
+  const scanlines: TArrayOfScanline; fragments: PFragment; maxX, maxY: integer);
 var
   i,j, highJ: integer;
   pt1, pt2: PPointD;
 begin
- for i := 0 to high(polygons) do
+  for i := 0 to high(polygons) do
   begin
     highJ := high(polygons[i]);
     if highJ < 2 then continue;
@@ -968,7 +969,7 @@ begin
     pt2 := @polygons[i][0];
     for j := 0 to highJ do
     begin
-      SplitEdgeIntoFragments(pt1^, pt2^, scanlines, fragments, clipRec);
+      SplitEdgeIntoFragments(pt1^, pt2^, scanlines, fragments, maxX, maxY);
       pt1 := pt2;
       inc(pt2);
     end;
@@ -1301,7 +1302,7 @@ begin
     SetLength(scanlines, maxH +1);
     SetLength(windingAccum, maxW +2);
     AllocateScanlines(paths2, scanlines, fragments, maxH, maxW-1);
-    InitializeScanlines(paths2, scanlines, fragments, clipRec2);
+    InitializeScanlines(paths2, scanlines, fragments, maxW, maxH);
 
     case fillRule of
       frEvenOdd:
