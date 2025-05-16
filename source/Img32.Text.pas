@@ -2972,7 +2972,7 @@ var
   dc: HDC;
 begin
   Result := nil;
-  if faceName = '' then Exit;
+  if (faceName = '') or (Length(faceName) > LF_FACESIZE) then Exit;
   FillChar(lf, sizeof(lf), 0);
   lf.lfCharSet := charSet;
   Move(faceName[1], lf.lfFaceName[0], Length(faceName) * SizeOf(Char));
