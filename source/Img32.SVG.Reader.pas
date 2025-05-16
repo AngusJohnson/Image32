@@ -2678,8 +2678,28 @@ begin
   clipPathEl := FindRefElement(drawDat.clipElRef);
   filterEl := FindRefElement(drawDat.filterElRef);
 
-  useTmpImage :=
-    Assigned(clipPathEl) or Assigned(filterEl) or Assigned(maskEl);
+  useTmpImage := Assigned(filterEl) or Assigned(maskEl);
+
+  if not useTmpImage and Assigned(clipPathEl) and (fDrawData.fillRule = frNegative) then
+  begin
+    // if Self.drawPathsO and Self.drawPathsC are completly inside
+    // clipPathEl.drawPathsC, then we can draw directly on the target
+    // image instead of using "usingTempImage=true" and the costly CopyBlend()
+    drawDat.clipElRef := '';
+    di := drawDat;
+    TClipPathElement(clipPathEl).GetPaths(di);
+    if IsSimpleRectanglePath(TClipPathElement(clipPathEl).drawPathsC, clipRec2) then
+    begin
+      clipRec := GetBoundsD(TClipPathElement(clipPathEl).drawPathsC);
+      if ((drawPathsO = nil) or RectInRect(clipRec, GetBoundsD(drawPathsO))) and
+         ((drawPathsC = nil) or RectInRect(clipRec, GetBoundsD(drawPathsC))) then
+      begin
+        clipPathEl := nil; // no clipping required as all painting is inside the clipRec
+      end;
+    end;
+  end;
+
+  useTmpImage := useTmpImage or Assigned(clipPathEl);
 
   if useTmpImage then
   begin
