@@ -267,7 +267,7 @@ type
   function Rect(const left,top,right,bottom: integer): TRect; overload;
 
   function PtInRect(const rec: TRectD; const pt: TPointD): Boolean; overload;
-  function RectInRect(const rec1, rec2: TRectD): Boolean;
+  function RectInRect(const outerRec, innerRec: TRectD): Boolean;
 
   function Size(cx, cy: integer): TSize;
   function SizeD(cx, cy: double): TSizeD;
@@ -787,12 +787,12 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function RectInRect(const rec1, rec2: TRectD): Boolean;
+function RectInRect(const outerRec, innerRec: TRectD): Boolean;
 var
   r: TRectD;
 begin
-  r := UnionRect(rec1, rec2);
-  Result := RectsEqual(rec1, r) or RectsEqual(rec2, r);
+  r := UnionRect(outerRec, innerRec);
+  Result := RectsEqual(r, outerRec);
 end;
 //------------------------------------------------------------------------------
 
