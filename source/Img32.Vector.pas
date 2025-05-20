@@ -95,7 +95,7 @@ type
   function Circle(const pt: TPointD; radius: double): TPathD; overload;
   function Circle(const pt: TPointD; radius: double; pendingScale: double): TPathD; overload;
 
-  function CalcCircleFrom3Points(const p1,p2,p3: TPointD;
+  function CalcCircleFrom3Points(const p1, p2, p3: TPointD;
     out centre: TPointD; out radius: double): Boolean;
 
   function Star(const rec: TRectD; points: integer; indentFrac: double = 0.4): TPathD; overload;
@@ -115,7 +115,7 @@ type
   function FlattenQBezier(const firstPt: TPointD; const pts: TPathD;
     tolerance: double = 0.0): TPathD; overload;
 
-  function GetPointInQuadBezier(const a,b,c: TPointD; t: double): TPointD;
+  function GetPointInQuadBezier(const a, b, c: TPointD; t: double): TPointD;
 
   function FlattenCBezier(const pt1, pt2, pt3, pt4: TPointD;
     tolerance: double = 0.0): TPathD; overload;
@@ -126,7 +126,7 @@ type
   function FlattenCBezier(const firstPt: TPointD; const pts: TPathD;
     tolerance: double = 0.0): TPathD; overload;
 
-  function GetPointInCubicBezier(const a,b,c,d: TPointD; t: double): TPointD;
+  function GetPointInCubicBezier(const a, b, c, d: TPointD; t: double): TPointD;
 
   //FlattenCSpline: Approximates the 'S' command inside the 'd' property of an
   //SVG path. (See https://www.w3.org/TR/SVG/paths.html#DProperty)
@@ -264,7 +264,7 @@ type
   function GetRotatedRectBounds(const rec: TRectD; angle: double): TRectD; overload;
 
   function Rect(const recD: TRectD): TRect; overload;
-  function Rect(const left,top,right,bottom: integer): TRect; overload;
+  function Rect(const left, top, right, bottom: integer): TRect; overload;
 
   function PtInRect(const rec: TRectD; const pt: TPointD): Boolean; overload;
 
@@ -293,7 +293,7 @@ type
   function IsValid(const pt: TPointD): Boolean; overload;
   function IsValid(const rec: TRect): Boolean; overload;
 
-  function Point(X,Y: Integer): TPoint; overload;
+  function Point(X, Y: Integer): TPoint; overload;
   function Point(const pt: TPointD): TPoint; overload;
 
   function PointsEqual(const pt1, pt2: TPointD): Boolean; overload;
@@ -639,7 +639,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function Point(X,Y: Integer): TPoint;
+function Point(X, Y: Integer): TPoint;
 begin
   result.X := X;
   result.Y := Y;
@@ -674,7 +674,7 @@ end;
 function StripNearDuplicates(const path: TPathD;
   minDist: double; isClosedPath: Boolean): TPathD;
 var
-  i,j, len: integer;
+  i, j, len: integer;
 begin
   len := length(path);
   NewPointDArray(Result, len, True);
@@ -1040,7 +1040,7 @@ end;
 
 function CrossProduct(const pt1, pt2, pt3: TPointD): double;
 var
-  x1,x2,y1,y2: double;
+  x1, x2, y1, y2: double;
 begin
   x1 := pt2.X - pt1.X;
   y1 := pt2.Y - pt1.Y;
@@ -1052,7 +1052,7 @@ end;
 
 function CrossProduct(const pt1, pt2, pt3, pt4: TPointD): double;
 var
-  x1,x2,y1,y2: double;
+  x1, x2, y1,y2: double;
 begin
   x1 := pt2.X - pt1.X;
   y1 := pt2.Y - pt1.Y;
@@ -1070,7 +1070,7 @@ end;
 
 function DotProduct(const pt1, pt2, pt3: TPointD): double;
 var
-  x1,x2,y1,y2: double;
+  x1, x2, y1, y2: double;
 begin
   x1 := pt2.X - pt1.X;
   y1 := pt2.Y - pt1.Y;
@@ -1230,18 +1230,18 @@ end;
 function TranslatePath(const paths: TPathsD;
   dx, dy: double): TPathsD;
 var
-  i,len: integer;
+  i, len: integer;
 begin
   len := length(paths);
   setLength(result, len);
-  for i := 0 to len -1 do
+  for i := 0 to len - 1 do
     result[i] := TranslatePath(paths[i], dx, dy);
 end;
 //------------------------------------------------------------------------------
 
 function TranslatePath(const ppp: TArrayOfPathsD; dx, dy: double): TArrayOfPathsD;
 var
-  i,len: integer;
+  i, len: integer;
 begin
   len := length(ppp);
   setLength(result, len);
@@ -1441,7 +1441,7 @@ begin
   if (i = 0) then
   begin
     //all points are equal!
-    for i := 0 to len -1 do result[i] := PointD(0,0);
+    for i := 0 to len -1 do result[i] := PointD(0, 0);
     Exit;
   end;
   result[i] := GetUnitVector(path[i], pt);
@@ -1556,7 +1556,7 @@ end;
 
 function PerpendicularDistSqrd(const pt, line1, line2: TPointD): double;
 var
-  a,b,c,d: double;
+  a, b, c, d: double;
 begin
   if PointsEqual(line1, line2) then
   begin
@@ -1644,7 +1644,7 @@ end;
 function PointInPolysWindingCount(const pt: TPointD;
   const paths: TPathsD; out PointOnEdgeDir: integer): integer;
 var
-  i,j, len: integer;
+  i, j, len: integer;
   p: TPathD;
   prevPt: TPointD;
   isAbove: Boolean;
@@ -1707,7 +1707,7 @@ end;
 
 function PerpendicularDist(const pt, line1, line2: TPointD): double;
 var
-  a,b,c,d: double;
+  a, b, c, d: double;
 begin
   //given: cross product of 2 vectors = area of parallelogram
   //and given: area of parallelogram = length base * height
@@ -1821,8 +1821,8 @@ end;
 function IsPointInEllipse(const ellipseRec: TRect; const pt: TPoint): Boolean;
 var
   rec: TRectD;
-  w,h: integer;
-  x,y, y2, a,b, dx,dy: double;
+  w, h: integer;
+  x, y, y2, a, b, dx, dy: double;
 begin
   RectWidthHeight(ellipseRec, w, h);
   a := w * 0.5;
@@ -1847,8 +1847,8 @@ end;
 function GetLineEllipseIntersects(const ellipseRec: TRect;
   var linePt1, linePt2: TPointD): Boolean;
 var
-  dx, dy, m,a,b,c,q: double;
-  qa,qb,qc,qs: double;
+  dx, dy, m, a, b, c, q: double;
+  qa, qb, qc, qs: double;
   rec: TRectD;
   pt1, pt2: TPointD;
 begin
@@ -2077,7 +2077,7 @@ function RotatePathInternal(const path: TPathD;
   const focalPoint: TPointD; sinA, cosA: double): TPathD;
 var
   i: integer;
-  x,y: double;
+  x, y: double;
 begin
   NewPointDArray(Result, length(path), True);
   for i := 0 to high(path) do
@@ -2134,7 +2134,7 @@ end;
 
 function GetAngle(const origin, pt: TPoint): double;
 var
-  x,y: double;
+  x, y: double;
 begin
   x := pt.X - origin.X;
   y := pt.Y - origin.Y;
@@ -2157,7 +2157,7 @@ end;
 
 function GetAngle(const origin, pt: TPointD): double;
 var
-  x,y: double;
+  x, y: double;
 begin
   x := pt.X - origin.X;
   y := pt.Y - origin.Y;
@@ -2223,7 +2223,7 @@ end;
 
 function IntersectPoint(const ln1a, ln1b, ln2a, ln2b: TPointD): TPointD;
 var
-  m1,b1,m2,b2: double;
+  m1, b1, m2, b2: double;
 begin
   result := InvalidPointD;
   //see http://paulbourke.net/geometry/pointlineplane/
@@ -2264,14 +2264,14 @@ end;
 
 function SegmentIntersectPt(const ln1a, ln1b, ln2a, ln2b: TPointD): TPointD;
 var
-  pqd,r,s : TPointD; //scalar vectors;
-  rs, t   : double;
+  pqd, r, s : TPointD; //scalar vectors;
+  rs, t: double;
 begin
   //https://stackoverflow.com/a/565282/359538
   Result := InvalidPointD;
   r := PointD(ln1b.X - ln1a.X, ln1b.Y - ln1a.Y);
   s := PointD(ln2b.X - ln2a.X, ln2b.Y - ln2a.Y);
-  rs := CrossProduct(r,s);
+  rs := CrossProduct(r, s);
   if Abs(rs) < 1 then Exit;
   pqd.X := ln2a.X - ln1a.X;
   pqd.y := ln2a.Y - ln1a.Y;
@@ -2444,7 +2444,7 @@ var
   len       : cardinal;
   steps     : double;
   highI     : cardinal;
-  iLo,iHi   : cardinal;
+  iLo, iHi  : cardinal;
   absDelta  : double;
 begin
   Result := nil;
@@ -2786,39 +2786,39 @@ begin
 
   if miterLim <= 0 then miterLim := DefaultMiterLimit
   else if miterLim < 2 then miterLim := 2;
-  miterLim := 2 /(sqr(miterLim));
+  miterLim := 2 / sqr(miterLim);
 
   norms := GetNormals(path);
   resCnt := 0; resCap := 0;
 
   case endStyle of
-    esButt: DoBevel(0,0);
-    esRound: DoRound(0,0);
+    esButt: DoBevel(0, 0);
+    esRound: DoRound(0, 0);
     else DoSquare(0, 0);
   end;
 
   // offset the left side going **forward**
   k := 0;
-  highJ := len -1;
-  for j := 1 to highJ -1 do DoPoint(j,k);
+  highJ := len - 1;
+  for j := 1 to highJ -1 do DoPoint(j, k);
 
   // reverse the normals ...
   for j := highJ downto 1 do
   begin
-    norms[j].X := -norms[j-1].X;
-    norms[j].Y := -norms[j-1].Y;
+    norms[j].X := -norms[j - 1].X;
+    norms[j].Y := -norms[j - 1].Y;
   end;
-  norms[0] := norms[len -1];
+  norms[0] := norms[len - 1];
 
   case endStyle of
-    esButt: DoBevel(highJ,highJ);
-    esRound: DoRound(highJ,highJ);
-    else DoSquare(highJ,highJ);
+    esButt: DoBevel(highJ, highJ);
+    esRound: DoRound(highJ, highJ);
+    else DoSquare(highJ, highJ);
   end;
 
   // offset the left side going **backward**
   k := highJ;
-  for j := highJ -1 downto 1 do
+  for j := highJ - 1 downto 1 do
     DoPoint(j, k);
 
   SetLength(Result, resCnt);
@@ -2856,7 +2856,7 @@ function RoughOutline(const line: TPathD; lineWidth: double;
 var
   lines: TPathsD;
 begin
-  SetLength(lines,1);
+  SetLength(lines, 1);
   lines[0] := line;
   Result := RoughOutline(lines, lineWidth, joinStyle, endStyle, miterLim, scale);
 end;
@@ -3008,7 +3008,7 @@ end;
 
 function RoundRect(const rec: TRectD; radius: TPointD): TPathD;
 var
-  i,j     : integer;
+  i, j    : integer;
   corners : TPathD;
   bezPts  : TPathD;
   magic   : TPointD;
@@ -3112,11 +3112,11 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function CalcCircleFrom3Points(const p1,p2,p3: TPointD;
+function CalcCircleFrom3Points(const p1, p2, p3: TPointD;
   out centre: TPointD; out radius: double): Boolean;
 var
   mat11, mat12, mat13, mat14: TMatrixD;
-  m11,m12,m13,m14: double;
+  m11, m12, m13, m14: double;
 begin
   mat11 := Matrix(p1.X, p1.Y, 1, p2.X, p2.Y, 1, p3.X, p3.Y, 1);
   m11 := MatrixDeterminant(mat11);
@@ -3641,10 +3641,10 @@ end;
 
 function GetBoundsD(const paths: TPathsD): TRectD;
 var
-  i,j: integer;
+  i, j: integer;
   p: PPointD;
   {$IFDEF CPUX64}
-  l,t,r,b,x,y: double;
+  l, t, r, b, x, y: double;
   {$ENDIF CPUX64}
 begin
   if paths = nil then
@@ -3707,10 +3707,10 @@ end;
 
 function GetBoundsD(const path: TPathD): TRectD;
 var
-  i,highI: integer;
+  i, highI: integer;
   p: PPointD;
   {$IFDEF CPUX64}
-  l,t,r,b,x,y: double;
+  l, t, r, b, x, y: double;
   {$ENDIF CPUX64}
 begin
   highI := High(path);
@@ -3883,7 +3883,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetPointInCubicBezier(const a,b,c,d: TPointD; t: double): TPointD;
+function GetPointInCubicBezier(const a, b, c, d: TPointD; t: double): TPointD;
 var
   omt: double;
 begin
@@ -3999,7 +3999,7 @@ begin
     AddPoint(pt4)
   end else
     DoCurve(pt1, pt2, pt3, pt4);
-  SetLength(result,resultCnt);
+  SetLength(result, resultCnt);
 end;
 //------------------------------------------------------------------------------
 
@@ -4071,7 +4071,7 @@ var
 var
   i, len: integer;
   p: PPointD;
-  pt1,pt2,pt3,pt4: TPointD;
+  pt1, pt2, pt3, pt4: TPointD;
 begin
   result := nil;
   len := Length(pts); resultLen := 0; resultCnt := 0;
@@ -4091,7 +4091,7 @@ begin
     pt1 := pt4;
     pt2 := ReflectPoint(pt3, pt1);
   end;
-  SetLength(result,resultCnt);
+  SetLength(result, resultCnt);
 end;
 //------------------------------------------------------------------------------
 
@@ -4169,14 +4169,14 @@ begin
     pt1 := pt3;
     pt2 := ReflectPoint(pt2, pt1);
   end;
-  SetLength(result,resultCnt);
+  SetLength(result, resultCnt);
 end;
 //------------------------------------------------------------------------------
 
 function MakePath(const pts: array of double): TPathD;
 var
   i, len: Integer;
-  x,y: double;
+  x, y: double;
 begin
   Result := nil;
   len := length(pts) div 2;
