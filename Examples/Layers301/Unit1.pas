@@ -109,7 +109,7 @@ type
     delayedPos         : TPoint;
     procedure AppOnIdle(Sender: TObject; var Done: Boolean);
     procedure DelayedMouseMove(Sender: TObject;
-      Shift: TShiftState; X,Y: Integer);
+      Shift: TShiftState; X, Y: Integer);
 
     function MakeRandomRect(const mp:TPointD): TRectD;
     function MakeRandomSquare(const mp:TPointD): TRectD;

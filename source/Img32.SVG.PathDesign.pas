@@ -905,7 +905,7 @@ end;
 
 procedure TSvgQSegLayer.DrawDesigner(designer: TLayer32);
 var
-  i,j: integer;
+  i, j: integer;
   p: TPathD;
   pt: TPointD;
   dashes: TArrayOfInteger;
@@ -957,7 +957,7 @@ end;
 
 procedure TSvgSSegLayer.DrawDesigner(designer: TLayer32);
 var
-  i,j: integer;
+  i, j: integer;
   p: TPathD;
   dashes: TArrayOfInteger;
 begin
@@ -982,7 +982,7 @@ end;
 
 procedure TSvgSSegLayer.BtnMoveCheck(const pos: TPointD);
 var
-  dx,dy : integer;
+  dx, dy : integer;
   layer : TPathSegLayer;
 begin
   layer := GetPrevSegLayer;
@@ -1011,7 +1011,7 @@ end;
 
 procedure TSvgTSegLayer.BtnMoveCheck(const pos: TPointD);
 var
-  dx,dy : integer;
+  dx, dy : integer;
   layer : TPathSegLayer;
 begin
   layer := GetPrevSegLayer;
@@ -1186,7 +1186,7 @@ end;
 procedure TSvgPathLayer.LoadPath(const dpath: string;
   const destRect: TRect; scale: double);
 var
-  i, w,h  : integer;
+  i, w, h  : integer;
   subPath : TSubPathLayer;
   srcRect : TRect;
 begin
@@ -1222,7 +1222,7 @@ end;
 procedure TSvgPathLayer.LoadPathsFromFile(const filename: string;
   const destRect: TRect; scale: double);
 var
-  s,s2: string;
+  s, s2: string;
 
   procedure ParseTree(el: TSvgTreeEl);
   var

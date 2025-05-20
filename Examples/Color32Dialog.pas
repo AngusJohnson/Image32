@@ -80,7 +80,7 @@ uses Math, StrUtils, Img32.Vector, Img32.Extra, Img32.Draw;
 
 procedure TColor32DialogForm.FormCreate(Sender: TObject);
 var
-  i,w,h: integer;
+  i, w, h: integer;
 begin
 
   // TTrackBar controls aren't being read correctly
@@ -170,8 +170,8 @@ end;
 
 procedure TColor32DialogForm.UpdateCtrls(Sender: TObject);
 var
-  i,j : integer;
-  w,h : integer;
+  i, j : integer;
+  w, h : integer;
   r   : integer;
   hsl : THsl;
   pc  : PColor32;
@@ -187,14 +187,14 @@ begin
     lblHue.Caption := inttostr(fHsl.hue);
 
     // update ipMain
-    RectWidthHeight(ipMain.InnerClientRect, w,h);
+    RectWidthHeight(ipMain.InnerClientRect, w, h);
     ipMain.Image.AssignPixelArray(fRainbow, w, 1, true);
 
     if Sender <> tbMain then
       tbMain.Position := Round(tbMain.Max * fHsl.hue / 255);
 
     j := tbMain.Position;
-    for i := Max(0,j -dpi2) to Min(w -1, j +dpi2) do
+    for i := Max(0, j - dpi2) to Min(w - 1, j + dpi2) do
       ipMain.Image.Pixels[i] := clBlack32;
     ipMain.Image.Resize(w, h); //stretch image vertically
 
@@ -333,7 +333,7 @@ var
   pt: TPoint;
 begin
   fMouseDn := true;
-  pt := ipMain.ClientToImage(Point(X,Y));
+  pt := ipMain.ClientToImage(Point(X, Y));
   tbMain.Position := pt.X;
 end;
 //------------------------------------------------------------------------------
@@ -344,7 +344,7 @@ var
   pt: TPoint;
 begin
   if not fMouseDn then Exit;
-  pt := ipSubMain.ClientToImage(Point(X,Y));
+  pt := ipSubMain.ClientToImage(Point(X, Y));
   tbMain.Position := pt.X;
 end;
 //------------------------------------------------------------------------------
@@ -362,7 +362,7 @@ var
   pt: TPoint;
 begin
   fMouseDn := true;
-  pt := ipSubMain.ClientToImage(Point(X,Y));
+  pt := ipSubMain.ClientToImage(Point(X, Y));
   ClampRange(pt.X, 0, fSize); ClampRange(pt.Y, 0, fSize);
   fHsl.sat := ClampByte(127 * (fSize - pt.X) / fSize + 127 * (fSize - pt.Y) / fSize);
   fHsl.lum := ClampByte(127 * pt.X / fSize + 127 * (fSize - pt.Y) / fSize);

@@ -494,7 +494,7 @@ end;
 
 procedure TClipperOffset.OffsetPolygon;
 var
-  i,j: integer;
+  i, j: integer;
 begin
   j := high(fInPath);
   for i := 0 to high(fInPath) do

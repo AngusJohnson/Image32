@@ -212,7 +212,7 @@ begin
     img.Clear(clBlue32);
     img.FillRect(Types.Rect(1, 1, 2, 2), clRed32);
     img.Resampler := rNearestResampler;
-    img.Resize(displaySize,displaySize);
+    img.Resize(displaySize, displaySize);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 

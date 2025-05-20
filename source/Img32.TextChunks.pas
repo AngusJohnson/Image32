@@ -241,7 +241,7 @@ begin
     if chunk[1] > SPACE then
     begin
       // relatively slow
-      TFontCacheHack(fontCache).GetTextOutlineInternal(0,0,
+      TFontCacheHack(fontCache).GetTextOutlineInternal(0, 0,
         chunk, 0, self.arrayOfPaths, self.glyphOffsets, self.width)
     end else
     begin
@@ -580,7 +580,7 @@ var
   idx     : integer;
   newWord : UnicodeString;
   fc      : TFontCache;
-  cTx,cBk : TColor32;
+  cTx, cBk : TColor32;
 begin
   // preconditions: ranges checked and y1 <= y2
   if y1 = y2 then
@@ -598,7 +598,7 @@ begin
     cBk     := backColor;
     idx     := index;
   end;
-  System.Delete(newWord, y1 +1, y2 - y1);
+  System.Delete(newWord, y1 + 1, y2 - y1);
   DeleteChunk(idx);
   if newWord = '' then
     Result := nil else
@@ -822,7 +822,7 @@ var
 
     if spcCnt = 0 then
       Result.justifyDeltas[arrayCnt] := 0 else
-      Result.justifyDeltas[arrayCnt] := (pageWidth - x)/spcCnt;
+      Result.justifyDeltas[arrayCnt] := (pageWidth - x) / spcCnt;
 
     if (Result.visibleLines < 0) and ((arrayCnt +1) * lh > pageHeight) then
     begin

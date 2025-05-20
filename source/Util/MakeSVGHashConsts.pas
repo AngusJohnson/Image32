@@ -103,7 +103,7 @@ var
 
   function TidyName(const name: string): string;
   var
-    i,j,len: integer;
+    i, j, len: integer;
     s: string;
     n: Char;
   begin

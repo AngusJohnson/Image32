@@ -498,7 +498,7 @@ end;
 procedure TBaseImgPanel.ScaleAtPoint(scaleDelta: double; const pt: TPoint);
 var
   marg: integer;
-  p,q: double;
+  p, q: double;
   pt1, pt2: TPoint;
 begin
   p := scaleDelta * fScale;

@@ -6939,7 +6939,7 @@ procedure TEventPropertyHandler.RegisterProperties;
 var
   context: TRttiContext;
   aType: TRttiType;
-  i,j: integer;
+  i, j: integer;
   properties: TArray<TRttiProperty>;
 begin
   // This gets both public and published properties
@@ -7706,7 +7706,7 @@ begin
   else if (StorageState = ssNormal) and Assigned(RootCtrl) and
     AllowResize and (value >= 0.01) and (value <= 100)  then
   begin
-    delta := value/DesignScale;
+    delta := value / DesignScale;
     inherited SetDesignScale(value);
     if Assigned(EventAndPropertyHandler) then // scale fonts etc before ctrls
       EventAndPropertyHandler.Scale(delta);

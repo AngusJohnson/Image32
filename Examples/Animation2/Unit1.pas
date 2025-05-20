@@ -109,7 +109,7 @@ end;
 
 procedure TForm1.FormPaint(Sender: TObject);
 var
-  x,y: integer;
+  x, y: integer;
   mpForm: TPointD;
 begin
   with ClientRect do

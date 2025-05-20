@@ -45,7 +45,7 @@ uses
 
 procedure TForm1.FormCreate(Sender: TObject);
 var
-  i,j, ballsize, SpaceAbove, maxSquishSize: integer;
+  i, j, ballsize, SpaceAbove, maxSquishSize: integer;
   img: TImage32;
   path: TPathD;
   ballRec: TRect;
@@ -66,7 +66,7 @@ begin
     DrawLine(Image, path, 5, clBlack32, esSquare);
   end;
 
-  ballRec := Rect(0,0,ballsize,ballsize);
+  ballRec := Rect(0, 0, ballsize, ballsize);
 
   Windows.InflateRect(ballRec, -15, -15);
   path := Ellipse(ballRec);

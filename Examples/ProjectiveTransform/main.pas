@@ -304,7 +304,7 @@ begin
   if not (ssLeft in Shift) then
   begin
     //update the cursor
-    layer := layeredImage.GetLayerAt(Point(X,Y));
+    layer := layeredImage.GetLayerAt(Point(X, Y));
     if Assigned(layer) then
       pnlLeft.Cursor := layer.CursorId else
       pnlLeft.Cursor := crDefault;
