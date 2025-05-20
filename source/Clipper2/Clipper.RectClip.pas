@@ -614,7 +614,7 @@ end;
 
 function TRectClip64.Execute(const paths: TPaths64): TPaths64;
 var
-  i,j, len: integer;
+  i, j, len: integer;
   path: TPath64;
 begin
   result := nil;
@@ -652,7 +652,7 @@ end;
 
 function StartLocsAreClockwise(const startLocs: TList): Boolean;
 var
-  i,j, res: integer;
+  i, j, res: integer;
 begin
   res := 0;
   for i := 1 to startLocs.Count -1 do
@@ -671,8 +671,8 @@ end;
 
 procedure TRectClip64.ExecuteInternal(const path: TPath64);
 var
-  i,j, highI    : integer;
-  prevPt,ip,ip2 : TPoint64;
+  i, j, highI   : integer;
+  prevPt, ip, ip2: TPoint64;
   loc, prevLoc  : TLocation;
   loc2          : TLocation;
   startingLoc   : TLocation;
@@ -851,7 +851,7 @@ end;
 
 procedure TRectClip64.CheckEdges;
 var
-  i,j: integer;
+  i, j: integer;
   edgeSet1, edgeSet2, combinedSet: Cardinal;
   op, op2: POutPt2;
 begin
@@ -920,8 +920,8 @@ begin
   // Alternatively cw and ccw could be POutPtArray locals,
   // but these require lots of dereferencing.
   if not Assigned(ccw) then Exit;
-  isHorz := idx in [1,3];
-  cwIsTowardLarger := idx in [1,2];
+  isHorz := idx in [1, 3];
+  cwIsTowardLarger := idx in [1, 2];
   i := 0; j := 0;
   while (i <= High(cw)) do
   begin
@@ -1129,7 +1129,7 @@ end;
 
 function TRectClipLines64.Execute(const paths: TPaths64): TPaths64;
 var
-  i,j, len: integer;
+  i, j, len: integer;
   pathrec: TRect64;
 begin
   result := nil;
@@ -1159,7 +1159,7 @@ end;
 procedure TRectClipLines64.ExecuteInternal(const path: TPath64);
 var
   i, highI      : integer;
-  prevPt,ip,ip2 : TPoint64;
+  prevPt, ip, ip2: TPoint64;
   loc, prev     : TLocation;
   crossingLoc   : TLocation;
 begin

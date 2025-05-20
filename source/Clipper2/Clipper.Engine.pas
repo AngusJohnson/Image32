@@ -1120,7 +1120,7 @@ end;
 function BuildPath(op: POutPt; reverse, isOpen: Boolean;
   out path: TPath64): Boolean;
 var
-  i,j, cnt: integer;
+  i, j, cnt: integer;
 begin
   cnt := PointCount(op);
   if (cnt < 3) and (not isOpen or (Cnt < 2)) then
@@ -1280,7 +1280,7 @@ end;
 
 function AreaTriangle(const pt1, pt2, pt3: TPoint64): double;
 var
-  d1,d2,d3,d4,d5,d6: double;
+  d1, d2, d3, d4, d5, d6: double;
 begin
   d1 := (pt3.y + pt1.y);
   d2 := (pt3.x - pt1.x);
@@ -2114,8 +2114,8 @@ begin
     //   not preserving collinear points OR
     //   is a 180 degree 'spike'
     if IsCollinear(op2.prev.pt, op2.pt, op2.next.pt) and
-      (PointsEqual(op2.pt,op2.prev.pt) or
-      PointsEqual(op2.pt,op2.next.pt) or
+      (PointsEqual(op2.pt, op2.prev.pt) or
+      PointsEqual(op2.pt, op2.next.pt) or
       not FPreserveCollinear or
       (DotProduct(op2.prev.pt, op2.pt, op2.next.pt) < 0)) then
     begin
@@ -2671,15 +2671,15 @@ begin
       end;
   end;
 
-  if (not IsHotEdge(e1) and not (e1WindCnt in [0,1])) or
-    (not IsHotEdge(e2) and not (e2WindCnt in [0,1])) then Exit;
+  if (not IsHotEdge(e1) and not (e1WindCnt in [0, 1])) or
+    (not IsHotEdge(e2) and not (e2WindCnt in [0, 1])) then Exit;
 
   // NOW PROCESS THE INTERSECTION
 
   // if both edges are 'hot' ...
   if IsHotEdge(e1) and IsHotEdge(e2) then
   begin
-    if not (e1WindCnt in [0,1]) or not (e2WindCnt in [0,1]) or
+    if not (e1WindCnt in [0, 1]) or not (e2WindCnt in [0, 1]) or
       (not IsSamePolyType(e1, e2) and (fClipType <> ctXor)) then
     begin
       op := AddLocalMaxPoly(e1, e2, pt);
@@ -3142,7 +3142,7 @@ var
   i: Integer;
 begin
   for i := 0 to FIntersectList.Count - 1 do
-    Dispose(PIntersectNode(UnsafeGet(FIntersectList,i)));
+    Dispose(PIntersectNode(UnsafeGet(FIntersectList, i)));
   FIntersectList.Clear;
 end;
 //------------------------------------------------------------------------------
@@ -3207,7 +3207,7 @@ end;
 
 function TClipperBase.BuildIntersectList(const topY: Int64): Boolean;
 var
-  e, base,prevBase,left,right, lend, rend: PActive;
+  e, base, prevBase, left, right, lend, rend: PActive;
 begin
   result := false;
   if not Assigned(FActives) or not Assigned(FActives.nextInAEL) then Exit;

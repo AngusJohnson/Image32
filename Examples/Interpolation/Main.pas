@@ -153,7 +153,7 @@ end;
 
 procedure TMainForm.DoClosedPaths2;
 var
-  i,j, maxX,maxY: integer;
+  i, j, maxX, maxY: integer;
   path, smoothedPath: TPathD;
   dstRec, srcRec: TRect;
   scaleX, scaleY: double;
@@ -192,7 +192,7 @@ end;
 
 procedure TMainForm.DoOpenPaths;
 var
-  i,j, dx: integer;
+  i, j, dx: integer;
   paths, smoothedPaths: TPathsD;
   rec: TRect;
 const

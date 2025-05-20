@@ -72,13 +72,13 @@ type
     fZCallback64 : TZCallback64;
     procedure ZCB(const bot1, top1, bot2, top2: TPoint64;
       var intersectPt: TPoint64);
-    procedure AddPoint(x,y: double; z: ZType); overload;
+    procedure AddPoint(x, y: double; z: ZType); overload;
     procedure AddPoint(const pt: TPoint64); overload;
       {$IFDEF INLINING} inline; {$ENDIF}
     procedure AddPoint(const pt: TPoint64; newZ: ZType); overload;
       {$IFDEF INLINING} inline; {$ENDIF}
 {$ELSE}
-    procedure AddPoint(x,y: double); overload;
+    procedure AddPoint(x, y: double); overload;
 
     procedure AddPoint(const pt: TPoint64); overload;
       {$IFDEF INLINING} inline; {$ENDIF}
@@ -218,7 +218,7 @@ end;
 
 function GetLowestPolygonIdx(const paths: TPaths64): integer;
 var
-  i,j: integer;
+  i, j: integer;
   botPt: TPoint64;
 begin
 	Result := -1;
@@ -355,7 +355,7 @@ end;
 
 procedure TClipperOffset.DoGroupOffset(group: TGroup);
 var
-  i,j, len, steps: Integer;
+  i, j, len, steps: Integer;
   r, stepsPer360, arcTol: Double;
   absDelta: double;
   rec: TRect64;
@@ -543,7 +543,7 @@ begin
   else
     case fEndType of
       etButt: DoBevel(0, 0);
-      etRound: DoRound(0,0, PI);
+      etRound: DoRound(0, 0, PI);
       else DoSquare(0, 0);
     end;
 
@@ -570,7 +570,7 @@ begin
   end else
   case fEndType of
     etButt: DoBevel(highI, highI);
-    etRound: DoRound(highI,highI, PI);
+    etRound: DoRound(highI, highI, PI);
     else DoSquare(highI, highI);
   end;
 
@@ -585,7 +585,7 @@ end;
 
 procedure TClipperOffset.ExecuteInternal(delta: Double);
 var
-  i,j: integer;
+  i, j: integer;
   group: TGroup;
   pathsReversed: Boolean;
   fillRule: TFillRule;
@@ -709,9 +709,9 @@ end;
 //------------------------------------------------------------------------------
 
 {$IFDEF USINGZ}
-procedure TClipperOffset.AddPoint(x,y: double; z: ZType);
+procedure TClipperOffset.AddPoint(x, y: double; z: ZType);
 {$ELSE}
-procedure TClipperOffset.AddPoint(x,y: double);
+procedure TClipperOffset.AddPoint(x, y: double);
 {$ENDIF}
 const
   BuffLength = 32;
@@ -719,14 +719,14 @@ var
   pt: TPoint64;
 begin
 {$IFDEF USINGZ}
-  pt := Point64(Round(x),Round(y), z);
+  pt := Point64(Round(x), Round(y), z);
 {$ELSE}
-  pt := Point64(Round(x),Round(y));
+  pt := Point64(Round(x), Round(y));
 {$ENDIF}
   if fOutPathLen = length(fOutPath) then
     SetLength(fOutPath, fOutPathLen + BuffLength);
   if (fOutPathLen > 0) and
-    PointsEqual(fOutPath[fOutPathLen-1], pt) then Exit;
+    PointsEqual(fOutPath[fOutPathLen - 1], pt) then Exit;
   fOutPath[fOutPathLen] := pt;
   Inc(fOutPathLen);
 end;
@@ -755,7 +755,7 @@ end;
 
 function IntersectPoint(const ln1a, ln1b, ln2a, ln2b: TPointD): TPointD;
 var
-  m1,b1,m2,b2: double;
+  m1, b1, m2, b2: double;
 begin
   result := NullPointD;
   //see https://paulbourke.net/geometry/pointlineplane/#i2l
@@ -841,7 +841,7 @@ end;
 
 procedure TClipperOffset.DoSquare(j, k: Integer);
 var
-  vec, pt1,pt2,pt3,pt4, pt,ptQ : TPointD;
+  vec, pt1, pt2, pt3, pt4, pt, ptQ : TPointD;
   absDelta: double;
 begin
   if k = j then

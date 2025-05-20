@@ -736,7 +736,7 @@ end;
 
 procedure TLayer32.SetSize(width, height: double);
 var
-  w,h: integer;
+  w, h: integer;
 begin
 {$IFDEF USE_FILE_STORAGE}
   if StorageState = ssDestroying then Exit;
@@ -1832,7 +1832,7 @@ procedure TRasterLayer32.DoAutoHitTest;
 begin
   if fAutoHitTest then
     fHitTest.htImage.Assign(Image) else
-    HitTest.htImage.SetSize(0,0);
+    HitTest.htImage.SetSize(0, 0);
 end;
 //------------------------------------------------------------------------------
 
@@ -1875,7 +1875,7 @@ end;
 
 procedure TRasterLayer32.SetInnerBounds(const newBounds: TRectD);
 var
-  x,y, rx,ry: double;
+  x, y, rx, ry: double;
   mat: TMatrixD;
   sinA, cosA, tanA: double;
 begin
@@ -2035,7 +2035,7 @@ procedure TRotatingGroupLayer32.Init(const rec: TRect;
   startingAngle: double; startingZeroOffset: double;
   buttonLayerClass: TButtonDesignerLayer32Class);
 var
-  w,h: integer;
+  w, h: integer;
   q, dist: double;
   pt: TPointD;
   pivot: TPointD;
@@ -2053,8 +2053,8 @@ begin
 
   dist := Average(w, h) / 2;
   rec2 := RectD(
-    pivot.X -dist, pivot.Y -dist,
-    pivot.X +dist,pivot.Y +dist);
+    pivot.X - dist, pivot.Y - dist,
+    pivot.X + dist, pivot.Y + dist);
 
   with AddChild(TLayer32) do //Layer 0 - design layer
   begin
@@ -2500,7 +2500,7 @@ begin
   if not Result then Exit;
   fRoot := newRoot;
   fRoot.UpdateLayeredImage(self);
-  fRoot.SetInnerBounds(RectD(0,0,Width, Height));
+  fRoot.SetInnerBounds(RectD(0, 0, Width, Height));
   fRoot.Visible := true;
   Invalidate;
 end;
@@ -2708,8 +2708,8 @@ begin
   if PointsNearEqual(pivot, targetLayer.MidPoint, 1) then
     rec := targetLayer.InnerBounds
   else
-    rec := RectD(pivot.X -radius, pivot.Y -radius,
-      pivot.X +radius,pivot.Y +radius);
+    rec := RectD(pivot.X - radius, pivot.Y - radius,
+      pivot.X + radius, pivot.Y + radius);
 
   Result.Init(Rect(rec), buttonSize,
     pivotButtonColor, angleButtonColor, initialAngle,
@@ -2762,7 +2762,7 @@ begin
     mp := PivotButton.MidPoint;
     pt2 := AngleButton.MidPoint;
     radius := Distance(mp, pt2);
-    rec := RectD(mp.X -radius, mp.Y -radius, mp.X +radius,mp.Y +radius);
+    rec := RectD(mp.X - radius, mp.Y - radius, mp.X + radius, mp.Y + radius);
     designer := DesignLayer;
     designer.SetInnerBounds(rec);
     pt2 := TranslatePoint(mp, -rec.Left, -rec.Top);

@@ -64,7 +64,7 @@ const
   QOI_MASK_2      = $C0;
   QOI_MAGIC       = $66696F71;
   QOI_HEADER_SIZE = 14;
-  qoi_padding: array[0..7] of byte = (0,0,0,0,0,0,0,1);
+  qoi_padding: array[0..7] of byte = (0, 0, 0, 0, 0, 0, 0, 1);
   qoi_padding_size = 8;
 
 type

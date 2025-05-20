@@ -56,7 +56,7 @@ type
     function Initialize(imgBase: Pointer;
       imgWidth, imgHeight, pixelSize: integer): Boolean; overload; virtual;
     function Initialize(targetImage: TImage32): Boolean; overload; virtual;
-    function GetDstPixel(x,y: integer): Pointer;
+    function GetDstPixel(x, y: integer): Pointer;
     // RenderProc: x & y refer to pixel coords in the destination image and
     // where x1 is the start (and left) and x2 is the end of the render
     procedure RenderProc(x1, x2, y: integer; alpha: PByte); virtual; abstract;
@@ -484,7 +484,7 @@ begin
   end;
 
   // Following compression the right 2/3 of the image is redundant
-   img.Crop(Types.Rect(0,0, img.Width div 3, img.Height));
+   img.Crop(Types.Rect(0, 0, img.Width div 3, img.Height));
 
   // currently text is white and the background is black
   // so blend in the text and background colors ...
@@ -741,7 +741,7 @@ end;
 procedure AllocateScanlines(const polygons: TPathsD;
   const scanlines: TArrayOfScanline; var fragments: PFragment; clipBottom, clipRight: integer);
 var
-  i,j, highI, highJ: integer;
+  i, j, highI, highJ: integer;
   y1, y2: integer;
   fragOff: Cardinal;
   psl: PScanline;
@@ -813,7 +813,7 @@ end;
 procedure SplitEdgeIntoFragments(const pt1, pt2: TPointD;
   const scanlines: TArrayOfScanline; fragments: PFragment; const clipRec: TRect);
 var
-  x,y, dx,dy, absDx, dydx, dxdy: double;
+  x, y, dx, dy, absDx, dydx, dxdy: double;
   i, scanlineY, maxY, maxX: integer;
   psl: PScanLine;
   pFrag: PFragment;
@@ -979,7 +979,7 @@ end;
 procedure ProcessScanlineFragments(var scanline: TScanLine;
   fragments: PFragment; const buffer: TArrayOfDouble);
 var
-  i,j, leftXi,rightXi: integer;
+  i, j, leftXi, rightXi: integer;
   fracX, yy, q{, windDir}: double;
   left, right, dy, dydx: double;
   frag: PFragment;
@@ -1624,7 +1624,7 @@ var
   dst: PColor32;
   c: TColor32;
 begin
-  dst := GetDstPixel(x1,y);
+  dst := GetDstPixel(x1, y);
   c := fColor; // copy fColor to local variable
   for i := x1 to x2 do
   begin
@@ -1802,7 +1802,7 @@ var
   pImg: PColor32;
   opacityTable: PByteArray;
 begin
-  pDst := GetDstPixel(x1,y);
+  pDst := GetDstPixel(x1, y);
   dec(x1, fOffset.X);
   dec(x2, fOffset.X);
   dec(y, fOffset.Y);
@@ -1931,7 +1931,7 @@ end;
 function TLinearGradientRenderer.Initialize(targetImage: TImage32): Boolean;
 var
   i: integer;
-  dx,dy, dxdy,dydx: double;
+  dx, dy, dxdy, dydx: double;
 begin
   result := inherited Initialize(targetImage) and assigned(fGradientColors);
   if not result then Exit;
@@ -2067,8 +2067,8 @@ procedure TRadialGradientRenderer.SetParameters(const focalRect: TRect;
   innerColor, outerColor: TColor32;
   gradientFillStyle: TGradientFillStyle);
 var
-  w,h: integer;
-  radX,radY: double;
+  w, h: integer;
+  radX, radY: double;
 begin
   inherited SetParameters(innerColor, outerColor, gradientFillStyle);
   fColorsCnt := 0;
@@ -2168,7 +2168,7 @@ end;
 procedure TSvgRadialGradientRenderer.RenderProc(x1, x2, y: integer; alpha: PByte);
 var
   i: integer;
-  q,qq, m,c, qa,qb,qc,qs: double;
+  q, qq, m, c, qa, qb, qc, qs: double;
   dist, dist2: double;
   color: TColor32;
   pDst: PColor32;
@@ -2177,7 +2177,7 @@ var
 begin
   opacityTable := PByteArray(@MulTable[Opacity]);
   // get the left-most pixel to render
-  pDst := GetDstPixel(x1,y);
+  pDst := GetDstPixel(x1, y);
   pt.X := x1 - fCenterPt.X; pt.Y := y - fCenterPt.Y;
   for i := x1 to x2 do
   begin
@@ -2247,7 +2247,7 @@ var
   i: integer;
   dst: PARGB;
 begin
-  dst := PARGB(GetDstPixel(x1,y));
+  dst := PARGB(GetDstPixel(x1, y));
   for i := x1 to x2 do
   begin
     {$IFDEF PBYTE}
@@ -2300,10 +2300,10 @@ var
   src, dst: PARGB;
   c: TARGB;
 begin
-  dst := PARGB(GetDstPixel(x1,y));
+  dst := PARGB(GetDstPixel(x1, y));
   if Assigned(fBackImage) then
   begin
-    src := PARGB(GetSrcPixel(x1,y));
+    src := PARGB(GetSrcPixel(x1, y));
     for i := x1 to x2 do
     begin
       if src.Color = 0 then c.Color := clBlack32

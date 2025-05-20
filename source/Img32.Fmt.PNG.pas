@@ -192,7 +192,7 @@ end;
 function TImageFormat_PNG.LoadFromStream(stream: TStream;
   img32: TImage32; imgIndex: integer): Boolean;
 var
-  i,j         : integer;
+  i, j        : integer;
   png         : TPngImage;
   dst         : PARGB;
   srcColor    : PByte;
@@ -286,7 +286,7 @@ end;
 procedure TImageFormat_PNG.SaveToStream(stream: TStream;
   img32: TImage32; compressionQuality: integer);
 var
-  i,j: integer;
+  i, j: integer;
   png: TPngImage;
   srcColor: PARGB;
   dstAlpha, dstColor: PByte;

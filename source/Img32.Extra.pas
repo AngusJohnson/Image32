@@ -434,8 +434,8 @@ end;
 procedure DrawShadowRect(img: TImage32; const rec: TRect; depth: double;
   angle: double = angle45; color: TColor32 = $80000000);
 var
-  i,j, sX,sY: integer;
-  l,t,r,b: integer;
+  i, j, sX, sY: integer;
+  l, t, r, b: integer;
   tmpImg: TImage32;
   tmpRec: TRect;
   xx,yy: double;
@@ -560,7 +560,7 @@ procedure DrawShadow(img: TImage32; const polygons: TPathsD;
   color: TColor32; cutoutInsideShadow: Boolean);
 var
   x, y: double;
-  blurSize, w,h: integer;
+  blurSize, w, h: integer;
   rec: TRect;
   polys, shadowPolys: TPathsD;
   shadowImg: TImage32;
@@ -575,7 +575,7 @@ begin
   depth := depth * 0.5;
   x := depth * x;
   y := depth * y;
-  blurSize := Max(1,Round(depth / 2));
+  blurSize := Max(1, Round(depth / 2));
   Img32.Vector.InflateRect(rec, Ceil(depth * 2), Ceil(depth * 2));
   polys := TranslatePath(polygons, -rec.Left, -rec.Top);
   shadowPolys := TranslatePath(polys, x, y);
@@ -606,7 +606,7 @@ end;
 procedure DrawGlow(img: TImage32; const polygons: TPathsD;
   fillRule: TFillRule; color: TColor32; blurRadius: integer);
 var
-  w,h: integer;
+  w, h: integer;
   rec: TRect;
   glowPolys: TPathsD;
   glowImg: TImage32;
@@ -778,7 +778,7 @@ end;
 procedure GridBackground(img: TImage32; majorInterval, minorInterval: integer;
   fillColor: TColor32; majColor: TColor32; minColor: TColor32);
 var
-  i, x,y, w,h: integer;
+  i, x, y, w, h: integer;
   path: TPathD;
   cr: TCustomColorRenderer;
 begin
@@ -865,7 +865,7 @@ procedure ReplaceColor(img: TImage32; oldColor, newColor: TColor32;
   channelTolerance: Byte; preserveAlpha: Boolean);
 var
   c: PARGB;
-  a,r,g,b: Byte;
+  a, r, g, b: Byte;
   i: Integer;
 begin
   c := PARGB(img.PixelBase);
@@ -1540,17 +1540,17 @@ var
   dirY         : Integer;
 begin
   Result := Assigned(imgIn) and Assigned(imgMaskOut) and
-    InRange(x,0,imgIn.Width -1) and InRange(y,0,imgIn.Height -1);
+    InRange(x,0,imgIn.Width -1) and InRange(y, 0, imgIn.Height - 1);
   if not Result then Exit;
   w := imgIn.Width; h := imgIn.Height;
   // make sure the mask is the size of the image
-  imgMaskOut.SetSize(w,h);
+  imgMaskOut.SetSize(w, h);
   img   := imgIn;
   mask  := imgMaskOut;
   compareFunc := compFunc;
   tolerance := aTolerance;
   maxX := w -1;
-  ffs := TFloodFillStack.create(h -1);
+  ffs := TFloodFillStack.create(h - 1);
   try
     initialColor := imgIn.Pixel[x, y];
     xl := x; xr := x;
@@ -1699,7 +1699,7 @@ end;
 procedure Emboss(img: TImage32; radius: Integer;
   depth: Integer; luminance: Integer; preserveColor: Boolean);
 var
-  yy,xx, x,y, w,h: Integer;
+  yy, xx, x, y, w, h: Integer;
   b: byte;
   kernel: array [0 .. MaxBlur, 0 .. MaxBlur] of Integer;
   wca: TArrayOfWeightedColor;
@@ -1740,7 +1740,7 @@ begin
         inc(pcf);
       end else
       begin
-        pw^.Add(customGray, kernel[0,0]);
+        pw^.Add(customGray, kernel[0, 0]);
         pcf := IncPColor32(pc0, x + 1);
       end;
       // parse the kernel ...
@@ -1748,8 +1748,8 @@ begin
       begin
         for xx := 1 to radius do
         begin
-          pw^.Subtract(Gray(pcf^), kernel[yy,xx]);
-          pw^.Add(Gray(pcb^), kernel[yy,xx]);
+          pw^.Subtract(Gray(pcf^), kernel[yy, xx]);
+          pw^.Add(Gray(pcb^), kernel[yy, xx]);
           dec(pcb); inc(pcf);
         end;
         dec(pcb, img.Width - radius);
@@ -1797,7 +1797,7 @@ end;
 function RamerDouglasPeucker(const path: TPathD;
   epsilon: double): TPathD;
 var
-  i,j, len: integer;
+  i, j, len: integer;
   buffer: TArrayOfInteger;
 begin
   len := length(path);
@@ -1825,7 +1825,7 @@ end;
 function RamerDouglasPeucker(const paths: TPathsD;
   epsilon: double): TPathsD;
 var
-  i,j, len: integer;
+  i, j, len: integer;
 begin
   j := 0;
   len := length(paths);
@@ -1933,7 +1933,7 @@ end;
 function SimplifyPaths(const paths: TPathsD;
   shapeTolerance: double; isClosedPath: Boolean): TPathsD;
 var
-  i,j, len: integer;
+  i, j, len: integer;
 begin
   len := Length(paths);
   SetLength(Result, len);
@@ -2077,7 +2077,7 @@ var
   vec: TPointD;
   pl: TArrayOfDouble;
   unitVecs: TPathD;
-  d, angle, d1,d2: double;
+  d, angle, d1, d2: double;
 begin
   // SmoothToCubicBezier - returns cubic bezier control points
   Result := nil;
@@ -2150,7 +2150,7 @@ var
   vec: TPointD;
   pl: TArrayOfDouble;
   unitVecs: TPathD;
-  d1,d2: double;
+  d1, d2: double;
 begin
   // SmoothToCubicBezier2 - returns cubic bezier control points
   Result := nil;
@@ -2332,7 +2332,7 @@ end;
 
 procedure GaussianBlur(img: TImage32; rec: TRect; radius: Integer);
 var
-  i, w,h, highX, x,y,yy,z,startz: Integer;
+  i, w, h, highX, x, y, yy, z, startz: Integer;
   expConst: double;
   gaussTable: array [-MaxBlur .. MaxBlur] of integer;
   wc: TWeightedColor;
@@ -2484,9 +2484,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure BoxBlurH(const src, dst: TArrayOfColor32; w,h, stdDev: integer);
+procedure BoxBlurH(const src, dst: TArrayOfColor32; w, h, stdDev: integer);
 var
-  i,j, ti, li, ri, re, ovr: integer;
+  i, j, ti, li, ri, re, ovr: integer;
   fv, val: TWeightedColor;
   lastColor: TColor32;
   stdDevW: integer;
@@ -2604,7 +2604,7 @@ end;
 
 procedure BoxBlurV(const src, dst: TArrayOfColor32; w, h, stdDev: integer);
 var
-  i,j, ti, li, ri, re, ovr: integer;
+  i, j, ti, li, ri, re, ovr: integer;
   fv, val: TWeightedColor;
   lastColor: TColor32;
   stdDevH: integer;
@@ -2672,7 +2672,7 @@ end;
 procedure FastGaussianBlur(img: TImage32;
   const rec: TRect; stdDevX, stdDevY: integer; repeats: integer);
 var
-  i,j,len, w,h: integer;
+  i, j, len, w, h: integer;
   rec2: TRect;
   boxesH: TArrayOfInteger;
   boxesV: TArrayOfInteger;

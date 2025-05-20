@@ -901,11 +901,11 @@ const
 function CenterWindow(windowHdl: THandle): boolean;
 var
   DesktopRec, WindowRec: TRect;
-  l,t: integer;
+  l, t: integer;
 begin
   result := SystemParametersInfo(SPI_GETWORKAREA, 0, @DesktopRec, 0);
   if not result or (windowHdl = 0) then exit;
-  GetWindowRect(windowHdl,WindowRec);
+  GetWindowRect(windowHdl, WindowRec);
   l := ((DesktopRec.Right - DesktopRec.Left) - (WindowRec.Right - WindowRec.Left)) div 2;
   t := ((DesktopRec.Bottom - DesktopRec.Top) - (WindowRec.Bottom - WindowRec.Top)) div 2;
   if l < 0 then l := 0;
@@ -917,7 +917,7 @@ end;
 procedure ResizeMainWindow(hdl: HWnd; width, height: Cardinal);
 var
   winRec, clientRec: TRect;
-  dx,dy: cardinal;
+  dx, dy: cardinal;
 begin
   GetWindowRect(hdl, winRec);
   GetClientRect(hdl, clientRec);
@@ -956,12 +956,12 @@ function BasicWindowProc(hWnd, uMsg,	wParam: WPARAM; lParam: LPARAM): Integer; s
 var
   key     : Word;
   chr     : Char;
-  w,h     : integer;
+  w, h    : integer;
   pt      : TPoint;
   ps      : TPAINTSTRUCT;
   dc      : HDC;
   img     : TImage32;
-  dx,dy   : integer;
+  dx, dy  : integer;
   rec     : TRectD;
   shift   : TShiftState;
   layer   : TLayer32;
@@ -1041,8 +1041,8 @@ begin
           if (storageMngr.fClickLayer = storageMngr.DesignTarget) then
           begin
             SetCursor(handCursor);
-            storageMngr.DesignTarget.Offset(dx,dy);
-            storageMngr.fSizingGroup.Offset(dx,dy);
+            storageMngr.DesignTarget.Offset(dx, dy);
+            storageMngr.fSizingGroup.Offset(dx, dy);
             storageMngr.fClickPt := pt;
             //UpdateTargetPosDisplay;
             InvalidateRect(hWnd, nil, false);
@@ -1120,32 +1120,32 @@ begin
             VK_DOWN:
               begin
                 if Shift and ssCtrl <> 0 then w := 5 else w := 1;
-                storageMngr.DesignTarget.Offset(0,w);
-                storageMngr.fSizingGroup.Offset(0,w);
+                storageMngr.DesignTarget.Offset(0, w);
+                storageMngr.fSizingGroup.Offset(0, w);
                 //UpdateTargetPosDisplay;
                 InvalidateRect(hWnd, nil, false);
               end;
             VK_UP:
               begin
                 if Shift and ssCtrl <> 0 then w := 5 else w := 1;
-                storageMngr.DesignTarget.Offset(0,-w);
-                storageMngr.fSizingGroup.Offset(0,-w);
+                storageMngr.DesignTarget.Offset(0, -w);
+                storageMngr.fSizingGroup.Offset(0, -w);
                 //UpdateTargetPosDisplay;
                 InvalidateRect(hWnd, nil, false);
               end;
             VK_RIGHT:
               begin
                 if Shift and ssCtrl <> 0 then w := 5 else w := 1;
-                storageMngr.DesignTarget.Offset(w,0);
-                storageMngr.fSizingGroup.Offset(w,0);
+                storageMngr.DesignTarget.Offset(w, 0);
+                storageMngr.fSizingGroup.Offset(w, 0);
                 //UpdateTargetPosDisplay;
                 InvalidateRect(hWnd, nil, false);
               end;
             VK_LEFT:
               begin
                 if Shift and ssCtrl <> 0 then w := 5 else w := 1;
-                storageMngr.DesignTarget.Offset(-w,0);
-                storageMngr.fSizingGroup.Offset(-w,0);
+                storageMngr.DesignTarget.Offset(-w, 0);
+                storageMngr.fSizingGroup.Offset(-w, 0);
                 //UpdateTargetPosDisplay;
                 InvalidateRect(hWnd, nil, false);
               end;
@@ -1186,8 +1186,8 @@ begin
       begin
         w := LoWord(lParam);
         h := HIWord(lParam);
-        storageMngr.Resize(w,h);
-        InvalidateRect(hWnd,nil,true);
+        storageMngr.Resize(w, h);
+        InvalidateRect(hWnd, nil, true);
         Result := 0;
       end;
     WM_PAINT:
@@ -1343,7 +1343,7 @@ begin
   Result.chrIdx := 0;
 
   case (key) of
-    8,9,13,27,32,33,34,35,37,38,39,40,45,46: Result.chr := Char(key);
+    8, 9, 13, 27, 32, 33, 34, 35, 37, 38, 39, 40, 45, 46: Result.chr := Char(key);
     else if key < 48 then Exit
     else Result.chr := Char(key);
   end;
@@ -3183,7 +3183,7 @@ begin
     if Assigned(RootCtrl.PopMenuCtrl) then
       RootCtrl.PopMenuCtrl.Visible := false;
     if not GetUsableFont then Exit;
-    pt.X := GetMenuItemRect(ItemIndex).Left + fUsableFont.GetSpaceWidth *2;
+    pt.X := GetMenuItemRect(ItemIndex).Left + fUsableFont.GetSpaceWidth * 2;
     pt.Y := Height - fUsableFont.FontHeight * 0.2;
     pt := MakeAbsolute(pt);
     RootCtrl.PopMenuCtrl := TPopMenuCtrl(mnuItem[0]);
@@ -3569,7 +3569,7 @@ end;
 
 procedure TMainMenuCtrl.Paint;
 var
-  i,cnt   : integer;
+  i, cnt  : integer;
   bh, y   : double;
   dummy   : double;
   padding : double;
@@ -4033,7 +4033,7 @@ end;
 function TMemoCtrl.PosToChunkIdx(const relPos: TPointD): TPoint;
 var
   i: integer;
-  x,x2,y2     : double;
+  x, x2, y2     : double;
   spcW, chrW  : double;
   chunk       : TTextChunk;
 begin
@@ -4133,7 +4133,7 @@ end;
 function ClipPathTopAndBot(const clipRect: TRectD; const path: TPathD): TPathD;
 var
   i, len: integer;
-  y, t,b: double;
+  y, t, b: double;
 begin
   len := Length(path);
   NewPointDArray(Result, len, True);
@@ -4765,7 +4765,7 @@ end;
 
 function TEditCtrl.ChunkIdxToPos(const chunkIdx: TPoint): TPointD;
 var
-  i,j, om : integer;
+  i, j, om: integer;
   bh      : double;
   chunk   : TTextChunk;
 begin
@@ -4798,7 +4798,7 @@ end;
 function TEditCtrl.PosToChunkIdx(const relPos: TPointD): TPoint;
 var
   len     : integer;
-  x,d, bh : double;
+  x, d, bh: double;
   textRec : TRectD;
   cwDiv2  : double;
   chunk   : TTextChunk;
@@ -5331,7 +5331,7 @@ procedure TCheckboxCtrl.Paint;
 var
   i       : integer;
   j       : double;
-  bh,dx   : double;
+  bh, dx  : double;
   rec     : TRectD;
   pp      : TPathsD;
   caption : string;
@@ -5417,7 +5417,7 @@ end;
 procedure TRadioBtnCtrl.Paint;
 var
   i         : integer;
-  j,bh,dx   : double;
+  j, bh, dx : double;
   rec       : TRectD;
   p         : TPathD;
   pp        : TPathsD;
@@ -5496,7 +5496,7 @@ end;
 procedure TPanelCtrl.RecalcScrollMax;
 var
   i     : integer;
-  x,y   : double;
+  x, y  : double;
 begin
   if not Assigned(ScrollH) and not Assigned(ScrollV) then
     Exit;
@@ -7673,7 +7673,7 @@ begin
       fLayeredImg.SetSize(width, height);
       fRootCtrl.SetInnerBounds(RectD(0, 0, width, height));
       newRec := fRootCtrl.InnerBounds;
-      scale := Average(newRec.Width/oldRec.Width, newRec.Height/oldRec.Height);
+      scale := Average(newRec.Width / oldRec.Width, newRec.Height / oldRec.Height);
       DesignScale := DesignScale * scale;
     end else
     begin

@@ -47,7 +47,7 @@ end;
 function Minkowski(const Base, Path: TPath64;
   IsSum: Boolean; IsClosed: Boolean): TPaths64;
 var
-  i,j,k,g,h, delta, baseLen, pathLen: integer;
+  i, j, k, g, h, delta, baseLen, pathLen: integer;
   tmp: TPaths64;
   quad: TPath64;
 begin

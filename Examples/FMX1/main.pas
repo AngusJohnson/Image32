@@ -177,7 +177,7 @@ begin
       i := rec.Width div 2 - margin else
       i := rec.Height div 2 - margin;
     with Img32.Vector.MidPoint(rec) do
-      tmpRec := Img32.Vector.Rect(X,Y,X,Y);
+      tmpRec := Img32.Vector.Rect(X, Y, X, Y);
     Img32.Vector.InflateRect(tmpRec, i, i);
     Image.CopyBlend(bookImg, bookImg.Bounds, tmpRec, BlendToOpaque);
   end;
@@ -215,7 +215,7 @@ begin
   bmp := TBitmap.Create;
   try
     AssignImage32ToFmxBitmap(img, bmp);
-    rec := RectF(0,0,bmp.Width,bmp.Height);
+    rec := RectF(0, 0, bmp.Width, bmp.Height);
     Canvas.Lock;
     Canvas.DrawBitmap(bmp, rec, rec, 1.0);
     Canvas.Unlock;

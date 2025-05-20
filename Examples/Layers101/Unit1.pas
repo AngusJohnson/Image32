@@ -242,14 +242,14 @@ end;
 procedure TMainForm.mnuAddEllipseClick(Sender: TObject);
 var
   newLayer: TLayer32;
-  x,y: integer;
+  x, y: integer;
   rec: TRect;
 begin
   //create a semi-random sized object
   x := DPIAware(25 + Random(100));
   y := DPIAware(25 + Random(100));
-  rec := Rect(popupPoint.X -x,popupPoint.Y -y,
-    popupPoint.X +x,popupPoint.Y +y);
+  rec := Rect(popupPoint.X - x, popupPoint.Y - y,
+    popupPoint.X + x, popupPoint.Y + y);
 
   //create the new layer
   newLayer := TMyVectorLayer32(layeredImg32.AddLayer(TMyVectorLayer32));
@@ -271,8 +271,8 @@ begin
   //create a semi-random sized object
   x := DPIAware(25 + Random(100));
   y := DPIAware(25 + Random(100));
-  rec := Rect(popupPoint.X -x,popupPoint.Y -y,
-    popupPoint.X +x,popupPoint.Y +y);
+  rec := Rect(popupPoint.X - x, popupPoint.Y - y,
+    popupPoint.X + x, popupPoint.Y + y);
 
   newLayer := layeredImg32.AddLayer(TMyVectorLayer32);
   with newLayer as TMyVectorLayer32 do
@@ -403,7 +403,7 @@ end;
 procedure TMainForm.pnlMainMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  clickPoint := Types.Point(X,Y);
+  clickPoint := Types.Point(X, Y);
   clickedLayer := layeredImg32.GetLayerAt(clickPoint);
 
   if not Assigned(clickedLayer) then
@@ -429,7 +429,7 @@ var
   layer: TLayer32;
   rec: TRect;
 begin
-  pt := Types.Point(X,Y);
+  pt := Types.Point(X, Y);
 
   if not (ssLeft in Shift) then
   begin

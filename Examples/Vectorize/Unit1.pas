@@ -105,7 +105,7 @@ begin
   masterImg := TImage32.Create;
   masterImg.LoadFromResource('beetle', 'PNG');
   hasTransparency := masterImg.HasTransparency;
-  masterImg.ScaleToFit(1000,1000);
+  masterImg.ScaleToFit(1000, 1000);
   OpenDialog1.InitialDir :=
     ExtractFilePath(paramStr(0)) + 'sample_images';
   ForceDirectories(OpenDialog1.InitialDir);
@@ -155,7 +155,7 @@ end;
 
 procedure TForm1.DisplayImage;
 var
-  i,j: integer;
+  i, j: integer;
   scale, simplifyTol: double;
   vectorBounds: TRect;
   //tmpColors: TArrayOfColor32;
@@ -243,7 +243,7 @@ begin
   if not OpenDialog1.Execute then Exit;
   masterImg.LoadFromFile(OpenDialog1.FileName);
   hasTransparency := masterImg.HasTransparency;
-  masterImg.ScaleToFit(1000,1000);
+  masterImg.ScaleToFit(1000, 1000);
   DisplayImage;
 end;
 //------------------------------------------------------------------------------
@@ -291,7 +291,7 @@ begin
   with TSimpleSvgWriter.Create(frEvenOdd) do
   try
     AddPaths(smoothedPaths, false, $40000033, $FF000033, 1.2);
-    SaveToFile(SaveDialog1.FileName, 800,600);
+    SaveToFile(SaveDialog1.FileName, 800, 600);
   finally
     free;
   end;

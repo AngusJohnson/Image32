@@ -97,7 +97,7 @@ begin
 
     // scale draw tmpBitmap onto the canvas
     Canvas.Lock;
-    Canvas.DrawBitmap(tmpBitmap, RectF(0,0,img.Width, img.Height), dstRec, 1);
+    Canvas.DrawBitmap(tmpBitmap, RectF(0, 0, img.Width, img.Height), dstRec, 1);
     Canvas.UnLock;
   finally
     tmpBitmap.Free;
@@ -231,8 +231,8 @@ end;
 
 procedure TMainForm.DrawClockTab;
 var
-  i,j: integer;
-  x,y: double;
+  i, j: integer;
+  x, y: double;
   frameWidth, lineWidth6: double;
   path, path2, path3: TPathD;
   recD, rec2, rec3: TRectD;
@@ -315,7 +315,7 @@ begin
   try
     with recD do
       lgr.SetParameters(
-        PointD(Right,Top), PointD(Left,Bottom),
+        PointD(Right, Top), PointD(Left, Bottom),
         clNearWhite32, clLightGray32, gfsClamp);
     DrawLine(imgClockface, path, frameWidth, lgr, esPolygon);
     inflateRect(recD, frameWidth / 2, frameWidth / 2);
@@ -357,7 +357,7 @@ begin
 
     // Get the glyphs for the numbers 1 .. 12
     for i := 1 to 12 do
-      numGlyphs[i] := boldCache.GetTextOutline(0,0,inttostr(i));
+      numGlyphs[i] := boldCache.GetTextOutline(0, 0, inttostr(i));
   finally
     regCache.Free;
     boldCache.Free;

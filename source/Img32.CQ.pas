@@ -832,13 +832,13 @@ function GetLuminescence(color: TColor32): integer;
 var
   c: TARGB absolute color;
 begin
-  Result := (Max(c.B,Max(c.G,c.R)) + Min(c.B, Min(c.G,c.R))) shr 1;
+  Result := (Max(c.B, Max(c.G, c.R)) + Min(c.B, Min(c.G, c.R))) shr 1;
 end;
 //------------------------------------------------------------------------------
 
 function SortPaletteByLuminence(const pal: TArrayOfColor32): TArrayOfColor32;
 var
-  i,j, len: integer;
+  i, j, len: integer;
   cfArr   : TArrayOfColFreq;
 begin
   len := Length(pal);
@@ -904,8 +904,8 @@ end;
 procedure Dither(image: TImage32; octree: TOctree);
 var
   X, Y, W         : Integer;
-  qeR,qeG, qeB    : integer;
-  qeRq,qeGq, qeBq : integer;
+  qeR, qeG, qeB   : integer;
+  qeRq, qeGq, qeBq: integer;
   oldC            : TARGB;
   newC            : PARGB;
   tmp             : TImage32;
@@ -1097,7 +1097,7 @@ begin
   if len < 16 then w := len else w := 16;
   h := (len +15) div 16;
   image.SetSize(w * 16, h * 16);
-  rec := Img32.Vector.Rect(0,0,16,16);
+  rec := Img32.Vector.Rect(0, 0, 16, 16);
   for i := 0 to len -1 do
   begin
     image.FillRect(rec, palette[i] or $FF000000);

@@ -75,7 +75,7 @@ begin
     with TJpegImageHack(jpeg).Bitmap do
     try
       if GetCurrentThreadId <> MainThreadID then Canvas.Lock;
-      img32.CopyFromDC(Canvas.Handle, Rect(0,0, Width, Height));
+      img32.CopyFromDC(Canvas.Handle, Rect(0, 0, Width, Height));
     finally
       if GetCurrentThreadId <> MainThreadID then Canvas.Unlock;
     end;

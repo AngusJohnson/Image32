@@ -70,7 +70,7 @@ begin
   //get the 'copyright' text glyphs outline
   fontCache := TFontCache.Create(fontReader2, DPIAware(15));
   try
-    copyTxtPaths := fontCache.GetTextOutline(0,0, copyright, nextX);
+    copyTxtPaths := fontCache.GetTextOutline(0, 0, copyright, nextX);
   finally
     fontCache.Free;
     fontReader2.Free;
@@ -109,7 +109,7 @@ begin
   dy := (h - img.Height) div 2;
   tmpImg := TImage32.Create(img);
   try
-    img.SetSize(w,h);
+    img.SetSize(w, h);
     img.Copy(tmpImg, tmpImg.Bounds,
       Rect(dx, dy, dx + tmpImg.Width, dy + tmpImg.Height));
   finally

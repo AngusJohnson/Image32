@@ -47,13 +47,13 @@ type
     actives: PActive;
     currActive: PActive;
     paths: TPathsD;
-    procedure AddToCurrent(x,y: integer);
+    procedure AddToCurrent(x, y: integer);
     procedure InsertBeforeCurrent(left, right, y: integer);
     procedure InsertAtEnd(left, right, y: integer);
     procedure JoinAndPopCurrent(left, right: PActive);
     procedure AddRange(left, right, y: integer);
   public
-    function Execute(const ba: TArrayOfByte; w,h: integer): TPathsD;
+    function Execute(const ba: TArrayOfByte; w, h: integer): TPathsD;
   end;
 
 //------------------------------------------------------------------------------

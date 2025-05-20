@@ -136,7 +136,7 @@ var
 procedure TMyRasterLayer32.Init(const filename: string; const centerPt: TPointD);
 begin
   if not Image.LoadFromFile(filename) then
-    Image.SetSize(100,100, clBlack32);
+    Image.SetSize(100, 100, clBlack32);
   PositionCenteredAt(centerPt);
   AutoPivot := false;//true;// :)
 end;
@@ -152,7 +152,7 @@ begin
   result.MasterImage.Assign(MasterImage);
   result.Angle := Angle;
   b := InnerBounds;
-  TranslateRect(b, 50,50);
+  TranslateRect(b, 50, 50);
   result.SetInnerBounds(b);
 end;
 
@@ -259,9 +259,9 @@ begin
   end;
 
   Screen.Cursors[crRotate] :=
-    LoadImage(hInstance, 'ROTATE', IMAGE_CURSOR, 32,32, LR_DEFAULTSIZE);
+    LoadImage(hInstance, 'ROTATE', IMAGE_CURSOR, 32, 32, LR_DEFAULTSIZE);
   Screen.Cursors[crMove] :=
-    LoadImage(hInstance, 'MOVE', IMAGE_CURSOR, 32,32, LR_DEFAULTSIZE);
+    LoadImage(hInstance, 'MOVE', IMAGE_CURSOR, 32, 32, LR_DEFAULTSIZE);
 
   Randomize;
   hsl.hue := Random(256);
@@ -351,7 +351,7 @@ end;
 procedure TMainForm.PanelMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  clickPoint := Image32Panel1.ClientToImage(Point(X,Y));
+  clickPoint := Image32Panel1.ClientToImage(Point(X, Y));
   clickedLayer := layeredImage.GetLayerAt(clickPoint, false);
   if not assigned(clickedLayer) then
   begin
@@ -387,7 +387,7 @@ procedure TMainForm.PanelMouseMove(Sender: TObject;
 var
   pt: TPoint;
 begin
-  pt := Image32Panel1.ClientToImage(Point(X,Y));
+  pt := Image32Panel1.ClientToImage(Point(X, Y));
   if UseAppOnIdle then
   begin
     delayedShift := Shift;
@@ -442,7 +442,7 @@ begin
     if clickedLayer = rotatingButtonGroup.PivotButton then
     begin
       clickedLayer.Offset(-dx, -dy);     //undo button move above
-      rotatingButtonGroup.Offset(dx,dy); //move the whole rotate group
+      rotatingButtonGroup.Offset(dx, dy); //move the whole rotate group
       TRotLayer32(targetLayer).PivotPt := clickedLayer.MidPoint;
     end else
     begin

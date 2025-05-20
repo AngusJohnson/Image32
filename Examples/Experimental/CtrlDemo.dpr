@@ -141,7 +141,7 @@ end;
 procedure SetupCtrls;
 var
   i, pad      : integer;
-  j,k,h,w     : double;
+  j, k, h, w  : double;
   bevelSize   : double;
   pagePnl     : TPagePnlCtrl;
   layeredImg  : TLayeredImage32;

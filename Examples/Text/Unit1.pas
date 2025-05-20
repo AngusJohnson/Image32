@@ -402,11 +402,11 @@ end;
 
 procedure TForm1.ResetPanelImage(color: TColor32);
 var
-  w,h: integer;
+  w, h: integer;
   rec: TRect;
 begin
   rec := imgPanel.InnerClientRect;
-  RectWidthHeight(rec, w,h);
+  RectWidthHeight(rec, w, h);
   imgPanel.Image.SetSize(w, h);
 end;
 //------------------------------------------------------------------------------
@@ -424,7 +424,7 @@ begin
 
   // now get the chunk under the click point ...
   if not chunkedText.GetChunkAndGlyphOffsetAtPt(pageMetrics,
-    imgPanel.ClientToImage( img32.Vector.Point(X,Y)), ChunkPos) then
+    imgPanel.ClientToImage( img32.Vector.Point(X, Y)), ChunkPos) then
       Exit;
 
   // and draw a green wavy line under that chunk ...

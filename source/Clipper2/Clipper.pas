@@ -746,7 +746,7 @@ end;
 
 function TrimCollinear(const p: TPath64; isOpenPath: Boolean = false): TPath64;
 var
-  i,j, len: integer;
+  i, j, len: integer;
 begin
   len := Length(p);
 
@@ -819,7 +819,7 @@ end;
 function DistanceSqrd(const pt1, pt2: TPoint64): double;
   {$IFDEF INLINE} inline; {$ENDIF}
 var
-  x1,y1,x2,y2: double;
+  x1, y1, x2, y2: double;
 begin
   // nb: older versions of Delphi don't allow explicit typecasting
   x1 := pt1.X; y1 := pt1.Y;
@@ -831,7 +831,7 @@ end;
 function PerpendicDistSqrd(const pt, line1, line2: TPoint64): double;
   {$IFDEF INLINE} inline; {$ENDIF}
 var
-  a,b,c,d: double;
+  a, b, c, d: double;
 begin
   a := pt.X - line1.X;
   b := pt.Y - line1.Y;

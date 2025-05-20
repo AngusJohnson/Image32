@@ -728,7 +728,7 @@ end;
 
 procedure BoxDownSampling(Image, TargetImage: TImage32; newWidth, newHeight: Integer);
 var
-  x,y, x256,y256,xx256,yy256: Integer;
+  x, y, x256, y256, xx256, yy256: Integer;
   sx,sy: double;
   tmp: TArrayOfColor32;
   pc: PColor32;

@@ -835,7 +835,7 @@ end;
 
 function ScalePath(const path: TPath64; sx, sy: double): TPath64;
 var
-  i,len: integer;
+  i, len: integer;
 begin
   if sx = 0 then sx := 1;
   if sy = 0 then sy := 1;
@@ -854,7 +854,7 @@ end;
 
 function ScalePath(const path: TPathD; sx, sy: double): TPath64;
 var
-  i,j, len: integer;
+  i, j, len: integer;
 begin
   if sx = 0 then sx := 1;
   if sy = 0 then sy := 1;
@@ -883,7 +883,7 @@ end;
 
 function ScalePath(const path: TPath64; scale: double): TPath64;
 var
-  i,j, len: integer;
+  i, j, len: integer;
 begin
   len := length(path);
   setlength(result, len);
@@ -910,7 +910,7 @@ end;
 
 function ScalePath(const path: TPathD; scale: double): TPath64;
 var
-  i,len: integer;
+  i, len: integer;
 begin
   len := length(path);
   setlength(result, len);
@@ -927,7 +927,7 @@ end;
 
 function ScalePaths(const paths: TPaths64; sx, sy: double): TPaths64;
 var
-  i,len: integer;
+  i, len: integer;
 begin
   if sx = 0 then sx := 1;
   if sy = 0 then sy := 1;
@@ -940,7 +940,7 @@ end;
 
 function ScalePaths(const paths: TPathsD; sx, sy: double): TPaths64;
 var
-  i,len: integer;
+  i, len: integer;
 begin
   if sx = 0 then sx := 1;
   if sy = 0 then sy := 1;
@@ -1039,7 +1039,7 @@ end;
 
 function ScalePathsD(const paths: TPathsD; sx, sy: double): TPathsD;
 var
-  i,j: integer;
+  i, j: integer;
 begin
   if sx = 0 then sx := 1;
   if sy = 0 then sy := 1;
@@ -1081,7 +1081,7 @@ end;
 
 function ScalePaths(const paths: TPathsD; scale: double): TPaths64;
 var
-  i,j: integer;
+  i, j: integer;
 begin
   setlength(result, length(paths));
   for i := 0 to high(paths) do
@@ -1381,7 +1381,7 @@ end;
 
 function ArrayOfPathsToPaths(const ap: TArrayOfPaths): TPaths64;
 var
-  i,j,k, len, cnt: integer;
+  i, j, k, len, cnt: integer;
 begin
   cnt := 0;
   len := length(ap);
@@ -1809,7 +1809,7 @@ function Area(const path: TPath64): Double;
 var
   i, highI: Integer;
   d: double;
-  p1,p2: PPoint64;
+  p1, p2: PPoint64;
 begin
   // shoelace formula
   Result := 0.0;
@@ -1840,7 +1840,7 @@ end;
 function Area(const path: TPathD): Double;
 var
   i, highI: Integer;
-  p1,p2: PPointD;
+  p1, p2: PPointD;
 begin
   // https://en.wikipedia.org/wiki/Shoelace_formula
   Result := 0.0;
@@ -1909,7 +1909,7 @@ end;
 
 function ProductsAreEqual(a, b, c, d: Int64): Boolean;
 var
-  absA,absB,absC,absD: UInt64;
+  absA, absB, absC, absD: UInt64;
   absAB, absCD       : TMultiplyUInt64Result;
   signAB, signCD     : integer;
 begin
@@ -1933,7 +1933,7 @@ end;
 
 function IsCollinear(const pt1, sharedPt, pt2: TPoint64): Boolean;
 var
-  a,b,c,d: Int64;
+  a, b, c, d: Int64;
 begin
   a := sharedPt.X - pt1.X;
   b := pt2.Y - sharedPt.Y;
@@ -1975,7 +1975,7 @@ end;
 
 function DotProduct(const pt1, pt2, pt3: TPoint64): double;
 var
-  x1,x2,y1,y2: double; // avoids potential int overflow
+  x1, x2, y1, y2: double; // avoids potential int overflow
 begin
   x1 := pt2.X - pt1.X;
   y1 := pt2.Y - pt1.Y;
@@ -2006,7 +2006,7 @@ end;
 
 function PerpendicDistFromLineSqrd(const pt, linePt1, linePt2: TPoint64): double;
 var
-  a,b,c: double;
+  a, b, c: double;
 begin
   // perpendicular distance of point (x0,y0) = (a*x0 + b*y0 + C)/Sqrt(a*a + b*b)
   // where ax + by +c = 0 is the equation of the line
@@ -2023,7 +2023,7 @@ end;
 
 function PerpendicDistFromLineSqrd(const pt, linePt1, linePt2: TPointD): double;
 var
-  a,b,c: double;
+  a, b, c: double;
 begin
 	a := (linePt1.Y - linePt2.Y);
 	b := (linePt2.X - linePt1.X);
@@ -2037,7 +2037,7 @@ end;
 
 function CleanPath(const path: TPath64): TPath64;
 var
-  i,j, len: integer;
+  i, j, len: integer;
   prev: TPoint64;
 begin
   Result := nil;
@@ -2098,7 +2098,7 @@ end;
 function GetSegmentIntersectPt(const ln1a, ln1b, ln2a, ln2b: TPoint64;
   out ip: TPoint64): Boolean;
 var
-  dx1,dy1, dx2,dy2, t, cp: double;
+  dx1, dy1, dx2, dy2, t, cp: double;
 begin
   // https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
   dy1 := (ln1b.y - ln1a.y);
@@ -2343,7 +2343,7 @@ end;
 
 function RamerDouglasPeucker(const path: TPath64; epsilon: double): TPath64;
 var
-  i,j, len: integer;
+  i, j, len: integer;
   boolArray: TArrayOfBoolean;
 begin
   len := length(path);
@@ -2381,7 +2381,7 @@ end;
 
 function RamerDouglasPeucker(const path: TPathD; epsilon: double): TPathD; overload;
 var
-  i,j, len: integer;
+  i, j, len: integer;
   boolArray: TArrayOfBoolean;
 begin
   len := length(path);

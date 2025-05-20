@@ -274,7 +274,7 @@ end;
 procedure TForm1.pnlLeftMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  clickedPoint := Point(X,Y);
+  clickedPoint := Point(X, Y);
   clickedLayer := layeredImage.GetLayerAt(clickedPoint);
   if not (clickedLayer is TButtonDesignerLayer32) then
     clickedLayer := nil;
@@ -296,7 +296,7 @@ procedure TForm1.pnlLeftMouseMove(Sender: TObject; Shift: TShiftState; X,
   Y: Integer);
 var
   layer: TLayer32;
-  i, dx,dy: integer;
+  i, dx, dy: integer;
   rec: TRect;
   pt: TPoint;
 begin
@@ -319,7 +319,7 @@ begin
   InflateRect(rec, -i, -i);
   //when moving buttons make sure it remains inside the image bounds
   //otherwise we'll lose sight (and control) of it.
-  pt := SafePoint(Point(X,Y), rec);
+  pt := SafePoint(Point(X, Y), rec);
 
   dx := pt.X - clickedPoint.X;
   dy := pt.Y - clickedPoint.Y;
@@ -362,10 +362,10 @@ begin
   updateNeeded := false;
 
   //get the offset amounts
-  offRec.Top := StrToIntDef(SpinEdit2.Text,0);
-  offRec.Right := StrToIntDef(SpinEdit3.Text,0);
-  offRec.Bottom := StrToIntDef(SpinEdit4.Text,0);
-  offRec.Left := StrToIntDef(SpinEdit1.Text,0);
+  offRec.Top := StrToIntDef(SpinEdit2.Text, 0);
+  offRec.Right := StrToIntDef(SpinEdit3.Text, 0);
+  offRec.Bottom := StrToIntDef(SpinEdit4.Text, 0);
+  offRec.Left := StrToIntDef(SpinEdit1.Text, 0);
 
   //transform the master image not the scaled image
   with rasterLayer do
@@ -494,7 +494,7 @@ begin
   btnTransform.Enabled := true;
   dstPts := nil;
   FreeAndNil(dstBtnGroup);
-  transformedImage.SetSize(0,0);
+  transformedImage.SetSize(0, 0);
   pnlLeft.Invalidate;
   pnlRight.Canvas.FillRect(pnlRight.ClientRect);
   PaintDesignerLayer;

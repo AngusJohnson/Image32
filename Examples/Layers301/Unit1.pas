@@ -196,8 +196,8 @@ procedure TMyVectorLayer32.UpdateHitTestAndClipPath;
 var
   rec: TRectD;
 begin
-  rec := RectD(0,0,Width,Height);
-  if Copy(Name,1,9) = 'rectangle' then
+  rec := RectD(0, 0, Width, Height);
+  if Copy(Name, 1, 9) = 'rectangle' then
   begin
     //don't worry about hittesting for rectangles because the
     //default hittest region is the layer's rectangular bounds :)
@@ -232,7 +232,7 @@ var
   rec: TRectD;
   delta: TPointD;
 begin
-  rec := RectD(0,0, Width, Height);
+  rec := RectD(0, 0, Width, Height);
   TranslateRect(rec, OuterMargin, OuterMargin);
   //preparing to center text
   delta.X := (rec.Width - textRect.Width) / 2;
@@ -378,7 +378,7 @@ end;
 
 procedure TMainForm.FormResize(Sender: TObject);
 var
-  w,h: integer;
+  w, h: integer;
 begin
   if not Assigned(layeredImg32) then Exit; //ie when destroying
 
@@ -391,7 +391,7 @@ begin
   begin
     //nb: use SetSize not Resize which would waste
     //CPU cycles stretching any previous hatching
-    SetSize(w,h);
+    SetSize(w, h);
     if visible then
       HatchBackground(Image);
   end;
@@ -401,7 +401,7 @@ end;
 
 function TMainForm.MakeRandomRect(const mp:TPointD): TRectD;
 var
-  x2,y2: double;
+  x2, y2: double;
 begin
   with Point(mp) do
   begin
@@ -417,13 +417,13 @@ end;
 
 function TMainForm.MakeRandomSquare(const mp:TPointD): TRectD;
 var
-  x2,y2: integer;
+  x2, y2: integer;
 begin
   with Point(mp) do
   begin
     x2 := X div 2 + Random(X div 2);
     y2 := Y div 2 + Random(Y div 2);
-    x2 := Min(x2,y2);
+    x2 := Min(x2, y2);
     Result.Left := X - x2;
     Result.Right := X + x2;
     Result.Top := Y - x2;
@@ -541,7 +541,7 @@ end;
 procedure TMainForm.pnlMainMouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  clickPoint := Types.Point(X,Y);
+  clickPoint := Types.Point(X, Y);
   clickedLayer := layeredImg32.GetLayerAt(PointD(clickPoint));
 
   if Assigned(clickedLayer) then
@@ -563,7 +563,7 @@ procedure TMainForm.pnlMainMouseMove(Sender: TObject;
   Shift: TShiftState; X, Y: Integer);
 begin
   delayedShift := Shift;
-  delayedPos := Types.Point(X,Y);
+  delayedPos := Types.Point(X, Y);
   delayedMovePending := true;
 end;
 //------------------------------------------------------------------------------
@@ -576,7 +576,7 @@ var
   layer: TLayer32;
   rec: TRectD;
 begin
-  pt := Types.Point(X,Y);
+  pt := Types.Point(X, Y);
 
   if not (ssLeft in Shift) then
   begin

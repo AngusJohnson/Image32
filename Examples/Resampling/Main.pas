@@ -208,17 +208,17 @@ begin
 
     // rNearestResampler
 
-    img.SetSize(3,3);
+    img.SetSize(3, 3);
     img.Clear(clBlue32);
-    img.FillRect(Types.Rect(1,1,2,2), clRed32);
+    img.FillRect(Types.Rect(1, 1, 2, 2), clRed32);
     img.Resampler := rNearestResampler;
     img.Resize(displaySize,displaySize);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 
-    img.SetSize(3,3);
+    img.SetSize(3, 3);
     img.Clear(clBlue32);
-    img.FillRect(Types.Rect(1,1,2,2), clRed32);
+    img.FillRect(Types.Rect(1, 1, 2, 2), clRed32);
     img.Resize(preRotatedSize, preRotatedSize);
     img.Rotate(angle);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
@@ -226,17 +226,17 @@ begin
 
     // rBilinearResampler
 
-    img.SetSize(3,3);
+    img.SetSize(3, 3);
     img.Clear(clBlue32);
-    img.FillRect(Types.Rect(1,1,2,2), clRed32);
+    img.FillRect(Types.Rect(1, 1, 2, 2), clRed32);
     img.Resampler := rBilinearResampler;
-    img.Resize(displaySize,displaySize);
+    img.Resize(displaySize, displaySize);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 
-    img.SetSize(3,3);
+    img.SetSize(3, 3);
     img.Clear(clBlue32);
-    img.FillRect(Types.Rect(1,1,2,2), clRed32);
+    img.FillRect(Types.Rect(1, 1, 2, 2), clRed32);
     img.Resize(preRotatedSize, preRotatedSize);
     img.Rotate(angle);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
@@ -245,17 +245,17 @@ begin
 
     // rWeightedBilinear
 
-    img.SetSize(3,3);
+    img.SetSize(3, 3);
     img.Clear(clBlue32);
-    img.FillRect(Types.Rect(1,1,2,2), clRed32);
+    img.FillRect(Types.Rect(1, 1, 2, 2), clRed32);
     img.Resampler := rWeightedBilinear;
-    img.Resize(displaySize,displaySize);
+    img.Resize(displaySize, displaySize);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 
-    img.SetSize(3,3);
+    img.SetSize(3, 3);
     img.Clear(clBlue32);
-    img.FillRect(Types.Rect(1,1,2,2), clRed32);
+    img.FillRect(Types.Rect(1, 1, 2, 2), clRed32);
     img.Resize(preRotatedSize, preRotatedSize);
     img.Rotate(angle);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
@@ -263,17 +263,17 @@ begin
 
     // rBicubicResampler
 
-    img.SetSize(3,3);
+    img.SetSize(3, 3);
     img.Clear(clBlue32);
-    img.FillRect(Types.Rect(1,1,2,2), clRed32);
+    img.FillRect(Types.Rect(1, 1, 2, 2), clRed32);
     img.Resampler := rBicubicResampler;
-    img.Resize(displaySize,displaySize);
+    img.Resize(displaySize, displaySize);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 
-    img.SetSize(3,3);
+    img.SetSize(3, 3);
     img.Clear(clBlue32);
-    img.FillRect(Types.Rect(1,1,2,2), clRed32);
+    img.FillRect(Types.Rect(1, 1, 2, 2), clRed32);
     img.Resize(preRotatedSize, preRotatedSize);
     img.Rotate(angle);
     //img.SaveToFile('c:\temp\test.png');
@@ -500,15 +500,15 @@ begin
 
     // rNearestResampler
 
-    img.SetSize(100,1);
+    img.SetSize(100, 1);
     for i := 0 to 99 do
       img.Pixels[i] := RainbowColor(i / 100);
     img.Resampler := rNearestResampler;
-    img.Resize(displaySize,displaySize);
+    img.Resize(displaySize, displaySize);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 
-    img.SetSize(100,1);
+    img.SetSize(100, 1);
     for i := 0 to 99 do
       img.Pixels[i] := RainbowColor(i / 100);
     if useMatrix then
@@ -523,15 +523,15 @@ begin
 
     // rBilinearResampler
 
-    img.SetSize(100,1);
+    img.SetSize(100, 1);
     for i := 0 to 99 do
       img.Pixels[i] := RainbowColor(i / 100);
     img.Resampler := rBilinearResampler;
-    img.Resize(displaySize,displaySize);
+    img.Resize(displaySize, displaySize);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 
-    img.SetSize(100,1);
+    img.SetSize(100, 1);
     for i := 0 to 99 do
       img.Pixels[i] := RainbowColor(i / 100);
     if useMatrix then
@@ -547,15 +547,15 @@ begin
 
     // rWeightedBilinear
 
-    img.SetSize(100,1);
+    img.SetSize(100, 1);
     for i := 0 to 99 do
       img.Pixels[i] := RainbowColor(i / 100);
     img.Resampler := rWeightedBilinear;
-    img.Resize(displaySize,displaySize);
+    img.Resize(displaySize, displaySize);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 
-    img.SetSize(100,1);
+    img.SetSize(100, 1);
     for i := 0 to 99 do
       img.Pixels[i] := RainbowColor(i / 100);
     if useMatrix then
@@ -570,15 +570,15 @@ begin
 
     // rBicubicResampler
 
-    img.SetSize(100,1);
+    img.SetSize(100, 1);
     for i := 0 to 99 do
       img.Pixels[i] := RainbowColor(i / 100);
     img.Resampler := rBicubicResampler;
-    img.Resize(displaySize,displaySize);
+    img.Resize(displaySize, displaySize);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 
-    img.SetSize(100,1);
+    img.SetSize(100, 1);
     for i := 0 to 99 do
       img.Pixels[i] := RainbowColor(i / 100);
     if useMatrix then
@@ -639,7 +639,7 @@ begin
 
     // rNearestResampler
 
-    img.SetSize(1,1);
+    img.SetSize(1, 1);
     img.Pixels[0] := clBlue32;
     img.Resampler := rNearestResampler;
     img.Resize(preRotatedSize, preRotatedSize);
@@ -647,7 +647,7 @@ begin
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 
-    img.SetSize(2,2);
+    img.SetSize(2, 2);
     img.Pixels[0] := clLime32;
     img.Pixels[1] := clAqua32;
     img.Pixels[2] := clYellow32;
@@ -659,15 +659,15 @@ begin
 
     // rBilinearResampler
 
-    img.SetSize(1,1);
+    img.SetSize(1, 1);
     img.Pixels[0] := clBlue32;
     img.Resampler := rBilinearResampler;
-    img.Resize(displaySize,displaySize);
+    img.Resize(displaySize, displaySize);
     img.Rotate(angle);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 
-    img.SetSize(2,2);
+    img.SetSize(2, 2);
     img.Pixels[0] := clLime32;
     img.Pixels[1] := clAqua32;
     img.Pixels[2] := clYellow32;
@@ -680,15 +680,15 @@ begin
 
     // rWeightedBilinear
 
-    img.SetSize(1,1);
+    img.SetSize(1, 1);
     img.Pixels[0] := clBlue32;
     img.Resampler := rWeightedBilinear;
-    img.Resize(displaySize,displaySize);
+    img.Resize(displaySize, displaySize);
     img.Rotate(angle);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 
-    img.SetSize(2,2);
+    img.SetSize(2, 2);
     img.Pixels[0] := clLime32;
     img.Pixels[1] := clAqua32;
     img.Pixels[2] := clYellow32;
@@ -700,15 +700,15 @@ begin
 
     // rBicubicResampler
 
-    img.SetSize(1,1);
+    img.SetSize(1, 1);
     img.Pixels[0] := clBlue32;
     img.Resampler := rBicubicResampler;
-    img.Resize(displaySize,displaySize);
+    img.Resize(displaySize, displaySize);
     img.Rotate(angle);
     ImagePanel.Image.Copy(img, img.Bounds, displayRect);
     TranslateRect(displayRect, displaySize + margin, 0);
 
-    img.SetSize(2,2);
+    img.SetSize(2, 2);
     img.Pixels[0] := clLime32;
     img.Pixels[1] := clAqua32;
     img.Pixels[2] := clYellow32;
@@ -783,7 +783,7 @@ var
   pt: TPoint;
 begin
   if (TabControl1.TabIndex <> 4) then Exit;
-  pt := ImagePanel.ClientToImage(Point(X,Y));
+  pt := ImagePanel.ClientToImage(Point(X, Y));
   if PtInRect(boxDownsamplingLinkRect, pt) then
     ShellExecute(0, 'open', PChar(boxDownSamplingUrl), nil, nil, SW_SHOWNORMAL);
 end;
@@ -795,7 +795,7 @@ var
   pt: TPoint;
 begin
   if (TabControl1.TabIndex <> 4) then Exit;
-  pt := ImagePanel.ClientToImage(Point(X,Y));
+  pt := ImagePanel.ClientToImage(Point(X, Y));
   if PtInRect(boxDownsamplingLinkRect, pt) then
     ImagePanel.Cursor := crHandPoint else
     ImagePanel.Cursor := crDefault;

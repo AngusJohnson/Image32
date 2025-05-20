@@ -644,7 +644,7 @@ begin
   currentDrawingLayer   := nil;
   currentDesignerLayer  := nil;
 
-  pt := PointD(imgPanel.ClientToImage(Point(X,Y)));
+  pt := PointD(imgPanel.ClientToImage(Point(X, Y)));
   // ignore mouse clicks outside the image
   if (pt.X < 0) or (pt.X >= masterImage.Width) or
     (pt.Y < 0) or (pt.Y >= masterImage.Height) then
@@ -657,7 +657,7 @@ begin
   else if (toolIdx = DROPPER) then
   begin
     with Point(pt) do
-      SetColor((button = mbLeft), masterImage.pixel[X,Y]);
+      SetColor((button = mbLeft), masterImage.pixel[X, Y]);
     Exit;
   end
   else if (TopLayerIdx < 0) then
@@ -913,7 +913,7 @@ var
   currentDrawingLayer: TVectorLayer32;
 begin
 
-  pt := PointD(imgPanel.ClientToImage(Point(X,Y)));
+  pt := PointD(imgPanel.ClientToImage(Point(X, Y)));
   // update cursor position in statusbar
   if (pt.X < 0) or (pt.X >= masterImage.Width) or
     (pt.Y < 0) or (pt.Y >= masterImage.Height) then
@@ -1107,12 +1107,12 @@ begin
             if (highI > 0) then
             begin
               p[0] := pp[0][0]; p[1] := pp[0][1];
-              DrawDashedLine(Image, p, [10,10], nil, 1, clRed32, esButt);
+              DrawDashedLine(Image, p, [10, 10], nil, 1, clRed32, esButt);
             end;
             for i := 1 to highI div 2 do
             begin
               p[0] := pp[0][i * 2]; p[1] := pp[0][i * 2 + 1];
-              DrawDashedLine(Image, p, [10,10], nil, 1, clRed32, esButt);
+              DrawDashedLine(Image, p, [10, 10], nil, 1, clRed32, esButt);
             end;
 
             if moveOvrIdx = 0 then

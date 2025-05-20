@@ -15,7 +15,7 @@ type
 {$ELSE}
   TTextInfo = object
 {$ENDIF}
-    x,y : integer;
+    x, y : integer;
     text: string;
     fontSize: integer;
     fontColor: TColor32;
@@ -43,7 +43,7 @@ type
     destructor Destroy; override;
     procedure AddPaths(const paths: TPathsD; isOpen: Boolean;
       brushColor, penColor: Cardinal; penWidth: double);
-    procedure AddText(text: string; x,y: integer;
+    procedure AddText(text: string; x, y: integer;
       fontSize: integer = 14; fontClr: TColor32 = clBlack32);
     function SaveToFile(const filename: string;
       maxWidth: integer = 0; maxHeight: integer = 0;
@@ -124,7 +124,7 @@ begin
   fPolyInfos.Add(pi);
 end;
 
-procedure TSimpleSvgWriter.AddText(text: string; x,y: integer;
+procedure TSimpleSvgWriter.AddText(text: string; x, y: integer;
   fontSize: integer; fontClr: TColor32);
 var
   ti: PTextInfo;
@@ -182,7 +182,7 @@ end;
 function TSimpleSvgWriter.SaveToFile(const filename: string;
   maxWidth: integer = 0; maxHeight: integer = 0; margin: integer = 20): Boolean;
 var
-  i,j,k: integer;
+  i, j, k: integer;
   bounds: TRectD;
   scale: double;
   offsetX, offsetY: integer;

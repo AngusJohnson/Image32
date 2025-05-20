@@ -97,7 +97,7 @@ type
 var
   Form1: TForm1;
 
-  a,b: double;
+  a, b: double;
 
 implementation
 
@@ -176,7 +176,7 @@ end;
 
 procedure TForm1.FormResize(Sender: TObject);
 var
-  w,h: integer;
+  w, h: integer;
   mp: TPointD;
   dx, dy: double;
 begin
@@ -303,7 +303,7 @@ begin
   begin
     transformType := ttSplineH;
     with transformLayer.Image do
-      ctrlPoints := MakePath([0,0, 0,Height div 2, 0, Height]);
+      ctrlPoints := MakePath([0, 0, 0, Height div 2, 0, Height]);
     StatusBar1.SimpleText := ' HORZ SPLINE TRANSFORM: Right click to add control points';
   end;
 
@@ -480,7 +480,7 @@ procedure TForm1.pnlMainMouseDown(Sender: TObject; Button: TMouseButton;
 begin
   if (ssRight in Shift) then Exit; //popup menu
 
-  clickPoint := Types.Point(X,Y);
+  clickPoint := Types.Point(X, Y);
   clickedLayer := layeredImage.GetLayerAt(clickPoint);
 end;
 //------------------------------------------------------------------------------
@@ -492,7 +492,7 @@ var
   pt: TPoint;
   layer: TLayer32;
 begin
-  pt := Types.Point(X,Y);
+  pt := Types.Point(X, Y);
 
   //if not clicked-moving a layer, then update the cursor and exit.
   if not (ssLeft in Shift) then

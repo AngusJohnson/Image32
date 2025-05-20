@@ -69,7 +69,7 @@ end;
 
 procedure TMainForm.FormResize(Sender: TObject);
 var
-  w,h: integer;
+  w, h: integer;
 begin
   w := ClientWidth;
   h := ClientHeight;
@@ -110,7 +110,7 @@ begin
   bmp := TBitmap.Create;
   try
     AssignImage32ToFmxBitmap(img, bmp);
-    rec := RectF(0,0,bmp.Width,bmp.Height);
+    rec := RectF(0, 0, bmp.Width, bmp.Height);
     Canvas.Lock;
     Canvas.DrawBitmap(bmp, rec, rec, 1.0);
     Canvas.Unlock;
