@@ -1104,7 +1104,7 @@ function TChunkedText.GetGlyphsOrDrawInternal(image: TImage32; const rec: TRect;
   textAlign: TTextAlign; textAlignV: TTextVAlign; const startChunkPos: TPoint;
   lineHeight: double; out paths: TPathsD): TPageTextMetrics;
 var
-  i, highI, j,k, recWidth, recHeight, chrOff: integer;
+  i, highI, j, k, recWidth, recHeight, chrOff: integer;
   y, top, totalHeight, spcDx: double;
   consumedWidth: double;
   pp: TPathsD;
@@ -1256,7 +1256,7 @@ begin
   for i := 0 to Count -1 do
     with Chunk[i] do
     begin
-      TFontCacheHack(font).GetTextOutlineInternal(0,0,
+      TFontCacheHack(font).GetTextOutlineInternal(0, 0,
         text, 0, arrayOfPaths, glyphOffsets, width);
       height := font.LineHeight;
       ascent := font.Ascent;

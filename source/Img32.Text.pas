@@ -631,7 +631,7 @@ const
 
 // GetMeaningfulDateTime: returns UTC date & time
 procedure GetMeaningfulDateTime(const secsSince1904: Uint64;
-  out yy,mo,dd, hh,mi,ss: cardinal);
+  out yy, mo, dd, hh, mi, ss: cardinal);
 const
   dayInYrAtMthStart: array[boolean, 0..12] of cardinal =
     ((0,31,59,90,120,151,181,212,243,273,304,334,365),  // non-leap year
@@ -713,7 +713,7 @@ end;
 function WordSwap(val: WORD): WORD;
 {$IFDEF ASM_X86}
 asm
-  rol ax,8;
+  rol ax, 8;
 end;
 {$ELSE}
 var
@@ -729,7 +729,7 @@ end;
 function Int16Swap(val: Int16): Int16;
 {$IFDEF ASM_X86}
 asm
-  rol ax,8;
+  rol ax, 8;
 end;
 {$ELSE}
 var
@@ -1215,7 +1215,7 @@ end;
 
 function TFontReader.GetTable_cmap: Boolean;
 var
-  i,j         : integer;
+  i, j        : integer;
   segCount    : integer;
   format      : WORD;
   reserved    : WORD;
@@ -1473,7 +1473,7 @@ end;
 function TFontReader.GetTable_head: Boolean;
 var
   headTbl: TFontTable;
-  yy,mo,dd,hh,mi,ss: cardinal;
+  yy, mo, dd, hh, mi, ss: cardinal;
 begin
   headTbl := fTables[fTblIdxes[tblHead]];
   Result := IsValidFontTable(headTbl) and (headTbl.length >= 54);
@@ -1489,11 +1489,11 @@ begin
   GetWord(fStream, fTbl_head.unitsPerEm);
 
   GetUInt64(fStream, fTbl_head.dateCreated);
-  GetMeaningfulDateTime(fTbl_head.dateCreated, yy,mo,dd,hh,mi,ss);
-  fFontInfo.dateCreated := EncodeDate(yy,mo,dd) + EncodeTime(hh,mi,ss, 0);
+  GetMeaningfulDateTime(fTbl_head.dateCreated, yy, mo, dd, hh, mi, ss);
+  fFontInfo.dateCreated := EncodeDate(yy, mo, dd) + EncodeTime(hh, mi,ss, 0);
   GetUInt64(fStream, fTbl_head.dateModified);
-  GetMeaningfulDateTime(fTbl_head.dateModified, yy,mo,dd,hh,mi,ss);
-  fFontInfo.dateModified := EncodeDate(yy,mo,dd) + EncodeTime(hh,mi,ss, 0);
+  GetMeaningfulDateTime(fTbl_head.dateModified, yy, mo, dd, hh, mi, ss);
+  fFontInfo.dateModified := EncodeDate(yy, mo, dd) + EncodeTime(hh, mi, ss, 0);
 
   GetInt16(fStream, fTbl_head.xMin);
   GetInt16(fStream, fTbl_head.yMin);
@@ -1617,7 +1617,7 @@ end;
 
 function FindKernInTable(glyphIdx: WORD; const kernTable: TArrayOfKernRecs): integer;
 var
-  i,l,r: integer;
+  i, l, r: integer;
 begin
   l := 0;
   r := High(kernTable);
@@ -1646,7 +1646,7 @@ end;
 
 function TFontReader.GetGlyphKernList(glyphIdx: WORD): TArrayOfTKern;
 var
-  i,j,len: integer;
+  i, j, len: integer;
 begin
   result := nil;
   i := FindKernInTable(glyphIdx, fKernTable);
@@ -1709,7 +1709,7 @@ const
 
 function TFontReader.GetSimpleGlyph(tbl_glyf: TFontTable_Glyf): TPathsEx;
 var
-  i,j, len: integer;
+  i, j, len: integer;
   instructLen: WORD;
   flag, repeats: byte;
   contourEnds: TArrayOfWord;
@@ -1750,13 +1750,13 @@ end;
 
 procedure TFontReader.GetPathCoords(var paths: TPathsEx);
 var
-  i,j: integer;
-  xi,yi: Int16;
-  flag, xb,yb: byte;
+  i, j: integer;
+  xi, yi: Int16;
+  flag, xb, yb: byte;
   pt: TPoint;
 begin
   // get X coords
-  pt := Point(0,0);
+  pt := Point(0, 0);
   xi := 0;
   for i := 0 to high(paths) do
   begin
@@ -1824,7 +1824,7 @@ end;
 
 function TFontReader.ConvertSplinesToBeziers(const pathsEx: TPathsEx): TPathsEx;
 var
-  i,j,k: integer;
+  i, j, k: integer;
   pt: TPointEx;
   prevOnCurve: Boolean;
 begin
@@ -1865,7 +1865,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure AffineTransform(const a,b,c,d,e,f: double; var pathsEx: TPathsEx);
+procedure AffineTransform(const a, b, c, d, e, f: double; var pathsEx: TPathsEx);
 var
   i,j: integer;
   mat: TMatrixD;
@@ -1883,10 +1883,10 @@ begin
         end;
   end else
   begin
-    mat[0,0] := a;
-    mat[0,1] := b;
-    mat[1,0] := c;
-    mat[1,1] := d;
+    mat[0, 0] := a;
+    mat[0, 1] := b;
+    mat[1, 0] := c;
+    mat[1, 1] := d;
     mat[2][0] := e;
     mat[2][1] := f;
 
@@ -1905,7 +1905,7 @@ var
   arg1_i8, arg2_i8: ShortInt;
   arg1_i16, arg2_i16: Int16;
   tmp_single: single;
-  a,b,c,d,e,f: double;
+  a, b, c, d, e, f: double;
   componentPaths: TPathsEx;
   component_tbl_glyf: TFontTable_Glyf;
   component_tbl_hmtx: TFontTable_Hmtx;
@@ -1977,7 +1977,7 @@ begin
     fStream.Position := streamPos;
 
     if (flag and ARGS_ARE_XY_VALUES <> 0) then
-      AffineTransform(a,b,c,d,e,f, componentPaths); // (#131)
+      AffineTransform(a, b, c, d, e, f, componentPaths); // (#131)
 
     if (flag and USE_MY_METRICS <> 0) then
       tbl_hmtx := component_tbl_hmtx;               // (#24)
@@ -2004,7 +2004,7 @@ end;
 
 function FlattenPathExBeziers(pathsEx: TPathsEx): TPathsD;
 var
-  i,j : integer;
+  i, j : integer;
   pt2: TPointEx;
   bez: TPathD;
 begin
@@ -2121,7 +2121,7 @@ begin
   rec := GetBoundsD(gm.paths);
   gm.paths := Img32.Vector.TranslatePath(gm.paths, -rec.Left, -rec.Top);
   gm.paths := Img32.Vector.ScalePath(gm.paths, imgSize / rec.Width, imgSize / rec.Height);
-  img := TImage32.Create(imgSize,imgSize);
+  img := TImage32.Create(imgSize, imgSize);
   try
     DrawPolygon(img, gm.paths, frEvenOdd, clBlack32);
     accum := 0;
@@ -2279,7 +2279,7 @@ function FindInSortedList(charOrdinal: Cardinal; glyphList: TList<PGlyphInfo>): 
 function FindInSortedList(charOrdinal: Cardinal; glyphList: TList): integer;
 {$ENDIF}
 var
-  i,l,r: integer;
+  i, l, r: integer;
 begin
   // binary search the sorted list ...
   l := 0;
@@ -2371,7 +2371,7 @@ end;
 
 procedure TFontCache.VerticalFlip(var paths: TPathsD);
 var
-  i,j: integer;
+  i, j: integer;
 begin
   for i := 0 to High(paths) do
     for j := 0 to High(paths[i]) do
@@ -2381,7 +2381,7 @@ end;
 
 function FindInKernList(glyphIdx: WORD; const kernList: TArrayOfTKern): integer;
 var
-  i,l,r: integer;
+  i, l, r: integer;
 begin
   l := 0;
   r := High(kernList);
@@ -2432,7 +2432,7 @@ end;
 
 function TFontCache.GetTextCodePoints(const text: UnicodeString): TArrayOfCardinal;
 var
-  i,j, len: integer;
+  i, j, len: integer;
   inSurrogate: Boolean;
 begin
   len := Length(text);
@@ -2462,7 +2462,7 @@ end;
 function TFontCache.GetGlyphOffsets(const text: UnicodeString;
  interCharSpace: double): TArrayOfDouble;
 var
-  i,j, len: integer;
+  i, j, len: integer;
   codePoints: TArrayOfCardinal;
   glyphInfo: PGlyphInfo;
   thisX: double;
@@ -2659,8 +2659,8 @@ function TFontCache.GetTextOutlineInternal(x, y: double;
   const text: UnicodeString; underlineIdx: integer; out glyphs: TArrayOfPathsD;
   out offsets: TArrayOfDouble; out nextX: double): Boolean;
 var
-  i,j, len    : integer;
-  dx,y2,w     : double;
+  i, j, len    : integer;
+  dx ,y2, w     : double;
   codepoints  : TArrayOfCardinal;
   glyphInfo   : PGlyphInfo;
   currGlyph   : TPathsD;
@@ -2731,10 +2731,10 @@ function TFontCache.GetAngledTextGlyphs(x, y: double;
   const rotatePt: TPointD; out nextPt: TPointD): TPathsD;
 begin
   nextPt.Y := y;
-  Result := GetTextOutline(x,y, text, nextPt.X);
+  Result := GetTextOutline(x, y, text, nextPt.X);
   if not Assigned(Result) then Exit;
   Result := RotatePath(Result, rotatePt, angleRadians);
-  RotatePoint(nextPt, PointD(x,y), angleRadians);
+  RotatePoint(nextPt, PointD(x, y), angleRadians);
   UpdateFontReaderLastUsedTime;
 end;
 //------------------------------------------------------------------------------
@@ -2786,7 +2786,7 @@ end;
 
 procedure FlipVert(var paths: TPathsD);
 var
-  i,j: integer;
+  i, j: integer;
 begin
   for i := 0 to High(paths) do
     for j := 0 to High(paths[i]) do
@@ -3017,7 +3017,7 @@ var
 begin
   Result := 0;
   if (text = '') or not assigned(font) or not font.IsValidFont then Exit;
-  glyphs := font.GetTextOutline(x,y, text, Result);
+  glyphs := font.GetTextOutline(x, y, text, Result);
   DrawPolygon(image, glyphs, frNonZero, textColor);
 end;
 //------------------------------------------------------------------------------
@@ -3030,7 +3030,7 @@ begin
   Result := 0;
   if (text = '') or not assigned(font) or
     not font.IsValidFont then Exit;
-  glyphs := font.GetTextOutline(x,y, text, Result);
+  glyphs := font.GetTextOutline(x, y, text, Result);
   DrawPolygon(image, glyphs, frNonZero, renderer);
 end;
 //------------------------------------------------------------------------------
@@ -3041,7 +3041,7 @@ procedure DrawText(image: TImage32; const rec: TRectD;
   valign: TTextVAlign = tvaMiddle);
 var
   glyphs: TPathsD;
-  dx,dy: double;
+  dx, dy: double;
   rec2: TRectD;
   chunkedText: TChunkedText;
 begin
@@ -3057,7 +3057,7 @@ begin
     Exit;
   end;
 
-  glyphs := font.GetTextOutline(0,0, text);
+  glyphs := font.GetTextOutline(0, 0, text);
   rec2 := GetBoundsD(glyphs);
   case align of
     taRight: dx := rec.Right - rec2.Right;
@@ -3082,7 +3082,7 @@ var
   glyphs: TPathsD;
   rotatePt: TPointD;
 begin
-  rotatePt := PointD(x,y);
+  rotatePt := PointD(x, y);
   if not assigned(font) or not font.IsValidFont then
   begin
     Result := NullPointD;
@@ -3102,7 +3102,7 @@ var
   cr: TCustomRenderer;
 begin
   if not assigned(font) or not font.IsValidFont or (text = '') then Exit;
-  glyphs := font.GetVerticalTextOutline(x,y, text, lineHeight);
+  glyphs := font.GetVerticalTextOutline(x, y, text, lineHeight);
   if image.AntiAliased then
     cr := TColorRenderer.Create(textColor) else
     cr := TAliasedColorRenderer.Create(textColor);

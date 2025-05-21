@@ -696,7 +696,7 @@ end;
 
 procedure TSvgASegment.GetFlattenedInternal;
 var
-  a1,a2: double;
+  a1, a2: double;
   p: TPathD;
 begin
   fFlatPath := nil;
@@ -771,7 +771,7 @@ end;
 
 function TSvgASegment.GetStringDef(relative: Boolean; decimalPrec: integer): string;
 var
-  a, a1,a2: double;
+  a, a1, a2: double;
   sp, ep: TPointD;
 begin
   with fArcInfo do
@@ -1462,7 +1462,7 @@ end;
 
 procedure TSvgPath.ScaleAndOffset(scale: double; dx, dy: integer);
 var
-  i,j: integer;
+  i, j: integer;
 begin
   if fPathScale = 0 then fPathScale := 1;
   if scale = 0 then scale := 1;
@@ -1475,7 +1475,7 @@ begin
       if scale <> 1 then
       for j := 0 to fSegsCount - 1 do
         fSegs[j].Scale(scale);
-      Offset(dx,dy);
+      Offset(dx, dy);
     end;
 end;
 //------------------------------------------------------------------------------
@@ -1789,7 +1789,7 @@ end;
 
 function TSvgPath.GetControlBounds: TRectD;
 var
-  i,j: integer;
+  i, j: integer;
   p: TPathD;
 begin
   p := nil;

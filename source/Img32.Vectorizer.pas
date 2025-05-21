@@ -275,7 +275,7 @@ begin
       ap.Y := y;
       Exit;
     end;
-    pt := NewPoint(x,y);
+    pt := NewPoint(x, y);
     prev.next := pt;
     pt.prev := prev;
     ap.prev := pt;

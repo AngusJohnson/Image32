@@ -294,7 +294,7 @@ var
 function CubicInterpolate(aclr: PColor32;
   t: Byte; bce: TBiCubicEdgeAdjust): TColor32;
 var
-  a,b,c,d: PARGB;
+  a, b, c, d: PARGB;
   q: TARGB;
 	aa, bb, m0, m1: double;
   t1, t2, t3: double;
@@ -729,7 +729,7 @@ end;
 procedure BoxDownSampling(Image, TargetImage: TImage32; newWidth, newHeight: Integer);
 var
   x, y, x256, y256, xx256, yy256: Integer;
-  sx,sy: double;
+  sx, sy: double;
   tmp: TArrayOfColor32;
   pc: PColor32;
   scaledX: TArrayOfInteger;

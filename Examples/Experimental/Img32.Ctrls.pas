@@ -1513,7 +1513,7 @@ procedure DrawCheckboxCtrl(Image: TImage32; const rec: TRect;
   bevHeight: double; triState: TTriState = tsNo; lineWidth: double = 1.0;
   color: TColor32 = clWhite32; enabled: Boolean = true);
 var
-  d,w   : double;
+  d, w  : double;
   hbh   : double;
   p     : TPathD;
   pp    : TPathsD;
@@ -2743,7 +2743,7 @@ end;
 
 function TListCtrl.GetItemCount: integer;
 begin
-  // TListItem objects always preceed TLayer32 objects
+  // TListItem objects always precede TLayer32 objects
   Result := ChildCount;
   while (Result > 0) and (GetStorageChild(Result - 1) is TLayer32) do
     Dec(Result);
@@ -2883,7 +2883,7 @@ end;
 
 procedure TListCtrl.Paint;
 var
-  i,cnt, spaceW, vis: integer;
+  i, cnt, spaceW, vis: integer;
   itemH, bh: double;
   rec, rec2: TRectD;
   img: TImage32;
@@ -5784,9 +5784,9 @@ end;
 
 procedure TPageCtrl.ResizeTabs;
 var
-  i, len    : integer;
-  h,bh      : double;
-  tabs      : TArrayOfString;
+  i, len : integer;
+  h, bh  : double;
+  tabs   : TArrayOfString;
 begin
   len := ChildCount div 2;
   SetLength(tabs, len);
@@ -6787,7 +6787,7 @@ var
   bhDiv2  : double;
   rec     : TRectD;
   tmpRec  : TRectD;
-  p,p2    : TPathD;
+  p, p2   : TPathD;
   drawBtn : Boolean;
 begin
   bh := fBevelHeight;
@@ -6911,7 +6911,7 @@ procedure TEventPropertyHandler.GetNotifyEvents;
 var
   context: TRttiContext;
   aType: TRttiType;
-  i,j: integer;
+  i, j: integer;
   methods: TArray<TRttiMethod>;
   params: TArray<TRttiParameter>;
 begin

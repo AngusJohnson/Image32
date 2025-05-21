@@ -569,8 +569,8 @@ end;
 
 procedure TSvgASegLayer.UpdateBtnGroup(movedBtn: TLayer32);
 var
-  sa,ea, a  : double;
-  dx,dy     : double;
+  sa, ea, a  : double;
+  dx, dy     : double;
   mp, sp    : TPointD;
   designer  : TLayer32;
   segLayer  : TPathSegLayer;
@@ -780,7 +780,7 @@ end;
 procedure TSvgASegLayer.DrawDesigner(designer: TLayer32);
 var
   j: integer;
-  r,r2: TRectD;
+  r, r2: TRectD;
   p, p2: TPathD;
   dashes: TArrayOfInteger;
 begin
@@ -842,7 +842,7 @@ end;
 
 procedure TSvgCSegLayer.DrawDesigner(designer: TLayer32);
 var
-  i,j: integer;
+  i, j: integer;
   pt: TPointD;
   p: TPathD;
   dashes: TArrayOfInteger;

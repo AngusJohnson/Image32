@@ -398,7 +398,7 @@ begin
   fScale := 1.0;
   fScaleMin := 0.05;
   fScaleMax := 20;
-  fImageSize := Size(200,200);
+  fImageSize := Size(200, 200);
   fBkgType        := pbtSolidColor;
   fBkgChBrdColor1 := clLiteBtn32;
   fBkgChBrdColor2 := clWhite32;
@@ -415,7 +415,7 @@ end;
 function TBaseImgPanel.GetDstOffset: TPoint;
 begin
   if not fAutoCenter then
-    Result := Types.Point(0,0)
+    Result := Types.Point(0, 0)
   else
     with GetInnerClientRect do
     begin
@@ -469,7 +469,7 @@ end;
 function TBaseImgPanel.IsScaledToFit: Boolean;
 var
   rec: TRect;
-  h,w: integer;
+  h, w: integer;
 begin
   rec := GetInnerClientRect;
   h := RectHeight(rec); w := RectWidth(rec);
@@ -481,7 +481,7 @@ end;
 procedure TBaseImgPanel.ScaleToFit;
 var
   rec: TRect;
-  h,w: integer;
+  h, w: integer;
 begin
   if IsEmpty then Exit;
   // fScale := 1;
@@ -780,7 +780,7 @@ var
   inDrawRegion: Boolean;
 begin
   rec := GetInnerClientRect;
-  inDrawRegion := Windows.PtInRect(rec, Types.Point(X,Y));
+  inDrawRegion := Windows.PtInRect(rec, Types.Point(X, Y));
   if inDrawRegion and
     not (fScrollbarHorz.MouseDown or fScrollbarVert.MouseDown) then
   begin
@@ -1289,7 +1289,7 @@ begin
   Color := clWhite;
   fImage := TNotifyImage32.Create(Self);
   fImage.Resampler := rBicubicResampler;
-  fImage.SetSize(200,200);
+  fImage.SetSize(200, 200);
   fAllowCopy := true;
   fAllowPaste := true;
   DoubleBuffered := true;

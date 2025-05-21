@@ -738,7 +738,7 @@ end;
 
 function StripDuplicates(const path: TPath64; isClosedPath: Boolean): TPath64;
 var
-  i,j, len: integer;
+  i, j, len: integer;
 begin
   len := length(path);
   SetLength(Result, len);
@@ -759,7 +759,7 @@ end;
 function StripNearDuplicates(const path: TPathD;
   minLenSqrd: double; isClosedPath: Boolean): TPathD;
 var
-  i,j, len: integer;
+  i, j, len: integer;
 begin
   len := length(path);
   SetLength(Result, len);
@@ -1017,7 +1017,7 @@ end;
 
 function ScalePathsD(const paths: TPaths64; sx, sy: double): TPathsD;
 var
-  i,j: integer;
+  i, j: integer;
 begin
   if sx = 0 then sx := 1;
   if sy = 0 then sy := 1;
@@ -1121,7 +1121,7 @@ end;
 
 function ScalePathsD(const paths: TPathsD; scale: double): TPathsD; overload;
 var
-  i,j: integer;
+  i, j: integer;
 begin
   setlength(result, length(paths));
   for i := 0 to high(paths) do
@@ -1543,7 +1543,7 @@ end;
 
 function GetBounds(const paths: TArrayOfPaths): TRect64; overload;
 var
-  i,j,k: Integer;
+  i, j, k: Integer;
   p: PPoint64;
 begin
   Result := Rect64(MaxInt64, MaxInt64, -MaxInt64, -MaxInt64);
@@ -1567,7 +1567,7 @@ end;
 
 function GetBounds(const paths: TPaths64): TRect64;
 var
-  i,j: Integer;
+  i, j: Integer;
   p: PPoint64;
 begin
   Result := Rect64(MaxInt64, MaxInt64, -MaxInt64, -MaxInt64);
@@ -1590,7 +1590,7 @@ end;
 
 function GetBounds(const paths: TPathsD): TRectD;
 var
-  i,j: Integer;
+  i, j: Integer;
   p: PPointD;
 begin
   Result := RectD(MaxDouble, MaxDouble, -MaxDouble, -MaxDouble);

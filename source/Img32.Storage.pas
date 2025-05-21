@@ -335,7 +335,7 @@ end;
 function GetDoublefromArray(const str: string;
   var startIdx: integer; out val: double): Boolean;
 var
-  i,j, len, dotIdx: integer;
+  i, j, len, dotIdx: integer;
   isNeg: Boolean;
 begin
   val := 0; dotIdx := 0;
@@ -407,7 +407,7 @@ end;
 function GetIntfromArray(const str: string;
   var startIdx: integer; out val: integer): Boolean;
 var
-  i,j,len: integer;
+  i, j, len: integer;
   isNeg: Boolean;
 begin
   val := 0;
@@ -1444,7 +1444,7 @@ function TStorageManager.FindObjectByName(const name: string;
 
   function FindChildByName(so: TStorage): TStorage;
   var
-    i,highI: integer;
+    i, highI: integer;
   begin
     if SameText(so.fName, name) then
     begin

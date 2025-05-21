@@ -604,7 +604,7 @@ end;
 
 function Split(const str: UTF8String): UTF8Strings;
 var
-  i,j,k, spcCnt, len: integer;
+  i, j,k, spcCnt, len: integer;
 begin
   spcCnt := 0;
   i := 1;
@@ -651,7 +651,7 @@ end;
 
 function GetCommaSeparatedArray(const str: UTF8String): UTF8Strings;
 var
-  i,j,k, cnt, len: integer;
+  i, j, k, cnt, len: integer;
 begin
   // precondition: commas CANNOT be embedded
   len := Length(str);
@@ -1149,7 +1149,7 @@ begin
     // Exponent
     if (cc < endC) and ((cc^ = 'e') or (cc^ = 'E')) then
     begin
-      case (cc+1)^ of
+      case (cc + 1)^ of
         '-', '0'..'9':
           begin
             inc(cc);
@@ -1598,12 +1598,12 @@ begin
       'i' : //matrIx
         if IsValid(values[5]) then
         begin
-          mat[0,0] :=  values[0];
-          mat[0,1] :=  values[1];
-          mat[1,0] :=  values[2];
-          mat[1,1] :=  values[3];
-          mat[2,0] :=  values[4];
-          mat[2,1] :=  values[5];
+          mat[0, 0] :=  values[0];
+          mat[0, 1] :=  values[1];
+          mat[1, 0] :=  values[2];
+          mat[1, 1] :=  values[3];
+          mat[2, 0] :=  values[4];
+          mat[2, 1] :=  values[5];
         end;
       's' : //tranSlateX, tranSlateY & tranSlate
         if Length(word) =10  then
@@ -1678,7 +1678,7 @@ end;
 function HtmlDecode(const html: UTF8String): UTF8String;
 var
   val, len: integer;
-  c,ce,endC: PUTF8Char;
+  c, ce, endC: PUTF8Char;
   ch: UTF8Char;
 begin
   len := Length(html);
@@ -2674,7 +2674,7 @@ end;
 
 function DecodeUtf8ToUnicode(const utf8: UTF8String): UnicodeString;
 var
-  i,j, len: Integer;
+  i, j, len: Integer;
   c, cp: Cardinal;
   codePoints: TArrayOfCardinal;
 begin

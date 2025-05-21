@@ -157,7 +157,7 @@ end;
 function StreamReadImageWithBitfields(stream: TStream; width, height,
   bpp: integer; bitfields: TTriColor32): TArrayOfColor32;
 var
-  i,j,bytesPerRow, bytesPerPix: integer;
+  i, j, bytesPerRow, bytesPerPix: integer;
   shift, size: array[0..2] of byte;
   buffer: PByte;
   dstPixel: PARGB;
@@ -226,7 +226,7 @@ function StreamReadImageWithPalette(stream: TStream;
   width, height, bpp: integer;
   const palette: TArrayOfColor32): TArrayOfColor32;
 var
-  i,j, bytesPerRow, palHigh, pxCnt: integer;
+  i, j, bytesPerRow, palHigh, pxCnt: integer;
   buffer: TArrayOfByte;
   b: PByte;
   dstPixel: PColor32;
@@ -597,7 +597,7 @@ end;
 function Find(color: TColor32; const colors: TArrayOfColor32;
   colorsCnt: integer; out idx: integer): Boolean;
 var
-  i,l,r: integer;
+  i, l, r: integer;
 begin
   //binary search a sorted list ...
   Result := False;
@@ -624,7 +624,7 @@ end;
 
 function IndexOf(color: TColor32; const colors: TArrayOfColor32): integer;
 var
-  i,l,r: integer;
+  i, l, r: integer;
 begin
   //binary search a sorted list ...
   l := 0; r := Length(colors) -1;
@@ -816,7 +816,7 @@ begin
     tmp.FlipVertical;
 
     case BitCount of
-    1,4,8:
+    1, 4, 8:
       begin
         stream.Write(bih, bih.bV4Size);
         SetLength(pals, palCnt);

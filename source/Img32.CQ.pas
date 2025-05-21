@@ -428,7 +428,7 @@ end;
 
 procedure FrequencyCut(palSize: integer; var cfArr: TArrayOfColFreq);
 var
-  i,len : integer;
+  i, len : integer;
 begin
   len := Length(cfArr); // total colors in octree
   if palSize >= len then Exit;

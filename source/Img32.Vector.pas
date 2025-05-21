@@ -1427,7 +1427,7 @@ end;
 
 function GetVectors(const path: TPathD): TPathD;
 var
-  i,j, len: cardinal;
+  i, j, len: cardinal;
   pt: TPointD;
 begin
   len := length(path);
@@ -3783,7 +3783,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function GetPointInQuadBezier(const a,b,c: TPointD; t: double): TPointD;
+function GetPointInQuadBezier(const a, b, c: TPointD; t: double): TPointD;
 var
   omt: double;
 begin

@@ -696,7 +696,7 @@ end;
 procedure MakeColorGradient(const gradColors: TArrayOfGradientColor;
   len: integer; var result: TArrayOfColor32);
 var
-  i,j, lenC: integer;
+  i, j, lenC: integer;
   dist, offset1, offset2, step, pos, reciprocalDistTimes255: double;
   color1, color2: TColor32;
 begin
@@ -957,7 +957,7 @@ end;
 procedure InitializeScanlines(const polygons: TPathsD;
   const scanlines: TArrayOfScanline; fragments: PFragment; const clipRec: TRect);
 var
-  i,j, highJ: integer;
+  i, j, highJ: integer;
   pt1, pt2: PPointD;
 begin
  for i := 0 to high(polygons) do
@@ -1258,7 +1258,7 @@ end;
 procedure Rasterize(const paths: TPathsD; const clipRec: TRect;
   fillRule: TFillRule; renderer: TCustomRenderer);
 var
-  i, xli,xri, maxW, maxH: integer;
+  i, xli, xri, maxW, maxH: integer;
   clipRec2: TRect;
   paths2: TPathsD;
   windingAccum: TArrayOfDouble;
@@ -1997,7 +1997,7 @@ var
   perpendicOffsets: PIntegerArray;
   opacityTable: PByteArray;
 begin
-  pDst := GetDstPixel(x1,y);
+  pDst := GetDstPixel(x1, y);
   // optimize self fields access
   colorsCnt := fColorsCnt;
   colors := @fColors[0];
@@ -2101,7 +2101,7 @@ var
   pDst: PColor32;
   opacityTable: PByteArray;
 begin
-  pDst := GetDstPixel(x1,y);
+  pDst := GetDstPixel(x1, y);
   if Opacity < 255 then
   begin
     opacityTable := PByteArray(@MulTable[Opacity]);

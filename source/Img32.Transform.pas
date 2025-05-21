@@ -151,9 +151,9 @@ var
 
 function IsIdentityMatrix(const matrix: TMatrixD): Boolean;
 begin
-  result := (matrix[0,0] = 1) and (matrix[0,1] = 0) and (matrix[0,2] = 0) and
-    (matrix[1,0] = 0) and (matrix[1,1] = 1) and (matrix[1,2] = 0) and
-    (matrix[2,0] = 0) and (matrix[2,1] = 0) and (matrix[2,2] = 1);
+  result := (matrix[0, 0] = 1) and (matrix[0, 1] = 0) and (matrix[0, 2] = 0) and
+    (matrix[1, 0] = 0) and (matrix[1, 1] = 1) and (matrix[1, 2] = 0) and
+    (matrix[2, 0] = 0) and (matrix[2, 1] = 0) and (matrix[2, 2] = 1);
 end;
 //------------------------------------------------------------------------------
 
@@ -165,9 +165,9 @@ end;
 
 function Matrix(const m00, m01, m02, m10, m11, m12, m20, m21, m22: double): TMatrixD;
 begin
-  Result[0,0] := m00; Result[0,1] := m01; Result[0,2] := m02;
-  Result[1,0] := m10; Result[1,1] := m11; Result[1,2] := m12;
-  Result[2,0] := m20; Result[2,1] := m21; Result[2,2] := m22;
+  Result[0, 0] := m00; Result[0, 1] := m01; Result[0, 2] := m02;
+  Result[1, 0] := m10; Result[1, 1] := m11; Result[1, 2] := m12;
+  Result[2, 0] := m20; Result[2, 1] := m21; Result[2, 2] := m22;
 end;
 //------------------------------------------------------------------------------
 
@@ -189,26 +189,26 @@ end;
 function MatrixDeterminant(const matrix: TMatrixD): double;
 {$IFDEF INLINE} inline; {$ENDIF}
 begin
-  Result := Det9(matrix[0,0], matrix[1,0], matrix[2,0],
-                 matrix[0,1], matrix[1,1], matrix[2,1],
-                 matrix[0,2], matrix[1,2], matrix[2,2]);
+  Result := Det9(matrix[0, 0], matrix[1, 0], matrix[2, 0],
+                 matrix[0, 1], matrix[1, 1], matrix[2, 1],
+                 matrix[0, 2], matrix[1, 2], matrix[2, 2]);
 end;
 //------------------------------------------------------------------------------
 
 function MatrixAdjugate(const matrix: TMatrixD): TMatrixD;
 begin
   //https://en.wikipedia.org/wiki/Adjugate_matrix
-  Result[0,0] :=  Det4(matrix[1,1], matrix[1,2], matrix[2,1], matrix[2,2]);
-  Result[0,1] := -Det4(matrix[0,1], matrix[0,2], matrix[2,1], matrix[2,2]);
-  Result[0,2] :=  Det4(matrix[0,1], matrix[0,2], matrix[1,1], matrix[1,2]);
+  Result[0, 0] :=  Det4(matrix[1, 1], matrix[1, 2], matrix[2, 1], matrix[2, 2]);
+  Result[0, 1] := -Det4(matrix[0, 1], matrix[0, 2], matrix[2, 1], matrix[2, 2]);
+  Result[0, 2] :=  Det4(matrix[0, 1], matrix[0, 2], matrix[1, 1], matrix[1, 2]);
 
-  Result[1,0] := -Det4(matrix[1,0], matrix[1,2], matrix[2,0], matrix[2,2]);
-  Result[1,1] :=  Det4(matrix[0,0], matrix[0,2], matrix[2,0], matrix[2,2]);
-  Result[1,2] := -Det4(matrix[0,0], matrix[0,2], matrix[1,0], matrix[1,2]);
+  Result[1, 0] := -Det4(matrix[1, 0], matrix[1, 2], matrix[2, 0], matrix[2, 2]);
+  Result[1, 1] :=  Det4(matrix[0, 0], matrix[0, 2], matrix[2, 0], matrix[2, 2]);
+  Result[1, 2] := -Det4(matrix[0, 0], matrix[0, 2], matrix[1, 0], matrix[1, 2]);
 
-  Result[2,0] :=  Det4(matrix[1,0], matrix[1,1], matrix[2,0], matrix[2,1]);
-  Result[2,1] := -Det4(matrix[0,0], matrix[0,1], matrix[2,0], matrix[2,1]);
-  Result[2,2] :=  Det4(matrix[0,0], matrix[0,1], matrix[1,0], matrix[1,1]);
+  Result[2, 0] :=  Det4(matrix[1, 0], matrix[1, 1], matrix[2, 0], matrix[2, 1]);
+  Result[2, 1] := -Det4(matrix[0, 0], matrix[0, 1], matrix[2, 0], matrix[2, 1]);
+  Result[2, 2] :=  Det4(matrix[0, 0], matrix[0, 1], matrix[1, 0], matrix[1, 1]);
 end;
 //------------------------------------------------------------------------------
 
@@ -276,7 +276,7 @@ end;
 
 procedure MatrixApply(const matrix: TMatrixD; var paths: TPathsD);
 var
-  i,j,len: integer;
+  i, j, len: integer;
   tmpX: double;
   pp: PPointD;
 begin
@@ -430,7 +430,7 @@ var
 begin
   for i := 0 to 2 do
     for j := 0 to 2 do
-      matrix[i,j] := matrix[i,j] * s;
+      matrix[i, j] := matrix[i, j] * s;
 end;
 //------------------------------------------------------------------------------
 
@@ -465,33 +465,33 @@ end;
 procedure MatrixExtractScale(const mat: TMatrixD; out X, Y: double);
 begin
   // https://stackoverflow.com/a/32125700/359538
-  X := Sqrt(Sqr(mat[0,0]) + Sqr(mat[0,1]));
-  //Y := Sqrt(Sqr(mat[1,0]) + Sqr(mat[1,1]));
+  X := Sqrt(Sqr(mat[0, 0]) + Sqr(mat[0, 1]));
+  //Y := Sqrt(Sqr(mat[1, 0]) + Sqr(mat[1, 1]));
   if IsZero(X) then
     Y := 0 else
-    Y := Abs(mat[0,0] * mat[1,1] - mat[1,0] * mat[0,1]) / X;
+    Y := Abs(mat[0,0] * mat[1, 1] - mat[1, 0] * mat[0, 1]) / X;
 end;
 //------------------------------------------------------------------------------
 
 procedure MatrixExtractScale(const mat: TMatrixD; out scale: double);
 var
-  x,y: double;
+  x, y: double;
 begin
   MatrixExtractScale(mat, x, y);
-  scale := Average(x,y);
+  scale := Average(x, y);
 end;
 //------------------------------------------------------------------------------
 
 procedure MatrixExtractTranslation(const mat: TMatrixD; out dx, dy: double);
 begin
-  dx := mat[2,0];
-  dy := mat[2,1];
+  dx := mat[2, 0];
+  dy := mat[2, 1];
 end;
 //------------------------------------------------------------------------------
 
 procedure MatrixExtractRotation(const mat: TMatrixD; out angle: double);
 begin
-  angle := ArcTan2(mat[0,1], mat[0,0]);
+  angle := ArcTan2(mat[0, 1], mat[0, 0]);
 end;
 //------------------------------------------------------------------------------
 
@@ -506,14 +506,14 @@ begin
   trans.Y := mat[2][1];
 
   angle := 0;
-  scale := PointD(1,1);
+  scale := PointD(1, 1);
 
   Result := (m00 <> 0) or (m01 <> 0);
   if not Result then Exit;
 
   angle := ArcTan2(m01, m00);
   // https://stackoverflow.com/a/32125700/359538
-  scale.X := Sqrt(Sqr(mat[0,0]) + Sqr(mat[0,1]));
+  scale.X := Sqrt(Sqr(mat[0, 0]) + Sqr(mat[0, 1]));
   scale.Y := (m00 * m11 - m10 * m01) / scale.X;
 end;
 //------------------------------------------------------------------------------
@@ -536,10 +536,10 @@ begin
 
   // We can skip the divisions, because m/s is only zero if m is zero
   // and m/s=1 is the same as m=s
-  Result := (SameValue(mat[0,0], sx)) and (mat[0,1] = 0) and
-            (mat[1,0] = 0)            and (SameValue(mat[1,1], sy)) and
-            (mat[2,0] = 0)            and (mat[2,1] = 0) and
-            (mat[2,2] = 1);
+  Result := (SameValue(mat[0, 0], sx)) and (mat[0, 1] = 0) and
+            (mat[1, 0] = 0)            and (SameValue(mat[1, 1], sy)) and
+            (mat[2, 0] = 0)            and (mat[2, 1] = 0) and
+            (mat[2, 2] = 1);
 end;
 {$ENDIF USE_DOWNSAMPLER_AUTOMATICALLY}
 
@@ -665,15 +665,15 @@ end;
 // Projective Transformation
 //------------------------------------------------------------------------------
 
-procedure MatrixMulCoord(const matrix: TMatrixD; var x,y,z: double);
+procedure MatrixMulCoord(const matrix: TMatrixD; var x, y, z: double);
 {$IFDEF INLINE} inline; {$ENDIF}
 var
   xx, yy: double;
 begin
   xx := x; yy := y;
-  x := matrix[0,0] * xx + matrix[0,1] * yy + matrix[0,2] * z;
-  y := matrix[1,0] * xx + matrix[1,1] * yy + matrix[1,2] * z;
-  z := matrix[2,0] * xx + matrix[2,1] * yy + matrix[2,2] * z;
+  x := matrix[0, 0] * xx + matrix[0, 1] * yy + matrix[0, 2] * z;
+  y := matrix[1, 0] * xx + matrix[1, 1] * yy + matrix[1, 2] * z;
+  z := matrix[2, 0] * xx + matrix[2, 1] * yy + matrix[2, 2] * z;
 end;
 //------------------------------------------------------------------------------
 
@@ -694,7 +694,7 @@ end;
 procedure GetSrcCoords256(const matrix: TMatrixD; var x, y: integer);
 {$IFDEF INLINE} inline; {$ENDIF}
 var
-  xx,yy,zz: double;
+  xx, yy, zz: double;
 const
   Q: integer = MaxInt div 256;
 begin
@@ -780,8 +780,8 @@ end;
 function ProjectiveTransform(img, targetImg: TImage32;
   const srcPts, dstPts: TPathD; const margins: TRect): Boolean;
 var
-  w,h,i,j: integer;
-  x,y: double;
+  w, h, i, j: integer;
+  x, y: double;
   xLimLo, yLimLo, xLimHi, yLimHi: double;
   rec: TRect;
   dstPts2: TPathD;
@@ -852,7 +852,7 @@ end;
 function InterpolateSegX(const pt1, pt2: TPointD): TPathD;
 var
   i, x1, x2: integer;
-  xo,dydx: double;
+  xo, dydx: double;
 begin
   Result := nil;
   if pt2.X > pt1.X then
@@ -887,8 +887,8 @@ end;
 
 function InterpolateSegY(const pt1, pt2: TPointD): TPathD;
 var
-  i, y1,y2: integer;
-  yo,dxdy: double;
+  i, y1, y2: integer;
+  yo, dxdy: double;
 begin
   Result := nil;
   if pt2.Y > pt1.Y then
@@ -923,7 +923,7 @@ end;
 
 function InterpolatePathForX(const path: TPathD): TPathD;
 var
-  i,len: integer;
+  i, len: integer;
   tmp: TPathD;
 begin
   Result := nil;
@@ -963,8 +963,8 @@ end;
 function SplineVertTransform(img, targetImg: TImage32; const topSpline: TPathD;
   splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean;
 var
-  i,j, w,h, len: integer;
-  x,y, yy, q: double;
+  i, j, w, h, len: integer;
+  x, y, yy, q: double;
   yLimLo, yLimHi: double;
   distances: TArrayOfDouble;
   pc: PColor32;
@@ -1048,8 +1048,8 @@ end;
 function SplineHorzTransform(img, targetImg: TImage32; const leftSpline: TPathD;
   splineType: TSplineType; backColor: TColor32; out offset: TPoint): Boolean;
 var
-  i,j, len, w,h: integer;
-  x,y, xx, q, prevY: double;
+  i, j, len, w, h: integer;
+  x, y, xx, q, prevY: double;
   xLimLo, xLimHi: double;
   leftPath: TPathD;
   distances: TArrayOfDouble;

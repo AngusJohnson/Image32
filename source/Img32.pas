@@ -225,8 +225,8 @@ type
     fUpdateCnt: integer;
     fAntiAliased: Boolean;
     fNotifyBlockCnt: integer;
-    function GetPixel(x,y: Integer): TColor32;
-    procedure SetPixel(x,y: Integer; color: TColor32);
+    function GetPixel(x, y: Integer): TColor32;
+    procedure SetPixel(x, y: Integer; color: TColor32);
     function GetIsBlank: Boolean;
     function GetIsEmpty: Boolean;
     function GetPixelBase: PColor32;
@@ -364,7 +364,7 @@ type
     //the color to fill those uncovered pixels in rec following rotation.
     procedure RotateRect(const rec: TRect;
       angleRads: double; eraseColor: TColor32 = 0);
-    procedure Skew(dx,dy: double);
+    procedure Skew(dx, dy: double);
 
     //ScaleAlpha: Scales the alpha byte of every pixel by the specified amount.
     procedure ScaleAlpha(scale: double);
@@ -391,7 +391,7 @@ type
     property IsEmpty: Boolean read GetIsEmpty;
     property IsPreMultiplied: Boolean read fIsPremultiplied;
     property MidPoint: TPointD read GetMidPoint;
-    property Pixel[x,y: Integer]: TColor32 read GetPixel write SetPixel;
+    property Pixel[x, y: Integer]: TColor32 read GetPixel write SetPixel;
     property Pixels: TArrayOfColor32 read fPixels;
     property PixelBase: PColor32 read GetPixelBase;
     property PixelRow[row: Integer]: PColor32 read GetPixelRow;
@@ -1892,7 +1892,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure ScaleRect(var rec: TRect; x,y: double);
+procedure ScaleRect(var rec: TRect; x, y: double);
 begin
   rec.Right := rec.Left + Round((rec.Right - rec.Left) * x);
   rec.Bottom := rec.Top + Round((rec.Bottom - rec.Top) * y);
@@ -2008,7 +2008,7 @@ function RgbToHsl(color: TColor32): THsl;
 var
   rgba: TARGB absolute color;
   hsl: THsl absolute result;
-  r,g,b: byte;
+  r, g, b: byte;
   maxRGB, minRGB, mAdd, mSub: Integer;
 begin
   //https://en.wikipedia.org/wiki/HSL_and_HSV and
@@ -2326,7 +2326,7 @@ begin
   if not Assigned(ImageFormatClassList) then CreateImageFormatList;
 
   if (ext = '') or (ext = '.') then Exit;
-  if (ext[1] = '.') then Delete(ext, 1,1);
+  if (ext[1] = '.') then Delete(ext, 1, 1);
   if not IsAlphaChar(ext[1]) then Exit;
   isNewFormat := true;
 
@@ -2379,7 +2379,7 @@ begin
   Result := nil;
   pattern := ext;
   if (pattern = '')  or (pattern = '.') then Exit;
-  if pattern[1] = '.' then Delete(pattern, 1,1);
+  if pattern[1] = '.' then Delete(pattern, 1, 1);
 
   //try for highest priority first
   for i := imageFormatClassList.count -1 downto 0 do
@@ -2582,7 +2582,7 @@ end;
 
 procedure TImage32.FillRect(const rec: TRect; color: TColor32);
 var
-  i,j, rw, w: Integer;
+  i, j, rw, w: Integer;
   c: PColor32;
   r: TRect;
 begin
@@ -2727,7 +2727,7 @@ begin
     FillChar(pDst^, w * SizeOf(TColor32), 0);
     inc(pDst, w);
   end;
-  pSrc := @fPixels[recClipped.Top * Width + Max(0,rec.Left)];
+  pSrc := @fPixels[recClipped.Top * Width + Max(0, rec.Left)];
   if (rec.Left < 0) or (rec.Right > Width) then
   begin
     clipW := RectWidth(recClipped);
@@ -2938,7 +2938,7 @@ end;
 
 procedure TImage32.RotateLeft90;
 var
-  x,y, xx: Integer;
+  x, y, xx: Integer;
   src, dst: PColor32;
   tmp: TImage32;
 begin
@@ -2968,7 +2968,7 @@ end;
 
 procedure TImage32.RotateRight90;
 var
-  x,y: Integer;
+  x, y: Integer;
   src, dst: PColor32;
   tmp: TImage32;
 begin
@@ -2997,7 +2997,7 @@ end;
 
 procedure TImage32.Rotate180;
 var
-  x,y: Integer;
+  x, y: Integer;
   src, dst: PColor32;
   tmp: TImage32;
 begin
@@ -3153,7 +3153,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.SetPixel(x,y: Integer; color: TColor32);
+procedure TImage32.SetPixel(x, y: Integer; color: TColor32);
 begin
   if (x < 0) or (x >= Width) or (y < 0) or (y >= Height) then Exit;
   fPixels[y * width + x] := color;
@@ -3320,7 +3320,7 @@ var
   tmp: TImage32;
   srcRecClipped, dstRecClipped, r: TRect;
   scaleX, scaleY: double;
-  w,h, dstW,dstH, srcW,srcH: integer;
+  w, h, dstW, dstH, srcW, srcH: integer;
 begin
   result := false;
   if IsEmptyRect(srcRec) or IsEmptyRect(dstRec) then Exit;
@@ -3427,11 +3427,11 @@ var
   bm, oldBm: HBitmap;
   dc, memDc: HDC;
   pixels: Pointer;
-  w,h: integer;
+  w, h: integer;
 begin
   BeginUpdate;
   try
-    RectWidthHeight(srcRect, w,h);
+    RectWidthHeight(srcRect, w, h);
     SetSize(w, h);
     bi := Get32bitBitmapInfoHeader(w, -h); // -h => avoids need to flip image
     dc := GetDC(0);
@@ -3442,7 +3442,7 @@ begin
       if bm = 0 then Exit;
       try
         oldBm := SelectObject(memDc, bm);
-        BitBlt(memDc, 0, 0, w, h, srcDc, srcRect.Left,srcRect.Top, SRCCOPY);
+        BitBlt(memDc, 0, 0, w, h, srcDc, srcRect.Left, srcRect.Top, SRCCOPY);
         Move(pixels^, fPixels[0], w * h * sizeOf(TColor32));
         SelectObject(memDc, oldBm);
       finally
@@ -3460,7 +3460,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.CopyToDc(dstDc: HDC; x,y: Integer; transparent: Boolean);
+procedure TImage32.CopyToDc(dstDc: HDC; x, y: Integer; transparent: Boolean);
 begin
   CopyToDc(Bounds, Types.Rect(x,y, x + Width, y + Height),
     dstDc, transparent);
@@ -3473,14 +3473,14 @@ var
   recW, recH: integer;
 begin
   RectWidthHeight(srcRect, recW, recH);
-  CopyToDc(srcRect, Types.Rect(x,y, x + recW, y + recH), dstDc, transparent);
+  CopyToDc(srcRect, Types.Rect(x, y, x + recW, y + recH), dstDc, transparent);
 end;
 //------------------------------------------------------------------------------
 
 procedure TImage32.CopyToDc(const srcRect, dstRect: TRect;
   dstDc: HDC; transparent: Boolean = true);
 var
-  i, x,y, wSrc ,hSrc, wDest, hDest, wBytes: integer;
+  i, x, y, wSrc, hSrc, wDest, hDest, wBytes: integer;
   rec: TRect;
   bi: TBitmapInfoHeader;
   bm, oldBm: HBitmap;
@@ -3543,15 +3543,15 @@ begin
         bf.BlendFlags := 0;
         bf.SourceConstantAlpha := 255;
         bf.AlphaFormat := AC_SRC_ALPHA;
-        AlphaBlend(dstDc, x,y, wDest,hDest, memDC, 0,0, wSrc,hSrc, bf);
+        AlphaBlend(dstDc, x, y, wDest,hDest, memDC, 0, 0, wSrc, hSrc, bf);
       end
       else if (wDest = wSrc) and (hDest = hSrc) then
       begin
-        BitBlt(dstDc, x,y, wSrc, hSrc, memDc, 0,0, SRCCOPY)
+        BitBlt(dstDc, x, y, wSrc, hSrc, memDc, 0, 0, SRCCOPY)
       end else
       begin
         oldStretchBltMode := SetStretchBltMode(dstDc, COLORONCOLOR);
-        StretchBlt(dstDc, x,y, wDest, hDest, memDc, 0,0, wSrc,hSrc, SRCCOPY);
+        StretchBlt(dstDc, x, y, wDest, hDest, memDc, 0,0, wSrc, hSrc, SRCCOPY);
         if oldStretchBltMode <> COLORONCOLOR then // restore mode
           SetStretchBltMode(dstDc, oldStretchBltMode);
       end;
@@ -3749,7 +3749,7 @@ end;
 
 procedure TImage32.FlipHorizontal;
 var
-  i,j, widthLess1: Integer;
+  i, j, widthLess1: Integer;
   a: TArrayOfColor32;
   row: PColor32;
 begin
@@ -3805,7 +3805,7 @@ end;
 
 procedure TImage32.SetRGB(rgbColor: TColor32; rec: TRect);
 var
-  i,j, dx: Integer;
+  i, j, dx: Integer;
   pc: PColor32;
 begin
   Types.IntersectRect(rec, rec, bounds);
@@ -3865,7 +3865,7 @@ end;
 
 procedure TImage32.ReduceOpacity(opacity: Byte; rec: TRect);
 var
-  i,j, rw: Integer;
+  i, j, rw: Integer;
   c: PARGB;
   a: Byte;
   lineOffsetInBytes: integer;
@@ -4114,7 +4114,7 @@ end;
 
 function TImage32.GetOpaqueBounds: TRect;
 var
-  x,y, x1,x2,y1,y2: Integer;
+  x, y, x1, x2, y1, y2: Integer;
   found: Boolean;
 begin
   y1 := 0; y2 := 0;
@@ -4165,7 +4165,7 @@ function TImage32.CropTransparentPixels: TRect;
 begin
   Result := GetOpaqueBounds;
   if IsEmptyRect(Result) then
-     SetSize(0,0) else
+     SetSize(0, 0) else
      Crop(Result);
 end;
 //------------------------------------------------------------------------------
@@ -4236,7 +4236,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TImage32.Skew(dx,dy: double);
+procedure TImage32.Skew(dx, dy: double);
 var
   mat: TMatrixD;
 begin
@@ -4459,7 +4459,7 @@ end;
 
 procedure MakeBlendTables;
 var
-  i,j: Integer;
+  i, j: Integer;
 begin
   for j := 0 to 255 do MulTable[0, j] := 0;
   for i := 0 to 255 do MulTable[i, 0] := 0;

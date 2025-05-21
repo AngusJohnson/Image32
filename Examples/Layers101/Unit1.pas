@@ -265,7 +265,7 @@ end;
 procedure TMainForm.mnuAddRectangleClick(Sender: TObject);
 var
   newLayer: TLayer32;
-  x,y: integer;
+  x, y: integer;
   rec: TRect;
 begin
   //create a semi-random sized object

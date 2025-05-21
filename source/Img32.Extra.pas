@@ -394,7 +394,7 @@ end;
 
 procedure FillColorHorz(img: TImage32; x, endX, y: integer; color: TColor32);
 var
-  i,dx: integer;
+  i, dx: integer;
   p: PColor32;
 begin
   if (x < 0) or (x >= img.Width) then Exit;
@@ -438,7 +438,7 @@ var
   l, t, r, b: integer;
   tmpImg: TImage32;
   tmpRec: TRect;
-  xx,yy: double;
+  xx, yy: double;
   ss: TPointD;
   c: TColor32;
 begin
@@ -496,7 +496,7 @@ begin
     if (ss.X < 0) then
     begin
       l := rec.Left; t := rec.Top + sY; b := rec.Bottom - 1;
-      if ss.Y < 0 then begin dec(t, sY); dec(b,sY); end;
+      if ss.Y < 0 then begin dec(t, sY); dec(b, sY); end;
       for i := 1 to sX do
       begin
         c := tmpImg.Pixel[sX - i, sY + 1];
@@ -1183,8 +1183,8 @@ var
   tmp: TImage32;
   rec: TRect;
   paths, paths2: TPathsD;
-  w,h: integer;
-  x,y: double;
+  w, h: integer;
+  x, y: double;
 begin
   rec := GetBounds(polygons);
   if IsEmptyRect(rec) then Exit;
@@ -1395,7 +1395,7 @@ end;
 
 procedure TraceContours(img: TImage32; intensity: integer);
 var
-  i,j, w,h: integer;
+  i, j, w, h: integer;
   tmp, tmp2: TArrayOfColor32;
   s, s2: PColor32;
   d: PARGB;
@@ -1452,8 +1452,8 @@ type
     maxY      : integer;
     constructor Create(maxY: integer);
     destructor Destroy; override;
-    procedure Push(xLeft, xRight,y, direction: Integer);
-    procedure Pop(out xLeft, xRight,y, direction: Integer);
+    procedure Push(xLeft, xRight, y, direction: Integer);
+    procedure Pop(out xLeft, xRight, y, direction: Integer);
     function IsEmpty: Boolean;
   end;
   TFloodFillMask = class
@@ -1466,7 +1466,7 @@ type
     compareFunc  : TCompareFunctionEx;
     tolerance    : Integer;
   public
-    function Execute(imgIn, imgMaskOut: TImage32; x,y: integer;
+    function Execute(imgIn, imgMaskOut: TImage32; x, y: integer;
       aTolerance: Byte = 0; compFunc: TCompareFunctionEx = nil): Boolean;
     procedure SetCurrentY(y: Integer);
     function IsMatch(x: Integer): Boolean;
@@ -1530,17 +1530,17 @@ end;
 // TFloodFillMask methods
 //------------------------------------------------------------------------------
 
-function TFloodFillMask.Execute(imgIn, imgMaskOut: TImage32; x,y: integer;
+function TFloodFillMask.Execute(imgIn, imgMaskOut: TImage32; x, y: integer;
   aTolerance: Byte; compFunc: TCompareFunctionEx): Boolean;
 var
   ffs          : TFloodFillStack;
-  w,h          : integer;
+  w, h         : integer;
   xl, xr, xr2  : Integer;
   maxX         : Integer;
   dirY         : Integer;
 begin
   Result := Assigned(imgIn) and Assigned(imgMaskOut) and
-    InRange(x,0,imgIn.Width -1) and InRange(y, 0, imgIn.Height - 1);
+    InRange(x, 0, imgIn.Width - 1) and InRange(y, 0, imgIn.Height - 1);
   if not Result then Exit;
   w := imgIn.Width; h := imgIn.Height;
   // make sure the mask is the size of the image
@@ -1736,7 +1736,7 @@ begin
       if preserveColor then
       begin
         pcf := IncPColor32(pc0, x);
-        pw^.Add(pcf^, kernel[0,0]);
+        pw^.Add(pcf^, kernel[0, 0]);
         inc(pcf);
       end else
       begin
@@ -2103,7 +2103,7 @@ begin
     end;
     vec := GetAvgUnitVector(unitVecs[i], unitVecs[j]);
 
-    angle := arccos(Max(-1,Min(1,(DotProdVecs(unitVecs[i], unitVecs[j])))));
+    angle := arccos(Max(-1, Min(1, (DotProdVecs(unitVecs[i], unitVecs[j])))));
     d := abs(Pi-angle) / TwoPi;
     d1 := pl[i] * d;
     d2 := pl[j] * d;

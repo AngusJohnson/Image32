@@ -1532,7 +1532,7 @@ end;
 procedure THitTestLayer32.ClearHitTesting;
 begin
   if not fHitTest.htImage.IsEmpty then
-    fHitTest.htImage.SetSize(0,0);
+    fHitTest.htImage.SetSize(0, 0);
 end;
 //------------------------------------------------------------------------------
 
@@ -1668,7 +1668,7 @@ end;
 
 procedure TVectorLayer32.SetInnerBounds(const newBounds: TRectD);
 var
-  w,h: double;
+  w, h: double;
   rec: TRect;
   mat: TMatrixD;
 begin
@@ -1695,7 +1695,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TVectorLayer32.Offset(dx,dy: double);
+procedure TVectorLayer32.Offset(dx, dy: double);
 begin
   inherited;
   fPaths := TranslatePath(fPaths, dx, dy);

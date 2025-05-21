@@ -911,8 +911,8 @@ end;
 // Note: This MatrixApply() is a function, whereas in Img32.Transform it's a procedure.
 function MatrixApply(const paths: TPathsD; const matrix: TMatrixD): TPathsD; overload;
 var
-  i,j,len,len2: integer;
-  pp,rr: PPointD;
+  i, j, len, len2: integer;
+  pp, rr: PPointD;
 begin
   if not Assigned(paths) then
     Result := nil
@@ -942,7 +942,7 @@ end;
 
 function FixSpaces(const text: UnicodeString; trimLeadingSpace: Boolean): UnicodeString;
 var
-  i,j, len: integer;
+  i, j, len: integer;
 begin
   //changes \r\n\t chars to spaces
   //and trims consecutive spaces
@@ -1208,7 +1208,7 @@ var
   tmp: TImage32;
   tmpScale: TPointD;
 begin
-  dstRecD := Self.elRectWH.GetRectD(0,0);
+  dstRecD := Self.elRectWH.GetRectD(0, 0);
   MatrixMultiply2(fDrawData.matrix, drawDat.matrix);
 
   MatrixApply(drawDat.matrix, dstRecD);
@@ -1462,7 +1462,7 @@ begin
           mat := IdentityMatrix;
           MatrixScale(mat, s, s);
           MatrixMultiply2(mat, drawDat.matrix);
-          drawDat.bounds := RectD(0,0,viewboxWH.Width, viewboxWH.Height);
+          drawDat.bounds := RectD(0, 0, viewboxWH.Width, viewboxWH.Height);
         end;
 
         if self.elRectWH.width.IsValid and
@@ -1580,7 +1580,7 @@ begin
   if (len > 0) and (stops[len-1].offset > offset) then
     offset := stops[len - 1].offset;
   setLength(stops, len + 1);
-  stops[len].offset := Min(1,Max(0, offset));
+  stops[len].offset := Min(1, Max(0, offset));
   stops[len].color := color;
 end;
 //------------------------------------------------------------------------------
@@ -2169,8 +2169,8 @@ procedure ArithmeticBlend(src1, src2, dst: TImage32;
   const recS1, recS2, recDst: TRect; const ks: TFourDoubles);
 var
   kk: array[0..3] of byte;
-  w,h, w2,h2, w3,h3, i,j: integer;
-  p1,p2,r: PColor32;
+  w, h, w2, h2, w3, h3, i, j: integer;
+  p1, p2, r: PColor32;
 begin
   RectWidthHeight(recS1, w, h);
   RectWidthHeight(recS2, w2, h2);
@@ -2277,7 +2277,7 @@ end;
 
 procedure TFeColorMatrixElement.Apply;
 var
-  i,j, dx1,dx2: integer;
+  i, j, dx1, dx2: integer;
   colorMatrix: TColorMatrix;
   p1, p2: PColor32;
 begin
@@ -2306,7 +2306,7 @@ end;
 
 procedure TFeComponentTransferElement.Apply;
 var
-  i,j,k, dx1,dx2: integer;
+  i, j, k, dx1, dx2: integer;
   d: double;
   rangeSize: integer;
   p1: PColor32;
@@ -2799,7 +2799,7 @@ end;
 
 procedure TShapeElement.DrawMarkers(img: TImage32; drawDat: TDrawData);
 var
-  i,j: integer;
+  i, j: integer;
   scale, sw: double;
   markerEl: TBaseElement;
   markerPaths: TPathsD;
@@ -3446,7 +3446,7 @@ end;
 procedure TTSpanElement.GetPaths(const drawDat: TDrawData);
 var
   tmpX, startX, fontScale, fontSize, bs: double;
-  i,j, len  : integer;
+  i, j, len  : integer;
   di        : TDrawData;
   s         : UnicodeString;
   mat       : TMatrixD;
@@ -3916,7 +3916,7 @@ end;
 procedure TMarkerElement.Draw(img: TImage32; drawDat: TDrawData);
 var
   i, len: integer;
-  l,t,w,h,scale, a, a2: double;
+  l, t, w, h, scale, a, a2: double;
   mat: TMatrixD;
   angles: TArrayOfDouble;
 begin
@@ -4028,7 +4028,7 @@ var
   el    : TBaseElement;
   rec   : TRectD;
   mat   : TMatrixD;
-  sx,sy : double;
+  sx, sy : double;
   scale : TPointD;
 begin
   Result := false;
@@ -4850,7 +4850,7 @@ var
   opacity: double;
 begin
   UTF8StringToFloat(value, opacity);
-  opacity := ClampRange(opacity, 0,1);
+  opacity := ClampRange(opacity, 0, 1);
   with aOwnerEl.fDrawData do
   begin
     if IsValid(strokeOpacity) then
@@ -4959,7 +4959,7 @@ procedure Viewbox_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
         not ParseNextNum(c, endC, true, Top) or
         not ParseNextNum(c, endC, true, Width) or
         not ParseNextNum(c, endC, true, Height) then
-          Result := RectWH(0,0,0,0);
+          Result := RectWH(0, 0, 0, 0);
   end;
 
 begin

@@ -90,7 +90,7 @@ begin
     fontReader.LoadFromResource('FONT_1', RT_RCDATA);
     if fontReader.IsValidFontFormat then
       copyrightGlyphs :=
-        fontCache.GetTextOutline(0,0,#$00A9' 2021 Angus Johnson');
+        fontCache.GetTextOutline(0, 0, #$00A9' 2021 Angus Johnson');
 
     //connect fontReader to a decorative ttf font resource
     //and get 'bigText' glyph outlines ...
