@@ -635,11 +635,11 @@ begin
   if highI < 0 then Exit;
   for i := 0 to highI -1 do
   begin
-    Result := Result + format('%d,%d, ',[p[i].X,p[i].Y]);
+    Result := Result + format('%d,%d, ',[p[i].X, p[i].Y]);
     if (pointsPerRow > 0) and ((i + 1) mod pointsPerRow = 0) then
       Result := Result + #10 + spaces;
   end;
-  Result := Result + format('%d,%d',[p[highI].X,p[highI].Y]);
+  Result := Result + format('%d,%d',[p[highI].X, p[highI].Y]);
 end;
 //------------------------------------------------------------------------------
 

@@ -469,7 +469,7 @@ begin
   //Y := Sqrt(Sqr(mat[1, 0]) + Sqr(mat[1, 1]));
   if IsZero(X) then
     Y := 0 else
-    Y := Abs(mat[0,0] * mat[1, 1] - mat[1, 0] * mat[0, 1]) / X;
+    Y := Abs(mat[0, 0] * mat[1, 1] - mat[1, 0] * mat[0, 1]) / X;
 end;
 //------------------------------------------------------------------------------
 
@@ -569,7 +569,7 @@ function AffineTransformImage(img, targetImg: TImage32; matrix: TMatrixD;
 var
   i, j: integer;
   newWidth, newHeight: integer;
-  sx, sy, x,y: double;
+  sx, sy, x, y: double;
   xLimLo, yLimLo, xLimHi, yLimHi: double;
   pc: PColor32;
   tmp: TArrayOfColor32;

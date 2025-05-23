@@ -284,7 +284,7 @@ function ReadRLE4orRLE8Compression(stream: TStream;
   width, height, bpp: integer;
   const palette: TArrayOfColor32): TArrayOfColor32;
 var
-  i,j,k, cnt, idx: integer;
+  i, j,k, cnt, idx: integer;
   w, delta, bitOffset: integer;
   dst: PColor32;
   byte1, byte2: byte;
@@ -724,7 +724,7 @@ end;
 
 procedure StreamWrite24BitImage(img32: TImage32; stream: TStream);
 var
-  i,j, delta, rowSize, totalBytes: integer;
+  i, j, delta, rowSize, totalBytes: integer;
   buffer: TArrayOfByte;
   pc: PColor32;
   pb: PByte;

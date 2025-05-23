@@ -457,7 +457,7 @@ end;
 
 function GetScaleForBestFit(srcW, srcH, dstW, dstH: double): double;
 var
-  sx,sy: double;
+  sx, sy: double;
 begin
   sx := dstW / srcW;
   sy := dstH / srcH;
@@ -604,7 +604,7 @@ end;
 
 function Split(const str: UTF8String): UTF8Strings;
 var
-  i, j,k, spcCnt, len: integer;
+  i, j, k, spcCnt, len: integer;
 begin
   spcCnt := 0;
   i := 1;

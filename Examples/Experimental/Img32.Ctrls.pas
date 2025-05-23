@@ -923,7 +923,7 @@ begin
   GetClientRect(hdl, clientRec);
   dx := winrec.Width - clientRec.Width;
   dy := winrec.Height - clientRec.Height;
-  SetWindowPos(hdl, 0,0,0, width + dx, height + dy, SWP_NOZORDER or SWP_NOMOVE);
+  SetWindowPos(hdl, 0, 0, 0, width + dx, height + dy, SWP_NOZORDER or SWP_NOMOVE);
 end;
 //------------------------------------------------------------------------------
 

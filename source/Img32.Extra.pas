@@ -247,8 +247,8 @@ end;
 
 function GetSymmetricCropTransparentRect(img: TImage32): TRect;
 var
-  w,h, x,y, x1,y1: Integer;
-  p1,p2: PARGB;
+  w, h, x, y, x1, y1: Integer;
+  p1, p2: PARGB;
   opaquePxlFound: Boolean;
 begin
   Result := img.Bounds;

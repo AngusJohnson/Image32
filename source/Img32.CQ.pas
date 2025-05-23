@@ -314,7 +314,7 @@ end;
 procedure PaletteSort(var ptrArray: TArrayOfColFreq;
   l, r: Integer; sortFunc: TColFreqSortFunc);
 var
-  i,j: integer;
+  i, j: integer;
   P, T: TColFreqRec;
 begin
   repeat
@@ -689,8 +689,8 @@ end;
 //------------------------------------------------------------------------------
 
 procedure TOctree.MedianCut(palSize: integer; var cfArr: TArrayOfColFreq);
-var
-  i,j       : integer;
+var  
+  i, j       : integer;
   arrLen    : integer;
   sizeAdjust: cardinal;
   idxArrLen : integer;

@@ -1061,7 +1061,7 @@ end;
 
 function ScalePaths(const paths: TPaths64; scale: double): TPaths64;
 var
-  i,j: integer;
+  i, j: integer;
 begin
   setlength(result, length(paths));
   for i := 0 to high(paths) do

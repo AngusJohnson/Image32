@@ -4718,7 +4718,7 @@ var
   opacity: double;
 begin
   if not UTF8StringToFloat(value, opacity) then Exit;
-  opacity := ClampRange(opacity, 0,1);
+  opacity := ClampRange(opacity, 0, 1);
   with aOwnerEl.fDrawData do
   begin
     if IsValid(fillOpacity) then

@@ -254,7 +254,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-procedure TVectorizer.AddToCurrent(x,y: integer);
+procedure TVectorizer.AddToCurrent(x, y: integer);
 var
   prev, next, ap, pt: PPt;
 begin
@@ -287,7 +287,7 @@ begin
       ap.Y := y;
       Exit;
     end;
-    pt := NewPoint(x,y);
+    pt := NewPoint(x, y);
     next.prev := pt;
     pt.next := next;
     ap.next := pt;
@@ -356,9 +356,9 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function TVectorizer.Execute(const ba: TArrayOfByte; w,h: integer): TPathsD;
+function TVectorizer.Execute(const ba: TArrayOfByte; w, h: integer): TPathsD;
 var
-  i,j, len: integer;
+  i, j, len: integer;
   left: integer;
   pb: PByte;
   isInRange: Boolean;

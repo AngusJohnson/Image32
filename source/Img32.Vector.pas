@@ -1052,7 +1052,7 @@ end;
 
 function CrossProduct(const pt1, pt2, pt3, pt4: TPointD): double;
 var
-  x1, x2, y1,y2: double;
+  x1, x2, y1, y2: double;
 begin
   x1 := pt2.X - pt1.X;
   y1 := pt2.Y - pt1.Y;
@@ -1465,7 +1465,7 @@ end;
 
 function GetNormals(const path: TPathD): TPathD;
 var
-  i,j, highI: integer;
+  i, j, highI: integer;
 begin
   highI := High(path);
   NewPointDArray(result, highI + 1, True);

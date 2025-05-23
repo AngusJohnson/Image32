@@ -268,7 +268,7 @@ type
   public
     constructor Create(parent: TLayer32 = nil; const name: string = ''); override;
     procedure SetInnerBounds(const newBounds: TRectD); override;
-    procedure Offset(dx,dy: double); override;
+    procedure Offset(dx, dy: double); override;
     function  Rotate(angleDelta: double): Boolean; override;
     procedure Scale(sx, sy: double); override;
     procedure UpdateHitTestMask(const vectorRegions: TPathsD); virtual;

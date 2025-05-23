@@ -1083,7 +1083,7 @@ end;
 function BlendToOpaque(bgColor, fgColor: TColor32): TColor32;
 var
   fgA: byte;
-  fw,bw: PByteArray;
+  fw, bw: PByteArray;
 begin
   fgA := fgColor shr 24;
   if fgA = 0 then Result := bgColor
@@ -2688,11 +2688,11 @@ end;
 
 function TImage32.CopyPixels(const rec: TRect): TArrayOfColor32;
 var
-  i, clipW, w,h: Integer;
+  i, clipW, w, h: Integer;
   pSrc, pDst, pDst2: PColor32;
   recClipped: TRect;
 begin
-  RectWidthHeight(rec, w,h);
+  RectWidthHeight(rec, w, h);
   NewColor32Array(result, w * h, True);
 
   if w * h = 0 then Exit;
@@ -3462,7 +3462,7 @@ end;
 
 procedure TImage32.CopyToDc(dstDc: HDC; x, y: Integer; transparent: Boolean);
 begin
-  CopyToDc(Bounds, Types.Rect(x,y, x + Width, y + Height),
+  CopyToDc(Bounds, Types.Rect(x, y, x + Width, y + Height),
     dstDc, transparent);
 end;
 //------------------------------------------------------------------------------
@@ -3543,7 +3543,7 @@ begin
         bf.BlendFlags := 0;
         bf.SourceConstantAlpha := 255;
         bf.AlphaFormat := AC_SRC_ALPHA;
-        AlphaBlend(dstDc, x, y, wDest,hDest, memDC, 0, 0, wSrc, hSrc, bf);
+        AlphaBlend(dstDc, x, y, wDest, hDest, memDC, 0, 0, wSrc, hSrc, bf);
       end
       else if (wDest = wSrc) and (hDest = hSrc) then
       begin
@@ -3551,7 +3551,7 @@ begin
       end else
       begin
         oldStretchBltMode := SetStretchBltMode(dstDc, COLORONCOLOR);
-        StretchBlt(dstDc, x, y, wDest, hDest, memDc, 0,0, wSrc, hSrc, SRCCOPY);
+        StretchBlt(dstDc, x, y, wDest, hDest, memDc, 0, 0, wSrc, hSrc, SRCCOPY);
         if oldStretchBltMode <> COLORONCOLOR then // restore mode
           SetStretchBltMode(dstDc, oldStretchBltMode);
       end;
