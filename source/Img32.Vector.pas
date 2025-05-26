@@ -1296,7 +1296,7 @@ end;
 function ScalePath(const paths: TPathsD;
   sx, sy: double): TPathsD;
 var
-  i,len: integer;
+  i, len: integer;
 begin
   len := length(paths);
   setLength(result, len);

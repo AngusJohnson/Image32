@@ -1490,7 +1490,7 @@ begin
 
   GetUInt64(fStream, fTbl_head.dateCreated);
   GetMeaningfulDateTime(fTbl_head.dateCreated, yy, mo, dd, hh, mi, ss);
-  fFontInfo.dateCreated := EncodeDate(yy, mo, dd) + EncodeTime(hh, mi,ss, 0);
+  fFontInfo.dateCreated := EncodeDate(yy, mo, dd) + EncodeTime(hh, mi, ss, 0);
   GetUInt64(fStream, fTbl_head.dateModified);
   GetMeaningfulDateTime(fTbl_head.dateModified, yy, mo, dd, hh, mi, ss);
   fFontInfo.dateModified := EncodeDate(yy, mo, dd) + EncodeTime(hh, mi, ss, 0);
@@ -1867,7 +1867,7 @@ end;
 
 procedure AffineTransform(const a, b, c, d, e, f: double; var pathsEx: TPathsEx);
 var
-  i,j: integer;
+  i, j: integer;
   mat: TMatrixD;
 begin
   // https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6glyf.html
@@ -2659,8 +2659,8 @@ function TFontCache.GetTextOutlineInternal(x, y: double;
   const text: UnicodeString; underlineIdx: integer; out glyphs: TArrayOfPathsD;
   out offsets: TArrayOfDouble; out nextX: double): Boolean;
 var
-  i, j, len    : integer;
-  dx ,y2, w     : double;
+  i, j, len   : integer;
+  dx, y2, w   : double;
   codepoints  : TArrayOfCardinal;
   glyphInfo   : PGlyphInfo;
   currGlyph   : TPathsD;

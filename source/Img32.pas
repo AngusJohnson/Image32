@@ -2426,7 +2426,7 @@ begin
       dst.fHeight := fHeight;
       dst.Resized;
     except
-      dst.SetSize(0,0);
+      dst.SetSize(0, 0);
     end;
   finally
     dst.EndUpdate;
@@ -2761,7 +2761,7 @@ end;
 procedure TImage32.Crop(const rec: TRect);
 var
   newPixels: TArrayOfColor32;
-  w,h: integer;
+  w, h: integer;
 begin
   RectWidthHeight(rec, w, h);
   if (w = Width) and (h = Height) then Exit;

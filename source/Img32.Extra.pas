@@ -2047,7 +2047,7 @@ end;
 
 function SimplifyPathsEx(const paths: TPathsD; shapeTolerance: double): TPathsD;
 var
-  i,j, len: integer;
+  i, j, len: integer;
 begin
   len := Length(paths);
   SetLength(Result, len);
