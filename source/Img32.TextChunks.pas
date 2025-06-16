@@ -284,7 +284,14 @@ end;
 
 function TTextChunk.IsText: Boolean;
 begin
-  Result := not CharInSet(text[1], [SPACE, NEWLINE]);
+  // CharInSet is slow in Win32 and generates even slower code for Win64
+  //Result := not CharInSet(text[1], [SPACE, NEWLINE]);
+  case text[1] of
+    SPACE, NEWLINE:
+      Result := False;
+  else
+    Result := True;
+  end;
 end;
 //------------------------------------------------------------------------------
 
@@ -568,12 +575,12 @@ begin
   for i := startIdx to endIdx do
     TTextChunk(fList.Items[i]).Free;
 
-{$IFDEF FPC}
+{$IF defined(FPC) or not defined(LIST_DELETERANGE)}
   for i := endIdx-startIdx +1 downto startIdx do
     fList.Delete(i);
 {$ELSE}
   fList.DeleteRange(startIdx, endIdx-startIdx +1);
-{$ENDIF}
+{$IFEND}
 
   // reindex
   for i := startIdx to fList.Count -1 do

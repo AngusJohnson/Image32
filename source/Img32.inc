@@ -99,7 +99,8 @@
             {$IF COMPILERVERSION >= 23}         //DelphiXE2
               {$DEFINE USES_NAMESPACES}
               {$DEFINE FORMATSETTINGS}
-              {$DEFINE TROUNDINGMODE}   
+              {$DEFINE TROUNDINGMODE}
+              {$DEFINE LIST_DELETERANGE}          //added TList.DeleteRange
               {$DEFINE UITYPES}                   //added UITypes unit
               {$DEFINE XPLAT_GENERICS}            //cross-platform generics support
               {$DEFINE STYLESERVICES}             //added StyleServices unit
