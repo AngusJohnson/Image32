@@ -2177,8 +2177,8 @@ end;
 
 function TRectD.MidPoint: TPointD;
 begin
-  Result.X := (Right + Left) / 2;
-  Result.Y := (Bottom + Top) / 2;
+  Result.X := (Right + Left) * 0.5;
+  Result.Y := (Bottom + Top) * 0.5;
 end;
 //------------------------------------------------------------------------------
 
@@ -4472,7 +4472,7 @@ begin
       MulTable[i, j] := Round(i * j * div255);
       if i >= j then
         DivTable[i, j] := 255 else
-        DivTable[i, j] := Round(i * $FF / j);
+        DivTable[i, j] := Round(i * 255 / j);
     end;
   end;
 

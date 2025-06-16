@@ -1100,8 +1100,8 @@ begin
     // EvenOdd
     lastValue := Trunc(Abs(accum) * 1275) mod 2550; // mul 5
     if lastValue > 1275 then
-      lastValue := (2550 - lastValue) shr 2 else    // div 4
-      lastValue := lastValue shr 2;                 // div 4
+      lastValue := 2550 - lastValue;
+    lastValue := lastValue shr 2;                   // div 4
     if lastValue > 255 then lastValue := 255;
 
     buf[count] := Byte(lastValue);
