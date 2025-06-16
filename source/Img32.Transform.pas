@@ -1162,7 +1162,7 @@ end;
 
 procedure TWeightedColor.Reset(c: TColor32; w: Integer);
 var
-  a: Cardinal;
+  a: NativeInt;
 begin
   fAddCount := w;
   a := w * Byte(c shr 24);
@@ -1190,13 +1190,13 @@ end;
 
 procedure TWeightedColor.Add(c: TColor32; w: Integer);
 var
-  a: Int64;
+  a: NativeInt;
 begin
   inc(fAddCount, w);
   a := Byte(c shr 24);
   if a <> 0 then
   begin
-    a := a * Cardinal(w);
+    a := a * w;
     inc(fAlphaTot, a);
     inc(fColorTotB, (a * Byte(c)));
     inc(fColorTotG, (a * Byte(c shr 8)));
@@ -1208,7 +1208,7 @@ end;
 procedure TWeightedColor.Add(c: TColor32);
 // Optimized for w=1
 var
-  a: Int64;
+  a: NativeInt;
 begin
   inc(fAddCount);
   a := Byte(c shr 24);
@@ -1232,7 +1232,7 @@ end;
 
 procedure TWeightedColor.Subtract(c: TColor32; w: Integer);
 var
-  a: Int64;
+  a: NativeInt;
 begin
   dec(fAddCount, w);
   a := w * Byte(c shr 24);
@@ -1247,7 +1247,7 @@ end;
 procedure TWeightedColor.Subtract(c: TColor32);
 // Optimized for w=1
 var
-  a: Int64;
+  a: NativeInt;
 begin
   dec(fAddCount);
   a := Byte(c shr 24);
@@ -1271,7 +1271,7 @@ end;
 
 function TWeightedColor.AddSubtract(addC, subC: TColor32): Boolean;
 var
-  a: Int64;
+  a: NativeInt;
 begin
   // add+subtract => fAddCount stays the same
 
@@ -1303,7 +1303,7 @@ end;
 
 function TWeightedColor.AddNoneSubtract(c: TColor32): Boolean;
 var
-  a: Int64;
+  a: NativeInt;
 begin
   // add+subtract => fAddCount stays the same
 
