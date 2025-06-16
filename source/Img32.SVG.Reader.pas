@@ -943,49 +943,79 @@ end;
 function FixSpaces(const text: UnicodeString; trimLeadingSpace: Boolean): UnicodeString;
 var
   i,j, len: integer;
+  P: PWideChar;
 begin
   //changes \r\n\t chars to spaces
   //and trims consecutive spaces
   len  := Length(text);
-  SetLength(Result, len);
-  if len = 0 then Exit;
-
-  if trimLeadingSpace then
+  if len = 0 then
   begin
-    i := 1;
-    while (i <= len) and (text[i] <= #32) do inc(i);
-    if i > len then
-    begin
-      Result := '';
-      Exit;
-    end;
-    Result[1] := text[i];
-    inc(i);
-  end else
+    Result := '';
+    Exit;
+  end;
+  // Find first non whitespace
+  i := 1;
+  while (i <= len) and (text[i] > #32) do inc(i);
+  if i > len then
   begin
-    // allow a single leading space char
-    if text[1] <= #32 then
-      Result[1] := #32
-    else
-      Result[1] := text[1];
-    i := 2;
+    // There are no whitespaces
+    Result := text;
+    Exit;
   end;
 
-  j := 1;
+  SetLength(Result, len);
+  j := 0; // P is zero-based
+  if i > 1 then
+  begin
+    // Copy all the leading non-whitespace characters
+    Move(text[1], Result[1], (i - 1) * SizeOf(WideChar));
+    j := (i - 1) - 1; // P is zero-based
+  end;
+
+  // use PWideChar to prevent UniqueString() calls, that the compiler
+  // inserts for every write access to Result[].
+  P := PWideChar(Result);
+
+  if i = 1 then
+  begin
+    if trimLeadingSpace then
+    begin
+      while (i <= len) and (text[i] <= #32) do inc(i);
+      if i > len then
+      begin
+        Result := '';
+        Exit;
+      end;
+      P[0] := text[i];
+      inc(i);
+    end else
+    begin
+      // allow a single leading space char
+      if text[1] <= #32 then
+        P[0] := #32
+      else
+        P[0] := text[1];
+      i := 2;
+    end;
+  end;
+
   for i := i to len do
   begin
     if (text[i] <= #32) then
     begin
-      if (Result[j] = #32) then Continue;
+      if (P[j] = #32) then Continue;
       inc(j);
-      Result[j] := #32;
+      P[j] := #32;
     end else
     begin
       inc(j);
-      Result[j] := text[i];
+      P[j] := text[i];
     end;
   end;
-  SetLength(Result, j);
+
+  inc(j); // P is zero-based, but Result isn't
+  if Length(Result) <> j then
+    SetLength(Result, j);
 end;
 //------------------------------------------------------------------------------
 
