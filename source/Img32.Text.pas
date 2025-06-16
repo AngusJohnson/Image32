@@ -897,7 +897,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function SameText(const text1, text2: Utf8String): Boolean; overload;
+function SameUtf8Text(const text1, text2: Utf8String): Boolean;
 var
   len: integer;
 begin
@@ -3276,7 +3276,7 @@ begin
   for Result := 0 to fFontList.Count -1 do
   begin
     fi2 := TFontReader(fFontList[Result]).FontInfo;
-    if SameText(fi.fullFaceName, fi2.fullFaceName) and
+    if SameUtf8Text(fi.fullFaceName, fi2.fullFaceName) and
       (fi.macStyles = fi2.macStyles) then Exit;
     end;
   Result := -1;
@@ -3512,7 +3512,7 @@ function TFontManager.GetBestMatchFont(const fontInfo: TFontInfo): TFontReader;
     // third priority (shl 3)
     if name1 = '' then
       Result := 0 else
-    if SameText(name1, name2) then Result := 0 else Result := 4;
+    if SameUtf8Text(name1, name2) then Result := 0 else Result := 4;
   end;
 
   function GetFullNameDiff(const fiToMatch: TFontInfo;
@@ -3525,9 +3525,9 @@ function TFontManager.GetBestMatchFont(const fontInfo: TFontInfo): TFontReader;
     if Assigned(fiToMatch.familyNames) then
     begin
       for i := 0 to High(fiToMatch.familyNames) do
-        if SameText(fiToMatch.familyNames[i], candidateName) then Exit;
+        if SameUtf8Text(fiToMatch.familyNames[i], candidateName) then Exit;
     end
-    else if SameText(fiToMatch.faceName, candidateName) then Exit;
+    else if SameUtf8Text(fiToMatch.faceName, candidateName) then Exit;
     Result := 2;
   end;
 
