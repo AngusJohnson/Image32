@@ -163,7 +163,7 @@ type
     fCustomRendererCache: TCustomRendererCache;
     fRootElement      : TSvgElement;
     fFontCache        : TFontCache;
-    fUsePropScale     : Boolean;
+    fKeepAspectRatio  : Boolean;
     fSimpleDraw       : Boolean;
     fSimpleDrawList   : TList;
     function  LoadInternal: Boolean;
@@ -199,7 +199,7 @@ type
     // KeepAspectRatio: this property has also been added for the convenience of
     // the third-party SVGIconImageList. (IMHO it should always = true)
     property  KeepAspectRatio: Boolean
-      read fUsePropScale write fUsePropScale;
+      read fKeepAspectRatio write fKeepAspectRatio;
     property  RootElement     : TSvgElement read fRootElement;
     // RecordSimpleDraw: record simple drawing instructions
     property  RecordSimpleDraw: Boolean read fSimpleDraw write fSimpleDraw;
@@ -5567,10 +5567,9 @@ begin
   fCustomRendererCache := TCustomRendererCache.Create;
   fIdList              := TSvgIdNameHashMap.Create;
   fSimpleDrawList      := TList.Create;
-
-  fBlurQuality        := 1; //0: draft (faster); 1: good; 2: excellent (slow)
-  currentColor        := clBlack32;
-  fUsePropScale       := true;
+  fBlurQuality         := 1; //0: draft (faster); 1: good; 2: excellent (slow)
+  currentColor         := clBlack32;
+  fKeepAspectRatio     := true;
 end;
 //------------------------------------------------------------------------------
 
@@ -5639,13 +5638,14 @@ begin
 
     if scaleToImage and not img.IsEmpty then
     begin
-      //nb: the calculated vbox.width and vbox.height are ignored here since
-      //we're scaling the SVG image to the display image. However we still
-      //need to call GetViewbox (above) to make sure that viewboxWH is filled.
-      if fUsePropScale then
+      // scale the SVG image to the display region.
+      // nb: viewboxWH must be valid to reach here.
+
+      if fKeepAspectRatio then
       begin
         scale := GetScaleForBestFit(
-          viewboxWH.Width, viewboxWH.Height, img.Width, img.Height);
+          {src} viewboxWH.Width, viewboxWH.Height,
+          {dst} img.Width, img.Height);
         scaleH := scale;
       end else
       begin
