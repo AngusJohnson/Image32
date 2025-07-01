@@ -2123,7 +2123,7 @@ begin
   gm.paths := Img32.Vector.ScalePath(gm.paths, imgSize / rec.Width, imgSize / rec.Height);
   img := TImage32.Create(imgSize,imgSize);
   try
-    DrawPolygon(img, gm.paths, frEvenOdd, clBlack32);
+    DrawPolygon(img, gm.paths, frEvenOdd, clBlack32, true);
     accum := 0;
     p := PARGB(img.PixelBase);
     for i := 0 to imgSize * imgSize do
@@ -3018,7 +3018,7 @@ begin
   Result := 0;
   if (text = '') or not assigned(font) or not font.IsValidFont then Exit;
   glyphs := font.GetTextOutline(x,y, text, Result);
-  DrawPolygon(image, glyphs, frNonZero, textColor);
+  DrawPolygon(image, glyphs, frNonZero, textColor, true);
 end;
 //------------------------------------------------------------------------------
 
@@ -3031,7 +3031,7 @@ begin
   if (text = '') or not assigned(font) or
     not font.IsValidFont then Exit;
   glyphs := font.GetTextOutline(x,y, text, Result);
-  DrawPolygon(image, glyphs, frNonZero, renderer);
+  DrawPolygon(image, glyphs, frNonZero, renderer, true);
 end;
 //------------------------------------------------------------------------------
 
@@ -3070,7 +3070,7 @@ begin
     else dy := rec.Top + font.Ascent;
   end;
   glyphs := TranslatePath(glyphs, dx, dy);
-  DrawPolygon(image, glyphs, frNonZero, textColor);
+  DrawPolygon(image, glyphs, frNonZero, textColor, true);
 end;
 //------------------------------------------------------------------------------
 
@@ -3090,7 +3090,7 @@ begin
   end;
   glyphs := font.GetAngledTextGlyphs(x, y,
     text, angleRadians, rotatePt, Result);
-  DrawPolygon(image, glyphs, frNonZero, textColor);
+  DrawPolygon(image, glyphs, frNonZero, textColor, true);
 end;
 //------------------------------------------------------------------------------
 
@@ -3107,7 +3107,7 @@ begin
     cr := TColorRenderer.Create(textColor) else
     cr := TAliasedColorRenderer.Create(textColor);
   try
-    DrawPolygon(image, glyphs, frNonZero, cr);
+    DrawPolygon(image, glyphs, frNonZero, cr, true);
   finally
     cr.Free;
   end;
