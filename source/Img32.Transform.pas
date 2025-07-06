@@ -1157,7 +1157,7 @@ end;
 
 procedure TWeightedColor.Reset(c: TColor32; w: Integer);
 var
-  a: NativeInt;
+  a: SizeInt; // D2007 internal compiler error with NativeInt
   a64: Int64;
 begin
   fAddCount := w;
@@ -1191,7 +1191,7 @@ end;
 
 procedure TWeightedColor.Add(c: TColor32; w: Integer);
 var
-  a: NativeInt;
+  a: SizeInt; // D2007 internal compiler error with NativeInt
   a64: Int64;
 begin
   inc(fAddCount, w);
@@ -1220,7 +1220,7 @@ end;
 
 procedure TWeightedColor.Subtract(c: TColor32; w: Integer);
 var
-  a: NativeInt;
+  a: SizeInt; // D2007 internal compiler error with NativeInt
   a64: Int64;
 begin
   dec(fAddCount, w);
@@ -1304,7 +1304,7 @@ end;
 procedure TWeightedColor.Add(c: TColor32);
 // Optimized for w=1
 var
-  a: NativeInt;
+  a: SizeInt; // D2007 internal compiler error with NativeInt
 begin
   inc(fAddCount);
   a := Byte(c shr 24);
@@ -1329,7 +1329,7 @@ end;
 procedure TWeightedColor.Subtract(c: TColor32);
 // Optimized for w=1
 var
-  a: NativeInt;
+  a: SizeInt; // D2007 internal compiler error with NativeInt
 begin
   dec(fAddCount);
   a := Byte(c shr 24);
@@ -1353,7 +1353,7 @@ end;
 
 function TWeightedColor.AddSubtract(addC, subC: TColor32): Boolean;
 var
-  a: NativeInt;
+  a: SizeInt; // D2007 internal compiler error with NativeInt
 begin
   // add+subtract => fAddCount stays the same
   // skip identical colors
@@ -1384,7 +1384,7 @@ end;
 
 function TWeightedColor.AddNoneSubtract(c: TColor32): Boolean;
 var
-  a: NativeInt;
+  a: SizeInt; // D2007 internal compiler error with NativeInt
 begin
   // add+subtract => fAddCount stays the same
 
