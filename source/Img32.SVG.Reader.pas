@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  10 May 2025                                                     *
+* Date      :  6 July 2025                                                     *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -164,12 +164,11 @@ type
     fRootElement      : TSvgElement;
     fFontCache        : TFontCache;
     fKeepAspectRatio  : Boolean;
-    fSimpleDraw       : Boolean;
-    fSimpleDrawList   : TList;
     function  LoadInternal: Boolean;
     function  GetIsEmpty: Boolean;
     function  GetTempImage: TImage32;
     procedure SetBlurQuality(quality: integer);
+    procedure ResetPaths;
   protected
     userSpaceBounds : TRectD;
     currentColor    : TColor32;
@@ -186,6 +185,7 @@ type
     function  LoadFromStream(stream: TStream): Boolean;
     function  LoadFromFile(const filename: string): Boolean;
     function  LoadFromString(const str: string): Boolean;
+    function  GetImageSize: TSize;
 
     // The following two methods are deprecated and intended only for ...
     // https://github.com/EtheaDev/SVGIconImageList
@@ -201,18 +201,6 @@ type
     property  KeepAspectRatio: Boolean
       read fKeepAspectRatio write fKeepAspectRatio;
     property  RootElement     : TSvgElement read fRootElement;
-    // RecordSimpleDraw: record simple drawing instructions
-    property  RecordSimpleDraw: Boolean read fSimpleDraw write fSimpleDraw;
-    // SimpleDrawList: list of PSimpleDrawData records;
-    property  SimpleDrawList  : TList read fSimpleDrawList;
-  end;
-
-  PSimpleDrawData = ^TSimpleDrawData;
-  TSimpleDrawData = record
-    paths     : TPathsD;
-    fillRule  : TFillRule;
-    color     : TColor32;
-    tag       : integer;
   end;
 
 var
@@ -5566,7 +5554,6 @@ begin
   fRadGradRenderer     := TSvgRadialGradientRenderer.Create;
   fCustomRendererCache := TCustomRendererCache.Create;
   fIdList              := TSvgIdNameHashMap.Create;
-  fSimpleDrawList      := TList.Create;
   fBlurQuality         := 1; //0: draft (faster); 1: good; 2: excellent (slow)
   currentColor         := clBlack32;
   fKeepAspectRatio     := true;
@@ -5583,15 +5570,11 @@ begin
   fRadGradRenderer.Free;
   fCustomRendererCache.Free;
   FreeAndNil(fFontCache);
-  fSimpleDrawList.Free;
-
   inherited;
 end;
 //------------------------------------------------------------------------------
 
 procedure TSvgReader.Clear;
-var
-  i: integer;
 begin
   FreeAndNil(fRootElement);
   fSvgParser.Clear;
@@ -5600,9 +5583,46 @@ begin
   fRadGradRenderer.Clear;
   currentColor := clBlack32;
   userSpaceBounds := NullRectD;
-  for i := 0 to fSimpleDrawList.Count -1 do
-    Dispose(PSimpleDrawData(fSimpleDrawList[i]));
-  fSimpleDrawList.Clear;
+end;
+//------------------------------------------------------------------------------
+
+function TSvgReader.GetImageSize: TSize;
+begin
+  with fRootElement do
+    if viewboxWH.IsEmpty then
+    begin
+      if elRectWH.IsValid then
+      begin
+        Result.cx := Round(elRectWH.width.GetValue(defaultSvgWidth, 0));
+        Result.cy := Round(elRectWH.height.GetValue(defaultSvgHeight, 0));
+      end else
+      begin
+        // should never happen
+        Result.cx := defaultSvgWidth;
+        Result.cy := defaultSvgHeight;
+      end;
+    end else
+    begin
+      Result.cx := Round(viewboxWH.Width);
+      Result.cy := Round(viewboxWH.Height);
+    end;
+end;
+//------------------------------------------------------------------------------
+
+procedure InternalResetPaths(el: TBaseElement);
+var
+  i: integer;
+begin
+  if el is TShapeElement then
+    TShapeElement(el).pathsLoaded := False;
+  for i := 0 to el.ChildCount -1 do
+    InternalResetPaths(el[i]);
+end;
+//------------------------------------------------------------------------------
+
+procedure TSvgReader.ResetPaths;
+begin
+  InternalResetPaths(fRootElement);
 end;
 //------------------------------------------------------------------------------
 
@@ -5616,11 +5636,12 @@ begin
   with fRootElement do
   begin
     if viewboxWH.IsEmpty then
-    begin
-      if not elRectWH.IsValid then Exit;  // should never happen
-      viewboxWH.Width := elRectWH.width.GetValue(defaultSvgWidth, 0);
-      viewboxWH.height := elRectWH.height.GetValue(defaultSvgHeight, 0);
-    end;
+      with GetImageSize do
+      begin
+        viewboxWH.Width := cx;
+        viewboxWH.height := cy;
+        if viewboxWH.IsEmpty then Exit; // should never happen
+      end;
 
     fBackgndImage := img;
     di := fDrawData;
@@ -5664,17 +5685,12 @@ begin
   if fBkgndColor <> clNone32 then
     img.Clear(fBkgndColor);
 
-//  // Delay the creation of the TempImage until it is actually needed.
-//  // Not all SVGs need it.
-//  fTempImageWidth := img.Width;
-//  fTempImageHeight := img.Height;
-
+  // Delay the creation of the TempImage until it is actually needed.
   img.BeginUpdate;
   try
+    ResetPaths; // force path redrawing
     fRootElement.Draw(img, di);
   finally
-//    fTempImageWidth := 0;
-//    fTempImageHeight := 0;
     FreeAndNil(fTempImage);
     img.EndUpdate;
   end;
