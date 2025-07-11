@@ -205,7 +205,7 @@ type
 
   TSvgParser = class
   private
-    svgStream : TMemoryStream;
+    svgStream : TCustomMemoryStream;
     procedure ParseUtf8Stream;
   public
     classStyles : TClassStylesList;
@@ -219,6 +219,8 @@ type
     function  LoadFromFile(const filename: string): Boolean;
     function  LoadFromStream(stream: TStream): Boolean;
     function  LoadFromString(const str: string): Boolean;
+    function  LoadFromUtf8String(const str: UTF8String): Boolean;
+    function  LoadFromUtf8Buffer(str: PUTF8Char; len: NativeInt): Boolean;
   end;
 
   //////////////////////////////////////////////////////////////////////
@@ -306,6 +308,18 @@ var
   LowerCaseTable : array[#0..#$FF] of UTF8Char;
 
 implementation
+
+type
+  TUTF8BufferReadStream = class(TCustomMemoryStream)
+  public
+    constructor Create(ABuffer: PUTF8Char; ASize: NativeInt);
+  end;
+
+constructor TUTF8BufferReadStream.Create(ABuffer: PUTF8Char; ASize: NativeInt);
+begin
+  inherited Create;
+  SetPointer(ABuffer, ASize);
+end;
 
 //------------------------------------------------------------------------------
 // Color Constant HashMap
@@ -1986,7 +2000,7 @@ begin
 
   c := SkipBlanksEx(c, endC);
   if c >= endC then Exit;
-  
+
   if Match(c, '<![cdata[') then inc(c, 9);
 
   while True do
@@ -2533,7 +2547,7 @@ end;
 procedure TSvgParser.Clear;
 begin
   classStyles.Clear;
-  svgStream.Clear;
+  FreeAndNil(svgStream);
   xmlHeader.Clear;
   docType.Clear;
   FreeAndNil(svgTree);
@@ -2603,15 +2617,51 @@ end;
 //------------------------------------------------------------------------------
 
 function TSvgParser.LoadFromStream(stream: TStream): Boolean;
+var
+  Buf: PUTF8Char;
+  Len: NativeInt;
 begin
   Clear;
   Result := true;
   try
-    svgStream.LoadFromStream(stream);
-    // very few SVG files are unicode encoded, almost all are Utf8
-    // so it's more efficient to parse them all as Utf8 encoded files
-    ConvertUnicodeToUtf8(svgStream);
-    ParseUtf8Stream;
+    try
+      // If we already have a memory stream then we can use it directly
+      // without copying it around.
+      if stream is TCustomMemoryStream then
+      begin
+        // TMemoryStream.LoadFromStream (below) seeks to the stream start and
+        // copies the whole stream instead of reading from the stream's current
+        // position.
+        Buf := TCustomMemoryStream(stream).Memory;
+        Len := stream.Size;
+        //Len := stream.Position;
+        //Inc(Buf, Len);
+        //Len := stream.Size - Len;
+
+        // If we have UTF8, we can parse the stream data directly without
+        // copying it.
+        if not (GetXmlEncoding(Buf, Len) in [eUnicodeLE, eUnicodeBE]) then
+        begin
+          svgStream := TUTF8BufferReadStream.Create(Buf, Len);
+          stream.Seek(0, soEnd); // Keep the behaviour of TMemoryStream.LoadFromStream
+        end
+      end;
+
+      if svgStream = nil then // Fallback for non-UTF-8 and non-MemoryStreams
+      begin
+        // Copy the stream into a MemoryStream
+        svgStream := TMemoryStream.Create;
+        TMemoryStream(svgStream).LoadFromStream(stream);
+        // very few SVG files are unicode encoded, almost all are Utf8
+        // so it's more efficient to parse them all as Utf8 encoded files
+        ConvertUnicodeToUtf8(TMemoryStream(svgStream));
+      end;
+
+      ParseUtf8Stream;
+    finally
+      // Clean up after the SVG was read
+      FreeAndNil(svgStream);
+    end;
   except
     Result := false;
   end;
@@ -2619,18 +2669,39 @@ end;
 //------------------------------------------------------------------------------
 
 function TSvgParser.LoadFromString(const str: string): Boolean;
-var
-  ss: TStringStream;
 begin
-{$IFDEF UNICODE}
-  ss := TStringStream.Create(str, TEncoding.UTF8);
-{$ELSE}
-  ss := TStringStream.Create(UTF8Encode(str));
-{$ENDIF}
+  Result := LoadFromUtf8String(UTF8Encode(str));
+end;
+//------------------------------------------------------------------------------
+
+function TSvgParser.LoadFromUtf8String(const str: UTF8String): Boolean;
+begin
+  Result := LoadFromUtf8Buffer(PUTF8Char(str), Length(str));
+end;
+
+//------------------------------------------------------------------------------
+function TSvgParser.LoadFromUtf8Buffer(str: PUTF8Char; len: NativeInt): Boolean;
+begin
+  Clear;
+  Result := True;
+
+  if len <= 0 then
+    Exit;
+  if str = nil then // invalid parameter
+  begin
+    Result := False;
+    Exit;
+  end;
+
   try
-    Result := LoadFromStream(ss);
+    svgStream := TUTF8BufferReadStream.Create(str, len);
+    try
+      ParseUtf8Stream;
+    except
+      Result := False;
+    end;
   finally
-    ss.Free;
+    FreeAndNil(svgStream);
   end;
 end;
 //------------------------------------------------------------------------------
