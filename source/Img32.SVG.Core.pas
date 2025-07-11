@@ -150,6 +150,8 @@ type
     hash      : Cardinal;     //hashed name
     name      : UTF8String;
     value     : UTF8String;
+    namespace : UTF8String;
+    // If you add a managed field, you must adjust DisposeSvgAttrib()
   end;
 
   TSvgParser = class;
@@ -170,6 +172,7 @@ type
     childs      : TList;
     {$ENDIF}
     name        : UTF8String;
+    namespace   : UTF8String;
     owner       : TSvgParser;
     hash        : Cardinal;
     text        : UTF8String;
@@ -212,6 +215,7 @@ type
     xmlHeader   : TXmlEl;
     docType     : TDocTypeEl;
     svgTree     : TSvgXmlEl;
+    svgNamespace: UTF8String; // if empty => no namespace handling
     constructor Create;
     destructor  Destroy; override;
     procedure Clear;
@@ -458,6 +462,8 @@ begin
   // By clearing them outself we can achieve that much faster.
   attrib.name := '';
   attrib.value := '';
+  if attrib.namespace <> '' then
+    attrib.namespace := '';
   FreeMem(attrib);
 end;
 //------------------------------------------------------------------------------
@@ -705,6 +711,27 @@ begin
     #$FE: if (p1^ = #$FF) then
       Result := eUnicodeBE;
   end;
+end;
+//------------------------------------------------------------------------------
+
+function SkipBlanksAndXmlComments(c, endC: PUTF8Char): PUTF8Char;
+begin
+  c := SkipBlanksEx(c, endC);
+  while c < endC do
+  begin
+    if (c[0] = '<') and (c[1] = '!') and (c[2] = '-') and (c[3] = '-') then //start comment
+    begin
+      inc(c, 4);
+      // find comment end
+      while (c < endC - 3) and ((c^ <> '-') or not Match(c, '-->')) do
+        inc(c);
+      inc(c, 3);
+      c := SkipBlanksEx(c, endC);
+    end
+    else
+      Break;
+  end;
+  Result := c;
 end;
 //------------------------------------------------------------------------------
 
@@ -2093,10 +2120,19 @@ function TXmlEl.ParseHeader(var c: PUTF8Char; endC: PUTF8Char): Boolean;
 var
   style: UTF8String;
   c2: PUTF8Char;
+  i: integer;
 begin
   c2 := SkipBlanksEx(c, endC);
   c := ParseNameLength(c2, endC);
   ToAsciiLowerUTF8String(c2, c, name);
+
+  // Extract and remove namespace
+  i := PosEx(':', name);
+  if i > 0 then
+  begin
+    namespace := Copy(name, 1, i - 1);
+    Delete(name, 1, i);
+  end;
 
   //load the class's style (ie undotted style) if found.
   style := owner.classStyles.GetStyle(name);
@@ -2105,14 +2141,24 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-class function TXmlEl.ParseAttribName(c: PUTF8Char;
-  endC: PUTF8Char; attrib: PSvgAttrib): PUTF8Char;
+class function TXmlEl.ParseAttribName(c, endC: PUTF8Char; attrib: PSvgAttrib): PUTF8Char;
+var
+  i: integer;
 begin
   Result := SkipBlanksEx(c, endC);
   if Result >= endC then Exit;
   c := Result;
   Result := ParseNameLength(Result, endC);
   ToUTF8String(c, Result, attrib.Name);
+
+  // Extract and remove namespace
+  i := PosEx(':', attrib.name);
+  if i > 0 then
+  begin
+    attrib.namespace := Copy(attrib.name, 1, i - 1);
+    Delete(attrib.name, 1, i);
+  end;
+
   attrib.hash := GetHash(attrib.Name);
 end;
 //------------------------------------------------------------------------------
@@ -2202,12 +2248,28 @@ begin
       Exit;
     end;
 
-    attribs.Add(attrib);
-    case attrib.hash of
-      hId     : idAttrib := attrib;
-      hClass  : classAttrib := attrib;
-      hStyle  : styleAttrib := attrib;
-    end;    
+    if (owner <> nil) and (owner.svgNamespace <> '') then
+    begin
+      if (attrib.namespace <> '') and // not the attribute default-namespace
+         (attrib.namespace <> owner.svgNamespace) then // not the SVG namespace
+      begin
+        // We are not interested in this attribute, so skip it
+        DisposeSvgAttrib(attrib);
+        attrib := nil;
+      end
+      else
+        attrib.namespace := ''; //owner.svgNamespace; // reduce memory usage
+    end;
+
+    if attrib <> nil then
+    begin
+      attribs.Add(attrib);
+      case attrib.hash of
+        hId     : idAttrib := attrib;
+        hClass  : classAttrib := attrib;
+        hStyle  : styleAttrib := attrib;
+      end;
+    end;
   end;
 
   if assigned(classAttrib) then
@@ -2374,10 +2436,28 @@ begin
         begin
           //starting a new element
           child := TSvgXmlEl.Create(owner);
-          childs.Add(child);
-          if not child.ParseHeader(c, endC) then break;
-          if not child.selfClosed then
+          if not child.ParseHeader(c, endC) then
+          begin
+            child.Free;
+            break;
+          end;
+
+          try
+            if not child.selfClosed then
               child.ParseContent(c, endC);
+
+            // If we have a TAG that is not part of the svgNamespace, then we skip it
+            if (owner <> nil) and (owner.svgNamespace <> '') then
+            begin
+              if (child.namespace <> '') and (child.namespace <> owner.svgNamespace) then
+                FreeAndNil(child)
+              else
+                child.namespace := ''; //owner.svgNamespace; // reduce memory usage
+            end;
+          finally
+            if child <> nil then
+              childs.Add(child);
+          end;
         end;
       end;
     end
@@ -2551,6 +2631,7 @@ begin
   xmlHeader.Clear;
   docType.Clear;
   FreeAndNil(svgTree);
+  svgNamespace := '';
 end;
 //------------------------------------------------------------------------------
 
@@ -2708,8 +2789,11 @@ end;
 
 procedure TSvgParser.ParseUtf8Stream;
 var
-  c, endC: PUTF8Char;
+  c, endC, cc: PUTF8Char;
+  I: Integer;
+  Attr: PSvgAttrib;
 begin
+  svgNamespace := '';
   c := svgStream.Memory;
   endC := c + svgStream.Size;
   SkipBlanks(c, endC);
@@ -2719,21 +2803,79 @@ begin
     if not xmlHeader.ParseHeader(c, endC) then Exit;
     SkipBlanks(c, endC);
   end;
+  c := SkipBlanksAndXmlComments(c, endC);
   if Match(c, '<!doctype') then
   begin
     inc(c, 2);
     if not docType.ParseHeader(c, endC) then Exit;
   end;
-  while SkipBlanks(c, endC) do
+  while True do
   begin
-    if (c^ = '<') and Match(c, '<svg') then
+    c := SkipBlanksAndXmlComments(c, endC);
+    if c >= endC then break;
+
+    if c^ = '<' then
     begin
-      inc(c);
-      svgTree := TSvgXmlEl.Create(self);
-      if svgTree.ParseHeader(c, endC) and
-        not svgTree.selfClosed then
-          svgTree.ParseContent(c, endC);
-      break;
+      if Match(c, '<svg') and (c[4] <> ':') then // handle <svg ...> but not <svg:xxx ...>
+      begin
+        inc(c);
+        svgNamespace := ''; // disable namespace handling
+        svgTree := TSvgXmlEl.Create(self);
+        if svgTree.ParseHeader(c, endC) and
+          not svgTree.selfClosed then
+            svgTree.ParseContent(c, endC);
+        break;
+      end
+      else // <namespace:svg ...>
+      begin
+        // Find the actual namespace definition for SVG in
+        // <namespace:svg xmlns:xxx="http://www.w3.org/2000/svg">
+        cc := c;
+        inc(c);
+        svgNamespace := ''; // disable namespace handling so we get all attributes
+        svgTree := TSvgXmlEl.Create(self);
+        if svgTree.ParseHeader(c, endC) then
+        begin
+          // Only if we have a <namespace:svg ...> tag
+          if (svgTree.namespace <> '') and (svgTree.name = 'svg') then
+          begin
+            // Find the actual namespace. We could use the one from the tag, but that
+            // could be a coinsidence and the namespace in "<ns:svg ..." could be for
+            // a different namespace definition.
+            // So we search for the correct namespace definition:
+            //   <ns:svg xmlns:xxx="http://www.w3.org/2000/svg">
+            for I := 0 to svgTree.GetAttribCount - 1 do
+            begin
+              Attr := svgTree.GetAttrib(I);
+              if (Attr.namespace = 'xmlns') and (Attr.value = 'http://www.w3.org/2000/svg') then
+              begin
+                svgNamespace := Attr.name;
+                break;
+              end;
+            end;
+          end;
+        end;
+        if (svgNamespace = '') or (svgTree.namespace <> svgNamespace) then
+        begin
+          // If we didn't find a svg-namespace or have the wrong namespace in the svg-TAG,
+          // then we search for the next TAG.
+          FreeAndNil(svgTree);
+          c := cc; // reset position
+        end
+        else
+        begin
+          // We need to parse the <ns:svg ...> TAG again but this time with the svg-namespace
+          // and the TAG content.
+          FreeAndNil(svgTree);
+          c := cc; // reset position
+          inc(c);
+          svgTree := TSvgXmlEl.Create(self);
+          if svgTree.ParseHeader(c, endC) and
+            not svgTree.selfClosed then
+              svgTree.ParseContent(c, endC);
+          break;
+        end;
+      end;
     end;
     inc(c);
   end;
