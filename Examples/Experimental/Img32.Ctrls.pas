@@ -3,7 +3,7 @@ unit Img32.Ctrls;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  0.0 (Experimental)                                              *
-* Date      :  12 April 2025                                                   *
+* Date      :  11 July 2025                                                    *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -1402,6 +1402,13 @@ begin
 end;
 //------------------------------------------------------------------------------
 
+function GetLuminance(c: TColor32): Byte;
+  {$IFDEF INLINE} inline; {$ENDIF}
+begin
+  Result := RgbtoHsl(c).lum;
+end;
+//------------------------------------------------------------------------------
+
 procedure DrawBtnInternal(Image: TImage32; const p: TPathD;
   caption: string; font: TFontCache; bevHeight, padding: double;
   pressed: Boolean; enabled: Boolean; color: TColor32 = clNone32;
@@ -1538,7 +1545,7 @@ begin
         pp := ScalePath(queryPaths, w * 0.6 / 100);
         pp := TranslatePath(pp, rec.Left + w * 0.2, rec.Top + w * 0.2);
         DrawPolygon(Image, pp, frEvenOdd, SetAlpha(color, 80));
-        DrawLine(Image, pp, lineWidth, clBlack32, esPolygon);
+        DrawLine(Image, pp, lineWidth, clBlack32, esClosed);
       end;
     tsYes :
       begin
@@ -1547,7 +1554,7 @@ begin
         p := ScalePath(tickPaths[0],  w * 0.65 / 100);
         p := TranslatePath(p, rec.Left + w * 0.18, rec.Top + w * 0.18);
         DrawPolygon(Image, p, frEvenOdd, color);
-        DrawLine(Image, p, lineWidth, clBlack32, esPolygon);
+        DrawLine(Image, p, lineWidth, clBlack32, esClosed);
       end;
   end;
 end;
@@ -1583,7 +1590,7 @@ begin
         pp := ScalePath(queryPaths, d * 0.7 / 100);
         pp := TranslatePath(pp, rec2.Left + d * 0.22, rec2.Top  + d * 0.22);
         DrawPolygon(Image, pp, frEvenOdd, SetAlpha(color, 80));
-        DrawLine(Image, pp, lineWidth, clBlack32, esPolygon);
+        DrawLine(Image, pp, lineWidth, clBlack32, esClosed);
       end;
     tsYes :
       begin
@@ -1591,7 +1598,7 @@ begin
         InflateRect(rec2, -d, -d);
         p := Img32.Vector.Ellipse(rec2);
         DrawPolygon(Image, p, frNonZero, color);
-        DrawLine(Image, p, lineWidth, clBlack32, esPolygon);
+        DrawLine(Image, p, lineWidth, clBlack32, esClosed);
       end
     else Exit;
   end;
@@ -2913,7 +2920,7 @@ begin
     InflateRect(rec, bh, bh);
     if (OuterMargin > 0) then
       DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, clDarkGray32);
-    DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esPolygon);
+    DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esClosed);
     InflateRect(rec, -bh, -bh);
   end;
 
@@ -2938,7 +2945,7 @@ begin
       if i = fItemIndex then
       begin
         DrawLine(Image, Rectangle(rec),
-          DpiAwareOne, clGray32, esPolygon);
+          DpiAwareOne, clGray32, esClosed);
         if HasFocus then
           Image.FillRect(Rect(rec2), clLiteBtn32)
         else
@@ -2946,7 +2953,7 @@ begin
         Img32.Vector.InflateRect(rec2, - bh / 2, -bh / 2);
         if HasFocus then
           DrawLine(Image, Rectangle(rec2),
-            FocusLineWidth, GetFocusColor, esPolygon);
+            FocusLineWidth, GetFocusColor, esClosed);
       end;
 
       if Assigned(img) then
@@ -4272,7 +4279,7 @@ begin
   if HasFocus then
   begin
     Img32.Vector.InflateRect(rec, -fBevelHeight * 0.5, -fBevelHeight * 0.5);
-    DrawLine(Image, Rectangle(rec), fBevelHeight, GetFocusColor, esPolygon);
+    DrawLine(Image, Rectangle(rec), fBevelHeight, GetFocusColor, esClosed);
   end;
 
 
@@ -4868,7 +4875,7 @@ begin
   if HasFocus then
   begin
     DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, clDarkGray32);
-    DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esPolygon);
+    DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esClosed);
 
     // draw selection rect ...
     if not PointsEqual(fSelStart, fSelEnd) then
@@ -5009,7 +5016,7 @@ begin
     DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, clDarkGray32);
     DrawBtnInternal(Image, p, txt, fUsableFont,
       bh, fPadding, fPressed, fEnabled, GetColor, GetFontColor);
-    DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esPolygon);
+    DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esClosed);
   end else
     DrawBtnInternal(Image, Rectangle(rec), txt, fUsableFont,
       bh, fPadding, fPressed, fEnabled, GetColor, GetFontColor);
@@ -5046,7 +5053,7 @@ begin
       frNonZero, OuterMargin, Angle45, clDarkGray32, true);
     DrawBtnInternal(Image, p, txt, fUsableFont,
       bh, fPadding, fPressed, fEnabled, GetColor, GetFontColor);
-    DrawLine(Image, p, FocusLineWidth, GetFocusColor, esPolygon);
+    DrawLine(Image, p, FocusLineWidth, GetFocusColor, esClosed);
   end else
     DrawBtnInternal(Image, p, txt, fUsableFont,
       bh, fPadding, fPressed, fEnabled, GetColor, GetFontColor);
@@ -5088,7 +5095,7 @@ begin
       frNonZero, OuterMargin, Angle45, clDarkGray32, true);
     DrawBtnInternal(Image, ellip, txt, fUsableFont,
       bh, fPadding, fPressed, fEnabled, GetColor, GetFontColor);
-    DrawLine(Image, ellip, FocusLineWidth, GetFocusColor, esPolygon);
+    DrawLine(Image, ellip, FocusLineWidth, GetFocusColor, esClosed);
   end else
     DrawBtnInternal(Image, ellip, txt, fUsableFont,
       bh, fPadding, fPressed, fEnabled, GetColor, GetFontColor);
@@ -5145,7 +5152,7 @@ begin
     if (bh > 0) then
       DrawBtnInternal(Image, Rectangle(rec), '', nil,
         bh, fPadding, fPressed, enabled, GetColor, clNone32);
-    DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esPolygon);
+    DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esClosed);
   end
   else if ( bh > 0) then
     DrawBtnInternal(Image, Rectangle(rec), '', nil,
@@ -5361,7 +5368,7 @@ begin
     DrawCheckboxCtrl(Image, Rect(rec),
       bh, fTriState, StorageManager.DesignScale, GetFocusColor, enabled);
     if HasFocus then
-      DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esPolygon);
+      DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esClosed);
     rec := InnerRect;
     TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
     rec.Left := rec.Left + j;
@@ -5381,7 +5388,7 @@ begin
     DrawCheckboxCtrl(Image, Rect(rec),
       bh, fTriState, StorageManager.DesignScale, GetFocusColor, enabled);
     if HasFocus then
-      DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esPolygon);
+      DrawLine(Image, Rectangle(rec), FocusLineWidth, GetFocusColor, esClosed);
 
     rec := InnerRect;
     TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
@@ -5449,7 +5456,7 @@ begin
     DrawRadioCtrl(Image, p, GetFocusColor, bh, enabled, fTriState,
       StorageManager.DesignScale);
     if HasFocus then
-      DrawLine(Image, p, FocusLineWidth, GetFocusColor, esPolygon);
+      DrawLine(Image, p, FocusLineWidth, GetFocusColor, esClosed);
     rec := InnerRect;
     TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
     rec.Left := rec.Left + j;
@@ -5462,7 +5469,7 @@ begin
     DrawRadioCtrl(Image, p, GetFocusColor, bh, enabled, fTriState,
       StorageManager.DesignScale);
     if HasFocus then
-      DrawLine(Image, p, FocusLineWidth, GetFocusColor, esPolygon);
+      DrawLine(Image, p, FocusLineWidth, GetFocusColor, esClosed);
     rec := InnerRect;
     TranslateRect(rec, Round(OuterMargin), Round(OuterMargin));
     rec.Right := rec.Right - j;
@@ -6230,7 +6237,7 @@ begin
   if HasFocus then
     DrawShadowRect(Image, Rect(rec), OuterMargin, angle45, clDarkGray32);
   Image.FillRect(Rect(rec), GetColor);
-  DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
+  DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esClosed);
 
   Img32.Vector.InflateRect(rec, -dpiAwareOne, -dpiAwareOne);
   if fPressed then
@@ -6242,7 +6249,7 @@ begin
     hbh := Round(fBevelHeight / 2);
     recI := Rect(rec);
     Types.InflateRect(recI, hbh, hbh);
-    DrawLine(Image, Rectangle(recI), FocusLineWidth * 1.5, GetFocusColor, esPolygon);
+    DrawLine(Image, Rectangle(recI), FocusLineWidth * 1.5, GetFocusColor, esClosed);
   end;
 
 
@@ -6841,7 +6848,7 @@ begin
       rec.Right := rec.Right -1;
       Image.FillRect(Rect(rec), clPaleGray32);
 
-      DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
+      DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esClosed);
       Img32.Vector.InflateRect(rec, -1, -1);
       DrawEdge(Image, rec, clWhite32, clBlack32, 1);
     end;
@@ -6880,7 +6887,7 @@ begin
       rec.Right := rec.Left + fBtnSize;
       rec.Top := rec.Top + bhDiv2 + 1;
       Image.FillRect(Rect(rec), clPaleGray32);
-      DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esPolygon);
+      DrawLine(Image, Rectangle(rec), dpiAware1 + 1, clWhite32, esClosed);
       Img32.Vector.InflateRect(rec, -1, -1);
       DrawEdge(Image, rec, clWhite32, clBlack32, 1);
     end;
