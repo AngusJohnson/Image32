@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  6 July 2025                                                     *
+* Date      :  18 July 2025                                                    *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -5614,7 +5614,12 @@ var
   i: integer;
 begin
   if el is TShapeElement then
-    TShapeElement(el).pathsLoaded := False;
+    with TShapeElement(el) do
+    begin
+      drawPathsO := nil;
+      drawPathsC := nil;
+      pathsLoaded := False;
+    end;
   for i := 0 to el.ChildCount -1 do
     InternalResetPaths(el[i]);
 end;
