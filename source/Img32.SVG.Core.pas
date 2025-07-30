@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.7                                                             *
-* Date      :  12 January 2025                                                 *
+* Date      :  20 January 2025                                                 *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -459,11 +459,10 @@ end;
 procedure DisposeSvgAttrib(attrib: PSvgAttrib); {$IFDEF INLINE} inline; {$ENDIF}
 begin
   // Dispose(Result) uses RTTI to set the UTF8String fields to nil.
-  // By clearing them outself we can achieve that much faster.
+  // By clearing these fields ourself we can achieve that much faster.
   attrib.name := '';
   attrib.value := '';
-  if attrib.namespace <> '' then
-    attrib.namespace := '';
+  attrib.namespace := '';
   FreeMem(attrib);
 end;
 //------------------------------------------------------------------------------
@@ -834,7 +833,7 @@ begin
   begin
     case Result^ of
       '0'..'9', 'A'..'Z', 'a'..'z', '-': inc(Result);
-      else break;
+    else break;
     end;
   end;
 end;
@@ -2122,6 +2121,9 @@ var
   c2: PUTF8Char;
   i: integer;
 begin
+  Result := Assigned(owner);
+  if not Result then Exit;
+
   c2 := SkipBlanksEx(c, endC);
   c := ParseNameLength(c2, endC);
   ToAsciiLowerUTF8String(c2, c, name);
@@ -2248,27 +2250,22 @@ begin
       Exit;
     end;
 
-    if (owner <> nil) and (owner.svgNamespace <> '') then
+    if (attrib.namespace <> '') and (owner.svgNamespace <> '') then
     begin
-      if (attrib.namespace <> '') and // not the attribute default-namespace
-         (attrib.namespace <> owner.svgNamespace) then // not the SVG namespace
+      if (attrib.namespace <> owner.svgNamespace) then
       begin
         // We are not interested in this attribute, so skip it
         DisposeSvgAttrib(attrib);
-        attrib := nil;
-      end
-      else
-        attrib.namespace := ''; //owner.svgNamespace; // reduce memory usage
+        Continue;
+      end;
+      attrib.namespace := '' // reduce memory usage
     end;
 
-    if attrib <> nil then
-    begin
-      attribs.Add(attrib);
-      case attrib.hash of
-        hId     : idAttrib := attrib;
-        hClass  : classAttrib := attrib;
-        hStyle  : styleAttrib := attrib;
-      end;
+    attribs.Add(attrib);
+    case attrib.hash of
+      hId     : idAttrib := attrib;
+      hClass  : classAttrib := attrib;
+      hStyle  : styleAttrib := attrib;
     end;
   end;
 
@@ -2790,95 +2787,70 @@ end;
 procedure TSvgParser.ParseUtf8Stream;
 var
   c, endC, cc: PUTF8Char;
-  I: Integer;
+  i: Integer;
   Attr: PSvgAttrib;
+  tag: UTF8String;
 begin
-  svgNamespace := '';
   c := svgStream.Memory;
   endC := c + svgStream.Size;
   SkipBlanks(c, endC);
+
   if Match(c, '<?xml') then
   begin
-    inc(c, 2); //todo: accommodate space after '<' eg using sMatchEl function
+    inc(c, 2);
     if not xmlHeader.ParseHeader(c, endC) then Exit;
     SkipBlanks(c, endC);
   end;
+
   c := SkipBlanksAndXmlComments(c, endC);
   if Match(c, '<!doctype') then
   begin
     inc(c, 2);
     if not docType.ParseHeader(c, endC) then Exit;
   end;
-  while True do
-  begin
-    c := SkipBlanksAndXmlComments(c, endC);
-    if c >= endC then break;
 
-    if c^ = '<' then
+  svgNamespace := '';
+
+  c := SkipBlanksAndXmlComments(c, endC);
+  while (c < endC) do
+  begin
+    if (c^ = '<') then
     begin
-      if Match(c, '<svg') and (c[4] <> ':') then // handle <svg ...> but not <svg:xxx ...>
-      begin
-        inc(c);
-        svgNamespace := ''; // disable namespace handling
-        svgTree := TSvgXmlEl.Create(self);
-        if svgTree.ParseHeader(c, endC) and
-          not svgTree.selfClosed then
-            svgTree.ParseContent(c, endC);
-        break;
-      end
-      else // <namespace:svg ...>
-      begin
-        // Find the actual namespace definition for SVG in
-        // <namespace:svg xmlns:xxx="http://www.w3.org/2000/svg">
-        cc := c;
-        inc(c);
-        svgNamespace := ''; // disable namespace handling so we get all attributes
-        svgTree := TSvgXmlEl.Create(self);
-        if svgTree.ParseHeader(c, endC) then
-        begin
-          // Only if we have a <namespace:svg ...> tag
-          if (svgTree.namespace <> '') and (svgTree.name = 'svg') then
-          begin
-            // Find the actual namespace. We could use the one from the tag, but that
-            // could be a coinsidence and the namespace in "<ns:svg ..." could be for
-            // a different namespace definition.
-            // So we search for the correct namespace definition:
-            //   <ns:svg xmlns:xxx="http://www.w3.org/2000/svg">
-            for I := 0 to svgTree.GetAttribCount - 1 do
-            begin
-              Attr := svgTree.GetAttrib(I);
-              if (Attr.namespace = 'xmlns') and (Attr.value = 'http://www.w3.org/2000/svg') then
-              begin
-                svgNamespace := Attr.name;
-                break;
-              end;
-            end;
-          end;
-        end;
-        if (svgNamespace = '') or (svgTree.namespace <> svgNamespace) then
-        begin
-          // If we didn't find a svg-namespace or have the wrong namespace in the svg-TAG,
-          // then we search for the next TAG.
-          FreeAndNil(svgTree);
-          c := cc; // reset position
-        end
-        else
-        begin
-          // We need to parse the <ns:svg ...> TAG again but this time with the svg-namespace
-          // and the TAG content.
-          FreeAndNil(svgTree);
-          c := cc; // reset position
-          inc(c);
-          svgTree := TSvgXmlEl.Create(self);
-          if svgTree.ParseHeader(c, endC) and
-            not svgTree.selfClosed then
-              svgTree.ParseContent(c, endC);
-          break;
-        end;
-      end;
+      Inc(c);
+      cc := c;
+      cc := ParseNameLength(cc, endC);
+      ToAsciiLowerUTF8String(c, cc, tag);
+      i := PosEx(':', tag, 1);
+      if Copy(tag, i + 1, MaxInt) <> 'svg' then
+        Continue;  // ie continue searching for the top-most SVG tag
+      if i > 1 then
+        svgNamespace := Copy(tag, 1, i -1);
+      break;
     end;
     inc(c);
   end;
+
+  svgTree := TSvgXmlEl.Create(self);
+  if not svgTree.ParseHeader(c, endC) or svgTree.selfClosed then Exit;
+
+  if (svgNamespace <> '') then
+  begin
+    // If the top-most SVG element has a namespace, then make sure it
+    // corresponds to the namespace associated with the xmlns value ...
+    // "http://www.w3.org/2000/svg"
+    for i := 0 to svgTree.GetAttribCount - 1 do
+    begin
+      Attr := svgTree.GetAttrib(i);
+      if (Attr.namespace = 'xmlns') and
+        (Attr.value = 'http://www.w3.org/2000/svg') then
+      begin
+        if svgNamespace <> Attr.name then Exit; //oops!
+        break;
+      end;
+    end;
+  end;
+
+  svgTree.ParseContent(c, endC);
 end;
 
 //------------------------------------------------------------------------------
