@@ -3,7 +3,7 @@ unit Img32.Fmt.BMP;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.7                                                             *
-* Date      :  6 January 2025                                                  *
+* Date      :  1 August 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  BMP file format extension for TImage32                          *
@@ -58,6 +58,11 @@ resourcestring
   s_cf_dib_error = 'TImage32 - clipboard CF_DIB format error';
 
 type
+
+{$IFDEF LINUX}
+  longint=integer;
+{$ENDIF}
+
   PTriColor32 = ^TTriColor32;
   TTriColor32 = array [0..2] of TColor32;
   TArrayOfByte = array of Byte;
