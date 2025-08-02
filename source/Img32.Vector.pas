@@ -3,7 +3,7 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  16 April 2025                                                   *
+* Date      :  2 August 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -3320,6 +3320,8 @@ begin
   if endAngle < startAngle then
     angle := endAngle - startAngle + angle360 else
     angle := endAngle - startAngle;
+  if angle = 0 then angle := angle360;
+
   //steps = (No. steps for a whole ellipse) * angle/(2*Pi)
   steps := Round(CalcRoundingSteps((rec.width + rec.height) / 2 * scale));
   steps := steps div 2; /////////////////////////////////
