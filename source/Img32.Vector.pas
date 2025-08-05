@@ -3,7 +3,7 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  2 August 2025                                                   *
+* Date      :  5 August 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -2544,7 +2544,9 @@ begin
     else if (asin < -1.0) then asin := -1.0;
     acos := DotProduct(norms[k], norms[j]);
 
-    if (acos > -0.999) and (asin * delta < 0) then
+    if (acos < -0.999) then
+      DoBevel(j, k)
+    else if {(acos > -0.999) and} (asin * delta < 0) then
     begin
       // is concave
       AddPoint(PointD(
@@ -2727,7 +2729,9 @@ var
     else if (asin < -1.0) then asin := -1.0;
     acos := DotProduct(norms[k], norms[j]);
 
-    if (acos > -0.999) and (asin * delta < 0) then
+    if (acos < -0.999) then
+      DoBevel(j, k)
+    else if {(acos > -0.999) and} (asin * delta < 0) then
     begin
       // is concave
       AddPoint(PointD(
@@ -3623,8 +3627,6 @@ begin
     if pattern[i] <= 0 then pattern[i] := 1;
   tmp := GetDashedPath(path, closed, pattern, patternOffset);
   for i := 0 to high(tmp) do
-//    AppendPath(Result, GrowOpenLine(tmp[i],
-//      lineWidth, joinStyle, endStyle, 2));
     AppendPath(Result, GrowClosedLine(tmp[i], lineWidth, joinStyle, 2));
 end;
 //------------------------------------------------------------------------------

@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  3 August 2025                                                   *
+* Date      :  5 August 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -3055,13 +3055,8 @@ begin
     if Assigned(dashArray) then
     begin
       if joinStyle = jsRound then
-      begin
-        endStyle := esRound;
-      end else
-      begin
+        endStyle := esRound else
         endStyle := esButt;
-        joinStyle := jsButt;
-      end;
 
       dashArray := ScaleDashArray(drawDat.dashArray, 1);  // ie. don't scale yet!
       strokePaths := nil;
@@ -3082,10 +3077,7 @@ begin
   begin
 
     if fDrawData.strokeCap = esClosed then
-    begin
-      endStyle := esButt;
-      if joinStyle = jsMiter then joinStyle := jsButt;
-    end else
+      endStyle := esButt else
       endStyle := fDrawData.strokeCap;
 
     if Assigned(dashArray) then
@@ -4898,7 +4890,7 @@ begin
     case hash of
       hMiter  : strokeJoin := jsMiter;
       hRound  : strokeJoin := jsRound;
-      hBevel  : strokeJoin := jsSquare;
+      hBevel  : strokeJoin := jsButt;
     end;
 end;
 //------------------------------------------------------------------------------
