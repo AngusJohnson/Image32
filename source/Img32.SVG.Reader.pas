@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.8                                                             *
-* Date      :  5 August 2025                                                   *
+* Date      :  9 August 2025                                                   *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -4563,6 +4563,11 @@ begin
     len := Length(dashArray);
     while ParseNextNum(c, endC, true, val) do
     begin
+      if val < 0 then // ie invalid!
+      begin
+        dashArray := nil;
+        Exit;
+      end;
       SetLength(dashArray, len +1);
       dashArray[len] := val;
       inc(len);
