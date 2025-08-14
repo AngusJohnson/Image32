@@ -3,7 +3,7 @@ unit Img32.Text;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.9                                                             *
-* Date      :  9 August 2025                                                   *
+* Date      :  14 August 2025                                                  *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 * Purpose   :  TrueType fonts for TImage32 (without Windows dependencies)      *
@@ -650,8 +650,10 @@ var
   glyphCnt: integer;
   hasSurrogates: Boolean;
 begin
+  // nb: glyphOffsets length will always be one more that the no. glyphs
+  // because the first value in the array will always be 0.
   glyphCnt := High(glyphOffsets);
-  hasSurrogates := Length(text) > glyphsThatFit;
+  hasSurrogates := Length(text) > glyphCnt;
   if hasSurrogates then
   begin
     charsThatFit := 0;
@@ -665,8 +667,8 @@ begin
     end
   end else
   begin
-    glyphsThatFit := High(glyphOffsets);
-    while (glyphsThatFit > 0) and (glyphOffsets[glyphsThatFit +1] > maxWidth) do
+    glyphsThatFit := glyphCnt;
+    while (glyphsThatFit > 0) and (glyphOffsets[glyphsThatFit] > maxWidth) do
       Dec(glyphsThatFit);
     charsThatFit := glyphsThatFit;
   end;
