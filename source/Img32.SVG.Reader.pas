@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.9                                                             *
-* Date      :  23 August 2025                                                  *
+* Date      :  29 August 2025                                                  *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -749,6 +749,7 @@ begin
       drawDat.fillColor := thisElement.fSvgReader.currentColor
     else if (fillColor <> clInvalid) then
       drawDat.fillColor := fillColor;
+
     if fillOpacity <> InvalidD then
       drawDat.fillOpacity := fillOpacity;
     if (fillEl <> '') then
@@ -756,7 +757,10 @@ begin
     if (strokeColor = clCurrent) then
       drawDat.strokeColor := thisElement.fSvgReader.currentColor
     else if strokeColor <> clInvalid then
-      drawDat.strokeColor := strokeColor;
+      drawDat.strokeColor := strokeColor
+    else if currentColor <> clInvalid then
+      drawDat.strokeColor := currentColor;
+
     if strokeOpacity <> InvalidD then
       drawDat.strokeOpacity := strokeOpacity;
     if strokeWidth.IsValid then
