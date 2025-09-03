@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.9                                                             *
-* Date      :  29 August 2025                                                  *
+* Date      :  4 September 2025                                                *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -1814,6 +1814,8 @@ begin
   if units = hUserSpaceOnUse then
     rec2 := fSvgReader.userSpaceBounds else
     rec2 := drawDat.bounds;
+  if rec2.IsEmpty then rec2 := RectD(0, 0, 1, 1);
+
 
   with TLinearGradientRenderer(renderer) do
   begin
