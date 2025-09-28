@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.9                                                             *
-* Date      :  4 September 2025                                                *
+* Date      :  28 September 2025                                               *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -2470,10 +2470,6 @@ begin
     rec := Rect(elRectWH.GetRectD(RectD(srcRec), GetRelFracLimit)) else
     rec := dstRec;
   dstImg.FillRect(rec, floodColor);
-
-//  srcImg.SaveToFile('c:\temp\test3.png');
-//  dstImg.SaveToFile('c:\temp\test4.png');
-
 end;
 
 //------------------------------------------------------------------------------
