@@ -1719,6 +1719,7 @@ begin
   if units = hUserSpaceOnUse then
     rec2 := fSvgReader.userSpaceBounds else
     rec2 := drawDat.bounds;
+  if rec2.IsEmpty then rec2 := RectD(0, 0, 1, 1);
 
   if radius.IsValid then
   begin
@@ -1815,7 +1816,6 @@ begin
     rec2 := fSvgReader.userSpaceBounds else
     rec2 := drawDat.bounds;
   if rec2.IsEmpty then rec2 := RectD(0, 0, 1, 1);
-
 
   with TLinearGradientRenderer(renderer) do
   begin
@@ -2762,8 +2762,8 @@ begin
           MatrixExtractScale(DrawData.matrix, fScale);
 
           if fUnits = hUserSpaceOnUse then
-          clipRec := GetAdjustedBounds(fSvgReader.userSpaceBounds) else
-          clipRec := GetAdjustedBounds(clipRec);
+            clipRec := GetAdjustedBounds(fSvgReader.userSpaceBounds) else
+            clipRec := GetAdjustedBounds(clipRec);
         end;
       end;
       MatrixApply(drawDat.matrix, clipRec);
@@ -4078,6 +4078,7 @@ begin
   if units = hUserSpaceOnUse then
     rec := fSvgReader.userSpaceBounds else
     rec := drawDat.bounds;
+  if rec.IsEmpty then rec := RectD(0, 0, 1, 1);
 
   //todo: implement patternUnits & patternContentUnits too
 
