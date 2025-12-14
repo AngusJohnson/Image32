@@ -245,6 +245,9 @@ type
   end;
 
   TGroupElement = class(TShapeElement)
+  private
+    procedure DrawChildrenAndFilter(image: TImage32; const drawDat: TDrawData;
+      filterEl: TBaseElement);
   protected
     procedure Draw(image: TImage32; drawDat: TDrawData); override;
   end;
@@ -1283,6 +1286,7 @@ var
   clipPaths : TPathsD;
   clipRec   : TRect;
   dstClipRec: TRect;
+  filterEl  : TBaseElement;
   offsetX, offsetY: integer;
   fr: TFillRule;
 begin
@@ -1296,6 +1300,9 @@ begin
 
   maskEl := TMaskElement(FindRefElement(drawDat.maskElRef));
   clipEl := TClipPathElement(FindRefElement(drawDat.clipElRef));
+  filterEl := FindRefElement(drawDat.filterElRef);
+  drawDat.filterElRef := ''; // don't inherit to children
+
   if Assigned(clipEl) then
   begin
     drawDat.clipElRef := '';
@@ -1326,7 +1333,7 @@ begin
     //nb: it's not safe to use fReader.TempImage when calling DrawChildren
     tmpImg := TImage32.Create(Min(image.Width, clipRec.Right), Min(image.Height, clipRec.Bottom));
     try
-      DrawChildren(tmpImg, drawDat);
+      DrawChildrenAndFilter(tmpImg, drawDat, filterEl);
       if clipEl.fDrawData.fillRule = frNegative then
         fr := frNonZero else
         fr := clipEl.fDrawData.fillRule;
@@ -1362,13 +1369,52 @@ begin
 
     tmpImg := TImage32.Create(Min(image.Width, clipRec.Right), Min(image.Height, clipRec.Bottom));
     try
-      DrawChildren(tmpImg, drawDat);
+      DrawChildrenAndFilter(tmpImg, drawDat, filterEl);
       TMaskElement(maskEl).ApplyMask(tmpImg, drawDat);
       image.CopyBlend(tmpImg, clipRec, dstClipRec, BlendToAlphaLine);
     finally
       tmpImg.Free;
     end;
-  end else
+  end
+  else
+    DrawChildrenAndFilter(image, drawDat, filterEl);
+end;
+//------------------------------------------------------------------------------
+
+procedure TGroupElement.DrawChildrenAndFilter(image: TImage32;
+  const drawDat: TDrawData; filterEl: TBaseElement);
+var
+  clipRec2: TRectD;
+  clipRec: TRect;
+  tmpImg: TImage32;
+begin
+  // Draw the children into the image and apply an optional group-filter to the image.
+  if Assigned(filterEl) then
+  begin
+    clipRec2 := drawDat.bounds;
+    with TFilterElement(filterEl) do
+    begin
+      MatrixExtractScale(DrawData.matrix, fScale);
+
+      if fUnits = hUserSpaceOnUse then
+        clipRec2 := GetAdjustedBounds(fSvgReader.userSpaceBounds) else
+        clipRec2 := GetAdjustedBounds(clipRec2);
+    end;
+    MatrixApply(drawDat.matrix, clipRec2);
+    clipRec := Rect(clipRec2);
+    Types.IntersectRect(clipRec, clipRec, image.Bounds);
+
+    tmpImg := TImage32.Create(Min(image.Width, clipRec.Right), Min(image.Height, clipRec.Bottom));
+    try
+      DrawChildren(tmpImg, drawDat);
+      with TFilterElement(filterEl) do
+        Apply(tmpImg, clipRec, drawDat.matrix);
+      image.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlphaLine);
+    finally
+      tmpImg.Free;
+    end;
+  end
+  else
     DrawChildren(image, drawDat);
 end;
 
