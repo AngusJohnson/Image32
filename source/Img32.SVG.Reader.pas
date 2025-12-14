@@ -247,7 +247,7 @@ type
   TGroupElement = class(TShapeElement)
   private
     procedure DrawChildrenAndFilter(image: TImage32; const drawDat: TDrawData;
-      filterEl: TBaseElement);
+      filterEl: TBaseElement; useTmpImage: Boolean);
   protected
     procedure Draw(image: TImage32; drawDat: TDrawData); override;
   end;
@@ -1333,7 +1333,7 @@ begin
     //nb: it's not safe to use fReader.TempImage when calling DrawChildren
     tmpImg := TImage32.Create(Min(image.Width, clipRec.Right), Min(image.Height, clipRec.Bottom));
     try
-      DrawChildrenAndFilter(tmpImg, drawDat, filterEl);
+      DrawChildrenAndFilter(tmpImg, drawDat, filterEl, False);
       if clipEl.fDrawData.fillRule = frNegative then
         fr := frNonZero else
         fr := clipEl.fDrawData.fillRule;
@@ -1369,7 +1369,7 @@ begin
 
     tmpImg := TImage32.Create(Min(image.Width, clipRec.Right), Min(image.Height, clipRec.Bottom));
     try
-      DrawChildrenAndFilter(tmpImg, drawDat, filterEl);
+      DrawChildrenAndFilter(tmpImg, drawDat, filterEl, False);
       TMaskElement(maskEl).ApplyMask(tmpImg, drawDat);
       image.CopyBlend(tmpImg, clipRec, dstClipRec, BlendToAlphaLine);
     finally
@@ -1377,12 +1377,12 @@ begin
     end;
   end
   else
-    DrawChildrenAndFilter(image, drawDat, filterEl);
+    DrawChildrenAndFilter(image, drawDat, filterEl, True);
 end;
 //------------------------------------------------------------------------------
 
 procedure TGroupElement.DrawChildrenAndFilter(image: TImage32;
-  const drawDat: TDrawData; filterEl: TBaseElement);
+  const drawDat: TDrawData; filterEl: TBaseElement; useTmpImage: Boolean);
 var
   clipRec2: TRectD;
   clipRec: TRect;
@@ -1404,14 +1404,23 @@ begin
     clipRec := Rect(clipRec2);
     Types.IntersectRect(clipRec, clipRec, image.Bounds);
 
-    tmpImg := TImage32.Create(Min(image.Width, clipRec.Right), Min(image.Height, clipRec.Bottom));
-    try
-      DrawChildren(tmpImg, drawDat);
+    if useTmpImage then
+    begin
+      tmpImg := TImage32.Create(Min(image.Width, clipRec.Right), Min(image.Height, clipRec.Bottom));
+      try
+        DrawChildren(tmpImg, drawDat);
+        with TFilterElement(filterEl) do
+          Apply(tmpImg, clipRec, drawDat.matrix);
+        image.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlphaLine);
+      finally
+        tmpImg.Free;
+      end;
+    end
+    else
+    begin
+      DrawChildren(image, drawDat);
       with TFilterElement(filterEl) do
-        Apply(tmpImg, clipRec, drawDat.matrix);
-      image.CopyBlend(tmpImg, clipRec, clipRec, BlendToAlphaLine);
-    finally
-      tmpImg.Free;
+        Apply(image, clipRec, drawDat.matrix);
     end;
   end
   else
