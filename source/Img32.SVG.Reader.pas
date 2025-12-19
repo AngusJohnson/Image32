@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.9                                                             *
-* Date      :  15 December 2025                                                *
+* Date      :  20 December 2025                                                *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2025                                         *
 *                                                                              *
@@ -5854,8 +5854,8 @@ var
   bestFontReader: TFontReader;
   fi: TFontInfo;
 begin
-  if svgFontInfo.family = tfUnknown then
-    fi.family := tfSerif else
+  FillChar(fi, SizeOf(fi), 0);
+  if svgFontInfo.family <> tfUnknown then
     fi.family := svgFontInfo.family;
   fi.faceName := ''; //just match to a family here, not to a specific facename
   fi.macStyles := [];
