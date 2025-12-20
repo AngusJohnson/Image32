@@ -794,6 +794,8 @@ end;
 //------------------------------------------------------------------------------
 
 procedure UpdateFontInfo(var drawDat: TDrawData; thisElement: TBaseElement);
+var
+  fontValue: TValue;
 begin
   with thisElement.fDrawData do
   begin
@@ -806,7 +808,12 @@ begin
       drawDat.fontInfo.familyNames := fontInfo.familyNames;
 
     if fontInfo.size > 0 then
-      drawDat.fontInfo.size := fontInfo.size;
+    begin
+      // Convert fontsize+unitType to pixels
+      fontValue.SetValue(fontInfo.size, fontInfo.sizeUnitType);
+      drawDat.fontInfo.size := fontValue.GetValue(drawDat.fontInfo.size, 1);
+      drawDat.fontInfo.sizeUnitType := utPixel;
+    end;
     if fontInfo.spacing <> 0 then
       drawDat.fontInfo.spacing := fontInfo.spacing;
     if fontInfo.textLength > 0 then
@@ -4672,12 +4679,14 @@ end;
 
 procedure FontSize_Attrib(aOwnerEl: TBaseElement; const value: UTF8String);
 var
-  num: double;
   c, endC: PUTF8Char;
+  tmp: TValue;
 begin
   c := PUTF8Char(value); endC := c + Length(value);
-  if not ParseNextNum(c, endC, false, num) then Exit;
-  aOwnerEl.fDrawData.FontInfo.size := num;
+  tmp.Init;
+  if not ParseNextNumEx(c, endC, false, tmp.rawVal, tmp.unitType) then Exit;
+  aOwnerEl.fDrawData.fontInfo.size := tmp.rawVal;
+  aOwnerEl.fDrawData.fontInfo.sizeUnitType := tmp.unitType;
 end;
 //------------------------------------------------------------------------------
 
