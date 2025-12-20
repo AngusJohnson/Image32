@@ -5864,6 +5864,7 @@ var
   fi: TFontInfo;
 begin
   FillChar(fi, SizeOf(fi), 0);
+  fi.fontFormat := ffTrueType;
   if svgFontInfo.family <> tfUnknown then
     fi.family := svgFontInfo.family;
   fi.faceName := ''; //just match to a family here, not to a specific facename
