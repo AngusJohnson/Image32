@@ -2032,7 +2032,7 @@ begin
     if pathLen > 0 then
     begin
       // Skip the start-point if it matches the previous path's end-point
-      if (i > 0) and PointsEqual(paths[i][0], paths[i -1][high(paths[i -1])]) then
+      if (i > 0) and (Length(paths[i -1])>0) and PointsEqual(paths[i][0], paths[i -1][high(paths[i -1])]) then
         dec(pathLen);
       inc(len, pathLen);
     end;
@@ -2048,7 +2048,7 @@ begin
     begin
       offset := 0;
       // Skip the start-point if it matches the previous path's end-point
-      if (i > 0) and PointsEqual(paths[i][0], paths[i -1][high(paths[i -1])]) then
+      if (i > 0) and (Length(paths[i -1])>0) and PointsEqual(paths[i][0], paths[i -1][high(paths[i -1])]) then
       begin
         dec(pathLen);
         offset := 1;
