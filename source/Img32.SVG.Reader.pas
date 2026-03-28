@@ -273,6 +273,8 @@ type
     fRendering: Boolean;
     procedure GetPaths(const drawDat: TDrawData); override;
     procedure ApplyMask(img: TImage32; const drawDat: TDrawData);
+  public
+    constructor Create(parent: TBaseElement; svgEl: TSvgXmlEl); override;
   end;
 
   TSymbolElement = class(TShapeElement)
@@ -1601,6 +1603,13 @@ end;
 
 //------------------------------------------------------------------------------
 // TMaskElement
+//------------------------------------------------------------------------------
+
+constructor TMaskElement.Create(parent: TBaseElement; svgEl: TSvgXmlEl);
+begin
+  inherited;
+  fDrawData.visible := false;
+end;
 //------------------------------------------------------------------------------
 
 procedure TMaskElement.GetPaths(const drawDat: TDrawData);
