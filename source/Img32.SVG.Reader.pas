@@ -270,6 +270,7 @@ type
   TMaskElement = class(TShapeElement)
   protected
     maskRec: TRect;
+    fRendering: Boolean;
     procedure GetPaths(const drawDat: TDrawData); override;
     procedure ApplyMask(img: TImage32; const drawDat: TDrawData);
   end;
@@ -403,6 +404,7 @@ type
   TMarkerElement = class(TShapeElement)
   private
     fPoints     : TPathD;
+    fRendering  : Boolean;
   protected
     refPt       : TValuePt;
     angle       : double;
@@ -433,6 +435,7 @@ type
   protected
     ImgRenderer : TImageRenderer;
     pattBoxWH   : TRectWH;
+    fRendering  : Boolean;
     function PrepareRenderer(renderer: TImageRenderer;
       drawDat: TDrawData): Boolean; virtual;
   public
@@ -1622,12 +1625,23 @@ procedure TMaskElement.ApplyMask(img: TImage32; const drawDat: TDrawData);
 var
   tmpImg: TImage32;
 begin
-  tmpImg := TImage32.Create(Min(img.Width, maskRec.Right), Min(img.Height, maskRec.Bottom));
+  // Guard against infinite recursion from self-referencing mask IDs.
+  // Adobe Illustrator exports opacity masks with nested <mask> elements
+  // sharing the same ID, relying on SVG scoping rules (inner shadows outer).
+  // Image32 uses flat ID lookup (first-wins), so the inner empty mask is
+  // ignored and the path references the outer mask → infinite loop.
+  if fRendering then Exit;
+  fRendering := True;
   try
-    DrawChildren(tmpImg, drawDat);
-    img.CopyBlend(tmpImg, maskRec, maskRec, BlendBlueChannelLine);
+    tmpImg := TImage32.Create(Min(img.Width, maskRec.Right), Min(img.Height, maskRec.Bottom));
+    try
+      DrawChildren(tmpImg, drawDat);
+      img.CopyBlend(tmpImg, maskRec, maskRec, BlendBlueChannelLine);
+    finally
+      tmpImg.Free;
+    end;
   finally
-    tmpImg.Free;
+    fRendering := False;
   end;
 end;
 
@@ -4025,6 +4039,9 @@ var
   mat: TMatrixD;
   angles: TArrayOfDouble;
 begin
+  if fRendering then Exit;  // guard against self-referencing markers
+  fRendering := True;
+  try
   UpdateDrawInfo(drawDat, self);
   mat := drawDat.matrix;
 
@@ -4067,6 +4084,9 @@ begin
     MatrixRotate(drawDat.matrix, NullPointD, angles[i]);
     MatrixTranslate(drawDat.matrix, fPoints[i].X, fPoints[i].Y);
     DrawChildren(img, drawDat);
+  end;
+  finally
+    fRendering := False;
   end;
 end;
 //------------------------------------------------------------------------------
@@ -4137,6 +4157,9 @@ var
   scale : TPointD;
 begin
   Result := false;
+  if fRendering then Exit;  // guard against self-referencing pattern fills
+  fRendering := True;
+  try
 
   MatrixExtractScale(drawDat.matrix, scale.X, scale.Y);
 
@@ -4207,6 +4230,9 @@ begin
         drawDat.bounds := rec;
         Draw(renderer.Image, drawDat);
       end;
+  finally
+    fRendering := False;
+  end;
 end;
 
 //------------------------------------------------------------------------------
