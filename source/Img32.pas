@@ -2264,6 +2264,8 @@ begin
   fResampler := DefaultResampler;
   fwidth := Max(0, width);
   fheight := Max(0, height);
+  if (fwidth > 20000) or (fheight > 20000) then
+    raise Exception.Create(rsImageTooLarge);
   NewColor32Array(fPixels, fwidth * fheight);
 end;
 //------------------------------------------------------------------------------
