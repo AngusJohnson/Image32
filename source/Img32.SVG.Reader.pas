@@ -165,6 +165,9 @@ type
     fRootElement      : TSvgElement;
     fFontCache        : TFontCache;
     fKeepAspectRatio  : Boolean;
+    fDrawOpCount      : Integer;
+    fMaxDrawOps       : Integer;
+    fRenderAborted    : Boolean;
     function  LoadInternal: Boolean;
     function  GetIsEmpty: Boolean;
     function  GetTempImage: TImage32;
@@ -197,6 +200,8 @@ type
     property  BackgroundColor : TColor32 read fBkgndColor write fBkgndColor;
     property  BlurQuality     : integer read fBlurQuality write SetBlurQuality;
     property  IsEmpty         : Boolean read GetIsEmpty;
+    property  MaxDrawOps      : Integer read fMaxDrawOps write fMaxDrawOps;
+    property  RenderAborted   : Boolean read fRenderAborted;
     // KeepAspectRatio: this property has also been added for the convenience of
     // the third-party SVGIconImageList. (IMHO it should always = true)
     property  KeepAspectRatio: Boolean
@@ -1343,15 +1348,24 @@ begin
     end;
 
     //nb: it's not safe to use fReader.TempImage when calling DrawChildren
-    tmpImg := TImage32.Create(Min(image.Width, clipRec.Right), Min(image.Height, clipRec.Bottom));
+    var tmpW := Min(image.Width, clipRec.Right);
+    var tmpH := Min(image.Height, clipRec.Bottom);
+    if (tmpW <= 0) or (tmpH <= 0) then Exit;
+    tmpImg := TImage32.Create(tmpW, tmpH);
     try
       DrawChildrenAndFilter(tmpImg, drawDat, filterEl, False);
       if clipEl.fDrawData.fillRule = frNegative then
         fr := frNonZero else
         fr := clipEl.fDrawData.fillRule;
-      EraseOutsidePaths(tmpImg, clipPaths,
-        fr, clipRec, fSvgReader.fCustomRendererCache);
-      image.CopyBlend(tmpImg, clipRec, dstClipRec, BlendToAlphaLine);
+      // Clamp clipRec to temp image bounds — negative coords from
+      // rotated clip-paths cause out-of-bounds writes in the rasterizer.
+      Types.IntersectRect(clipRec, clipRec, tmpImg.Bounds);
+      if not IsEmptyRect(clipRec) then
+      begin
+        EraseOutsidePaths(tmpImg, clipPaths,
+          fr, clipRec, fSvgReader.fCustomRendererCache);
+        image.CopyBlend(tmpImg, clipRec, dstClipRec, BlendToAlphaLine);
+      end;
     finally
       tmpImg.Free;
     end;
@@ -1379,11 +1393,16 @@ begin
       TranslateRect(maskEl.maskRec, offsetX, offsetY);
     end;
 
-    tmpImg := TImage32.Create(Min(image.Width, clipRec.Right), Min(image.Height, clipRec.Bottom));
+    var tmpW := Min(image.Width, clipRec.Right);
+    var tmpH := Min(image.Height, clipRec.Bottom);
+    if (tmpW <= 0) or (tmpH <= 0) then Exit;
+    tmpImg := TImage32.Create(tmpW, tmpH);
     try
       DrawChildrenAndFilter(tmpImg, drawDat, filterEl, False);
       TMaskElement(maskEl).ApplyMask(tmpImg, drawDat);
-      image.CopyBlend(tmpImg, clipRec, dstClipRec, BlendToAlphaLine);
+      Types.IntersectRect(clipRec, clipRec, tmpImg.Bounds);
+      if not IsEmptyRect(clipRec) then
+        image.CopyBlend(tmpImg, clipRec, dstClipRec, BlendToAlphaLine);
     finally
       tmpImg.Free;
     end;
@@ -1634,21 +1653,16 @@ procedure TMaskElement.ApplyMask(img: TImage32; const drawDat: TDrawData);
 var
   tmpImg: TImage32;
 begin
-  // Guard against infinite recursion from self-referencing mask IDs.
-  // Adobe Illustrator exports opacity masks with nested <mask> elements
-  // sharing the same ID, relying on SVG scoping rules (inner shadows outer).
-  // Image32 uses flat ID lookup (first-wins), so the inner empty mask is
-  // ignored and the path references the outer mask → infinite loop.
-  if fRendering then Exit;
+  if fRendering then Exit;  // guard against self-referencing masks
   fRendering := True;
   try
-    tmpImg := TImage32.Create(Min(img.Width, maskRec.Right), Min(img.Height, maskRec.Bottom));
-    try
-      DrawChildren(tmpImg, drawDat);
-      img.CopyBlend(tmpImg, maskRec, maskRec, BlendBlueChannelLine);
-    finally
-      tmpImg.Free;
-    end;
+  tmpImg := TImage32.Create(Min(img.Width, maskRec.Right), Min(img.Height, maskRec.Bottom));
+  try
+    DrawChildren(tmpImg, drawDat);
+    img.CopyBlend(tmpImg, maskRec, maskRec, BlendBlueChannelLine);
+  finally
+    tmpImg.Free;
+  end;
   finally
     fRendering := False;
   end;
@@ -4339,7 +4353,17 @@ var
 begin
   for i := 0 to fChilds.Count -1 do
     with TBaseElement(fChilds[i]) do
-      if fDrawData.visible then Draw(image, drawDat);
+      if fDrawData.visible then
+      begin
+        Inc(Self.fSvgReader.fDrawOpCount);
+        if Self.fSvgReader.fDrawOpCount > Self.fSvgReader.fMaxDrawOps then
+        begin
+          Self.fSvgReader.fRenderAborted := True;
+          Exit;
+        end;
+        Draw(image, drawDat);
+        if Self.fSvgReader.fRenderAborted then Exit;
+      end;
 end;
 //------------------------------------------------------------------------------
 
@@ -5671,6 +5695,7 @@ begin
   fBlurQuality         := 1; //0: draft (faster); 1: good; 2: excellent (slow)
   currentColor         := clBlack32;
   fKeepAspectRatio     := true;
+  fMaxDrawOps          := MaxInt;
 end;
 //------------------------------------------------------------------------------
 
@@ -5746,6 +5771,8 @@ var
   di: TDrawData;
 begin
   if not Assigned(fRootElement) or not assigned(img) then Exit;
+  fDrawOpCount := 0;
+  fRenderAborted := False;
 
   with fRootElement do
   begin
