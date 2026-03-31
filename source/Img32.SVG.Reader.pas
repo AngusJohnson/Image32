@@ -460,7 +460,7 @@ type
     procedure AddStop(color: TColor32; offset: double);
     procedure AssignTo(other: TBaseElement);  virtual;
     function PrepareRenderer(renderer: TCustomGradientRenderer;
-      drawDat: TDrawData): Boolean; virtual;
+      const drawDat: TDrawData): Boolean; virtual;
     procedure AddColorStopsToRenderer(renderer: TCustomGradientRenderer);
   end;
 
@@ -470,7 +470,7 @@ type
     F, C: TValuePt;
     procedure AssignTo(other: TBaseElement); override;
     function PrepareRenderer(renderer: TCustomGradientRenderer;
-      drawDat: TDrawData): Boolean; override;
+      const drawDat: TDrawData): Boolean; override;
   public
     constructor Create(parent: TBaseElement; svgEl: TSvgXmlEl); override;
   end;
@@ -480,7 +480,7 @@ type
     startPt, endPt: TValuePt;
     procedure AssignTo(other: TBaseElement); override;
     function PrepareRenderer(renderer: TCustomGradientRenderer;
-      drawDat: TDrawData): Boolean; override;
+      const drawDat: TDrawData): Boolean; override;
   public
     constructor Create(parent: TBaseElement; svgEl: TSvgXmlEl); override;
   end;
@@ -1315,9 +1315,16 @@ begin
   if drawDat.fillRule = frNegative then
     drawDat.fillRule := frNonZero;
 
-  maskEl := TMaskElement(FindRefElement(drawDat.maskElRef));
-  clipEl := TClipPathElement(FindRefElement(drawDat.clipElRef));
+  maskEl := nil;
+  var maskRefEl := FindRefElement(drawDat.maskElRef);
+  if Assigned(maskRefEl) and (maskRefEl is TMaskElement) then
+    maskEl := TMaskElement(maskRefEl);
+  clipEl := nil;
+  var clipRefEl := FindRefElement(drawDat.clipElRef);
+  if Assigned(clipRefEl) and (clipRefEl is TClipPathElement) then
+    clipEl := TClipPathElement(clipRefEl);
   filterEl := FindRefElement(drawDat.filterElRef);
+  if Assigned(filterEl) and not (filterEl is TFilterElement) then filterEl := nil;
   drawDat.filterElRef := ''; // don't inherit to children
 
   if Assigned(clipEl) then
@@ -1736,15 +1743,30 @@ end;
 //------------------------------------------------------------------------------
 
 function TGradientElement.PrepareRenderer(
-  renderer: TCustomGradientRenderer; drawDat: TDrawData): Boolean;
+  renderer: TCustomGradientRenderer; const drawDat: TDrawData): Boolean;
 var
   el: TBaseElement;
 begin
   if (refEl <> '') then
   begin
     el := FindRefElement(refEl);
-    if Assigned(el) and (el is TGradientElement) then
-      TGradientElement(el).AssignTo(self);
+    if Assigned(el) then
+    begin
+      // Guard against corrupt element pointer from FindRefElement.
+      // If el points to freed/overwritten memory, the 'is' check
+      // dereferences its VMT and may AV.
+      try
+        if not (el is TGradientElement) then el := nil;
+      except
+        on E: EAccessViolation do
+          raise Exception.CreateFmt(
+            'Corrupt element from FindRefElement ' +
+            '(el=%p, refEl="%s", gradient id="%s")',
+            [Pointer(el), string(Self.refEl), string(Self.fId)]);
+      end;
+      if Assigned(el) then
+        TGradientElement(el).AssignTo(self);
+    end;
   end;
   Result := Length(stops) > 0;
 end;
@@ -1804,13 +1826,19 @@ end;
 //------------------------------------------------------------------------------
 
 function TRadGradElement.PrepareRenderer(renderer: TCustomGradientRenderer;
-  drawDat: TDrawData): Boolean;
+  const drawDat: TDrawData): Boolean;
 var
   hiStops: integer;
   cp, fp, r: TPointD;
   scale, scale2: TPointD;
   rec2, rec3: TRectD;
 begin
+  Result := False;
+  // Always use our own reader's renderer to avoid stale/corrupt parameter
+  if not Assigned(fSvgReader) then Exit;
+  renderer := fSvgReader.RadGradRenderer;
+  if not Assigned(renderer) then Exit;
+
   inherited PrepareRenderer(renderer, drawDat);
   hiStops := High(stops);
   Result := hiStops >= 0;
@@ -1893,12 +1921,18 @@ end;
 //------------------------------------------------------------------------------
 
 function TLinGradElement.PrepareRenderer(
-  renderer: TCustomGradientRenderer; drawDat: TDrawData): Boolean;
+  renderer: TCustomGradientRenderer; const drawDat: TDrawData): Boolean;
 var
   pt1, pt2: TPointD;
   hiStops: integer;
   rec2: TRectD;
 begin
+  Result := False;
+  // Always use our own reader's renderer to avoid stale/corrupt parameter
+  if not Assigned(fSvgReader) then Exit;
+  renderer := fSvgReader.LinGradRenderer;
+  if not Assigned(renderer) then Exit;
+
   inherited PrepareRenderer(renderer, drawDat);
   hiStops := High(stops);
   Result := (hiStops >= 0);
@@ -2784,8 +2818,11 @@ begin
   clipRec2 := NullRect;
 
   maskEl := FindRefElement(drawDat.maskElRef);
+  if Assigned(maskEl) and not (maskEl is TMaskElement) then maskEl := nil;
   clipPathEl := FindRefElement(drawDat.clipElRef);
+  if Assigned(clipPathEl) and not (clipPathEl is TClipPathElement) then clipPathEl := nil;
   filterEl := FindRefElement(drawDat.filterElRef);
+  if Assigned(filterEl) and not (filterEl is TFilterElement) then filterEl := nil;
 
   useTmpImage := Assigned(filterEl) or Assigned(maskEl);
 
@@ -3045,21 +3082,19 @@ begin
     begin
       if refEl is TRadGradElement then
       begin
-        with TRadGradElement(refEl) do
-        begin
-          fSvgReader.RadGradRenderer.Opacity := opacity;
-          if PrepareRenderer(fSvgReader.RadGradRenderer, drawDat) then
-            DrawPolygon(img, paths, drawDat.fillRule, fSvgReader.RadGradRenderer);
-        end;
+        refEl.fSvgReader.RadGradRenderer.Opacity := opacity;
+        if TRadGradElement(refEl).PrepareRenderer(
+          refEl.fSvgReader.RadGradRenderer, drawDat) then
+            DrawPolygon(img, paths, drawDat.fillRule,
+              refEl.fSvgReader.RadGradRenderer);
       end
       else if refEl is TLinGradElement then
       begin
-        with TLinGradElement(refEl) do
-        begin
-          fSvgReader.LinGradRenderer.Opacity := opacity;
-          if PrepareRenderer(fSvgReader.LinGradRenderer, drawDat) then
-            DrawPolygon(img, paths, drawDat.fillRule, fSvgReader.LinGradRenderer);
-        end;
+        refEl.fSvgReader.LinGradRenderer.Opacity := opacity;
+        if TLinGradElement(refEl).PrepareRenderer(
+          refEl.fSvgReader.LinGradRenderer, drawDat) then
+            DrawPolygon(img, paths, drawDat.fillRule,
+              refEl.fSvgReader.LinGradRenderer);
       end
       else if refEl is TPatternElement then
       begin
@@ -3187,21 +3222,19 @@ begin
 
     if refEl is TRadGradElement then
     begin
-      with TRadGradElement(refEl) do
-      begin
-        fSvgReader.RadGradRenderer.Opacity := opacity;
-        PrepareRenderer(fSvgReader.RadGradRenderer, drawDat);
-      end;
-      DrawPolygon(img, strokePaths, frNonZero, fSvgReader.RadGradRenderer);
+      refEl.fSvgReader.RadGradRenderer.Opacity := opacity;
+      TRadGradElement(refEl).PrepareRenderer(
+        refEl.fSvgReader.RadGradRenderer, drawDat);
+      DrawPolygon(img, strokePaths, frNonZero,
+        refEl.fSvgReader.RadGradRenderer);
     end
     else if refEl is TLinGradElement then
     begin
-      with TLinGradElement(refEl) do
-      begin
-        fSvgReader.LinGradRenderer.Opacity := opacity;
-        PrepareRenderer(fSvgReader.LinGradRenderer, drawDat);
-      end;
-      DrawPolygon(img, strokePaths, frNonZero, fSvgReader.LinGradRenderer);
+      refEl.fSvgReader.LinGradRenderer.Opacity := opacity;
+      TLinGradElement(refEl).PrepareRenderer(
+        refEl.fSvgReader.LinGradRenderer, drawDat);
+      DrawPolygon(img, strokePaths, frNonZero,
+        refEl.fSvgReader.LinGradRenderer);
     end
     else if refEl is TPatternElement then
       with TPatternElement(refEl) do
