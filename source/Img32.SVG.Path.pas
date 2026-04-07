@@ -3,7 +3,7 @@ unit Img32.SVG.Path;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.9                                                             *
-* Date      :  4 April 2026                                                    *
+* Date      :  7 April 2026                                                    *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2026                                         *
 *                                                                              *
@@ -1275,17 +1275,17 @@ begin
   begin
     if (fSegs[i-1] is TSvgCSegment) then
     begin
-      while (Length(TSvgCSegment(fSegs[i-1]).fCtrlPts) < 6) do
+      while (Length(TSvgCSegment(fSegs[i-1]).fCtrlPts) < 3) do
         AppendPoint(TSvgCSegment(fSegs[i-1]).fCtrlPts, GetFirstPt);
     end
     else if (fSegs[i-1] is TSvgSSegment) then
     begin
-      while (Length(TSvgCSegment(fSegs[i-1]).fCtrlPts) < 4) do
+      while (Length(TSvgCSegment(fSegs[i-1]).fCtrlPts) < 2) do
         AppendPoint(TSvgCSegment(fSegs[i-1]).fCtrlPts, GetFirstPt);
     end
     else if (fSegs[i-1] is TSvgQSegment) then
     begin
-      while (Length(TSvgCSegment(fSegs[i-1]).fCtrlPts) < 4) do
+      while (Length(TSvgCSegment(fSegs[i-1]).fCtrlPts) < 2) do
         AppendPoint(TSvgCSegment(fSegs[i-1]).fCtrlPts, GetFirstPt);
     end;
   end;

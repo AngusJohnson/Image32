@@ -3,9 +3,9 @@ unit Img32.Vector;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.9                                                             *
-* Date      :  9 August 2025                                                   *
+* Date      :  7 April 2026                                                    *
 * Website   :  https://www.angusj.com                                          *
-* Copyright :  Angus Johnson 2019-2025                                         *
+* Copyright :  Angus Johnson 2019-2026                                         *
 *                                                                              *
 * Purpose   :  Vector drawing for TImage32                                     *
 *                                                                              *
@@ -2863,18 +2863,23 @@ var
 begin
   rec := GetBoundsD(line);
   skipHole := (rec.Width <= width) or (rec.Height <= width);
+  norms := GetNormals(line);
   if skipHole then
   begin
     SetLength(Result, 1);
-    norms := GetNormals(line);
-    Result[0] := Grow(line, norms, width / 2, joinStyle, miterLim, scale, false);
+    if IsClockwise(line) then
+      Result[0] := Grow(line, norms,
+        width / 2, joinStyle, miterLim, scale, false)
+    else
+      Result[0] := ReversePath(Grow(line, norms,
+        -width / 2, joinStyle, miterLim, scale, false));
   end else
   begin
     SetLength(Result, 2);
-    norms := GetNormals(line);
-    Result[0] := Grow(line, norms, width / 2, joinStyle, miterLim, scale, false);
-    Result[1] := ReversePath(
-      Grow(line, norms, -width / 2, joinStyle, miterLim, scale, false));
+    Result[0] := Grow(line, norms,
+      width / 2, joinStyle, miterLim, scale, false);
+    Result[1] := ReversePath(Grow(line, norms,
+      -width / 2, joinStyle, miterLim, scale, false));
   end;
 end;
 //------------------------------------------------------------------------------
