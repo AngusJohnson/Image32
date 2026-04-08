@@ -1638,7 +1638,6 @@ begin
   try
     DrawChildren(tmpImg, drawDat);
     img.CopyBlend(tmpImg, maskRec, maskRec, BlendBlueChannelLine);
-    tmpImg.SaveToFile('c:\temp\mask.bmp');
   finally
     tmpImg.Free;
   end;
