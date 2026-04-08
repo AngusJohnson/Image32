@@ -3,7 +3,7 @@ unit Img32.SVG.Reader;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.9                                                             *
-* Date      :  4 April 2026                                                    *
+* Date      :  8 April 2026                                                    *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2026                                         *
 *                                                                              *
@@ -272,6 +272,8 @@ type
     maskRec: TRect;
     procedure GetPaths(const drawDat: TDrawData); override;
     procedure ApplyMask(img: TImage32; const drawDat: TDrawData);
+  public
+    constructor Create(parent: TBaseElement; svgEl: TSvgXmlEl); override;
   end;
 
   TSymbolElement = class(TShapeElement)
@@ -1603,6 +1605,13 @@ end;
 // TMaskElement
 //------------------------------------------------------------------------------
 
+constructor TMaskElement.Create(parent: TBaseElement; svgEl: TSvgXmlEl);
+begin
+  inherited;
+  fDrawData.visible := false;
+end;
+//------------------------------------------------------------------------------
+
 procedure TMaskElement.GetPaths(const drawDat: TDrawData);
 var
   i   : integer;
@@ -1629,6 +1638,7 @@ begin
   try
     DrawChildren(tmpImg, drawDat);
     img.CopyBlend(tmpImg, maskRec, maskRec, BlendBlueChannelLine);
+    tmpImg.SaveToFile('c:\temp\mask.bmp');
   finally
     tmpImg.Free;
   end;
@@ -4309,7 +4319,7 @@ begin
 end;
 //------------------------------------------------------------------------------
 
-function  TBaseElement.IsFirstChild: Boolean;
+function TBaseElement.IsFirstChild: Boolean;
 begin
   Result := not Assigned(fParent) or (self = fParent.fChilds[0]);
 end;

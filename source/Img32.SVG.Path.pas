@@ -3,7 +3,7 @@ unit Img32.SVG.Path;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.9                                                             *
-* Date      :  7 April 2026                                                    *
+* Date      :  8 April 2026                                                    *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2026                                         *
 *                                                                              *
@@ -1522,7 +1522,7 @@ var
   firstPt     : TPointD;
   lastPt      : TPointD;
   currPt      : TPointD;
-  pt2, pt3    : TPointD;
+  pt2         : TPointD;
   angle       : double;
   sweepCW     : integer;
   largeArc    : integer;

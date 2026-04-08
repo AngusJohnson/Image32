@@ -3,7 +3,7 @@ unit Img32.SVG.Core;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  4.9                                                             *
-* Date      :  4 April 2026                                                    *
+* Date      :  8 April 2026                                                    *
 * Website   :  https://www.angusj.com                                          *
 * Copyright :  Angus Johnson 2019-2026                                         *
 *                                                                              *
@@ -250,8 +250,8 @@ type
   function GetHashCaseSensitive(const name: UTF8String): cardinal; overload; {$IFDEF INLINE} inline; {$ENDIF}
   function GetHashCaseInsensitive(const name: UTF8String): cardinal; overload; {$IFDEF INLINE} inline; {$ENDIF}
 
-  function GetHashCaseSensitive(name: PUTF8Char; nameLen: integer): cardinal; overload;
-  function GetHashCaseInsensitive(name: PUTF8Char; nameLen: integer): cardinal; overload;
+//  function GetHashCaseSensitive(name: PUTF8Char; nameLen: integer): cardinal; overload;
+//  function GetHashCaseInsensitive(name: PUTF8Char; nameLen: integer): cardinal; overload;
   function ExtractRef(const href: UTF8String): UTF8String;
   function IsNumPending(var c: PUTF8Char;
     endC: PUTF8Char; ignoreComma: Boolean): Boolean;
@@ -1039,46 +1039,6 @@ begin
   // skip function call by directly casting it to Pointer
   Result := GetHashCaseInsensitive(PUTF8Char(Pointer(name)), Length(name));
 end;
-//------------------------------------------------------------------------------
-
-{$OVERFLOWCHECKS OFF}
-function GetHashCaseSensitive(name: PUTF8Char; nameLen: integer): cardinal;
-var
-  i: integer;
-begin
-  Result := 0;
-  for i := 1 to nameLen do
-  begin
-    Result := (Result + Ord(name^));
-    Result := Result + (Result shl 10);
-    Result := Result xor (Result shr 6);
-    inc(name);
-  end;
-  Result := Result + (Result shl 3);
-  Result := Result xor (Result shr 11);
-  Result := Result + (Result shl 15);
-end;
-//------------------------------------------------------------------------------
-
-function GetHashCaseInsensitive(name: PUTF8Char; nameLen: integer): cardinal;
-var
-  i: integer;
-begin
-  Result := 0;
-  for i := 1 to nameLen do
-  begin
-    Result := (Result + Ord(LowerCaseTable[name^]));
-    Result := Result + (Result shl 10);
-    Result := Result xor (Result shr 6);
-    inc(name);
-  end;
-  Result := Result + (Result shl 3);
-  Result := Result xor (Result shr 11);
-  Result := Result + (Result shl 15);
-end;
-{$IFDEF OVERFLOWCHECKS_ENABLED}
-  {$OVERFLOWCHECKS ON}
-{$ENDIF}
 //------------------------------------------------------------------------------
 
 function ParseNextWordHashed(var c: PUTF8Char; endC: PUTF8Char): cardinal;
