@@ -1,4 +1,4 @@
-package Img32_Library;
+﻿package Img32_Library;
 
 {$R *.res}
 {$ALIGN 8}
