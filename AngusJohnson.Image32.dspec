@@ -1,0 +1,78 @@
+# DPM package spec file
+min dpm client version: 1.0.0
+metadata:
+  id: AngusJohnson.Image32
+  version: 4.9.1
+  description: 'Image32 is a comprehensive 2D graphics library written entirely in Delphi Pascal, and without dependencies on other libraries. It provides an extensive range of image manipulation and drawing functions.'
+  authors:
+    - Angus Johnson
+  projectUrl: https://github.com/AngusJohnson/Image32
+  repositoryUrl: https://github.com/AngusJohnson/Image32
+  repositoryCommit: '#HASH#'
+  license: BSL-1.0
+  copyright: Angus Johnson
+  tags:
+    - 2d
+    - graphics
+    - drawing
+    - svg
+  readme: Readme.md
+variables:
+  packagesource: RAD Studio $compilerNoPrefix$
+targetPlatforms:
+  - compiler: delphixe2
+    platforms:
+      - win32
+      - win64
+  - compiler from: delphixe3
+    compiler to: delphi10.3
+    platforms:
+      - win32
+      - win64
+      - macos32
+  - compiler: delphi10.4
+    platforms:
+      - win32
+      - win64
+      - macos64
+      - android
+      - android64
+      - ios64
+      - linux64
+  - compiler from: delphi11.0
+    compiler to: delphi12.0
+    platforms:
+      - win32
+      - win64
+      - macos64
+      - macosarm64
+      - android
+      - android64
+      - ios64
+      - iossimarm64
+      - linux64
+  - compiler: delphi13.0
+    platforms:
+      - win32
+      - win64
+      - winarm64ec
+      - macos64
+      - macosarm64
+      - android
+      - android64
+      - ios64
+      - iossimarm64
+      - linux64
+templates:
+  - name: default
+    source:
+      - src: ./source/**.pas
+      - src: ./source/**.inc
+      - src: ./packages/$packageSource$/*.dpk
+      - src: ./packages/$packageSource$/*.dproj
+      - src: ./source/*.dcr
+        copyToLib: true
+    build:
+      - project: ./packages/$packageSource$/Img32_Library.dproj
+    design:
+      - project: ./packages/$packageSource$/Img32_VCL_Dsgn.dproj

@@ -2128,7 +2128,11 @@ var
   i: integer;
 begin
   for i := 0 to attribs.Count -1 do
+    {$IF DEFINED(XPLAT_GENERICS) AND NOT DEFINED(GENERIC_LIST_PROP)}
+    DisposeSvgAttrib(PSvgAttrib(attribs[i])); // Delphi XE2: no TList<T>.List
+    {$ELSE}
     DisposeSvgAttrib(PSvgAttrib(attribs.List[i]));
+    {$IFEND}
   attribs.Clear;
 
   for i := 0 to childs.Count -1 do
@@ -2661,7 +2665,11 @@ begin
   //there are usually so few, that there seems little point sorting etc.
   for i := 0 to docType.attribs.Count -1 do
   begin
+    {$IF DEFINED(XPLAT_GENERICS) AND NOT DEFINED(GENERIC_LIST_PROP)}
+    Result := PSvgAttrib(docType.attribs[i]); // Delphi XE2: no TList<T>.List
+    {$ELSE}
     Result := PSvgAttrib(docType.attribs.List[i]);
+    {$IFEND}
     if Result.hash = hash then Exit;
   end;
   Result := nil;

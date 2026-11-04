@@ -999,7 +999,10 @@ begin
   // paint innerRec background
   backgroundPainted := ParentBackground and
   {$IFDEF STYLESERVICES}
-    StyleServices.Enabled and (seClient in StyleElements) and
+    StyleServices.Enabled and
+    {$IFDEF STYLEELEMENTS}
+    (seClient in StyleElements) and
+    {$ENDIF}
   {$ELSE}
     ThemeServices.ThemesEnabled and
   {$ENDIF}
