@@ -1,0 +1,74 @@
+﻿package Img32_Library;
+
+{$R *.res}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO ON}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS ON}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION OFF}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES ON}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE DEBUG}
+{$ENDIF IMPLICITBUILDING}
+{$LIBSUFFIX '170'}
+{$RUNONLY}
+{$IMPLICITBUILD OFF}
+
+requires
+  rtl
+  {$IFDEF MSWINDOWS}
+  , vcl
+  , vclimg
+  {$ENDIF}
+  ;
+
+contains
+  Img32.Clipper2 in '..\..\source\Img32.Clipper2.pas',
+  Clipper.Core in '..\..\source\Clipper2\Clipper.Core.pas',
+  Clipper.Engine in '..\..\source\Clipper2\Clipper.Engine.pas',
+  Clipper.Minkowski in '..\..\source\Clipper2\Clipper.Minkowski.pas',
+  Clipper.Offset in '..\..\source\Clipper2\Clipper.Offset.pas',
+  Clipper.RectClip in '..\..\source\Clipper2\Clipper.RectClip.pas',
+  Clipper in '..\..\source\Clipper2\Clipper.pas',
+  Img32.CQ in '..\..\source\Img32.CQ.pas',
+  Img32.Draw in '..\..\source\Img32.Draw.pas',
+  Img32.Extra in '..\..\source\Img32.Extra.pas',
+  Img32.Fmt.BMP in '..\..\source\Img32.Fmt.BMP.pas',
+  Img32.Fmt.QOI in '..\..\source\Img32.Fmt.QOI.pas',
+  Img32.Fmt.SVG in '..\..\source\Img32.Fmt.SVG.pas',
+  Img32.Layers in '..\..\source\Img32.Layers.pas',
+  Img32 in '..\..\source\Img32.pas',
+  Img32.Resamplers in '..\..\source\Img32.Resamplers.pas',
+  Img32.Storage in '..\..\source\Img32.Storage.pas',
+  Img32.SVG.Core in '..\..\source\Img32.SVG.Core.pas',
+  Img32.SVG.Path in '..\..\source\Img32.SVG.Path.pas',
+  Img32.SVG.Reader in '..\..\source\Img32.SVG.Reader.pas',
+  Img32.Text in '..\..\source\Img32.Text.pas',
+  Img32.TextChunks in '..\..\source\Img32.TextChunks.pas',
+  Img32.Transform in '..\..\source\Img32.Transform.pas',
+  Img32.Vector in '..\..\source\Img32.Vector.pas',
+  Img32.Vectorizer in '..\..\source\Img32.Vectorizer.pas'
+  {$IFDEF MSWINDOWS}
+  // these units use Winapi and the VCL unconditionally
+  , Img32.Fmt.GIF in '..\..\source\Img32.Fmt.GIF.pas'
+  , Img32.Fmt.JPG in '..\..\source\Img32.Fmt.JPG.pas'
+  , Img32.Fmt.PNG in '..\..\source\Img32.Fmt.PNG.pas'
+  , Img32.Panels in '..\..\source\Img32.Panels.pas'
+  {$ENDIF}
+  ;
+end.

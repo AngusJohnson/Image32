@@ -39,11 +39,11 @@
     {$DEFINE USING_VCL_LCL}
   {$ELSEIF declared(FireMonkeyVersion) OR DEFINED(FRAMEWORK_FMX)}
     {$DEFINE USING_FMX}
-  {$ELSE}
+  {$ELSEIF DEFINED(MSWINDOWS)} // the VCL only exists on Windows
     {$DEFINE USING_VCL}
     {$DEFINE USING_VCL_LCL}
   {$IFEND}
-{$IFEND}
+{$ENDIF}
 
 {$IFDEF FPC}
   {$MODE DELPHI}
@@ -73,6 +73,9 @@
   {$IF COMPILERVERSION < 23}
     {$DEFINE CPUX86}                            // CPUX86 was added in Delphi XE2 (added Win64 compiler)
   {$IFEND}
+  {$IFDEF CPUX64}
+    {$DEFINE CPU64BITS}                         // CPU64BITS was added in Delphi XE8 (XE2-XE7 Win64 only define CPUX64)
+  {$ENDIF}
   {$IF COMPILERVERSION >= 17}                   //Delphi 2005
     {$IFNDEF DEBUG}
       {$DEFINE INLINE}                            //added inlining
@@ -112,6 +115,8 @@
                 {$LEGACYIFEND ON}
                 {$DEFINE NEWPOSFUNC}
                 {$DEFINE ZEROBASEDSTR}
+                {$DEFINE GENERIC_LIST_PROP}       //added TList<T>.List property
+                {$DEFINE STYLEELEMENTS}           //added TControl.StyleElements
                 {$IF COMPILERVERSION >= 25}     //DelphiXE4
                   {$LEGACYIFEND ON}               //avoids compiler warning
                 {$IFEND}
