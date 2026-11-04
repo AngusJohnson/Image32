@@ -3,12 +3,12 @@ min dpm client version: 1.0.0
 metadata:
   id: AngusJohnson.Image32
   version: 4.9.1
-  description: "Image32 is a comprehensive 2D graphics library written entirely in Delphi Pascal, and without dependencies on other libraries. It provides an extensive range of image manipulation and drawing functions."
+  description: 'Image32 is a comprehensive 2D graphics library written entirely in Delphi Pascal, and without dependencies on other libraries. It provides an extensive range of image manipulation and drawing functions.'
   authors:
     - Angus Johnson
   projectUrl: https://github.com/AngusJohnson/Image32
   repositoryUrl: https://github.com/AngusJohnson/Image32
-  repositoryCommit: "#HASH#"
+  repositoryCommit: '#HASH#'
   license: BSL-1.0
   copyright: Angus Johnson
   tags:
@@ -40,10 +40,22 @@ targetPlatforms:
       - ios64
       - linux64
   - compiler from: delphi11.0
-    compiler to: delphi13.0
+    compiler to: delphi12.0
     platforms:
       - win32
       - win64
+      - macos64
+      - macosarm64
+      - android
+      - android64
+      - ios64
+      - iossimarm64
+      - linux64
+  - compiler: delphi13.0
+    platforms:
+      - win32
+      - win64
+      - winarm64ec
       - macos64
       - macosarm64
       - android
