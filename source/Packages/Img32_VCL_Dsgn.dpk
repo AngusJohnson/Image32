@@ -1,4 +1,4 @@
-package Img32_VCL_Dsgn;
+﻿package Img32_VCL_Dsgn;
 {$R *.res}
 {$R '..\Img32.Panels.dcr'}
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}

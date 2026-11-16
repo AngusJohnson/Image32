@@ -4,3 +4,10 @@
 /source/__history
 /source/__recovery
 /source/backup
+/source/Packages/*.dsk
+/source/Packages/*.~dsk
+/source/Packages/*.identcache
+/source/Packages/*.local
+/source/Packages/Img32_Library.res
+/source/Packages/Img32_VCL_Dsgn.res
+/source/Packages/*.res

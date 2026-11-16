@@ -720,9 +720,12 @@ type
   end;
   {$ELSE}
   TDynArrayRec = packed record
-    {$IFDEF CPU64BITS}
+    // CPU64BITS is not defined by older Delphi Win64 compilers (eg XE2-XE4);
+    // without _Padding the 64-bit dyn.array header is 4 bytes short
+    // (12 instead of the real 16) and ReallocMem gets a non-block pointer
+    {$IF DEFINED(CPU64BITS) or DEFINED(CPUX64) or DEFINED(CPUARM64)}
     _Padding: Integer;
-    {$ENDIF}
+    {$IFEND}
     RefCnt: Integer;
     Length: NativeInt;
     Data: record end;

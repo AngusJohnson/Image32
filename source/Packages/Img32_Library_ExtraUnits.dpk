@@ -1,0 +1,49 @@
+﻿package Img32_Library_ExtraUnits;
+
+{$R *.res}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO OFF}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS OFF}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION ON}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO OFF}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES OFF}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE RELEASE}
+{$ENDIF IMPLICITBUILDING}
+{$DESIGNONLY}
+{$IMPLICITBUILD OFF}
+
+requires
+  rtl,
+  vcl,
+  vclimg,
+  Img32_Library;
+
+contains
+  Img32.CQ in '..\Img32.CQ.pas',
+  Img32.SVG.Core in '..\Img32.SVG.Core.pas',
+  Img32.SVG.Path in '..\Img32.SVG.Path.pas',
+  Img32.SVG.Reader in '..\Img32.SVG.Reader.pas',
+  Img32.Fmt.PNG in '..\Img32.Fmt.PNG.pas',
+  Img32.Fmt.JPG in '..\Img32.Fmt.JPG.pas',
+  Img32.Fmt.GIF in '..\Img32.Fmt.GIF.pas',
+  Img32.Fmt.QOI in '..\Img32.Fmt.QOI.pas',
+  Img32.Fmt.SVG in '..\Img32.Fmt.SVG.pas',
+  Img32.Vectorizer in '..\Img32.Vectorizer.pas';
+
+end.
