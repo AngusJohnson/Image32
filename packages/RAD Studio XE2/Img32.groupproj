@@ -1,0 +1,36 @@
+﻿	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+		<PropertyGroup>
+			<ProjectGuid>{60072306-C6FD-429E-A352-3D41A9A01DB0}</ProjectGuid>
+		</PropertyGroup>
+		<ItemGroup>
+			<Projects Include="Img32_Library.dproj">
+				<Dependencies/>
+			</Projects>
+		</ItemGroup>
+		<ProjectExtensions>
+			<Borland.Personality>Default.Personality.12</Borland.Personality>
+			<Borland.ProjectType/>
+			<BorlandProject>
+				<Default.Personality/>
+			</BorlandProject>
+		</ProjectExtensions>
+		<Target Name="Img32_Library">
+			<MSBuild Projects="Img32_Library.dproj"/>
+		</Target>
+		<Target Name="Img32_Library:Clean">
+			<MSBuild Projects="Img32_Library.dproj" Targets="Clean"/>
+		</Target>
+		<Target Name="Img32_Library:Make">
+			<MSBuild Projects="Img32_Library.dproj" Targets="Make"/>
+		</Target>
+		<Target Name="Build">
+			<CallTarget Targets="Img32_Library"/>
+		</Target>
+		<Target Name="Clean">
+			<CallTarget Targets="Img32_Library:Clean"/>
+		</Target>
+		<Target Name="Make">
+			<CallTarget Targets="Img32_Library:Make"/>
+		</Target>
+		<Import Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')" Project="$(BDS)\Bin\CodeGear.Group.Targets"/>
+	</Project>
